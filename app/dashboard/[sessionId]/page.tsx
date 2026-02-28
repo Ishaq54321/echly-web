@@ -210,7 +210,7 @@ export default function SessionPage() {
             : "grid-rows-[0_1fr_1fr] lg:grid-cols-[72px_340px_1fr] lg:grid-rows-none"
         }`}
       >
-        <div className="hidden lg:block min-h-0">
+        <div className="hidden lg:block min-h-0 h-full">
           <GlobalRail />
         </div>
 

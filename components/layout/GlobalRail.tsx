@@ -32,7 +32,7 @@ export default function GlobalRail() {
 
   return (
     <aside
-      className="w-[72px] flex flex-col items-center py-8 gap-6 border-r bg-[hsl(var(--surface-2))] shrink-0"
+      className="w-[72px] h-full flex flex-col items-center py-8 gap-6 border-r border-r-[rgba(0,0,0,0.06)] bg-[hsl(var(--surface-2))] shrink-0"
       aria-label="Global navigation"
     >
       <div className="relative group">
