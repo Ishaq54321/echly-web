@@ -21,7 +21,7 @@ export function FeedbackHeader({
     <div className="flex items-start justify-between gap-4">
       <div>
         <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-slate-500 mt-3">
           {index} of {total}
         </p>
       </div>

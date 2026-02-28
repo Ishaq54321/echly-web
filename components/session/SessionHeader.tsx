@@ -17,32 +17,28 @@ export default function SessionHeader({
   onCopy,
 }: Props) {
   return (
-    <div className="border-b border-slate-200 bg-white/80 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-12 py-7 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <Image
-            src="/Echly_logo.svg"
-            alt="Echly"
-            width={34}
-            height={34}
-          />
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">
-              {title}
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {feedbackCount} feedback items
-            </p>
-          </div>
-        </div>
+    <div className="px-8 py-4 border-b bg-[hsl(var(--surface-1))]">
+      <div className="flex items-center gap-4">
+        <Image
+          src="/Echly_logo.svg"
+          alt="Echly"
+          width={34}
+          height={34}
+        />
+        <h1 className="text-xl font-semibold text-[hsl(var(--text-primary))]">
+          {title}
+        </h1>
+      </div>
 
+      <div className="mt-8 bg-[hsl(var(--surface-2))] rounded-xl px-8 py-5 text-sm flex justify-between items-center space-x-10">
+        <p className="text-[hsl(var(--text-secondary))]">
+          {feedbackCount} feedback items
+        </p>
         <button
+          type="button"
           onClick={onCopy}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl
-                     bg-white border border-slate-300
-                     text-slate-700 hover:text-rose-600
-                     hover:border-rose-300 hover:bg-rose-50
-                     transition-all duration-200"
+          className="inline-flex items-center gap-2 border border-opacity-60 rounded-lg px-3 py-1.5 text-sm font-medium
+            text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-2))]"
         >
           <Share2 size={16} />
           {copied ? "Copied ✓" : "Share"}

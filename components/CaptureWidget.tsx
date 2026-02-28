@@ -324,12 +324,12 @@ const deletePointer = async (id: string) => {
       <button
         onClick={() => setIsOpen(true)}
         className="fixed bottom-10 right-10 z-50
-                   flex items-center gap-4
-                   bg-white border border-slate-200
-                   px-8 py-4 rounded-full
-                   shadow-[0_12px_40px_rgba(0,0,0,0.12)]
-                   text-slate-900 font-medium tracking-tight
-                   transition-all duration-200 hover:shadow-lg"
+                   flex items-center gap-3
+                   bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] border-opacity-50
+                   px-5 py-2.5 rounded-full
+                   shadow-[0_4px_12px_rgba(0,0,0,0.06)]
+                   text-[hsl(var(--text-primary))] font-medium tracking-tight
+                   transition-all duration-150 ease-out hover:shadow-[0_6px_16px_rgba(0,0,0,0.08)]"
       >
         <Image src="/Echly_logo.svg" alt="Echly" width={26} height={26} />
         Capture Feedback

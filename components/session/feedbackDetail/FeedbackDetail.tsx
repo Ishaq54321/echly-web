@@ -30,36 +30,34 @@ export default function FeedbackDetail({
 }: FeedbackDetailProps) {
   if (!selectedItem) {
     return (
-      <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white border border-slate-200 rounded-3xl shadow-sm">
-        <div className="flex-1 flex items-center justify-center p-10">
-          <p className="text-sm text-slate-500">Select a feedback item</p>
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden max-w-4xl mx-auto">
+        <div className="flex-1 flex items-center justify-center py-16">
+          <p className="text-sm text-[hsl(var(--text-secondary))]">
+            Select a feedback item
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white border border-slate-200 rounded-3xl shadow-sm">
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
-        <div className="mb-6">
-          <FeedbackHeader
-            title={selectedItem.title}
-            index={selectedItem.index}
-            total={selectedItem.total}
-            isActivityOpen={isCommentsOpen}
-            onToggleActivity={onToggleActivity}
-          />
-        </div>
-        <FeedbackContent
-          item={selectedItem}
-          isEditingDescription={isEditingDescription}
-          descriptionDraft={descriptionDraft}
-          setIsEditingDescription={setIsEditingDescription}
-          setDescriptionDraft={setDescriptionDraft}
-          saveDescription={saveDescription}
-          onExpandImage={() => setIsImageExpanded(true)}
-        />
-      </div>
+    <div className="flex flex-col flex-1 min-h-0 overflow-y-auto max-w-4xl mx-auto space-y-14">
+      <FeedbackHeader
+        title={selectedItem.title}
+        index={selectedItem.index}
+        total={selectedItem.total}
+        isActivityOpen={isCommentsOpen}
+        onToggleActivity={onToggleActivity}
+      />
+      <FeedbackContent
+        item={selectedItem}
+        isEditingDescription={isEditingDescription}
+        descriptionDraft={descriptionDraft}
+        setIsEditingDescription={setIsEditingDescription}
+        setDescriptionDraft={setDescriptionDraft}
+        saveDescription={saveDescription}
+        onExpandImage={() => setIsImageExpanded(true)}
+      />
     </div>
   );
 }

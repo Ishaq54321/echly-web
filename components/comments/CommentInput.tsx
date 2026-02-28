@@ -17,25 +17,28 @@ export default function CommentInput({ onSend }: Props) {
   };
 
   return (
-    <div className="flex items-center gap-3">
-      <input
-        type="text"
-        placeholder="Write a comment..."
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && handleSend()}
-        className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm 
-                   focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent
-                   transition-all duration-150"
-      />
-
-      <button
-        onClick={handleSend}
-        className="bg-rose-600 hover:bg-rose-700 text-white p-2 rounded-xl 
-                   transition-all duration-150 shadow-sm"
-      >
-        <Send size={16} />
-      </button>
+    <div className="px-6 py-8 bg-[hsl(var(--surface-1))] border-b">
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          placeholder="Write a comment..."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          className="flex-1 w-full rounded-3xl bg-[hsl(var(--surface-2))] px-5 py-3.5 text-sm outline-none
+            placeholder:text-[hsl(var(--text-muted))]
+            focus:ring-[1.5px] focus:ring-[hsl(var(--accent))] focus:ring-opacity-70
+            transition-all duration-150"
+        />
+        <button
+          type="button"
+          onClick={handleSend}
+          className="flex-shrink-0 p-2 text-[hsl(var(--accent))] transition-all duration-150"
+          aria-label="Send comment"
+        >
+          <Send size={18} />
+        </button>
+      </div>
     </div>
   );
 }

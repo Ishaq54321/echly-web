@@ -54,7 +54,7 @@ export function DescriptionSection({
         </div>
       ) : (
         <div className="flex items-start justify-between gap-2">
-          <p className="text-[15px] text-slate-800 leading-8 flex-1">
+          <p className="text-[15px] text-slate-800 leading-relaxed flex-1">
             {displayValue}
           </p>
           {hasEdit && (

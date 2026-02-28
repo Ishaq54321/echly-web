@@ -9,8 +9,8 @@ interface ScreenshotBlockProps {
 
 export function ScreenshotBlock({ screenshotUrl, onExpand }: ScreenshotBlockProps) {
   return (
-    <div className="mb-16">
-      <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-xl group transition">
+    <div className="mt-8 mb-16">
+      <div className="relative rounded-3xl overflow-hidden border border-[hsl(var(--border))] border-opacity-50 p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)] group transition">
         <button
           onClick={onExpand}
           className="absolute top-4 right-4 bg-black/80 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 transition"

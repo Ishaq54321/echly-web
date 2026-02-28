@@ -27,11 +27,11 @@ export function ActivityPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-6 py-5 border-b">
-        <h2 className="text-sm font-semibold text-slate-900">Activity</h2>
+      <div className="px-6 pt-7 pb-5 border-b border-[hsl(var(--border))] border-opacity-50">
+        <h2 className="text-sm font-semibold text-[hsl(var(--text-primary))]">Activity</h2>
       </div>
 
-      <div className="px-6 py-4 border-b">
+      <div className="px-6 py-4 border-b border-[hsl(var(--border))] border-opacity-50">
         <ActivityComposer
           newMessage={newMessage}
           setNewMessage={setNewMessage}

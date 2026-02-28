@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -14,6 +13,7 @@ import {
 } from "@/lib/feedback";
 import CaptureWidget from "@/components/CaptureWidget";
 import { uploadScreenshot } from "@/lib/screenshot";
+import GlobalRail from "@/components/layout/GlobalRail";
 import SessionHeader from "@/components/session/SessionHeader";
 import FeedbackSidebar from "@/components/session/FeedbackSidebar";
 import FeedbackDetail from "@/components/session/feedbackDetail/FeedbackDetail";
@@ -188,8 +188,7 @@ export default function SessionPage() {
 
   return (
     <>
-      <div className="h-screen bg-[#f6f8fb] flex flex-col overflow-hidden">
-
+      <div className="min-h-screen flex flex-col overflow-hidden">
         <SessionHeader
           title={session?.title}
           feedbackCount={feedback.length}
@@ -198,11 +197,15 @@ export default function SessionPage() {
         />
 
         <div
-          className={`grid flex-1 min-h-0 grid-cols-1 overflow-hidden pt-5 pb-2 ${
-            isCommentsOpen ? "lg:grid-cols-[280px_1fr_400px]" : "lg:grid-cols-[280px_1fr]"
+          className={`grid flex-1 min-h-0 grid-cols-1 overflow-hidden ${
+            isCommentsOpen ? "lg:grid-cols-[72px_280px_1fr_380px]" : "lg:grid-cols-[72px_280px_1fr]"
           }`}
         >
-          <div className="min-h-0 overflow-hidden px-4 lg:px-6">
+          <div className="hidden lg:block min-h-0">
+            <GlobalRail />
+          </div>
+
+          <aside className="min-h-0 overflow-hidden border-r border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))]">
             <FeedbackSidebar
               feedback={feedback}
               selectedId={selectedId}
@@ -210,61 +213,55 @@ export default function SessionPage() {
               selectedIndex={selectedIndex}
               total={feedback.length}
             />
+          </aside>
+
+          <div className="min-h-0 overflow-hidden">
+            <div className="max-w-4xl mx-auto h-full overflow-auto rounded-3xl border border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))] px-8 py-10">
+              <FeedbackDetail
+                sessionId={sessionId as string}
+                selectedItem={selectedItem}
+                isEditingDescription={isEditingDescription}
+                descriptionDraft={descriptionDraft}
+                setIsEditingDescription={setIsEditingDescription}
+                setDescriptionDraft={setDescriptionDraft}
+                saveDescription={saveDescription}
+                setIsImageExpanded={setIsImageExpanded}
+                isCommentsOpen={isCommentsOpen}
+                onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}
+              />
+            </div>
           </div>
-          <div className="min-h-0 overflow-hidden px-4 lg:px-6">
-            <FeedbackDetail
-              sessionId={sessionId as string}
-              selectedItem={selectedItem}
-              isEditingDescription={isEditingDescription}
-              descriptionDraft={descriptionDraft}
-              setIsEditingDescription={setIsEditingDescription}
-              setDescriptionDraft={setDescriptionDraft}
-              saveDescription={saveDescription}
-              setIsImageExpanded={setIsImageExpanded}
-              isCommentsOpen={isCommentsOpen}
-              onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}
-            />
-          </div>
+
           {isCommentsOpen && (
-            <div className="min-h-0 overflow-hidden hidden lg:block border-l border-slate-200 bg-white">
+            <aside className="min-h-0 overflow-hidden hidden lg:block bg-[hsl(var(--surface-1))] border-l border-[hsl(var(--border))] border-opacity-50 px-6">
+              <ActivityPanel
+                comments={comments}
+                loading={loadingComments}
+                sendComment={sendComment}
+              />
+            </aside>
+          )}
+        </div>
+
+        {isCommentsOpen && (
+          <div className="lg:hidden fixed inset-0 z-40 flex justify-end">
+            <div
+              className="absolute inset-0 bg-black/50 transition-opacity duration-200"
+              onClick={() => setIsCommentsOpen(false)}
+              aria-hidden
+            />
+            <div
+              className="relative w-full max-w-sm h-full bg-[hsl(var(--surface-1))] flex flex-col transition-opacity duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
               <ActivityPanel
                 comments={comments}
                 loading={loadingComments}
                 sendComment={sendComment}
               />
             </div>
-          )}
-        </div>
-
-        <AnimatePresence>
-          {isCommentsOpen && (
-            <div className="lg:hidden fixed inset-0 z-40 flex justify-end">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="absolute inset-0 bg-black/50"
-                onClick={() => setIsCommentsOpen(false)}
-                aria-hidden
-              />
-              <motion.div
-                initial={{ x: "100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
-                className="relative w-full max-w-sm h-full bg-white shadow-xl flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ActivityPanel
-                  comments={comments}
-                  loading={loadingComments}
-                  sendComment={sendComment}
-                />
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
 
         {isImageExpanded && selectedItem?.screenshotUrl && (
           <div
@@ -274,7 +271,7 @@ export default function SessionPage() {
             <img
               src={selectedItem.screenshotUrl}
               alt="Expanded Screenshot"
-              className="max-h-full max-w-full rounded-xl shadow-2xl"
+              className="max-h-full max-w-full rounded-xl"
             />
           </div>
         )}
