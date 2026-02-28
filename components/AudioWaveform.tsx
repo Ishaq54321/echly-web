@@ -6,32 +6,31 @@ type Props = {
 
 export default function AudioWaveform({ isActive }: Props) {
   return (
-    <div className="flex items-center justify-center gap-[6px] h-[60px]">
+    <div className="flex items-center justify-center gap-[6px] h-[60px] waveform-root">
       {[...Array(6)].map((_, i) => (
         <span
           key={i}
-          className={`w-[4px] rounded-full bg-gradient-to-b from-rose-500 to-red-600 transition-all duration-300 ease-in-out ${
-            isActive ? "animate-wave" : "h-[6px] opacity-40"
+          className={`w-[4px] rounded-full bg-gradient-to-b from-rose-500 to-red-600 transition-none ${
+            isActive ? "waveform-bar waveform-bar--active" : "h-[6px] opacity-40"
           }`}
           style={{
-            animationDelay: `${i * 0.12}s`,
+            animationDelay: `${i * 0.14}s`,
           }}
         />
       ))}
 
       <style jsx>{`
-        @keyframes wave {
-          0%,
-          100% {
-            height: 8px;
+        @keyframes waveform-smooth {
+          0%, 100% {
+            height: 10px;
           }
           50% {
-            height: 32px;
+            height: 28px;
           }
         }
 
-        .animate-wave {
-          animation: wave 1.4s ease-in-out infinite;
+        .waveform-bar--active {
+          animation: waveform-smooth 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
         }
       `}</style>
     </div>

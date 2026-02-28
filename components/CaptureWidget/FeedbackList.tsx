@@ -21,7 +21,7 @@ export default function FeedbackList({
   getHandlers,
 }: FeedbackListProps) {
   return (
-    <>
+    <div className="capture-feedback-list flex flex-col gap-4">
       {items.map((p) => (
         <FeedbackItem
           key={p.id}
@@ -33,6 +33,6 @@ export default function FeedbackList({
           handlers={getHandlers(p)}
         />
       ))}
-    </>
+    </div>
   );
 }

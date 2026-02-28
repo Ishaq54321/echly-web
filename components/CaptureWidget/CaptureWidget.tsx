@@ -93,9 +93,14 @@ export default function CaptureWidget({
           />
 
           {state.state === "processing" && (
-            <div className="capture-processing-enter flex items-center gap-4 text-sm text-slate-600">
-              <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
-              Structuring your feedback...
+            <div className="capture-processing-enter relative flex items-center gap-4 text-sm text-slate-600 py-3 pr-4 min-h-[52px]">
+              <div className="capture-structuring-text flex items-center gap-2 flex-1">
+                <span className="text-slate-600">Structuring your feedback</span>
+                <span className="capture-ellipsis inline-flex gap-0.5" aria-hidden>
+                  <span>.</span><span>.</span><span>.</span>
+                </span>
+              </div>
+              <div className="capture-structuring-progress" aria-hidden />
             </div>
           )}
 
@@ -103,9 +108,9 @@ export default function CaptureWidget({
             <div className="capture-listening-enter border border-slate-200 rounded-lg p-4 bg-slate-50">
               <div className="flex justify-between mb-4">
                 <span className="text-sm font-medium text-slate-800">Listening...</span>
-                <span className="text-sm text-slate-500">{derivedValues.formatTime()}</span>
+                <span className="capture-timer text-sm text-slate-500">{derivedValues.formatTime()}</span>
               </div>
-              <div className="mb-4">
+              <div className="capture-listening-waveform-wrap mb-4 flex items-center justify-center">
                 <AudioWaveform isActive={state.state === "listening"} />
               </div>
               <div className="flex justify-between">
