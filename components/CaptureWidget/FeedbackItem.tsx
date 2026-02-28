@@ -40,7 +40,7 @@ export default function FeedbackItem({
 
   return (
     <div
-      className="bg-white px-5 py-3.5 border-b border-[rgba(0,0,0,0.05)]
+      className="bg-white px-5 py-3 border-b border-[rgba(0,0,0,0.05)]
                  transition-[background-color,transform] duration-[120ms] ease-out
                  hover:bg-[rgba(0,0,0,0.02)]
                  active:scale-[0.99] active:duration-75 active:ease-in
@@ -53,10 +53,10 @@ export default function FeedbackItem({
               <input
                 value={editedTitle}
                 onChange={(e) => onEditedTitleChange(e.target.value)}
-                className="w-full mb-2.5 px-3 py-2
+                className="w-full mb-2 px-3 py-2
                                      bg-white text-slate-900
                                      border border-slate-300
-                                     rounded-md text-sm font-medium
+                                     rounded-sm text-sm font-medium
                                      focus:ring-2 focus:ring-rose-500
                                      outline-none transition"
               />
@@ -67,7 +67,7 @@ export default function FeedbackItem({
                 className="w-full px-3 py-2
                                      bg-white text-slate-800
                                      border border-slate-300
-                                     rounded-md text-sm
+                                     rounded-sm text-sm
                                      focus:ring-2 focus:ring-rose-500
                                      outline-none transition resize-none"
               />
@@ -78,7 +78,7 @@ export default function FeedbackItem({
                 {item.title}
               </h3>
               {isExpanded && (
-                <p className="text-xs text-slate-600 mt-1.5">
+                <p className="text-xs text-slate-600 mt-1">
                   {item.description}
                 </p>
               )}
@@ -86,35 +86,35 @@ export default function FeedbackItem({
           )}
         </div>
 
-        <div className="flex items-start gap-2 text-slate-400">
+        <div className="flex items-start gap-0.5 text-slate-400">
           <button
             onClick={onExpand}
-            className="hover:text-slate-700 transition"
+            className="p-1.5 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-slate-700 transition-colors duration-[120ms] ease-out"
           >
-            <Expand size={16} />
+            <Expand size={16} strokeWidth={2} />
           </button>
 
           {isEditing ? (
             <button
               onClick={onSaveEdit}
-              className="hover:text-emerald-600 transition"
+              className="p-1.5 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-emerald-600 transition-colors duration-[120ms] ease-out"
             >
-              <Check size={16} />
+              <Check size={16} strokeWidth={2} />
             </button>
           ) : (
             <button
               onClick={onEdit}
-              className="hover:text-slate-700 transition"
+              className="p-1.5 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-slate-700 transition-colors duration-[120ms] ease-out"
             >
-              <Pencil size={16} />
+              <Pencil size={16} strokeWidth={2} />
             </button>
           )}
 
           <button
             onClick={onDelete}
-            className="hover:text-rose-600 transition"
+            className="p-1.5 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-rose-600 transition-colors duration-[120ms] ease-out"
           >
-            <Trash2 size={16} />
+            <Trash2 size={16} strokeWidth={2} />
           </button>
         </div>
       </div>

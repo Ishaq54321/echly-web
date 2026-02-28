@@ -58,7 +58,7 @@ export default function CaptureWidget({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 backdrop-blur-[2px] bg-black/5"
+        className="fixed inset-0 z-40 backdrop-blur-[4px] bg-black/6"
         aria-hidden
       />
       <div
@@ -68,9 +68,9 @@ export default function CaptureWidget({
         }`}
         style={state.position ? { left: state.position.x, top: state.position.y } : undefined}
       >
-        <div className="bg-white rounded-xl
+        <div className="bg-white rounded-lg
                         border border-slate-200/80
-                        shadow-[0_10px_25px_rgba(0,0,0,0.08),0_4px_10px_rgba(0,0,0,0.05)]
+                        shadow-[0_12px_30px_rgba(0,0,0,0.10),0_4px_12px_rgba(0,0,0,0.06)]
                         overflow-hidden font-sans">
         <CaptureHeader
           onStartDrag={handlers.startDrag}
@@ -82,7 +82,7 @@ export default function CaptureWidget({
           menuRef={refs.menuRef}
         />
 
-        <div className="p-6 flex flex-col gap-5 max-h-[60vh] overflow-y-auto">
+        <div className="p-5 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
           <FeedbackList
             items={state.pointers}
             expandedId={state.expandedId}
@@ -100,22 +100,22 @@ export default function CaptureWidget({
           )}
 
           {state.state === "listening" && (
-            <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50">
-              <div className="flex justify-between mb-4">
+            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <div className="flex justify-between mb-3">
                 <span className="text-sm font-medium text-slate-800">Listening...</span>
                 <span className="text-sm text-slate-500">{derivedValues.formatTime()}</span>
               </div>
-              <div className="mb-5">
+              <div className="mb-3">
                 <AudioWaveform isActive={state.state === "listening"} />
               </div>
               <div className="flex justify-between">
-                <button onClick={handlers.discardListening} className="text-sm text-slate-600 hover:text-slate-900 transition">Cancel</button>
-                <button onClick={handlers.finishListening} className="bg-gradient-to-r from-rose-600 to-red-600 hover:opacity-95 text-white px-5 py-2 rounded-lg text-sm font-medium transition">Done</button>
+                <button onClick={handlers.discardListening} className="text-sm text-slate-600 hover:text-slate-900 transition-colors duration-[120ms] ease-out">Cancel</button>
+                <button onClick={handlers.finishListening} className="bg-gradient-to-r from-rose-600 to-red-600 hover:brightness-95 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-[120ms] ease-out">Done</button>
               </div>
             </div>
           )}
           {state.errorMessage && (
-            <div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-4 py-3">
+            <div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-4 py-2.5">
               {state.errorMessage}
             </div>
           )}

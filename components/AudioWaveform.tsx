@@ -10,11 +10,11 @@ export default function AudioWaveform({ isActive }: Props) {
       {[...Array(6)].map((_, i) => (
         <span
           key={i}
-          className={`w-[4px] rounded-full bg-gradient-to-b from-rose-500 to-red-600 transition-all duration-300 ${
+          className={`w-[4px] rounded-full bg-gradient-to-b from-rose-500 to-red-600 transition-all duration-300 ease-in-out ${
             isActive ? "animate-wave" : "h-[6px] opacity-40"
           }`}
           style={{
-            animationDelay: `${i * 0.1}s`,
+            animationDelay: `${i * 0.12}s`,
           }}
         />
       ))}
@@ -31,7 +31,7 @@ export default function AudioWaveform({ isActive }: Props) {
         }
 
         .animate-wave {
-          animation: wave 1.2s ease-in-out infinite;
+          animation: wave 1.4s ease-in-out infinite;
         }
       `}</style>
     </div>
