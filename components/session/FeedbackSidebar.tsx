@@ -165,7 +165,7 @@ export default function FeedbackSidebar({
 
         {/* Ticket list (scrollable only) */}
         <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-          <div className="space-y-1">
+          <div className="space-y-1.5">
           {displayed.map((item) => {
             const isActive = item.id === selectedId;
             const timeStr = formatRowTime(item);
@@ -183,17 +183,11 @@ export default function FeedbackSidebar({
                     onSelect(item.id);
                   }
                 }}
-                className={`group flex flex-col px-4 py-2.5 rounded-md cursor-pointer transition-all duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand))] focus-visible:ring-offset-0
+                className={`group flex flex-col px-3 py-2.5 rounded-md cursor-pointer transition-all duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] focus-visible:ring-offset-0 border-0
                   ${isActive
-                    ? "bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] relative shadow-[inset_0_1px_0_0_hsl(var(--border)/0.5)]"
-                    : "hover:bg-[hsl(var(--surface-1))/0.7] border border-transparent"}`}
+                    ? "bg-[var(--surface-selected)] border-l-2 border-l-[hsl(var(--brand))] hover:bg-[#e4e7ec]"
+                    : "bg-[var(--surface-card)] hover:bg-[rgba(0,0,0,0.03)]"}`}
               >
-                {isActive && (
-                  <span
-                    className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-[hsl(var(--brand))] rounded-r-full"
-                    aria-hidden
-                  />
-                )}
                 <div className="flex justify-between items-start gap-3">
                   <span className="text-sm font-medium text-[hsl(var(--text-primary))] leading-snug truncate flex-1 min-w-0">
                     {item.title}
