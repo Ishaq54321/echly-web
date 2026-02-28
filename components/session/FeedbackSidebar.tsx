@@ -22,6 +22,11 @@ interface Props {
   onSelect: (id: string) => void;
   selectedIndex?: number;
   total?: number;
+  /** Pagination: show "Load more" and call when user requests next page. */
+  loadingMore?: boolean;
+  hasMore?: boolean;
+  hasReachedLimit?: boolean;
+  onLoadMore?: () => void;
 }
 
 function formatRowTime(f: FeedbackItem): string {
@@ -49,6 +54,10 @@ export default function FeedbackSidebar({
   feedback,
   selectedId,
   onSelect,
+  loadingMore = false,
+  hasMore = false,
+  hasReachedLimit = false,
+  onLoadMore,
 }: Props) {
   const [sort, setSort] = useState<SortKind>("recent");
   const [sortOpen, setSortOpen] = useState(false);
@@ -228,6 +237,24 @@ export default function FeedbackSidebar({
             );
           })}
           </div>
+          {/* Cost protection: load more only when allowed; append results. */}
+          {hasMore && !hasReachedLimit && onLoadMore && (
+            <div className="shrink-0 px-3 py-2 border-t border-[rgba(0,0,0,0.04)]">
+              <button
+                type="button"
+                onClick={() => onLoadMore()}
+                disabled={loadingMore}
+                className="w-full text-xs py-2 rounded-md bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] text-[hsl(var(--text-secondary))] hover:bg-[hsl(var(--surface-2))] disabled:opacity-60 transition-colors"
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            </div>
+          )}
+          {hasReachedLimit && feedback.length > 0 && (
+            <div className="shrink-0 px-3 py-1.5 text-xs text-[hsl(var(--text-muted))] text-center">
+              Reached maximum items
+            </div>
+          )}
         </div>
       </div>
     </div>

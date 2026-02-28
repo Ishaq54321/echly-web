@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { auth } from "@/lib/firebase";
 import { addComment, resolveFeedback, type Comment } from "@/lib/comments";
 import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
 
+/**
+ * Controlled realtime comment list: exactly ONE onSnapshot listener at a time.
+ * When selectedFeedbackId changes we unsubscribe the previous listener, then
+ * subscribe to the new feedback's comments. Cleanup on unmount prevents leaks.
+ */
 export function useFeedbackDetailController(args: {
   sessionId: string;
   feedbackId: string | null | undefined;
@@ -13,12 +18,19 @@ export function useFeedbackDetailController(args: {
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!feedbackId) {
       setComments([]);
       setLoadingComments(false);
       return;
+    }
+
+    // Prevent multiple listeners: tear down previous before subscribing.
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
     }
 
     let cancelled = false;
@@ -33,10 +45,12 @@ export function useFeedbackDetailController(args: {
         setLoadingComments(false);
       }
     );
+    unsubscribeRef.current = unsubscribe;
 
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeRef.current = null;
     };
   }, [sessionId, feedbackId]);
 

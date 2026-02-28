@@ -14,9 +14,11 @@ import type {
 import {
   addFeedbackRepo,
   deleteFeedbackRepo,
-  getSessionFeedbackRepo,
+  getSessionFeedbackPageRepo,
   updateFeedbackRepo,
 } from "@/lib/repositories/feedbackRepository";
+import type { FeedbackPageCursor, FeedbackPageResult } from "@/lib/repositories/feedbackRepository";
+export type { FeedbackPageCursor, FeedbackPageResult } from "@/lib/repositories/feedbackRepository";
 
 /* ================================
    TYPES
@@ -56,14 +58,25 @@ export async function updateFeedback(
 }
 
 /* ================================
-   GET SESSION FEEDBACK
+   GET SESSION FEEDBACK (paginated)
 ================================ */
 
+/** Fetches one page of feedback; use for cursor-based pagination. */
+export async function getSessionFeedbackPage(
+  sessionId: string,
+  pageSize: number = 20,
+  cursor?: FeedbackPageCursor | null
+): Promise<FeedbackPageResult> {
+  return getSessionFeedbackPageRepo(sessionId, pageSize, cursor ?? undefined);
+}
+
+/** First page only; for callers that need a single batch (e.g. CaptureWidget). Cost protection: always limited. */
 export async function getSessionFeedback(
   sessionId: string,
-  max?: number
+  max: number = 50
 ): Promise<Feedback[]> {
-  return await getSessionFeedbackRepo(sessionId, max);
+  const { feedback } = await getSessionFeedbackPageRepo(sessionId, max);
+  return feedback;
 }
 
 /* ================================

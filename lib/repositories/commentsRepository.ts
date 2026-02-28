@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -9,6 +10,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { assertQueryLimit } from "@/lib/querySafety";
 import type { Comment } from "@/lib/domain/comment";
 
 export async function addCommentRepo(
@@ -55,20 +57,29 @@ export async function addCommentRepo(
   }
 }
 
+/** Max comments per feedback thread (cost protection). */
+const COMMENTS_QUERY_LIMIT = 100;
+
+/**
+ * Single realtime listener for comments of one feedback item.
+ * Cost protection: limit(COMMENTS_QUERY_LIMIT). Caller must unsubscribe when
+ * switching feedback or unmounting to avoid stacking listeners.
+ */
 export function listenToCommentsRepo(
   sessionId: string,
   feedbackId: string,
   callback: (comments: Comment[]) => void
 ): Unsubscribe {
+  assertQueryLimit(COMMENTS_QUERY_LIMIT, "listenToCommentsRepo");
   const q = query(
     collection(db, "comments"),
     where("sessionId", "==", sessionId),
     where("feedbackId", "==", feedbackId),
-    orderBy("createdAt", "asc")
+    orderBy("createdAt", "asc"),
+    limit(COMMENTS_QUERY_LIMIT)
   );
 
   return onSnapshot(q, (snapshot) => {
-    console.log("SNAPSHOT RECEIVED", snapshot.docs.length);
     const comments: Comment[] = snapshot.docs.map((docSnap) => ({
       id: docSnap.id,
       ...(docSnap.data() as Omit<Comment, "id">),

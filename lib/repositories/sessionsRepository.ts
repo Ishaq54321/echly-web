@@ -13,6 +13,7 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { assertQueryLimit } from "@/lib/querySafety";
 import type { Session } from "@/lib/domain/session";
 
 type SessionDoc = Omit<Session, "id"> & { createdAt?: Timestamp | null };
@@ -31,6 +32,7 @@ export async function getUserSessionsRepo(
   userId: string,
   max: number = 50
 ): Promise<Session[]> {
+  assertQueryLimit(max, "getUserSessionsRepo");
   const q = query(
     collection(db, "sessions"),
     where("userId", "==", userId),

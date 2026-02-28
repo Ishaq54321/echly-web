@@ -6,11 +6,7 @@ import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import {
-  addFeedback,
-  getSessionFeedback,
-  deleteFeedback,
-} from "@/lib/feedback";
+import { addFeedback, deleteFeedback } from "@/lib/feedback";
 import CaptureWidget from "@/components/CaptureWidget";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import GlobalRail from "@/components/layout/GlobalRail";
@@ -18,6 +14,7 @@ import FeedbackSidebar from "@/components/session/FeedbackSidebar";
 import FeedbackDetail from "@/components/session/feedbackDetail/FeedbackDetail";
 import { ActivityPanel } from "@/components/session/feedbackDetail/ActivityPanel";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
+import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
 
 function formatRelativeTime(
   createdAt: { toDate?: () => Date; seconds?: number } | null | undefined
@@ -49,9 +46,17 @@ export default function SessionPage() {
   const router = useRouter();
 
   const [session, setSession] = useState<any>(null);
-  const [feedback, setFeedback] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [sessionLoading, setSessionLoading] = useState(true);
+
+  const {
+    feedback,
+    setFeedback,
+    loading: feedbackLoading,
+    hasMore: hasMoreFeedback,
+    hasReachedLimit: feedbackReachedLimit,
+    fetchNextPage: fetchNextFeedbackPage,
+  } = useSessionFeedbackPaginated(sessionId as string | undefined);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
@@ -82,19 +87,18 @@ export default function SessionPage() {
       }
 
       setSession({ id: sessionSnap.id, ...data });
-
-      const feedbackData = await getSessionFeedback(sessionId as string);
-      setFeedback(feedbackData);
-
-      if (feedbackData.length > 0) {
-        setSelectedId(feedbackData[0].id);
-      }
-
-      setLoading(false);
+      setSessionLoading(false);
     });
 
     return () => unsubscribe();
   }, [sessionId, router]);
+
+  // Select first feedback when first page loads and none selected.
+  useEffect(() => {
+    if (feedback.length > 0 && selectedId === null) {
+      setSelectedId(feedback[0].id);
+    }
+  }, [feedback, selectedId]);
 
   /* ================= SELECTED ITEM WITH INDEX ================= */
 
@@ -214,7 +218,7 @@ export default function SessionPage() {
     setFeedback((prev) => prev.filter((item) => item.id !== id));
   };
 
-  if (loading) return null;
+  if (sessionLoading) return null;
 
   return (
     <>
@@ -236,6 +240,10 @@ export default function SessionPage() {
             onSelect={setSelectedId}
             selectedIndex={selectedIndex}
             total={feedback.length}
+            loadingMore={feedbackLoading}
+            hasMore={hasMoreFeedback}
+            hasReachedLimit={feedbackReachedLimit}
+            onLoadMore={fetchNextFeedbackPage}
           />
         </aside>
 
