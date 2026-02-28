@@ -5,6 +5,14 @@ export type StructuredFeedback = {
   type: string;
 };
 
+export interface Recording {
+  id: string;
+  screenshot: string | null;
+  transcript: string;
+  structuredOutput: StructuredFeedback | null;
+  createdAt: number;
+}
+
 export type CaptureState =
   | "idle"
   | "capturing"

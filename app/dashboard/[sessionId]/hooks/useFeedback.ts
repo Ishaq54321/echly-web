@@ -6,9 +6,27 @@ import {
   deleteFeedback,
   type Feedback,
   type StructuredFeedback,
+  type FeedbackPriority,
 } from "@/lib/feedback";
 import { uploadScreenshot } from "@/lib/screenshot";
 import type { Session } from "@/lib/sessions";
+
+/** Elite structuring API response. */
+interface EliteTicket {
+  title: string;
+  contextSummary: string;
+  actionItems?: string[];
+  impact?: string;
+  suggestedPriority?: string;
+  suggestedTags?: string[];
+}
+
+function normalizePriority(s: string | undefined): FeedbackPriority {
+  const v = (s ?? "medium").toLowerCase();
+  if (v === "low" || v === "medium" || v === "high" || v === "critical")
+    return v;
+  return "medium";
+}
 
 export type SelectedFeedbackItem = Feedback & {
   index: number;
@@ -81,10 +99,12 @@ export function useFeedback({
       body: JSON.stringify({ transcript }),
     });
 
-    const structured = (await res.json()) as StructuredFeedback;
+    const { tickets } = (await res.json()) as { tickets: EliteTicket[] };
+    if (!tickets?.length) {
+      throw new Error("No structured tickets returned");
+    }
 
     let screenshotUrl: string | null = null;
-
     if (screenshot) {
       screenshotUrl = await uploadScreenshot(screenshot, sessionId);
     }
@@ -93,39 +113,51 @@ export function useFeedback({
       throw new Error("Session required for feedback");
     }
 
-    const docRef = await addFeedback(sessionId, session.userId, {
-      title: structured.title,
-      description: structured.description,
-      suggestion: structured.suggestion || "",
-      type: structured.type,
-      screenshotUrl,
-      timestamp: Date.now(),
-    });
+    const created: Feedback[] = [];
+    for (const t of tickets) {
+      const payload: StructuredFeedback = {
+        title: t.title,
+        description: t.contextSummary ?? t.title,
+        type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
+        contextSummary: t.contextSummary ?? null,
+        actionItems: t.actionItems ?? [],
+        impact: t.impact ?? undefined,
+        suggestedTags: t.suggestedTags,
+        priority: normalizePriority(t.suggestedPriority),
+        screenshotUrl: created.length === 0 ? screenshotUrl : null,
+        timestamp: Date.now(),
+      };
 
-    const newItem = {
-      id: docRef.id,
-      sessionId,
-      userId: session.userId,
-      title: structured.title,
-      description: structured.description,
-      suggestion: structured.suggestion || "",
-      type: structured.type,
-      status: "open" as const,
-      priority: "medium" as const,
-      createdAt: null,
-      screenshotUrl,
-      clientTimestamp: Date.now(),
-      timestamp: Date.now(),
-    };
+      const docRef = await addFeedback(sessionId, session.userId, payload);
+      const newItem: Feedback = {
+        id: docRef.id,
+        sessionId,
+        userId: session.userId,
+        title: payload.title,
+        description: payload.description,
+        suggestion: "",
+        type: payload.type,
+        status: "open",
+        priority: payload.priority ?? "medium",
+        createdAt: null,
+        contextSummary: payload.contextSummary ?? null,
+        actionItems: payload.actionItems ?? null,
+        impact: payload.impact ?? null,
+        suggestedTags: payload.suggestedTags ?? null,
+        screenshotUrl: payload.screenshotUrl ?? null,
+        clientTimestamp: Date.now(),
+      };
+      created.push(newItem);
+    }
 
-    setFeedback((prev) => [newItem as Feedback, ...prev]);
-    setSelectedId(newItem.id);
+    setFeedback((prev) => [...created, ...prev]);
+    setSelectedId(created[0].id);
 
     return {
-      id: newItem.id,
-      title: newItem.title,
-      description: newItem.description,
-      type: newItem.type,
+      id: created[0].id,
+      title: created[0].title,
+      description: created[0].description,
+      type: created[0].type,
     };
   };
 

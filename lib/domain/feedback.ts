@@ -9,6 +9,13 @@ export interface StructuredFeedback {
   suggestion?: string;
   type: string;
 
+  // Elite structuring (action-ready ticket fields)
+  contextSummary?: string;
+  actionItems?: string[];
+  impact?: string;
+  suggestedTags?: string[];
+  priority?: FeedbackPriority;
+
   // Metadata
   url?: string;
   viewportWidth?: number;
@@ -31,6 +38,12 @@ export interface Feedback {
   status: FeedbackStatus;
   priority: FeedbackPriority;
   createdAt: Timestamp | null;
+
+  // Elite structuring
+  contextSummary?: string | null;
+  actionItems?: string[] | null;
+  impact?: string | null;
+  suggestedTags?: string[] | null;
 
   // Metadata
   url?: string | null;

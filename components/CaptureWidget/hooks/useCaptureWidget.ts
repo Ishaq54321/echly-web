@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { getSessionFeedback } from "@/lib/feedback";
 import type {
   StructuredFeedback,
+  Recording,
   CaptureState,
   CaptureWidgetProps,
   Position,
@@ -11,17 +12,24 @@ import type {
 
 const SAFE_MARGIN = 24;
 
+function generateRecordingId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `rec-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 export function useCaptureWidget({
   sessionId,
   initialPointers,
   onComplete,
   onDelete,
 }: CaptureWidgetProps) {
-  const [pendingScreenshot, setPendingScreenshot] = useState<string | null>(null);
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [state, setState] = useState<CaptureState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState("");
   const [pointers, setPointers] = useState<StructuredFeedback[]>(
     initialPointers ?? []
   );
@@ -40,6 +48,16 @@ export function useCaptureWidget({
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const activeRecordingIdRef = useRef<string | null>(null);
+  const recordingsRef = useRef<Recording[]>(recordings);
+
+  useEffect(() => {
+    activeRecordingIdRef.current = activeRecordingId;
+  }, [activeRecordingId]);
+
+  useEffect(() => {
+    recordingsRef.current = recordings;
+  }, [recordings]);
 
   /* ================= DRAG ================= */
 
@@ -123,7 +141,14 @@ export function useCaptureWidget({
       for (let i = 0; i < event.results.length; i++) {
         text += event.results[i][0].transcript;
       }
-      setTranscript(text);
+      const activeId = activeRecordingIdRef.current;
+      if (activeId) {
+        setRecordings((prev) =>
+          prev.map((r) =>
+            r.id === activeId ? { ...r, transcript: text } : r
+          )
+        );
+      }
     };
     recognitionRef.current = recognition;
   }, []);
@@ -150,7 +175,6 @@ export function useCaptureWidget({
   const startListening = () => {
     try {
       recognitionRef.current?.start();
-      setTranscript("");
       setState("listening");
       startTimer();
     } catch (err) {
@@ -163,17 +187,27 @@ export function useCaptureWidget({
   const finishListening = async () => {
     recognitionRef.current?.stop();
     stopTimer();
-    if (!transcript.trim()) {
+    const activeId = activeRecordingIdRef.current;
+    if (!activeId) {
+      setState("idle");
+      return;
+    }
+    const currentRecordings = recordingsRef.current;
+    const active = currentRecordings.find((r) => r.id === activeId);
+    if (!active || !active.transcript.trim()) {
       setState("idle");
       return;
     }
     setState("processing");
     try {
-      const structured = await onComplete(transcript, pendingScreenshot);
+      const structured = await onComplete(active.transcript, active.screenshot);
+      setRecordings((prev) =>
+        prev.map((r) =>
+          r.id === activeId ? { ...r, structuredOutput: structured } : r
+        )
+      );
       setPendingStructured(structured);
       setState("anticipation");
-      setPendingScreenshot(null);
-      setTranscript("");
     } catch (err) {
       console.error(err);
       setErrorMessage("AI processing failed.");
@@ -195,6 +229,7 @@ export function useCaptureWidget({
         ...prev,
       ]);
       setPendingStructured(null);
+      setActiveRecordingId(null);
       setState("idle");
     }, 160);
     return () => clearTimeout(t);
@@ -203,8 +238,9 @@ export function useCaptureWidget({
   const discardListening = () => {
     recognitionRef.current?.stop();
     stopTimer();
-    setTranscript("");
-    setPendingScreenshot(null);
+    const activeId = activeRecordingIdRef.current;
+    setRecordings((prev) => prev.filter((r) => r.id !== activeId));
+    setActiveRecordingId(null);
     setState("idle");
   };
 
@@ -220,8 +256,8 @@ export function useCaptureWidget({
 
   const resetSession = () => {
     setPointers([]);
-    setTranscript("");
-    setPendingScreenshot(null);
+    setRecordings([]);
+    setActiveRecordingId(null);
     setState("idle");
     setExpandedId(null);
     setEditingId(null);
@@ -283,7 +319,16 @@ export function useCaptureWidget({
         setErrorMessage("Capture cancelled.");
         return;
       }
-      setPendingScreenshot(image);
+      const id = generateRecordingId();
+      const newRecording: Recording = {
+        id,
+        screenshot: image,
+        transcript: "",
+        structuredOutput: null,
+        createdAt: Date.now(),
+      };
+      setRecordings((prev) => [...prev, newRecording]);
+      setActiveRecordingId(id);
       startListening();
     } catch (err) {
       console.error(err);

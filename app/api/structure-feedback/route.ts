@@ -5,6 +5,78 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const ADAPTIVE_STRUCTURE_SYSTEM = `You are Echly's Adaptive Structuring Engine. Your job is to intelligently adjust output depth based on feedback complexity.
+
+MODE SELECTION (choose one for the entire response)
+
+LIGHT MODE (default): Use for short, simple, single-issue feedback.
+FULL MODE: Use when ANY of the following apply:
+- Mentions errors, crashes, failures, blocking issues.
+- Includes words like "not working", "can't", "broken", "error", "fails", "blocking".
+- Contains multiple distinct issues.
+- Is longer than ~25 words.
+- Mentions checkout, login, onboarding, payment, conversion.
+- Mentions performance problems.
+- Expresses urgency.
+
+RULES
+- Split multiple issues into separate tickets. Never merge unrelated problems.
+- No filler. No conversational tone. Output structured content only.
+- Do not mention which mode you used in the output.
+
+LIGHT MODE output (per ticket):
+- Title: Clear professional rewrite.
+- Actions: Concise bullet points (actionItems array).
+- Tag: 1–2 relevant tags (suggestedTags). No impact. No priority.
+
+FULL MODE output (per ticket):
+- Title: Clear and scoped.
+- Context Summary: 1–2 sentences.
+- Action Items: Specific bullets.
+- Impact: Why this matters.
+- Suggested Priority: Exactly one of: Low, Medium, High, Critical.
+- Suggested Tags: 2–5 relevant tags.
+
+PRIORITY (FULL MODE ONLY)
+- CRITICAL: Core functionality broken; users cannot proceed; errors; data loss or security risk; blocking.
+- HIGH: Major feature impaired; strong negative UX; conversion-impacting; affects many users.
+- MEDIUM: Noticeable UX flaw; design inconsistency; performance degradation but not blocking.
+- LOW: Minor cosmetic; microcopy; non-urgent enhancement.
+Do not default to Medium. Do not inflate severity. If ambiguous, choose the lower reasonable severity.
+
+Allowed suggestedTags: UX, Bug, Performance, Accessibility, Copy, Visual Hierarchy, Interaction, Responsive, Backend, Data, Blocking.
+
+Return ONLY valid JSON. No markdown, no code fence.
+
+LIGHT MODE response shape:
+{
+  "mode": "light",
+  "tickets": [
+    {
+      "title": "Clear professional title",
+      "actionItems": ["Action one", "Action two"],
+      "suggestedTags": ["Tag1", "Tag2"]
+    }
+  ]
+}
+
+FULL MODE response shape:
+{
+  "mode": "full",
+  "tickets": [
+    {
+      "title": "Clear, scoped title",
+      "contextSummary": "1-2 sentences.",
+      "actionItems": ["Specific action"],
+      "impact": "Why this matters.",
+      "suggestedPriority": "Low|Medium|High|Critical",
+      "suggestedTags": ["Tag1", "Tag2"]
+    }
+  ]
+}
+
+If the input is empty or unintelligible, return: { "mode": "light", "tickets": [] }`;
+
 export async function POST(req: Request) {
   try {
     if (!process.env.OPENAI_API_KEY) {
@@ -26,46 +98,14 @@ export async function POST(req: Request) {
 
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.2, // lower = less creative
+      temperature: 0.2,
       messages: [
-        {
-          role: "system",
-          content: `
-You are Echly's structured feedback engine.
-
-Your job is to convert raw spoken feedback into a clean, professional issue report.
-
-STRICT RULES:
-- Do NOT invent facts.
-- Do NOT assume causes.
-- Do NOT add features or solutions.
-- Do NOT speculate.
-- Only refine what is explicitly stated.
-- If information is unclear, keep wording neutral.
-- Do not add extra context beyond the transcript.
-- Do not include explanations outside JSON.
-
-Classify the issue into ONE of:
-Bug
-UX Issue
-UI Issue
-Copy Issue
-Performance
-
-Return ONLY valid JSON with this exact structure:
-
-{
-  "title": "Concise professional issue title (max 12 words)",
-  "description": "Clear, neutral, professional description of the issue",
-  "type": "Bug | UX Issue | UI Issue | Copy Issue | Performance"
-}
-`
-        },
+        { role: "system", content: ADAPTIVE_STRUCTURE_SYSTEM },
         {
           role: "user",
-          content: `Raw feedback:\n"${transcript}"`
-        }
-      ]
+          content: `Raw feedback:\n"${transcript.trim()}"`,
+        },
+      ],
     });
 
     let content = completion.choices[0]?.message?.content;
@@ -74,21 +114,61 @@ Return ONLY valid JSON with this exact structure:
       throw new Error("No content returned from OpenAI");
     }
 
-    // Remove markdown wrapping if present
     content = content.replace(/```json/g, "").replace(/```/g, "").trim();
-
     const parsed = JSON.parse(content);
 
-    // Extra safety validation
-    if (!parsed.title || !parsed.description || !parsed.type) {
-      throw new Error("Invalid AI response structure");
+    if (!parsed.tickets || !Array.isArray(parsed.tickets)) {
+      throw new Error("Invalid AI response: missing tickets array");
     }
 
-    return NextResponse.json(parsed);
+    const mode = parsed.mode === "full" ? "full" : "light";
 
+    const valid = parsed.tickets
+      .filter(
+        (t: Record<string, unknown>) =>
+          t && typeof t.title === "string"
+      )
+      .map((t: Record<string, unknown>) => {
+        const title = t.title as string;
+        const actionItems = Array.isArray(t.actionItems)
+          ? (t.actionItems as string[])
+          : [];
+        const suggestedTags = Array.isArray(t.suggestedTags)
+          ? (t.suggestedTags as string[])
+          : [];
+
+        if (mode === "light") {
+          return {
+            title,
+            contextSummary: title,
+            actionItems,
+            impact: null as string | null,
+            suggestedPriority: "medium" as const,
+            suggestedTags,
+          };
+        }
+
+        return {
+          title,
+          contextSummary:
+            typeof t.contextSummary === "string" ? t.contextSummary : title,
+          actionItems,
+          impact:
+            typeof t.impact === "string" ? (t.impact as string) : (null as string | null),
+          suggestedPriority:
+            typeof t.suggestedPriority === "string" &&
+            ["low", "medium", "high", "critical"].includes(
+              (t.suggestedPriority as string).toLowerCase()
+            )
+              ? (t.suggestedPriority as string).toLowerCase()
+              : "medium",
+          suggestedTags,
+        };
+      });
+
+    return NextResponse.json({ tickets: valid });
   } catch (error) {
     console.error("AI STRUCTURE ERROR:", error);
-
     return NextResponse.json(
       { error: "Failed to structure feedback" },
       { status: 500 }

@@ -55,23 +55,21 @@ export default function FeedbackSidebar({
   const [searchQuery, setSearchQuery] = useState("");
 
   const displayed = useMemo(() => {
-    let list = [...feedback];
-    const q = searchQuery.trim().toLowerCase();
-    if (q) {
-      list = list.filter((f) => f.title.toLowerCase().includes(q));
-    }
-    const getTime = (f: FeedbackItem) => {
-      if (f.createdAt?.seconds) return f.createdAt.seconds * 1000;
+    const getTime = (f: FeedbackItem): number => {
+      if (f.createdAt?.seconds != null) return f.createdAt.seconds * 1000;
       if (typeof f.clientTimestamp === "number") return f.clientTimestamp;
       if (typeof f.timestamp === "number") return f.timestamp;
       return 0;
     };
-    if (sort === "recent") {
-      list.sort((a, b) => getTime(b) - getTime(a));
-    } else {
-      list.sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0));
-    }
-    return list;
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = q
+      ? feedback.filter((f) => f.title.toLowerCase().includes(q))
+      : feedback;
+    const sorted =
+      sort === "recent"
+        ? [...filtered].sort((a, b) => getTime(b) - getTime(a))
+        : [...filtered].sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0));
+    return sorted;
   }, [feedback, searchQuery, sort]);
 
   const total = feedback.length;

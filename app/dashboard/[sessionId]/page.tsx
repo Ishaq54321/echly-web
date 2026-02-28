@@ -142,7 +142,13 @@ export default function SessionPage() {
     setIsEditingDescription(false);
   };
 
-  /* ================= AI SAVE ================= */
+  /* ================= AI SAVE (Elite Structuring) ================= */
+
+  const normalizePriority = (s: string | undefined): "low" | "medium" | "high" | "critical" => {
+    const v = (s ?? "medium").toLowerCase();
+    if (v === "low" || v === "medium" || v === "high" || v === "critical") return v;
+    return "medium";
+  };
 
   const handleTranscript = async (
     transcript: string,
@@ -154,44 +160,46 @@ export default function SessionPage() {
       body: JSON.stringify({ transcript }),
     });
 
-    const structured = await res.json();
-
-    let screenshotUrl: string | null = null;
-
-    if (screenshot) {
-      screenshotUrl = await uploadScreenshot(
-        screenshot,
-        sessionId as string
-      );
+    const { tickets } = await res.json();
+    if (!tickets?.length) {
+      throw new Error("No structured tickets returned");
     }
 
-    const docRef = await addFeedback(
-      sessionId as string,
-      session.userId,
-      {
-        title: structured.title,
-        description: structured.description,
-        suggestion: structured.suggestion || "",
-        type: structured.type,
-        screenshotUrl,
+    let screenshotUrl: string | null = null;
+    if (screenshot) {
+      screenshotUrl = await uploadScreenshot(screenshot, sessionId as string);
+    }
+
+    const created: any[] = [];
+    for (let i = 0; i < tickets.length; i++) {
+      const t = tickets[i];
+      const payload = {
+        title: t.title,
+        description: t.contextSummary ?? t.title,
+        type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
+        contextSummary: t.contextSummary ?? null,
+        actionItems: t.actionItems ?? [],
+        impact: t.impact ?? null,
+        suggestedTags: t.suggestedTags,
+        priority: normalizePriority(t.suggestedPriority),
+        screenshotUrl: i === 0 ? screenshotUrl : null,
         timestamp: Date.now(),
-      }
-    );
+      };
 
-    const newItem = {
-      id: docRef.id,
-      title: structured.title,
-      description: structured.description,
-      suggestion: structured.suggestion || "",
-      type: structured.type,
-      screenshotUrl,
-      timestamp: Date.now(),
-    };
+      const docRef = await addFeedback(sessionId as string, session.userId, payload);
+      const newItem = {
+        id: docRef.id,
+        ...payload,
+        status: "open",
+        clientTimestamp: Date.now(),
+      };
+      created.push(newItem);
+    }
 
-    setFeedback((prev) => [newItem, ...prev]);
-    setSelectedId(newItem.id);
+    setFeedback((prev) => [...created, ...prev]);
+    setSelectedId(created[0].id);
 
-    return newItem;
+    return created[0];
   };
 
   const handleDeleteFeedback = async (id: string) => {

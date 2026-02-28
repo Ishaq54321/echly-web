@@ -50,6 +50,34 @@ export function FeedbackContent({
       {item.suggestion != null && item.suggestion !== "" && (
         <SuggestionSection suggestion={item.suggestion} />
       )}
+      {Array.isArray(item.actionItems) && item.actionItems.length > 0 && (
+        <Section title="Action items">
+          <ul className="list-disc list-inside space-y-1">
+            {item.actionItems.map((action, i) => (
+              <li key={i}>{action}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {item.impact && (
+        <Section title="Impact">
+          <p>{item.impact}</p>
+        </Section>
+      )}
+      {Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0 && (
+        <Section title="Tags">
+          <div className="flex flex-wrap gap-1.5">
+            {item.suggestedTags.map((tag, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center rounded-md bg-[hsl(var(--surface-3))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--text-secondary))]"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </Section>
+      )}
     </>
   );
 }

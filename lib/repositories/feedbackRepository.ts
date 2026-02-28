@@ -34,8 +34,13 @@ export async function addFeedbackRepo(
     suggestion: data.suggestion ?? "",
     type: data.type,
     status: "open",
-    priority: "medium",
+    priority: data.priority ?? "medium",
     createdAt: serverTimestamp(),
+
+    contextSummary: data.contextSummary ?? null,
+    actionItems: data.actionItems ?? null,
+    impact: data.impact ?? null,
+    suggestedTags: data.suggestedTags ?? null,
 
     url: data.url ?? null,
     viewportWidth: data.viewportWidth ?? null,
@@ -90,6 +95,11 @@ export async function getSessionFeedbackRepo(
       status: data.status ?? "open",
       priority: data.priority ?? "medium",
       createdAt: (data.createdAt ?? null) as Timestamp | null,
+
+      contextSummary: data.contextSummary ?? null,
+      actionItems: data.actionItems ?? null,
+      impact: data.impact ?? null,
+      suggestedTags: data.suggestedTags ?? null,
 
       url: data.url ?? null,
       viewportWidth: data.viewportWidth ?? null,
