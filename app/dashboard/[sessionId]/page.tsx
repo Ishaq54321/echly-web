@@ -14,11 +14,35 @@ import {
 import CaptureWidget from "@/components/CaptureWidget";
 import { uploadScreenshot } from "@/lib/screenshot";
 import GlobalRail from "@/components/layout/GlobalRail";
-import SessionHeader from "@/components/session/SessionHeader";
 import FeedbackSidebar from "@/components/session/FeedbackSidebar";
 import FeedbackDetail from "@/components/session/feedbackDetail/FeedbackDetail";
 import { ActivityPanel } from "@/components/session/feedbackDetail/ActivityPanel";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
+
+function formatRelativeTime(
+  createdAt: { toDate?: () => Date; seconds?: number } | null | undefined
+): string {
+  if (!createdAt) return "";
+  try {
+    const date =
+      typeof createdAt.toDate === "function"
+        ? createdAt.toDate()
+        : createdAt.seconds != null
+          ? new Date(createdAt.seconds * 1000)
+          : null;
+    if (!date) return "";
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "1 day ago";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return date.toLocaleDateString(undefined, { dateStyle: "medium" });
+  } catch {
+    return "";
+  }
+}
 
 export default function SessionPage() {
   const { sessionId } = useParams();
@@ -28,7 +52,6 @@ export default function SessionPage() {
   const [feedback, setFeedback] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
@@ -106,14 +129,6 @@ export default function SessionPage() {
     }
   }, [selectedId]);
 
-  /* ================= COPY LINK ================= */
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   /* ================= SAVE DESCRIPTION ================= */
 
   const saveDescription = () => {
@@ -189,15 +204,27 @@ export default function SessionPage() {
   return (
     <>
       <div className="min-h-screen flex flex-col overflow-hidden">
-        <SessionHeader
-          title={session?.title}
-          feedbackCount={feedback.length}
-          copied={copied}
-          onCopy={handleCopy}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-[72px_280px_1fr]">
+          <div className="hidden lg:block" aria-hidden />
+          <div className="hidden lg:block" aria-hidden />
+          <div className="max-w-4xl mx-auto w-full px-6 py-8">
+            <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--text-primary))]">
+              {session?.title ?? "Session"}
+            </h1>
+            <div className="text-sm text-[hsl(var(--text-muted))] mt-1 flex items-center gap-2">
+              <span>You</span>
+              <span className="opacity-50">•</span>
+              <span>{formatRelativeTime(session?.createdAt) || "—"}</span>
+              <span className="opacity-50">•</span>
+              <span>
+                {feedback.length} feedback item{feedback.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+        </div>
 
         <div
-          className={`grid flex-1 min-h-0 grid-cols-1 overflow-hidden ${
+          className={`mt-6 grid flex-1 min-h-0 grid-cols-1 overflow-hidden ${
             isCommentsOpen ? "lg:grid-cols-[72px_280px_1fr_380px]" : "lg:grid-cols-[72px_280px_1fr]"
           }`}
         >
@@ -216,19 +243,21 @@ export default function SessionPage() {
           </aside>
 
           <div className="min-h-0 overflow-hidden">
-            <div className="max-w-4xl mx-auto h-full overflow-auto rounded-3xl border border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))] px-8 py-10">
-              <FeedbackDetail
-                sessionId={sessionId as string}
-                selectedItem={selectedItem}
-                isEditingDescription={isEditingDescription}
-                descriptionDraft={descriptionDraft}
-                setIsEditingDescription={setIsEditingDescription}
-                setDescriptionDraft={setDescriptionDraft}
-                saveDescription={saveDescription}
-                setIsImageExpanded={setIsImageExpanded}
-                isCommentsOpen={isCommentsOpen}
-                onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}
-              />
+            <div className="max-w-4xl mx-auto h-full overflow-auto rounded-3xl border border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))] px-6 py-10">
+              <div className="mt-6">
+                <FeedbackDetail
+                  sessionId={sessionId as string}
+                  selectedItem={selectedItem}
+                  isEditingDescription={isEditingDescription}
+                  descriptionDraft={descriptionDraft}
+                  setIsEditingDescription={setIsEditingDescription}
+                  setDescriptionDraft={setDescriptionDraft}
+                  saveDescription={saveDescription}
+                  setIsImageExpanded={setIsImageExpanded}
+                  isCommentsOpen={isCommentsOpen}
+                  onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}
+                />
+              </div>
             </div>
           </div>
 

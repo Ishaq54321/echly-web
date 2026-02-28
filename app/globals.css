@@ -25,6 +25,14 @@
   /* Accent */
   --accent: 243 75% 59%;
   --accent-hover: 243 75% 65%;
+
+  /* Tag semantic tints (muted, 8–10% max) */
+  --tag-bug-bg: hsl(0 80% 96%);
+  --tag-bug-text: hsl(0 60% 40%);
+  --tag-ux-bg: hsl(235 60% 96%);
+  --tag-ux-text: hsl(235 40% 45%);
+  --tag-ui-bg: hsl(210 40% 96%);
+  --tag-ui-text: hsl(210 30% 45%);
 }
 
 /* ======================================
