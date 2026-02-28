@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Tailwind theme extension: text colors */
+@theme {
+  --color-primary: #2A2A2A;
+  --color-active: #6E6E6E;
+}
+
 /* ======================================
    PREMIUM LIGHT DESIGN SYSTEM (ECHLY)
    Tailwind v4 Compatible
@@ -18,7 +24,8 @@
   --border: 220 13% 91%;            /* #E6E8EB */
 
   /* Text */
-  --text-primary: 220 20% 8%;       /* #111318 */
+  --text-primary: 0 0% 16.5%;       /* #2A2A2A */
+  --text-active: 0 0% 43%;         /* #6E6E6E (HSB 0° 0 43) */
   --text-secondary: 220 9% 46%;     /* #6B7280 */
   --text-muted: 220 8% 60%;
 
@@ -48,7 +55,6 @@ body {
   height: 100%;
   background: hsl(var(--background));
   color: hsl(var(--text-primary));
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

@@ -134,8 +134,8 @@ export default function FeedbackSidebar({
                     }}
                     className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 transition-colors duration-150 ${
                       sort === "recent"
-                        ? "font-medium text-[hsl(var(--text-primary))]"
-                        : "text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))]"
+                        ? "font-medium text-active"
+                        : "text-[hsl(var(--text-muted))] hover:text-primary"
                     }`}
                   >
                     Most Recent
@@ -148,8 +148,8 @@ export default function FeedbackSidebar({
                     }}
                     className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 transition-colors duration-150 ${
                       sort === "active"
-                        ? "font-medium text-[hsl(var(--text-primary))]"
-                        : "text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))]"
+                        ? "font-medium text-active"
+                        : "text-[hsl(var(--text-muted))] hover:text-primary"
                     }`}
                   >
                     Most Active
@@ -200,7 +200,7 @@ export default function FeedbackSidebar({
                     : "bg-[var(--surface-card)] hover:bg-[rgba(0,0,0,0.02)]"}`}
               >
                 <div className="flex justify-between items-start gap-3">
-                  <span className={`text-sm leading-snug truncate flex-1 min-w-0 ${isActive ? "font-semibold text-[hsl(var(--text-primary))]" : "font-medium text-[hsl(var(--text-muted))]"}`}>
+                  <span className={`text-sm leading-snug truncate flex-1 min-w-0 ${isActive ? "font-semibold text-[#2A2A2A]" : "font-medium text-[hsl(var(--text-muted))]"}`}>
                     {item.title}
                   </span>
                   <div className="flex items-center gap-1.5 shrink-0">

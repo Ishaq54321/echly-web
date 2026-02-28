@@ -17,7 +17,7 @@ export default function WidgetFooter({
   transition-[color,filter,transform] duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]
   ${
     !isIdle
-      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+      ? "bg-gray-300 text-active cursor-not-allowed"
       : "bg-gradient-to-r from-rose-600 to-red-600 text-white hover:brightness-[0.96] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40"
   }`}
     >

@@ -67,8 +67,8 @@ export function FeedbackHeader({
             onClick={onToggleActivity}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] ${
               isActivityOpen
-                ? "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))]"
-                : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]"
+                ? "bg-[hsl(var(--surface-2))] text-active"
+                : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))] hover:text-primary"
             }`}
             aria-pressed={isActivityOpen}
           >

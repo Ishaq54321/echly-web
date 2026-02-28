@@ -23,15 +23,15 @@ export default function CommentItem({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-900">
+          <span className="text-sm font-semibold text-primary">
             {name}
           </span>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-active">
             {time}
           </span>
         </div>
 
-        <p className="mt-2 text-sm text-gray-700 leading-relaxed">
+        <p className="mt-2 text-sm text-primary leading-relaxed">
           {message}
         </p>
       </div>

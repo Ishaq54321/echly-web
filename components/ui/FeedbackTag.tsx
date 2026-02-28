@@ -9,7 +9,7 @@ function getTagClass(type: string): string {
     return `${base} bg-indigo-50 text-indigo-600 border-indigo-100`;
   if (t.includes("ui"))
     return `${base} bg-blue-50 text-blue-600 border-blue-100`;
-  return `${base} bg-gray-50 text-gray-600 border-gray-100`;
+  return `${base} bg-gray-50 text-active border-gray-100`;
 }
 
 interface FeedbackTagProps {

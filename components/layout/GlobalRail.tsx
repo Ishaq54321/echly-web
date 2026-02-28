@@ -53,7 +53,7 @@ export default function GlobalRail() {
               <Link
                 href={href}
                 className={`relative flex items-center justify-center w-10 h-10 rounded-xl text-[hsl(var(--text-secondary))] transition-all duration-150 ease-out hover:bg-[hsl(var(--surface-1))] ${
-                  active ? "bg-[hsl(var(--surface-1))] text-[hsl(var(--text-primary))]" : ""
+                  active ? "bg-[hsl(var(--surface-1))] text-active" : ""
                 }`}
                 aria-label={label}
                 aria-current={active ? "page" : undefined}

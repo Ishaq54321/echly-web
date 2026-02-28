@@ -241,7 +241,7 @@ export default function SessionPage() {
 
         <div className="flex flex-col h-full min-h-0 overflow-hidden bg-neutral-50">
           <div className="max-w-4xl mx-auto w-full px-8 pt-5 pb-3 shrink-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--text-primary))]">
+            <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--text-primary))]">
               {session?.title ?? "Session"}
             </h1>
             <div className="text-sm text-[hsl(var(--text-secondary))] mt-1 flex items-center gap-1.5 [&_span]:opacity-[0.92]">
