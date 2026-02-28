@@ -89,9 +89,9 @@ export default function FeedbackSidebar({
       : "0 total";
 
   return (
-    <div className="flex h-full flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-4 pt-5 pb-4">
-      <div className="flex flex-1 min-h-0 flex-col gap-4">
-        {/* Header */}
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex flex-col flex-1 min-h-0 gap-4 px-4 pt-5 pb-4">
+        {/* Header (fixed) */}
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
             <h2 className="text-sm font-semibold tracking-wide uppercase text-[hsl(var(--text-muted))]">
@@ -151,18 +151,21 @@ export default function FeedbackSidebar({
           </div>
         </div>
 
-        {/* Search */}
-        <input
-          type="search"
-          placeholder="Search feedback…"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="h-9 w-full text-sm px-3 rounded-md bg-[hsl(var(--surface-2))] border border-[hsl(var(--border))] placeholder:text-[hsl(var(--text-muted))] focus:ring-1 focus:ring-[hsl(var(--accent))]/20 focus:outline-none"
-          aria-label="Search feedback"
-        />
+        {/* Search (fixed) */}
+        <div className="shrink-0">
+          <input
+            type="search"
+            placeholder="Search feedback…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-9 w-full text-sm px-3 rounded-md bg-[hsl(var(--surface-2))] border border-[hsl(var(--border))] placeholder:text-[hsl(var(--text-muted))] focus:ring-1 focus:ring-[hsl(var(--accent))]/20 focus:outline-none"
+            aria-label="Search feedback"
+          />
+        </div>
 
-        {/* List */}
-        <div className="flex flex-1 flex-col space-y-1.5 overflow-y-auto min-h-0">
+        {/* Ticket list (scrollable only) */}
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+          <div className="space-y-1.5">
           {displayed.map((item) => {
             const isActive = item.id === selectedId;
             const timeStr = formatRowTime(item);
@@ -217,6 +220,7 @@ export default function FeedbackSidebar({
               </div>
             );
           })}
+          </div>
         </div>
       </div>
     </div>

@@ -14,12 +14,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="antialiased">
-        <GlobalNavBar />
-        <main className="pt-16">
-          {children}
-        </main>
+    <html lang="en" className="h-full">
+      <body className="antialiased h-full overflow-hidden">
+        <div className="h-screen overflow-hidden flex flex-col">
+          <GlobalNavBar />
+          <main className="flex-1 min-h-0 pt-16">
+            {children}
+          </main>
+        </div>
       </body>
     </html>
   );

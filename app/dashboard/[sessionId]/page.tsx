@@ -204,15 +204,17 @@ export default function SessionPage() {
   return (
     <>
       <div
-        className={`min-h-screen flex flex-col overflow-hidden grid grid-cols-1 ${
-          isCommentsOpen ? "lg:grid-cols-[72px_340px_1fr_380px]" : "lg:grid-cols-[72px_340px_1fr]"
+        className={`h-full grid grid-cols-1 ${
+          isCommentsOpen
+            ? "grid-rows-[0_1fr_1fr_1fr] lg:grid-cols-[72px_340px_1fr_380px] lg:grid-rows-none"
+            : "grid-rows-[0_1fr_1fr] lg:grid-cols-[72px_340px_1fr] lg:grid-rows-none"
         }`}
       >
         <div className="hidden lg:block min-h-0">
           <GlobalRail />
         </div>
 
-        <aside className="min-h-0 overflow-hidden border-r border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))]">
+        <aside className="flex flex-col h-full min-h-0 border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-1))]">
           <FeedbackSidebar
             feedback={feedback}
             selectedId={selectedId}
@@ -222,7 +224,7 @@ export default function SessionPage() {
           />
         </aside>
 
-        <div className="min-h-0 overflow-hidden flex flex-col">
+        <div className="flex flex-col h-full min-h-0 overflow-hidden">
           <div className="max-w-4xl mx-auto w-full px-6 pt-6 pb-4 shrink-0">
             <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--text-primary))]">
               {session?.title ?? "Session"}
@@ -237,8 +239,8 @@ export default function SessionPage() {
               </span>
             </div>
           </div>
-          <div className="max-w-4xl mx-auto w-full flex-1 min-h-0 overflow-auto px-6">
-            <div className="rounded-3xl border border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))] px-6 py-10">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col max-w-4xl mx-auto w-full px-6">
+            <div className="flex-1 min-h-0 overflow-y-auto rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-6 py-10">
               <FeedbackDetail
                   sessionId={sessionId as string}
                   selectedItem={selectedItem}
@@ -256,7 +258,7 @@ export default function SessionPage() {
         </div>
 
         {isCommentsOpen && (
-            <aside className="min-h-0 overflow-hidden hidden lg:block bg-[hsl(var(--surface-1))] border-l border-[hsl(var(--border))] border-opacity-50 px-6">
+            <aside className="flex flex-col h-full min-h-0 hidden lg:block bg-[hsl(var(--surface-1))] border-l border-[hsl(var(--border))] px-6">
               <ActivityPanel
                 comments={comments}
                 loading={loadingComments}
