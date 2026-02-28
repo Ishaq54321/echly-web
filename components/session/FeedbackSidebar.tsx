@@ -105,10 +105,10 @@ export default function FeedbackSidebar({
         {/* Header (fixed) */}
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
-            <h2 className="text-sm font-semibold tracking-wide uppercase text-[hsl(var(--text-muted))]">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.02em] text-[#111827]">
               Feedback
             </h2>
-            <p className="text-xs text-[hsl(var(--text-muted))] mt-1">
+            <p className="text-xs text-[#4B5563] mt-1">
               {subline}
             </p>
           </div>
@@ -116,7 +116,7 @@ export default function FeedbackSidebar({
             <button
               type="button"
               onClick={() => setSortOpen((o) => !o)}
-              className="text-xs bg-transparent border-none focus:ring-0 text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] transition-all duration-150 ease-out cursor-pointer py-0.5"
+              className="text-xs bg-transparent border-none focus:ring-0 text-[#4B5563] hover:text-[#374151] transition-all duration-150 ease-out cursor-pointer py-0.5"
             >
               {sort === "recent" ? "Most Recent" : "Most Active"}
             </button>
