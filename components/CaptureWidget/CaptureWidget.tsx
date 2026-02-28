@@ -92,7 +92,7 @@ export default function CaptureWidget({
             getHandlers={getFeedbackItemHandlers}
           />
 
-          {state.state === "processing" && (
+          {(state.state === "processing" || state.state === "anticipation") && (
             <div className="capture-processing-enter relative flex items-center gap-4 text-sm text-slate-600 py-3 pr-4 min-h-[52px]">
               <div className="capture-structuring-text flex items-center gap-2 flex-1">
                 <span className="text-slate-600">Structuring your feedback</span>
@@ -100,7 +100,12 @@ export default function CaptureWidget({
                   <span>.</span><span>.</span><span>.</span>
                 </span>
               </div>
-              <div className="capture-structuring-progress" aria-hidden />
+              <div
+                className={`capture-structuring-progress ${state.state === "anticipation" ? "capture-structuring-progress--complete" : ""}`}
+                aria-hidden
+              >
+                <div className="capture-structuring-progress-fill" />
+              </div>
             </div>
           )}
 

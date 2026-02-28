@@ -10,6 +10,7 @@ export type CaptureState =
   | "capturing"
   | "listening"
   | "processing"
+  | "anticipation"
   | "error";
 
 export type CaptureWidgetProps = {

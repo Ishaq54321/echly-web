@@ -33,6 +33,7 @@ export function useCaptureWidget({
   const [showMenu, setShowMenu] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [pendingStructured, setPendingStructured] = useState<StructuredFeedback | null>(null);
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -169,24 +170,35 @@ export function useCaptureWidget({
     setState("processing");
     try {
       const structured = await onComplete(transcript, pendingScreenshot);
-      setPointers((prev) => [
-        {
-          id: structured.id,
-          title: structured.title,
-          description: structured.description,
-          type: structured.type,
-        },
-        ...prev,
-      ]);
+      setPendingStructured(structured);
+      setState("anticipation");
       setPendingScreenshot(null);
       setTranscript("");
-      setState("idle");
     } catch (err) {
       console.error(err);
       setErrorMessage("AI processing failed.");
       setState("error");
     }
   };
+
+  /* Anticipation: 160ms pause then show result */
+  useEffect(() => {
+    if (state !== "anticipation" || !pendingStructured) return;
+    const t = setTimeout(() => {
+      setPointers((prev) => [
+        {
+          id: pendingStructured.id,
+          title: pendingStructured.title,
+          description: pendingStructured.description,
+          type: pendingStructured.type,
+        },
+        ...prev,
+      ]);
+      setPendingStructured(null);
+      setState("idle");
+    }, 160);
+    return () => clearTimeout(t);
+  }, [state, pendingStructured]);
 
   const discardListening = () => {
     recognitionRef.current?.stop();

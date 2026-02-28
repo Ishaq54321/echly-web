@@ -129,19 +129,14 @@ h3 {
   border-radius: 8px;
   position: relative;
 }
-/* Very faint breathing glow behind waveform */
+/* Very subtle tint behind waveform — no glow */
 .capture-listening-waveform-wrap::after {
   content: "";
   position: absolute;
-  inset: -4px;
-  border-radius: 10px;
-  background: radial-gradient(ellipse 80% 50% at 50% 50%, rgba(244, 63, 94, 0.06) 0%, transparent 70%);
-  animation: captureBreathingGlow 2.5s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  inset: 0;
+  border-radius: 8px;
+  background: rgba(244, 63, 94, 0.03);
   pointer-events: none;
-}
-@keyframes captureBreathingGlow {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
 }
 
 /* Timer fade-in (slight opacity transition) */
@@ -158,15 +153,11 @@ h3 {
   animation: captureProcessingEnter 150ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 @keyframes captureProcessingEnter {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* 3. Structuring — progress line (2px) + slow shimmer */
+/* 3. Structuring — 2px progress bar 0% → 85%, calm ease, 1.5s */
 .capture-structuring-progress {
   position: absolute;
   bottom: 0;
@@ -176,47 +167,69 @@ h3 {
   background: hsl(var(--border));
   overflow: hidden;
 }
-.capture-structuring-progress::after {
+.capture-structuring-progress .capture-structuring-progress-fill {
+  height: 100%;
+  width: 0;
+  background: hsl(var(--text-secondary) / 0.25);
+  animation: captureProgressFill 1.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  position: relative;
+}
+.capture-structuring-progress .capture-structuring-progress-fill::after {
   content: "";
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 40%;
-  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.35), transparent);
-  animation: captureShimmer 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.12) 50%, transparent 100%);
+  animation: captureShimmer 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  pointer-events: none;
+}
+@keyframes captureProgressFill {
+  to { width: 85%; }
 }
 @keyframes captureShimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(350%); }
+  0% { opacity: 0.4; transform: translateX(-100%); }
+  100% { opacity: 0.4; transform: translateX(200%); }
 }
 
-/* Structuring text fade-in */
+/* Anticipation: bar to 92% then fade out in 80ms */
+.capture-structuring-progress.capture-structuring-progress--complete .capture-structuring-progress-fill {
+  animation: captureProgressComplete 80ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.capture-structuring-progress.capture-structuring-progress--complete {
+  animation: captureProgressFadeOut 80ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes captureProgressComplete {
+  to { width: 92%; }
+}
+@keyframes captureProgressFadeOut {
+  to { opacity: 0; }
+}
+
+/* Structuring text — fade in 120ms */
 .capture-structuring-text {
-  animation: captureStructuringTextIn 160ms cubic-bezier(0.2, 0.8, 0.2, 1) 80ms forwards;
+  animation: captureStructuringTextIn 120ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   opacity: 0;
 }
 @keyframes captureStructuringTextIn {
   to { opacity: 1; }
 }
 
-/* 3-dot ellipsis (subtle, not bouncy) */
+/* Ellipsis — opacity pulse only, no bounce */
 .capture-ellipsis span {
-  animation: captureEllipsisDot 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
-  opacity: 0.5;
+  animation: captureEllipsisPulse 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  opacity: 0.6;
 }
 .capture-ellipsis span:nth-child(1) { animation-delay: 0ms; }
-.capture-ellipsis span:nth-child(2) { animation-delay: 200ms; }
-.capture-ellipsis span:nth-child(3) { animation-delay: 400ms; }
-@keyframes captureEllipsisDot {
-  0%, 60%, 100% { opacity: 0.5; }
-  30% { opacity: 1; }
+.capture-ellipsis span:nth-child(2) { animation-delay: 180ms; }
+.capture-ellipsis span:nth-child(3) { animation-delay: 360ms; }
+@keyframes captureEllipsisPulse {
+  0%, 55%, 100% { opacity: 0.6; }
+  28% { opacity: 1; }
 }
 
-/* 4 & 5. Completion — structured output enter + highlight pulse */
+/* 4 & 5. Result arrival — fade in + translateY(6px→0), 180ms ease-out; 2% tint flash 100ms */
 .capture-feedback-list > div:first-child {
-  animation: captureFeedbackItemEnter 180ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards,
-             captureCompletionPulse 400ms cubic-bezier(0.2, 0.8, 0.2, 1) 180ms forwards;
+  animation: captureFeedbackItemEnter 180ms ease-out forwards,
+             captureCompletionTint 100ms ease-out 180ms forwards;
   opacity: 0;
   transform: translateY(6px);
 }
@@ -226,8 +239,8 @@ h3 {
     transform: translateY(0);
   }
 }
-@keyframes captureCompletionPulse {
-  0% { background-color: #fff; }
-  30% { background-color: rgba(0, 0, 0, 0.02); }
-  100% { background-color: #fff; }
+@keyframes captureCompletionTint {
+  0% { background-color: transparent; }
+  50% { background-color: rgba(0, 0, 0, 0.02); }
+  100% { background-color: transparent; }
 }
