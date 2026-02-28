@@ -109,20 +109,37 @@ body {
   }
 }
 
-/* Dashboard v5 — card reveal: opacity + translateY 10px, 250ms, stagger 30ms (set via style) */
-.dashboard-card-v5 {
+/* ======================================
+   WORKSPACE DASHBOARD — GROK / PRODUCT OS
+   Gradient, noise, section fade, card stagger
+====================================== */
+
+/* Page section: fade in 300ms */
+.dashboard-workspace-section {
   opacity: 0;
-  animation: dashboard-card-v5-reveal 250ms ease-out forwards;
+  animation: dashboard-section-in 300ms ease-out forwards;
 }
-@keyframes dashboard-card-v5-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@keyframes dashboard-section-in {
+  to { opacity: 1; }
+}
+
+/* Card: stagger 40ms (set via style animationDelay), no translateY on reveal */
+.dashboard-workspace-card {
+  opacity: 0;
+  animation: dashboard-workspace-card-in 300ms ease-out forwards;
+}
+@keyframes dashboard-workspace-card-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Subtle noise overlay — 2% opacity (Grok product OS) */
+.dashboard-workspace-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* ======================================

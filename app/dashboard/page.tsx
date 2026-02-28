@@ -98,6 +98,26 @@ function filterAndSortSessions(
   return list;
 }
 
+/* Monochrome Echly symbol — 16px, stroke 1.5, neutral-800 */
+function EchlySymbol({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width={16}
+      height={16}
+      viewBox="0 0 24 24"
+      fill="none"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 6h16M4 12h12M4 18h8" />
+    </svg>
+  );
+}
+
 function MetricBlock({
   label,
   value,
@@ -110,10 +130,10 @@ function MetricBlock({
   const display = useCountUp(value, animate, 600);
   return (
     <div className="flex flex-col">
-      <span className="text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-neutral-900">
+      <span className="text-[40px] font-medium tracking-[-0.02em] tabular-nums text-neutral-900">
         {display}
       </span>
-      <span className="text-[11px] uppercase tracking-[0.18em] text-neutral-400 mt-1">
+      <span className="text-[11px] uppercase tracking-[0.22em] text-neutral-400 mt-1">
         {label}
       </span>
     </div>
@@ -140,8 +160,6 @@ function SessionCard({
     return () => cancelAnimationFrame(id);
   }, [resolutionPct]);
 
-  const ownerInitial = session.title ? session.title.charAt(0).toUpperCase() : "?";
-
   return (
     <div
       role="button"
@@ -153,8 +171,8 @@ function SessionCard({
           onView(session.id);
         }
       }}
-      className="dashboard-card-v5 group flex flex-col justify-between min-h-[160px] w-full max-w-[520px] bg-white rounded-[16px] px-6 py-6 shadow-sm cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2 hover:shadow-md hover:-translate-y-[3px] transition-[box-shadow,transform] duration-[180ms] ease-out"
-      style={{ animationDelay: `${index * 30}ms` }}
+      className="dashboard-workspace-card group flex flex-col min-h-[150px] w-full bg-white/70 backdrop-blur-lg rounded-[20px] px-6 py-6 border border-white/50 shadow-[0_8px_24px_rgba(0,0,0,0.04)] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2 transition-[background-color,border-color,box-shadow,transform] duration-[160ms] ease-out hover:bg-white/85 hover:border-white/80 hover:shadow-[0_12px_32px_rgba(0,0,0,0.06)] active:translate-y-[1px] active:transition-transform active:duration-[80ms]"
+      style={{ animationDelay: `${index * 40}ms` }}
       data-session-id={session.id}
     >
       {/* Top row: folder icon, name, status dot */}
@@ -164,59 +182,66 @@ function SessionCard({
           fill="none"
           strokeWidth={1.5}
           stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           viewBox="0 0 24 24"
           aria-hidden
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44l-2.122-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6z" />
+          <path d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44l-2.122-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6z" />
         </svg>
-        <h2 className="text-[16px] font-medium text-neutral-900 truncate min-w-0">
+        <h2 className="text-[15px] font-medium text-neutral-900 truncate min-w-0">
           {session.title}
         </h2>
         <span
-          className={`shrink-0 w-1.5 h-1.5 rounded-full ${hasOpenIssues ? "bg-neutral-900" : "bg-neutral-300"}`}
+          className={`shrink-0 w-[5px] h-[5px] rounded-full ${hasOpenIssues ? "bg-neutral-900" : "bg-neutral-300"}`}
           aria-hidden
         />
       </div>
 
-      {/* Middle: feedback count (left), open issues (right) */}
-      <div className="flex justify-between items-baseline gap-4 mt-4">
-        <div className="flex flex-col">
-          <span className="text-[26px] font-semibold tabular-nums text-neutral-900">
-            {total}
-          </span>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-neutral-400 mt-0.5">
-            Feedback
-          </span>
-        </div>
-        <div className="flex flex-col text-right">
-          <span className="text-[18px] font-medium tabular-nums text-neutral-900">
-            {counts.open}
-          </span>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-neutral-400 mt-0.5">
-            Open issues
-          </span>
-        </div>
+      {/* Primary signal: feedback count + label, open issues inline */}
+      <div className="mt-4 flex flex-col">
+        <span className="text-[32px] font-medium tabular-nums text-neutral-900">
+          {total}
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 mt-0.5">
+          Feedback
+        </span>
+        <p className="text-[13px] text-neutral-600 mt-1">
+          {counts.open} open {counts.open === 1 ? "issue" : "issues"}
+        </p>
       </div>
 
-      {/* Health line */}
-      <div className="mt-4 h-[2px] rounded-full bg-neutral-200 overflow-hidden">
+      {/* Progress bar */}
+      <div className="mt-4 h-[1.5px] rounded-full bg-neutral-200/70 overflow-hidden">
         <div
-          className="h-[2px] rounded-full bg-neutral-900 transition-[width] duration-300 ease-out"
+          className="h-full rounded-full bg-neutral-900 opacity-90 transition-[width] duration-300 ease-out"
           style={{ width: `${healthWidth}%` }}
           aria-hidden
         />
       </div>
 
-      {/* Bottom meta strip */}
+      {/* Meta row */}
       <div className="mt-4 flex justify-between items-center">
         <span className="text-[12px] text-neutral-400">
           {formatLastUpdated(session.createdAt)}
         </span>
         <span
-          className="w-5 h-5 rounded-full bg-neutral-200 flex items-center justify-center text-[10px] font-medium text-neutral-600"
+          className="opacity-0 group-hover:opacity-100 translate-x-[-2px] group-hover:translate-x-0 transition-[opacity,transform] duration-150 ease-out inline-flex"
           aria-hidden
         >
-          {ownerInitial}
+          <svg
+            width={14}
+            height={14}
+            viewBox="0 0 24 24"
+            fill="none"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-neutral-400"
+          >
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
         </span>
       </div>
     </div>
@@ -240,32 +265,33 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div
-        className="min-h-[40vh] flex items-center justify-center px-6 pt-16 pb-24"
-        style={{ background: "#F7F8FA" }}
-      >
-        <div className="w-full max-w-[1120px] mx-auto">
-          <p className="text-[14px] text-neutral-500">Loading workspace…</p>
+      <div className="min-h-[40vh] flex items-center justify-center px-6 pt-20 pb-32 bg-gradient-to-b from-[#F6F7F9] to-[#F1F3F6] relative">
+        <div className="dashboard-workspace-noise" aria-hidden />
+        <div className="w-full max-w-[1100px] mx-auto relative">
+          <p className="text-[13px] text-neutral-500">Loading workspace…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div
-      className="min-h-0 flex flex-col px-6 pt-16 pb-24"
-      style={{ background: "#F7F8FA" }}
-    >
-      <div className="w-full max-w-[1120px] mx-auto flex flex-col">
-        {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
-            <h1 className="text-[34px] font-semibold tracking-[-0.02em] text-neutral-900">
-              Workspaces
-            </h1>
-            <p className="text-[14px] text-neutral-500 mt-2">
-              Sessions and feedback in one place.
-            </p>
+    <div className="min-h-0 flex flex-col bg-gradient-to-b from-[#F6F7F9] to-[#F1F3F6] relative">
+      <div className="dashboard-workspace-noise" aria-hidden />
+      <div className="dashboard-workspace-section w-full max-w-[1100px] mx-auto px-6 pt-20 pb-32 flex flex-col relative">
+        {/* Header — Grok style */}
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+          <div className="flex items-start gap-3">
+            <span className="text-neutral-800 mt-0.5" aria-hidden>
+              <EchlySymbol />
+            </span>
+            <div>
+              <h1 className="text-[30px] font-medium tracking-[-0.015em] text-neutral-900">
+                Workspaces
+              </h1>
+              <p className="text-[13px] text-neutral-500 mt-1">
+                Sessions and feedback in one place.
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -273,13 +299,14 @@ export default function DashboardPage() {
               placeholder="Search sessions"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 px-3 border border-neutral-200 rounded-md text-[13px] text-neutral-900 placeholder:text-neutral-400 bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300"
+              className="h-9 px-3 bg-white/60 backdrop-blur-md border border-neutral-200/60 rounded-xl text-[13px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-300/80 min-w-[180px]"
               aria-label="Search sessions"
             />
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortValue)}
-              className="h-9 px-3 border border-neutral-200 rounded-md text-[13px] text-neutral-700 bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300"
+              className="h-9 px-3 bg-white/60 backdrop-blur-md border border-neutral-200/60 rounded-xl text-[13px] text-neutral-700 focus:outline-none focus:border-neutral-300/80 appearance-none cursor-pointer pr-8 bg-[length:12px] bg-[right_10px_center] bg-no-repeat"
+              style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23737373' stroke-width='1.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E\")" }}
               aria-label="Sort sessions"
             >
               {SORT_OPTIONS.map((opt) => (
@@ -291,26 +318,24 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={handleCreateSession}
-              className="h-9 px-4 rounded-md bg-black text-white text-[13px] font-medium hover:bg-neutral-800 transition-colors"
+              className="h-9 rounded-xl bg-neutral-900 text-white text-[13px] px-4 font-medium hover:bg-neutral-800 transition-colors"
             >
               New Session
             </button>
           </div>
         </header>
 
-        <div className="h-[1px] bg-neutral-200 mt-12" aria-hidden />
-
-        {/* Metrics: inline row, no card */}
-        <section className="flex justify-between mt-10 gap-x-20 flex-wrap gap-y-4">
+        {/* Metrics — floating numbers */}
+        <section className="flex flex-wrap gap-x-24 gap-y-2 mt-8">
           <MetricBlock label="Total Sessions" value={stats.totalSessions} animate={true} />
           <MetricBlock label="Active Sessions" value={stats.activeSessions} animate={true} />
           <MetricBlock label="Total Feedback Items" value={stats.totalFeedbackItems} animate={true} />
           <MetricBlock label="Open Issues" value={stats.openIssues} animate={true} />
         </section>
 
-        {/* Main grid */}
-        <main className="mt-16 flex-1 overflow-auto">
-          <div className="grid grid-cols-2 gap-x-[4.5rem] gap-y-[4.5rem]">
+        {/* Cards grid */}
+        <main className="mt-8 flex-1 overflow-auto">
+          <div className="grid grid-cols-2 gap-x-14 gap-y-14">
             {filteredSessions.map((item, index) => (
               <SessionCard
                 key={item.session.id}
@@ -321,7 +346,7 @@ export default function DashboardPage() {
             ))}
           </div>
           {filteredSessions.length === 0 && (
-            <p className="text-[14px] text-neutral-500 py-8">
+            <p className="text-[13px] text-neutral-500 py-8">
               {search.trim()
                 ? "No sessions match your search."
                 : "No sessions yet. Create one to get started."}
