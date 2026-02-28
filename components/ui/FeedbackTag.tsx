@@ -1,11 +1,15 @@
 "use client";
 
-function getTagVars(type: string): { bg: string; text: string } {
+function getTagClass(type: string): string {
   const t = type.toLowerCase();
-  if (t.includes("bug")) return { bg: "var(--tag-bug-bg)", text: "var(--tag-bug-text)" };
-  if (t.includes("ux")) return { bg: "var(--tag-ux-bg)", text: "var(--tag-ux-text)" };
-  if (t.includes("ui")) return { bg: "var(--tag-ui-bg)", text: "var(--tag-ui-text)" };
-  return { bg: "hsl(var(--surface-2))", text: "hsl(var(--text-muted))" };
+  const base = "text-[11px] px-2 py-0.5 rounded-full font-medium border";
+  if (t.includes("bug"))
+    return `${base} bg-red-50 text-red-600 border-red-100`;
+  if (t.includes("ux"))
+    return `${base} bg-indigo-50 text-indigo-600 border-indigo-100`;
+  if (t.includes("ui"))
+    return `${base} bg-blue-50 text-blue-600 border-blue-100`;
+  return `${base} bg-gray-50 text-gray-600 border-gray-100`;
 }
 
 interface FeedbackTagProps {
@@ -13,13 +17,5 @@ interface FeedbackTagProps {
 }
 
 export function FeedbackTag({ type }: FeedbackTagProps) {
-  const { bg, text } = getTagVars(type);
-  return (
-    <span
-      className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide"
-      style={{ backgroundColor: bg, color: text }}
-    >
-      {type}
-    </span>
-  );
+  return <span className={getTagClass(type)}>{type}</span>;
 }

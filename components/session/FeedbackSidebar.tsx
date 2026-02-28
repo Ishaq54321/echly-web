@@ -3,13 +3,13 @@
 import { useState, useMemo } from "react";
 import { FeedbackTag } from "@/components/ui/FeedbackTag";
 
-type FilterKind = "all" | "ux" | "bugs" | "unresolved" | "most_active";
-type SortKind = "recent" | "commented" | "oldest";
+type SortKind = "recent" | "active";
 
 interface FeedbackItem {
   id: string;
   title: string;
   type: string;
+  status?: string;
   createdAt?: { seconds: number } | null;
   clientTimestamp?: number | null;
   timestamp?: number;
@@ -24,87 +24,90 @@ interface Props {
   total?: number;
 }
 
+function formatRowTime(f: FeedbackItem): string {
+  const ms =
+    f.createdAt?.seconds != null
+      ? f.createdAt.seconds * 1000
+      : typeof f.clientTimestamp === "number"
+        ? f.clientTimestamp
+        : typeof f.timestamp === "number"
+          ? f.timestamp
+          : null;
+  if (ms == null) return "";
+  const date = new Date(ms);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "1d ago";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export default function FeedbackSidebar({
   feedback,
   selectedId,
   onSelect,
 }: Props) {
-  const [filter, setFilter] = useState<FilterKind>("all");
   const [sort, setSort] = useState<SortKind>("recent");
   const [sortOpen, setSortOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const displayed = useMemo(() => {
-    let list = feedback;
-
-    switch (filter) {
-      case "ux":
-        list = feedback.filter((f) => f.type === "UX Issue");
-        break;
-      case "bugs":
-        list = feedback.filter((f) => f.type === "Bug");
-        break;
-      case "unresolved":
-        list = feedback.filter((f) => (f.commentCount ?? 0) === 0);
-        break;
-      case "most_active":
-        list = [...feedback].sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0));
-        break;
-      default:
-        break;
+    let list = [...feedback];
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((f) => f.title.toLowerCase().includes(q));
     }
-
-    if (filter !== "most_active") {
-      const getTime = (f: FeedbackItem) => {
-        if (f.createdAt?.seconds) return f.createdAt.seconds * 1000;
-        if (typeof f.clientTimestamp === "number") return f.clientTimestamp;
-        if (typeof f.timestamp === "number") return f.timestamp;
-        return 0;
-      };
-      list = [...list];
-      switch (sort) {
-        case "recent":
-          list.sort((a, b) => getTime(b) - getTime(a));
-          break;
-        case "oldest":
-          list.sort((a, b) => getTime(a) - getTime(b));
-          break;
-        case "commented":
-          list.sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0));
-          break;
-      }
+    const getTime = (f: FeedbackItem) => {
+      if (f.createdAt?.seconds) return f.createdAt.seconds * 1000;
+      if (typeof f.clientTimestamp === "number") return f.clientTimestamp;
+      if (typeof f.timestamp === "number") return f.timestamp;
+      return 0;
+    };
+    if (sort === "recent") {
+      list.sort((a, b) => getTime(b) - getTime(a));
+    } else {
+      list.sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0));
     }
-
     return list;
-  }, [feedback, filter, sort]);
+  }, [feedback, searchQuery, sort]);
 
-  const selectedIndex = selectedId
-    ? displayed.findIndex((f) => f.id === selectedId)
-    : -1;
-  const total = displayed.length;
+  const total = feedback.length;
+  const activeCount =
+    feedback.filter((f) => f.status !== "resolved").length;
+  const resolvedCount = feedback.filter((f) => f.status === "resolved").length;
+
+  const subline =
+    total > 0
+      ? [
+          total + " total",
+          ...(activeCount > 0 ? [activeCount + " active"] : []),
+          ...(resolvedCount > 0 ? [resolvedCount + " resolved"] : []),
+        ].join(" · ")
+      : "0 total";
 
   return (
-    <div className="flex h-full flex-col border-r border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))] px-6 pt-8 pb-6">
-      <div className="space-y-5 flex-1 min-h-0 flex flex-col">
-        <div className="flex items-start justify-between gap-2">
+    <div className="flex h-full flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-4 pt-5 pb-4">
+      <div className="flex flex-1 min-h-0 flex-col gap-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
-            <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[hsl(var(--text-muted))]">
-              FEEDBACK
-            </div>
-            {total >= 0 && (
-              <div className="text-xs text-[hsl(var(--text-muted))]">
-                {selectedIndex >= 0 ? selectedIndex + 1 : 0} of {total}
-              </div>
-            )}
+            <h2 className="text-sm font-semibold tracking-wide uppercase text-[hsl(var(--text-muted))]">
+              Feedback
+            </h2>
+            <p className="text-xs text-[hsl(var(--text-muted))] mt-1">
+              {subline}
+            </p>
           </div>
           <div className="relative">
             <button
               type="button"
               onClick={() => setSortOpen((o) => !o)}
-              className="text-xs text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] transition-colors duration-150 rounded px-2 py-1"
+              className="text-xs bg-transparent border-none focus:ring-0 text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] transition-colors duration-150 cursor-pointer py-0.5"
             >
-              {sort === "recent" && "Most Recent"}
-              {sort === "commented" && "Most Commented"}
-              {sort === "oldest" && "Oldest"}
+              {sort === "recent" ? "Most Recent" : "Most Active"}
             </button>
             {sortOpen && (
               <>
@@ -113,14 +116,14 @@ export default function FeedbackSidebar({
                   aria-hidden
                   onClick={() => setSortOpen(false)}
                 />
-                <div className="absolute right-0 top-full mt-1 z-20 min-w-[140px] rounded-lg border border-[hsl(var(--border))] border-opacity-60 bg-[hsl(var(--surface-1))] py-1">
+                <div className="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] py-1">
                   <button
                     type="button"
                     onClick={() => {
                       setSort("recent");
                       setSortOpen(false);
                     }}
-                    className={`block w-full text-left px-3 py-1.5 text-xs transition-colors duration-150 ${
+                    className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 transition-colors duration-150 ${
                       sort === "recent"
                         ? "font-medium text-[hsl(var(--text-primary))]"
                         : "text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))]"
@@ -131,30 +134,16 @@ export default function FeedbackSidebar({
                   <button
                     type="button"
                     onClick={() => {
-                      setSort("commented");
+                      setSort("active");
                       setSortOpen(false);
                     }}
-                    className={`block w-full text-left px-3 py-1.5 text-xs transition-colors duration-150 ${
-                      sort === "commented"
+                    className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 transition-colors duration-150 ${
+                      sort === "active"
                         ? "font-medium text-[hsl(var(--text-primary))]"
                         : "text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))]"
                     }`}
                   >
-                    Most Commented
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSort("oldest");
-                      setSortOpen(false);
-                    }}
-                    className={`block w-full text-left px-3 py-1.5 text-xs transition-colors duration-150 ${
-                      sort === "oldest"
-                        ? "font-medium text-[hsl(var(--text-primary))]"
-                        : "text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))]"
-                    }`}
-                  >
-                    Oldest
+                    Most Active
                   </button>
                 </div>
               </>
@@ -162,55 +151,70 @@ export default function FeedbackSidebar({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-6">
-          {(
-            [
-              ["all", "All"],
-              ["ux", "UX"],
-              ["bugs", "Bugs"],
-              ["unresolved", "Unresolved"],
-              ["most_active", "Most Active"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setFilter(value)}
-              className={`rounded-full px-3 py-1.5 text-xs cursor-pointer transition-colors duration-150 ${
-                filter === value
-                  ? "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] font-medium"
-                  : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-muted))]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* Search */}
+        <input
+          type="search"
+          placeholder="Search feedback…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="h-9 w-full text-sm px-3 rounded-md bg-[hsl(var(--surface-2))] border border-[hsl(var(--border))] placeholder:text-[hsl(var(--text-muted))] focus:ring-1 focus:ring-[hsl(var(--accent))]/20 focus:outline-none"
+          aria-label="Search feedback"
+        />
 
+        {/* List */}
         <div className="flex flex-1 flex-col space-y-1.5 overflow-y-auto min-h-0">
           {displayed.map((item) => {
             const isActive = item.id === selectedId;
+            const timeStr = formatRowTime(item);
+            const commentNum = item.commentCount ?? 0;
 
             return (
-              <button
+              <div
                 key={item.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelect(item.id)}
-                className={`relative w-full cursor-pointer rounded-xl px-4 py-3.5 text-left transition-all duration-150 ease-out
-                  ${isActive ? "bg-[hsl(var(--surface-2))]" : "hover:bg-[hsl(var(--surface-2))]"}`}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelect(item.id);
+                  }
+                }}
+                className={`group flex flex-col px-4 py-3 rounded-lg cursor-pointer transition-colors duration-150
+                  ${isActive ? "bg-[hsl(var(--surface-2))] border border-[hsl(var(--border))] relative" : "hover:bg-[hsl(var(--surface-2))]/60 border border-transparent"}`}
               >
                 {isActive && (
                   <span
-                    className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-[hsl(var(--accent))]"
+                    className="absolute left-0 top-2 bottom-2 w-[2px] bg-[hsl(var(--accent))] rounded-full"
                     aria-hidden
                   />
                 )}
-                <div className="truncate text-sm font-medium text-[hsl(var(--text-primary))]">
-                  {item.title}
+                <div className="flex justify-between items-start gap-3">
+                  <span className="text-sm font-medium text-[hsl(var(--text-primary))] leading-snug truncate flex-1 min-w-0">
+                    {item.title}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-xs text-[hsl(var(--text-muted))]">
+                      {commentNum > 0 ? `${commentNum}` : timeStr || ""}
+                    </span>
+                    <button
+                      type="button"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-0.5 rounded text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] cursor-pointer border-0 bg-transparent"
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label="More actions"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                        <circle cx="8" cy="3" r="1.5" />
+                        <circle cx="8" cy="8" r="1.5" />
+                        <circle cx="8" cy="13" r="1.5" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-                <div className="mt-1.5">
+                <div className="flex items-center gap-2 mt-2">
                   <FeedbackTag type={item.type} />
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>

@@ -205,7 +205,7 @@ export default function SessionPage() {
     <>
       <div
         className={`min-h-screen flex flex-col overflow-hidden grid grid-cols-1 ${
-          isCommentsOpen ? "lg:grid-cols-[72px_280px_1fr_380px]" : "lg:grid-cols-[72px_280px_1fr]"
+          isCommentsOpen ? "lg:grid-cols-[72px_340px_1fr_380px]" : "lg:grid-cols-[72px_340px_1fr]"
         }`}
       >
         <div className="hidden lg:block min-h-0">
