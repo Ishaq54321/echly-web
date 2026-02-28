@@ -9,10 +9,10 @@
   --radius: 14px;
 
   /* Base Surfaces */
-  --background: 210 20% 97%;        /* #F7F8FA */
-  --surface-1: 0 0% 100%;           /* #FFFFFF */
-  --surface-2: 210 16% 96%;         /* #F1F3F5 */
-  --surface-3: 210 14% 93%;
+  --background: 220 0% 77%;        /* #F7F8FA */
+  --surface-1: 207 6% 100%;          /* #FFFFFF */
+  --surface-2: 207 6% 100%;         /* #F1F3F5 */
+  --surface-3: 210 6% 93%;
 
   /* Borders */
   --border: 220 13% 91%;            /* #E6E8EB */
