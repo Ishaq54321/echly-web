@@ -37,6 +37,10 @@
   --brand: 0 72% 51%;
   --brand-ring: 0 72% 51% / 0.35;
 
+  /* Dashboard / executive layer — subtle authority (no bright colors) */
+  --brand-accent: #111111;
+  --brand-muted: #6B7280;
+
   /* Tag semantic tints (muted, 8–10% max) */
   --tag-bug-bg: hsl(0 80% 96%);
   --tag-bug-text: hsl(0 60% 40%);

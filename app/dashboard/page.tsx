@@ -14,20 +14,38 @@ const SORT_OPTIONS = [
 
 type SortValue = (typeof SORT_OPTIONS)[number]["value"];
 
+function toDate(createdAt: Session["createdAt"]): Date | null {
+  if (!createdAt) return null;
+  if (typeof (createdAt as { toDate?: () => Date }).toDate === "function") {
+    return (createdAt as { toDate: () => Date }).toDate();
+  }
+  if ((createdAt as { seconds?: number }).seconds != null) {
+    return new Date((createdAt as { seconds: number }).seconds * 1000);
+  }
+  return null;
+}
+
 function formatSessionDate(createdAt: Session["createdAt"]): string {
-  if (!createdAt) return "—";
-  const d =
-    typeof (createdAt as { toDate?: () => Date }).toDate === "function"
-      ? (createdAt as { toDate: () => Date }).toDate()
-      : (createdAt as { seconds?: number }).seconds != null
-        ? new Date((createdAt as { seconds: number }).seconds * 1000)
-        : null;
+  const d = toDate(createdAt);
   if (!d) return "—";
   return d.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatRelativeTime(createdAt: Session["createdAt"]): string {
+  const d = toDate(createdAt);
+  if (!d) return "";
+  const now = new Date();
+  const sec = Math.floor((now.getTime() - d.getTime()) / 1000);
+  if (sec < 60) return "Created just now";
+  if (sec < 3600) return `Created ${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `Created ${Math.floor(sec / 3600)}h ago`;
+  if (sec < 2592000) return `Created ${Math.floor(sec / 86400)}d ago`;
+  if (sec < 31536000) return `Created ${Math.floor(sec / 2592000)}mo ago`;
+  return `Created ${Math.floor(sec / 31536000)}y ago`;
 }
 
 function filterAndSortSessions(
@@ -74,15 +92,22 @@ function StatCard({
   value: number;
 }) {
   return (
-    <div className="rounded-md border border-neutral-200 bg-white p-3 flex flex-col justify-center min-h-[72px]">
-      <p className="text-xs uppercase tracking-wide text-neutral-500">
+    <div className="flex flex-col justify-center">
+      <p className="text-[11px] uppercase tracking-[0.08em] text-neutral-500">
         {label}
       </p>
-      <p className="mt-0.5 text-2xl font-semibold leading-tight text-neutral-900 tabular-nums">
+      <p className="text-[30px] font-semibold tracking-tight text-neutral-900 tabular-nums leading-tight">
         {value}
       </p>
     </div>
   );
+}
+
+function isRecentSession(createdAt: Session["createdAt"]): boolean {
+  const d = toDate(createdAt);
+  if (!d) return false;
+  const now = new Date();
+  return now.getTime() - d.getTime() < 24 * 60 * 60 * 1000;
 }
 
 function SessionCard({
@@ -98,46 +123,74 @@ function SessionCard({
   const progress = total > 0 ? (done / total) * 100 : 0;
   const openRatio = total > 0 ? counts.open / total : 0;
   const hasOpen = counts.open > 0;
-  const highOpenRatio = openRatio >= 0.5;
+  const highOpenRatio = openRatio > 0.7;
+  const zeroFeedback = total === 0;
+  const recent = isRecentSession(session.createdAt);
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    onView(session.id);
+  };
 
   return (
     <div
-      className={`rounded-md border border-neutral-200 bg-white p-3 transition-[border-color,background-color] duration-[120ms] hover:border-neutral-300 hover:bg-neutral-50 ${highOpenRatio ? "border-l-2 border-l-neutral-400" : ""}`}
+      role="button"
+      tabIndex={0}
+      onClick={handleCardClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onView(session.id);
+        }
+      }}
+      className={`relative flex flex-col justify-between rounded-md border border-neutral-200 bg-white px-5 py-4 cursor-pointer transition-colors duration-150 hover:border-neutral-400 hover:bg-neutral-50 ${highOpenRatio ? "border-l-2 border-l-neutral-400" : ""} ${zeroFeedback ? "opacity-[0.94]" : ""}`}
       data-session-id={session.id}
     >
-      <h2 className="font-semibold text-base leading-tight text-neutral-900 truncate">
-        {session.title}
-      </h2>
-      <p className="text-xs text-neutral-500 mt-0.5">
-        {formatSessionDate(session.createdAt)}
-      </p>
+      {/* Top section: title, metadata, stats, progress */}
+      <div>
+        <h2 className="text-[15px] font-semibold leading-snug text-neutral-900 truncate" data-recent={recent || undefined}>
+          {session.title}
+        </h2>
+        <div className="mt-1 flex items-center gap-x-2 text-[12px] text-neutral-500">
+          <span>{formatSessionDate(session.createdAt)}</span>
+          <span>{formatRelativeTime(session.createdAt)}</span>
+        </div>
 
-      <div className="mt-2 flex items-baseline gap-x-3 gap-y-0 text-xs text-neutral-500">
-        <span>{total} feedback</span>
-        <span className={hasOpen ? "font-medium text-neutral-700" : ""}>
-          {counts.open} open
-        </span>
-        <span>{counts.in_progress} in progress</span>
-        <span>{counts.resolved} done</span>
-      </div>
-      <div
-        className="mt-1.5 h-1 w-full bg-neutral-200 overflow-hidden"
-        role="progressbar"
-        aria-valuenow={progress}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
+        <div className="mt-2 flex items-baseline gap-x-3 gap-y-0 text-[12px] text-neutral-600">
+          <span>{total} feedback</span>
+          <span className={hasOpen ? "font-medium text-neutral-900 tabular-nums" : ""}>
+            {hasOpen && <span className="mr-1 inline-block h-1 w-1 rounded-full bg-[var(--brand-accent)] align-middle" aria-hidden />}
+            {counts.open} open
+          </span>
+          <span>{counts.in_progress} in progress</span>
+          <span>{counts.resolved} done</span>
+        </div>
         <div
-          className="h-full bg-neutral-700 transition-[width] duration-150"
-          style={{ width: `${progress}%` }}
-        />
+          className="mt-1.5 h-[2px] w-full bg-neutral-200 rounded-none overflow-hidden"
+          role="progressbar"
+          aria-valuenow={progress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <div
+            className="h-[2px] bg-[var(--brand-accent)] rounded-none transition-[width] duration-150"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-end">
+      {/* Bottom row: metadata cluster left, View button right */}
+      <div className="mt-3 flex items-center justify-between">
+        <div className="min-w-0 text-[12px] text-neutral-500">
+          {formatRelativeTime(session.createdAt)}
+        </div>
         <button
           type="button"
-          onClick={() => onView(session.id)}
-          className="h-9 px-3 rounded-md border border-neutral-200 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors duration-[120ms]"
+          onClick={(e) => {
+            e.stopPropagation();
+            onView(session.id);
+          }}
+          className="shrink-0 text-xs rounded-md border border-neutral-300 bg-transparent px-3 py-1 text-neutral-600 hover:bg-neutral-100 transition-colors duration-150"
         >
           View
         </button>
@@ -171,18 +224,18 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-0 flex flex-col">
-      {/* Workspace Header */}
+      {/* Workspace Header — baseline aligned with metrics */}
       <header className="shrink-0 px-6 py-3 border-b border-neutral-200">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-neutral-900">
+            <h1 className="text-[28px] font-semibold tracking-tight text-neutral-900">
               Workspaces
             </h1>
-            <p className="text-sm text-neutral-500 mt-0.5">
+            <p className="text-sm text-neutral-500 mt-1">
               Sessions and feedback in one place.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <input
               type="search"
               placeholder="Search sessions"
@@ -214,19 +267,21 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* Stats Bar */}
-      <section className="shrink-0 px-6 py-3 border-b border-neutral-200">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Total Sessions" value={stats.totalSessions} />
-          <StatCard label="Active Sessions" value={stats.activeSessions} />
-          <StatCard label="Total Feedback Items" value={stats.totalFeedbackItems} />
-          <StatCard label="Open Issues" value={stats.openIssues} />
+      {/* Metrics — command strip */}
+      <section className="shrink-0 px-6 py-4">
+        <div className="rounded-md border border-neutral-200 border-t-neutral-300 bg-neutral-50 px-6 py-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="Total Sessions" value={stats.totalSessions} />
+            <StatCard label="Active Sessions" value={stats.activeSessions} />
+            <StatCard label="Total Feedback Items" value={stats.totalFeedbackItems} />
+            <StatCard label="Open Issues" value={stats.openIssues} />
+          </div>
         </div>
       </section>
 
       {/* Session Grid */}
-      <main className="flex-1 overflow-auto px-6 py-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      <main className="flex-1 overflow-auto px-6 pt-2 pb-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-2.5">
           {filteredSessions.map((item) => (
             <SessionCard
               key={item.session.id}
