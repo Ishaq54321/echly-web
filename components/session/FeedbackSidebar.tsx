@@ -90,7 +90,7 @@ export default function FeedbackSidebar({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex flex-col flex-1 min-h-0 gap-4 px-4 pt-5 pb-4">
+      <div className="flex flex-col flex-1 min-h-0 gap-3 px-4 pt-5 pb-4">
         {/* Header (fixed) */}
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
@@ -105,7 +105,7 @@ export default function FeedbackSidebar({
             <button
               type="button"
               onClick={() => setSortOpen((o) => !o)}
-              className="text-xs bg-transparent border-none focus:ring-0 text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] transition-colors duration-150 cursor-pointer py-0.5"
+              className="text-xs bg-transparent border-none focus:ring-0 text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] transition-all duration-150 ease-out cursor-pointer py-0.5"
             >
               {sort === "recent" ? "Most Recent" : "Most Active"}
             </button>
@@ -158,14 +158,14 @@ export default function FeedbackSidebar({
             placeholder="Search feedback…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-full text-sm px-3 rounded-md bg-[hsl(var(--surface-2))] border border-[hsl(var(--border))] placeholder:text-[hsl(var(--text-muted))] focus:ring-1 focus:ring-[hsl(var(--accent))]/20 focus:outline-none"
+            className="h-9 w-full text-sm px-3 rounded-md bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] placeholder:text-[hsl(var(--text-muted))] focus:ring-2 focus:ring-[hsl(var(--brand)/0.35)] focus:outline-none transition-all duration-150 ease-out"
             aria-label="Search feedback"
           />
         </div>
 
         {/* Ticket list (scrollable only) */}
         <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-          <div className="space-y-1.5">
+          <div className="space-y-1">
           {displayed.map((item) => {
             const isActive = item.id === selectedId;
             const timeStr = formatRowTime(item);
@@ -183,12 +183,14 @@ export default function FeedbackSidebar({
                     onSelect(item.id);
                   }
                 }}
-                className={`group flex flex-col px-4 py-3 rounded-lg cursor-pointer transition-colors duration-150
-                  ${isActive ? "bg-[hsl(var(--surface-2))] border border-[hsl(var(--border))] relative" : "hover:bg-[hsl(var(--surface-2))]/60 border border-transparent"}`}
+                className={`group flex flex-col px-4 py-2.5 rounded-md cursor-pointer transition-all duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand))] focus-visible:ring-offset-0
+                  ${isActive
+                    ? "bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] relative shadow-[inset_0_1px_0_0_hsl(var(--border)/0.5)]"
+                    : "hover:bg-[hsl(var(--surface-1))/0.7] border border-transparent"}`}
               >
                 {isActive && (
                   <span
-                    className="absolute left-0 top-2 bottom-2 w-[2px] bg-[hsl(var(--accent))] rounded-full"
+                    className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-[hsl(var(--brand))] rounded-r-full"
                     aria-hidden
                   />
                 )}
@@ -197,12 +199,12 @@ export default function FeedbackSidebar({
                     {item.title}
                   </span>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-xs text-[hsl(var(--text-muted))]">
+                    <span className="text-xs text-[hsl(var(--text-secondary))] opacity-90">
                       {commentNum > 0 ? `${commentNum}` : timeStr || ""}
                     </span>
                     <button
                       type="button"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-0.5 rounded text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] cursor-pointer border-0 bg-transparent"
+                      className="opacity-0 group-hover:opacity-100 transition-all duration-150 ease-out p-0.5 rounded text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] cursor-pointer border-0 bg-transparent"
                       onClick={(e) => e.stopPropagation()}
                       aria-label="More actions"
                     >
@@ -214,7 +216,7 @@ export default function FeedbackSidebar({
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-1.5">
                   <FeedbackTag type={item.type} />
                 </div>
               </div>

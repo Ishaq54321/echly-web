@@ -26,6 +26,10 @@
   --accent: 243 75% 59%;
   --accent-hover: 243 75% 65%;
 
+  /* Brand (selected state, focus ring — use sparingly) */
+  --brand: 0 72% 51%;
+  --brand-ring: 0 72% 51% / 0.35;
+
   /* Tag semantic tints (muted, 8–10% max) */
   --tag-bug-bg: hsl(0 80% 96%);
   --tag-bug-text: hsl(0 60% 40%);
@@ -91,4 +95,10 @@ h2 {
 
 h3 {
   letter-spacing: -0.01em;
+}
+
+/* Brand focus-visible ring (disciplined use) */
+.focus-ring-brand:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--brand));
 }

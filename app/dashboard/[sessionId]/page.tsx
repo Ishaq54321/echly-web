@@ -214,7 +214,7 @@ export default function SessionPage() {
           <GlobalRail />
         </div>
 
-        <aside className="flex flex-col h-full min-h-0 border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-1))]">
+        <aside className="flex flex-col h-full min-h-0 border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]">
           <FeedbackSidebar
             feedback={feedback}
             selectedId={selectedId}
@@ -225,15 +225,15 @@ export default function SessionPage() {
         </aside>
 
         <div className="flex flex-col h-full min-h-0 overflow-hidden bg-neutral-50">
-          <div className="max-w-4xl mx-auto w-full px-8 pt-6 pb-4 shrink-0">
+          <div className="max-w-4xl mx-auto w-full px-8 pt-5 pb-3 shrink-0">
             <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--text-primary))]">
               {session?.title ?? "Session"}
             </h1>
-            <div className="text-sm text-[hsl(var(--text-muted))] mt-1 flex items-center gap-2">
+            <div className="text-sm text-[hsl(var(--text-secondary))] mt-1 flex items-center gap-1.5 [&_span]:opacity-[0.92]">
               <span>You</span>
-              <span className="opacity-50">•</span>
+              <span aria-hidden>•</span>
               <span>{formatRelativeTime(session?.createdAt) || "—"}</span>
-              <span className="opacity-50">•</span>
+              <span aria-hidden>•</span>
               <span>
                 {feedback.length} feedback item{feedback.length !== 1 ? "s" : ""}
               </span>
@@ -260,7 +260,7 @@ export default function SessionPage() {
         </div>
 
         {isCommentsOpen && (
-            <aside className="flex flex-col h-full min-h-0 hidden lg:block bg-[hsl(var(--surface-1))] border-l border-[hsl(var(--border))] px-6">
+            <aside className="flex flex-col h-full min-h-0 hidden lg:block bg-[hsl(var(--surface-1))] border-l border-[hsl(var(--border)/0.8)] px-6">
               <ActivityPanel
                 comments={comments}
                 loading={loadingComments}

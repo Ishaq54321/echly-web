@@ -38,19 +38,19 @@ export function FeedbackHeader({
     <>
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-[19px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))]">
+          <h1 className="text-[20px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))]">
             {item.title}
           </h1>
-          <div className="flex items-center gap-2.5 mt-2 text-[12px]">
+          <div className="flex items-center gap-2 mt-1.5 text-[12px]">
             <span className="font-medium text-[hsl(var(--text-primary))]">
               {item.type || "—"}
             </span>
-            <span className="opacity-30" aria-hidden>•</span>
-            <span className="text-[hsl(var(--text-muted))] opacity-90">
+            <span className="opacity-60" aria-hidden>•</span>
+            <span className="text-[hsl(var(--text-secondary))] opacity-[0.92]">
               Created {createdAgo}
             </span>
-            <span className="opacity-30" aria-hidden>•</span>
-            <span className="text-[hsl(var(--text-muted))] opacity-90">
+            <span className="opacity-60" aria-hidden>•</span>
+            <span className="text-[hsl(var(--text-secondary))] opacity-[0.92]">
               Assigned to You
             </span>
           </div>
@@ -65,10 +65,10 @@ export function FeedbackHeader({
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] ${
               isActivityOpen
                 ? "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))]"
-                : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))]"
+                : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]"
             }`}
             aria-pressed={isActivityOpen}
           >
@@ -77,7 +77,7 @@ export function FeedbackHeader({
           </button>
         </div>
       </div>
-      <div className="mt-4 border-b border-[hsl(var(--border)/0.9)]" />
+      <div className="mt-4 border-b border-[hsl(var(--border))]" />
     </>
   );
 }

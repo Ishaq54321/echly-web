@@ -39,14 +39,14 @@ export function DescriptionSection({
               <button
                 type="button"
                 onClick={onSave}
-                className="px-3 py-1.5 text-xs font-medium rounded-md bg-[hsl(var(--text-primary))] text-[hsl(var(--surface-1))] hover:opacity-90"
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-[hsl(var(--text-primary))] text-[hsl(var(--surface-1))] hover:opacity-90 transition-all duration-150 ease-out"
               >
                 Save
               </button>
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-3 py-1.5 text-xs font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:opacity-90"
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:opacity-90 transition-all duration-150 ease-out"
               >
                 Cancel
               </button>
@@ -61,7 +61,7 @@ export function DescriptionSection({
               <button
                 type="button"
                 onClick={onEdit}
-                className="text-xs text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] flex-shrink-0"
+                className="text-xs text-[hsl(var(--text-secondary))] opacity-90 hover:text-[hsl(var(--text-primary))] flex-shrink-0 transition-all duration-150 ease-out"
               >
                 Edit
               </button>

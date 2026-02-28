@@ -39,22 +39,22 @@ export default function SessionHeader({
   const dateStr = formatCreatedAt(createdAt ?? null);
 
   return (
-    <div className="flex items-start justify-between py-10 border-b border-[hsl(var(--border))]">
-      <div className="flex flex-col gap-2">
+    <div className="flex items-start justify-between py-6 border-b border-[hsl(var(--border))]">
+      <div className="flex flex-col gap-1.5">
         <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--text-primary))] leading-snug">
           {title ?? "Session"}
         </h1>
-        <div className="text-sm text-[hsl(var(--text-muted))] flex items-center gap-3">
+        <div className="text-sm text-[hsl(var(--text-secondary))] opacity-[0.92] flex items-center gap-2">
           <span>{feedbackCount} feedback item{feedbackCount !== 1 ? "s" : ""}</span>
           {sessionId != null && sessionId !== "" && (
             <>
-              <span className="opacity-50">•</span>
+              <span className="opacity-60" aria-hidden>•</span>
               <span>{sessionId}</span>
             </>
           )}
           {dateStr != null && (
             <>
-              <span className="opacity-50">•</span>
+              <span className="opacity-60" aria-hidden>•</span>
               <span>{dateStr}</span>
             </>
           )}
@@ -64,7 +64,7 @@ export default function SessionHeader({
         <button
           type="button"
           onClick={onCopy}
-          className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] hover:bg-[hsl(var(--surface-2))] transition-colors duration-150 font-medium text-[hsl(var(--text-primary))]"
+          className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] hover:bg-[hsl(var(--surface-2))] hover:border-[hsl(var(--border)/0.9)] transition-all duration-150 ease-out font-medium text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)]"
         >
           <Share2 size={16} />
           {copied ? "Copied" : "Share"}

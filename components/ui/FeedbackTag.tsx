@@ -17,5 +17,5 @@ interface FeedbackTagProps {
 }
 
 export function FeedbackTag({ type }: FeedbackTagProps) {
-  return <span className={getTagClass(type)}>{type}</span>;
+  return <span className={`${getTagClass(type)} transition-all duration-150 ease-out`}>{type}</span>;
 }
