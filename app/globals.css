@@ -109,6 +109,22 @@ body {
   }
 }
 
+/* Dashboard v5 — card reveal: opacity + translateY 10px, 250ms, stagger 30ms (set via style) */
+.dashboard-card-v5 {
+  opacity: 0;
+  animation: dashboard-card-v5-reveal 250ms ease-out forwards;
+}
+@keyframes dashboard-card-v5-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ======================================
    TYPOGRAPHY REFINEMENT
 ====================================== */
