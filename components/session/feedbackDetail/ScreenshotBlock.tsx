@@ -9,12 +9,16 @@ interface ScreenshotBlockProps {
 
 export function ScreenshotBlock({ screenshotUrl, onExpand }: ScreenshotBlockProps) {
   return (
-    <div className="mt-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] p-3">
-      <div className="relative overflow-hidden rounded-md max-h-[360px] bg-[hsl(var(--surface-1))]">
+    <div className="mt-4 rounded-lg border border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-1))] p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+      <div className="flex items-center justify-between mb-3 text-xs text-[hsl(var(--text-muted))] tracking-normal">
+        <span>Attachment</span>
+        <span>Screenshot</span>
+      </div>
+      <div className="relative overflow-hidden rounded-md max-h-[400px] bg-neutral-50">
         <img
           src={screenshotUrl}
           alt="Screenshot"
-          className="w-full h-auto max-h-[360px] object-contain"
+          className="w-full h-auto max-h-[400px] object-contain"
         />
         <button
           type="button"

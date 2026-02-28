@@ -9,7 +9,7 @@ interface SuggestionSectionProps {
 export function SuggestionSection({ suggestion }: SuggestionSectionProps) {
   return (
     <Section title="Suggestion">
-      <p className="text-sm leading-relaxed text-[hsl(var(--text-primary))]">
+      <p className="text-[14px] leading-[1.6] text-[hsl(var(--text-primary))]">
         {suggestion}
       </p>
     </Section>

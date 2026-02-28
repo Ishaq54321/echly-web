@@ -41,12 +41,10 @@ export function FeedbackContent({
       />
       {item.screenshotUrl && (
         <Section title="Attachments">
-          <div className="flex flex-col gap-3">
-            <ScreenshotBlock
-              screenshotUrl={item.screenshotUrl}
-              onExpand={onExpandImage}
-            />
-          </div>
+          <ScreenshotBlock
+            screenshotUrl={item.screenshotUrl}
+            onExpand={onExpandImage}
+          />
         </Section>
       )}
       {item.suggestion != null && item.suggestion !== "" && (

@@ -26,7 +26,7 @@ export function DescriptionSection({
 
   return (
     <Section title="Description">
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
         {isEditing && hasEdit ? (
           <>
             <textarea
@@ -54,7 +54,7 @@ export function DescriptionSection({
           </>
         ) : (
           <div className="flex items-start justify-between gap-2">
-            <p className="text-sm leading-relaxed text-[hsl(var(--text-primary))] flex-1">
+            <p className="text-[14px] leading-[1.55] text-[hsl(var(--text-primary))] flex-1">
               {displayValue}
             </p>
             {hasEdit && (
