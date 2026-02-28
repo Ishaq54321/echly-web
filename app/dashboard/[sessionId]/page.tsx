@@ -203,11 +203,27 @@ export default function SessionPage() {
 
   return (
     <>
-      <div className="min-h-screen flex flex-col overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-[72px_280px_1fr]">
-          <div className="hidden lg:block" aria-hidden />
-          <div className="hidden lg:block" aria-hidden />
-          <div className="max-w-4xl mx-auto w-full px-6 py-8">
+      <div
+        className={`min-h-screen flex flex-col overflow-hidden grid grid-cols-1 ${
+          isCommentsOpen ? "lg:grid-cols-[72px_280px_1fr_380px]" : "lg:grid-cols-[72px_280px_1fr]"
+        }`}
+      >
+        <div className="hidden lg:block min-h-0">
+          <GlobalRail />
+        </div>
+
+        <aside className="min-h-0 overflow-hidden border-r border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))]">
+          <FeedbackSidebar
+            feedback={feedback}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            selectedIndex={selectedIndex}
+            total={feedback.length}
+          />
+        </aside>
+
+        <div className="min-h-0 overflow-hidden flex flex-col">
+          <div className="max-w-4xl mx-auto w-full px-6 pt-6 pb-4 shrink-0">
             <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--text-primary))]">
               {session?.title ?? "Session"}
             </h1>
@@ -221,31 +237,9 @@ export default function SessionPage() {
               </span>
             </div>
           </div>
-        </div>
-
-        <div
-          className={`mt-6 grid flex-1 min-h-0 grid-cols-1 overflow-hidden ${
-            isCommentsOpen ? "lg:grid-cols-[72px_280px_1fr_380px]" : "lg:grid-cols-[72px_280px_1fr]"
-          }`}
-        >
-          <div className="hidden lg:block min-h-0">
-            <GlobalRail />
-          </div>
-
-          <aside className="min-h-0 overflow-hidden border-r border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))]">
-            <FeedbackSidebar
-              feedback={feedback}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              selectedIndex={selectedIndex}
-              total={feedback.length}
-            />
-          </aside>
-
-          <div className="min-h-0 overflow-hidden">
-            <div className="max-w-4xl mx-auto h-full overflow-auto rounded-3xl border border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))] px-6 py-10">
-              <div className="mt-6">
-                <FeedbackDetail
+          <div className="max-w-4xl mx-auto w-full flex-1 min-h-0 overflow-auto px-6">
+            <div className="rounded-3xl border border-[hsl(var(--border))] border-opacity-50 bg-[hsl(var(--surface-1))] px-6 py-10">
+              <FeedbackDetail
                   sessionId={sessionId as string}
                   selectedItem={selectedItem}
                   isEditingDescription={isEditingDescription}
@@ -257,11 +251,11 @@ export default function SessionPage() {
                   isCommentsOpen={isCommentsOpen}
                   onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}
                 />
-              </div>
             </div>
           </div>
+        </div>
 
-          {isCommentsOpen && (
+        {isCommentsOpen && (
             <aside className="min-h-0 overflow-hidden hidden lg:block bg-[hsl(var(--surface-1))] border-l border-[hsl(var(--border))] border-opacity-50 px-6">
               <ActivityPanel
                 comments={comments}
@@ -270,9 +264,9 @@ export default function SessionPage() {
               />
             </aside>
           )}
-        </div>
+      </div>
 
-        {isCommentsOpen && (
+      {isCommentsOpen && (
           <div className="lg:hidden fixed inset-0 z-40 flex justify-end">
             <div
               className="absolute inset-0 bg-black/50 transition-opacity duration-200"
@@ -304,7 +298,6 @@ export default function SessionPage() {
             />
           </div>
         )}
-      </div>
 
       {session && (
         <CaptureWidget

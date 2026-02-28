@@ -17,7 +17,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <GlobalNavBar />
-        <main className="pt-16 min-h-screen">
+        <main className="pt-16">
           {children}
         </main>
       </body>
