@@ -12,7 +12,7 @@ import {
   deleteFeedback,
 } from "@/lib/feedback";
 import CaptureWidget from "@/components/CaptureWidget";
-import { uploadScreenshot } from "@/lib/screenshot";
+import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import GlobalRail from "@/components/layout/GlobalRail";
 import FeedbackSidebar from "@/components/session/FeedbackSidebar";
 import FeedbackDetail from "@/components/session/feedbackDetail/FeedbackDetail";
@@ -166,8 +166,10 @@ export default function SessionPage() {
     }
 
     let screenshotUrl: string | null = null;
+    let firstFeedbackId: string | null = null;
     if (screenshot) {
-      screenshotUrl = await uploadScreenshot(screenshot, sessionId as string);
+      firstFeedbackId = generateFeedbackId();
+      screenshotUrl = await uploadScreenshot(screenshot, sessionId as string, firstFeedbackId);
     }
 
     const created: any[] = [];
@@ -186,7 +188,12 @@ export default function SessionPage() {
         timestamp: Date.now(),
       };
 
-      const docRef = await addFeedback(sessionId as string, session.userId, payload);
+      const docRef = await addFeedback(
+        sessionId as string,
+        session.userId,
+        payload,
+        i === 0 && firstFeedbackId ? firstFeedbackId : undefined
+      );
       const newItem = {
         id: docRef.id,
         ...payload,

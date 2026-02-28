@@ -31,9 +31,10 @@ import {
 export async function addFeedback(
   sessionId: string,
   userId: string,
-  data: StructuredFeedback
+  data: StructuredFeedback,
+  feedbackId?: string
 ): Promise<DocumentReference> {
-  return await addFeedbackRepo(sessionId, userId, data);
+  return await addFeedbackRepo(sessionId, userId, data, feedbackId);
 }
 
 /* ================================

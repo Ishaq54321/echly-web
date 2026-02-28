@@ -8,7 +8,7 @@ import {
   type StructuredFeedback,
   type FeedbackPriority,
 } from "@/lib/feedback";
-import { uploadScreenshot } from "@/lib/screenshot";
+import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import type { Session } from "@/lib/sessions";
 
 /** Elite structuring API response. */
@@ -105,8 +105,10 @@ export function useFeedback({
     }
 
     let screenshotUrl: string | null = null;
+    let firstFeedbackId: string | null = null;
     if (screenshot) {
-      screenshotUrl = await uploadScreenshot(screenshot, sessionId);
+      firstFeedbackId = generateFeedbackId();
+      screenshotUrl = await uploadScreenshot(screenshot, sessionId, firstFeedbackId);
     }
 
     if (!session) {
@@ -114,6 +116,7 @@ export function useFeedback({
     }
 
     const created: Feedback[] = [];
+    let ticketIndex = 0;
     for (const t of tickets) {
       const payload: StructuredFeedback = {
         title: t.title,
@@ -124,11 +127,17 @@ export function useFeedback({
         impact: t.impact ?? undefined,
         suggestedTags: t.suggestedTags,
         priority: normalizePriority(t.suggestedPriority),
-        screenshotUrl: created.length === 0 ? screenshotUrl : null,
+        screenshotUrl: ticketIndex === 0 ? screenshotUrl : null,
         timestamp: Date.now(),
       };
 
-      const docRef = await addFeedback(sessionId, session.userId, payload);
+      const docRef = await addFeedback(
+        sessionId,
+        session.userId,
+        payload,
+        ticketIndex === 0 && firstFeedbackId ? firstFeedbackId : undefined
+      );
+      ticketIndex++;
       const newItem: Feedback = {
         id: docRef.id,
         sessionId,

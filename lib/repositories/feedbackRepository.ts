@@ -8,6 +8,7 @@ import {
   query,
   limitToLast,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   type DocumentReference,
@@ -21,36 +22,50 @@ import type {
   StructuredFeedback,
 } from "@/lib/domain/feedback";
 
-export async function addFeedbackRepo(
+const feedbackPayload = (
   sessionId: string,
   userId: string,
   data: StructuredFeedback
+) => ({
+  sessionId,
+  userId,
+  title: data.title,
+  description: data.description,
+  suggestion: data.suggestion ?? "",
+  type: data.type,
+  status: "open",
+  priority: data.priority ?? "medium",
+  createdAt: serverTimestamp(),
+
+  contextSummary: data.contextSummary ?? null,
+  actionItems: data.actionItems ?? null,
+  impact: data.impact ?? null,
+  suggestedTags: data.suggestedTags ?? null,
+
+  url: data.url ?? null,
+  viewportWidth: data.viewportWidth ?? null,
+  viewportHeight: data.viewportHeight ?? null,
+  userAgent: data.userAgent ?? null,
+  clientTimestamp: data.timestamp ?? null,
+
+  screenshotUrl: data.screenshotUrl ?? null,
+});
+
+export async function addFeedbackRepo(
+  sessionId: string,
+  userId: string,
+  data: StructuredFeedback,
+  feedbackId?: string
 ): Promise<DocumentReference> {
-  const docRef = await addDoc(collection(db, "feedback"), {
-    sessionId,
-    userId,
-    title: data.title,
-    description: data.description,
-    suggestion: data.suggestion ?? "",
-    type: data.type,
-    status: "open",
-    priority: data.priority ?? "medium",
-    createdAt: serverTimestamp(),
+  const payload = feedbackPayload(sessionId, userId, data);
 
-    contextSummary: data.contextSummary ?? null,
-    actionItems: data.actionItems ?? null,
-    impact: data.impact ?? null,
-    suggestedTags: data.suggestedTags ?? null,
+  if (feedbackId != null && feedbackId !== "") {
+    const docRef = doc(db, "feedback", feedbackId);
+    await setDoc(docRef, payload);
+    return docRef;
+  }
 
-    url: data.url ?? null,
-    viewportWidth: data.viewportWidth ?? null,
-    viewportHeight: data.viewportHeight ?? null,
-    userAgent: data.userAgent ?? null,
-    clientTimestamp: data.timestamp ?? null,
-
-    screenshotUrl: data.screenshotUrl ?? null,
-  });
-
+  const docRef = await addDoc(collection(db, "feedback"), payload);
   return docRef;
 }
 
