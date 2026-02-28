@@ -26,7 +26,7 @@ export function DescriptionSection({
 
   return (
     <Section title="Description">
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-2">
         {isEditing && hasEdit ? (
           <>
             <textarea

@@ -41,16 +41,16 @@ export function FeedbackHeader({
           <h1 className="text-[19px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))]">
             {item.title}
           </h1>
-          <div className="flex items-center gap-3 mt-2 text-[12px]">
+          <div className="flex items-center gap-2.5 mt-2 text-[12px]">
             <span className="font-medium text-[hsl(var(--text-primary))]">
               {item.type || "—"}
             </span>
-            <span className="opacity-40" aria-hidden>•</span>
-            <span className="text-[hsl(var(--text-muted))] opacity-80">
+            <span className="opacity-30" aria-hidden>•</span>
+            <span className="text-[hsl(var(--text-muted))] opacity-90">
               Created {createdAgo}
             </span>
-            <span className="opacity-40" aria-hidden>•</span>
-            <span className="text-[hsl(var(--text-muted))] opacity-80">
+            <span className="opacity-30" aria-hidden>•</span>
+            <span className="text-[hsl(var(--text-muted))] opacity-90">
               Assigned to You
             </span>
           </div>
@@ -77,7 +77,7 @@ export function FeedbackHeader({
           </button>
         </div>
       </div>
-      <div className="mt-5 border-b border-[hsl(var(--border)/0.7)]" />
+      <div className="mt-4 border-b border-[hsl(var(--border)/0.9)]" />
     </>
   );
 }

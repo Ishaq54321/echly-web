@@ -224,7 +224,7 @@ export default function SessionPage() {
           />
         </aside>
 
-        <div className="flex flex-col h-full min-h-0 overflow-hidden">
+        <div className="flex flex-col h-full min-h-0 overflow-hidden bg-neutral-50">
           <div className="max-w-4xl mx-auto w-full px-8 pt-6 pb-4 shrink-0">
             <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--text-primary))]">
               {session?.title ?? "Session"}
@@ -240,7 +240,7 @@ export default function SessionPage() {
             </div>
           </div>
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col max-w-4xl mx-auto w-full">
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-50">
               <div className="flex flex-col h-full px-8 py-6">
                 <FeedbackDetail
                   sessionId={sessionId as string}

@@ -49,7 +49,7 @@ export function StatusPill({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] hover:bg-[hsl(var(--surface-2))] transition text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent)/0.3)]"
+        className="flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-md border border-[hsl(var(--border)/0.9)] bg-neutral-50 hover:bg-neutral-100 transition text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent)/0.3)]"
         aria-label={ariaLabel}
         aria-expanded={open}
         aria-haspopup="listbox"
