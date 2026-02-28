@@ -25,41 +25,41 @@ export default function CaptureHeader({
   return (
     <div
       onMouseDown={onStartDrag}
-      className="px-6 py-3 flex justify-between items-center
+      className="px-6 py-4 flex justify-between items-center
                  bg-[rgba(0,0,0,0.03)] border-b border-[rgba(0,0,0,0.06)]
                  cursor-move"
     >
-      <div className="flex items-center gap-2">
-        <Image src="/Echly_logo.svg" alt="Echly" width={23} height={23} />
-        <span className="text-base font-semibold text-slate-900">Echly</span>
+      <div className="flex items-center gap-2 min-h-8">
+        <Image src="/Echly_logo.svg" alt="Echly" width={24} height={24} className="shrink-0" />
+        <span className="text-base font-semibold text-slate-900 leading-none">Echly</span>
       </div>
 
-      <div className="flex items-center gap-0 relative" ref={menuRef}>
+      <div className="flex items-center gap-2 relative" ref={menuRef}>
         <button
+          type="button"
           onClick={onShare}
-          className="flex items-center gap-2 px-2 py-1.5 rounded-sm
+          className="flex items-center gap-2 h-8 px-2 rounded-sm
                          text-sm font-medium text-slate-600
-                         hover:bg-[rgba(0,0,0,0.04)] transition-colors duration-[120ms] ease-out"
-          style={{ minHeight: 32 }}
+                         hover:bg-[rgba(0,0,0,0.04)] transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
         >
-          <Share2 size={14} strokeWidth={2} />
+          <Share2 size={14} strokeWidth={2} className="shrink-0" />
           Share
         </button>
 
         <button
+          type="button"
           onClick={onMoreClick}
-          className="p-2 rounded-sm hover:bg-[rgba(0,0,0,0.04)] transition-colors duration-[120ms] ease-out"
-          style={{ width: 32, height: 32 }}
+          className="flex items-center justify-center w-8 h-8 rounded-sm hover:bg-[rgba(0,0,0,0.04)] transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
         >
-          <MoreVertical size={16} strokeWidth={2} className="text-slate-500" />
+          <MoreVertical size={18} strokeWidth={2} className="text-slate-500" />
         </button>
 
         <button
+          type="button"
           onClick={onClose}
-          className="p-2 rounded-sm hover:bg-[rgba(0,0,0,0.04)] transition-colors duration-[120ms] ease-out"
-          style={{ width: 32, height: 32 }}
+          className="flex items-center justify-center w-8 h-8 rounded-sm hover:bg-[rgba(0,0,0,0.04)] transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
         >
-          <X size={16} strokeWidth={2} className="text-slate-500" />
+          <X size={18} strokeWidth={2} className="text-slate-500" />
         </button>
 
         {showMenu && (

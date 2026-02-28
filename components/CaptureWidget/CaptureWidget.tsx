@@ -58,7 +58,7 @@ export default function CaptureWidget({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 backdrop-blur-[4px] bg-black/6"
+        className="fixed inset-0 z-40 backdrop-blur-[4px] bg-black/8"
         aria-hidden
       />
       <div
@@ -70,7 +70,7 @@ export default function CaptureWidget({
       >
         <div className="bg-white rounded-lg
                         border border-slate-200/80
-                        shadow-[0_12px_30px_rgba(0,0,0,0.10),0_4px_12px_rgba(0,0,0,0.06)]
+                        shadow-[0_16px_40px_rgba(0,0,0,0.12),0_6px_16px_rgba(0,0,0,0.08)]
                         overflow-hidden font-sans">
         <CaptureHeader
           onStartDrag={handlers.startDrag}
@@ -82,7 +82,7 @@ export default function CaptureWidget({
           menuRef={refs.menuRef}
         />
 
-        <div className="p-5 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
+        <div className="px-6 py-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
           <FeedbackList
             items={state.pointers}
             expandedId={state.expandedId}
@@ -93,29 +93,29 @@ export default function CaptureWidget({
           />
 
           {state.state === "processing" && (
-            <div className="flex items-center gap-3 text-sm text-slate-600">
-              <div className="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+            <div className="capture-processing-enter flex items-center gap-4 text-sm text-slate-600">
+              <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
               Structuring your feedback...
             </div>
           )}
 
           {state.state === "listening" && (
-            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-              <div className="flex justify-between mb-3">
+            <div className="capture-listening-enter border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <div className="flex justify-between mb-4">
                 <span className="text-sm font-medium text-slate-800">Listening...</span>
                 <span className="text-sm text-slate-500">{derivedValues.formatTime()}</span>
               </div>
-              <div className="mb-3">
+              <div className="mb-4">
                 <AudioWaveform isActive={state.state === "listening"} />
               </div>
               <div className="flex justify-between">
-                <button onClick={handlers.discardListening} className="text-sm text-slate-600 hover:text-slate-900 transition-colors duration-[120ms] ease-out">Cancel</button>
-                <button onClick={handlers.finishListening} className="bg-gradient-to-r from-rose-600 to-red-600 hover:brightness-95 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-[120ms] ease-out">Done</button>
+                <button onClick={handlers.discardListening} className="text-sm text-slate-600 hover:text-slate-900 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]">Cancel</button>
+                <button onClick={handlers.finishListening} className="bg-gradient-to-r from-rose-600 to-red-600 hover:brightness-[0.96] text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]">Done</button>
               </div>
             </div>
           )}
           {state.errorMessage && (
-            <div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-4 py-2.5">
+            <div className="text-sm text-rose-600 bg-rose-50/80 border border-rose-200 rounded-md px-4 py-3">
               {state.errorMessage}
             </div>
           )}

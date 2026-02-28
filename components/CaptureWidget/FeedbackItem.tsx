@@ -40,14 +40,14 @@ export default function FeedbackItem({
 
   return (
     <div
-      className="bg-white px-5 py-3 border-b border-[rgba(0,0,0,0.05)]
-                 transition-[background-color,transform] duration-[120ms] ease-out
+      className="bg-white px-6 py-4 border-b border-[rgba(0,0,0,0.05)]
+                 transition-[background-color,transform] duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]
                  hover:bg-[rgba(0,0,0,0.02)]
-                 active:scale-[0.99] active:duration-75 active:ease-in
+                 active:scale-[0.99] active:duration-[80ms] active:ease-in
                  last:border-b-0"
     >
       <div className="flex justify-between gap-4">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {isEditing ? (
             <>
               <input
@@ -74,11 +74,11 @@ export default function FeedbackItem({
             </>
           ) : (
             <>
-              <h3 className="text-sm font-semibold text-slate-900">
+              <h3 className="text-sm font-semibold text-slate-900 leading-snug">
                 {item.title}
               </h3>
               {isExpanded && (
-                <p className="text-xs text-slate-600 mt-1">
+                <p className="text-xs text-slate-600 mt-1.5">
                   {item.description}
                 </p>
               )}
@@ -86,35 +86,39 @@ export default function FeedbackItem({
           )}
         </div>
 
-        <div className="flex items-start gap-0.5 text-slate-400">
+        <div className="flex items-center gap-2 shrink-0 text-slate-400">
           <button
+            type="button"
             onClick={onExpand}
-            className="p-1.5 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-slate-700 transition-colors duration-[120ms] ease-out"
+            className="flex items-center justify-center w-6 h-6 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-slate-700 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
           >
-            <Expand size={16} strokeWidth={2} />
+            <Expand size={18} strokeWidth={2} />
           </button>
 
           {isEditing ? (
             <button
+              type="button"
               onClick={onSaveEdit}
-              className="p-1.5 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-emerald-600 transition-colors duration-[120ms] ease-out"
+              className="flex items-center justify-center w-6 h-6 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-emerald-600 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
             >
-              <Check size={16} strokeWidth={2} />
+              <Check size={18} strokeWidth={2} />
             </button>
           ) : (
             <button
+              type="button"
               onClick={onEdit}
-              className="p-1.5 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-slate-700 transition-colors duration-[120ms] ease-out"
+              className="flex items-center justify-center w-6 h-6 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-slate-700 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
             >
-              <Pencil size={16} strokeWidth={2} />
+              <Pencil size={18} strokeWidth={2} />
             </button>
           )}
 
           <button
+            type="button"
             onClick={onDelete}
-            className="p-1.5 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-rose-600 transition-colors duration-[120ms] ease-out"
+            className="flex items-center justify-center w-6 h-6 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-rose-600 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
           >
-            <Trash2 size={16} strokeWidth={2} />
+            <Trash2 size={18} strokeWidth={2} />
           </button>
         </div>
       </div>

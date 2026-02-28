@@ -11,8 +11,9 @@ export default function WidgetFooter({
 }: WidgetFooterProps) {
   return (
     <button
+      type="button"
       onClick={onAddFeedback}
-      className={`mt-2 w-full px-6 py-3 rounded-lg text-sm font-semibold tracking-tight transition-colors duration-[120ms] ease-out
+      className={`mt-3 w-full px-6 py-2.5 rounded-md flex items-center justify-center text-sm font-semibold tracking-tight transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]
   ${
     !isIdle
       ? "bg-gray-300 text-gray-500 cursor-not-allowed"
