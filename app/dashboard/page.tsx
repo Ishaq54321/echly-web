@@ -130,10 +130,10 @@ function MetricBlock({
   const display = useCountUp(value, animate, 600);
   return (
     <div className="flex flex-col">
-      <span className="text-[40px] font-medium tracking-[-0.02em] tabular-nums text-neutral-900">
+      <span className="text-[36px] font-medium tracking-[-0.02em] tabular-nums text-neutral-900">
         {display}
       </span>
-      <span className="text-[11px] uppercase tracking-[0.22em] text-neutral-400 mt-1">
+      <span className="text-[10px] uppercase tracking-[0.22em] text-neutral-400 mt-1">
         {label}
       </span>
     </div>
@@ -171,14 +171,14 @@ function SessionCard({
           onView(session.id);
         }
       }}
-      className="dashboard-workspace-card group flex flex-col min-h-[150px] w-full bg-white/70 backdrop-blur-lg rounded-[20px] px-6 py-6 border border-white/50 shadow-[0_8px_24px_rgba(0,0,0,0.04)] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2 transition-[background-color,border-color,box-shadow,transform] duration-[160ms] ease-out hover:bg-white/85 hover:border-white/80 hover:shadow-[0_12px_32px_rgba(0,0,0,0.06)] active:translate-y-[1px] active:transition-transform active:duration-[80ms]"
+      className="dashboard-workspace-card group flex flex-col min-h-[125px] w-full max-w-[360px] bg-white/75 backdrop-blur-md rounded-[16px] px-5 py-5 border border-white/50 shadow-[0_4px_14px_rgba(0,0,0,0.03)] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2 transition-[background-color] duration-[160ms] ease-out hover:bg-white/90"
       style={{ animationDelay: `${index * 40}ms` }}
       data-session-id={session.id}
     >
       {/* Top row: folder icon, name, status dot */}
       <div className="flex items-center gap-2 min-w-0">
         <svg
-          className="shrink-0 w-4 h-4 text-neutral-400"
+          className="shrink-0 w-[14px] h-[14px] text-neutral-400"
           fill="none"
           strokeWidth={1.5}
           stroke="currentColor"
@@ -189,44 +189,41 @@ function SessionCard({
         >
           <path d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44l-2.122-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6z" />
         </svg>
-        <h2 className="text-[15px] font-medium text-neutral-900 truncate min-w-0">
+        <h2 className="text-[14px] font-medium text-neutral-900 truncate min-w-0">
           {session.title}
         </h2>
         <span
-          className={`shrink-0 w-[5px] h-[5px] rounded-full ${hasOpenIssues ? "bg-neutral-900" : "bg-neutral-300"}`}
+          className={`shrink-0 w-1 h-1 rounded-full ${hasOpenIssues ? "bg-neutral-900" : "bg-neutral-300"}`}
           aria-hidden
         />
       </div>
 
-      {/* Primary signal: feedback count + label, open issues inline */}
-      <div className="mt-4 flex flex-col">
-        <span className="text-[32px] font-medium tabular-nums text-neutral-900">
+      {/* Primary signal: feedback number + label, open issues inline */}
+      <div className="mt-2 flex flex-col">
+        <span className="text-[24px] font-medium tabular-nums text-neutral-900">
           {total}
         </span>
-        <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 mt-0.5">
-          Feedback
+        <span className="text-[9px] uppercase tracking-[0.22em] text-neutral-400 mt-0.5">
+          {total} FEEDBACK • {counts.open} OPEN
         </span>
-        <p className="text-[13px] text-neutral-600 mt-1">
-          {counts.open} open {counts.open === 1 ? "issue" : "issues"}
-        </p>
       </div>
 
       {/* Progress bar */}
-      <div className="mt-4 h-[1.5px] rounded-full bg-neutral-200/70 overflow-hidden">
+      <div className="mt-2 h-px rounded-full bg-neutral-200/70 overflow-hidden">
         <div
-          className="h-full rounded-full bg-neutral-900 opacity-90 transition-[width] duration-300 ease-out"
+          className="h-full rounded-full bg-neutral-900/60 transition-[width] duration-300 ease-out"
           style={{ width: `${healthWidth}%` }}
           aria-hidden
         />
       </div>
 
       {/* Meta row */}
-      <div className="mt-4 flex justify-between items-center">
-        <span className="text-[12px] text-neutral-400">
+      <div className="mt-2 flex justify-between items-center">
+        <span className="text-[11px] text-neutral-400">
           {formatLastUpdated(session.createdAt)}
         </span>
         <span
-          className="opacity-0 group-hover:opacity-100 translate-x-[-2px] group-hover:translate-x-0 transition-[opacity,transform] duration-150 ease-out inline-flex"
+          className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out inline-flex"
           aria-hidden
         >
           <svg
@@ -326,7 +323,7 @@ export default function DashboardPage() {
         </header>
 
         {/* Metrics — floating numbers */}
-        <section className="flex flex-wrap gap-x-24 gap-y-2 mt-8">
+        <section className="flex flex-wrap gap-x-24 gap-y-2 mt-6">
           <MetricBlock label="Total Sessions" value={stats.totalSessions} animate={true} />
           <MetricBlock label="Active Sessions" value={stats.activeSessions} animate={true} />
           <MetricBlock label="Total Feedback Items" value={stats.totalFeedbackItems} animate={true} />
@@ -334,8 +331,8 @@ export default function DashboardPage() {
         </section>
 
         {/* Cards grid */}
-        <main className="mt-8 flex-1 overflow-auto">
-          <div className="grid grid-cols-2 gap-x-14 gap-y-14">
+        <main className="mt-12 flex-1 overflow-auto">
+          <div className="grid grid-cols-3 gap-x-12 gap-y-12">
             {filteredSessions.map((item, index) => (
               <SessionCard
                 key={item.session.id}
