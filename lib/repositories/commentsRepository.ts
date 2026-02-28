@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -86,6 +87,30 @@ export function listenToCommentsRepo(
     }));
     callback(comments);
   });
+}
+
+const RECENT_ACTIVITY_LIMIT = 10;
+
+/**
+ * Fetches most recent comments for a session (for overview activity feed).
+ * Composite index: comments (sessionId ASC, createdAt DESC).
+ */
+export async function getSessionRecentCommentsRepo(
+  sessionId: string,
+  max: number = RECENT_ACTIVITY_LIMIT
+): Promise<Comment[]> {
+  assertQueryLimit(max, "getSessionRecentCommentsRepo");
+  const q = query(
+    collection(db, "comments"),
+    where("sessionId", "==", sessionId),
+    orderBy("createdAt", "desc"),
+    limit(max)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...(docSnap.data() as Omit<Comment, "id">),
+  }));
 }
 
 

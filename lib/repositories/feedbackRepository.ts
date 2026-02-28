@@ -3,6 +3,8 @@ import {
   collection,
   deleteDoc,
   doc,
+  getCountFromServer,
+  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -167,5 +169,104 @@ export async function deleteFeedbackRepo(feedbackId: string): Promise<void> {
 
 export async function resolveFeedbackRepo(feedbackId: string): Promise<void> {
   await updateDoc(doc(db, "feedback", feedbackId), { status: "resolved" });
+}
+
+/** Counts by status for one session. Each count uses aggregation (no unbounded reads). */
+export interface SessionFeedbackCounts {
+  open: number;
+  in_progress: number;
+  resolved: number;
+}
+
+export async function getSessionFeedbackCountsByStatusRepo(
+  sessionId: string
+): Promise<SessionFeedbackCounts> {
+  const coll = collection(db, "feedback");
+  const base = (status: string) =>
+    query(coll, where("sessionId", "==", sessionId), where("status", "==", status));
+  const [openSnap, inProgressSnap, resolvedSnap] = await Promise.all([
+    getCountFromServer(base("open")),
+    getCountFromServer(base("in_progress")),
+    getCountFromServer(base("resolved")),
+  ]);
+  return {
+    open: openSnap.data().count,
+    in_progress: inProgressSnap.data().count,
+    resolved: resolvedSnap.data().count,
+  };
+}
+
+export async function getSessionFeedbackTotalCountRepo(
+  sessionId: string
+): Promise<number> {
+  const q = query(
+    collection(db, "feedback"),
+    where("sessionId", "==", sessionId)
+  );
+  const snap = await getCountFromServer(q);
+  return snap.data().count;
+}
+
+const OVERVIEW_HIGH_IMPACT_LIMIT = 5;
+
+const OVERVIEW_PREVIEW_PER_STATUS_LIMIT = 3;
+
+/**
+ * Fetches up to N feedback items for a session filtered by status, newest first.
+ * Composite index: feedback (sessionId ASC, status ASC, createdAt DESC).
+ */
+export async function getSessionFeedbackByStatusRepo(
+  sessionId: string,
+  status: FeedbackStatus,
+  max: number = OVERVIEW_PREVIEW_PER_STATUS_LIMIT
+): Promise<Feedback[]> {
+  assertQueryLimit(max, "getSessionFeedbackByStatusRepo");
+  const q = query(
+    collection(db, "feedback"),
+    where("sessionId", "==", sessionId),
+    where("status", "==", status),
+    orderBy("createdAt", "desc"),
+    limit(max)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docToFeedback);
+}
+
+/**
+ * Fetches up to N feedback items with impact === "high" for a session, newest first.
+ * Composite index required: feedback (sessionId ASC, impact ASC, createdAt DESC).
+ */
+export async function getSessionFeedbackHighImpactRepo(
+  sessionId: string,
+  max: number = OVERVIEW_HIGH_IMPACT_LIMIT
+): Promise<Feedback[]> {
+  assertQueryLimit(max, "getSessionFeedbackHighImpactRepo");
+  const q = query(
+    collection(db, "feedback"),
+    where("sessionId", "==", sessionId),
+    where("impact", "==", "high"),
+    orderBy("createdAt", "desc"),
+    limit(max)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(docToFeedback);
+}
+
+const OVERVIEW_FEEDBACK_BY_IDS_LIMIT = 10;
+
+/** Fetches feedback docs by IDs (e.g. for activity titles). Limited for cost safety. */
+export async function getFeedbackByIdsRepo(
+  feedbackIds: string[],
+  max: number = OVERVIEW_FEEDBACK_BY_IDS_LIMIT
+): Promise<Feedback[]> {
+  if (feedbackIds.length === 0) return [];
+  const limited = feedbackIds.slice(0, max);
+  assertQueryLimit(limited.length, "getFeedbackByIdsRepo");
+  const snaps = await Promise.all(
+    limited.map((id) => getDoc(doc(db, "feedback", id)))
+  );
+  return snaps
+    .filter((s) => s.exists())
+    .map((s) => docToFeedback(s as QueryDocumentSnapshot));
 }
 

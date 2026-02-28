@@ -1,7 +1,10 @@
 // lib/comments.ts
 
 export type { Comment } from "@/lib/domain/comment";
-import { addCommentRepo } from "@/lib/repositories/commentsRepository";
+import {
+  addCommentRepo,
+  getSessionRecentCommentsRepo,
+} from "@/lib/repositories/commentsRepository";
 import { resolveFeedbackRepo } from "@/lib/repositories/feedbackRepository";
 
 export async function addComment(
@@ -19,4 +22,12 @@ export async function addComment(
 
 export async function resolveFeedback(feedbackId: string) {
   await resolveFeedbackRepo(feedbackId);
+}
+
+/** Recent comments for a session (overview activity feed). Limited. */
+export async function getSessionRecentComments(
+  sessionId: string,
+  max: number = 10
+) {
+  return getSessionRecentCommentsRepo(sessionId, max);
 }

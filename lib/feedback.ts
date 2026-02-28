@@ -14,11 +14,24 @@ import type {
 import {
   addFeedbackRepo,
   deleteFeedbackRepo,
+  getFeedbackByIdsRepo,
+  getSessionFeedbackByStatusRepo,
+  getSessionFeedbackCountsByStatusRepo,
+  getSessionFeedbackHighImpactRepo,
   getSessionFeedbackPageRepo,
+  getSessionFeedbackTotalCountRepo,
   updateFeedbackRepo,
 } from "@/lib/repositories/feedbackRepository";
-import type { FeedbackPageCursor, FeedbackPageResult } from "@/lib/repositories/feedbackRepository";
-export type { FeedbackPageCursor, FeedbackPageResult } from "@/lib/repositories/feedbackRepository";
+import type {
+  FeedbackPageCursor,
+  FeedbackPageResult,
+  SessionFeedbackCounts,
+} from "@/lib/repositories/feedbackRepository";
+export type {
+  FeedbackPageCursor,
+  FeedbackPageResult,
+  SessionFeedbackCounts,
+} from "@/lib/repositories/feedbackRepository";
 
 /* ================================
    TYPES
@@ -77,6 +90,45 @@ export async function getSessionFeedback(
 ): Promise<Feedback[]> {
   const { feedback } = await getSessionFeedbackPageRepo(sessionId, max);
   return feedback;
+}
+
+/** Counts by status for overview. Uses aggregation (no unbounded reads). */
+export async function getSessionFeedbackCountsByStatus(
+  sessionId: string
+): Promise<SessionFeedbackCounts> {
+  return getSessionFeedbackCountsByStatusRepo(sessionId);
+}
+
+/** Up to N feedback items per status for overview preview. */
+export async function getSessionFeedbackByStatus(
+  sessionId: string,
+  status: FeedbackStatus,
+  max: number = 3
+): Promise<Feedback[]> {
+  return getSessionFeedbackByStatusRepo(sessionId, status, max);
+}
+
+/** Total feedback count for session (aggregation). */
+export async function getSessionFeedbackTotalCount(
+  sessionId: string
+): Promise<number> {
+  return getSessionFeedbackTotalCountRepo(sessionId);
+}
+
+/** Up to N high-impact items for session, newest first. */
+export async function getSessionFeedbackHighImpact(
+  sessionId: string,
+  max: number = 5
+): Promise<Feedback[]> {
+  return getSessionFeedbackHighImpactRepo(sessionId, max);
+}
+
+/** Fetch feedback by IDs (e.g. for activity titles). Limited. */
+export async function getFeedbackByIds(
+  feedbackIds: string[],
+  max?: number
+): Promise<Feedback[]> {
+  return getFeedbackByIdsRepo(feedbackIds, max);
 }
 
 /* ================================
