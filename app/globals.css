@@ -244,3 +244,37 @@ h3 {
   50% { background-color: rgba(0, 0, 0, 0.02); }
   100% { background-color: transparent; }
 }
+
+/* ======================================
+   FLOATING CAPTURE OBJECT — INFRASTRUCTURE EDITION
+   Entry motion, presence pulse, no bounce/glow.
+====================================== */
+
+.capture-floating-trigger {
+  letter-spacing: -0.01em;
+}
+
+/* Entry: fade in 120ms, translateY(4px → 0) */
+.capture-floating-wrapper {
+  animation: captureFloatingEntry 120ms ease-out forwards,
+             captureFloatingPresence 14s ease-in-out 120ms infinite;
+}
+.capture-floating-wrapper:hover {
+  animation-play-state: paused;
+}
+@keyframes captureFloatingEntry {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Presence: extremely subtle 1px lift every ~14s (shadow stays on button for hover) */
+@keyframes captureFloatingPresence {
+  0%, 92%, 100% { transform: translateY(0); }
+  94%, 96% { transform: translateY(-1px); }
+}

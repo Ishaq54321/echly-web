@@ -39,19 +39,23 @@ export default function CaptureWidget({
 
   if (!state.isOpen) {
     return (
-      <button
-        onClick={() => handlers.setIsOpen(true)}
-        className="fixed bottom-10 right-10 z-50
-                   flex items-center gap-3
-                   bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] border-opacity-50
-                   px-5 py-2.5 rounded-full
-                   shadow-[0_4px_12px_rgba(0,0,0,0.06)]
-                   text-[hsl(var(--text-primary))] font-medium tracking-tight
-                   transition-all duration-150 ease-out hover:shadow-[0_6px_16px_rgba(0,0,0,0.08)]"
-      >
-        <Image src="/Echly_logo.svg" alt="Echly" width={26} height={26} />
-        Capture Feedback
-      </button>
+      <div className="fixed bottom-10 right-10 z-50 capture-floating-wrapper">
+        <button
+          onClick={() => handlers.setIsOpen(true)}
+          className="capture-floating-trigger
+                     flex items-center gap-3
+                     bg-white border border-[rgba(0,0,0,0.08)]
+                     px-5 py-2.5 rounded-[20px]
+                     text-[#111827] font-semibold
+                     shadow-[0_10px_30px_rgba(0,0,0,0.12),0_4px_10px_rgba(0,0,0,0.06)]
+                     transition-[transform_80ms_ease-in,box-shadow_150ms_ease-out]
+                     hover:-translate-y-px hover:shadow-[0_12px_34px_rgba(0,0,0,0.14),0_5px_12px_rgba(0,0,0,0.08)]
+                     active:scale-[0.98]"
+        >
+          <Image src="/Echly_logo.svg" alt="Echly" width={26} height={26} className="shrink-0" />
+          Capture Feedback
+        </button>
+      </div>
     );
   }
 
