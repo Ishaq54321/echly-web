@@ -93,11 +93,11 @@ function StatCard({
 }) {
   return (
     <div className="flex flex-col justify-center">
-      <p className="text-[11px] uppercase tracking-[0.08em] text-neutral-500">
-        {label}
-      </p>
-      <p className="text-[30px] font-semibold tracking-tight text-neutral-900 tabular-nums leading-tight">
+      <p className="text-[36px] font-semibold tracking-tight text-[var(--brand-900)] tabular-nums leading-tight">
         {value}
+      </p>
+      <p className="text-[11px] uppercase tracking-[0.12em] text-neutral-500 mt-1">
+        {label}
       </p>
     </div>
   );
@@ -143,54 +143,61 @@ function SessionCard({
           onView(session.id);
         }
       }}
-      className={`relative flex flex-col justify-between rounded-md border border-neutral-200 bg-white px-5 py-4 cursor-pointer transition-colors duration-150 hover:border-neutral-400 hover:bg-neutral-50 ${highOpenRatio ? "border-l-2 border-l-neutral-400" : ""} ${zeroFeedback ? "opacity-[0.94]" : ""}`}
+      className={`relative flex flex-col justify-between rounded-md border border-neutral-200 bg-white px-5 py-4 cursor-pointer transition-colors duration-[120ms] hover:border-[var(--brand-500)] hover:bg-neutral-50 ${highOpenRatio ? "border-l-2 border-l-[var(--brand-700)]" : ""} ${zeroFeedback ? "opacity-[0.94]" : ""}`}
       data-session-id={session.id}
     >
-      {/* Top section: title, metadata, stats, progress */}
+      {/* Top section: title row, metadata, stats, progress */}
       <div>
-        <h2 className="text-[15px] font-semibold leading-snug text-neutral-900 truncate" data-recent={recent || undefined}>
-          {session.title}
-        </h2>
-        <div className="mt-1 flex items-center gap-x-2 text-[12px] text-neutral-500">
-          <span>{formatSessionDate(session.createdAt)}</span>
-          <span>{formatRelativeTime(session.createdAt)}</span>
+        <div className="flex justify-between items-start">
+          <h2
+            className={`text-[15px] font-semibold leading-snug truncate min-w-0 ${recent ? "text-[var(--brand-900)]" : "text-neutral-800"}`}
+          >
+            {session.title}
+          </h2>
+          {hasOpen && (
+            <span
+              className="shrink-0 w-1.5 h-1.5 rounded-full bg-[var(--brand-700)] mt-1.5 ml-2"
+              aria-hidden
+            />
+          )}
         </div>
+        <p className="text-[12px] text-neutral-500 mt-1">
+          {formatSessionDate(session.createdAt)}
+        </p>
 
-        <div className="mt-2 flex items-baseline gap-x-3 gap-y-0 text-[12px] text-neutral-600">
+        <div className="mt-3 text-[12px] text-neutral-600">
           <span>{total} feedback</span>
-          <span className={hasOpen ? "font-medium text-neutral-900 tabular-nums" : ""}>
-            {hasOpen && <span className="mr-1 inline-block h-1 w-1 rounded-full bg-[var(--brand-accent)] align-middle" aria-hidden />}
-            {counts.open} open
-          </span>
-          <span>{counts.in_progress} in progress</span>
+          <span> · </span>
+          <span className="font-medium text-[var(--brand-900)] tabular-nums">{counts.open} open</span>
+          <span> · </span>
           <span>{counts.resolved} done</span>
         </div>
         <div
-          className="mt-1.5 h-[2px] w-full bg-neutral-200 rounded-none overflow-hidden"
+          className="mt-3 h-[2px] w-full bg-neutral-200 rounded-none overflow-hidden"
           role="progressbar"
           aria-valuenow={progress}
           aria-valuemin={0}
           aria-valuemax={100}
         >
           <div
-            className="h-[2px] bg-[var(--brand-accent)] rounded-none transition-[width] duration-150"
+            className="h-[2px] bg-[var(--brand-900)] rounded-none transition-[width] duration-[120ms]"
             style={{ width: `${progress}%` }}
           />
         </div>
       </div>
 
-      {/* Bottom row: metadata cluster left, View button right */}
+      {/* Bottom row: Created + View */}
       <div className="mt-3 flex items-center justify-between">
-        <div className="min-w-0 text-[12px] text-neutral-500">
+        <span className="min-w-0 text-[12px] text-neutral-500">
           {formatRelativeTime(session.createdAt)}
-        </div>
+        </span>
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onView(session.id);
           }}
-          className="shrink-0 text-xs rounded-md border border-neutral-300 bg-transparent px-3 py-1 text-neutral-600 hover:bg-neutral-100 transition-colors duration-150"
+          className="shrink-0 text-xs border border-neutral-300 px-3 py-1 rounded-md hover:bg-neutral-100 transition-colors duration-[120ms]"
         >
           View
         </button>
@@ -225,13 +232,13 @@ export default function DashboardPage() {
   return (
     <div className="min-h-0 flex flex-col">
       {/* Workspace Header — baseline aligned with metrics */}
-      <header className="shrink-0 px-6 py-3 border-b border-neutral-200">
+      <header className="shrink-0 px-6 pt-3 pb-4 border-b border-neutral-200">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
           <div>
-            <h1 className="text-[28px] font-semibold tracking-tight text-neutral-900">
+            <h1 className="text-[34px] font-semibold tracking-tight text-[var(--brand-900)]">
               Workspaces
             </h1>
-            <p className="text-sm text-neutral-500 mt-1">
+            <p className="text-sm text-neutral-500 mt-2">
               Sessions and feedback in one place.
             </p>
           </div>
@@ -259,7 +266,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={handleCreateSession}
-              className="h-9 shrink-0 rounded-md bg-neutral-900 text-white px-4 text-sm font-medium hover:bg-neutral-800 transition-colors duration-[120ms]"
+              className="h-9 shrink-0 rounded-md bg-[var(--brand-900)] text-white px-4 text-sm font-medium hover:bg-[var(--brand-700)] transition-colors duration-[120ms]"
             >
               + New Session
             </button>
@@ -268,20 +275,18 @@ export default function DashboardPage() {
       </header>
 
       {/* Metrics — command strip */}
-      <section className="shrink-0 px-6 py-4">
-        <div className="rounded-md border border-neutral-200 border-t-neutral-300 bg-neutral-50 px-6 py-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <section className="shrink-0 bg-[var(--neutral-weak)] border-t border-neutral-300 border-b border-neutral-200 py-6 px-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-10 gap-y-4">
             <StatCard label="Total Sessions" value={stats.totalSessions} />
             <StatCard label="Active Sessions" value={stats.activeSessions} />
             <StatCard label="Total Feedback Items" value={stats.totalFeedbackItems} />
             <StatCard label="Open Issues" value={stats.openIssues} />
           </div>
-        </div>
       </section>
 
       {/* Session Grid */}
-      <main className="flex-1 overflow-auto px-6 pt-2 pb-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-2.5">
+      <main className="flex-1 overflow-auto px-6 pt-4 pb-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-4">
           {filteredSessions.map((item) => (
             <SessionCard
               key={item.session.id}

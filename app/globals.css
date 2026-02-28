@@ -14,6 +14,12 @@
 :root {
   --radius: 14px;
 
+  /* Brand foundation — signal only, never decoration */
+  --brand-900: #0F172A;
+  --brand-700: #1F2937;
+  --brand-500: #374151;
+  --neutral-weak: #F9FAFB;
+
   /* Base Surfaces */
   --background: 207 6% 100%;      /* #F7F8FA */
   --surface-1: 207 6% 100%;          /* #FFFFFF */
