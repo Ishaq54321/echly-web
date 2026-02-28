@@ -1,6 +1,7 @@
 "use client";
 
 import { DescriptionSection } from "./DescriptionSection";
+import { Section } from "./Section";
 import { ScreenshotBlock } from "./ScreenshotBlock";
 import { SuggestionSection } from "./SuggestionSection";
 import type { FeedbackItemShape } from "./types";
@@ -25,7 +26,7 @@ export function FeedbackContent({
   onExpandImage,
 }: FeedbackContentProps) {
   return (
-    <div className="space-y-0">
+    <>
       <DescriptionSection
         description={item.description}
         isEditing={isEditingDescription}
@@ -39,14 +40,18 @@ export function FeedbackContent({
         }}
       />
       {item.screenshotUrl && (
-        <ScreenshotBlock
-          screenshotUrl={item.screenshotUrl}
-          onExpand={onExpandImage}
-        />
+        <Section title="Attachments">
+          <div className="flex flex-col gap-3">
+            <ScreenshotBlock
+              screenshotUrl={item.screenshotUrl}
+              onExpand={onExpandImage}
+            />
+          </div>
+        </Section>
       )}
       {item.suggestion != null && item.suggestion !== "" && (
         <SuggestionSection suggestion={item.suggestion} />
       )}
-    </div>
+    </>
   );
 }

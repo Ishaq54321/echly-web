@@ -1,6 +1,5 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
 import { Section } from "./Section";
 
 interface DescriptionSectionProps {
@@ -26,48 +25,50 @@ export function DescriptionSection({
   const hasEdit = Boolean(onEdit && onDraftChange && onSave && onCancel);
 
   return (
-    <Section title="Description" icon={<Sparkles size={16} />}>
-      {isEditing && hasEdit ? (
-        <div className="space-y-3">
-          <textarea
-            value={draft}
-            onChange={(e) => onDraftChange?.(e.target.value)}
-            className="w-full min-h-[120px] rounded-xl border border-slate-200 px-4 py-3 text-[15px] text-slate-800 leading-8 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            autoFocus
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onSave}
-              className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200"
-            >
-              Cancel
-            </button>
+    <Section title="Description">
+      <div className="flex flex-col gap-3">
+        {isEditing && hasEdit ? (
+          <>
+            <textarea
+              value={draft}
+              onChange={(e) => onDraftChange?.(e.target.value)}
+              className="w-full min-h-[100px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-3 py-2 text-sm text-[hsl(var(--text-primary))] leading-relaxed focus:outline-none focus:ring-2 focus:ring-[hsl(var(--border))]"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onSave}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-[hsl(var(--text-primary))] text-[hsl(var(--surface-1))] hover:opacity-90"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:opacity-90"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm leading-relaxed text-[hsl(var(--text-primary))] flex-1">
+              {displayValue}
+            </p>
+            {hasEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="text-xs text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] flex-shrink-0"
+              >
+                Edit
+              </button>
+            )}
           </div>
-        </div>
-      ) : (
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-[15px] text-slate-800 leading-relaxed flex-1">
-            {displayValue}
-          </p>
-          {hasEdit && (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="text-sm text-slate-500 hover:text-slate-700 flex-shrink-0"
-            >
-              Edit
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </Section>
   );
 }

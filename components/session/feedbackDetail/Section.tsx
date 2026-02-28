@@ -3,18 +3,17 @@
 interface SectionProps {
   title: string;
   children: React.ReactNode;
-  icon?: React.ReactNode;
 }
 
-export function Section({ title, children, icon }: SectionProps) {
+export function Section({ title, children }: SectionProps) {
   return (
-    <div className="mb-16">
-      <div className="flex items-center gap-2 mb-5">
-        {icon && <div className="text-slate-400">{icon}</div>}
-        <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+    <section className="mt-8">
+      <h2 className="text-xs uppercase tracking-wide text-[hsl(var(--text-muted))] font-medium mb-3">
+        {title}
+      </h2>
+      <div className="text-sm leading-relaxed text-[hsl(var(--text-primary))]">
+        {children}
       </div>
-
-      {children}
-    </div>
+    </section>
   );
 }

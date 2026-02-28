@@ -41,11 +41,9 @@ export default function FeedbackDetail({
   }
 
   return (
-    <div className="flex flex-col min-h-0 space-y-14">
+    <div className="flex flex-col min-h-0">
       <FeedbackHeader
-        title={selectedItem.title}
-        index={selectedItem.index}
-        total={selectedItem.total}
+        item={selectedItem}
         isActivityOpen={isCommentsOpen}
         onToggleActivity={onToggleActivity}
       />
