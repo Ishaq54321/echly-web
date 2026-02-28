@@ -90,6 +90,17 @@ export default function FeedbackSidebar({
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .feedback-sidebar-active-rail::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          background-color: hsl(var(--brand));
+        }
+      `}} />
       <div className="flex flex-col flex-1 min-h-0 gap-3 px-4 pt-5 pb-4">
         {/* Header (fixed) */}
         <div className="flex items-start justify-between gap-3 shrink-0">
@@ -165,9 +176,10 @@ export default function FeedbackSidebar({
 
         {/* Ticket list (scrollable only) */}
         <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-          <div className="space-y-1.5">
-          {displayed.map((item) => {
+          <div>
+          {displayed.map((item, index) => {
             const isActive = item.id === selectedId;
+            const isLast = index === displayed.length - 1;
             const timeStr = formatRowTime(item);
             const commentNum = item.commentCount ?? 0;
 
@@ -183,13 +195,14 @@ export default function FeedbackSidebar({
                     onSelect(item.id);
                   }
                 }}
-                className={`group flex flex-col px-3 py-2.5 rounded-md cursor-pointer transition-all duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] focus-visible:ring-offset-0 border-0
+                className={`group flex flex-col px-3 py-2.5 cursor-pointer transition-[background-color] duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] focus-visible:ring-offset-0 border-b border-b-[rgba(0,0,0,0.04)]
+                  ${isLast ? "border-b-0" : ""}
                   ${isActive
-                    ? "bg-[var(--surface-selected)] border-l-2 border-l-[hsl(var(--brand))] hover:bg-[#e4e7ec]"
-                    : "bg-[var(--surface-card)] hover:bg-[rgba(0,0,0,0.03)]"}`}
+                    ? "relative bg-[var(--surface-selected)] feedback-sidebar-active-rail hover:bg-[#e4e7ec]"
+                    : "bg-[var(--surface-card)] hover:bg-[rgba(0,0,0,0.02)]"}`}
               >
                 <div className="flex justify-between items-start gap-3">
-                  <span className="text-sm font-medium text-[hsl(var(--text-primary))] leading-snug truncate flex-1 min-w-0">
+                  <span className={`text-sm leading-snug truncate flex-1 min-w-0 ${isActive ? "font-semibold text-[hsl(var(--text-primary))]" : "font-medium text-[hsl(var(--text-muted))]"}`}>
                     {item.title}
                   </span>
                   <div className="flex items-center gap-1.5 shrink-0">
