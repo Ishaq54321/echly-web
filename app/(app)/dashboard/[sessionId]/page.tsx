@@ -25,14 +25,24 @@ type TicketFromApi = {
   [key: string]: unknown;
 };
 
-function formatRelativeTime(
+const sessionDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "2-digit",
+  year: "numeric",
+});
+const sessionTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+function formatSessionCreatedMeta(
   createdAt:
     | { toDate?: () => Date; seconds?: number }
     | string
     | null
     | undefined
-): string {
-  if (!createdAt) return "";
+): { dateStr: string; timeStr: string } {
+  if (!createdAt) return { dateStr: "—", timeStr: "" };
   try {
     const date =
       typeof createdAt === "string"
@@ -42,17 +52,13 @@ function formatRelativeTime(
           : (createdAt as { seconds?: number }).seconds != null
             ? new Date((createdAt as { seconds: number }).seconds * 1000)
             : null;
-    if (!date) return "";
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "1 day ago";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    return date.toLocaleDateString(undefined, { dateStyle: "medium" });
+    if (!date) return { dateStr: "—", timeStr: "" };
+    return {
+      dateStr: sessionDateFormatter.format(date),
+      timeStr: sessionTimeFormatter.format(date),
+    };
   } catch {
-    return "";
+    return { dateStr: "—", timeStr: "" };
   }
 }
 
@@ -61,6 +67,8 @@ export default function SessionPage() {
   const router = useRouter();
 
   const [session, setSession] = useState<any>(null);
+  const [userName, setUserName] = useState<string>("");
+  const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   /** Detail panel: always from DB (GET /api/tickets/:id). Do not use memory state. */
@@ -113,6 +121,10 @@ export default function SessionPage() {
       }
 
       setSession({ id: sessionSnap.id, ...data });
+      setUserName(
+        currentUser.displayName || currentUser.email || "You"
+      );
+      setUserPhotoURL(currentUser.photoURL ?? null);
       setSessionLoading(false);
     });
 
@@ -269,6 +281,28 @@ export default function SessionPage() {
     }
   };
 
+  const saveTags = async (suggestedTags: string[]) => {
+    if (!selectedId) return;
+    try {
+      const res = await fetch(`/api/tickets/${selectedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suggestedTags }),
+      });
+      const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
+      if (data.success && data.ticket) {
+        setDetailTicket(data.ticket);
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === selectedId ? { ...item, suggestedTags: data.ticket!.suggestedTags ?? null } : item
+          )
+        );
+      }
+    } catch {
+      if (detailTicket) setDetailTicket((t) => (t ? { ...t } : null));
+    }
+  };
+
   /* ================= AI SAVE (Elite Structuring) ================= */
 
   const normalizePriority = (s: string | undefined): "low" | "medium" | "high" | "critical" => {
@@ -374,123 +408,143 @@ export default function SessionPage() {
         </aside>
 
         <div className="flex flex-col h-full min-h-0 overflow-hidden bg-neutral-50">
-          <div className="max-w-4xl mx-auto w-full px-8 pt-5 pb-3 shrink-0">
-            {isEditingSessionTitle ? (
-              <>
-              <input
-                value={sessionTitleDraft}
-                onChange={(e) => setSessionTitleDraft(e.target.value)}
-                onBlur={async () => {
-                  const trimmed = sessionTitleDraft.trim();
-                  if (!sessionId || !session) return;
-                  if (trimmed === (session.title ?? "")) {
-                    setIsEditingSessionTitle(false);
-                    return;
-                  }
-                  setIsSavingSessionTitle(true);
-                  try {
-                    const safeTitle =
-                      trimmed && trimmed.length > 0
-                        ? trimmed
-                        : session.title || "Untitled Session";
-                    const res = await fetch(`/api/sessions/${sessionId}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ title: safeTitle }),
-                    });
-                    const data = (await res.json()) as { success?: boolean; session?: Record<string, unknown> };
-                    if (data.success && data.session) {
-                      setSession((prev: any) => (prev ? { ...prev, ...data.session } : prev));
-                      setSessionTitleDraft((data.session.title as string) ?? trimmed);
-                      setIsSavingSessionTitle(false);
-                      setSaveSessionTitleSuccess(true);
-                      setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
-                      setIsEditingSessionTitle(false);
-                    } else {
-                      setIsSavingSessionTitle(false);
-                      setIsEditingSessionTitle(false);
-                    }
-                  } catch {
-                    setSessionTitleDraft(session.title ?? "Session");
-                    setIsSavingSessionTitle(false);
-                    setIsEditingSessionTitle(false);
-                  }
-                }}
-                onFocus={(e) => e.currentTarget.select()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    e.currentTarget.blur();
-                  } else if (e.key === "Escape") {
-                    setSessionTitleDraft(session?.title ?? "Session");
-                    setIsEditingSessionTitle(false);
-                    e.currentTarget.blur();
-                  }
-                }}
-                autoFocus
-                className="text-2xl font-bold tracking-tight text-[hsl(var(--text-primary))] w-full bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-black/10"
-                aria-label="Session title"
-              />
-            <p className="text-xs text-neutral-500 mt-1 transition-opacity duration-150">
-              Enter to save · Esc to cancel
-            </p>
-            {isSavingSessionTitle && (
-              <p className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
-                Saving...
-              </p>
-            )}
-            </>
-            ) : (
-              <div
-                className="group flex items-center gap-2 cursor-pointer min-h-[2rem]"
-                onClick={() => {
-                  setSessionTitleDraft(session?.title ?? "Session");
-                  setIsEditingSessionTitle(true);
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setSessionTitleDraft(session?.title ?? "Session");
-                    setIsEditingSessionTitle(true);
-                  }
-                }}
-                aria-label="Edit session title"
-              >
-                <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--text-primary))]">
-                  {session?.title ?? "Session"}
-                </h1>
-                {saveSessionTitleSuccess ? (
-                  <Check size={14} className="text-green-600 shrink-0" aria-hidden />
+          <div className="max-w-4xl mx-auto w-full px-8 pt-5 pb-4 border-b border-neutral-200 shrink-0">
+            <div className="flex justify-between items-center gap-4">
+              <div className="min-w-0 flex-1">
+                {isEditingSessionTitle ? (
+                  <>
+                    <input
+                      value={sessionTitleDraft}
+                      onChange={(e) => setSessionTitleDraft(e.target.value)}
+                      onBlur={async () => {
+                        const trimmed = sessionTitleDraft.trim();
+                        if (!sessionId || !session) return;
+                        if (trimmed === (session.title ?? "")) {
+                          setIsEditingSessionTitle(false);
+                          return;
+                        }
+                        setIsSavingSessionTitle(true);
+                        try {
+                          const safeTitle =
+                            trimmed && trimmed.length > 0
+                              ? trimmed
+                              : session.title || "Untitled Session";
+                          const res = await fetch(`/api/sessions/${sessionId}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ title: safeTitle }),
+                          });
+                          const data = (await res.json()) as { success?: boolean; session?: Record<string, unknown> };
+                          if (data.success && data.session) {
+                            setSession((prev: any) => (prev ? { ...prev, ...data.session } : prev));
+                            setSessionTitleDraft((data.session.title as string) ?? trimmed);
+                            setIsSavingSessionTitle(false);
+                            setSaveSessionTitleSuccess(true);
+                            setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
+                            setIsEditingSessionTitle(false);
+                          } else {
+                            setIsSavingSessionTitle(false);
+                            setIsEditingSessionTitle(false);
+                          }
+                        } catch {
+                          setSessionTitleDraft(session.title ?? "Session");
+                          setIsSavingSessionTitle(false);
+                          setIsEditingSessionTitle(false);
+                        }
+                      }}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.currentTarget.blur();
+                        } else if (e.key === "Escape") {
+                          setSessionTitleDraft(session?.title ?? "Session");
+                          setIsEditingSessionTitle(false);
+                          e.currentTarget.blur();
+                        }
+                      }}
+                      autoFocus
+                      className="text-[26px] font-semibold tracking-[-0.01em] text-[hsl(var(--text-primary))] w-full bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-black/10"
+                      aria-label="Session title"
+                    />
+                    <p className="text-xs text-neutral-400 mt-1">
+                      Enter to save
+                    </p>
+                    {isSavingSessionTitle && (
+                      <p className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+                        Saving...
+                      </p>
+                    )}
+                  </>
                 ) : (
-                  <Pencil
-                    size={14}
-                    className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[hsl(var(--text-secondary))] shrink-0"
-                    aria-hidden
-                  />
+                  <>
+                    <div
+                      className="group flex items-center gap-2 cursor-pointer min-h-[2rem]"
+                      onClick={() => {
+                        setSessionTitleDraft(session?.title ?? "Session");
+                        setIsEditingSessionTitle(true);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSessionTitleDraft(session?.title ?? "Session");
+                          setIsEditingSessionTitle(true);
+                        }
+                      }}
+                      aria-label="Edit session title"
+                    >
+                      <h1 className="text-[26px] font-semibold tracking-[-0.01em] text-[hsl(var(--text-primary))]">
+                        {session?.title ?? "Session"}
+                      </h1>
+                      {saveSessionTitleSuccess ? (
+                        <Check size={14} className="text-green-600 shrink-0" aria-hidden />
+                      ) : (
+                        <Pencil
+                          size={14}
+                          className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[hsl(var(--text-secondary))] shrink-0"
+                          aria-hidden
+                        />
+                      )}
+                    </div>
+                    {saveSessionTitleSuccess && (
+                      <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+                        <Check size={12} className="shrink-0" aria-hidden />
+                        Saved
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
-            )}
-            {saveSessionTitleSuccess && !isEditingSessionTitle && (
-              <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
-                <Check size={12} className="shrink-0" aria-hidden />
-                Saved
-              </p>
-            )}
-            <div className="text-sm text-[hsl(var(--text-secondary))] mt-1 flex items-center gap-1.5 [&_span]:opacity-[0.92]">
-              <span>You</span>
-              <span aria-hidden>•</span>
-              <span>{formatRelativeTime(session?.createdAt) || "—"}</span>
-              <span aria-hidden>•</span>
-              <span>
-                {feedback.length} feedback item{feedback.length !== 1 ? "s" : ""}
-              </span>
+              <div className="text-sm text-neutral-500 font-medium flex-shrink-0 flex items-center">
+                {(() => {
+                  const { dateStr, timeStr } = formatSessionCreatedMeta(session?.createdAt);
+                  return (
+                    <>
+                      <span>{dateStr}</span>
+                      <span aria-hidden className="mx-1">·</span>
+                      <span>{timeStr}</span>
+                      <span aria-hidden className="mx-1">·</span>
+                      <span>{userName}</span>
+                      {userPhotoURL && (
+                        <img
+                          src={userPhotoURL}
+                          alt=""
+                          className="w-6 h-6 rounded-full border border-neutral-200 ml-2 flex-shrink-0"
+                          width={24}
+                          height={24}
+                        />
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
             </div>
           </div>
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col max-w-4xl mx-auto w-full">
             <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-50">
-              <div className="flex flex-col h-full px-8 py-6">
+              <div className="flex flex-col h-full px-8 pt-4 pb-4">
                 {detailLoading && selectedId ? (
                   <div className="flex-1 min-h-0 flex items-center justify-center py-16">
                     <p className="text-sm text-[hsl(var(--text-secondary))]">Loading…</p>
@@ -509,6 +563,7 @@ export default function SessionPage() {
                   onSaveTitle={saveTitle}
                   onRequestDelete={() => setShowDeleteModal(true)}
                   onSaveActionItems={saveActionItems}
+                  onSaveTags={saveTags}
                   setIsImageExpanded={setIsImageExpanded}
                   isCommentsOpen={isCommentsOpen}
                   onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}

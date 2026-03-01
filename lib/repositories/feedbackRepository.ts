@@ -84,6 +84,7 @@ export async function updateFeedbackRepo(
     priority: FeedbackPriority;
     screenshotUrl: string | null;
     actionItems: string[] | null;
+    suggestedTags: string[] | null;
   }>
 ): Promise<void> {
   await updateDoc(doc(db, "feedback", feedbackId), data);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { FeedbackTag } from "@/components/ui/FeedbackTag";
+import { Tag } from "@/components/ui/Tag";
 
 type SortKind = "recent" | "active";
 
@@ -27,27 +27,6 @@ interface Props {
   hasMore?: boolean;
   hasReachedLimit?: boolean;
   onLoadMore?: () => void;
-}
-
-function formatRowTime(f: FeedbackItem): string {
-  const ms =
-    f.createdAt?.seconds != null
-      ? f.createdAt.seconds * 1000
-      : typeof f.clientTimestamp === "number"
-        ? f.clientTimestamp
-        : typeof f.timestamp === "number"
-          ? f.timestamp
-          : null;
-  if (ms == null) return "";
-  const date = new Date(ms);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "1d ago";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export default function FeedbackSidebar({
@@ -187,8 +166,6 @@ export default function FeedbackSidebar({
           {displayed.map((item, index) => {
             const isActive = item.id === selectedId;
             const isLast = index === displayed.length - 1;
-            const timeStr = formatRowTime(item);
-            const commentNum = item.commentCount ?? 0;
 
             return (
               <div
@@ -202,7 +179,7 @@ export default function FeedbackSidebar({
                     onSelect(item.id);
                   }
                 }}
-                className={`group flex flex-col px-3 py-2.5 cursor-pointer transition-[background-color] duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] focus-visible:ring-offset-0 border-b border-b-[rgba(0,0,0,0.04)]
+                className={`group flex flex-col px-3 py-2.5 cursor-pointer transition-[background-color] duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] focus-visible:ring-offset-0 border-b border-neutral-100
                   ${isLast ? "border-b-0" : ""}
                   ${isActive
                     ? "relative bg-[var(--surface-selected)] feedback-sidebar-active-rail hover:bg-[#e4e7ec]"
@@ -213,9 +190,6 @@ export default function FeedbackSidebar({
                     {item.title}
                   </span>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-xs text-[hsl(var(--text-secondary))] opacity-90">
-                      {commentNum > 0 ? `${commentNum}` : timeStr || ""}
-                    </span>
                     <button
                       type="button"
                       className="opacity-0 group-hover:opacity-100 transition-all duration-150 ease-out p-0.5 rounded text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] cursor-pointer border-0 bg-transparent"
@@ -231,7 +205,7 @@ export default function FeedbackSidebar({
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-1.5">
-                  <FeedbackTag type={item.type} />
+                  <Tag name={item.type} variant="sidebar" inactive={!isActive} />
                 </div>
               </div>
             );
@@ -239,7 +213,7 @@ export default function FeedbackSidebar({
           </div>
           {/* Cost protection: load more only when allowed; append results. */}
           {hasMore && !hasReachedLimit && onLoadMore && (
-            <div className="shrink-0 px-3 py-2 border-t border-[rgba(0,0,0,0.04)]">
+            <div className="shrink-0 px-3 py-2 border-t border-neutral-100">
               <button
                 type="button"
                 onClick={() => onLoadMore()}

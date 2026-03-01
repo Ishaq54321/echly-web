@@ -50,7 +50,7 @@ export async function PATCH(
       { status: 400 }
     );
   }
-  let body: { title?: string; description?: string; actionItems?: string[] };
+  let body: { title?: string; description?: string; actionItems?: string[]; suggestedTags?: string[] };
   try {
     body = await req.json();
   } catch {
@@ -63,6 +63,7 @@ export async function PATCH(
   if (typeof body.title === "string") updates.title = body.title;
   if (typeof body.description === "string") updates.description = body.description;
   if (Array.isArray(body.actionItems)) updates.actionItems = body.actionItems;
+  if (Array.isArray(body.suggestedTags)) updates.suggestedTags = body.suggestedTags;
 
   if (Object.keys(updates).length === 0) {
     const existing = await getFeedbackByIdRepo(id);

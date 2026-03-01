@@ -17,6 +17,7 @@ export interface FeedbackDetailProps {
   onSaveTitle?: (newTitle: string) => Promise<void>;
   onRequestDelete?: () => void;
   onSaveActionItems?: (actionItems: string[]) => Promise<void>;
+  onSaveTags?: (suggestedTags: string[]) => Promise<void>;
   setIsImageExpanded: (v: boolean) => void;
   isCommentsOpen: boolean;
   onToggleActivity: () => void;
@@ -34,6 +35,7 @@ export default function FeedbackDetail({
   onSaveTitle,
   onRequestDelete,
   onSaveActionItems,
+  onSaveTags,
   setIsImageExpanded,
   isCommentsOpen,
   onToggleActivity,
@@ -67,6 +69,7 @@ export default function FeedbackDetail({
         isSavingDescription={isSavingDescription}
         saveDescriptionSuccess={saveDescriptionSuccess}
         onSaveActionItems={onSaveActionItems}
+        onSaveTags={onSaveTags}
         onExpandImage={() => setIsImageExpanded(true)}
       />
     </div>

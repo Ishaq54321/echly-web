@@ -5,23 +5,6 @@ import { MessageSquare, Trash2, Pencil, Check } from "lucide-react";
 import { StatusPill } from "./StatusPill";
 import type { FeedbackItemShape } from "./types";
 
-function formatRelativeTime(timestamp: number | undefined): string {
-  if (timestamp == null) return "—";
-  try {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "1 day ago";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    return date.toLocaleDateString(undefined, { dateStyle: "medium" });
-  } catch {
-    return "—";
-  }
-}
-
 interface FeedbackHeaderProps {
   item: FeedbackItemShape & { index: number; total: number };
   isActivityOpen: boolean;
@@ -86,10 +69,8 @@ export function FeedbackHeader({
     }
   };
 
-  const createdAgo = formatRelativeTime(item.timestamp);
-
   return (
-    <>
+    <div className="pt-4 pb-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           {isEditingTitle && onSaveTitle ? (
@@ -105,8 +86,8 @@ export function FeedbackHeader({
                 className="w-full text-[20px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))] bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-black/10"
                 aria-label="Edit title"
               />
-              <p className="text-xs text-neutral-500 mt-1 transition-opacity duration-150">
-                Enter to save · Esc to cancel
+              <p className="text-xs text-neutral-400 mt-1">
+                Enter to save
               </p>
               {isSaving && (
                 <p className="text-xs text-neutral-500 mt-0.5 transition-opacity duration-150">
@@ -150,19 +131,6 @@ export function FeedbackHeader({
               Saved
             </p>
           )}
-          <div className="flex items-center gap-2 mt-1.5 text-[12px]">
-            <span className="font-medium text-[hsl(var(--text-primary))]">
-              {item.type || "—"}
-            </span>
-            <span className="opacity-60" aria-hidden>•</span>
-            <span className="text-[hsl(var(--text-secondary))] opacity-[0.92]">
-              Created {createdAgo}
-            </span>
-            <span className="opacity-60" aria-hidden>•</span>
-            <span className="text-[hsl(var(--text-secondary))] opacity-[0.92]">
-              Assigned to You
-            </span>
-          </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           {onRequestDelete && (
@@ -177,11 +145,6 @@ export function FeedbackHeader({
             </button>
           )}
           <StatusPill defaultValue={item.status ?? "open"} aria-label="Status" />
-          <div
-            className="h-8 w-8 rounded-full bg-[hsl(var(--surface-2))] flex-shrink-0"
-            title="Assignee"
-            aria-hidden
-          />
           <button
             type="button"
             onClick={onToggleActivity}
@@ -197,7 +160,7 @@ export function FeedbackHeader({
           </button>
         </div>
       </div>
-      <div className="mt-4 border-b border-[hsl(var(--border))]" />
-    </>
+      <div className="mt-4 border-b border-neutral-200" />
+    </div>
   );
 }
