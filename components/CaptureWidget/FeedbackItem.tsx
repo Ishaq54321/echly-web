@@ -1,43 +1,54 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { Pencil, Trash2, Expand, Check } from "lucide-react";
 import type { StructuredFeedback } from "./types";
 
-export type FeedbackItemHandlers = {
-  onExpand: () => void;
-  onEdit: () => void;
-  onSaveEdit: () => void;
-  onDelete: () => void;
+type FeedbackItemProps = {
+  item: StructuredFeedback;
+  expandedId: string | null;
+  editingId: string | null;
+  editedTitle: string;
+  editedDescription: string;
+  onExpand: (id: string | null) => void;
+  onStartEdit: (item: StructuredFeedback) => void;
+  onSaveEdit: (id: string) => void;
+  onDelete: (id: string) => void;
   onEditedTitleChange: (value: string) => void;
   onEditedDescriptionChange: (value: string) => void;
 };
 
-type FeedbackItemProps = {
-  item: StructuredFeedback;
-  isExpanded: boolean;
-  isEditing: boolean;
-  editedTitle: string;
-  editedDescription: string;
-  handlers: FeedbackItemHandlers;
-};
-
 function FeedbackItem({
   item,
-  isExpanded,
-  isEditing,
+  expandedId,
+  editingId,
   editedTitle,
   editedDescription,
-  handlers,
+  onExpand,
+  onStartEdit,
+  onSaveEdit,
+  onDelete,
+  onEditedTitleChange,
+  onEditedDescriptionChange,
 }: FeedbackItemProps) {
-  const {
-    onExpand,
-    onEdit,
-    onSaveEdit,
-    onDelete,
-    onEditedTitleChange,
-    onEditedDescriptionChange,
-  } = handlers;
+  const isExpanded = expandedId === item.id;
+  const isEditing = editingId === item.id;
+
+  const handleExpand = useCallback(() => {
+    onExpand(isExpanded ? null : item.id);
+  }, [isExpanded, item.id, onExpand]);
+
+  const handleEdit = useCallback(() => {
+    onStartEdit(item);
+  }, [item, onStartEdit]);
+
+  const handleSave = useCallback(() => {
+    onSaveEdit(item.id);
+  }, [item.id, onSaveEdit]);
+
+  const handleDelete = useCallback(() => {
+    onDelete(item.id);
+  }, [item.id, onDelete]);
 
   return (
     <div
@@ -88,7 +99,7 @@ function FeedbackItem({
         <div className="flex items-center gap-2 shrink-0 text-slate-400">
           <button
             type="button"
-            onClick={onExpand}
+            onClick={handleExpand}
             className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
           >
             <Expand size={18} strokeWidth={1.5} />
@@ -97,7 +108,7 @@ function FeedbackItem({
           {isEditing ? (
             <button
               type="button"
-              onClick={onSaveEdit}
+              onClick={handleSave}
               className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
             >
               <Check size={18} strokeWidth={1.5} />
@@ -105,7 +116,7 @@ function FeedbackItem({
           ) : (
             <button
               type="button"
-              onClick={onEdit}
+              onClick={handleEdit}
               className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
             >
               <Pencil size={18} strokeWidth={1.5} />
@@ -114,7 +125,7 @@ function FeedbackItem({
 
           <button
             type="button"
-            onClick={onDelete}
+            onClick={handleDelete}
             className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-semantic-danger/10 hover:text-semantic-danger transition-colors duration-120 cursor-pointer"
           >
             <Trash2 size={18} strokeWidth={1.5} />
@@ -125,4 +136,12 @@ function FeedbackItem({
   );
 }
 
-export default React.memo(FeedbackItem);
+export default React.memo(FeedbackItem, (prev, next) => {
+  return (
+    prev.item === next.item &&
+    prev.expandedId === next.expandedId &&
+    prev.editingId === next.editingId &&
+    prev.editedTitle === next.editedTitle &&
+    prev.editedDescription === next.editedDescription
+  );
+});

@@ -47767,6 +47767,19 @@ ${this.customData.serverResponse}`;
   }
 
   // lib/authFetch.ts
+  var cachedToken = null;
+  var tokenExpiry = null;
+  async function getCachedIdToken(user) {
+    const now = Date.now();
+    if (cachedToken && tokenExpiry && now < tokenExpiry) {
+      return cachedToken;
+    }
+    const token = await user.getIdToken();
+    const result = await user.getIdTokenResult();
+    cachedToken = token;
+    tokenExpiry = result.expirationTime ? new Date(result.expirationTime).getTime() - 6e4 : now + 6e4;
+    return token;
+  }
   function resolveInput(input) {
     const base = typeof window !== "undefined" && window.__ECHLY_API_BASE__;
     if (!base) return input;
@@ -47778,7 +47791,7 @@ ${this.customData.serverResponse}`;
     if (!user) {
       throw new Error("User not authenticated");
     }
-    const token = await user.getIdToken();
+    const token = await getCachedIdToken(user);
     const headers = new Headers(init.headers || {});
     headers.set("Authorization", `Bearer ${token}`);
     return fetch(resolveInput(input), {
@@ -48516,20 +48529,31 @@ ${this.customData.serverResponse}`;
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
   function FeedbackItem({
     item,
-    isExpanded,
-    isEditing,
+    expandedId,
+    editingId,
     editedTitle,
     editedDescription,
-    handlers
+    onExpand,
+    onStartEdit,
+    onSaveEdit,
+    onDelete,
+    onEditedTitleChange,
+    onEditedDescriptionChange
   }) {
-    const {
-      onExpand,
-      onEdit,
-      onSaveEdit,
-      onDelete,
-      onEditedTitleChange,
-      onEditedDescriptionChange
-    } = handlers;
+    const isExpanded = expandedId === item.id;
+    const isEditing = editingId === item.id;
+    const handleExpand = (0, import_react6.useCallback)(() => {
+      onExpand(isExpanded ? null : item.id);
+    }, [isExpanded, item.id, onExpand]);
+    const handleEdit = (0, import_react6.useCallback)(() => {
+      onStartEdit(item);
+    }, [item, onStartEdit]);
+    const handleSave = (0, import_react6.useCallback)(() => {
+      onSaveEdit(item.id);
+    }, [item.id, onSaveEdit]);
+    const handleDelete = (0, import_react6.useCallback)(() => {
+      onDelete(item.id);
+    }, [item.id, onDelete]);
     return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
       "div",
       {
@@ -48562,7 +48586,7 @@ ${this.customData.serverResponse}`;
               "button",
               {
                 type: "button",
-                onClick: onExpand,
+                onClick: handleExpand,
                 className: "flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer",
                 children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Expand, { size: 18, strokeWidth: 1.5 })
               }
@@ -48571,7 +48595,7 @@ ${this.customData.serverResponse}`;
               "button",
               {
                 type: "button",
-                onClick: onSaveEdit,
+                onClick: handleSave,
                 className: "flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer",
                 children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Check, { size: 18, strokeWidth: 1.5 })
               }
@@ -48579,7 +48603,7 @@ ${this.customData.serverResponse}`;
               "button",
               {
                 type: "button",
-                onClick: onEdit,
+                onClick: handleEdit,
                 className: "flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer",
                 children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Pencil, { size: 18, strokeWidth: 1.5 })
               }
@@ -48588,7 +48612,7 @@ ${this.customData.serverResponse}`;
               "button",
               {
                 type: "button",
-                onClick: onDelete,
+                onClick: handleDelete,
                 className: "flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-semantic-danger/10 hover:text-semantic-danger transition-colors duration-120 cursor-pointer",
                 children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Trash2, { size: 18, strokeWidth: 1.5 })
               }
@@ -48598,7 +48622,9 @@ ${this.customData.serverResponse}`;
       }
     );
   }
-  var FeedbackItem_default = import_react6.default.memo(FeedbackItem);
+  var FeedbackItem_default = import_react6.default.memo(FeedbackItem, (prev, next) => {
+    return prev.item === next.item && prev.expandedId === next.expandedId && prev.editingId === next.editingId && prev.editedTitle === next.editedTitle && prev.editedDescription === next.editedDescription;
+  });
 
   // components/CaptureWidget/FeedbackList.tsx
   var import_jsx_runtime3 = __toESM(require_jsx_runtime());
@@ -48608,17 +48634,27 @@ ${this.customData.serverResponse}`;
     editingId,
     editedTitle,
     editedDescription,
-    getHandlers
+    onExpand,
+    onStartEdit,
+    onSaveEdit,
+    onDelete,
+    onEditedTitleChange,
+    onEditedDescriptionChange
   }) {
     return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "capture-feedback-list flex flex-col space-y-2", children: items.map((p) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       FeedbackItem_default,
       {
         item: p,
-        isExpanded: expandedId === p.id,
-        isEditing: editingId === p.id,
+        expandedId,
+        editingId,
         editedTitle,
         editedDescription,
-        handlers: getHandlers(p)
+        onExpand,
+        onStartEdit,
+        onSaveEdit,
+        onDelete,
+        onEditedTitleChange,
+        onEditedDescriptionChange
       },
       p.id
     )) });
@@ -48673,20 +48709,6 @@ ${this.customData.serverResponse}`;
         widgetToggleRef.current = null;
       };
     }, [handlers, widgetToggleRef]);
-    const getFeedbackItemHandlers = import_react8.default.useCallback(
-      (p) => ({
-        onExpand: () => handlers.setExpandedId(state.expandedId === p.id ? null : p.id),
-        onEdit: () => handlers.startEditing(p),
-        onSaveEdit: () => handlers.saveEdit(p.id),
-        onDelete: () => handlers.deletePointer(p.id),
-        onEditedTitleChange: handlers.setEditedTitle,
-        onEditedDescriptionChange: handlers.setEditedDescription
-      }),
-      [
-        handlers,
-        state.expandedId
-      ]
-    );
     if (!state.isOpen) {
       return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "fixed bottom-10 right-10 z-50 capture-floating-wrapper", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
         "button",
@@ -48749,7 +48771,12 @@ ${this.customData.serverResponse}`;
                   editingId: state.editingId,
                   editedTitle: state.editedTitle,
                   editedDescription: state.editedDescription,
-                  getHandlers: getFeedbackItemHandlers
+                  onExpand: handlers.setExpandedId,
+                  onStartEdit: handlers.startEditing,
+                  onSaveEdit: handlers.saveEdit,
+                  onDelete: handlers.deletePointer,
+                  onEditedTitleChange: handlers.setEditedTitle,
+                  onEditedDescriptionChange: handlers.setEditedDescription
                 }
               ),
               state.errorMessage && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3", children: state.errorMessage }),

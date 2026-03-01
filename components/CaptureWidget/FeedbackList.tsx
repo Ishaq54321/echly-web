@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import FeedbackItem, { type FeedbackItemHandlers } from "./FeedbackItem";
+import FeedbackItem from "./FeedbackItem";
 import type { StructuredFeedback } from "./types";
 
 type FeedbackListProps = {
@@ -10,7 +10,12 @@ type FeedbackListProps = {
   editingId: string | null;
   editedTitle: string;
   editedDescription: string;
-  getHandlers: (item: StructuredFeedback) => FeedbackItemHandlers;
+  onExpand: (id: string | null) => void;
+  onStartEdit: (item: StructuredFeedback) => void;
+  onSaveEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+  onEditedTitleChange: (value: string) => void;
+  onEditedDescriptionChange: (value: string) => void;
 };
 
 function FeedbackList({
@@ -19,7 +24,12 @@ function FeedbackList({
   editingId,
   editedTitle,
   editedDescription,
-  getHandlers,
+  onExpand,
+  onStartEdit,
+  onSaveEdit,
+  onDelete,
+  onEditedTitleChange,
+  onEditedDescriptionChange,
 }: FeedbackListProps) {
   return (
     <div className="capture-feedback-list flex flex-col space-y-2">
@@ -27,11 +37,16 @@ function FeedbackList({
         <FeedbackItem
           key={p.id}
           item={p}
-          isExpanded={expandedId === p.id}
-          isEditing={editingId === p.id}
+          expandedId={expandedId}
+          editingId={editingId}
           editedTitle={editedTitle}
           editedDescription={editedDescription}
-          handlers={getHandlers(p)}
+          onExpand={onExpand}
+          onStartEdit={onStartEdit}
+          onSaveEdit={onSaveEdit}
+          onDelete={onDelete}
+          onEditedTitleChange={onEditedTitleChange}
+          onEditedDescriptionChange={onEditedDescriptionChange}
         />
       ))}
     </div>

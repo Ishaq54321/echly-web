@@ -7,7 +7,7 @@ import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackList from "./FeedbackList";
 import WidgetFooter from "./WidgetFooter";
-import type { CaptureWidgetProps, StructuredFeedback } from "./types";
+import type { CaptureWidgetProps } from "./types";
 
 export default function CaptureWidget({
   sessionId,
@@ -39,22 +39,6 @@ export default function CaptureWidget({
       widgetToggleRef.current = null;
     };
   }, [handlers, widgetToggleRef]);
-
-  const getFeedbackItemHandlers = React.useCallback(
-    (p: StructuredFeedback) => ({
-      onExpand: () =>
-        handlers.setExpandedId(state.expandedId === p.id ? null : p.id),
-      onEdit: () => handlers.startEditing(p),
-      onSaveEdit: () => handlers.saveEdit(p.id),
-      onDelete: () => handlers.deletePointer(p.id),
-      onEditedTitleChange: handlers.setEditedTitle,
-      onEditedDescriptionChange: handlers.setEditedDescription,
-    }),
-    [
-      handlers,
-      state.expandedId,
-    ]
-  );
 
   if (!state.isOpen) {
     return (
@@ -135,7 +119,12 @@ export default function CaptureWidget({
             editingId={state.editingId}
             editedTitle={state.editedTitle}
             editedDescription={state.editedDescription}
-            getHandlers={getFeedbackItemHandlers}
+            onExpand={handlers.setExpandedId}
+            onStartEdit={handlers.startEditing}
+            onSaveEdit={handlers.saveEdit}
+            onDelete={handlers.deletePointer}
+            onEditedTitleChange={handlers.setEditedTitle}
+            onEditedDescriptionChange={handlers.setEditedDescription}
           />
 
           {state.errorMessage && (
