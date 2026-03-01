@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2 } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import { formatFullDateTime } from "@/lib/utils/date";
@@ -39,16 +39,56 @@ export function WorkspaceCard({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const firstMenuItemRef = useRef<HTMLButtonElement>(null);
+
+  const closeMenu = useCallback(() => setMoreOpen(false), []);
 
   useEffect(() => {
     if (!moreOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
-        setMoreOpen(false);
+        closeMenu();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [moreOpen, closeMenu]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeMenu();
+        return;
+      }
+      const menu = menuRef.current;
+      if (!menu) return;
+      const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+      const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+      if (e.key === "ArrowDown" && currentIndex < items.length - 1) {
+        e.preventDefault();
+        items[currentIndex + 1]?.focus();
+      } else if (e.key === "ArrowUp" && currentIndex > 0) {
+        e.preventDefault();
+        items[currentIndex - 1]?.focus();
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        items[0]?.focus();
+      } else if (e.key === "End") {
+        e.preventDefault();
+        items[items.length - 1]?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [moreOpen, closeMenu]);
+
+  useEffect(() => {
+    if (moreOpen) {
+      firstMenuItemRef.current?.focus();
+    }
   }, [moreOpen]);
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -76,27 +116,27 @@ export function WorkspaceCard({
         () => {}
       );
     }
-    setMoreOpen(false);
+    closeMenu();
   };
 
   const handleShare = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setShareOpen(true);
-    setMoreOpen(false);
+    closeMenu();
   };
 
   const handleRenameClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setRenameOpen(true);
-    setMoreOpen(false);
+    closeMenu();
   };
 
   const handleArchiveClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setMoreOpen(false);
+    closeMenu();
     if (archiving || !onArchiveSuccess) return;
     setArchiving(true);
     try {
@@ -115,7 +155,7 @@ export function WorkspaceCard({
     e.preventDefault();
     e.stopPropagation();
     setDeleteOpen(true);
-    setMoreOpen(false);
+    closeMenu();
   };
 
   const handleRenameSave = async (title: string) => {
@@ -137,8 +177,8 @@ export function WorkspaceCard({
     onDeleteSuccess?.(session.id);
   };
 
-  const iconButtonClass =
-    "focus-ring-brand flex items-center justify-center h-8 w-8 rounded-md text-[hsl(var(--text-secondary))] hover:bg-[hsl(var(--surface-2))] hover:scale-[1.02] transition-[opacity,background-color,transform] duration-150";
+  const menuItemClass =
+    "focus-ring-brand w-full px-3 py-2 text-left text-sm rounded-md text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-2))] transition-colors duration-150 flex items-center gap-2";
 
   return (
     <>
@@ -155,38 +195,11 @@ export function WorkspaceCard({
         style={{ animationDelay: `${index * 40}ms` }}
         data-session-id={session.id}
       >
-        {/* Action bar: visible on hover, absolute so no layout shift */}
+        {/* Action bar: 3-dot menu only */}
         <div
           data-card-actions
-          className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+          className="absolute top-3 right-3 flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-150"
         >
-          <div className="relative">
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className={iconButtonClass}
-              aria-label={copyTooltip ? "Copied" : "Copy link"}
-              title={copyTooltip ? "Copied" : "Copy link"}
-            >
-              <Link2 className="h-4 w-4" aria-hidden />
-            </button>
-            {copyTooltip && (
-              <span
-                className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2 py-0.5 text-xs font-medium rounded bg-neutral-800 text-white whitespace-nowrap"
-                role="status"
-              >
-                Copied
-              </span>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={handleShare}
-            className={iconButtonClass}
-            aria-label="Share session"
-          >
-            <UserPlus className="h-4 w-4" aria-hidden />
-          </button>
           <div className="relative" ref={moreRef}>
             <button
               type="button"
@@ -195,23 +208,53 @@ export function WorkspaceCard({
                 e.stopPropagation();
                 setMoreOpen((prev) => !prev);
               }}
-              className={iconButtonClass}
-              aria-label="More options"
+              className="
+                h-10 w-10
+                flex items-center justify-center
+                rounded-lg
+                text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]
+                transition-all duration-150
+                hover:bg-[hsl(var(--surface-2))]
+                focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand))]
+                cursor-pointer
+              "
+              aria-label="Workspace actions"
               aria-expanded={moreOpen}
-              aria-haspopup="true"
+              aria-haspopup="menu"
             >
               <MoreHorizontal className="h-4 w-4" aria-hidden />
             </button>
             {moreOpen && (
               <div
+                ref={menuRef}
                 data-card-actions
-                className="absolute right-0 top-full mt-1 py-1 min-w-[140px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] shadow-lg z-10"
+                className="absolute right-0 top-full mt-1 py-1 min-w-[160px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] shadow-lg z-10"
                 role="menu"
+                aria-label="Workspace actions"
               >
+                <button
+                  ref={firstMenuItemRef}
+                  type="button"
+                  onClick={handleCopyLink}
+                  className={menuItemClass}
+                  role="menuitem"
+                >
+                  <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Copy link
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className={menuItemClass}
+                  role="menuitem"
+                >
+                  <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Share
+                </button>
                 <button
                   type="button"
                   onClick={handleRenameClick}
-                  className="focus-ring-brand w-full px-3 py-2 text-left text-sm text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-2))] flex items-center gap-2"
+                  className={menuItemClass}
                   role="menuitem"
                 >
                   <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -221,16 +264,17 @@ export function WorkspaceCard({
                   type="button"
                   onClick={handleArchiveClick}
                   disabled={archiving}
-                  className="focus-ring-brand w-full px-3 py-2 text-left text-sm text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-2))] flex items-center gap-2 disabled:opacity-60"
+                  className={`${menuItemClass} disabled:opacity-60`}
                   role="menuitem"
                 >
                   <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   {archiving ? "Archiving…" : "Archive"}
                 </button>
+                <div className="my-1 border-t border-[hsl(var(--border))]" role="separator" aria-hidden />
                 <button
                   type="button"
                   onClick={handleDeleteClick}
-                  className="focus-ring-brand w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  className="focus-ring-brand w-full px-3 py-2 text-left text-sm rounded-md text-red-500 hover:bg-red-50 transition-colors duration-150 flex items-center gap-2"
                   role="menuitem"
                 >
                   <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -239,6 +283,15 @@ export function WorkspaceCard({
               </div>
             )}
           </div>
+          {copyTooltip && (
+            <span
+              className="absolute right-12 top-0 px-2 py-1 text-xs font-medium rounded-md bg-neutral-800 text-white whitespace-nowrap z-20 pointer-events-none"
+              role="status"
+              aria-live="polite"
+            >
+              Link copied
+            </span>
+          )}
         </div>
 
         <div className={`flex items-center gap-2 min-w-0 ${!isActive ? "opacity-90" : ""}`}>
