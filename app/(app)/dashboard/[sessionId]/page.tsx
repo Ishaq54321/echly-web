@@ -84,6 +84,7 @@ export default function SessionPage() {
   const {
     feedback,
     setFeedback,
+    total: feedbackTotal,
     loading: feedbackLoading,
     hasMore: hasMoreFeedback,
     hasReachedLimit: feedbackReachedLimit,
@@ -188,7 +189,7 @@ export default function SessionPage() {
       ? {
           ...detailTicket,
           index: selectedIndex !== -1 ? selectedIndex + 1 : 1,
-          total: feedback.length || 1,
+          total: feedbackTotal > 0 ? feedbackTotal : feedback.length || 1,
         }
       : null;
 
@@ -430,7 +431,7 @@ export default function SessionPage() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             selectedIndex={selectedIndex}
-            total={feedback.length}
+            total={feedbackTotal}
             loadingMore={feedbackLoadingMore}
             hasMore={hasMoreFeedback}
             hasReachedLimit={feedbackReachedLimit}

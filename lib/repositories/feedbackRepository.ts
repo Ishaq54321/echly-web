@@ -229,6 +229,14 @@ export async function getSessionFeedbackPageWithStringCursorRepo(
   return { feedback, nextCursor, hasMore };
 }
 
+/** Total count of feedback for a session (for sidebar display). */
+export async function getSessionFeedbackCountRepo(sessionId: string): Promise<number> {
+  const coll = collection(db, "feedback");
+  const q = query(coll, where("sessionId", "==", sessionId));
+  const snapshot = await getCountFromServer(q);
+  return snapshot.data().count;
+}
+
 export async function deleteFeedbackRepo(feedbackId: string): Promise<void> {
   await deleteDoc(doc(db, "feedback", feedbackId));
 }

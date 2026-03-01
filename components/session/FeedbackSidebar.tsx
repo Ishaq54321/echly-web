@@ -33,6 +33,7 @@ export default function FeedbackSidebar({
   feedback,
   selectedId,
   onSelect,
+  total: totalProp,
   loadingMore = false,
   hasMore = false,
   hasReachedLimit = false,
@@ -60,7 +61,7 @@ export default function FeedbackSidebar({
     return sorted;
   }, [feedback, searchQuery, sort]);
 
-  const total = feedback.length;
+  const total = typeof totalProp === "number" ? totalProp : feedback.length;
   const openCount = feedback.filter((f) => !(f.isResolved ?? false)).length;
   const resolvedCount = feedback.filter((f) => f.isResolved === true).length;
 
@@ -68,7 +69,7 @@ export default function FeedbackSidebar({
     total > 0
       ? [
           total + " total",
-          ...(openCount > 0 ? [openCount + " open"] : []),
+          ...(openCount > 0 ? [openCount + " active"] : []),
           ...(resolvedCount > 0 ? [resolvedCount + " resolved"] : []),
         ].join(" · ")
       : "0 total";
@@ -153,63 +154,58 @@ export default function FeedbackSidebar({
           <div>
           {displayed.map((item, index) => {
             const isActive = item.id === selectedId;
-            const totalCount = displayed.length;
-            const isResolved = item.isResolved === true;
-            const statusAccentClass = isResolved
-              ? "text-semantic-success"
-              : "text-semantic-system";
 
             return (
-              <div
-                key={item.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => onSelect(item.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onSelect(item.id);
-                  }
-                }}
-                className={`group relative flex flex-col px-3 py-2.5 cursor-pointer text-[15px] font-medium rounded-lg transition-all duration-150 outline-none focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1
-                  ${isActive
-                    ? "bg-semantic-system text-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-semantic-system"
-                    : "text-neutral-400 hover:bg-neutral-100"}`}
-              >
-                {isActive && (
-                  <div className="absolute left-0 top-0 h-full w-[3px] bg-white rounded-r-md opacity-80" aria-hidden />
-                )}
-                <div className="flex justify-between items-start gap-3">
-                  <div className="flex items-start gap-2 min-w-0 flex-1">
-                    <span
-                      className={`text-[13px] mt-[2px] w-[36px] shrink-0 ${isActive ? "text-white" : "text-neutral-400"}`}
-                    >
-                      {index + 1}/{totalCount}
-                    </span>
-                    <span className="truncate text-[15px] font-medium">
-                      {item.title}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      className="opacity-0 group-hover:opacity-100 transition-all duration-150 ease-out p-0.5 rounded text-neutral-400 hover:text-neutral-900 cursor-pointer border-0 bg-transparent"
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label="More actions"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-                        <circle cx="8" cy="3" r="1.5" />
-                        <circle cx="8" cy="8" r="1.5" />
-                        <circle cx="8" cy="13" r="1.5" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                {isActive && (
-                  <span className="text-[12px] mt-1 ml-[calc(36px+0.5rem)] text-white">
-                    {isResolved ? "Resolved" : "Open"}
+              <div key={item.id} className="relative group">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onSelect(item.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onSelect(item.id);
+                    }
+                  }}
+                  className={`relative flex items-center gap-3 px-4 py-2.5 rounded-md transition-colors duration-150 outline-none focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 cursor-pointer ${
+                    isActive
+                      ? "text-neutral-900"
+                      : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
+                  }`}
+                >
+                  {isActive && (
+                    <div
+                      className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-md bg-semantic-system"
+                      aria-hidden
+                    />
+                  )}
+                  <span
+                    className={`w-6 shrink-0 text-right text-[13px] ${
+                      isActive ? "text-semantic-system font-medium" : "text-neutral-400"
+                    }`}
+                  >
+                    {index + 1}
                   </span>
-                )}
+                  <span
+                    className={`min-w-0 flex-1 truncate text-[15px] ${
+                      isActive ? "font-medium text-neutral-900" : "font-normal text-neutral-600"
+                    }`}
+                  >
+                    {item.title}
+                  </span>
+                  <button
+                    type="button"
+                    className="opacity-0 group-hover:opacity-100 transition-all duration-150 ease-out p-0.5 rounded text-neutral-400 hover:text-neutral-900 cursor-pointer border-0 bg-transparent shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label="More actions"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                      <circle cx="8" cy="3" r="1.5" />
+                      <circle cx="8" cy="8" r="1.5" />
+                      <circle cx="8" cy="13" r="1.5" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             );
           })}

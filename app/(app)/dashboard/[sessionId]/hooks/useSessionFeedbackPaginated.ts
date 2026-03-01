@@ -11,6 +11,8 @@ const FEEDBACK_LOAD_CAP = 200;
 export interface UseSessionFeedbackPaginatedResult {
   feedback: Feedback[];
   setFeedback: React.Dispatch<React.SetStateAction<Feedback[]>>;
+  /** Total count from server (first page); stable, not derived from loaded items. */
+  total: number;
   loading: boolean;
   hasMore: boolean;
   hasReachedLimit: boolean;
@@ -29,6 +31,7 @@ export function useSessionFeedbackPaginated(
   sessionId: string | undefined
 ): UseSessionFeedbackPaginatedResult {
   const [items, setItems] = useState<Feedback[]>([]);
+  const [total, setTotal] = useState<number>(0);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -49,12 +52,14 @@ export function useSessionFeedbackPaginated(
         feedback?: Feedback[];
         nextCursor?: string | null;
         hasMore?: boolean;
+        total?: number;
       };
 
       if (data.feedback?.length) {
         setItems((prev) => [...prev, ...data.feedback!]);
         setCursor(data.nextCursor ?? null);
         setHasMore(data.hasMore ?? false);
+        // Do not update total on scroll; keep from initial load
       } else {
         setHasMore(false);
       }
@@ -94,6 +99,7 @@ export function useSessionFeedbackPaginated(
   useEffect(() => {
     if (!sessionId) {
       setItems([]);
+      setTotal(0);
       setCursor(null);
       setHasMore(true);
       setInitialLoadDone(false);
@@ -108,8 +114,9 @@ export function useSessionFeedbackPaginated(
       `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
     )
       .then((res) => res.json())
-      .then((data: { feedback?: Feedback[]; nextCursor?: string | null; hasMore?: boolean }) => {
+      .then((data: { feedback?: Feedback[]; nextCursor?: string | null; hasMore?: boolean; total?: number }) => {
         if (cancelled) return;
+        if (typeof data.total === "number") setTotal(data.total);
         if (data.feedback?.length) {
           setItems(data.feedback);
           setCursor(data.nextCursor ?? null);
@@ -141,7 +148,9 @@ export function useSessionFeedbackPaginated(
         feedback?: Feedback[];
         nextCursor?: string | null;
         hasMore?: boolean;
+        total?: number;
       };
+      if (typeof data.total === "number") setTotal(data.total);
       if (data.feedback?.length) {
         setItems(data.feedback);
         setCursor(data.nextCursor ?? null);
@@ -158,6 +167,7 @@ export function useSessionFeedbackPaginated(
 
   return {
     feedback: items,
+    total,
     setFeedback: setItems,
     loading: initialLoading,
     hasMore,

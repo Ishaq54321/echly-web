@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
-import { getSessionFeedbackPageWithStringCursorRepo } from "@/lib/repositories/feedbackRepository";
+import {
+  getSessionFeedbackPageWithStringCursorRepo,
+  getSessionFeedbackCountRepo,
+} from "@/lib/repositories/feedbackRepository";
 
 function serializeFeedback(item: Feedback): Record<string, unknown> {
   const out = { ...item } as Record<string, unknown>;
@@ -32,17 +35,22 @@ export async function GET(req: Request) {
   }
 
   try {
-    const { feedback, nextCursor, hasMore } =
-      await getSessionFeedbackPageWithStringCursorRepo(
-        sessionId,
-        limit,
-        cursor && cursor.trim() !== "" ? cursor : undefined
-      );
+    const isFirstPage = !cursor || cursor.trim() === "";
+    const pageResult = await getSessionFeedbackPageWithStringCursorRepo(
+      sessionId,
+      limit,
+      isFirstPage ? undefined : cursor
+    );
+    const total = isFirstPage
+      ? await getSessionFeedbackCountRepo(sessionId)
+      : undefined;
+    const { feedback, nextCursor, hasMore } = pageResult;
 
     return NextResponse.json({
       feedback: feedback.map(serializeFeedback),
       nextCursor,
       hasMore,
+      ...(typeof total === "number" && { total }),
     });
   } catch (err) {
     console.error("GET /api/feedback:", err);

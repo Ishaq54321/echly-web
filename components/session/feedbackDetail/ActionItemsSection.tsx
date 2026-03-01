@@ -118,56 +118,58 @@ export function ActionItemsSection({
     <Section title="Decisions" titleSemantic="attention">
       <ul className="list-none space-y-2 p-0 m-0">
         {visibleItems.map((text, i) => (
-          <li key={i} className="flex items-center gap-2 group">
-            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-semantic-attention">
-              {i + 1}
-            </span>
-            {editingIndex === i ? (
-              <div className="flex-1 flex gap-2 items-center">
-                <input
-                  type="text"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onBlur={() => void saveEdit()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void saveEdit();
-                    if (e.key === "Escape") cancelEdit();
-                  }}
-                  className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
-                  autoFocus
-                  aria-label={`Edit action item ${i + 1}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => void saveEdit()}
-                  className="text-[13px] font-medium text-neutral-700 hover:text-neutral-900 hover:underline"
-                >
-                  Save
-                </button>
-              </div>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => startEdit(i)}
-                  className={`flex-1 text-left font-mono text-[13px] bg-neutral-100 px-2 py-1 rounded-md -mx-2 cursor-text transition-colors duration-150 ${
-                    isResolved
-                      ? "line-through text-neutral-400"
-                      : "text-neutral-900 hover:bg-neutral-200/80"
-                  }`}
-                >
-                  {text}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void removeItem(i)}
-                  className="flex-shrink-0 p-1 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label={`Remove action item ${i + 1}`}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </>
-            )}
+          <li key={i}>
+            <div className="group flex items-center justify-between rounded-md px-3 py-2 transition-colors duration-150 hover:bg-neutral-100 cursor-pointer">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-semantic-attention">
+                {i + 1}
+              </span>
+              {editingIndex === i ? (
+                <div className="flex-1 flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onBlur={() => void saveEdit()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void saveEdit();
+                      if (e.key === "Escape") cancelEdit();
+                    }}
+                    className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
+                    autoFocus
+                    aria-label={`Edit action item ${i + 1}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void saveEdit()}
+                    className="text-[13px] font-medium text-neutral-700 hover:text-neutral-900 hover:underline"
+                  >
+                    Save
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(i)}
+                    className={`flex-1 text-left font-mono text-[13px] px-2 py-1 rounded-md -mx-2 cursor-text transition-colors duration-150 ${
+                      isResolved
+                        ? "line-through text-neutral-400"
+                        : "text-neutral-900"
+                    }`}
+                  >
+                    {text}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removeItem(i)}
+                    className="flex-shrink-0 p-1 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label={`Remove action item ${i + 1}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </>
+              )}
+            </div>
           </li>
         ))}
         {isAdding && (
