@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { Feedback } from "@/lib/domain/feedback";
 
@@ -53,7 +54,7 @@ export function useSessionFeedbackPaginated(
     setLoadingMore(true);
     try {
       const url = `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=${encodeURIComponent(cursor ?? "")}&limit=${PAGE_SIZE}`;
-      const res = await fetch(url);
+      const res = await authFetch(url);
       const data = (await res.json()) as {
         feedback?: Feedback[];
         nextCursor?: string | null;
@@ -120,7 +121,7 @@ export function useSessionFeedbackPaginated(
     setInitialLoading(true);
     setInitialLoadDone(false);
 
-    fetch(
+    authFetch(
       `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
     )
       .then((res) => res.json())
@@ -153,7 +154,7 @@ export function useSessionFeedbackPaginated(
     if (!sessionId) return;
     setInitialLoading(true);
     try {
-      const res = await fetch(
+      const res = await authFetch(
         `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
       );
       const data = (await res.json()) as {

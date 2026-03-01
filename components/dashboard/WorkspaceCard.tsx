@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle, Folder } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
@@ -150,7 +151,7 @@ export function WorkspaceCard({
     if (archiving || !onArchiveSuccess) return;
     setArchiving(true);
     try {
-      const res = await fetch(`/api/sessions/${session.id}`, {
+      const res = await authFetch(`/api/sessions/${session.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ archived: true }),
@@ -169,7 +170,7 @@ export function WorkspaceCard({
   };
 
   const handleRenameSave = async (title: string) => {
-    const res = await fetch(`/api/sessions/${session.id}`, {
+    const res = await authFetch(`/api/sessions/${session.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
@@ -182,7 +183,7 @@ export function WorkspaceCard({
   };
 
   const handleDeleteConfirm = async () => {
-    const res = await fetch(`/api/sessions/${session.id}`, { method: "DELETE" });
+    const res = await authFetch(`/api/sessions/${session.id}`, { method: "DELETE" });
     if (!res.ok) throw new Error("Failed to delete");
     onDeleteSuccess?.(session.id);
   };

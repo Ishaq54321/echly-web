@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect } from "react";
 import {
   addFeedback,
@@ -93,7 +94,7 @@ export function useFeedback({
     transcript: string,
     screenshot: string | null
   ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
-    const res = await fetch("/api/structure-feedback", {
+    const res = await authFetch("/api/structure-feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transcript }),

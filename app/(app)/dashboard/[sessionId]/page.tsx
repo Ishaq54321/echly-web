@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
@@ -158,7 +159,7 @@ export default function SessionPage() {
   const fetchDetailTicket = useCallback(async (id: string) => {
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/tickets/${id}`);
+      const res = await authFetch(`/api/tickets/${id}`);
       const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
       if (data.success && data.ticket) {
         setDetailTicket(data.ticket);
@@ -218,7 +219,7 @@ export default function SessionPage() {
   const saveTitle = async (newTitle: string): Promise<void> => {
     if (!selectedId || newTitle.trim() === "") return;
     try {
-      const res = await fetch(`/api/tickets/${selectedId}`, {
+      const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: newTitle.trim() }),
@@ -247,7 +248,7 @@ export default function SessionPage() {
     }
     setIsSavingDescription(true);
     try {
-      const res = await fetch(`/api/tickets/${selectedId}`, {
+      const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description: descriptionDraft }),
@@ -277,7 +278,7 @@ export default function SessionPage() {
   const saveActionItems = async (actionItems: string[]) => {
     if (!selectedId) return;
     try {
-      const res = await fetch(`/api/tickets/${selectedId}`, {
+      const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ actionItems }),
@@ -299,7 +300,7 @@ export default function SessionPage() {
   const saveTags = async (suggestedTags: string[]) => {
     if (!selectedId) return;
     try {
-      const res = await fetch(`/api/tickets/${selectedId}`, {
+      const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ suggestedTags }),
@@ -322,7 +323,7 @@ export default function SessionPage() {
   const saveResolved = async (isResolved: boolean) => {
     if (!selectedId) return;
     try {
-      const res = await fetch(`/api/tickets/${selectedId}`, {
+      const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isResolved }),
@@ -348,7 +349,7 @@ export default function SessionPage() {
     if (active.length === 0) return;
     await Promise.all(
       active.map((item) =>
-        fetch(`/api/tickets/${item.id}`, {
+        authFetch(`/api/tickets/${item.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ isResolved: true }),
@@ -376,7 +377,7 @@ export default function SessionPage() {
     transcript: string,
     screenshot: string | null
   ) => {
-    const res = await fetch("/api/structure-feedback", {
+    const res = await authFetch("/api/structure-feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transcript }),
@@ -489,7 +490,7 @@ export default function SessionPage() {
                             trimmed && trimmed.length > 0
                               ? trimmed
                               : session.title || "Untitled Session";
-                          const res = await fetch(`/api/sessions/${sessionId}`, {
+                          const res = await authFetch(`/api/sessions/${sessionId}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ title: safeTitle }),

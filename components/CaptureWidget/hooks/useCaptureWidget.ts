@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import { useEffect, useRef, useState } from "react";
 import { getSessionFeedback } from "@/lib/feedback";
 import type {
@@ -300,7 +301,7 @@ export function useCaptureWidget({
 
   const saveEdit = async (id: string) => {
     try {
-      const res = await fetch(`/api/tickets/${id}`, {
+      const res = await authFetch(`/api/tickets/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
