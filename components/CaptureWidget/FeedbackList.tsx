@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import FeedbackItem, { type FeedbackItemHandlers } from "./FeedbackItem";
 import type { StructuredFeedback } from "./types";
 
@@ -12,7 +13,7 @@ type FeedbackListProps = {
   getHandlers: (item: StructuredFeedback) => FeedbackItemHandlers;
 };
 
-export default function FeedbackList({
+function FeedbackList({
   items,
   expandedId,
   editingId,
@@ -36,3 +37,5 @@ export default function FeedbackList({
     </div>
   );
 }
+
+export default React.memo(FeedbackList);

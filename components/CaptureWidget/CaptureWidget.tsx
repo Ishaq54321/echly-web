@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
 import AudioWaveform from "@/components/AudioWaveform";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
@@ -30,14 +31,21 @@ export default function CaptureWidget({
     onDelete,
   });
 
-  const getFeedbackItemHandlers = (p: StructuredFeedback) => ({
-    onExpand: () => handlers.setExpandedId(state.expandedId === p.id ? null : p.id),
-    onEdit: () => handlers.startEditing(p),
-    onSaveEdit: () => handlers.saveEdit(p.id),
-    onDelete: () => handlers.deletePointer(p.id),
-    onEditedTitleChange: handlers.setEditedTitle,
-    onEditedDescriptionChange: handlers.setEditedDescription,
-  });
+  const getFeedbackItemHandlers = React.useCallback(
+    (p: StructuredFeedback) => ({
+      onExpand: () =>
+        handlers.setExpandedId(state.expandedId === p.id ? null : p.id),
+      onEdit: () => handlers.startEditing(p),
+      onSaveEdit: () => handlers.saveEdit(p.id),
+      onDelete: () => handlers.deletePointer(p.id),
+      onEditedTitleChange: handlers.setEditedTitle,
+      onEditedDescriptionChange: handlers.setEditedDescription,
+    }),
+    [
+      handlers,
+      state.expandedId,
+    ]
+  );
 
   if (!state.isOpen) {
     return (

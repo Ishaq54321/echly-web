@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { Pencil, Trash2, Expand, Check } from "lucide-react";
 import type { StructuredFeedback } from "./types";
 
@@ -21,7 +22,7 @@ type FeedbackItemProps = {
   handlers: FeedbackItemHandlers;
 };
 
-export default function FeedbackItem({
+function FeedbackItem({
   item,
   isExpanded,
   isEditing,
@@ -123,3 +124,5 @@ export default function FeedbackItem({
     </div>
   );
 }
+
+export default React.memo(FeedbackItem);

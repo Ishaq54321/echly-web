@@ -1,7 +1,7 @@
 "use client";
 
 import { authFetch } from "@/lib/authFetch";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSessionFeedback } from "@/lib/feedback";
 import type {
   StructuredFeedback,
@@ -77,7 +77,7 @@ export function useCaptureWidget({
   }, [state]);
 
   /** Guarded setter: in extension mode or during capturing/listening/structuring/edit, do not close. */
-  const setIsOpen = (next: boolean) => {
+  const setIsOpen = useCallback((next: boolean) => {
     if (next === false) {
       if (trayLockedRef.current) return;
       if (extensionMode) return;
@@ -92,7 +92,7 @@ export function useCaptureWidget({
       if (editingIdRef.current) return;
     }
     setIsOpenState(next);
-  };
+  }, [extensionMode]);
 
   useEffect(() => {
     activeRecordingIdRef.current = activeRecordingId;
@@ -134,7 +134,7 @@ export function useCaptureWidget({
     };
   }, [isDragging]);
 
-  const startDrag = (e: React.MouseEvent) => {
+  const startDrag = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0 || !widgetRef.current) return;
     const rect = widgetRef.current.getBoundingClientRect();
     setIsDragging(true);
@@ -144,7 +144,7 @@ export function useCaptureWidget({
       y: e.clientY - rect.top,
     };
     setPosition({ x: rect.left, y: rect.top });
-  };
+  }, []);
 
   /* ================= SYNC / LOAD SESSION FEEDBACK ================= */
 
@@ -206,24 +206,24 @@ export function useCaptureWidget({
 
   /* ================= TIMER ================= */
 
-  const startTimer = () => {
+  const startTimer = useCallback(() => {
     setSeconds(0);
     timerRef.current = setInterval(() => {
       setSeconds((prev) => prev + 1);
     }, 1000);
-  };
+  }, []);
 
   const stopTimer = () => clearInterval(timerRef.current);
 
-  const formatTime = () => {
+  const formatTime = useCallback(() => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-  };
+  }, [seconds]);
 
   /* ================= LISTEN ================= */
 
-  const startListening = async () => {
+  const startListening = useCallback(async () => {
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       recognitionRef.current?.start();
@@ -234,9 +234,9 @@ export function useCaptureWidget({
       setErrorMessage("Microphone permission denied.");
       setState("error");
     }
-  };
+  }, [startTimer]);
 
-  const finishListening = async () => {
+  const finishListening = useCallback(async () => {
     recognitionRef.current?.stop();
     stopTimer();
     const activeId = activeRecordingIdRef.current;
@@ -269,7 +269,7 @@ export function useCaptureWidget({
       setErrorMessage("AI processing failed.");
       setState("error");
     }
-  };
+  }, [onComplete]);
 
   /* Anticipation: 160ms pause then show result */
   useEffect(() => {
@@ -291,26 +291,26 @@ export function useCaptureWidget({
     return () => clearTimeout(t);
   }, [state, pendingStructured]);
 
-  const discardListening = () => {
+  const discardListening = useCallback(() => {
     recognitionRef.current?.stop();
     stopTimer();
     const activeId = activeRecordingIdRef.current;
     setRecordings((prev) => prev.filter((r) => r.id !== activeId));
     setActiveRecordingId(null);
     setState("idle");
-  };
+  }, []);
 
   /* ================= SHARE ================= */
 
-  const handleShare = async () => {
+  const handleShare = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
     } catch {}
-  };
+  }, []);
 
   /* ================= RESET ================= */
 
-  const resetSession = () => {
+  const resetSession = useCallback(() => {
     setPointers([]);
     setRecordings([]);
     setActiveRecordingId(null);
@@ -318,7 +318,7 @@ export function useCaptureWidget({
     setExpandedId(null);
     setEditingId(null);
     setShowMenu(false);
-  };
+  }, []);
 
   /* ================= CLICK OUTSIDE (menu only; no widget collapse in extension mode) ================= */
 
@@ -336,22 +336,22 @@ export function useCaptureWidget({
 
   /* ================= POINTER ACTIONS ================= */
 
-  const deletePointer = async (id: string) => {
+  const deletePointer = useCallback(async (id: string) => {
     try {
       await onDelete(id);
       setPointers((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       console.error("Delete failed:", err);
     }
-  };
+  }, [onDelete]);
 
-  const startEditing = (p: StructuredFeedback) => {
+  const startEditing = useCallback((p: StructuredFeedback) => {
     setEditingId(p.id);
     setEditedTitle(p.title);
     setEditedDescription(p.description);
-  };
+  }, []);
 
-  const saveEdit = async (id: string) => {
+  const saveEdit = useCallback(async (id: string) => {
     try {
       const res = await authFetch(`/api/tickets/${id}`, {
         method: "PATCH",
@@ -378,7 +378,7 @@ export function useCaptureWidget({
     } catch (err) {
       console.error("Save edit failed:", err);
     }
-  };
+  }, [editedTitle, editedDescription]);
 
   /* ================= ADD FEEDBACK (CAPTURE) ================= */
 
@@ -399,8 +399,8 @@ export function useCaptureWidget({
     return webCapture();
   };
 
-  const handleAddFeedback = async () => {
-    if (state !== "idle") return;
+  const handleAddFeedback = useCallback(async () => {
+    if (stateRef.current !== "idle") return;
     setIsOpen(true);
     setErrorMessage(null);
     // Stop recognition before screenshot; do NOT call setIsOpen(false), setCollapsed(true), or setVisible(false).
@@ -429,22 +429,10 @@ export function useCaptureWidget({
       setErrorMessage("Screen capture failed.");
       setState("error");
     }
-  };
+  }, [setIsOpen, startListening]);
 
-  return {
-    state: {
-      isOpen,
-      state,
-      errorMessage,
-      pointers,
-      expandedId,
-      editingId,
-      editedTitle,
-      editedDescription,
-      showMenu,
-      position,
-    },
-    handlers: {
+  const handlers = useMemo(
+    () => ({
       setIsOpen,
       startDrag,
       handleShare,
@@ -460,10 +448,44 @@ export function useCaptureWidget({
       setEditedTitle,
       setEditedDescription,
       handleAddFeedback,
-    },
-    derivedValues: {
+    }),
+    [
+      setIsOpen,
+      startDrag,
+      handleShare,
+      resetSession,
+      startListening,
+      finishListening,
+      discardListening,
+      deletePointer,
+      startEditing,
+      saveEdit,
+      handleAddFeedback,
+    ]
+  );
+
+  const derivedValues = useMemo(
+    () => ({
       formatTime,
+    }),
+    [formatTime]
+  );
+
+  return {
+    state: {
+      isOpen,
+      state,
+      errorMessage,
+      pointers,
+      expandedId,
+      editingId,
+      editedTitle,
+      editedDescription,
+      showMenu,
+      position,
     },
+    handlers,
+    derivedValues,
     refs: {
       widgetRef,
       menuRef,
