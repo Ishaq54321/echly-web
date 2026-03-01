@@ -148,6 +148,17 @@ body {
     0 0 0 4px #2563EB;
 }
 
+/* Enterprise focus ring — all interactive elements */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px #fafafa, 0 0 0 2px #a3a3a3;
+}
+
 /* ======================================
    CAPTURE WIDGET — AI STATE EXPERIENCE ARC
    Motion: 120–200ms, cubic-bezier(0.2, 0.8, 0.2, 1) only.

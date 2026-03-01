@@ -152,8 +152,18 @@ export default function FeedbackSidebar({
         {/* Ticket list (content flows; scroll is on parent panel) */}
         <div className="flex flex-col">
           <div>
-          {displayed.map((item) => {
+          {displayed.map((item, index) => {
             const isActive = item.id === selectedId;
+            const totalCount = displayed.length;
+            const status = (item.status ?? "open").toLowerCase();
+  const statusAccentClass =
+    status === "resolved" || status === "done"
+      ? "text-accent-green"
+      : status === "pending" || status === "in_progress" || status === "in_review"
+        ? "text-accent-amber"
+        : status === "archived"
+          ? "text-neutral-500"
+          : "text-accent-purple";
 
             return (
               <div
@@ -167,15 +177,25 @@ export default function FeedbackSidebar({
                     onSelect(item.id);
                   }
                 }}
-                className={`group flex flex-col px-3 py-2.5 cursor-pointer text-[14px] rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-0
+                className={`group relative flex flex-col px-3 py-2.5 cursor-pointer text-[14px] rounded-lg transition-all duration-150 outline-none focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1
                   ${isActive
                     ? "bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-white font-medium"
                     : "text-neutral-600 hover:bg-neutral-100"}`}
               >
+                {isActive && (
+                  <div className="absolute left-0 top-0 h-full w-[3px] bg-accent-blue rounded-r-md opacity-80" aria-hidden />
+                )}
                 <div className="flex justify-between items-start gap-3">
-                  <span className="truncate flex-1 min-w-0">
-                    {item.title}
-                  </span>
+                  <div className="flex items-start gap-2 min-w-0 flex-1">
+                    <span
+                      className={`text-[12px] mt-[2px] w-[36px] shrink-0 ${isActive ? "text-accent-blue" : "text-neutral-400"}`}
+                    >
+                      {index + 1}/{totalCount}
+                    </span>
+                    <span className="truncate text-[14px] font-medium">
+                      {item.title}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
@@ -191,6 +211,17 @@ export default function FeedbackSidebar({
                     </button>
                   </div>
                 </div>
+                {isActive && (
+                  <span className={`text-[11px] mt-1 ml-[calc(36px+0.5rem)] ${statusAccentClass}`}>
+                    {status === "resolved" || status === "done"
+                      ? "Resolved"
+                      : status === "pending" || status === "in_progress" || status === "in_review"
+                        ? "In Review"
+                        : status === "archived"
+                          ? "Archived"
+                          : "Open"}
+                  </span>
+                )}
               </div>
             );
           })}

@@ -5,6 +5,17 @@ import { MessageSquare, Trash2, Pencil, Check } from "lucide-react";
 import { StatusPill } from "./StatusPill";
 import type { FeedbackItemShape } from "./types";
 
+function formatRelative(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return "—";
+  }
+}
+
 interface FeedbackHeaderProps {
   item: FeedbackItemShape & { index: number; total: number };
   isActivityOpen: boolean;
@@ -71,7 +82,7 @@ export function FeedbackHeader({
 
   return (
     <div className="pt-4 pb-4">
-      <div className="mb-3 text-[12px] text-neutral-400">
+      <div className="text-[12px] text-accent-purple mb-3">
         {item.index} of {item.total}
       </div>
       <div className="flex items-start justify-between gap-4">
@@ -117,7 +128,7 @@ export function FeedbackHeader({
               </h1>
               {onSaveTitle && (
                 saveSuccess ? (
-                  <Check size={14} className="text-green-600 shrink-0 flex-shrink-0" aria-hidden />
+                  <Check size={14} className="text-neutral-600 shrink-0 flex-shrink-0" aria-hidden />
                 ) : (
                   <Pencil
                     size={14}
@@ -129,7 +140,7 @@ export function FeedbackHeader({
             </div>
           )}
           {saveSuccess && !isEditingTitle && (
-            <p className="text-[13px] text-green-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+            <p className="text-[13px] text-neutral-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
               <Check size={12} className="shrink-0" aria-hidden />
               Saved
             </p>
@@ -141,17 +152,17 @@ export function FeedbackHeader({
             <button
               type="button"
               onClick={onRequestDelete}
-              className="flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 rounded"
-              aria-label="Delete ticket"
+              className="flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 rounded"
+              aria-label="Delete permanently"
             >
               <Trash2 size={14} />
-              Delete Ticket
+              Delete permanently
             </button>
           )}
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 rounded ${
+            className={`flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 rounded ${
               isActivityOpen ? "text-neutral-700" : ""
             }`}
             aria-pressed={isActivityOpen}
@@ -161,6 +172,13 @@ export function FeedbackHeader({
           </button>
         </div>
       </div>
+      {(item.createdAt != null || item.updatedAt != null) && (
+        <div className="mt-1 text-[12px] text-neutral-400">
+          {item.updatedAt != null
+            ? `Created ${formatRelative(item.createdAt ?? null)} • Updated ${formatRelative(item.updatedAt)}`
+            : `Created ${formatRelative(item.createdAt ?? null)}`}
+        </div>
+      )}
       <div className="my-6 border-b border-neutral-200" />
     </div>
   );

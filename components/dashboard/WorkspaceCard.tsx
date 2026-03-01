@@ -187,7 +187,7 @@ export function WorkspaceCard({
   };
 
   const menuItemClass =
-    "w-full px-3 py-2 text-left text-sm rounded-md text-neutral-800 hover:bg-neutral-100 transition-colors duration-150 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300";
+    "w-full px-3 py-2 text-left text-sm rounded-md text-neutral-800 hover:bg-neutral-100 transition-colors duration-150 flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1";
 
   return (
     <>
@@ -207,7 +207,7 @@ export function WorkspaceCard({
           p-5
           cursor-pointer
           outline-none
-          focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2
+          focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1
           transition-all duration-150 ease-out
           will-change-transform
           hover:shadow-md
@@ -245,7 +245,7 @@ export function WorkspaceCard({
                 aria-label="More actions"
                 aria-expanded={moreOpen}
                 aria-haspopup="menu"
-                className="flex items-center justify-center h-10 w-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-neutral-100 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 cursor-pointer"
+                className="flex items-center justify-center h-10 w-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-neutral-100 hover:text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 cursor-pointer"
               >
                 <MoreHorizontal className="h-[16px] w-[16px] relative top-[1px] pointer-events-none" strokeWidth={1.5} aria-hidden />
               </button>
@@ -320,11 +320,11 @@ export function WorkspaceCard({
                   <button
                     type="button"
                     onClick={handleDeleteClick}
-                    className="w-full px-3 py-2 text-left text-sm rounded-md text-neutral-600 hover:bg-neutral-100 transition-colors duration-150 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
+                    className="w-full px-3 py-2 text-left text-sm rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors duration-150 flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1"
                     role="menuitem"
                   >
                     <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    Delete
+                    Delete permanently
                   </button>
                 </div>
               )}
@@ -395,6 +395,10 @@ export function WorkspaceCard({
                 <MessageCircle className="h-[14px] w-[14px] shrink-0 text-neutral-400" strokeWidth={1.5} aria-hidden />
                 <span>{commentCount}</span>
               </div>
+            </div>
+            {/* System ID — audit / structure signal */}
+            <div className="mt-2 text-[11px] text-neutral-400">
+              ID: {session.id ? `FB-${session.id.slice(-6).toUpperCase()}` : "—"}
             </div>
           </div>
         </div>

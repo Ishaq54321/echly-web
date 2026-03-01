@@ -13,4 +13,8 @@ export interface FeedbackItemShape {
   actionItems?: string[] | null;
   impact?: string | null;
   suggestedTags?: string[] | null;
+  /** ISO date string from API (audit trail). */
+  createdAt?: string | null;
+  /** ISO date string from API when available. */
+  updatedAt?: string | null;
 }

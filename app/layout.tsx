@@ -23,7 +23,7 @@ export default function RootLayout({
       <body className={`${plusJakartaSans.className} antialiased h-full overflow-hidden`} suppressHydrationWarning>
         <div className="h-screen flex flex-col">
           <GlobalNavBar />
-          <div className="flex flex-1 min-h-0 pt-16 overflow-hidden">
+          <div className="flex flex-1 min-h-0 pt-[56px] overflow-hidden">
             {children}
           </div>
         </div>

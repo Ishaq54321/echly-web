@@ -24,7 +24,7 @@ export function GlobalNavBar() {
     "h-9 w-9 flex items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors duration-150 shrink-0";
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-16 w-full bg-white border-b border-neutral-200 flex items-center justify-between px-6">
+    <header className="fixed top-0 left-0 right-0 z-50 h-[56px] w-full bg-white border-b border-neutral-200 flex items-center justify-between px-6">
       <Link href="/dashboard" className="flex items-center" aria-label="Echly home">
         <Image
           src="/Echly_logo.svg"

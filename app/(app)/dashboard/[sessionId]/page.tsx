@@ -503,7 +503,7 @@ export default function SessionPage() {
                         {session?.title ?? "Session"}
                       </h1>
                       {saveSessionTitleSuccess ? (
-                        <Check size={14} className="text-green-600 shrink-0" aria-hidden />
+                        <Check size={14} className="text-neutral-600 shrink-0" aria-hidden />
                       ) : (
                         <Pencil
                           size={14}
@@ -513,7 +513,7 @@ export default function SessionPage() {
                       )}
                     </div>
                     {saveSessionTitleSuccess && (
-                      <p className="text-[13px] text-green-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+                      <p className="text-[13px] text-neutral-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
                         <Check size={12} className="shrink-0" aria-hidden />
                         Saved
                       </p>
@@ -551,6 +551,15 @@ export default function SessionPage() {
               {detailLoading && selectedId ? (
                 <div className="flex items-center justify-center py-16">
                   <p className="text-[13px] text-neutral-500">Loading…</p>
+                </div>
+              ) : feedback.length === 0 ? (
+                <div className="text-center mt-24">
+                  <div className="text-[16px] font-medium text-neutral-800">
+                    No feedback yet
+                  </div>
+                  <div className="mt-2 text-[14px] text-neutral-500">
+                    Capture feedback to start organizing insights.
+                  </div>
                 </div>
               ) : (
                 <FeedbackDetail
@@ -631,29 +640,29 @@ export default function SessionPage() {
             aria-labelledby="delete-ticket-title"
           >
             <div
-              className="bg-[hsl(var(--surface-1))] rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] max-w-sm w-full p-6 border border-neutral-200"
+              className="bg-white rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] max-w-sm w-full p-6 border border-neutral-200"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 id="delete-ticket-title" className="text-[18px] font-medium leading-[1.35] text-neutral-900">
-                Delete ticket?
+                Delete feedback permanently?
               </h2>
               <p className="mt-2 text-[14px] text-neutral-500">
-                This cannot be undone.
+                This action cannot be undone. This will permanently remove this feedback and associated activity.
               </p>
               <div className="mt-6 flex gap-3 justify-end">
                 <button
                   type="button"
                   onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 text-[13px] font-medium rounded-md bg-[hsl(var(--surface-2))] text-neutral-900 hover:bg-[hsl(var(--surface-3))] transition-colors"
+                  className="px-4 py-2 text-[13px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeleteFeedback(selectedId)}
-                  className="px-4 py-2 text-[13px] font-medium rounded-lg bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] transition-transform duration-100 ease-out"
+                  className="px-4 py-2 text-[13px] font-medium rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors"
                 >
-                  Delete
+                  Delete permanently
                 </button>
               </div>
             </div>

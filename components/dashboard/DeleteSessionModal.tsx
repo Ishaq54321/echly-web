@@ -45,14 +45,13 @@ export function DeleteSessionModal({
           id="delete-session-title"
           className="text-[18px] font-medium leading-[1.35] text-neutral-900"
         >
-          Delete session?
+          Delete session permanently?
         </h2>
-        <p className="mt-2 text-sm text-[hsl(var(--text-secondary))]">
-          This will permanently delete this session and all associated tickets.
-          This action cannot be undone.
+        <p className="mt-2 text-[14px] text-neutral-500">
+          This action cannot be undone. This will permanently remove this session and all associated feedback.
         </p>
         {sessionTitle && (
-          <p className="mt-2 text-sm text-[hsl(var(--text-secondary))] font-medium truncate">
+          <p className="mt-2 text-[14px] text-neutral-500 font-medium truncate">
             &ldquo;{sessionTitle}&rdquo;
           </p>
         )}
@@ -61,7 +60,7 @@ export function DeleteSessionModal({
             type="button"
             onClick={onClose}
             disabled={deleting}
-            className="focus-ring-brand px-4 py-2 text-sm font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-3))] transition-colors disabled:opacity-60"
+            className="px-4 py-2 text-[13px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors disabled:opacity-60"
           >
             Cancel
           </button>
@@ -69,9 +68,9 @@ export function DeleteSessionModal({
             type="button"
             onClick={handleConfirm}
             disabled={deleting}
-            className="focus-ring-brand px-4 py-2 text-sm font-medium rounded-lg bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] transition-transform duration-100 ease-out disabled:opacity-60"
+            className="px-4 py-2 text-[13px] font-medium rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors disabled:opacity-60"
           >
-            {deleting ? "Deleting…" : "Delete"}
+            {deleting ? "Deleting…" : "Delete permanently"}
           </button>
         </div>
       </div>

@@ -5,8 +5,9 @@ import { ChevronDown } from "lucide-react";
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open" },
-  { value: "in_progress", label: "In progress" },
-  { value: "done", label: "Done" },
+  { value: "in_review", label: "In Review" },
+  { value: "resolved", label: "Resolved" },
+  { value: "archived", label: "Archived" },
 ] as const;
 
 interface StatusPillProps {
@@ -26,7 +27,16 @@ export function StatusPill({
 
   const value = controlledValue ?? internalValue;
   const displayLabel =
-    STATUS_OPTIONS.find((o) => o.value === value)?.label ?? "Open";
+    STATUS_OPTIONS.find((o) => o.value === value)?.label ??
+    (value === "done" ? "Resolved" : value === "in_progress" ? "In Review" : "Open");
+  const statusTextClass =
+    value === "resolved" || value === "done"
+      ? "text-accent-green"
+      : value === "in_review" || value === "in_progress"
+        ? "text-accent-amber"
+        : value === "archived"
+          ? "text-neutral-500"
+          : "text-accent-purple";
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +59,7 @@ export function StatusPill({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
+        className={`flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 transition-all duration-150 ease-out focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 ${statusTextClass}`}
         aria-label={ariaLabel}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -69,7 +79,7 @@ export function StatusPill({
               type="button"
               role="option"
               aria-selected={opt.value === value}
-              className="w-full text-left px-3 py-2 hover:bg-neutral-100 text-neutral-800 transition-all duration-150 ease-out"
+              className="w-full text-left px-3 py-2 hover:bg-neutral-100 text-neutral-800 transition-all duration-150 ease-out focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1"
               onClick={() => handleSelect(opt.value)}
             >
               {opt.label}

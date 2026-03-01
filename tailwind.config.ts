@@ -15,6 +15,12 @@ const config: Config = {
           accent: "#2563EB",
           soft: "#F3F4F6",
         },
+        accent: {
+          blue: "#2563EB",
+          purple: "#7C3AED",
+          green: "#059669",
+          amber: "#D97706",
+        },
       },
     },
   },
