@@ -13,6 +13,10 @@ export interface UseSessionFeedbackPaginatedResult {
   setFeedback: React.Dispatch<React.SetStateAction<Feedback[]>>;
   /** Total count from server (first page); stable, not derived from loaded items. */
   total: number;
+  /** Active (open) count from server (first page only); do not derive from items. */
+  activeCount: number;
+  /** Resolved count from server (first page only); do not derive from items. */
+  resolvedCount: number;
   loading: boolean;
   hasMore: boolean;
   hasReachedLimit: boolean;
@@ -32,6 +36,8 @@ export function useSessionFeedbackPaginated(
 ): UseSessionFeedbackPaginatedResult {
   const [items, setItems] = useState<Feedback[]>([]);
   const [total, setTotal] = useState<number>(0);
+  const [activeCount, setActiveCount] = useState<number>(0);
+  const [resolvedCount, setResolvedCount] = useState<number>(0);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -53,13 +59,15 @@ export function useSessionFeedbackPaginated(
         nextCursor?: string | null;
         hasMore?: boolean;
         total?: number;
+        activeCount?: number;
+        resolvedCount?: number;
       };
 
       if (data.feedback?.length) {
         setItems((prev) => [...prev, ...data.feedback!]);
         setCursor(data.nextCursor ?? null);
         setHasMore(data.hasMore ?? false);
-        // Do not update total on scroll; keep from initial load
+        // Do not update total/activeCount/resolvedCount on scroll; keep from initial load
       } else {
         setHasMore(false);
       }
@@ -100,6 +108,8 @@ export function useSessionFeedbackPaginated(
     if (!sessionId) {
       setItems([]);
       setTotal(0);
+      setActiveCount(0);
+      setResolvedCount(0);
       setCursor(null);
       setHasMore(true);
       setInitialLoadDone(false);
@@ -114,9 +124,11 @@ export function useSessionFeedbackPaginated(
       `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
     )
       .then((res) => res.json())
-      .then((data: { feedback?: Feedback[]; nextCursor?: string | null; hasMore?: boolean; total?: number }) => {
+      .then((data: { feedback?: Feedback[]; nextCursor?: string | null; hasMore?: boolean; total?: number; activeCount?: number; resolvedCount?: number }) => {
         if (cancelled) return;
         if (typeof data.total === "number") setTotal(data.total);
+        if (typeof data.activeCount === "number") setActiveCount(data.activeCount);
+        if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
         if (data.feedback?.length) {
           setItems(data.feedback);
           setCursor(data.nextCursor ?? null);
@@ -149,8 +161,12 @@ export function useSessionFeedbackPaginated(
         nextCursor?: string | null;
         hasMore?: boolean;
         total?: number;
+        activeCount?: number;
+        resolvedCount?: number;
       };
       if (typeof data.total === "number") setTotal(data.total);
+      if (typeof data.activeCount === "number") setActiveCount(data.activeCount);
+      if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
       if (data.feedback?.length) {
         setItems(data.feedback);
         setCursor(data.nextCursor ?? null);
@@ -168,6 +184,8 @@ export function useSessionFeedbackPaginated(
   return {
     feedback: items,
     total,
+    activeCount,
+    resolvedCount,
     setFeedback: setItems,
     loading: initialLoading,
     hasMore,

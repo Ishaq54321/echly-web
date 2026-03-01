@@ -3,6 +3,7 @@ import type { Feedback } from "@/lib/domain/feedback";
 import {
   getSessionFeedbackPageWithStringCursorRepo,
   getSessionFeedbackCountRepo,
+  getSessionFeedbackCountsRepo,
 } from "@/lib/repositories/feedbackRepository";
 
 function serializeFeedback(item: Feedback): Record<string, unknown> {
@@ -41,9 +42,15 @@ export async function GET(req: Request) {
       limit,
       isFirstPage ? undefined : cursor
     );
-    const total = isFirstPage
-      ? await getSessionFeedbackCountRepo(sessionId)
-      : undefined;
+    let total: number | undefined;
+    let activeCount: number | undefined;
+    let resolvedCount: number | undefined;
+    if (isFirstPage) {
+      total = await getSessionFeedbackCountRepo(sessionId);
+      const counts = await getSessionFeedbackCountsRepo(sessionId);
+      activeCount = counts.open;
+      resolvedCount = counts.resolved;
+    }
     const { feedback, nextCursor, hasMore } = pageResult;
 
     return NextResponse.json({
@@ -51,6 +58,8 @@ export async function GET(req: Request) {
       nextCursor,
       hasMore,
       ...(typeof total === "number" && { total }),
+      ...(typeof activeCount === "number" && { activeCount }),
+      ...(typeof resolvedCount === "number" && { resolvedCount }),
     });
   } catch (err) {
     console.error("GET /api/feedback:", err);

@@ -21,6 +21,10 @@ interface Props {
   onSelect: (id: string) => void;
   selectedIndex?: number;
   total?: number;
+  /** Server metadata: active (open) count; do not derive from feedback array. */
+  activeCount?: number;
+  /** Server metadata: resolved count; do not derive from feedback array. */
+  resolvedCount?: number;
   /** Infinite scroll: loading next page. */
   loadingMore?: boolean;
   hasMore?: boolean;
@@ -34,6 +38,8 @@ export default function FeedbackSidebar({
   selectedId,
   onSelect,
   total: totalProp,
+  activeCount: activeCountProp,
+  resolvedCount: resolvedCountProp,
   loadingMore = false,
   hasMore = false,
   hasReachedLimit = false,
@@ -62,14 +68,20 @@ export default function FeedbackSidebar({
   }, [feedback, searchQuery, sort]);
 
   const total = typeof totalProp === "number" ? totalProp : feedback.length;
-  const openCount = feedback.filter((f) => !(f.isResolved ?? false)).length;
-  const resolvedCount = feedback.filter((f) => f.isResolved === true).length;
+  const activeCount =
+    typeof activeCountProp === "number"
+      ? activeCountProp
+      : feedback.filter((f) => !(f.isResolved ?? false)).length;
+  const resolvedCount =
+    typeof resolvedCountProp === "number"
+      ? resolvedCountProp
+      : feedback.filter((f) => f.isResolved === true).length;
 
   const subline =
     total > 0
       ? [
           total + " total",
-          ...(openCount > 0 ? [openCount + " active"] : []),
+          ...(activeCount > 0 ? [activeCount + " active"] : []),
           ...(resolvedCount > 0 ? [resolvedCount + " resolved"] : []),
         ].join(" · ")
       : "0 total";
@@ -91,9 +103,12 @@ export default function FeedbackSidebar({
             <button
               type="button"
               onClick={() => setSortOpen((o) => !o)}
-              className="text-[12px] bg-transparent border-none focus:ring-0 text-neutral-400 hover:text-neutral-600 transition-all duration-150 ease-out cursor-pointer py-0.5"
+              className="inline-flex items-center text-[12px] bg-transparent border-none focus:ring-0 text-neutral-400 hover:text-neutral-600 transition-all duration-150 ease-out cursor-pointer py-0.5"
             >
-              {sort === "recent" ? "Most Recent" : "Most Active"}
+              <span className="text-neutral-500 text-[13px]">Sorted by</span>
+              <span className="ml-1 text-neutral-900 font-medium hover:underline">
+                {sort === "recent" ? "Newest first" : "Most active"}
+              </span>
             </button>
             {sortOpen && (
               <>
@@ -115,7 +130,7 @@ export default function FeedbackSidebar({
                         : "text-neutral-400 hover:text-neutral-600"
                     }`}
                   >
-                    Most Recent
+                    Newest first
                   </button>
                   <button
                     type="button"
@@ -129,7 +144,7 @@ export default function FeedbackSidebar({
                         : "text-neutral-400 hover:text-neutral-600"
                     }`}
                   >
-                    Most Active
+                    Most active
                   </button>
                 </div>
               </>

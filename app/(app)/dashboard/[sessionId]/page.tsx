@@ -85,6 +85,8 @@ export default function SessionPage() {
     feedback,
     setFeedback,
     total: feedbackTotal,
+    activeCount: feedbackActiveCount,
+    resolvedCount: feedbackResolvedCount,
     loading: feedbackLoading,
     hasMore: hasMoreFeedback,
     hasReachedLimit: feedbackReachedLimit,
@@ -334,6 +336,7 @@ export default function SessionPage() {
             item.id === selectedId ? { ...item, isResolved: resolved } : item
           )
         );
+        await refetchFeedbackFirstPage();
       }
     } catch {
       if (detailTicket) setDetailTicket((t) => (t ? { ...t } : null));
@@ -432,6 +435,8 @@ export default function SessionPage() {
             onSelect={setSelectedId}
             selectedIndex={selectedIndex}
             total={feedbackTotal}
+            activeCount={feedbackActiveCount}
+            resolvedCount={feedbackResolvedCount}
             loadingMore={feedbackLoadingMore}
             hasMore={hasMoreFeedback}
             hasReachedLimit={feedbackReachedLimit}
@@ -617,7 +622,7 @@ export default function SessionPage() {
 
         {isCommentsOpen && (
             <aside className="w-[320px] shrink-0 min-h-0 flex flex-col hidden lg:block border-l border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-1))]">
-              <div className="flex-1 min-h-0 overflow-y-auto px-6">
+              <div className="flex-1 min-h-0 flex flex-col px-6">
                 <ActivityPanel
                 comments={comments}
                 loading={loadingComments}
@@ -636,7 +641,7 @@ export default function SessionPage() {
               aria-hidden
             />
             <div
-              className="relative w-full max-w-sm h-full bg-[hsl(var(--surface-1))] flex flex-col transition-opacity duration-200 cursor-default"
+              className="relative w-full max-w-sm h-full min-h-0 bg-[hsl(var(--surface-1))] flex flex-col transition-opacity duration-200 cursor-default"
               onClick={(e) => e.stopPropagation()}
             >
               <ActivityPanel
