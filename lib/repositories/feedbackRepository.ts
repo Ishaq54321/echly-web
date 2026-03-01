@@ -255,6 +255,15 @@ export async function getSessionFeedbackHighImpactRepo(
 
 const OVERVIEW_FEEDBACK_BY_IDS_LIMIT = 10;
 
+/** Fetches a single feedback doc by ID. Returns null if not found. */
+export async function getFeedbackByIdRepo(
+  feedbackId: string
+): Promise<Feedback | null> {
+  const snap = await getDoc(doc(db, "feedback", feedbackId));
+  if (!snap.exists()) return null;
+  return docToFeedback(snap as QueryDocumentSnapshot);
+}
+
 /** Fetches feedback docs by IDs (e.g. for activity titles). Limited for cost safety. */
 export async function getFeedbackByIdsRepo(
   feedbackIds: string[],

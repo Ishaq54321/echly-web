@@ -12,6 +12,8 @@ export interface FeedbackDetailProps {
   setIsEditingDescription: (v: boolean) => void;
   setDescriptionDraft: (v: string) => void;
   saveDescription: () => void | Promise<void>;
+  isSavingDescription?: boolean;
+  saveDescriptionSuccess?: boolean;
   onSaveTitle?: (newTitle: string) => Promise<void>;
   onRequestDelete?: () => void;
   onSaveActionItems?: (actionItems: string[]) => Promise<void>;
@@ -27,6 +29,8 @@ export default function FeedbackDetail({
   setIsEditingDescription,
   setDescriptionDraft,
   saveDescription,
+  isSavingDescription,
+  saveDescriptionSuccess,
   onSaveTitle,
   onRequestDelete,
   onSaveActionItems,
@@ -60,6 +64,8 @@ export default function FeedbackDetail({
         setIsEditingDescription={setIsEditingDescription}
         setDescriptionDraft={setDescriptionDraft}
         saveDescription={saveDescription}
+        isSavingDescription={isSavingDescription}
+        saveDescriptionSuccess={saveDescriptionSuccess}
         onSaveActionItems={onSaveActionItems}
         onExpandImage={() => setIsImageExpanded(true)}
       />

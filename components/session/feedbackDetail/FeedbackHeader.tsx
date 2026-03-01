@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, Trash2 } from "lucide-react";
+import { MessageSquare, Trash2, Pencil, Check } from "lucide-react";
 import { StatusPill } from "./StatusPill";
 import type { FeedbackItemShape } from "./types";
 
@@ -39,6 +39,8 @@ export function FeedbackHeader({
 }: FeedbackHeaderProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(item.title);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -58,7 +60,17 @@ export function FeedbackHeader({
       setTitleDraft(item.title);
       return;
     }
-    onSaveTitle(titleDraft.trim()).finally(() => setIsEditingTitle(false));
+    setIsSaving(true);
+    onSaveTitle(titleDraft.trim())
+      .then(() => {
+        setIsSaving(false);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 1200);
+        setIsEditingTitle(false);
+      })
+      .catch(() => {
+        setIsSaving(false);
+      });
   };
 
   const handleTitleKeyDown = (e: React.KeyboardEvent) => {
@@ -67,6 +79,7 @@ export function FeedbackHeader({
       (e.target as HTMLInputElement).blur();
     }
     if (e.key === "Escape") {
+      e.preventDefault();
       setTitleDraft(item.title);
       setIsEditingTitle(false);
       inputRef.current?.blur();
@@ -80,23 +93,62 @@ export function FeedbackHeader({
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           {isEditingTitle && onSaveTitle ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={handleTitleBlur}
-              onKeyDown={handleTitleKeyDown}
-              className="w-full text-[20px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))] bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand)/0.4)]"
-              aria-label="Edit title"
-            />
+            <>
+              <input
+                ref={inputRef}
+                type="text"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={handleTitleBlur}
+                onFocus={(e) => e.currentTarget.select()}
+                onKeyDown={handleTitleKeyDown}
+                className="w-full text-[20px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))] bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-black/10"
+                aria-label="Edit title"
+              />
+              <p className="text-xs text-neutral-500 mt-1 transition-opacity duration-150">
+                Enter to save · Esc to cancel
+              </p>
+              {isSaving && (
+                <p className="text-xs text-neutral-500 mt-0.5 transition-opacity duration-150">
+                  Saving...
+                </p>
+              )}
+            </>
           ) : (
-            <h1
+            <div
+              className={`group flex items-center gap-2 min-w-0 ${onSaveTitle ? "cursor-pointer" : ""}`}
               onClick={() => onSaveTitle && setIsEditingTitle(true)}
-              className={`text-[20px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))] ${onSaveTitle ? "cursor-text hover:bg-[hsl(var(--surface-2))]/50 rounded px-1 -mx-1" : ""}`}
+              role={onSaveTitle ? "button" : undefined}
+              tabIndex={onSaveTitle ? 0 : undefined}
+              onKeyDown={(e) => {
+                if (onSaveTitle && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  setIsEditingTitle(true);
+                }
+              }}
+              aria-label={onSaveTitle ? "Edit title" : undefined}
             >
-              {item.title}
-            </h1>
+              <h1 className="text-[20px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))] truncate">
+                {item.title}
+              </h1>
+              {onSaveTitle && (
+                saveSuccess ? (
+                  <Check size={14} className="text-green-600 shrink-0 flex-shrink-0" aria-hidden />
+                ) : (
+                  <Pencil
+                    size={14}
+                    className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[hsl(var(--text-secondary))] shrink-0 flex-shrink-0"
+                    aria-hidden
+                  />
+                )
+              )}
+            </div>
+          )}
+          {saveSuccess && !isEditingTitle && (
+            <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+              <Check size={12} className="shrink-0" aria-hidden />
+              Saved
+            </p>
           )}
           <div className="flex items-center gap-2 mt-1.5 text-[12px]">
             <span className="font-medium text-[hsl(var(--text-primary))]">

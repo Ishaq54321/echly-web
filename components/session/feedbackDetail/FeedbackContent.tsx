@@ -14,6 +14,8 @@ interface FeedbackContentProps {
   setIsEditingDescription: (v: boolean) => void;
   setDescriptionDraft: (v: string) => void;
   saveDescription: () => void | Promise<void>;
+  isSavingDescription?: boolean;
+  saveDescriptionSuccess?: boolean;
   onSaveActionItems?: (actionItems: string[]) => Promise<void>;
   onExpandImage: () => void;
 }
@@ -25,6 +27,8 @@ export function FeedbackContent({
   setIsEditingDescription,
   setDescriptionDraft,
   saveDescription,
+  isSavingDescription,
+  saveDescriptionSuccess,
   onSaveActionItems,
   onExpandImage,
 }: FeedbackContentProps) {
@@ -43,6 +47,8 @@ export function FeedbackContent({
           setDescriptionDraft(item.description);
           setIsEditingDescription(false);
         }}
+        isSaving={isSavingDescription}
+        saveSuccess={saveDescriptionSuccess}
       />
       {item.screenshotUrl && (
         <Section title="Attachments">

@@ -298,15 +298,33 @@ export function useCaptureWidget({
     setEditedDescription(p.description);
   };
 
-  const saveEdit = (id: string) => {
-    setPointers((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, title: editedTitle, description: editedDescription }
-          : p
-      )
-    );
-    setEditingId(null);
+  const saveEdit = async (id: string) => {
+    try {
+      const res = await fetch(`/api/tickets/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editedTitle,
+          description: editedDescription,
+        }),
+      });
+      const data = (await res.json()) as { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string } };
+      if (!res.ok || !data.success || !data.ticket) {
+        console.error("PATCH ticket failed", data);
+        return;
+      }
+      const t = data.ticket;
+      setPointers((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? { ...p, title: t.title, description: t.description, type: t.type ?? p.type }
+            : p
+        )
+      );
+      setEditingId(null);
+    } catch (err) {
+      console.error("Save edit failed:", err);
+    }
   };
 
   /* ================= ADD FEEDBACK (CAPTURE) ================= */

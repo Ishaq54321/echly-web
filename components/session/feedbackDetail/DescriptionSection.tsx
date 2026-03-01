@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import { Pencil, Check } from "lucide-react";
 import { Section } from "./Section";
 
 interface DescriptionSectionProps {
@@ -11,6 +12,8 @@ interface DescriptionSectionProps {
   onDraftChange?: (v: string) => void;
   onSave?: () => void | Promise<void>;
   onCancel?: () => void;
+  isSaving?: boolean;
+  saveSuccess?: boolean;
 }
 
 export function DescriptionSection({
@@ -21,6 +24,8 @@ export function DescriptionSection({
   onDraftChange,
   onSave,
   onCancel,
+  isSaving = false,
+  saveSuccess = false,
 }: DescriptionSectionProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const displayValue = isEditing ? draft : description;
@@ -34,9 +39,23 @@ export function DescriptionSection({
     el.style.height = `${Math.max(100, el.scrollHeight)}px`;
   }, [isEditing, draft]);
 
+  const triggerSave = () => {
+    if (!onSave || draft === description || isSaving) return;
+    void onSave();
+  };
+
   const handleBlur = () => {
-    if (onSave && draft !== description) {
-      void onSave();
+    triggerSave();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onCancel?.();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      triggerSave();
     }
   };
 
@@ -44,26 +63,62 @@ export function DescriptionSection({
     <Section title="Description">
       <div className="flex flex-col gap-2">
         {isEditing && hasEdit ? (
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={(e) => onDraftChange?.(e.target.value)}
-            onBlur={handleBlur}
-            className="w-full min-h-[100px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] px-3 py-2 text-sm text-[hsl(var(--text-primary))] leading-relaxed focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand)/0.4)] resize-none overflow-hidden"
-            autoFocus
-            aria-label="Edit description"
-          />
+          <>
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => onDraftChange?.(e.target.value)}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+              className="w-full min-h-[100px] rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-[hsl(var(--text-primary))] leading-relaxed focus:outline-none focus:ring-2 focus:ring-black/10 resize-none overflow-hidden"
+              autoFocus
+              aria-label="Edit description"
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="text-xs px-3 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 transition-colors focus:outline-none focus:ring-2 focus:ring-black/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={triggerSave}
+                disabled={isSaving || draft === description}
+                className="text-xs px-3 py-1.5 rounded-md bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-50 disabled:pointer-events-none transition-colors focus:outline-none focus:ring-2 focus:ring-black/10"
+              >
+                {isSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </>
         ) : (
           <div
-            className={`flex items-start justify-between gap-2 ${hasEdit ? "cursor-text" : ""}`}
+            className={`group relative flex items-start justify-between gap-2 ${hasEdit ? "cursor-text" : ""}`}
             onClick={hasEdit ? onEdit : undefined}
-            onKeyDown={hasEdit ? (e) => e.key === "Enter" && (e.target as HTMLElement).click() : undefined}
+            onKeyDown={hasEdit ? (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onEdit?.()) : undefined}
             role={hasEdit ? "button" : undefined}
             tabIndex={hasEdit ? 0 : undefined}
           >
-            <p className="text-[14px] leading-[1.55] text-[hsl(var(--text-primary))] flex-1 hover:bg-[hsl(var(--surface-2))]/50 rounded px-1 -mx-1">
+            <p className="text-[14px] leading-[1.55] text-[hsl(var(--text-primary))] flex-1 pr-6">
               {displayValue || (hasEdit ? "Add description…" : "")}
             </p>
+            {hasEdit && (
+              <span className="absolute top-0 right-0 flex items-center gap-1.5">
+                {saveSuccess ? (
+                  <span className="text-xs text-green-600 flex items-center gap-1.5 transition-opacity duration-150">
+                    <Check size={14} className="shrink-0" aria-hidden />
+                    Saved
+                  </span>
+                ) : (
+                  <Pencil
+                    size={14}
+                    className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[hsl(var(--text-secondary))] shrink-0"
+                    aria-hidden
+                  />
+                )}
+              </span>
+            )}
           </div>
         )}
       </div>

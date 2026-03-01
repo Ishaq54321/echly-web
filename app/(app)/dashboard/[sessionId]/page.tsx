@@ -1,31 +1,47 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { addFeedback, deleteFeedback, updateFeedback } from "@/lib/feedback";
+import { addFeedback, deleteFeedback } from "@/lib/feedback";
 import CaptureWidget from "@/components/CaptureWidget";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import FeedbackSidebar from "@/components/session/FeedbackSidebar";
 import FeedbackDetail from "@/components/session/feedbackDetail/FeedbackDetail";
 import { ActivityPanel } from "@/components/session/feedbackDetail/ActivityPanel";
+import { Pencil, Check } from "lucide-react";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
 import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
 
+/** Ticket shape returned by GET/PATCH /api/tickets/:id (DB source of truth). */
+type TicketFromApi = {
+  id: string;
+  title: string;
+  description: string;
+  actionItems?: string[] | null;
+  [key: string]: unknown;
+};
+
 function formatRelativeTime(
-  createdAt: { toDate?: () => Date; seconds?: number } | null | undefined
+  createdAt:
+    | { toDate?: () => Date; seconds?: number }
+    | string
+    | null
+    | undefined
 ): string {
   if (!createdAt) return "";
   try {
     const date =
-      typeof createdAt.toDate === "function"
-        ? createdAt.toDate()
-        : createdAt.seconds != null
-          ? new Date(createdAt.seconds * 1000)
-          : null;
+      typeof createdAt === "string"
+        ? new Date(createdAt)
+        : typeof (createdAt as { toDate?: () => Date }).toDate === "function"
+          ? (createdAt as { toDate: () => Date }).toDate()
+          : (createdAt as { seconds?: number }).seconds != null
+            ? new Date((createdAt as { seconds: number }).seconds * 1000)
+            : null;
     if (!date) return "";
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -47,6 +63,9 @@ export default function SessionPage() {
   const [session, setSession] = useState<any>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
+  /** Detail panel: always from DB (GET /api/tickets/:id). Do not use memory state. */
+  const [detailTicket, setDetailTicket] = useState<TicketFromApi | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const {
     feedback,
@@ -60,8 +79,14 @@ export default function SessionPage() {
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
+  const [saveDescriptionSuccess, setSaveDescriptionSuccess] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isEditingSessionTitle, setIsEditingSessionTitle] = useState(false);
+  const [sessionTitleDraft, setSessionTitleDraft] = useState("");
+  const [isSavingSessionTitle, setIsSavingSessionTitle] = useState(false);
+  const [saveSessionTitleSuccess, setSaveSessionTitleSuccess] = useState(false);
 
   /* ================= LOAD SESSION ================= */
 
@@ -101,18 +126,45 @@ export default function SessionPage() {
     }
   }, [feedback, selectedId]);
 
-  /* ================= SELECTED ITEM WITH INDEX ================= */
+  /* ================= FETCH DETAIL FROM DB (single source of truth) ================= */
+
+  const fetchDetailTicket = useCallback(async (id: string) => {
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/tickets/${id}`);
+      const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
+      if (data.success && data.ticket) {
+        setDetailTicket(data.ticket);
+      } else {
+        setDetailTicket(null);
+      }
+    } catch {
+      setDetailTicket(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setDetailTicket(null);
+      return;
+    }
+    fetchDetailTicket(selectedId);
+  }, [selectedId, fetchDetailTicket]);
+
+  /* ================= SELECTED ITEM WITH INDEX (from DB) ================= */
 
   const selectedIndex = feedback.findIndex(
     (f) => f.id === selectedId
   );
 
   const selectedItem =
-    selectedIndex !== -1
+    detailTicket != null
       ? {
-          ...feedback[selectedIndex],
-          index: selectedIndex + 1,
-          total: feedback.length,
+          ...detailTicket,
+          index: selectedIndex !== -1 ? selectedIndex + 1 : 1,
+          total: feedback.length || 1,
         }
       : null;
 
@@ -125,79 +177,95 @@ export default function SessionPage() {
     feedbackId: selectedId,
   });
 
-  /* ================= SYNC DESCRIPTION ================= */
+  /* ================= SYNC DESCRIPTION (from DB-backed detail) ================= */
 
   useEffect(() => {
-    if (selectedItem) {
-      setDescriptionDraft(selectedItem.description);
+    if (detailTicket) {
+      setDescriptionDraft(detailTicket.description);
       setIsEditingDescription(false);
     }
-  }, [selectedId]);
+  }, [selectedId, detailTicket]);
 
-  /* ================= SAVE TITLE (inline, optimistic + revert on fail) ================= */
+  /* ================= SAVE TITLE (PATCH → DB, then update UI from response) ================= */
 
-  const saveTitle = async (newTitle: string) => {
+  const saveTitle = async (newTitle: string): Promise<void> => {
     if (!selectedId || newTitle.trim() === "") return;
-    const prevTitle = feedback.find((f) => f.id === selectedId)?.title ?? "";
-    setFeedback((prev) =>
-      prev.map((item) =>
-        item.id === selectedId ? { ...item, title: newTitle.trim() } : item
-      )
-    );
     try {
-      await updateFeedback(selectedId, { title: newTitle.trim() });
+      const res = await fetch(`/api/tickets/${selectedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle.trim() }),
+      });
+      const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
+      if (data.success && data.ticket) {
+        setDetailTicket(data.ticket);
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === selectedId ? { ...item, title: data.ticket!.title } : item
+          )
+        );
+      }
     } catch {
-      setFeedback((prev) =>
-        prev.map((item) =>
-          item.id === selectedId ? { ...item, title: prevTitle } : item
-        )
-      );
+      // revert detail to current state; could refetch
+      if (detailTicket) setDetailTicket((t) => (t ? { ...t } : null));
     }
   };
 
-  /* ================= SAVE DESCRIPTION (PATCH on blur) ================= */
+  /* ================= SAVE DESCRIPTION (PATCH → DB, then update UI from response) ================= */
 
-  const saveDescription = async () => {
-    if (!selectedId || descriptionDraft === feedback.find((f) => f.id === selectedId)?.description) {
+  const saveDescription = async (): Promise<void> => {
+    if (!selectedId || descriptionDraft === detailTicket?.description) {
       setIsEditingDescription(false);
       return;
     }
-    setFeedback((prev) =>
-      prev.map((item) =>
-        item.id === selectedId ? { ...item, description: descriptionDraft } : item
-      )
-    );
-    setIsEditingDescription(false);
+    setIsSavingDescription(true);
     try {
-      await updateFeedback(selectedId, { description: descriptionDraft });
+      const res = await fetch(`/api/tickets/${selectedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: descriptionDraft }),
+      });
+      const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
+      if (data.success && data.ticket) {
+        setDetailTicket(data.ticket);
+        setDescriptionDraft(data.ticket.description);
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === selectedId ? { ...item, description: data.ticket!.description } : item
+          )
+        );
+        setIsEditingDescription(false);
+        setSaveDescriptionSuccess(true);
+        setTimeout(() => setSaveDescriptionSuccess(false), 1200);
+      }
     } catch {
-      const prevDescription = feedback.find((f) => f.id === selectedId)?.description ?? "";
-      setFeedback((prev) =>
-        prev.map((item) =>
-          item.id === selectedId ? { ...item, description: prevDescription } : item
-        )
-      );
+      if (detailTicket) setDescriptionDraft(detailTicket.description);
+    } finally {
+      setIsSavingDescription(false);
     }
   };
 
-  /* ================= SAVE ACTION ITEMS ================= */
+  /* ================= SAVE ACTION ITEMS (PATCH → DB, then update UI from response) ================= */
 
   const saveActionItems = async (actionItems: string[]) => {
     if (!selectedId) return;
-    setFeedback((prev) =>
-      prev.map((item) =>
-        item.id === selectedId ? { ...item, actionItems } : item
-      )
-    );
     try {
-      await updateFeedback(selectedId, { actionItems });
+      const res = await fetch(`/api/tickets/${selectedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionItems }),
+      });
+      const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
+      if (data.success && data.ticket) {
+        setDetailTicket(data.ticket);
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === selectedId ? { ...item, actionItems: data.ticket!.actionItems ?? null } : item
+          )
+        );
+      }
     } catch {
-      const prevItems = feedback.find((f) => f.id === selectedId)?.actionItems ?? null;
-      setFeedback((prev) =>
-        prev.map((item) =>
-          item.id === selectedId ? { ...item, actionItems: prevItems } : item
-        )
-      );
+      if (detailTicket) setDetailTicket((t) => (t ? { ...t } : null));
     }
   };
 
@@ -307,9 +375,109 @@ export default function SessionPage() {
 
         <div className="flex flex-col h-full min-h-0 overflow-hidden bg-neutral-50">
           <div className="max-w-4xl mx-auto w-full px-8 pt-5 pb-3 shrink-0">
-            <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--text-primary))]">
-              {session?.title ?? "Session"}
-            </h1>
+            {isEditingSessionTitle ? (
+              <>
+              <input
+                value={sessionTitleDraft}
+                onChange={(e) => setSessionTitleDraft(e.target.value)}
+                onBlur={async () => {
+                  const trimmed = sessionTitleDraft.trim();
+                  if (!sessionId || !session) return;
+                  if (trimmed === (session.title ?? "")) {
+                    setIsEditingSessionTitle(false);
+                    return;
+                  }
+                  setIsSavingSessionTitle(true);
+                  try {
+                    const safeTitle =
+                      trimmed && trimmed.length > 0
+                        ? trimmed
+                        : session.title || "Untitled Session";
+                    const res = await fetch(`/api/sessions/${sessionId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ title: safeTitle }),
+                    });
+                    const data = (await res.json()) as { success?: boolean; session?: Record<string, unknown> };
+                    if (data.success && data.session) {
+                      setSession((prev: any) => (prev ? { ...prev, ...data.session } : prev));
+                      setSessionTitleDraft((data.session.title as string) ?? trimmed);
+                      setIsSavingSessionTitle(false);
+                      setSaveSessionTitleSuccess(true);
+                      setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
+                      setIsEditingSessionTitle(false);
+                    } else {
+                      setIsSavingSessionTitle(false);
+                      setIsEditingSessionTitle(false);
+                    }
+                  } catch {
+                    setSessionTitleDraft(session.title ?? "Session");
+                    setIsSavingSessionTitle(false);
+                    setIsEditingSessionTitle(false);
+                  }
+                }}
+                onFocus={(e) => e.currentTarget.select()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  } else if (e.key === "Escape") {
+                    setSessionTitleDraft(session?.title ?? "Session");
+                    setIsEditingSessionTitle(false);
+                    e.currentTarget.blur();
+                  }
+                }}
+                autoFocus
+                className="text-2xl font-bold tracking-tight text-[hsl(var(--text-primary))] w-full bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-black/10"
+                aria-label="Session title"
+              />
+            <p className="text-xs text-neutral-500 mt-1 transition-opacity duration-150">
+              Enter to save · Esc to cancel
+            </p>
+            {isSavingSessionTitle && (
+              <p className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+                Saving...
+              </p>
+            )}
+            </>
+            ) : (
+              <div
+                className="group flex items-center gap-2 cursor-pointer min-h-[2rem]"
+                onClick={() => {
+                  setSessionTitleDraft(session?.title ?? "Session");
+                  setIsEditingSessionTitle(true);
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSessionTitleDraft(session?.title ?? "Session");
+                    setIsEditingSessionTitle(true);
+                  }
+                }}
+                aria-label="Edit session title"
+              >
+                <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--text-primary))]">
+                  {session?.title ?? "Session"}
+                </h1>
+                {saveSessionTitleSuccess ? (
+                  <Check size={14} className="text-green-600 shrink-0" aria-hidden />
+                ) : (
+                  <Pencil
+                    size={14}
+                    className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[hsl(var(--text-secondary))] shrink-0"
+                    aria-hidden
+                  />
+                )}
+              </div>
+            )}
+            {saveSessionTitleSuccess && !isEditingSessionTitle && (
+              <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+                <Check size={12} className="shrink-0" aria-hidden />
+                Saved
+              </p>
+            )}
             <div className="text-sm text-[hsl(var(--text-secondary))] mt-1 flex items-center gap-1.5 [&_span]:opacity-[0.92]">
               <span>You</span>
               <span aria-hidden>•</span>
@@ -323,6 +491,11 @@ export default function SessionPage() {
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col max-w-4xl mx-auto w-full">
             <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-50">
               <div className="flex flex-col h-full px-8 py-6">
+                {detailLoading && selectedId ? (
+                  <div className="flex-1 min-h-0 flex items-center justify-center py-16">
+                    <p className="text-sm text-[hsl(var(--text-secondary))]">Loading…</p>
+                  </div>
+                ) : (
                 <FeedbackDetail
                   sessionId={sessionId as string}
                   selectedItem={selectedItem}
@@ -331,6 +504,8 @@ export default function SessionPage() {
                   setIsEditingDescription={setIsEditingDescription}
                   setDescriptionDraft={setDescriptionDraft}
                   saveDescription={saveDescription}
+                  isSavingDescription={isSavingDescription}
+                  saveDescriptionSuccess={saveDescriptionSuccess}
                   onSaveTitle={saveTitle}
                   onRequestDelete={() => setShowDeleteModal(true)}
                   onSaveActionItems={saveActionItems}
@@ -338,6 +513,7 @@ export default function SessionPage() {
                   isCommentsOpen={isCommentsOpen}
                   onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}
                 />
+                )}
               </div>
             </div>
           </div>
