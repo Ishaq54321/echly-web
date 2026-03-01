@@ -7,11 +7,26 @@ export type StructuredFeedback = {
   type: string;
 };
 
+/** Context captured with the region (URL, scroll, viewport, DOM path, nearby text). */
+export type CaptureContext = {
+  url: string;
+  scrollX: number;
+  scrollY: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  devicePixelRatio: number;
+  domPath: string | null;
+  nearbyText: string | null;
+  capturedAt: number;
+};
+
 export interface Recording {
   id: string;
   screenshot: string | null;
   transcript: string;
   structuredOutput: StructuredFeedback | null;
+  /** Page context when capture was taken (extension region capture). */
+  context?: CaptureContext | null;
   createdAt: number;
 }
 
@@ -35,7 +50,8 @@ export type CaptureWidgetProps = {
     callbacks?: {
       onSuccess: (ticket: StructuredFeedback) => void;
       onError: () => void;
-    }
+    },
+    context?: CaptureContext | null
   ) => void | Promise<StructuredFeedback | undefined>;
   onDelete: (id: string) => Promise<void>;
   /** Optional ref for extension: parent can set a toggle callback to open/close widget via message. */
@@ -48,6 +64,12 @@ export type CaptureWidgetProps = {
   onExpandRequest?: () => void;
   /** Called when user clicks close (X) to collapse (extension sends ECHLY_COLLAPSE_WIDGET). */
   onCollapseRequest?: () => void;
+  /** Optional: fetch live title/tags/priority while user is speaking (instant structured insight). */
+  liveStructureFetch?: (transcript: string) => Promise<{ title: string; tags: string[]; priority: string } | null>;
+  /** When true, Add Feedback button is disabled (e.g. no active session in extension). No message shown. */
+  captureDisabled?: boolean;
 };
+
+export type LiveStructured = { title: string; tags: string[]; priority: string };
 
 export type Position = { x: number; y: number };

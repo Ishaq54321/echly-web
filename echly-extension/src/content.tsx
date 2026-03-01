@@ -14,14 +14,6 @@ import CaptureWidget from "@/components/CaptureWidget";
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
 
-type SessionOption = {
-  id: string;
-  title: string;
-  userId: string;
-  createdAt?: string;
-  [key: string]: unknown;
-};
-
 function normalizePriority(s: string | undefined): "low" | "medium" | "high" | "critical" {
   const v = (s ?? "medium").toLowerCase();
   if (v === "low" || v === "medium" || v === "high" || v === "critical") return v;
@@ -39,7 +31,6 @@ function requestOpenPopup(): void {
 
 function ContentApp() {
   const [user, setUser] = React.useState<AuthUser | null>(null);
-  const [sessionId, setSessionId] = React.useState<string | null>(null);
   const [sessionMessage, setSessionMessage] = React.useState<string | null>(null);
   const [authChecked, setAuthChecked] = React.useState(false);
   const [globalState, setGlobalState] = React.useState<GlobalUIState>({
@@ -48,7 +39,7 @@ function ContentApp() {
     isRecording: false,
     sessionId: null,
   });
-  const effectiveSessionId = globalState.sessionId ?? sessionId;
+  const effectiveSessionId = globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
   const logoUrl =
     typeof chrome !== "undefined" && chrome.runtime?.getURL
@@ -77,6 +68,30 @@ function ContentApp() {
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
   }, []);
 
+  /* When user is on dashboard session page, set that session as the extension's active session. */
+  React.useEffect(() => {
+    const sendActiveSessionIfDashboard = () => {
+      const origin = window.location.origin;
+      const isAppOrigin =
+        origin === "https://echly-web.vercel.app" || origin === "http://localhost:3000";
+      if (!isAppOrigin) return;
+      const segments = window.location.pathname.split("/").filter(Boolean);
+      if (segments[0] === "dashboard" && segments[1]) {
+        chrome.runtime.sendMessage(
+          { type: "ECHLY_SET_ACTIVE_SESSION", sessionId: segments[1] },
+          () => {}
+        );
+      }
+    };
+    sendActiveSessionIfDashboard();
+    window.addEventListener("popstate", sendActiveSessionIfDashboard);
+    const interval = setInterval(sendActiveSessionIfDashboard, 2000);
+    return () => {
+      window.removeEventListener("popstate", sendActiveSessionIfDashboard);
+      clearInterval(interval);
+    };
+  }, []);
+
   const onRecordingChange = React.useCallback((recording: boolean) => {
     if (recording) {
       chrome.runtime.sendMessage(
@@ -87,7 +102,7 @@ function ContentApp() {
             return;
           }
           if (!response?.ok) {
-            setSessionMessage(response?.error || "Failed to create session");
+            setSessionMessage(response?.error || "No active session selected.");
           }
         }
       );
@@ -122,48 +137,6 @@ function ContentApp() {
     );
   }, []);
 
-  React.useEffect(() => {
-    if (!user) {
-      setSessionId(null);
-      setSessionMessage(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch("/api/sessions");
-        const json = (await res.json()) as {
-          success?: boolean;
-          sessions?: SessionOption[];
-          error?: string;
-        };
-        if (cancelled || !json.success) {
-          if (!cancelled) setSessionMessage(json.error || "Failed to load sessions");
-          return;
-        }
-        const sessions = json.sessions ?? [];
-        if (sessions.length === 0) {
-          setSessionMessage("Create a session in dashboard first.");
-          setSessionId(null);
-          return;
-        }
-        const sorted = [...sessions].sort((a, b) => {
-          const aT = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bT = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return bT - aT;
-        });
-        setSessionId(sorted[0].id);
-        setSessionMessage(null);
-      } catch {
-        if (!cancelled) setSessionMessage("Failed to load sessions");
-        setSessionId(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
   const handleComplete = React.useCallback(
     async (
       transcript: string,
@@ -171,7 +144,18 @@ function ContentApp() {
       callbacks?: {
         onSuccess: (ticket: { id: string; title: string; description: string; type: string }) => void;
         onError: () => void;
-      }
+      },
+      context?: {
+        url?: string;
+        scrollX?: number;
+        scrollY?: number;
+        viewportWidth?: number;
+        viewportHeight?: number;
+        devicePixelRatio?: number;
+        domPath?: string | null;
+        nearbyText?: string | null;
+        capturedAt?: number;
+      } | null
     ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
       if (!effectiveSessionId || !user) {
         callbacks?.onError();
@@ -210,6 +194,7 @@ function ContentApp() {
                 transcript,
                 screenshotUrl,
                 sessionId: effectiveSessionId,
+                context: context ?? null,
               },
             },
             (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
@@ -303,6 +288,35 @@ function ContentApp() {
 
   const handleDelete = React.useCallback(async (_id: string) => {}, []);
 
+  const liveStructureFetch = React.useCallback(
+    async (transcript: string): Promise<{ title: string; tags: string[]; priority: string } | null> => {
+      try {
+        const res = await apiFetch("/api/structure-feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: transcript.trim() }),
+        });
+        const data = (await res.json()) as {
+          success?: boolean;
+          tickets?: Array<{
+            title?: string;
+            suggestedTags?: string[];
+            suggestedPriority?: string;
+          }>;
+        };
+        if (!data.success || !Array.isArray(data.tickets) || data.tickets.length === 0) return null;
+        const t = data.tickets[0];
+        const title = typeof t.title === "string" ? t.title : "";
+        const tags = Array.isArray(t.suggestedTags) ? t.suggestedTags : [];
+        const priority = typeof t.suggestedPriority === "string" ? t.suggestedPriority.toLowerCase() : "medium";
+        return { title, tags, priority };
+      } catch {
+        return null;
+      }
+    },
+    []
+  );
+
   if (!authChecked) {
     return null;
   }
@@ -336,48 +350,9 @@ function ContentApp() {
     );
   }
 
-  if (sessionMessage && !sessionId) {
-    return (
-      <div
-        style={{
-          pointerEvents: "auto",
-          padding: "16px",
-          minWidth: "260px",
-          background: "#fff",
-          borderRadius: "12px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
-          border: "1px solid rgba(0,0,0,0.06)",
-        }}
-      >
-        <p style={{ fontSize: "14px", color: "#374151", margin: 0 }}>{sessionMessage}</p>
-        <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px", marginBottom: 0 }}>
-          Open the dashboard to create a session.
-        </p>
-      </div>
-    );
-  }
-
-  if (!effectiveSessionId) {
-    return (
-      <div
-        style={{
-          pointerEvents: "auto",
-          padding: "12px 20px",
-          background: "#fff",
-          borderRadius: "12px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-          fontSize: "14px",
-          color: "#6b7280",
-        }}
-      >
-        Loading session…
-      </div>
-    );
-  }
-
   return (
     <CaptureWidget
-      sessionId={effectiveSessionId}
+      sessionId={effectiveSessionId ?? ""}
       userId={user.uid}
       extensionMode={true}
       onComplete={handleComplete}
@@ -387,6 +362,8 @@ function ContentApp() {
       expanded={globalState.expanded}
       onExpandRequest={onExpandRequest}
       onCollapseRequest={onCollapseRequest}
+      liveStructureFetch={liveStructureFetch}
+      captureDisabled={!effectiveSessionId}
     />
   );
 }

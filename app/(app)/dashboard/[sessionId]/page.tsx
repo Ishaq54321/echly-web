@@ -110,6 +110,21 @@ export default function SessionPage() {
   const [isSavingSessionTitle, setIsSavingSessionTitle] = useState(false);
   const [saveSessionTitleSuccess, setSaveSessionTitleSuccess] = useState(false);
 
+  /* Sync active session to extension when user opens this session page. */
+  useEffect(() => {
+    if (!sessionId) return;
+    if (typeof window === "undefined") return;
+    if (!("chrome" in window)) return;
+    try {
+      (window as Window & { chrome?: { runtime?: { sendMessage?: (msg: unknown) => void } } }).chrome?.runtime?.sendMessage?.({
+        type: "ECHLY_SET_ACTIVE_SESSION",
+        sessionId,
+      });
+    } catch (err) {
+      console.warn("Extension not available");
+    }
+  }, [sessionId]);
+
   /* ================= LOAD SESSION ================= */
 
   useEffect(() => {

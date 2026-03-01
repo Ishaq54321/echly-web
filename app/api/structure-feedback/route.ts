@@ -157,7 +157,7 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  let body: { transcript?: unknown };
+  let body: { transcript?: unknown; context?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -171,16 +171,36 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  const ctx = body?.context as
+    | { url?: string; viewportWidth?: number; viewportHeight?: number; domPath?: string | null; nearbyText?: string | null }
+    | undefined
+    | null;
+  const contextBlock =
+    ctx && typeof ctx === "object"
+      ? [
+          "Page context (use to scope the feedback):",
+          ctx.url != null ? `URL: ${ctx.url}` : "",
+          ctx.viewportWidth != null && ctx.viewportHeight != null
+            ? `Viewport: ${ctx.viewportWidth}×${ctx.viewportHeight}px`
+            : "",
+          ctx.domPath ? `Element: ${ctx.domPath}` : "",
+          ctx.nearbyText ? `Nearby text: "${ctx.nearbyText}"` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "";
+
+  const userContent = contextBlock
+    ? `${contextBlock}\n\nRaw feedback:\n"${transcript.trim()}"`
+    : `Raw feedback:\n"${transcript.trim()}"`;
+
   try {
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.2,
       messages: [
         { role: "system", content: ADAPTIVE_STRUCTURE_SYSTEM },
-        {
-          role: "user",
-          content: `Raw feedback:\n"${transcript.trim()}"`,
-        },
+        { role: "user", content: userContent },
       ],
     });
 

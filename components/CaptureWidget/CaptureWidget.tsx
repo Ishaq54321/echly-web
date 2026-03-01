@@ -7,6 +7,7 @@ import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackList from "./FeedbackList";
 import WidgetFooter from "./WidgetFooter";
+import { RegionCaptureOverlay } from "./RegionCaptureOverlay";
 import type { CaptureWidgetProps } from "./types";
 
 export default function CaptureWidget({
@@ -21,6 +22,7 @@ export default function CaptureWidget({
   expanded,
   onExpandRequest,
   onCollapseRequest,
+  captureDisabled = false,
 }: CaptureWidgetProps) {
   const {
     state,
@@ -79,6 +81,13 @@ export default function CaptureWidget({
           aria-hidden
         />
       )}
+      {extensionMode && state.state === "capturing" && (
+        <RegionCaptureOverlay
+          getFullTabImage={handlers.getFullTabImage}
+          onCapture={handlers.handleRegionCaptured}
+          onCancel={handlers.handleCancelCapture}
+        />
+      )}
       <div
         ref={refs.widgetRef}
         className={`fixed w-[480px] transition-all duration-200 ${
@@ -134,7 +143,7 @@ export default function CaptureWidget({
             </div>
           )}
 
-          {state.state === "capturing" && (
+          {state.state === "capturing" && !extensionMode && (
             <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 text-sm text-slate-600">
               Capturing screenshot…
             </div>
@@ -166,6 +175,32 @@ export default function CaptureWidget({
               <div className="capture-listening-waveform-wrap mb-4 flex items-center justify-center">
                 <AudioWaveform isActive={state.state === "listening"} />
               </div>
+              {state.liveStructured && (
+                <div className="mb-4 rounded-lg border border-slate-200 bg-slate-100/80 px-3 py-2.5 transition-opacity duration-200">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-brand-accent/60 animate-pulse" aria-hidden />
+                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Understanding…</span>
+                  </div>
+                  <p className="text-sm font-medium text-slate-800 truncate pr-2">{state.liveStructured.title}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {state.liveStructured.tags.slice(0, 4).map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/80 text-slate-600 border border-slate-200/80"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {state.liveStructured.priority && state.liveStructured.priority !== "medium" && (
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/80 text-slate-600 border border-slate-200/80 capitalize"
+                      >
+                        {state.liveStructured.priority}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between">
                 <button type="button" onClick={handlers.discardListening} className="text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-neutral-100 transition-colors duration-120 cursor-pointer px-3 py-2 rounded-md">Cancel</button>
                 <button type="button" onClick={handlers.finishListening} className="bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-colors duration-150 cursor-pointer">Done</button>
@@ -177,6 +212,7 @@ export default function CaptureWidget({
             <WidgetFooter
               isIdle={state.state === "idle"}
               onAddFeedback={handlers.handleAddFeedback}
+              captureDisabled={captureDisabled}
             />
           )}
         </div>

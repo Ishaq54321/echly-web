@@ -6215,6 +6215,7 @@
   };
   var app = initializeApp(firebaseConfig);
   var auth = getAuth(app);
+  var activeSessionId = null;
   var globalUIState = {
     visible: false,
     expanded: false,
@@ -6222,6 +6223,10 @@
     sessionId: null
   };
   var cachedToken = null;
+  chrome.storage.local.get(["activeSessionId"], (result) => {
+    activeSessionId = result.activeSessionId ?? null;
+    globalUIState.sessionId = activeSessionId;
+  });
   var tokenExpiry = 0;
   async function getValidToken() {
     const now = Date.now();
@@ -6276,6 +6281,18 @@
         isRecording: globalUIState.isRecording,
         sessionId: globalUIState.sessionId
       });
+      return true;
+    }
+    if (request.type === "ECHLY_SET_ACTIVE_SESSION") {
+      activeSessionId = request.sessionId ?? null;
+      globalUIState.sessionId = activeSessionId;
+      chrome.storage.local.set({ activeSessionId });
+      broadcastUIState();
+      sendResponse({ ok: true });
+      return false;
+    }
+    if (request.type === "ECHLY_GET_ACTIVE_SESSION") {
+      sendResponse({ sessionId: activeSessionId });
       return true;
     }
     if (request.type === "ECHLY_GET_TOKEN") {
@@ -6342,31 +6359,15 @@
       return true;
     }
     if (request.type === "START_RECORDING") {
-      const API_BASE = "https://echly-web.vercel.app";
-      getValidToken().then(async (token) => {
-        const res = await fetch(`${API_BASE}/api/sessions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success || !data.session?.id) {
-          sendResponse({
-            ok: false,
-            error: data.error || "Failed to create session"
-          });
-          return;
-        }
-        globalUIState.sessionId = data.session.id;
-        globalUIState.isRecording = true;
-        broadcastUIState();
-        sendResponse({ ok: true });
-      }).catch((err) => {
-        sendResponse({
-          ok: false,
-          error: err instanceof Error ? err.message : "Failed to start recording"
-        });
-      });
-      return true;
+      if (activeSessionId === null) {
+        sendResponse({ ok: false, error: "No active session selected." });
+        return false;
+      }
+      globalUIState.sessionId = activeSessionId;
+      globalUIState.isRecording = true;
+      broadcastUIState();
+      sendResponse({ ok: true });
+      return false;
     }
     if (request.type === "STOP_RECORDING") {
       globalUIState.isRecording = false;
@@ -6397,7 +6398,7 @@
       var normalizePriority = normalizePriority2;
       const API_BASE = "https://echly-web.vercel.app";
       const payload = request.payload;
-      const { transcript, sessionId } = payload;
+      const { transcript, sessionId, context } = payload;
       if (!transcript?.trim() || !sessionId) {
         console.warn("[Echly BG] Invalid payload: missing transcript or sessionId", {
           hasTranscript: !!transcript?.trim(),
@@ -6416,7 +6417,7 @@
           console.log("[DEBUG] Firebase token audience check");
           const token = await getValidToken();
           console.log("[STEP 2] Token acquired:", token?.slice(0, 20));
-          const structurePayload = { transcript };
+          const structurePayload = context ? { transcript, context } : { transcript };
           const res = await fetch(`${API_BASE}/api/structure-feedback`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

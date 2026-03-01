@@ -9,6 +9,7 @@ import type {
   CaptureState,
   CaptureWidgetProps,
   Position,
+  CaptureContext,
 } from "../types";
 
 const SAFE_MARGIN = 24;
@@ -25,6 +26,9 @@ function generateRecordingId(): string {
 
 const RECORDING_STATES: CaptureState[] = ["capturing", "listening", "processing", "anticipation"];
 
+const LIVE_STRUCTURE_DEBOUNCE_MS = 1800;
+const LIVE_STRUCTURE_MIN_LENGTH = 12;
+
 export function useCaptureWidget({
   sessionId,
   extensionMode = false,
@@ -32,6 +36,7 @@ export function useCaptureWidget({
   onComplete,
   onDelete,
   onRecordingChange,
+  liveStructureFetch,
 }: CaptureWidgetProps) {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
@@ -50,6 +55,7 @@ export function useCaptureWidget({
   const [position, setPosition] = useState<Position | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [pendingStructured, setPendingStructured] = useState<StructuredFeedback | null>(null);
+  const [liveStructured, setLiveStructured] = useState<{ title: string; tags: string[]; priority: string } | null>(null);
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -61,6 +67,7 @@ export function useCaptureWidget({
   const stateRef = useRef<CaptureState>(state);
   const editingIdRef = useRef<string | null>(null);
   const trayLockedRef = useRef(false);
+  const liveStructureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     stateRef.current = state;
@@ -92,6 +99,42 @@ export function useCaptureWidget({
       onRecordingChange(false);
     }
   }, [state, onRecordingChange]);
+
+  /** Instant structured insight: debounced live title/tags/priority while user is speaking. */
+  useEffect(() => {
+    if (state !== "listening" || !liveStructureFetch || !activeRecordingId) {
+      setLiveStructured(null);
+      if (liveStructureTimeoutRef.current) {
+        clearTimeout(liveStructureTimeoutRef.current);
+        liveStructureTimeoutRef.current = null;
+      }
+      return;
+    }
+    const active = recordings.find((r) => r.id === activeRecordingId);
+    const transcript = (active?.transcript ?? "").trim();
+    if (transcript.length < LIVE_STRUCTURE_MIN_LENGTH) {
+      if (liveStructureTimeoutRef.current) {
+        clearTimeout(liveStructureTimeoutRef.current);
+        liveStructureTimeoutRef.current = null;
+      }
+      return;
+    }
+    if (liveStructureTimeoutRef.current) clearTimeout(liveStructureTimeoutRef.current);
+    liveStructureTimeoutRef.current = setTimeout(() => {
+      liveStructureTimeoutRef.current = null;
+      liveStructureFetch(transcript)
+        .then((result) => {
+          if (result && stateRef.current === "listening") setLiveStructured(result);
+        })
+        .catch(() => {});
+    }, LIVE_STRUCTURE_DEBOUNCE_MS);
+    return () => {
+      if (liveStructureTimeoutRef.current) {
+        clearTimeout(liveStructureTimeoutRef.current);
+        liveStructureTimeoutRef.current = null;
+      }
+    };
+  }, [state, activeRecordingId, recordings, liveStructureFetch]);
 
   /** Guarded setter: in extension mode or during capturing/listening/structuring/edit, do not close. */
   const setIsOpen = useCallback((next: boolean) => {
@@ -288,7 +331,7 @@ export function useCaptureWidget({
           setErrorMessage("AI processing failed.");
           setState("error");
         },
-      });
+      }, active.context ?? undefined);
       return;
     }
     try {
@@ -422,9 +465,9 @@ export function useCaptureWidget({
 
   /* ================= ADD FEEDBACK (CAPTURE) ================= */
 
-  /** Extension: capture via background chrome.tabs.captureVisibleTab. Web: lib/capture (no getDisplayMedia). */
-  const captureScreenshot = async (): Promise<string | null> => {
-    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+  /** Extension: full tab image via background chrome.tabs.captureVisibleTab. Used by region overlay to crop. */
+  const getFullTabImage = useCallback((): Promise<string | null> => {
+    if (typeof chrome !== "undefined" && chrome.runtime?.id) {
       return new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boolean; image?: string } | undefined) => {
           if (!response || !response.success) {
@@ -435,16 +478,51 @@ export function useCaptureWidget({
         });
       });
     }
+    return Promise.resolve(null);
+  }, []);
+
+  /** Web (non-extension): full-page capture. Extension uses region overlay + getFullTabImage instead. */
+  const captureScreenshot = useCallback(async (): Promise<string | null> => {
+    if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+      return getFullTabImage();
+    }
     const { captureScreenshot: webCapture } = await import("@/lib/capture");
     return webCapture();
-  };
+  }, [getFullTabImage]);
+
+  /** Extension only: called by RegionCaptureOverlay with cropped data URL and optional context. */
+  const handleRegionCaptured = useCallback(
+    (croppedDataUrl: string, context?: CaptureContext | null) => {
+      const id = generateRecordingId();
+      const newRecording: Recording = {
+        id,
+        screenshot: croppedDataUrl,
+        transcript: "",
+        structuredOutput: null,
+        context: context ?? null,
+        createdAt: Date.now(),
+      };
+      setRecordings((prev) => [...prev, newRecording]);
+      setActiveRecordingId(id);
+      startListening();
+    },
+    [startListening]
+  );
+
+  /** Extension only: cancel region capture mode (Escape or invalid selection). */
+  const handleCancelCapture = useCallback(() => {
+    setState("idle");
+  }, []);
 
   const handleAddFeedback = useCallback(async () => {
     if (stateRef.current !== "idle") return;
     setIsOpen(true);
     setErrorMessage(null);
-    // Stop recognition before screenshot; do NOT call setIsOpen(false), setCollapsed(true), or setVisible(false).
     recognitionRef.current?.stop();
+    if (extensionMode) {
+      setState("capturing");
+      return;
+    }
     setState("capturing");
     try {
       const image = await captureScreenshot();
@@ -469,7 +547,7 @@ export function useCaptureWidget({
       setErrorMessage("Screen capture failed.");
       setState("error");
     }
-  }, [setIsOpen, startListening]);
+  }, [extensionMode, setIsOpen, captureScreenshot, startListening]);
 
   const handlers = useMemo(
     () => ({
@@ -489,6 +567,9 @@ export function useCaptureWidget({
       setEditedTitle,
       setEditedDescription,
       handleAddFeedback,
+      handleRegionCaptured,
+      handleCancelCapture,
+      getFullTabImage,
     }),
     [
       setIsOpen,
@@ -503,6 +584,9 @@ export function useCaptureWidget({
       startEditing,
       saveEdit,
       handleAddFeedback,
+      handleRegionCaptured,
+      handleCancelCapture,
+      getFullTabImage,
     ]
   );
 
@@ -525,6 +609,7 @@ export function useCaptureWidget({
       editedDescription,
       showMenu,
       position,
+      liveStructured,
     },
     handlers,
     derivedValues,
