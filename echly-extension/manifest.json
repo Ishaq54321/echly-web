@@ -3,11 +3,29 @@
   "name": "Echly",
   "version": "1.0",
   "description": "Capture screenshots and submit feedback",
-  "permissions": ["activeTab", "storage", "scripting"],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "identity"
+  ],
+  "oauth2": {
+    "client_id": "609478020649-qqaun85ai4tg4t7du7f99ar11ihu4ekn.apps.googleusercontent.com",
+    "scopes": [
+      "openid",
+      "email",
+      "profile",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  },
   "host_permissions": [
-    "https://YOUR_DOMAIN.com/*",
+    "http://localhost:3000/*",
     "https://*.firebaseapp.com/*",
-    "https://www.gstatic.com/*"
+    "https://www.gstatic.com/*",
+    "https://securetoken.googleapis.com/*",
+    "https://www.googleapis.com/*",
+    "https://apis.google.com/*"
   ],
   "action": {
     "default_popup": "popup.html"

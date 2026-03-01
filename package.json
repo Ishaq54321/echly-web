@@ -6,12 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:extension": "esbuild echly-extension/src/popup.ts --bundle --outfile=echly-extension/popup.js --platform=browser --target=es2020"
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
-    "firebase": "^12.9.0",
-    "firebase-admin": "^13.7.0",
+    "firebase": "^12.10.0",
+    "jose": "^6.0.11",
     "framer-motion": "^12.34.3",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.575.0",
@@ -24,9 +25,12 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/chrome": "^0.1.37",
+    "@types/express": "^5.0.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.24.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",

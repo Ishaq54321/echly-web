@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
-import { adminStorage } from "@/lib/server/firebaseAdmin";
 
 const MAX_BASE64_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const DATA_IMAGE_PREFIX = "data:image/";
@@ -106,32 +105,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const timestamp = Date.now();
-  const storagePath = `sessions/${sessionId}/feedback/${feedbackId}/${timestamp}.png`;
-
-  try {
-    const bucket = adminStorage.bucket();
-    const file = bucket.file(storagePath);
-
-    await file.save(buffer, {
-      contentType: "image/png",
-      metadata: {
-        contentType: "image/png",
-      },
-    });
-
-    await file.makePublic();
-
-    const bucketName = bucket.name;
-    const encodedPath = encodeURIComponent(storagePath);
-    const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media`;
-
-    return NextResponse.json({ success: true, url });
-  } catch (err) {
-    console.error("POST /api/upload-screenshot:", err);
-    return NextResponse.json(
-      { success: false, error: "Upload failed" },
-      { status: 500 }
-    );
-  }
+  // Firebase Storage (adminStorage) removed; uploads require an alternative storage backend.
+  return NextResponse.json(
+    { success: false, error: "Upload not configured (storage backend removed)" },
+    { status: 501 }
+  );
 }
