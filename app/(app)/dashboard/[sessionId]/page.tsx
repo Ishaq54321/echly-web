@@ -88,6 +88,8 @@ export default function SessionPage() {
     total: feedbackTotal,
     activeCount: feedbackActiveCount,
     resolvedCount: feedbackResolvedCount,
+    setActiveCount: setFeedbackActiveCount,
+    setResolvedCount: setFeedbackResolvedCount,
     loading: feedbackLoading,
     hasMore: hasMoreFeedback,
     hasReachedLimit: feedbackReachedLimit,
@@ -323,6 +325,7 @@ export default function SessionPage() {
 
   const saveResolved = async (isResolved: boolean) => {
     if (!selectedId) return;
+    const previousResolved = Boolean(detailTicket?.isResolved);
     try {
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
@@ -338,7 +341,15 @@ export default function SessionPage() {
             item.id === selectedId ? { ...item, isResolved: resolved } : item
           )
         );
-        await refetchFeedbackFirstPage();
+        if (previousResolved !== resolved) {
+          if (resolved) {
+            setFeedbackActiveCount((c) => Math.max(0, c - 1));
+            setFeedbackResolvedCount((c) => c + 1);
+          } else {
+            setFeedbackActiveCount((c) => c + 1);
+            setFeedbackResolvedCount((c) => Math.max(0, c - 1));
+          }
+        }
       }
     } catch {
       if (detailTicket) setDetailTicket((t) => (t ? { ...t } : null));

@@ -18,6 +18,9 @@ export interface UseSessionFeedbackPaginatedResult {
   activeCount: number;
   /** Resolved count from server (first page only); do not derive from items. */
   resolvedCount: number;
+  /** Setters for counts so callers can update locally (e.g. after resolve toggle without refetch). */
+  setActiveCount: React.Dispatch<React.SetStateAction<number>>;
+  setResolvedCount: React.Dispatch<React.SetStateAction<number>>;
   loading: boolean;
   hasMore: boolean;
   hasReachedLimit: boolean;
@@ -188,6 +191,8 @@ export function useSessionFeedbackPaginated(
     activeCount,
     resolvedCount,
     setFeedback: setItems,
+    setActiveCount,
+    setResolvedCount,
     loading: initialLoading,
     hasMore,
     hasReachedLimit,
