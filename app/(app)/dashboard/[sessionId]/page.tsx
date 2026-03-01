@@ -10,7 +10,6 @@ import { db } from "@/lib/firebase";
 import { addFeedback, deleteFeedback } from "@/lib/feedback";
 import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
-import CaptureWidget from "@/components/CaptureWidget";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import FeedbackSidebar from "@/components/session/FeedbackSidebar";
 import FeedbackDetail from "@/components/session/feedbackDetail/FeedbackDetail";
@@ -727,14 +726,6 @@ export default function SessionPage() {
           </div>
         )}
 
-      {session && (
-        <CaptureWidget
-          sessionId={sessionId as string}
-          userId={session.userId}
-          onComplete={handleTranscript}
-          onDelete={handleDeleteFeedback}
-        />
-      )}
     </>
   );
 }

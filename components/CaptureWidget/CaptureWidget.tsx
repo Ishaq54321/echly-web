@@ -11,6 +11,7 @@ import type { CaptureWidgetProps, StructuredFeedback } from "./types";
 export default function CaptureWidget({
   sessionId,
   userId,
+  extensionMode = false,
   initialPointers,
   onComplete,
   onDelete,
@@ -23,6 +24,7 @@ export default function CaptureWidget({
   } = useCaptureWidget({
     sessionId,
     userId,
+    extensionMode,
     initialPointers,
     onComplete,
     onDelete,
@@ -60,18 +62,29 @@ export default function CaptureWidget({
     );
   }
 
+  // Debug: detect unwanted collapse triggers (remove after stabilization)
+  console.log("Widget state:", {
+    isOpen: state.isOpen,
+    isListening: state.state === "listening",
+    isStructuring: state.state === "processing" || state.state === "anticipation",
+  });
+
   return (
     <>
       <div
         className="fixed inset-0 z-40 backdrop-blur-[4px] bg-black/8"
         aria-hidden
+        style={extensionMode ? { pointerEvents: "none" } : undefined}
       />
       <div
         ref={refs.widgetRef}
         className={`fixed z-50 w-[480px] transition-all duration-200 ${
           state.position ? "" : "bottom-10 right-10"
         }`}
-        style={state.position ? { left: state.position.x, top: state.position.y } : undefined}
+        style={{
+          ...(state.position ? { left: state.position.x, top: state.position.y } : {}),
+          ...(extensionMode ? { pointerEvents: "auto" } : {}),
+        }}
       >
         <div className="bg-white rounded-lg
                         border border-slate-200/80

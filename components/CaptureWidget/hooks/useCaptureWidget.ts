@@ -13,6 +13,9 @@ import type {
 
 const SAFE_MARGIN = 24;
 
+/** Web Speech API recognition instance (not in DOM lib types). */
+type SpeechRecognitionInstance = { start(): void; stop(): void };
+
 function generateRecordingId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -22,13 +25,14 @@ function generateRecordingId(): string {
 
 export function useCaptureWidget({
   sessionId,
+  extensionMode = false,
   initialPointers,
   onComplete,
   onDelete,
 }: CaptureWidgetProps) {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpenState] = useState(false);
   const [state, setState] = useState<CaptureState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pointers, setPointers] = useState<StructuredFeedback[]>(
@@ -46,11 +50,26 @@ export function useCaptureWidget({
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const timerRef = useRef<any>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const activeRecordingIdRef = useRef<string | null>(null);
   const recordingsRef = useRef<Recording[]>(recordings);
+  const stateRef = useRef<CaptureState>(state);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  /** Guarded setter: in extension mode or during listening/structuring, do not close. */
+  const setIsOpen = (next: boolean) => {
+    if (next === false) {
+      if (extensionMode) return;
+      const s = stateRef.current;
+      if (s === "listening" || s === "processing" || s === "anticipation") return;
+    }
+    setIsOpenState(next);
+  };
 
   useEffect(() => {
     activeRecordingIdRef.current = activeRecordingId;
@@ -139,7 +158,7 @@ export function useCaptureWidget({
     recognition.lang = "en-US";
     recognition.onresult = (event: any) => {
       let text = "";
-      for (let i = 0; i < event.results.length; i++) {
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
         text += event.results[i][0].transcript;
       }
       const activeId = activeRecordingIdRef.current;
@@ -151,7 +170,15 @@ export function useCaptureWidget({
         );
       }
     };
+    recognition.onend = () => {
+      setState("idle");
+    };
     recognitionRef.current = recognition;
+    return () => {
+      try {
+        recognition.stop();
+      } catch (_) {}
+    };
   }, []);
 
   /* ================= TIMER ================= */
@@ -173,13 +200,14 @@ export function useCaptureWidget({
 
   /* ================= LISTEN ================= */
 
-  const startListening = () => {
+  const startListening = async () => {
     try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
       recognitionRef.current?.start();
       setState("listening");
       startTimer();
     } catch (err) {
-      console.error(err);
+      console.error("Microphone permission denied:", err);
       setErrorMessage("Microphone permission denied.");
       setState("error");
     }
@@ -269,9 +297,10 @@ export function useCaptureWidget({
     setShowMenu(false);
   };
 
-  /* ================= CLICK OUTSIDE ================= */
+  /* ================= CLICK OUTSIDE (menu only; no widget collapse in extension mode) ================= */
 
   useEffect(() => {
+    if (extensionMode) return;
     const handleClickOutside = (event: any) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setShowMenu(false);
@@ -280,7 +309,7 @@ export function useCaptureWidget({
     document.addEventListener("mousedown", handleClickOutside);
     return () =>
       document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [extensionMode]);
 
   /* ================= POINTER ACTIONS ================= */
 
@@ -330,12 +359,30 @@ export function useCaptureWidget({
 
   /* ================= ADD FEEDBACK (CAPTURE) ================= */
 
+  /** Extension: capture via background chrome.tabs.captureVisibleTab. Web: lib/capture (no getDisplayMedia). */
+  const captureScreenshot = async (): Promise<string | null> => {
+    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+      return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boolean; image?: string } | undefined) => {
+          if (!response || !response.success) {
+            reject(new Error("Capture failed"));
+          } else {
+            resolve(response.image ?? null);
+          }
+        });
+      });
+    }
+    const { captureScreenshot: webCapture } = await import("@/lib/capture");
+    return webCapture();
+  };
+
   const handleAddFeedback = async () => {
     if (state !== "idle") return;
     setErrorMessage(null);
+    // Stop recognition before screenshot; do NOT call setIsOpen(false), setCollapsed(true), or setVisible(false).
+    recognitionRef.current?.stop();
     setState("capturing");
     try {
-      const { captureScreenshot } = await import("@/lib/capture");
       const image = await captureScreenshot();
       if (!image) {
         setState("idle");

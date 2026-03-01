@@ -4,33 +4,27 @@
   "version": "1.0",
   "description": "Capture screenshots and submit feedback",
   "permissions": [
-    "activeTab",
+    "identity",
     "storage",
-    "scripting",
-    "identity"
+    "activeTab",
+    "scripting"
   ],
   "oauth2": {
     "client_id": "609478020649-qqaun85ai4tg4t7du7f99ar11ihu4ekn.apps.googleusercontent.com",
-    "scopes": [
-      "openid",
-      "email",
-      "profile",
-      "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/userinfo.profile"
-    ]
+    "scopes": ["profile", "email"]
   },
   "host_permissions": [
     "http://localhost:3000/*",
+    "https://echly-web.vercel.app/*",
     "https://*.firebaseapp.com/*",
     "https://www.gstatic.com/*",
     "https://securetoken.googleapis.com/*",
     "https://www.googleapis.com/*",
     "https://apis.google.com/*"
   ],
-  "action": {
-    "default_popup": "popup.html"
-  },
-  "background": {
-    "service_worker": "background.js"
-  }
+  "action": {},
+  "background": { "service_worker": "background.js" },
+  "web_accessible_resources": [
+    { "resources": ["popup.css", "assets/Echly_logo.svg"], "matches": ["<all_urls>"] }
+  ]
 }

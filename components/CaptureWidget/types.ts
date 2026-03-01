@@ -24,6 +24,8 @@ export type CaptureState =
 export type CaptureWidgetProps = {
   sessionId: string;
   userId: string;
+  /** When true, disables auto-collapse on blur/outside click and locks tray during recording. */
+  extensionMode?: boolean;
   initialPointers?: StructuredFeedback[];
   onComplete: (
     transcript: string,
