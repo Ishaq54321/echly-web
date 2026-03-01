@@ -205,7 +205,7 @@ export function WorkspaceCard({
           border border-neutral-200
           bg-white
           shadow-sm
-          px-6 py-6
+          p-5
           cursor-pointer
           outline-none
           transition-all duration-150 ease-out
@@ -217,13 +217,7 @@ export function WorkspaceCard({
         data-session-id={session.id}
       >
         {/* 3-DOTS — ABSOLUTELY POSITIONED */}
-        <div
-          className="
-            absolute
-            top-4
-            right-4
-          "
-        >
+        <div className="absolute top-4 right-4">
           <div data-card-actions className="relative z-20 shrink-0">
             <div
               className="relative h-10 w-10"
@@ -265,7 +259,7 @@ export function WorkspaceCard({
                   cursor-pointer
                 "
               >
-                <MoreHorizontal className="w-4 h-4 pointer-events-none" strokeWidth={1.5} aria-hidden />
+                <MoreHorizontal className="h-[16px] w-[16px] relative top-[1px] pointer-events-none" strokeWidth={1.5} aria-hidden />
               </button>
               {showTooltip && (
                 <span
@@ -363,29 +357,18 @@ export function WorkspaceCard({
           <div>
             {/* Title row */}
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2 min-w-0 flex-1 pr-10">
+              <div className="flex items-start gap-2 min-w-0 flex-1 pr-8">
                 <Folder
-                  className="w-4 h-4 shrink-0 text-neutral-500 transition-colors duration-150 group-hover:text-brand-accent"
+                  className="h-[16px] w-[16px] relative top-[1px] shrink-0 text-neutral-500 transition-colors duration-150 group-hover:text-brand-accent"
                   strokeWidth={1.5}
                   aria-hidden
                 />
-                <h3 className="
-                  text-[16px]
-                  font-medium
-                  tracking-tight
-                  text-[hsl(var(--text-primary))]
-                  leading-snug
-                  line-clamp-2
-                  overflow-hidden
-                  text-ellipsis
-                  min-w-0
-                  flex-1
-                ">
+                <h3 className="text-[15px] font-medium leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary))] line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
                   {session.title}
                 </h3>
                 {openFeedbackCount > 0 && (
                   <span
-                    className="ml-2 mt-[6px] h-2 w-2 shrink-0 rounded-full bg-brand-accent opacity-80"
+                    className="ml-2 mt-2 h-2 w-2 shrink-0 rounded-full bg-brand-accent opacity-80"
                     aria-hidden
                   />
                 )}
@@ -393,8 +376,8 @@ export function WorkspaceCard({
             </div>
 
             {/* Metrics row — premium metadata tags (informational, no hover) */}
-            <div className="mt-4 flex items-center gap-3">
-              <div className="inline-flex items-center rounded-sm bg-neutral-100/60 px-2.5 py-1 transition-colors duration-150">
+            <div className="mt-3 flex items-center gap-3">
+              <div className="inline-flex items-center rounded-md bg-neutral-100/60 px-2.5 py-[5px] transition-colors duration-150">
                 <span className="text-[13px] font-medium text-neutral-900">
                   {feedbackCount}
                 </span>
@@ -402,7 +385,7 @@ export function WorkspaceCard({
                   feedback
                 </span>
               </div>
-              <div className="inline-flex items-center rounded-sm px-2.5 py-1 bg-neutral-100/70 transition-colors duration-150">
+              <div className="inline-flex items-center rounded-md bg-neutral-100/70 px-2.5 py-[5px] transition-colors duration-150">
                 <span
                   className={`text-[13px] font-medium ${
                     openCount > 0 ? "text-brand-accent" : "text-neutral-900"
@@ -417,20 +400,16 @@ export function WorkspaceCard({
             </div>
           </div>
 
-          <div className="mt-6">
+          <div className="mt-5 flex flex-col">
             {/* Activity row (views + comments) */}
-            <div className="flex items-center gap-6 text-sm text-[hsl(var(--text-secondary))]">
+            <div className="flex items-center gap-4 text-[12px] text-neutral-500">
               <div className="flex items-center gap-1.5">
-                <Eye className="w-4 h-4 shrink-0 text-neutral-500" strokeWidth={1.5} aria-hidden />
-                <span className="font-medium text-[hsl(var(--text-primary))]">
-                  {viewCount}
-                </span>
+                <Eye className="h-[16px] w-[16px] relative top-[1px] shrink-0 text-neutral-500" strokeWidth={1.5} aria-hidden />
+                <span>{viewCount}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <MessageCircle className="w-4 h-4 shrink-0 text-neutral-500" strokeWidth={1.5} aria-hidden />
-                <span className="font-medium text-[hsl(var(--text-primary))]">
-                  {commentCount}
-                </span>
+                <MessageCircle className="h-[16px] w-[16px] relative top-[1px] shrink-0 text-neutral-500" strokeWidth={1.5} aria-hidden />
+                <span>{commentCount}</span>
               </div>
             </div>
           </div>

@@ -46,7 +46,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex flex-col w-full min-h-[40vh] bg-[hsl(var(--surface-2))]">
-        <div className="mx-auto w-full max-w-[1800px] px-10 pt-10 pb-16 flex items-center justify-center">
+        <div className="mx-auto w-full max-w-[1800px] px-8 pt-8 pb-8 flex items-center justify-center">
           <p className="text-[13px] text-[hsl(var(--text-secondary))]">Loading workspace…</p>
         </div>
       </div>
@@ -55,7 +55,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col w-full min-h-0 bg-[hsl(var(--surface-2))]">
-      <div className="mx-auto w-full max-w-[1800px] px-10 pt-10 pb-16">
+      <div className="mx-auto w-full max-w-[1800px] px-8 pt-8 pb-8">
         {/* Header */}
         <header className="flex items-start justify-between mb-8">
           <div>
@@ -87,7 +87,7 @@ export default function DashboardPage() {
 
         <main className="flex-1">
           {/* TODO: Future: Archived view to list archived sessions. */}
-          <div className="grid w-full gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
+          <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
             {filteredSessions.map((item, index) => (
               <WorkspaceCard
                 key={item.session.id}

@@ -19,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full">
-      <body className={`${plusJakartaSans.className} antialiased h-full overflow-hidden`}>
+    <html lang="en" className="h-full" suppressHydrationWarning>
+      <body className={`${plusJakartaSans.className} antialiased h-full overflow-hidden`} suppressHydrationWarning>
         <div className="h-screen flex flex-col">
           <GlobalNavBar />
           <div className="flex flex-1 min-h-0 pt-16 overflow-hidden">
