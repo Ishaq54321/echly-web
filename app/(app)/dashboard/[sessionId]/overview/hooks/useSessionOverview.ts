@@ -6,8 +6,8 @@ import type { SessionFeedbackCounts } from "@/lib/feedback";
 import {
   getFeedbackByIds,
   getSessionFeedback,
-  getSessionFeedbackByStatus,
-  getSessionFeedbackCountsByStatus,
+  getSessionFeedbackByResolved,
+  getSessionFeedbackCounts,
   getSessionFeedbackHighImpact,
   getSessionFeedbackTotalCount,
 } from "@/lib/feedback";
@@ -28,7 +28,6 @@ export interface OverviewActivityItem {
 
 export interface StatusPreview {
   open: Feedback[];
-  in_progress: Feedback[];
   resolved: Feedback[];
 }
 
@@ -45,7 +44,6 @@ export interface SessionOverviewData {
 
 const defaultCounts: SessionFeedbackCounts = {
   open: 0,
-  in_progress: 0,
   resolved: 0,
 };
 
@@ -87,7 +85,7 @@ export function useSessionOverview(sessionId: string | undefined) {
     countsByStatus: defaultCounts,
     totalCount: 0,
     recentFeedback: [],
-    statusPreview: { open: [], in_progress: [], resolved: [] },
+    statusPreview: { open: [], resolved: [] },
     highImpact: [],
     recentActivity: [],
     tagCounts: [],
@@ -114,18 +112,16 @@ export function useSessionOverview(sessionId: string | undefined) {
           totalCount,
           recentFeedback,
           openPreview,
-          inProgressPreview,
           resolvedPreview,
           highImpact,
           recentComments,
         ] = await Promise.all([
           getSessionById(sid),
-          getSessionFeedbackCountsByStatus(sid),
+          getSessionFeedbackCounts(sid),
           getSessionFeedbackTotalCount(sid),
           getSessionFeedback(sid, RECENT_FEEDBACK_LIMIT),
-          getSessionFeedbackByStatus(sid, "open", 3),
-          getSessionFeedbackByStatus(sid, "in_progress", 3),
-          getSessionFeedbackByStatus(sid, "resolved", 3),
+          getSessionFeedbackByResolved(sid, false, 3),
+          getSessionFeedbackByResolved(sid, true, 3),
           getSessionFeedbackHighImpact(sid, HIGH_IMPACT_LIMIT),
           getSessionRecentComments(sid, RECENT_ACTIVITY_LIMIT),
         ]);
@@ -150,7 +146,6 @@ export function useSessionOverview(sessionId: string | undefined) {
         const allForTags = [
           ...recentFeedback,
           ...openPreview,
-          ...inProgressPreview,
           ...resolvedPreview,
           ...highImpact,
         ];
@@ -163,7 +158,6 @@ export function useSessionOverview(sessionId: string | undefined) {
           recentFeedback,
           statusPreview: {
             open: openPreview,
-            in_progress: inProgressPreview,
             resolved: resolvedPreview,
           },
           highImpact,

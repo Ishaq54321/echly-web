@@ -49,10 +49,8 @@ function impactColor(impact: string | null | undefined): string {
   return "bg-neutral-200";
 }
 
-function statusLabel(status: string): string {
-  if (status === "resolved") return "Done";
-  if (status === "in_progress") return "In progress";
-  return "Open";
+function resolutionLabel(isResolved: boolean): string {
+  return isResolved ? "Done" : "Open";
 }
 
 // ----- Session header -----
@@ -162,7 +160,7 @@ function FeedbackPreviewRow({
       </div>
       {showStatus && (
         <span className="text-xs font-medium text-[hsl(var(--text-secondary))] shrink-0 px-2 py-0.5 rounded-md border border-neutral-200 bg-neutral-50">
-          {statusLabel(item.status)}
+          {resolutionLabel(item.isResolved ?? false)}
         </span>
       )}
     </div>
@@ -380,10 +378,9 @@ export default function SessionOverviewPage() {
       />
 
       <main className="px-6 py-4 max-w-6xl mx-auto">
-        <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <MetricCard label="Total Feedback" value={totalCount} />
           <MetricCard label="Open" value={countsByStatus.open} />
-          <MetricCard label="In Progress" value={countsByStatus.in_progress} />
           <MetricCard label="Done" value={doneCount} />
           <MetricCard
             label="Completion %"
@@ -394,24 +391,18 @@ export default function SessionOverviewPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <StatusSection
                 label="Open"
                 count={countsByStatus.open}
                 items={statusPreview.open}
-                viewAllHref={`/dashboard/${sessionId}?status=open`}
-              />
-              <StatusSection
-                label="In progress"
-                count={countsByStatus.in_progress}
-                items={statusPreview.in_progress}
-                viewAllHref={`/dashboard/${sessionId}?status=in_progress`}
+                viewAllHref={`/dashboard/${sessionId}`}
               />
               <StatusSection
                 label="Done"
                 count={countsByStatus.resolved}
                 items={statusPreview.resolved}
-                viewAllHref={`/dashboard/${sessionId}?status=resolved`}
+                viewAllHref={`/dashboard/${sessionId}`}
               />
             </div>
             <HighImpactSection items={highImpact} sessionId={sessionId} />

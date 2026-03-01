@@ -1,6 +1,5 @@
 import type { Timestamp } from "firebase/firestore";
 
-export type FeedbackStatus = "open" | "in_progress" | "resolved";
 export type FeedbackPriority = "low" | "medium" | "high" | "critical";
 
 export interface StructuredFeedback {
@@ -35,7 +34,7 @@ export interface Feedback {
   description: string;
   suggestion?: string;
   type: string;
-  status: FeedbackStatus;
+  isResolved: boolean;
   priority: FeedbackPriority;
   createdAt: Timestamp | null;
 

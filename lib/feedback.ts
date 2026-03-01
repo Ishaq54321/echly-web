@@ -2,12 +2,10 @@ import type { DocumentReference } from "firebase/firestore";
 export type {
   Feedback,
   FeedbackPriority,
-  FeedbackStatus,
   StructuredFeedback,
 } from "@/lib/domain/feedback";
 import type {
   FeedbackPriority,
-  FeedbackStatus,
   StructuredFeedback,
   Feedback,
 } from "@/lib/domain/feedback";
@@ -15,8 +13,8 @@ import {
   addFeedbackRepo,
   deleteFeedbackRepo,
   getFeedbackByIdsRepo,
-  getSessionFeedbackByStatusRepo,
-  getSessionFeedbackCountsByStatusRepo,
+  getSessionFeedbackByResolvedRepo,
+  getSessionFeedbackCountsRepo,
   getSessionFeedbackHighImpactRepo,
   getSessionFeedbackPageRepo,
   getSessionFeedbackTotalCountRepo,
@@ -65,7 +63,7 @@ export async function updateFeedback(
     title: string;
     description: string;
     type: string;
-    status: FeedbackStatus;
+    isResolved: boolean;
     priority: FeedbackPriority;
     screenshotUrl: string | null;
     actionItems: string[] | null;
@@ -98,20 +96,20 @@ export async function getSessionFeedback(
   return feedback;
 }
 
-/** Counts by status for overview. Uses aggregation (no unbounded reads). */
-export async function getSessionFeedbackCountsByStatus(
+/** Counts by resolution for overview. Uses aggregation (no unbounded reads). */
+export async function getSessionFeedbackCounts(
   sessionId: string
 ): Promise<SessionFeedbackCounts> {
-  return getSessionFeedbackCountsByStatusRepo(sessionId);
+  return getSessionFeedbackCountsRepo(sessionId);
 }
 
-/** Up to N feedback items per status for overview preview. */
-export async function getSessionFeedbackByStatus(
+/** Up to N feedback items by resolution for overview preview. */
+export async function getSessionFeedbackByResolved(
   sessionId: string,
-  status: FeedbackStatus,
+  isResolved: boolean,
   max: number = 3
 ): Promise<Feedback[]> {
-  return getSessionFeedbackByStatusRepo(sessionId, status, max);
+  return getSessionFeedbackByResolvedRepo(sessionId, isResolved, max);
 }
 
 /** Total feedback count for session (aggregation). */

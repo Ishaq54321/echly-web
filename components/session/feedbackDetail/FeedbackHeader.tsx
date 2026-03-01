@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { MessageSquare, Trash2, Pencil, Check } from "lucide-react";
-import { StatusPill } from "./StatusPill";
+import { ResolvedToggle } from "@/components/ui/ResolvedToggle";
 import type { FeedbackItemShape } from "./types";
 
 function formatRelative(iso: string | null | undefined): string {
@@ -22,6 +22,7 @@ interface FeedbackHeaderProps {
   onToggleActivity: () => void;
   onSaveTitle?: (newTitle: string) => Promise<void>;
   onRequestDelete?: () => void;
+  onResolvedChange?: (isResolved: boolean) => void;
 }
 
 export function FeedbackHeader({
@@ -30,6 +31,7 @@ export function FeedbackHeader({
   onToggleActivity,
   onSaveTitle,
   onRequestDelete,
+  onResolvedChange,
 }: FeedbackHeaderProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(item.title);
@@ -147,7 +149,12 @@ export function FeedbackHeader({
           )}
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          <StatusPill defaultValue={item.status ?? "open"} aria-label="Status" />
+          {onResolvedChange != null && (
+            <ResolvedToggle
+              isResolved={item.isResolved ?? false}
+              onChange={onResolvedChange}
+            />
+          )}
           {onRequestDelete && (
             <button
               type="button"

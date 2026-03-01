@@ -8,7 +8,7 @@ interface FeedbackItem {
   id: string;
   title: string;
   type: string;
-  status?: string;
+  isResolved?: boolean;
   createdAt?: { seconds: number } | null;
   clientTimestamp?: number | null;
   timestamp?: number;
@@ -61,15 +61,14 @@ export default function FeedbackSidebar({
   }, [feedback, searchQuery, sort]);
 
   const total = feedback.length;
-  const activeCount =
-    feedback.filter((f) => f.status !== "resolved").length;
-  const resolvedCount = feedback.filter((f) => f.status === "resolved").length;
+  const openCount = feedback.filter((f) => !(f.isResolved ?? false)).length;
+  const resolvedCount = feedback.filter((f) => f.isResolved === true).length;
 
   const subline =
     total > 0
       ? [
           total + " total",
-          ...(activeCount > 0 ? [activeCount + " active"] : []),
+          ...(openCount > 0 ? [openCount + " open"] : []),
           ...(resolvedCount > 0 ? [resolvedCount + " resolved"] : []),
         ].join(" · ")
       : "0 total";
@@ -155,18 +154,10 @@ export default function FeedbackSidebar({
           {displayed.map((item, index) => {
             const isActive = item.id === selectedId;
             const totalCount = displayed.length;
-            const status = (item.status ?? "open").toLowerCase();
-  const statusColorMap: Record<string, string> = {
-    resolved: "text-semantic-success",
-    done: "text-semantic-success",
-    pending: "text-semantic-attention",
-    in_progress: "text-semantic-attention",
-    in_review: "text-semantic-attention",
-    archived: "text-neutral-400",
-    open: "text-semantic-system",
-  };
-  const statusAccentClass =
-    statusColorMap[status] ?? "text-semantic-system";
+            const isResolved = item.isResolved === true;
+            const statusAccentClass = isResolved
+              ? "text-semantic-success"
+              : "text-semantic-system";
 
             return (
               <div
@@ -216,13 +207,7 @@ export default function FeedbackSidebar({
                 </div>
                 {isActive && (
                   <span className="text-[12px] mt-1 ml-[calc(36px+0.5rem)] text-white">
-                    {status === "resolved" || status === "done"
-                      ? "Resolved"
-                      : status === "pending" || status === "in_progress" || status === "in_review"
-                        ? "In Review"
-                        : status === "archived"
-                          ? "Archived"
-                          : "Open"}
+                    {isResolved ? "Resolved" : "Open"}
                   </span>
                 )}
               </div>

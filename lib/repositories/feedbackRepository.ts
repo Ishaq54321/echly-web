@@ -23,7 +23,6 @@ import { assertQueryLimit } from "@/lib/querySafety";
 import type {
   Feedback,
   FeedbackPriority,
-  FeedbackStatus,
   StructuredFeedback,
 } from "@/lib/domain/feedback";
 
@@ -38,7 +37,7 @@ const feedbackPayload = (
   description: data.description,
   suggestion: data.suggestion ?? "",
   type: data.type,
-  status: "open",
+  status: "open" as const,
   priority: data.priority ?? "medium",
   createdAt: serverTimestamp(),
 
@@ -74,20 +73,43 @@ export async function addFeedbackRepo(
   return docRef;
 }
 
+type FeedbackUpdate = Partial<{
+  title: string;
+  description: string;
+  type: string;
+  status: "open" | "resolved";
+  priority: FeedbackPriority;
+  screenshotUrl: string | null;
+  actionItems: string[] | null;
+  suggestedTags: string[] | null;
+}>;
+
 export async function updateFeedbackRepo(
   feedbackId: string,
   data: Partial<{
     title: string;
     description: string;
     type: string;
-    status: FeedbackStatus;
+    isResolved: boolean;
     priority: FeedbackPriority;
     screenshotUrl: string | null;
     actionItems: string[] | null;
     suggestedTags: string[] | null;
   }>
 ): Promise<void> {
-  await updateDoc(doc(db, "feedback", feedbackId), data);
+  const updates: FeedbackUpdate = {};
+  if (typeof data.title === "string") updates.title = data.title;
+  if (typeof data.description === "string") updates.description = data.description;
+  if (typeof data.type === "string") updates.type = data.type;
+  if (typeof data.priority === "string") updates.priority = data.priority;
+  if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
+  if (data.actionItems !== undefined) updates.actionItems = data.actionItems;
+  if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
+  if (typeof (data as { isResolved?: boolean }).isResolved === "boolean") {
+    updates.status = (data as { isResolved: boolean }).isResolved ? "resolved" : "open";
+  }
+  if (Object.keys(updates).length === 0) return;
+  await updateDoc(doc(db, "feedback", feedbackId), updates);
 }
 
 /** Cursor for server-side pagination. Opaque to callers; only repo uses it. */
@@ -105,6 +127,11 @@ const FEEDBACK_PAGE_SIZE_DEFAULT = 20;
 /** Maps a Firestore doc snapshot to domain Feedback. */
 function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
   const data = docSnap.data();
+  const status = data.status ?? "open";
+  const isResolved =
+    data.isResolved === true ||
+    status === "resolved" ||
+    status === "done";
   return {
     id: docSnap.id,
     sessionId: data.sessionId,
@@ -113,7 +140,7 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     description: data.description,
     suggestion: data.suggestion ?? "",
     type: data.type,
-    status: data.status ?? "open",
+    isResolved,
     priority: data.priority ?? "medium",
     createdAt: (data.createdAt ?? null) as Timestamp | null,
     contextSummary: data.contextSummary ?? null,
@@ -210,28 +237,26 @@ export async function resolveFeedbackRepo(feedbackId: string): Promise<void> {
   await updateDoc(doc(db, "feedback", feedbackId), { status: "resolved" });
 }
 
-/** Counts by status for one session. Each count uses aggregation (no unbounded reads). */
+/** Counts by resolution for one session. Each count uses aggregation (no unbounded reads). */
 export interface SessionFeedbackCounts {
   open: number;
-  in_progress: number;
   resolved: number;
 }
 
-export async function getSessionFeedbackCountsByStatusRepo(
+export async function getSessionFeedbackCountsRepo(
   sessionId: string
 ): Promise<SessionFeedbackCounts> {
   const coll = collection(db, "feedback");
-  const base = (status: string) =>
-    query(coll, where("sessionId", "==", sessionId), where("status", "==", status));
-  const [openSnap, inProgressSnap, resolvedSnap] = await Promise.all([
-    getCountFromServer(base("open")),
-    getCountFromServer(base("in_progress")),
-    getCountFromServer(base("resolved")),
+  const [resolvedSnap, totalSnap] = await Promise.all([
+    getCountFromServer(
+      query(coll, where("sessionId", "==", sessionId), where("status", "==", "resolved"))
+    ),
+    getSessionFeedbackTotalCountRepo(sessionId),
   ]);
+  const resolved = resolvedSnap.data().count;
   return {
-    open: openSnap.data().count,
-    in_progress: inProgressSnap.data().count,
-    resolved: resolvedSnap.data().count,
+    resolved,
+    open: totalSnap - resolved,
   };
 }
 
@@ -266,18 +291,19 @@ export async function deleteAllFeedbackForSessionRepo(
 
 const OVERVIEW_HIGH_IMPACT_LIMIT = 5;
 
-const OVERVIEW_PREVIEW_PER_STATUS_LIMIT = 3;
+const OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT = 3;
 
 /**
- * Fetches up to N feedback items for a session filtered by status, newest first.
+ * Fetches up to N feedback items for a session filtered by resolution, newest first.
  * Composite index: feedback (sessionId ASC, status ASC, createdAt DESC).
  */
-export async function getSessionFeedbackByStatusRepo(
+export async function getSessionFeedbackByResolvedRepo(
   sessionId: string,
-  status: FeedbackStatus,
-  max: number = OVERVIEW_PREVIEW_PER_STATUS_LIMIT
+  isResolved: boolean,
+  max: number = OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT
 ): Promise<Feedback[]> {
-  assertQueryLimit(max, "getSessionFeedbackByStatusRepo");
+  assertQueryLimit(max, "getSessionFeedbackByResolvedRepo");
+  const status = isResolved ? "resolved" : "open";
   const q = query(
     collection(db, "feedback"),
     where("sessionId", "==", sessionId),

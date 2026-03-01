@@ -4,7 +4,7 @@ export interface FeedbackItemShape {
   title: string;
   type: string;
   timestamp?: number;
-  status?: string;
+  isResolved?: boolean;
   priority?: string;
   screenshotUrl?: string | null;
   description: string;

@@ -23,7 +23,11 @@ type TicketFromApi = {
   id: string;
   title: string;
   description: string;
+  type: string;
+  isResolved?: boolean;
   actionItems?: string[] | null;
+  suggestedTags?: string[] | null;
+  screenshotUrl?: string | null;
   [key: string]: unknown;
 };
 
@@ -300,9 +304,33 @@ export default function SessionPage() {
       const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
       if (data.success && data.ticket) {
         setDetailTicket(data.ticket);
+        const nextTags = Array.isArray(data.ticket.suggestedTags) ? data.ticket.suggestedTags : null;
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === selectedId ? { ...item, suggestedTags: data.ticket!.suggestedTags ?? null } : item
+            item.id === selectedId ? { ...item, suggestedTags: nextTags } : item
+          )
+        );
+      }
+    } catch {
+      if (detailTicket) setDetailTicket((t) => (t ? { ...t } : null));
+    }
+  };
+
+  const saveResolved = async (isResolved: boolean) => {
+    if (!selectedId) return;
+    try {
+      const res = await fetch(`/api/tickets/${selectedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isResolved }),
+      });
+      const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
+      if (data.success && data.ticket) {
+        setDetailTicket(data.ticket);
+        const resolved = Boolean(data.ticket.isResolved);
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === selectedId ? { ...item, isResolved: resolved } : item
           )
         );
       }
@@ -370,7 +398,7 @@ export default function SessionPage() {
       const newItem = {
         id: docRef.id,
         ...payload,
-        status: "open",
+        isResolved: false,
         clientTimestamp: Date.now(),
       };
       created.push(newItem);
@@ -576,6 +604,7 @@ export default function SessionPage() {
                   onRequestDelete={() => setShowDeleteModal(true)}
                   onSaveActionItems={saveActionItems}
                   onSaveTags={saveTags}
+                  onResolvedChange={saveResolved}
                   setIsImageExpanded={setIsImageExpanded}
                   isCommentsOpen={isCommentsOpen}
                   onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}

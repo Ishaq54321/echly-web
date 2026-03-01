@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { createSession, getUserSessions } from "@/lib/sessions";
-import { getSessionFeedbackCountsByStatus } from "@/lib/feedback";
+import { getSessionFeedbackCounts } from "@/lib/feedback";
 import type { Session } from "@/lib/domain/session";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 
@@ -18,7 +18,7 @@ async function loadSessionsAndCounts(uid: string): Promise<{
   const userSessions = await getUserSessions(uid, SESSION_LIMIT);
   const counts = await Promise.all(
     userSessions.map((s) =>
-      getSessionFeedbackCountsByStatus(s.id).then((c) => [s.id, c] as const)
+      getSessionFeedbackCounts(s.id).then((c) => [s.id, c] as const)
     )
   );
   return { sessions: userSessions, counts: Object.fromEntries(counts) };
@@ -79,10 +79,10 @@ export function useWorkspaceOverview() {
     totalSessions: sessions.length,
     activeSessions: sessions.filter((s) => {
       const c = sessionCounts[s.id];
-      return c ? c.open + c.in_progress > 0 : false;
+      return c ? c.open + c.resolved > 0 : false;
     }).length,
     totalFeedbackItems: Object.values(sessionCounts).reduce(
-      (acc, c) => acc + c.open + c.in_progress + c.resolved,
+      (acc, c) => acc + c.open + c.resolved,
       0
     ),
     openIssues: Object.values(sessionCounts).reduce((acc, c) => acc + c.open, 0),
@@ -90,7 +90,7 @@ export function useWorkspaceOverview() {
 
   const sessionsWithCounts: SessionWithCounts[] = sessions.map((session) => ({
     session,
-    counts: sessionCounts[session.id] ?? { open: 0, in_progress: 0, resolved: 0 },
+    counts: sessionCounts[session.id] ?? { open: 0, resolved: 0 },
   }));
 
   const handleCreateSession = useCallback(async () => {

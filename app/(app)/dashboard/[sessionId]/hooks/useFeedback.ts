@@ -150,7 +150,7 @@ export function useFeedback({
         description: payload.description,
         suggestion: "",
         type: payload.type,
-        status: "open",
+        isResolved: false,
         priority: payload.priority ?? "medium",
         createdAt: null,
         contextSummary: payload.contextSummary ?? null,

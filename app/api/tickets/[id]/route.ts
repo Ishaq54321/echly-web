@@ -51,7 +51,7 @@ export async function PATCH(
       { status: 400 }
     );
   }
-  let body: { title?: string; description?: string; actionItems?: string[]; suggestedTags?: string[] };
+  let body: { title?: string; description?: string; actionItems?: string[]; suggestedTags?: string[]; isResolved?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -65,6 +65,7 @@ export async function PATCH(
   if (typeof body.description === "string") updates.description = body.description;
   if (Array.isArray(body.actionItems)) updates.actionItems = body.actionItems;
   if (Array.isArray(body.suggestedTags)) updates.suggestedTags = body.suggestedTags;
+  if (typeof body.isResolved === "boolean") updates.isResolved = body.isResolved;
 
   if (Object.keys(updates).length === 0) {
     const existing = await getFeedbackByIdRepo(id);

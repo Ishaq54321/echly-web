@@ -27,11 +27,10 @@ export function WorkspaceCard({
   onDeleteSuccess,
 }: WorkspaceCardProps) {
   const { session, counts } = item;
-  const feedbackCount = counts.open + counts.in_progress + counts.resolved;
+  const feedbackCount = counts.open + counts.resolved;
   const openFeedbackCount = counts.open;
   const openCount = openFeedbackCount;
-  const activeEntries = counts.open + counts.in_progress;
-  const allCompleted = feedbackCount > 0 && activeEntries === 0;
+  const allCompleted = feedbackCount > 0 && counts.resolved === feedbackCount;
   const viewCount = session.viewCount ?? 0;
   const commentCount = session.commentCount ?? 0;
 
@@ -360,7 +359,7 @@ export function WorkspaceCard({
                   className={`ml-2 mt-2 h-2 w-2 shrink-0 rounded-full opacity-80 ${
                     feedbackCount === 0
                       ? "bg-neutral-300"
-                      : activeEntries > 0
+                      : openCount > 0
                         ? "bg-semantic-attention"
                         : allCompleted
                           ? "bg-semantic-success"

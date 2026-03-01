@@ -107,10 +107,7 @@ export function FeedbackContent({
         <ActionItemsSection
           actionItems={actionItems}
           onSave={onSaveActionItems}
-          isResolved={
-            (item.status ?? "open") === "resolved" ||
-            (item.status ?? "open") === "done"
-          }
+          isResolved={item.isResolved ?? false}
         />
       ) : (
         actionItems.length > 0 && (
