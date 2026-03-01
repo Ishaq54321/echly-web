@@ -335,6 +335,8 @@ export default function SessionPage() {
 
   const saveResolved = async (isResolved: boolean) => {
     if (!selectedId) return;
+    const start = performance.now();
+    console.log("Resolve clicked at", start);
     const previousResolved = Boolean(detailTicket?.isResolved);
     setDetailTicket((t) => (t ? { ...t, isResolved } : null));
     setFeedback((prev) =>
@@ -350,13 +352,16 @@ export default function SessionPage() {
       }
     }
     try {
+      console.log("Sending PATCH...");
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isResolved }),
       });
       const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
+      console.log("PATCH finished in", performance.now() - start);
       if (data.success && data.ticket) setDetailTicket(data.ticket);
+      console.log("Total resolve flow time:", performance.now() - start);
     } catch {
       setDetailTicket((t) => (t ? { ...t, isResolved: previousResolved } : null));
       setFeedback((prev) =>

@@ -31,6 +31,8 @@ function serializeFeedback(item: Feedback): Record<string, unknown> {
  * Returns { feedback: [], nextCursor: string | null, hasMore: boolean }
  */
 export async function GET(req: Request) {
+  const start = Date.now();
+  console.log("[API] GET /api/feedback start");
   let user;
   try {
     user = await requireAuth(req);
@@ -82,6 +84,7 @@ export async function GET(req: Request) {
     }
     const { feedback, nextCursor, hasMore } = pageResult;
 
+    console.log("[API] GET /api/feedback duration:", Date.now() - start);
     return NextResponse.json({
       feedback: feedback.map(serializeFeedback),
       nextCursor,
@@ -92,6 +95,7 @@ export async function GET(req: Request) {
     });
   } catch (err) {
     console.error("GET /api/feedback:", err);
+    console.log("[API] GET /api/feedback duration (error):", Date.now() - start);
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }
@@ -103,6 +107,8 @@ export async function GET(req: Request) {
 const POST_BODY_PRIORITY: FeedbackPriority[] = ["low", "medium", "high", "critical"];
 
 export async function POST(req: Request) {
+  const start = Date.now();
+  console.log("[API] POST /api/feedback start");
   let user;
   try {
     user = await requireAuth(req);
@@ -209,12 +215,14 @@ export async function POST(req: Request) {
       );
     }
     await updateSessionUpdatedAtRepo(sessionId);
+    console.log("[API] POST /api/feedback duration:", Date.now() - start);
     return NextResponse.json({
       success: true,
       ticket: serializeTicket(created),
     });
   } catch (err) {
     console.error("POST /api/feedback:", err);
+    console.log("[API] POST /api/feedback duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Server error" },
       { status: 500 }

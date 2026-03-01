@@ -121,20 +121,27 @@ export function useSessionFeedbackPaginated(
       return;
     }
 
+    const sessionLoadStart = performance.now();
+    console.log("[Session load] Session feedback fetch started", { sessionId });
     let cancelled = false;
     setInitialLoading(true);
     setInitialLoadDone(false);
 
+    console.log("[Session load] GET /api/feedback starting");
     authFetch(
       `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
     )
-      .then((res) => res.json())
+      .then((res) => {
+        console.log("[Session load] GET /api/feedback response arrived in", performance.now() - sessionLoadStart);
+        return res.json();
+      })
       .then((data: { feedback?: Feedback[]; nextCursor?: string | null; hasMore?: boolean; total?: number; activeCount?: number; resolvedCount?: number }) => {
         if (cancelled) return;
         if (typeof data.total === "number") setTotal(data.total);
         if (typeof data.activeCount === "number") setActiveCount(data.activeCount);
         if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
         if (data.feedback?.length) {
+          console.log("[Session load] setItems running, count:", data.feedback.length);
           setItems(data.feedback);
           setCursor(data.nextCursor ?? null);
           setHasMore(data.hasMore ?? false);
@@ -144,9 +151,11 @@ export function useSessionFeedbackPaginated(
           setHasMore(false);
         }
         setInitialLoadDone(true);
+        console.log("[Session load] Total session load time:", performance.now() - sessionLoadStart);
       })
       .finally(() => {
         if (!cancelled) setInitialLoading(false);
+        if (!cancelled) console.log("[Session load] Page state updated (render will follow)");
       });
 
     return () => {
@@ -156,6 +165,8 @@ export function useSessionFeedbackPaginated(
 
   const refetchFirstPage = useCallback(async () => {
     if (!sessionId) return;
+    const refetchStart = performance.now();
+    console.log("[Refetch] refetchFirstPage called at", refetchStart);
     try {
       const res = await authFetch(
         `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
@@ -180,6 +191,7 @@ export function useSessionFeedbackPaginated(
         setCursor(null);
         setHasMore(false);
       }
+      console.log("[Refetch] refetchFirstPage finished in", performance.now() - refetchStart);
     } finally {
       // Do not set initialLoading: keep loading only for first mount and loadMore
     }

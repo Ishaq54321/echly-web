@@ -15,6 +15,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const start = Date.now();
+  console.log("[API] PATCH /api/sessions/[id] start");
   let user;
   try {
     user = await requireAuth(req);
@@ -76,12 +78,14 @@ export async function PATCH(
         { status: 404 }
       );
     }
+    console.log("[API] PATCH /api/sessions/[id] duration:", Date.now() - start);
     return NextResponse.json({
       success: true,
       session: serializeSession(updated),
     });
   } catch (err) {
     console.error("PATCH /api/sessions/[id]:", err);
+    console.log("[API] PATCH /api/sessions/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Server error" },
       { status: 500 }
@@ -94,6 +98,8 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const start = Date.now();
+  console.log("[API] DELETE /api/sessions/[id] start");
   let user;
   try {
     user = await requireAuth(req);
@@ -122,9 +128,11 @@ export async function DELETE(
   }
   try {
     await deleteSessionRepo(id);
+    console.log("[API] DELETE /api/sessions/[id] duration:", Date.now() - start);
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("DELETE /api/sessions/[id]:", err);
+    console.log("[API] DELETE /api/sessions/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Server error" },
       { status: 500 }
