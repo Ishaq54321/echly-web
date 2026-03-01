@@ -38,9 +38,7 @@ export default function CaptureHeader({
         <button
           type="button"
           onClick={onShare}
-          className="flex items-center gap-2 h-8 px-2 rounded-sm
-                         text-sm font-medium text-slate-600
-                         hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
+          className="flex items-center gap-2 h-8 px-2 rounded-md text-sm font-medium text-slate-600 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
         >
           <Share2 size={16} strokeWidth={1.5} className="shrink-0 text-neutral-500" />
           Share
@@ -49,7 +47,7 @@ export default function CaptureHeader({
         <button
           type="button"
           onClick={onMoreClick}
-          className="flex items-center justify-center w-8 h-8 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
+          className="flex items-center justify-center w-8 h-8 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
         >
           <MoreVertical size={18} strokeWidth={1.5} />
         </button>
@@ -57,7 +55,7 @@ export default function CaptureHeader({
         <button
           type="button"
           onClick={onClose}
-          className="flex items-center justify-center w-8 h-8 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
+          className="flex items-center justify-center w-8 h-8 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
         >
           <X size={18} strokeWidth={1.5} />
         </button>
@@ -67,9 +65,9 @@ export default function CaptureHeader({
                               bg-white border border-slate-200
                               rounded-lg shadow-md w-56 py-2">
             <button
+              type="button"
               onClick={onResetSession}
-              className="w-full text-left px-4 py-2 text-sm
-                             hover:bg-neutral-50 text-brand-accent transition"
+              className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-100 text-brand-accent transition-colors duration-120 cursor-pointer"
             >
               Reset Feedback Session
             </button>

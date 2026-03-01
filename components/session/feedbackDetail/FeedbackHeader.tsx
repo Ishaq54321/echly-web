@@ -159,7 +159,7 @@ export function FeedbackHeader({
             <button
               type="button"
               onClick={onRequestDelete}
-              className="flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 rounded"
+              className="flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-neutral-500 hover:text-neutral-700 hover:bg-semantic-danger/10 transition-colors duration-120 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-1 rounded-md cursor-pointer"
               aria-label="Delete permanently"
             >
               <Trash2 size={14} />
@@ -169,7 +169,7 @@ export function FeedbackHeader({
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 rounded ${
+            className={`flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors duration-120 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-1 rounded-md cursor-pointer ${
               isActivityOpen ? "text-neutral-700" : ""
             }`}
             aria-pressed={isActivityOpen}

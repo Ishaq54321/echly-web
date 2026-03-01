@@ -114,11 +114,11 @@ export default function CommandPalette({
       ref={overlayRef}
       role="dialog"
       aria-label="Command palette"
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 pt-[15vh] backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 pt-[15vh] backdrop-blur-sm cursor-pointer"
       onClick={handleOverlayClick}
     >
       <div
-        className={`w-full max-w-2xl overflow-hidden rounded-3xl border border-[hsl(var(--border))] border-opacity-60 bg-[hsl(var(--surface-1))] shadow-[0_25px_70px_rgba(0,0,0,0.12)] transition-all duration-[120ms] ease-out ${
+        className={`w-full max-w-2xl overflow-hidden rounded-3xl border border-[hsl(var(--border))] border-opacity-60 bg-[hsl(var(--surface-1))] shadow-[0_25px_70px_rgba(0,0,0,0.12)] transition-all duration-[120ms] ease-out cursor-default ${
           entered ? "opacity-100 scale-100" : "opacity-0 scale-95"
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -165,10 +165,10 @@ export default function CommandPalette({
                   role="option"
                   aria-selected={index === clampedIndex}
                   type="button"
-                  className={`w-full cursor-pointer rounded-lg px-6 py-3.5 text-left text-sm transition-all duration-150 ease-out focus-visible:outline-none ${
+                  className={`w-full cursor-pointer rounded-lg px-6 py-3.5 text-left text-sm transition-colors duration-120 focus-visible:outline-none ${
                     index === clampedIndex
                       ? "bg-[hsl(var(--surface-3))]"
-                      : "hover:bg-[hsl(var(--surface-2))]"
+                      : "hover:bg-neutral-100"
                   }`}
                   onClick={() => {
                     onSelect(item.id);

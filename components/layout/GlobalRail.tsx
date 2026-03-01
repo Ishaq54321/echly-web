@@ -38,7 +38,7 @@ export default function GlobalRail() {
       <div className="relative group">
         <Link
           href="/dashboard"
-          className="flex items-center justify-center w-10 h-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-white hover:text-neutral-900"
+          className="flex items-center justify-center w-10 h-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-white hover:text-neutral-900 cursor-pointer"
           aria-label="Echly home"
         >
           <Box className="h-[18px] w-[18px]" strokeWidth={1.5} />
@@ -52,7 +52,7 @@ export default function GlobalRail() {
             <div key={label} className="relative group">
               <Link
                 href={href}
-                className={`relative flex items-center justify-center w-10 h-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-white hover:text-neutral-900 ${
+                className={`relative flex items-center justify-center w-10 h-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-white hover:text-neutral-900 cursor-pointer ${
                   active ? "bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)]" : ""
                 }`}
                 aria-label={label}

@@ -28,11 +28,12 @@ export function ActivityComposer({
         className="flex-1 min-w-0 bg-transparent text-slate-900 placeholder:text-slate-400 text-sm focus:outline-none py-0.5"
       />
       <button
+        type="button"
         disabled={!newMessage.trim()}
         onClick={() => onSend(newMessage)}
-        className={`flex-shrink-0 text-sm font-medium transition-all duration-150 ease-out ${
+        className={`flex-shrink-0 text-sm font-medium transition-colors duration-120 rounded-md px-2 py-1 ${
           newMessage.trim()
-            ? "text-slate-700 hover:text-slate-900"
+            ? "text-slate-700 hover:text-slate-900 hover:bg-neutral-100 cursor-pointer"
             : "text-slate-300 cursor-not-allowed"
         }`}
       >

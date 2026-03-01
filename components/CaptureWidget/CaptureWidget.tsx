@@ -41,6 +41,7 @@ export default function CaptureWidget({
     return (
       <div className="fixed bottom-10 right-10 z-50 capture-floating-wrapper">
         <button
+          type="button"
           onClick={() => handlers.setIsOpen(true)}
           className="capture-floating-trigger
                      flex items-center gap-3
@@ -50,7 +51,7 @@ export default function CaptureWidget({
                      shadow-[0_10px_30px_rgba(0,0,0,0.12),0_4px_10px_rgba(0,0,0,0.06)]
                      transition-[transform_80ms_ease-in,box-shadow_150ms_ease-out]
                      hover:-translate-y-px hover:shadow-[0_12px_34px_rgba(0,0,0,0.14),0_5px_12px_rgba(0,0,0,0.08)]
-                     active:scale-[0.98]"
+                     active:scale-[0.98] cursor-pointer"
         >
           <Image src="/Echly_logo.svg" alt="Echly" width={26} height={26} className="shrink-0" />
           Capture Feedback
@@ -123,8 +124,8 @@ export default function CaptureWidget({
                 <AudioWaveform isActive={state.state === "listening"} />
               </div>
               <div className="flex justify-between">
-                <button onClick={handlers.discardListening} className="text-[14px] font-medium text-slate-600 hover:text-slate-900 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]">Cancel</button>
-                <button onClick={handlers.finishListening} className="bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-transform duration-100 ease-out">Done</button>
+                <button type="button" onClick={handlers.discardListening} className="text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-neutral-100 transition-colors duration-120 cursor-pointer px-3 py-2 rounded-md">Cancel</button>
+                <button type="button" onClick={handlers.finishListening} className="bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-colors duration-150 cursor-pointer">Done</button>
               </div>
             </div>
           )}

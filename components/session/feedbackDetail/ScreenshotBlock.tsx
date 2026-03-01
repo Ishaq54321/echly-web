@@ -23,7 +23,7 @@ export function ScreenshotBlock({ screenshotUrl, onExpand }: ScreenshotBlockProp
         <button
           type="button"
           onClick={onExpand}
-          className="absolute top-2 right-2 p-1.5 rounded-md bg-black/70 text-white opacity-0 hover:opacity-100 focus:opacity-100 transition-all duration-150 ease-out"
+          className="absolute top-2 right-2 p-1.5 rounded-md bg-black/70 text-white opacity-0 hover:opacity-100 focus:opacity-100 transition-colors duration-120 cursor-pointer"
           aria-label="Expand screenshot"
         >
           <Expand size={14} />

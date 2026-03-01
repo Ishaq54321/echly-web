@@ -74,7 +74,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={handleCreateSession}
-              className="h-9 rounded-lg bg-neutral-900 text-white text-[14px] px-4 font-medium hover:bg-neutral-800 active:scale-[0.98] focus:outline-none focus:ring-1 focus:ring-neutral-300 transition-all duration-150"
+              className="h-9 rounded-lg bg-neutral-900 text-white text-[14px] px-4 font-medium hover:opacity-90 active:scale-[0.98] focus:outline-none focus:ring-1 focus:ring-neutral-300 transition-colors duration-150 cursor-pointer"
             >
               New Session
             </button>

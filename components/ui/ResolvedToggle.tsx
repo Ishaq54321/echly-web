@@ -17,12 +17,13 @@ export function ResolvedToggle({
 }: ResolvedToggleProps) {
   return (
     <button
+      type="button"
       onClick={() => onChange(!isResolved)}
       className={cn(
-        "flex items-center gap-2 rounded-full border px-4 py-1.5 text-[14px] transition-all duration-150",
+        "flex items-center gap-2 rounded-full border px-4 py-1.5 text-[14px] transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-semantic-success/40",
         isResolved
-          ? "border-semantic-success bg-semantic-success/10 text-semantic-success"
-          : "border-neutral-300 text-neutral-600 hover:border-neutral-400"
+          ? "border-semantic-success bg-semantic-success/10 text-semantic-success hover:bg-semantic-success/15"
+          : "border-neutral-300 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50"
       )}
     >
       <span

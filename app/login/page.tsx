@@ -18,8 +18,9 @@ export default function Login() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-100">
       <button
+        type="button"
         onClick={handleLogin}
-        className="px-6 py-3 bg-black text-white rounded-lg"
+        className="px-6 py-3 bg-black text-white rounded-lg cursor-pointer transition-colors duration-150 hover:opacity-90 active:scale-[0.98]"
       >
         Sign in with Google
       </button>

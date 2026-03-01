@@ -87,7 +87,7 @@ export function ActionItemsSection({
           <button
             type="button"
             onClick={startAdd}
-            className="flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150"
+            className="flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 cursor-pointer"
           >
             <Plus size={14} />
             Add action item
@@ -119,7 +119,7 @@ export function ActionItemsSection({
       <ul className="list-none space-y-2 p-0 m-0">
         {visibleItems.map((text, i) => (
           <li key={i}>
-            <div className="group flex items-center justify-between rounded-md px-3 py-2 transition-colors duration-150 hover:bg-neutral-100 cursor-pointer">
+            <div className="group flex items-center justify-between rounded-md px-3 py-2 transition-colors duration-120 hover:bg-neutral-100 cursor-pointer">
               <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-semantic-attention">
                 {i + 1}
               </span>
@@ -141,7 +141,7 @@ export function ActionItemsSection({
                   <button
                     type="button"
                     onClick={() => void saveEdit()}
-                    className="text-[13px] font-medium text-neutral-700 hover:text-neutral-900 hover:underline"
+                    className="text-[13px] font-medium text-neutral-700 hover:text-neutral-900 hover:underline cursor-pointer transition-colors duration-120"
                   >
                     Save
                   </button>
@@ -151,7 +151,7 @@ export function ActionItemsSection({
                   <button
                     type="button"
                     onClick={() => startEdit(i)}
-                    className={`flex-1 text-left font-mono text-[13px] px-2 py-1 rounded-md -mx-2 cursor-text transition-colors duration-150 ${
+                    className={`flex-1 text-left font-mono text-[13px] px-2 py-1 rounded-md -mx-2 cursor-pointer transition-colors duration-120 ${
                       isResolved
                         ? "line-through text-neutral-400"
                         : "text-neutral-900"
@@ -162,7 +162,7 @@ export function ActionItemsSection({
                   <button
                     type="button"
                     onClick={() => void removeItem(i)}
-                    className="flex-shrink-0 p-1 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="flex-shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 opacity-0 group-hover:opacity-100 transition-colors duration-120 cursor-pointer"
                     aria-label={`Remove action item ${i + 1}`}
                   >
                     <Trash2 size={14} />
@@ -198,7 +198,7 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="mt-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150"
+          className="mt-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 cursor-pointer"
         >
           Show all
         </button>
@@ -207,7 +207,7 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-2 flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+          className="mt-2 flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-neutral-600 hover:text-neutral-900 transition-colors duration-120 cursor-pointer"
         >
           <Plus size={14} />
           Add action item

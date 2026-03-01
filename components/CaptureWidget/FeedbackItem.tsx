@@ -41,8 +41,8 @@ export default function FeedbackItem({
   return (
     <div
       className="bg-white px-6 py-4 border-b border-[rgba(0,0,0,0.05)]
-                 transition-[background-color,transform] duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]
-                 hover:bg-[rgba(0,0,0,0.02)]
+                 transition-colors duration-120 ease-[cubic-bezier(0.2,0.8,0.2,1)]
+                 hover:bg-neutral-100
                  active:scale-[0.99] active:duration-[80ms] active:ease-in
                  last:border-b-0"
     >
@@ -88,7 +88,7 @@ export default function FeedbackItem({
           <button
             type="button"
             onClick={onExpand}
-            className="flex items-center justify-center w-6 h-6 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
+            className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
           >
             <Expand size={18} strokeWidth={1.5} />
           </button>
@@ -97,7 +97,7 @@ export default function FeedbackItem({
             <button
               type="button"
               onClick={onSaveEdit}
-              className="flex items-center justify-center w-6 h-6 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
+              className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
             >
               <Check size={18} strokeWidth={1.5} />
             </button>
@@ -105,7 +105,7 @@ export default function FeedbackItem({
             <button
               type="button"
               onClick={onEdit}
-              className="flex items-center justify-center w-6 h-6 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
+              className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
             >
               <Pencil size={18} strokeWidth={1.5} />
             </button>
@@ -114,7 +114,7 @@ export default function FeedbackItem({
           <button
             type="button"
             onClick={onDelete}
-            className="flex items-center justify-center w-6 h-6 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
+            className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-semantic-danger/10 hover:text-semantic-danger transition-colors duration-120 cursor-pointer"
           >
             <Trash2 size={18} strokeWidth={1.5} />
           </button>

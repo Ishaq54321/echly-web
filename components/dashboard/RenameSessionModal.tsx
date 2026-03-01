@@ -66,14 +66,14 @@ export function RenameSessionModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="rename-session-title"
     >
       <div
-        className="bg-[hsl(var(--surface-1))] rounded-xl shadow-xl max-w-md w-full p-6 border border-[hsl(var(--border))]"
+        className="bg-[hsl(var(--surface-1))] rounded-xl shadow-xl max-w-md w-full p-6 border border-[hsl(var(--border))] cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
@@ -104,7 +104,7 @@ export function RenameSessionModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="focus-ring-brand px-4 py-2 text-[14px] font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-3))] transition-colors disabled:opacity-60"
+            className="focus-ring-brand px-4 py-2 text-[14px] font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:bg-neutral-100 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -112,7 +112,7 @@ export function RenameSessionModal({
             type="button"
             onClick={handleSave}
             disabled={saving || value.trim() === ""}
-            className="focus-ring-brand px-4 py-2 text-[14px] font-medium rounded-md bg-neutral-900 text-white hover:bg-neutral-800 transition-colors disabled:opacity-60"
+            className="focus-ring-brand px-4 py-2 text-[14px] font-medium rounded-md bg-neutral-900 text-white hover:opacity-90 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {saving ? "Saving…" : "Save"}
           </button>

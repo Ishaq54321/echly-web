@@ -631,12 +631,12 @@ export default function SessionPage() {
       {isCommentsOpen && (
           <div className="lg:hidden fixed inset-0 z-40 flex justify-end">
             <div
-              className="absolute inset-0 bg-black/50 transition-opacity duration-200"
+              className="absolute inset-0 bg-black/50 transition-opacity duration-200 cursor-pointer"
               onClick={() => setIsCommentsOpen(false)}
               aria-hidden
             />
             <div
-              className="relative w-full max-w-sm h-full bg-[hsl(var(--surface-1))] flex flex-col transition-opacity duration-200"
+              className="relative w-full max-w-sm h-full bg-[hsl(var(--surface-1))] flex flex-col transition-opacity duration-200 cursor-default"
               onClick={(e) => e.stopPropagation()}
             >
               <ActivityPanel
@@ -650,7 +650,7 @@ export default function SessionPage() {
 
         {isImageExpanded && selectedItem?.screenshotUrl && (
           <div
-            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-10"
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-10 cursor-pointer"
             onClick={() => setIsImageExpanded(false)}
           >
             <img
@@ -663,14 +663,14 @@ export default function SessionPage() {
 
         {showDeleteModal && selectedId && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
             onClick={() => setShowDeleteModal(false)}
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-ticket-title"
           >
             <div
-              className="bg-white rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] max-w-sm w-full p-6 border border-neutral-200"
+              className="bg-white rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] max-w-sm w-full p-6 border border-neutral-200 cursor-default"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 id="delete-ticket-title" className="text-[18px] font-medium leading-[1.35] text-neutral-900">
@@ -683,14 +683,14 @@ export default function SessionPage() {
                 <button
                   type="button"
                   onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 text-[13px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors"
+                  className="px-4 py-2 text-[13px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors duration-150 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeleteFeedback(selectedId)}
-                  className="px-4 py-2 text-[13px] font-medium rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors"
+                  className="px-4 py-2 text-[13px] font-medium rounded-lg bg-neutral-900 text-white hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors duration-150 cursor-pointer"
                 >
                   Delete permanently
                 </button>

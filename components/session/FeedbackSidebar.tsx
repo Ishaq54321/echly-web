@@ -98,7 +98,7 @@ export default function FeedbackSidebar({
             {sortOpen && (
               <>
                 <div
-                  className="fixed inset-0 z-10"
+                  className="fixed inset-0 z-10 cursor-pointer"
                   aria-hidden
                   onClick={() => setSortOpen(false)}
                 />
@@ -109,7 +109,7 @@ export default function FeedbackSidebar({
                       setSort("recent");
                       setSortOpen(false);
                     }}
-                    className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 transition-colors duration-150 ${
+                    className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 cursor-pointer transition-colors duration-120 hover:bg-neutral-100 ${
                       sort === "recent"
                         ? "font-medium text-neutral-900"
                         : "text-neutral-400 hover:text-neutral-600"
@@ -123,7 +123,7 @@ export default function FeedbackSidebar({
                       setSort("active");
                       setSortOpen(false);
                     }}
-                    className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 transition-colors duration-150 ${
+                    className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 cursor-pointer transition-colors duration-120 hover:bg-neutral-100 ${
                       sort === "active"
                         ? "font-medium text-neutral-900"
                         : "text-neutral-400 hover:text-neutral-600"
@@ -167,7 +167,7 @@ export default function FeedbackSidebar({
                       onSelect(item.id);
                     }
                   }}
-                  className={`relative flex items-center gap-3 px-4 py-2.5 rounded-md transition-colors duration-150 outline-none focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 cursor-pointer ${
+                  className={`relative flex items-center gap-3 px-4 py-2.5 rounded-md transition-colors duration-120 outline-none focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 cursor-pointer ${
                     isActive
                       ? "text-neutral-900"
                       : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
@@ -195,7 +195,7 @@ export default function FeedbackSidebar({
                   </span>
                   <button
                     type="button"
-                    className="opacity-0 group-hover:opacity-100 transition-all duration-150 ease-out p-0.5 rounded text-neutral-400 hover:text-neutral-900 cursor-pointer border-0 bg-transparent shrink-0"
+                    className="opacity-0 group-hover:opacity-100 transition-colors duration-120 ease-out p-0.5 rounded-md text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 cursor-pointer border-0 bg-transparent shrink-0"
                     onClick={(e) => e.stopPropagation()}
                     aria-label="More actions"
                   >

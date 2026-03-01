@@ -21,11 +21,11 @@ export function GlobalNavBar() {
   }, []);
 
   const iconButtonClass =
-    "h-9 w-9 flex items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors duration-150 shrink-0";
+    "h-9 w-9 flex items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors duration-120 cursor-pointer shrink-0";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-[56px] w-full bg-white border-b border-neutral-200 flex items-center justify-between px-6">
-      <Link href="/dashboard" className="flex items-center" aria-label="Echly home">
+      <Link href="/dashboard" className="flex items-center cursor-pointer hover:underline" aria-label="Echly home">
         <Image
           src="/Echly_logo.svg"
           alt="Echly"
@@ -38,7 +38,7 @@ export function GlobalNavBar() {
       <div className="flex items-center gap-4">
         <button
           type="button"
-          className="focus-ring-brand text-[14px] px-4 py-2 rounded-lg bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] font-medium transition-transform duration-100 ease-out"
+          className="focus-ring-brand text-[14px] px-4 py-2 rounded-lg bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] font-medium transition-colors duration-150 cursor-pointer"
         >
           Share
         </button>

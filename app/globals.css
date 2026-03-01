@@ -13,6 +13,8 @@
   --color-semantic-success: #059669;
   --color-semantic-attention: #D97706;
   --color-semantic-danger: #DC2626;
+  /* Interaction transitions */
+  --transition-duration-120: 120ms;
 }
 
 /* ======================================

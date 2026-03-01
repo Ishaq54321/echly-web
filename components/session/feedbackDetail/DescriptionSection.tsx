@@ -78,7 +78,7 @@ export function DescriptionSection({
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-[14px] font-medium px-3 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300"
+                className="text-[14px] font-medium px-3 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-100 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 cursor-pointer"
               >
                 Cancel
               </button>
@@ -86,7 +86,7 @@ export function DescriptionSection({
                 type="button"
                 onClick={triggerSave}
                 disabled={isSaving || draft === description}
-                className="text-[14px] font-medium px-3 py-1.5 rounded-md bg-neutral-800 text-white hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                className="text-[14px] font-medium px-3 py-1.5 rounded-md bg-neutral-800 text-white hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400 cursor-pointer"
               >
                 {isSaving ? "Saving..." : "Save"}
               </button>
@@ -94,7 +94,7 @@ export function DescriptionSection({
           </>
         ) : (
           <div
-            className={`group relative flex items-start justify-between gap-2 ${hasEdit ? "cursor-text" : ""}`}
+            className={`group relative flex items-start justify-between gap-2 ${hasEdit ? "cursor-pointer" : ""}`}
             onClick={hasEdit ? onEdit : undefined}
             onKeyDown={hasEdit ? (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onEdit?.()) : undefined}
             role={hasEdit ? "button" : undefined}

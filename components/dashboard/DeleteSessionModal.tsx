@@ -31,14 +31,14 @@ export function DeleteSessionModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="delete-session-title"
     >
       <div
-        className="bg-[hsl(var(--surface-1))] rounded-xl shadow-xl max-w-md w-full p-6 border border-[hsl(var(--border))]"
+        className="bg-[hsl(var(--surface-1))] rounded-xl shadow-xl max-w-md w-full p-6 border border-[hsl(var(--border))] cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
@@ -60,7 +60,7 @@ export function DeleteSessionModal({
             type="button"
             onClick={onClose}
             disabled={deleting}
-            className="px-4 py-2 text-[14px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors disabled:opacity-60"
+            className="px-4 py-2 text-[14px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -68,7 +68,7 @@ export function DeleteSessionModal({
             type="button"
             onClick={handleConfirm}
             disabled={deleting}
-            className="px-4 py-2 text-[14px] font-medium rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors disabled:opacity-60"
+            className="px-4 py-2 text-[14px] font-medium rounded-lg bg-neutral-900 text-white hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {deleting ? "Deleting…" : "Delete permanently"}
           </button>
