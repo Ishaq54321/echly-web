@@ -73,7 +73,7 @@ export function useFeedbackDetailController(args: {
 
   const resolve = async () => {
     if (!feedbackId) return;
-    await resolveFeedback(feedbackId);
+    await resolveFeedback(feedbackId, sessionId);
   };
 
   return {

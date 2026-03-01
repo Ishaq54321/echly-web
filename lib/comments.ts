@@ -6,6 +6,7 @@ import {
   getSessionRecentCommentsRepo,
 } from "@/lib/repositories/commentsRepository";
 import { resolveFeedbackRepo } from "@/lib/repositories/feedbackRepository";
+import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
 
 export async function addComment(
   sessionId: string,
@@ -20,8 +21,9 @@ export async function addComment(
   return addCommentRepo(sessionId, feedbackId, data);
 }
 
-export async function resolveFeedback(feedbackId: string) {
+export async function resolveFeedback(feedbackId: string, sessionId?: string) {
   await resolveFeedbackRepo(feedbackId);
+  if (sessionId) await updateSessionUpdatedAtRepo(sessionId);
 }
 
 /** Recent comments for a session (overview activity feed). Limited. */

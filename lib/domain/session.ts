@@ -5,5 +5,6 @@ export interface Session {
   userId: string;
   title: string;
   createdAt?: Timestamp | null;
+  updatedAt?: Timestamp | null;
 }
 

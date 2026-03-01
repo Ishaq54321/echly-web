@@ -61,67 +61,71 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[40vh] flex items-center justify-center px-8 py-8 bg-[#F7F8FA] w-full">
-        <p className="text-[13px] text-neutral-500">Loading workspace…</p>
+      <div className="flex flex-col w-full min-h-[40vh] bg-[#F7F8FA]">
+        <div className="w-full max-w-[1400px] mx-auto px-6 py-6 flex items-center justify-center">
+          <p className="text-[13px] text-neutral-500">Loading workspace…</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col w-full min-h-0 px-8 py-8 bg-[#F7F8FA]">
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-4">
-        <div className="flex items-start gap-3">
-          <span className="text-neutral-600 mt-0.5 inline-flex hover:text-brand-primary transition-colors duration-200" aria-hidden>
-            <EchlySymbol />
-          </span>
-          <div>
-            <h1 className="text-[30px] font-medium tracking-[-0.01em] text-neutral-900">
-              Workspaces
-            </h1>
-            <p className="text-[13px] text-neutral-500 mt-0.5">
-              Sessions and feedback in one place.
-            </p>
+    <div className="flex flex-col w-full min-h-0 bg-[#F7F8FA]">
+      <div className="w-full max-w-[1400px] mx-auto px-6 py-6">
+        {/* Header */}
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-4">
+          <div className="flex items-start gap-3">
+            <span className="text-neutral-600 mt-0.5 inline-flex hover:text-brand-primary transition-colors duration-200" aria-hidden>
+              <EchlySymbol />
+            </span>
+            <div>
+              <h1 className="text-[30px] font-medium tracking-[-0.01em] text-neutral-900">
+                Workspaces
+              </h1>
+              <p className="text-[13px] text-neutral-500 mt-1">
+                Sessions and feedback in one place.
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
+          <div className="flex items-center gap-2">
+            <input
             type="search"
             placeholder="Search sessions"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="focus-ring-brand h-9 px-3 bg-white border border-neutral-200/70 rounded-xl text-[13px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none min-w-[180px]"
             aria-label="Search sessions"
-          />
-          <button
-            type="button"
-            onClick={handleCreateSession}
-            className="focus-ring-brand h-9 rounded-xl bg-neutral-900 text-white text-[13px] px-4 font-medium hover:bg-neutral-800 focus:outline-none transition-colors"
-          >
-            New Session
-          </button>
-        </div>
-      </header>
-
-      <main className="mt-6 flex-1">
-        <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-10">
-          {filteredSessions.map((item, index) => (
-            <WorkspaceCard
-              key={item.session.id}
-              item={item}
-              onView={handleView}
-              index={index}
             />
-          ))}
-        </div>
-        {filteredSessions.length === 0 && (
-          <p className="text-[13px] text-neutral-500 py-8">
-            {search.trim()
-              ? "No sessions match your search."
-              : "No sessions yet. Create one to get started."}
-          </p>
-        )}
-      </main>
+            <button
+              type="button"
+              onClick={handleCreateSession}
+              className="focus-ring-brand h-9 rounded-xl bg-neutral-900 text-white text-[13px] px-4 font-medium hover:bg-neutral-800 focus:outline-none transition-colors"
+            >
+              New Session
+            </button>
+          </div>
+        </header>
+
+        <main className="mt-8 flex-1">
+          <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-10">
+            {filteredSessions.map((item, index) => (
+              <WorkspaceCard
+                key={item.session.id}
+                item={item}
+                onView={handleView}
+                index={index}
+              />
+            ))}
+          </div>
+          {filteredSessions.length === 0 && (
+            <p className="text-[13px] text-neutral-500 py-8">
+              {search.trim()
+                ? "No sessions match your search."
+                : "No sessions yet. Create one to get started."}
+            </p>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

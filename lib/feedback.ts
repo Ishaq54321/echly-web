@@ -22,6 +22,7 @@ import {
   getSessionFeedbackTotalCountRepo,
   updateFeedbackRepo,
 } from "@/lib/repositories/feedbackRepository";
+import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
 import type {
   FeedbackPageCursor,
   FeedbackPageResult,
@@ -49,7 +50,9 @@ export async function addFeedback(
   data: StructuredFeedback,
   feedbackId?: string
 ): Promise<DocumentReference> {
-  return await addFeedbackRepo(sessionId, userId, data, feedbackId);
+  const ref = await addFeedbackRepo(sessionId, userId, data, feedbackId);
+  await updateSessionUpdatedAtRepo(sessionId);
+  return ref;
 }
 
 /* ================================
@@ -66,9 +69,11 @@ export async function updateFeedback(
     priority: FeedbackPriority;
     screenshotUrl: string | null;
     actionItems: string[] | null;
-  }>
+  }>,
+  sessionId?: string
 ) {
   await updateFeedbackRepo(feedbackId, data);
+  if (sessionId) await updateSessionUpdatedAtRepo(sessionId);
 }
 
 /* ================================
@@ -136,6 +141,7 @@ export async function getFeedbackByIds(
    DELETE FEEDBACK
 ================================ */
 
-export async function deleteFeedback(feedbackId: string) {
+export async function deleteFeedback(feedbackId: string, sessionId?: string) {
   await deleteFeedbackRepo(feedbackId);
+  if (sessionId) await updateSessionUpdatedAtRepo(sessionId);
 }

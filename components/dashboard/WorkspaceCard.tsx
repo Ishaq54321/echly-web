@@ -1,32 +1,7 @@
 "use client";
 
-import type { Session } from "@/lib/domain/session";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
-
-function toDate(createdAt: Session["createdAt"]): Date | null {
-  if (!createdAt) return null;
-  if (typeof (createdAt as { toDate?: () => Date }).toDate === "function") {
-    return (createdAt as { toDate: () => Date }).toDate();
-  }
-  if ((createdAt as { seconds?: number }).seconds != null) {
-    return new Date((createdAt as { seconds: number }).seconds * 1000);
-  }
-  return null;
-}
-
-function formatUpdatedAgo(createdAt: Session["createdAt"]): string {
-  const d = toDate(createdAt);
-  if (!d) return "—";
-  const now = new Date();
-  const sec = Math.floor((now.getTime() - d.getTime()) / 1000);
-  if (sec < 60) return "just now";
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
-  const days = Math.floor(sec / 86400);
-  if (days < 30) return `${days}d ago`;
-  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
-}
+import { formatFullDateTime } from "@/lib/utils/date";
 
 export interface WorkspaceCardProps {
   item: SessionWithCounts;
@@ -61,7 +36,7 @@ export function WorkspaceCard({ item, onView, index }: WorkspaceCardProps) {
     >
       <div className={`flex items-center gap-2 min-w-0 ${!isActive ? "opacity-90" : ""}`}>
         <svg
-          className={`shrink-0 w-[14px] h-[14px] ${isActive ? "text-neutral-600" : "text-neutral-500"}`}
+          className="shrink-0 w-[14px] h-[14px] text-[hsl(var(--text-secondary))] transition-colors duration-150 group-hover:text-[hsl(var(--brand))]"
           fill="none"
           strokeWidth={1.4}
           stroke="currentColor"
@@ -87,8 +62,9 @@ export function WorkspaceCard({ item, onView, index }: WorkspaceCardProps) {
       </div>
 
       <div className="mt-1.5 flex justify-between items-center">
-        <span className="text-[13px] text-neutral-500 opacity-70">
-          Updated {formatUpdatedAgo(session.createdAt)}
+        <span className="text-xs text-[hsl(var(--text-secondary))] tracking-tight">
+          {/* Per-session only: this session's last activity, not global or other sessions */}
+          Last activity · {formatFullDateTime(session.updatedAt ?? session.createdAt)}
         </span>
         <span
           className="opacity-0 group-hover:opacity-100 transition-opacity duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] inline-flex text-neutral-400"

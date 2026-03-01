@@ -377,7 +377,7 @@ export default function SessionPage() {
   };
 
   const handleDeleteFeedback = async (id: string) => {
-    await deleteFeedback(id);
+    await deleteFeedback(id, sessionId as string);
     setFeedback((prev) => prev.filter((item) => item.id !== id));
     setShowDeleteModal(false);
     router.push(`/dashboard/${sessionId}`);

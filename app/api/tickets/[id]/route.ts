@@ -4,6 +4,7 @@ import {
   getFeedbackByIdRepo,
   updateFeedbackRepo,
 } from "@/lib/repositories/feedbackRepository";
+import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
 
 /** GET /api/tickets/:id — return single ticket (feedback) from DB. */
 export async function GET(
@@ -87,6 +88,8 @@ export async function PATCH(
         { status: 404 }
       );
     }
+    // Update only this ticket's parent session last activity (no other sessions)
+    await updateSessionUpdatedAtRepo(updated.sessionId);
     return NextResponse.json({
       success: true,
       ticket: serializeTicket(updated),

@@ -175,7 +175,7 @@ export function useFeedback({
   };
 
   const handleDeleteFeedback = async (id: string) => {
-    await deleteFeedback(id);
+    await deleteFeedback(id, sessionId);
     setFeedback((prev) => prev.filter((item) => item.id !== id));
   };
 
