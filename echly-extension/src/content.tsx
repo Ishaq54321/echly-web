@@ -5,6 +5,8 @@
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { storage } from "./firebase";
 import { apiFetch } from "./contentAuthFetch";
 import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
 import CaptureWidget from "@/components/CaptureWidget";
@@ -46,6 +48,7 @@ function ContentApp() {
     isRecording: false,
     sessionId: null,
   });
+  const effectiveSessionId = globalState.sessionId ?? sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
   const logoUrl =
     typeof chrome !== "undefined" && chrome.runtime?.getURL
@@ -75,7 +78,22 @@ function ContentApp() {
   }, []);
 
   const onRecordingChange = React.useCallback((recording: boolean) => {
-    chrome.runtime.sendMessage({ type: recording ? "START_RECORDING" : "STOP_RECORDING" }).catch(() => {});
+    if (recording) {
+      chrome.runtime.sendMessage(
+        { type: "START_RECORDING" },
+        (response: { ok?: boolean; error?: string } | undefined) => {
+          if (chrome.runtime.lastError) {
+            setSessionMessage(chrome.runtime.lastError.message || "Failed to start recording");
+            return;
+          }
+          if (!response?.ok) {
+            setSessionMessage(response?.error || "Failed to create session");
+          }
+        }
+      );
+    } else {
+      chrome.runtime.sendMessage({ type: "STOP_RECORDING" }).catch(() => {});
+    }
   }, []);
 
   const onExpandRequest = React.useCallback(() => {
@@ -155,35 +173,65 @@ function ContentApp() {
         onError: () => void;
       }
     ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
-      if (!sessionId || !user) {
+      if (!effectiveSessionId || !user) {
         callbacks?.onError();
         return undefined;
       }
       if (callbacks) {
-        chrome.runtime.sendMessage(
-          {
-            type: "ECHLY_PROCESS_FEEDBACK",
-            payload: { transcript, screenshot, sessionId },
-          },
-          (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
-            if (chrome.runtime.lastError) {
-              console.error("[Echly] Processing failed (runtime):", chrome.runtime.lastError.message);
+        (async () => {
+          let screenshotUrl: string | null = null;
+          if (screenshot) {
+            try {
+              const tokenResponse = await new Promise<{ token?: string; error?: string }>((resolve) =>
+                chrome.runtime.sendMessage({ type: "ECHLY_GET_TOKEN" }, resolve)
+              );
+              const token = tokenResponse?.token;
+              if (!token) {
+                callbacks.onError();
+                return;
+              }
+              const feedbackId = crypto.randomUUID();
+              const path = `sessions/${effectiveSessionId}/feedback/${feedbackId}/${Date.now()}.png`;
+              const screenshotRef = ref(storage, path);
+              await uploadString(screenshotRef, screenshot, "data_url", {
+                contentType: "image/png",
+              });
+              screenshotUrl = await getDownloadURL(screenshotRef);
+            } catch (err) {
+              console.error("[Echly] Screenshot upload failed:", err);
               callbacks.onError();
               return;
             }
-            if (!response?.success || !response.ticket) {
-              console.error("[Echly] Processing failed:", response?.error ?? "No success or ticket");
-              callbacks.onError();
-              return;
-            }
-            callbacks.onSuccess({
-              id: response.ticket.id,
-              title: response.ticket.title,
-              description: response.ticket.description,
-              type: response.ticket.type ?? "Feedback",
-            });
           }
-        );
+          chrome.runtime.sendMessage(
+            {
+              type: "ECHLY_PROCESS_FEEDBACK",
+              payload: {
+                transcript,
+                screenshotUrl,
+                sessionId: effectiveSessionId,
+              },
+            },
+            (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
+              if (chrome.runtime.lastError) {
+                console.error("[Echly] Processing failed (runtime):", chrome.runtime.lastError.message);
+                callbacks.onError();
+                return;
+              }
+              if (!response?.success || !response.ticket) {
+                console.error("[Echly] Processing failed:", response?.error ?? "No success or ticket");
+                callbacks.onError();
+                return;
+              }
+              callbacks.onSuccess({
+                id: response.ticket.id,
+                title: response.ticket.title,
+                description: response.ticket.description,
+                type: response.ticket.type ?? "Feedback",
+              });
+            }
+          );
+        })();
         return;
       }
       const res = await apiFetch("/api/structure-feedback", {
@@ -209,14 +257,14 @@ function ContentApp() {
       let screenshotUrl: string | null = null;
       if (tickets.length > 0 && screenshot) {
         const firstFeedbackId = generateFeedbackId();
-        screenshotUrl = await uploadScreenshot(screenshot, sessionId, firstFeedbackId);
+        screenshotUrl = await uploadScreenshot(screenshot, effectiveSessionId, firstFeedbackId);
       }
 
       let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
       for (let i = 0; i < tickets.length; i++) {
         const t = tickets[i];
         const body = {
-          sessionId,
+          sessionId: effectiveSessionId,
           title: t.title ?? "",
           description: t.contextSummary ?? t.title ?? "",
           type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
@@ -250,7 +298,7 @@ function ContentApp() {
       }
       return firstCreated;
     },
-    [sessionId, user]
+    [effectiveSessionId, user]
   );
 
   const handleDelete = React.useCallback(async (_id: string) => {}, []);
@@ -309,7 +357,7 @@ function ContentApp() {
     );
   }
 
-  if (!sessionId) {
+  if (!effectiveSessionId) {
     return (
       <div
         style={{
@@ -329,7 +377,7 @@ function ContentApp() {
 
   return (
     <CaptureWidget
-      sessionId={sessionId}
+      sessionId={effectiveSessionId}
       userId={user.uid}
       extensionMode={true}
       onComplete={handleComplete}

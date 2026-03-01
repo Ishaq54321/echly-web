@@ -16,6 +16,7 @@ export async function verifyIdToken(token: string): Promise<DecodedIdToken> {
     issuer: `https://securetoken.google.com/${PROJECT_ID}`,
     audience: PROJECT_ID,
   });
+  console.log("[DEBUG] Firebase token audience (decoded.aud):", payload.aud);
   return {
     uid: (payload.sub ?? payload.user_id) as string,
     ...payload,

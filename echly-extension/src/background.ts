@@ -4,7 +4,6 @@
  */
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithCredential, GoogleAuthProvider } from "firebase/auth/web-extension";
-import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM",
@@ -18,7 +17,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const storage = getStorage(app);
 
 let globalUIState: {
   visible: boolean;
@@ -179,28 +177,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request.type === "ECHLY_UPLOAD_SCREENSHOT") {
-    const { imageDataUrl, sessionId, feedbackId } = request as {
-      imageDataUrl: string;
-      sessionId: string;
-      feedbackId: string;
-    };
-    const timestamp = Date.now();
-    const path = `sessions/${sessionId}/feedback/${feedbackId}/${timestamp}.png`;
-    const screenshotRef = ref(storage, path);
-    uploadString(screenshotRef, imageDataUrl, "data_url", { contentType: "image/png" })
-      .then(() => getDownloadURL(screenshotRef))
-      .then((url) => sendResponse({ url }))
-      .catch((err) => sendResponse({ error: String(err) }));
-    return true;
-  }
-
   if (request.type === "START_RECORDING") {
-    globalUIState.isRecording = true;
-    globalUIState.sessionId = crypto.randomUUID();
-    broadcastUIState();
-    sendResponse({ ok: true });
-    return false;
+    const API_BASE = "https://echly-web.vercel.app";
+    getValidToken()
+      .then(async (token) => {
+        const res = await fetch(`${API_BASE}/api/sessions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        });
+        const data = (await res.json()) as { success?: boolean; session?: { id: string }; error?: string };
+        if (!res.ok || !data.success || !data.session?.id) {
+          sendResponse({
+            ok: false,
+            error: data.error || "Failed to create session",
+          });
+          return;
+        }
+        globalUIState.sessionId = data.session.id;
+        globalUIState.isRecording = true;
+        broadcastUIState();
+        sendResponse({ ok: true });
+      })
+      .catch((err) => {
+        sendResponse({
+          ok: false,
+          error: err instanceof Error ? err.message : "Failed to start recording",
+        });
+      });
+    return true;
   }
   if (request.type === "STOP_RECORDING") {
     globalUIState.isRecording = false;
@@ -228,10 +232,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const API_BASE = "https://echly-web.vercel.app";
     const payload = request.payload as {
       transcript: string;
-      screenshot: string | null;
+      screenshotUrl: string | null;
       sessionId: string;
     };
-    const { transcript, screenshot, sessionId } = payload;
+    const { transcript, sessionId } = payload;
     if (!transcript?.trim() || !sessionId) {
       console.warn("[Echly BG] Invalid payload: missing transcript or sessionId", {
         hasTranscript: !!transcript?.trim(),
@@ -245,14 +249,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (v === "low" || v === "medium" || v === "high" || v === "critical") return v;
       return "medium";
     }
-    function generateFeedbackId(): string {
-      return crypto.randomUUID?.() ?? `fb-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-    }
     (async () => {
+      console.log("[WORKER ALIVE] Starting async block");
+      console.log("SESSION ID USED:", sessionId);
       try {
+        const screenshotUrl: string | null = payload.screenshotUrl ?? null;
+
         console.log("[Echly BG] Starting feedback processing");
+        console.log("[STEP 1] About to get token");
+        console.log("[DEBUG] Firebase token audience check");
         const token = await getValidToken();
-        console.log("[Echly BG] Token acquired:", !!token);
+        console.log("[STEP 2] Token acquired:", token?.slice(0, 20));
 
         const structurePayload = { transcript };
         const res = await fetch(`${API_BASE}/api/structure-feedback`, {
@@ -260,9 +267,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify(structurePayload),
         });
-        console.log("[Echly BG] Structure API status:", res.status);
+        console.log("[STEP 3] Structure response status:", res.status);
 
-        const data = (await res.json()) as {
+        const structureText = await res.text();
+        if (!res.ok) {
+          console.error("[STRUCTURE FAILED RAW]", res.status, structureText);
+          sendResponse({ success: false, error: "Structure fetch failed" });
+          return;
+        }
+        const data = JSON.parse(structureText) as {
           success?: boolean;
           tickets?: Array<{
             title?: string;
@@ -274,29 +287,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }>;
           error?: string;
         };
-        console.log("[Echly BG] Structure API response:", data);
-
-        if (!res.ok) {
-          throw new Error(data.error || `Structure API failed: ${res.status}`);
-        }
-        const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-        if (!data.success || tickets.length === 0) {
+        console.log("[STEP 4] Structure JSON:", data);
+        if (!data.success) {
           sendResponse({
             success: false,
-            error: data.error || "No tickets from structure API",
+            error: data.error || "Structure API failed",
           });
           return;
         }
 
-        let screenshotUrl: string | null = null;
-        if (screenshot) {
-          console.log("[Echly BG] Uploading screenshot");
-          const firstFeedbackId = generateFeedbackId();
-          const path = `sessions/${sessionId}/feedback/${firstFeedbackId}/${Date.now()}.png`;
-          const screenshotRef = ref(storage, path);
-          await uploadString(screenshotRef, screenshot, "data_url", { contentType: "image/png" });
-          screenshotUrl = await getDownloadURL(screenshotRef);
-          console.log("[Echly BG] Screenshot URL obtained");
+        const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+        if (tickets.length === 0) {
+          tickets.push({
+            title: transcript.slice(0, 80),
+            contextSummary: transcript,
+            actionItems: [],
+            impact: null,
+            suggestedPriority: "medium",
+            suggestedTags: ["Feedback"],
+          });
         }
 
         let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
@@ -315,15 +324,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             screenshotUrl: i === 0 ? screenshotUrl : null,
             metadata: { clientTimestamp: Date.now() },
           };
+          console.log("CREATING TICKET FOR SESSION:", sessionId);
+          console.log("[STEP 5] Creating feedback ticket:", body);
           const feedbackRes = await fetch(`${API_BASE}/api/feedback`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(body),
           });
-          const feedbackJson = (await feedbackRes.json()) as {
+          console.log("[STEP 6] Feedback API status:", feedbackRes.status);
+          const feedbackText = await feedbackRes.text();
+          if (!feedbackRes.ok) {
+            console.error("[FEEDBACK FAILED RAW]", feedbackRes.status, feedbackText);
+            sendResponse({ success: false, error: "Feedback fetch failed" });
+            return;
+          }
+          const feedbackJson = JSON.parse(feedbackText) as {
             success?: boolean;
             ticket?: { id: string; title: string; description: string; type?: string };
           };
+          console.log("[STEP 7] Feedback API JSON:", feedbackJson);
           if (feedbackJson.success && feedbackJson.ticket) {
             const tick = feedbackJson.ticket;
             if (!firstCreated)
@@ -335,6 +354,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               };
           }
         }
+        console.log("[STEP 8] First created ticket:", firstCreated);
         if (firstCreated) {
           console.log("[Echly BG] Feedback processing complete, ticket:", firstCreated.id);
           sendResponse({ success: true, ticket: firstCreated });
@@ -342,7 +362,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           console.warn("[Echly BG] No ticket created from feedback API");
           sendResponse({ success: false, error: "No ticket created" });
         }
+        console.log("[WORKER ALIVE] Finished async block");
       } catch (err) {
+        console.log("[ERROR BLOCK]", err);
         const message = err instanceof Error ? err.message : "Unknown error";
         console.error("[Echly BG] Processing error:", err);
         sendResponse({ success: false, error: message });

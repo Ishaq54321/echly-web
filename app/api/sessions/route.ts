@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import type { Session } from "@/lib/domain/session";
 import { requireAuth } from "@/lib/server/auth";
-import { getUserSessionsRepo } from "@/lib/repositories/sessionsRepository";
+import {
+  getUserSessionsRepo,
+  createSessionRepo,
+} from "@/lib/repositories/sessionsRepository";
 
 /** GET /api/sessions — list sessions for the authenticated user. */
 export async function GET(req: Request) {
@@ -26,6 +29,26 @@ export async function GET(req: Request) {
     console.log("[API] GET /api/sessions duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Failed to load sessions" },
+      { status: 500 }
+    );
+  }
+}
+
+/** POST /api/sessions — create a new session. Returns { success: true, session: { id } }. */
+export async function POST(req: Request) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (res) {
+    return res as Response;
+  }
+  try {
+    const id = await createSessionRepo(user.uid, null);
+    return NextResponse.json({ success: true, session: { id } });
+  } catch (err) {
+    console.error("POST /api/sessions:", err);
+    return NextResponse.json(
+      { success: false, error: "Failed to create session" },
       { status: 500 }
     );
   }
