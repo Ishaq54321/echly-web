@@ -4,6 +4,7 @@ import { authFetch } from "@/lib/authFetch";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
+import { clearAuthTokenCache } from "@/lib/authFetch";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -111,6 +112,7 @@ export default function SessionPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
+        clearAuthTokenCache();
         router.push("/login");
         return;
       }

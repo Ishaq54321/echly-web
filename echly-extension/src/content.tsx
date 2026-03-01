@@ -8,7 +8,7 @@ import { createRoot } from "react-dom/client";
 import { signInWithCredential, GoogleAuthProvider } from "firebase/auth";
 import { subscribeToAuthState } from "./auth";
 import { auth } from "./firebase";
-import { apiFetch } from "./contentAuthFetch";
+import { apiFetch, clearAuthTokenCache } from "./contentAuthFetch";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import CaptureWidget from "@/components/CaptureWidget";
 import "./firebase";
@@ -74,6 +74,9 @@ function ContentApp() {
 
   React.useEffect(() => {
     const unsub = subscribeToAuthState((u) => {
+      if (!u) {
+        clearAuthTokenCache();
+      }
       setUser(u ?? null);
       setAuthChecked(true);
     });

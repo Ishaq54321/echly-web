@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Share2, Settings, LayoutPanelLeft } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { clearAuthTokenCache } from "@/lib/authFetch";
 import { onAuthStateChanged } from "firebase/auth";
 import { useSessionOverview } from "./hooks/useSessionOverview";
 import type { Feedback } from "@/lib/domain/feedback";
@@ -317,6 +318,7 @@ export default function SessionOverviewPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
+        clearAuthTokenCache();
         router.replace("/login");
         return;
       }

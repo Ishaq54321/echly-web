@@ -1337,7 +1337,7 @@
           return dispatcher;
         }
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-        var React4 = require_react(), Internals = {
+        var React7 = require_react(), Internals = {
           d: {
             f: noop2,
             r: function() {
@@ -1355,7 +1355,7 @@
           },
           p: 0,
           findDOMNode: null
-        }, REACT_PORTAL_TYPE = Symbol.for("react.portal"), ReactSharedInternals = React4.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+        }, REACT_PORTAL_TYPE = Symbol.for("react.portal"), ReactSharedInternals = React7.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
         "function" === typeof Map && null != Map.prototype && "function" === typeof Map.prototype.forEach && "function" === typeof Set && null != Set.prototype && "function" === typeof Set.prototype.clear && "function" === typeof Set.prototype.forEach || console.error(
           "React depends on Map and Set built-in types. Make sure that you load a polyfill in older browsers. https://reactjs.org/link/react-polyfills"
         );
@@ -2890,7 +2890,7 @@
           "number" === type && getActiveElement(node.ownerDocument) === node || node.defaultValue === "" + value || (node.defaultValue = "" + value);
         }
         function validateOptionProps(element, props) {
-          null == props.value && ("object" === typeof props.children && null !== props.children ? React4.Children.forEach(props.children, function(child2) {
+          null == props.value && ("object" === typeof props.children && null !== props.children ? React7.Children.forEach(props.children, function(child2) {
             null == child2 || "string" === typeof child2 || "number" === typeof child2 || "bigint" === typeof child2 || didWarnInvalidChild || (didWarnInvalidChild = true, console.error(
               "Cannot infer the option value of complex children. Pass a `value` prop or use a plain string as children to <option>."
             ));
@@ -18522,14 +18522,14 @@
           ));
         }
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-        var Scheduler = require_scheduler(), React4 = require_react(), ReactDOM = require_react_dom(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = Symbol.for("react.element"), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy");
+        var Scheduler = require_scheduler(), React7 = require_react(), ReactDOM = require_react_dom(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = Symbol.for("react.element"), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy");
         Symbol.for("react.scope");
         var REACT_ACTIVITY_TYPE = Symbol.for("react.activity");
         Symbol.for("react.legacy_hidden");
         Symbol.for("react.tracing_marker");
         var REACT_MEMO_CACHE_SENTINEL = Symbol.for("react.memo_cache_sentinel");
         Symbol.for("react.view_transition");
-        var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React4.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
+        var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React7.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
           pending: false,
           data: null,
           method: null,
@@ -21317,7 +21317,7 @@
           }
         };
         (function() {
-          var isomorphicReactPackageVersion = React4.version;
+          var isomorphicReactPackageVersion = React7.version;
           if ("19.2.3" !== isomorphicReactPackageVersion)
             throw Error(
               'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.2.3\nLearn more: https://react.dev/warnings/version-mismatch")
@@ -21685,18 +21685,18 @@
         function isValidElement(object) {
           return "object" === typeof object && null !== object && object.$$typeof === REACT_ELEMENT_TYPE;
         }
-        var React4 = require_react(), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy"), REACT_ACTIVITY_TYPE = Symbol.for("react.activity"), REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), ReactSharedInternals = React4.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, hasOwnProperty = Object.prototype.hasOwnProperty, isArrayImpl = Array.isArray, createTask = console.createTask ? console.createTask : function() {
+        var React7 = require_react(), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy"), REACT_ACTIVITY_TYPE = Symbol.for("react.activity"), REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), ReactSharedInternals = React7.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, hasOwnProperty = Object.prototype.hasOwnProperty, isArrayImpl = Array.isArray, createTask = console.createTask ? console.createTask : function() {
           return null;
         };
-        React4 = {
+        React7 = {
           react_stack_bottom_frame: function(callStackForError) {
             return callStackForError();
           }
         };
         var specialPropKeyWarningShown;
         var didWarnAboutElementRef = {};
-        var unknownOwnerDebugStack = React4.react_stack_bottom_frame.bind(
-          React4,
+        var unknownOwnerDebugStack = React7.react_stack_bottom_frame.bind(
+          React7,
           UnknownOwner
         )();
         var unknownOwnerDebugTask = createTask(getTaskName(UnknownOwner));
@@ -21741,7 +21741,7 @@
   });
 
   // echly-extension/src/content.tsx
-  var import_react6 = __toESM(require_react());
+  var import_react9 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // node_modules/@firebase/util/dist/postinstall.mjs
@@ -47625,6 +47625,9 @@ ${this.customData.serverResponse}`;
     return await getDownloadURL(screenshotRef);
   }
 
+  // components/CaptureWidget/CaptureWidget.tsx
+  var import_react8 = __toESM(require_react());
+
   // echly-extension/stubs/next-image.tsx
   var import_react = __toESM(require_react());
   function resolveSrc(src) {
@@ -47833,7 +47836,7 @@ ${this.customData.serverResponse}`;
         trayLockedRef.current = false;
       }
     }, [state]);
-    const setIsOpen = (next) => {
+    const setIsOpen = (0, import_react3.useCallback)((next) => {
       if (next === false) {
         if (trayLockedRef.current) return;
         if (extensionMode) return;
@@ -47843,7 +47846,10 @@ ${this.customData.serverResponse}`;
         if (editingIdRef.current) return;
       }
       setIsOpenState(next);
-    };
+    }, [extensionMode]);
+    const toggleOpen = (0, import_react3.useCallback)(() => {
+      setIsOpenState((prev) => !prev);
+    }, []);
     (0, import_react3.useEffect)(() => {
       activeRecordingIdRef.current = activeRecordingId;
     }, [activeRecordingId]);
@@ -47877,7 +47883,7 @@ ${this.customData.serverResponse}`;
         window.removeEventListener("mouseup", handleMouseUp);
       };
     }, [isDragging]);
-    const startDrag = (e) => {
+    const startDrag = (0, import_react3.useCallback)((e) => {
       if (e.button !== 0 || !widgetRef.current) return;
       const rect = widgetRef.current.getBoundingClientRect();
       setIsDragging(true);
@@ -47887,7 +47893,7 @@ ${this.customData.serverResponse}`;
         y: e.clientY - rect.top
       };
       setPosition({ x: rect.left, y: rect.top });
-    };
+    }, []);
     (0, import_react3.useEffect)(() => {
       if (initialPointers != null) {
         setPointers(initialPointers);
@@ -47939,19 +47945,19 @@ ${this.customData.serverResponse}`;
         }
       };
     }, []);
-    const startTimer = () => {
+    const startTimer = (0, import_react3.useCallback)(() => {
       setSeconds(0);
       timerRef.current = setInterval(() => {
         setSeconds((prev) => prev + 1);
       }, 1e3);
-    };
+    }, []);
     const stopTimer = () => clearInterval(timerRef.current);
-    const formatTime = () => {
+    const formatTime = (0, import_react3.useCallback)(() => {
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
       return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-    };
-    const startListening = async () => {
+    }, [seconds]);
+    const startListening = (0, import_react3.useCallback)(async () => {
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
         recognitionRef.current?.start();
@@ -47962,8 +47968,8 @@ ${this.customData.serverResponse}`;
         setErrorMessage("Microphone permission denied.");
         setState("error");
       }
-    };
-    const finishListening = async () => {
+    }, [startTimer]);
+    const finishListening = (0, import_react3.useCallback)(async () => {
       recognitionRef.current?.stop();
       stopTimer();
       const activeId = activeRecordingIdRef.current;
@@ -47996,7 +48002,7 @@ ${this.customData.serverResponse}`;
         setErrorMessage("AI processing failed.");
         setState("error");
       }
-    };
+    }, [onComplete]);
     (0, import_react3.useEffect)(() => {
       if (state !== "anticipation" || !pendingStructured) return;
       const t = setTimeout(() => {
@@ -48015,21 +48021,21 @@ ${this.customData.serverResponse}`;
       }, 160);
       return () => clearTimeout(t);
     }, [state, pendingStructured]);
-    const discardListening = () => {
+    const discardListening = (0, import_react3.useCallback)(() => {
       recognitionRef.current?.stop();
       stopTimer();
       const activeId = activeRecordingIdRef.current;
       setRecordings((prev) => prev.filter((r) => r.id !== activeId));
       setActiveRecordingId(null);
       setState("idle");
-    };
-    const handleShare = async () => {
+    }, []);
+    const handleShare = (0, import_react3.useCallback)(async () => {
       try {
         await navigator.clipboard.writeText(window.location.href);
       } catch {
       }
-    };
-    const resetSession = () => {
+    }, []);
+    const resetSession = (0, import_react3.useCallback)(() => {
       setPointers([]);
       setRecordings([]);
       setActiveRecordingId(null);
@@ -48037,7 +48043,7 @@ ${this.customData.serverResponse}`;
       setExpandedId(null);
       setEditingId(null);
       setShowMenu(false);
-    };
+    }, []);
     (0, import_react3.useEffect)(() => {
       if (extensionMode) return;
       const handleClickOutside = (event) => {
@@ -48048,20 +48054,20 @@ ${this.customData.serverResponse}`;
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [extensionMode]);
-    const deletePointer = async (id) => {
+    const deletePointer = (0, import_react3.useCallback)(async (id) => {
       try {
         await onDelete(id);
         setPointers((prev) => prev.filter((p) => p.id !== id));
       } catch (err) {
         console.error("Delete failed:", err);
       }
-    };
-    const startEditing = (p) => {
+    }, [onDelete]);
+    const startEditing = (0, import_react3.useCallback)((p) => {
       setEditingId(p.id);
       setEditedTitle(p.title);
       setEditedDescription(p.description);
-    };
-    const saveEdit = async (id) => {
+    }, []);
+    const saveEdit = (0, import_react3.useCallback)(async (id) => {
       try {
         const res = await authFetch2(`/api/tickets/${id}`, {
           method: "PATCH",
@@ -48086,7 +48092,7 @@ ${this.customData.serverResponse}`;
       } catch (err) {
         console.error("Save edit failed:", err);
       }
-    };
+    }, [editedTitle, editedDescription]);
     const captureScreenshot2 = async () => {
       if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
         return new Promise((resolve, reject) => {
@@ -48102,8 +48108,8 @@ ${this.customData.serverResponse}`;
       const { captureScreenshot: webCapture } = await Promise.resolve().then(() => (init_capture(), capture_exports));
       return webCapture();
     };
-    const handleAddFeedback = async () => {
-      if (state !== "idle") return;
+    const handleAddFeedback = (0, import_react3.useCallback)(async () => {
+      if (stateRef.current !== "idle") return;
       setIsOpen(true);
       setErrorMessage(null);
       recognitionRef.current?.stop();
@@ -48131,22 +48137,11 @@ ${this.customData.serverResponse}`;
         setErrorMessage("Screen capture failed.");
         setState("error");
       }
-    };
-    return {
-      state: {
-        isOpen,
-        state,
-        errorMessage,
-        pointers,
-        expandedId,
-        editingId,
-        editedTitle,
-        editedDescription,
-        showMenu,
-        position
-      },
-      handlers: {
+    }, [setIsOpen, startListening]);
+    const handlers = (0, import_react3.useMemo)(
+      () => ({
         setIsOpen,
+        toggleOpen,
         startDrag,
         handleShare,
         setShowMenu,
@@ -48161,10 +48156,43 @@ ${this.customData.serverResponse}`;
         setEditedTitle,
         setEditedDescription,
         handleAddFeedback
-      },
-      derivedValues: {
+      }),
+      [
+        setIsOpen,
+        toggleOpen,
+        startDrag,
+        handleShare,
+        resetSession,
+        startListening,
+        finishListening,
+        discardListening,
+        deletePointer,
+        startEditing,
+        saveEdit,
+        handleAddFeedback
+      ]
+    );
+    const derivedValues = (0, import_react3.useMemo)(
+      () => ({
         formatTime
+      }),
+      [formatTime]
+    );
+    return {
+      state: {
+        isOpen,
+        state,
+        errorMessage,
+        pointers,
+        expandedId,
+        editingId,
+        editedTitle,
+        editedDescription,
+        showMenu,
+        position
       },
+      handlers,
+      derivedValues,
       refs: {
         widgetRef,
         menuRef
@@ -48402,7 +48430,11 @@ ${this.customData.serverResponse}`;
     );
   }
 
+  // components/CaptureWidget/FeedbackList.tsx
+  var import_react7 = __toESM(require_react());
+
   // components/CaptureWidget/FeedbackItem.tsx
+  var import_react6 = __toESM(require_react());
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
   function FeedbackItem({
     item,
@@ -48488,6 +48520,7 @@ ${this.customData.serverResponse}`;
       }
     );
   }
+  var FeedbackItem_default = import_react6.default.memo(FeedbackItem);
 
   // components/CaptureWidget/FeedbackList.tsx
   var import_jsx_runtime3 = __toESM(require_jsx_runtime());
@@ -48500,7 +48533,7 @@ ${this.customData.serverResponse}`;
     getHandlers
   }) {
     return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "capture-feedback-list flex flex-col space-y-2", children: items.map((p) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-      FeedbackItem,
+      FeedbackItem_default,
       {
         item: p,
         isExpanded: expandedId === p.id,
@@ -48512,6 +48545,7 @@ ${this.customData.serverResponse}`;
       p.id
     )) });
   }
+  var FeedbackList_default = import_react7.default.memo(FeedbackList);
 
   // components/CaptureWidget/WidgetFooter.tsx
   var import_jsx_runtime4 = __toESM(require_jsx_runtime());
@@ -48538,7 +48572,8 @@ ${this.customData.serverResponse}`;
     extensionMode = false,
     initialPointers,
     onComplete,
-    onDelete
+    onDelete,
+    widgetToggleRef
   }) {
     const {
       state,
@@ -48553,14 +48588,27 @@ ${this.customData.serverResponse}`;
       onComplete,
       onDelete
     });
-    const getFeedbackItemHandlers = (p) => ({
-      onExpand: () => handlers.setExpandedId(state.expandedId === p.id ? null : p.id),
-      onEdit: () => handlers.startEditing(p),
-      onSaveEdit: () => handlers.saveEdit(p.id),
-      onDelete: () => handlers.deletePointer(p.id),
-      onEditedTitleChange: handlers.setEditedTitle,
-      onEditedDescriptionChange: handlers.setEditedDescription
-    });
+    import_react8.default.useEffect(() => {
+      if (!widgetToggleRef) return;
+      widgetToggleRef.current = handlers.toggleOpen;
+      return () => {
+        widgetToggleRef.current = null;
+      };
+    }, [handlers, widgetToggleRef]);
+    const getFeedbackItemHandlers = import_react8.default.useCallback(
+      (p) => ({
+        onExpand: () => handlers.setExpandedId(state.expandedId === p.id ? null : p.id),
+        onEdit: () => handlers.startEditing(p),
+        onSaveEdit: () => handlers.saveEdit(p.id),
+        onDelete: () => handlers.deletePointer(p.id),
+        onEditedTitleChange: handlers.setEditedTitle,
+        onEditedDescriptionChange: handlers.setEditedDescription
+      }),
+      [
+        handlers,
+        state.expandedId
+      ]
+    );
     if (!state.isOpen) {
       return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "fixed bottom-10 right-10 z-50 capture-floating-wrapper", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
         "button",
@@ -48616,7 +48664,7 @@ ${this.customData.serverResponse}`;
             ),
             /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "px-6 py-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto", children: [
               /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
-                FeedbackList,
+                FeedbackList_default,
                 {
                   items: state.pointers,
                   expandedId: state.expandedId,
@@ -48702,18 +48750,28 @@ ${this.customData.serverResponse}`;
     });
   }
   function ContentApp() {
-    const [user, setUser] = import_react6.default.useState(null);
-    const [sessionId, setSessionId] = import_react6.default.useState(null);
-    const [sessionMessage, setSessionMessage] = import_react6.default.useState(null);
-    const [authChecked, setAuthChecked] = import_react6.default.useState(false);
-    import_react6.default.useEffect(() => {
+    const [user, setUser] = import_react9.default.useState(null);
+    const [sessionId, setSessionId] = import_react9.default.useState(null);
+    const [sessionMessage, setSessionMessage] = import_react9.default.useState(null);
+    const [authChecked, setAuthChecked] = import_react9.default.useState(false);
+    const widgetToggleRef = import_react9.default.useRef(null);
+    import_react9.default.useEffect(() => {
+      const toggleHandler = () => {
+        widgetToggleRef.current?.();
+      };
+      window.addEventListener("ECHLY_TOGGLE_WIDGET", toggleHandler);
+      return () => {
+        window.removeEventListener("ECHLY_TOGGLE_WIDGET", toggleHandler);
+      };
+    }, []);
+    import_react9.default.useEffect(() => {
       const unsub = subscribeToAuthState((u) => {
         setUser(u ?? null);
         setAuthChecked(true);
       });
       return () => unsub();
     }, []);
-    import_react6.default.useEffect(() => {
+    import_react9.default.useEffect(() => {
       if (!user) {
         setSessionId(null);
         setSessionMessage(null);
@@ -48750,7 +48808,7 @@ ${this.customData.serverResponse}`;
         cancelled = true;
       };
     }, [user]);
-    const handleComplete = import_react6.default.useCallback(
+    const handleComplete = import_react9.default.useCallback(
       async (transcript, screenshot) => {
         if (!sessionId || !user) return void 0;
         const res = await apiFetch("/api/structure-feedback", {
@@ -48803,7 +48861,7 @@ ${this.customData.serverResponse}`;
       },
       [sessionId, user]
     );
-    const handleDelete = import_react6.default.useCallback(async (_id) => {
+    const handleDelete = import_react9.default.useCallback(async (_id) => {
     }, []);
     if (!authChecked) {
       return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { padding: 16, fontSize: 14, color: "#666" }, children: "Loading\u2026" });
@@ -48847,7 +48905,8 @@ ${this.customData.serverResponse}`;
         userId: user.uid,
         extensionMode: true,
         onComplete: handleComplete,
-        onDelete: handleDelete
+        onDelete: handleDelete,
+        widgetToggleRef
       }
     );
   }
@@ -48902,6 +48961,12 @@ ${this.customData.serverResponse}`;
     shadowRoot.appendChild(container);
     const reactRoot = (0, import_client.createRoot)(container);
     reactRoot.render(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ContentApp, {}));
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg.type === "ECHLY_TOGGLE") {
+        const event = new CustomEvent("ECHLY_TOGGLE_WIDGET");
+        window.dispatchEvent(event);
+      }
+    });
   }
   main();
 })();

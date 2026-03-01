@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
+import { clearAuthTokenCache } from "@/lib/authFetch";
 import { onAuthStateChanged } from "firebase/auth";
 import { getSessionFeedback } from "@/lib/feedback";
 import { getSessionById, type Session } from "@/lib/sessions";
@@ -21,6 +22,7 @@ export function useSessionLoader(sessionId: string | string[]) {
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
+        clearAuthTokenCache();
         router.push("/login");
         return;
       }
