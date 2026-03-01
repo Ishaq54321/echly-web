@@ -88,6 +88,7 @@ export default function SessionPage() {
     total: feedbackTotal,
     activeCount: feedbackActiveCount,
     resolvedCount: feedbackResolvedCount,
+    setTotal: setFeedbackTotal,
     setActiveCount: setFeedbackActiveCount,
     setResolvedCount: setFeedbackResolvedCount,
     loading: feedbackLoading,
@@ -217,39 +218,50 @@ export default function SessionPage() {
     }
   }, [selectedId, detailTicket]);
 
-  /* ================= SAVE TITLE (PATCH → DB, then update UI from response) ================= */
+  /* ================= SAVE TITLE (optimistic update, then PATCH) ================= */
 
   const saveTitle = async (newTitle: string): Promise<void> => {
     if (!selectedId || newTitle.trim() === "") return;
+    const trimmed = newTitle.trim();
+    const previousTitle = detailTicket?.title;
+    setDetailTicket((t) => (t ? { ...t, title: trimmed } : null));
+    setFeedback((prev) =>
+      prev.map((item) => (item.id === selectedId ? { ...item, title: trimmed } : item))
+    );
     try {
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newTitle.trim() }),
+        body: JSON.stringify({ title: trimmed }),
       });
       const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
       if (data.success && data.ticket) {
         setDetailTicket(data.ticket);
-        setFeedback((prev) =>
-          prev.map((item) =>
-            item.id === selectedId ? { ...item, title: data.ticket!.title } : item
-          )
-        );
       }
     } catch {
-      // revert detail to current state; could refetch
-      if (detailTicket) setDetailTicket((t) => (t ? { ...t } : null));
+      setDetailTicket((t) => (t ? { ...t, title: previousTitle ?? trimmed } : null));
+      setFeedback((prev) =>
+        prev.map((item) => (item.id === selectedId ? { ...item, title: previousTitle ?? trimmed } : item))
+      );
     }
   };
 
-  /* ================= SAVE DESCRIPTION (PATCH → DB, then update UI from response) ================= */
+  /* ================= SAVE DESCRIPTION (optimistic update, then PATCH) ================= */
 
   const saveDescription = async (): Promise<void> => {
     if (!selectedId || descriptionDraft === detailTicket?.description) {
       setIsEditingDescription(false);
       return;
     }
+    const previousDescription = detailTicket?.description ?? "";
     setIsSavingDescription(true);
+    setDetailTicket((t) => (t ? { ...t, description: descriptionDraft } : null));
+    setFeedback((prev) =>
+      prev.map((item) => (item.id === selectedId ? { ...item, description: descriptionDraft } : item))
+    );
+    setIsEditingDescription(false);
+    setSaveDescriptionSuccess(true);
+    setTimeout(() => setSaveDescriptionSuccess(false), 1200);
     try {
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
@@ -260,26 +272,27 @@ export default function SessionPage() {
       if (data.success && data.ticket) {
         setDetailTicket(data.ticket);
         setDescriptionDraft(data.ticket.description);
-        setFeedback((prev) =>
-          prev.map((item) =>
-            item.id === selectedId ? { ...item, description: data.ticket!.description } : item
-          )
-        );
-        setIsEditingDescription(false);
-        setSaveDescriptionSuccess(true);
-        setTimeout(() => setSaveDescriptionSuccess(false), 1200);
       }
     } catch {
-      if (detailTicket) setDescriptionDraft(detailTicket.description);
+      setDetailTicket((t) => (t ? { ...t, description: previousDescription } : null));
+      setFeedback((prev) =>
+        prev.map((item) => (item.id === selectedId ? { ...item, description: previousDescription } : item))
+      );
+      setDescriptionDraft(previousDescription);
     } finally {
       setIsSavingDescription(false);
     }
   };
 
-  /* ================= SAVE ACTION ITEMS (PATCH → DB, then update UI from response) ================= */
+  /* ================= SAVE ACTION ITEMS (optimistic update, then PATCH) ================= */
 
   const saveActionItems = async (actionItems: string[]) => {
     if (!selectedId) return;
+    const previous = detailTicket?.actionItems ?? null;
+    setDetailTicket((t) => (t ? { ...t, actionItems } : null));
+    setFeedback((prev) =>
+      prev.map((item) => (item.id === selectedId ? { ...item, actionItems } : item))
+    );
     try {
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
@@ -287,21 +300,23 @@ export default function SessionPage() {
         body: JSON.stringify({ actionItems }),
       });
       const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
-      if (data.success && data.ticket) {
-        setDetailTicket(data.ticket);
-        setFeedback((prev) =>
-          prev.map((item) =>
-            item.id === selectedId ? { ...item, actionItems: data.ticket!.actionItems ?? null } : item
-          )
-        );
-      }
+      if (data.success && data.ticket) setDetailTicket(data.ticket);
     } catch {
-      if (detailTicket) setDetailTicket((t) => (t ? { ...t } : null));
+      setDetailTicket((t) => (t ? { ...t, actionItems: previous } : null));
+      setFeedback((prev) =>
+        prev.map((item) => (item.id === selectedId ? { ...item, actionItems: previous } : item))
+      );
     }
   };
 
   const saveTags = async (suggestedTags: string[]) => {
     if (!selectedId) return;
+    const nextTags = Array.isArray(suggestedTags) ? suggestedTags : null;
+    const previous = detailTicket?.suggestedTags ?? null;
+    setDetailTicket((t) => (t ? { ...t, suggestedTags: nextTags } : null));
+    setFeedback((prev) =>
+      prev.map((item) => (item.id === selectedId ? { ...item, suggestedTags: nextTags } : item))
+    );
     try {
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
@@ -309,23 +324,31 @@ export default function SessionPage() {
         body: JSON.stringify({ suggestedTags }),
       });
       const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
-      if (data.success && data.ticket) {
-        setDetailTicket(data.ticket);
-        const nextTags = Array.isArray(data.ticket.suggestedTags) ? data.ticket.suggestedTags : null;
-        setFeedback((prev) =>
-          prev.map((item) =>
-            item.id === selectedId ? { ...item, suggestedTags: nextTags } : item
-          )
-        );
-      }
+      if (data.success && data.ticket) setDetailTicket(data.ticket);
     } catch {
-      if (detailTicket) setDetailTicket((t) => (t ? { ...t } : null));
+      setDetailTicket((t) => (t ? { ...t, suggestedTags: previous } : null));
+      setFeedback((prev) =>
+        prev.map((item) => (item.id === selectedId ? { ...item, suggestedTags: previous } : item))
+      );
     }
   };
 
   const saveResolved = async (isResolved: boolean) => {
     if (!selectedId) return;
     const previousResolved = Boolean(detailTicket?.isResolved);
+    setDetailTicket((t) => (t ? { ...t, isResolved } : null));
+    setFeedback((prev) =>
+      prev.map((item) => (item.id === selectedId ? { ...item, isResolved } : item))
+    );
+    if (previousResolved !== isResolved) {
+      if (isResolved) {
+        setFeedbackActiveCount((c) => Math.max(0, c - 1));
+        setFeedbackResolvedCount((c) => c + 1);
+      } else {
+        setFeedbackActiveCount((c) => c + 1);
+        setFeedbackResolvedCount((c) => Math.max(0, c - 1));
+      }
+    }
     try {
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
@@ -333,26 +356,21 @@ export default function SessionPage() {
         body: JSON.stringify({ isResolved }),
       });
       const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
-      if (data.success && data.ticket) {
-        setDetailTicket(data.ticket);
-        const resolved = Boolean(data.ticket.isResolved);
-        setFeedback((prev) =>
-          prev.map((item) =>
-            item.id === selectedId ? { ...item, isResolved: resolved } : item
-          )
-        );
-        if (previousResolved !== resolved) {
-          if (resolved) {
-            setFeedbackActiveCount((c) => Math.max(0, c - 1));
-            setFeedbackResolvedCount((c) => c + 1);
-          } else {
-            setFeedbackActiveCount((c) => c + 1);
-            setFeedbackResolvedCount((c) => Math.max(0, c - 1));
-          }
+      if (data.success && data.ticket) setDetailTicket(data.ticket);
+    } catch {
+      setDetailTicket((t) => (t ? { ...t, isResolved: previousResolved } : null));
+      setFeedback((prev) =>
+        prev.map((item) => (item.id === selectedId ? { ...item, isResolved: previousResolved } : item))
+      );
+      if (previousResolved !== isResolved) {
+        if (previousResolved) {
+          setFeedbackActiveCount((c) => c + 1);
+          setFeedbackResolvedCount((c) => Math.max(0, c - 1));
+        } else {
+          setFeedbackActiveCount((c) => Math.max(0, c - 1));
+          setFeedbackResolvedCount((c) => c - 1);
         }
       }
-    } catch {
-      if (detailTicket) setDetailTicket((t) => (t ? { ...t } : null));
     }
   };
 
@@ -374,8 +392,10 @@ export default function SessionPage() {
     if (detailTicket && selectedId) {
       setDetailTicket((t) => (t ? { ...t, isResolved: true } : null));
     }
-    await refetchFeedbackFirstPage();
-  }, [feedback, detailTicket, selectedId, refetchFeedbackFirstPage]);
+    const activeCountBefore = feedback.filter((f) => !(f.isResolved ?? false)).length;
+    setFeedbackActiveCount((c) => Math.max(0, c - activeCountBefore));
+    setFeedbackResolvedCount((c) => c + activeCountBefore);
+  }, [feedback, detailTicket, selectedId, setFeedback, setFeedbackActiveCount, setFeedbackResolvedCount]);
 
   /* ================= AI SAVE (Elite Structuring) ================= */
 
@@ -389,13 +409,18 @@ export default function SessionPage() {
     transcript: string,
     screenshot: string | null
   ) => {
-    const res = await authFetch("/api/structure-feedback", {
+    const firstFeedbackId = generateFeedbackId();
+    const structureCall = authFetch("/api/structure-feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transcript }),
-    });
+    }).then((res) => res.json() as Promise<{ success?: boolean; tickets?: any[]; error?: string }>);
+    const uploadCall =
+      screenshot ?
+        uploadScreenshot(screenshot, sessionId as string, firstFeedbackId)
+      : Promise.resolve(null);
 
-    const data = (await res.json()) as { success?: boolean; tickets?: any[]; error?: string };
+    const [data, screenshotUrl] = await Promise.all([structureCall, uploadCall]);
     console.log("STRUCTURING RESPONSE:", data);
 
     const tickets = Array.isArray(data.tickets) ? data.tickets : [];
@@ -404,12 +429,7 @@ export default function SessionPage() {
       return;
     }
 
-    let screenshotUrl: string | null = null;
-    let firstFeedbackId: string | null = null;
-    if (tickets.length > 0 && screenshot) {
-      firstFeedbackId = generateFeedbackId();
-      screenshotUrl = await uploadScreenshot(screenshot, sessionId as string, firstFeedbackId);
-    }
+    const effectiveFirstId = tickets.length > 0 && screenshotUrl !== null ? firstFeedbackId : null;
 
     const created: any[] = [];
     for (let i = 0; i < tickets.length; i++) {
@@ -423,7 +443,7 @@ export default function SessionPage() {
         impact: t.impact ?? null,
         suggestedTags: t.suggestedTags,
         priority: normalizePriority(t.suggestedPriority),
-        screenshotUrl: i === 0 ? screenshotUrl : null,
+        screenshotUrl: i === 0 ? screenshotUrl ?? null : null,
         timestamp: Date.now(),
       };
 
@@ -431,7 +451,7 @@ export default function SessionPage() {
         sessionId as string,
         session.userId,
         payload,
-        i === 0 && firstFeedbackId ? firstFeedbackId : undefined
+        i === 0 && effectiveFirstId ? effectiveFirstId : undefined
       );
       const newItem = {
         id: docRef.id,
@@ -444,16 +464,42 @@ export default function SessionPage() {
 
     setFeedback((prev) => [...created, ...prev]);
     setSelectedId(created[0].id);
-    await refetchFeedbackFirstPage();
+    setFeedbackTotal((c) => c + created.length);
+    setFeedbackActiveCount((c) => c + created.length);
 
     return created[0];
   };
 
   const handleDeleteFeedback = async (id: string) => {
-    await deleteFeedback(id, sessionId as string);
-    setFeedback((prev) => prev.filter((item) => item.id !== id));
+    const deletedItem = feedback.find((f) => f.id === id);
+    const wasResolved = deletedItem?.isResolved ?? false;
+    const prevFeedback = feedback;
+    const nextList = feedback.filter((item) => item.id !== id);
+    const nextSelected =
+      selectedId === id
+        ? nextList[0]?.id ?? null
+        : selectedId;
+    setFeedback(nextList);
+    setFeedbackTotal((c) => Math.max(0, c - 1));
+    if (wasResolved) {
+      setFeedbackResolvedCount((c) => Math.max(0, c - 1));
+    } else {
+      setFeedbackActiveCount((c) => Math.max(0, c - 1));
+    }
+    setDetailTicket(null);
+    setSelectedId(nextSelected);
     setShowDeleteModal(false);
-    router.push(`/dashboard/${sessionId}`);
+    if (nextSelected === null) router.push(`/dashboard/${sessionId}`);
+    try {
+      await deleteFeedback(id, sessionId as string);
+    } catch {
+      setFeedback(prevFeedback);
+      setFeedbackTotal((c) => c + 1);
+      if (wasResolved) setFeedbackResolvedCount((c) => c + 1);
+      else setFeedbackActiveCount((c) => c + 1);
+      setSelectedId(selectedId);
+      if (selectedId) fetchDetailTicket(selectedId);
+    }
   };
 
   if (sessionLoading) return null;
@@ -496,12 +542,18 @@ export default function SessionPage() {
                           setIsEditingSessionTitle(false);
                           return;
                         }
+                        const safeTitle =
+                          trimmed && trimmed.length > 0
+                            ? trimmed
+                            : session.title || "Untitled Session";
+                        const previousTitle = session.title ?? "";
+                        setSession((prev: any) => (prev ? { ...prev, title: safeTitle } : prev));
+                        setSessionTitleDraft(safeTitle);
                         setIsSavingSessionTitle(true);
+                        setIsEditingSessionTitle(false);
+                        setSaveSessionTitleSuccess(true);
+                        setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
                         try {
-                          const safeTitle =
-                            trimmed && trimmed.length > 0
-                              ? trimmed
-                              : session.title || "Untitled Session";
                           const res = await authFetch(`/api/sessions/${sessionId}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
@@ -510,19 +562,13 @@ export default function SessionPage() {
                           const data = (await res.json()) as { success?: boolean; session?: Record<string, unknown> };
                           if (data.success && data.session) {
                             setSession((prev: any) => (prev ? { ...prev, ...data.session } : prev));
-                            setSessionTitleDraft((data.session.title as string) ?? trimmed);
-                            setIsSavingSessionTitle(false);
-                            setSaveSessionTitleSuccess(true);
-                            setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
-                            setIsEditingSessionTitle(false);
-                          } else {
-                            setIsSavingSessionTitle(false);
-                            setIsEditingSessionTitle(false);
+                            setSessionTitleDraft((data.session!.title as string) ?? safeTitle);
                           }
                         } catch {
-                          setSessionTitleDraft(session.title ?? "Session");
+                          setSession((prev: any) => (prev ? { ...prev, title: previousTitle } : prev));
+                          setSessionTitleDraft(previousTitle);
+                        } finally {
                           setIsSavingSessionTitle(false);
-                          setIsEditingSessionTitle(false);
                         }
                       }}
                       onFocus={(e) => e.currentTarget.select()}

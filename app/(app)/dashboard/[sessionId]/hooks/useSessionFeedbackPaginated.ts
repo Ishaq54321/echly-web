@@ -18,7 +18,8 @@ export interface UseSessionFeedbackPaginatedResult {
   activeCount: number;
   /** Resolved count from server (first page only); do not derive from items. */
   resolvedCount: number;
-  /** Setters for counts so callers can update locally (e.g. after resolve toggle without refetch). */
+  /** Setters for counts so callers can update locally (e.g. after resolve toggle, delete, create without refetch). */
+  setTotal: React.Dispatch<React.SetStateAction<number>>;
   setActiveCount: React.Dispatch<React.SetStateAction<number>>;
   setResolvedCount: React.Dispatch<React.SetStateAction<number>>;
   loading: boolean;
@@ -155,7 +156,6 @@ export function useSessionFeedbackPaginated(
 
   const refetchFirstPage = useCallback(async () => {
     if (!sessionId) return;
-    setInitialLoading(true);
     try {
       const res = await authFetch(
         `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
@@ -181,7 +181,7 @@ export function useSessionFeedbackPaginated(
         setHasMore(false);
       }
     } finally {
-      setInitialLoading(false);
+      // Do not set initialLoading: keep loading only for first mount and loadMore
     }
   }, [sessionId]);
 
@@ -191,6 +191,7 @@ export function useSessionFeedbackPaginated(
     activeCount,
     resolvedCount,
     setFeedback: setItems,
+    setTotal,
     setActiveCount,
     setResolvedCount,
     loading: initialLoading,
