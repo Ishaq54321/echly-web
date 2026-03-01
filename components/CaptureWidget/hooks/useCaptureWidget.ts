@@ -94,6 +94,11 @@ export function useCaptureWidget({
     setIsOpenState(next);
   }, [extensionMode]);
 
+  /** For extension message toggle: flip open state without going through close guard. */
+  const toggleOpen = useCallback(() => {
+    setIsOpenState((prev) => !prev);
+  }, []);
+
   useEffect(() => {
     activeRecordingIdRef.current = activeRecordingId;
   }, [activeRecordingId]);
@@ -434,6 +439,7 @@ export function useCaptureWidget({
   const handlers = useMemo(
     () => ({
       setIsOpen,
+      toggleOpen,
       startDrag,
       handleShare,
       setShowMenu,
@@ -451,6 +457,7 @@ export function useCaptureWidget({
     }),
     [
       setIsOpen,
+      toggleOpen,
       startDrag,
       handleShare,
       resetSession,

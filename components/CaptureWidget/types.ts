@@ -1,3 +1,5 @@
+import type { MutableRefObject } from "react";
+
 export type StructuredFeedback = {
   id: string;
   title: string;
@@ -32,6 +34,8 @@ export type CaptureWidgetProps = {
     screenshot: string | null
   ) => Promise<StructuredFeedback | undefined>;
   onDelete: (id: string) => Promise<void>;
+  /** Optional ref for extension: parent can set a toggle callback to open/close widget via message. */
+  widgetToggleRef?: MutableRefObject<(() => void) | null>;
 };
 
 export type Position = { x: number; y: number };

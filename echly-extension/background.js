@@ -1,12 +1,18 @@
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab.id) return;
+
   try {
+    // Try sending toggle message first
+    await chrome.tabs.sendMessage(tab.id, { type: "ECHLY_TOGGLE" });
+  } catch (err) {
+    // If content script not injected yet, inject it
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      files: ["content.js"]
+      files: ["content.js"],
     });
-  } catch (err) {
-    console.error("Injection failed:", err);
+
+    // After injection, send toggle message
+    await chrome.tabs.sendMessage(tab.id, { type: "ECHLY_TOGGLE" });
   }
 });
 

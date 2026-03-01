@@ -16,6 +16,7 @@ export default function CaptureWidget({
   initialPointers,
   onComplete,
   onDelete,
+  widgetToggleRef,
 }: CaptureWidgetProps) {
   const {
     state,
@@ -30,6 +31,14 @@ export default function CaptureWidget({
     onComplete,
     onDelete,
   });
+
+  React.useEffect(() => {
+    if (!widgetToggleRef) return;
+    widgetToggleRef.current = handlers.toggleOpen;
+    return () => {
+      widgetToggleRef.current = null;
+    };
+  }, [handlers, widgetToggleRef]);
 
   const getFeedbackItemHandlers = React.useCallback(
     (p: StructuredFeedback) => ({

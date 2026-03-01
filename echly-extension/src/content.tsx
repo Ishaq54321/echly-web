@@ -58,6 +58,19 @@ function ContentApp() {
   const [sessionId, setSessionId] = React.useState<string | null>(null);
   const [sessionMessage, setSessionMessage] = React.useState<string | null>(null);
   const [authChecked, setAuthChecked] = React.useState(false);
+  const widgetToggleRef = React.useRef<(() => void) | null>(null);
+
+  React.useEffect(() => {
+    const toggleHandler = () => {
+      widgetToggleRef.current?.();
+    };
+
+    window.addEventListener("ECHLY_TOGGLE_WIDGET", toggleHandler);
+
+    return () => {
+      window.removeEventListener("ECHLY_TOGGLE_WIDGET", toggleHandler);
+    };
+  }, []);
 
   React.useEffect(() => {
     const unsub = subscribeToAuthState((u) => {
@@ -243,6 +256,7 @@ function ContentApp() {
       extensionMode={true}
       onComplete={handleComplete}
       onDelete={handleDelete}
+      widgetToggleRef={widgetToggleRef}
     />
   );
 }
@@ -308,6 +322,13 @@ function main(): void {
 
   const reactRoot = createRoot(container);
   reactRoot.render(<ContentApp />);
+
+  chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
+    if (msg.type === "ECHLY_TOGGLE") {
+      const event = new CustomEvent("ECHLY_TOGGLE_WIDGET");
+      window.dispatchEvent(event);
+    }
+  });
 }
 
 main();
