@@ -21,11 +21,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className={`${plusJakartaSans.className} antialiased h-full overflow-hidden`}>
-        <div className="h-screen overflow-hidden flex flex-col">
+        <div className="h-screen flex flex-col">
           <GlobalNavBar />
-          <main className="flex-1 min-h-0 pt-16">
+          <div className="flex flex-1 min-h-0 pt-16 overflow-hidden">
             {children}
-          </main>
+          </div>
         </div>
       </body>
     </html>

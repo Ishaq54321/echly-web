@@ -26,7 +26,7 @@ export function ActivityPanel({
   };
 
   return (
-    <div className="flex flex-col min-h-0">
+    <div className="flex flex-col">
       <div className="shrink-0 px-6 pt-4 pb-4 border-b border-neutral-200">
         <h2 className="text-sm font-semibold text-[hsl(var(--text-primary))]">Activity</h2>
       </div>
@@ -39,7 +39,7 @@ export function ActivityPanel({
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
+      <div className="px-6 py-6">
         <ActivityThread comments={comments} loading={loading} />
       </div>
     </div>

@@ -8,7 +8,7 @@ export default function AppLayout({
   return (
     <div className="flex flex-1 min-h-0">
       <GlobalRail />
-      <main className="flex-1 overflow-auto min-h-0">
+      <main className="flex flex-1 min-h-0">
         {children}
       </main>
     </div>

@@ -76,7 +76,7 @@ export default function FeedbackSidebar({
       : "0 total";
 
   return (
-    <div className="flex flex-col min-h-0">
+    <div className="flex flex-col">
       <style dangerouslySetInnerHTML={{ __html: `
         .feedback-sidebar-active-rail::before {
           content: "";
@@ -88,7 +88,7 @@ export default function FeedbackSidebar({
           background-color: hsl(var(--brand));
         }
       `}} />
-      <div className="flex flex-col flex-1 min-h-0 gap-3 px-4 pt-5 pb-4">
+      <div className="flex flex-col gap-3 px-4 pt-5 pb-4">
         {/* Header (fixed) */}
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
@@ -161,8 +161,8 @@ export default function FeedbackSidebar({
           />
         </div>
 
-        {/* Ticket list (scrollable only) */}
-        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+        {/* Ticket list (content flows; scroll is on parent panel) */}
+        <div className="flex flex-col">
           <div>
           {displayed.map((item, index) => {
             const isActive = item.id === selectedId;

@@ -387,9 +387,10 @@ export default function SessionPage() {
 
   return (
     <>
-      <div className="h-screen flex overflow-hidden">
-        <aside className="w-[280px] shrink-0 min-h-0 overflow-y-auto border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]">
-          <FeedbackSidebar
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <aside className="w-[280px] shrink-0 min-h-0 flex flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]">
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <FeedbackSidebar
             feedback={feedback}
             selectedId={selectedId}
             onSelect={setSelectedId}
@@ -400,9 +401,10 @@ export default function SessionPage() {
             hasReachedLimit={feedbackReachedLimit}
             loadMoreRef={feedbackLoadMoreRef}
           />
+          </div>
         </aside>
 
-        <div className="flex-1 min-h-0 flex flex-col bg-neutral-50">
+        <main className="flex-1 min-h-0 flex flex-col bg-neutral-50">
           <div className="max-w-4xl mx-auto w-full px-8 pt-5 pb-4 border-b border-neutral-200 shrink-0">
             <div className="flex justify-between items-center gap-4">
               <div className="min-w-0 flex-1">
@@ -537,14 +539,13 @@ export default function SessionPage() {
               </div>
             </div>
           </div>
-          <div className="flex-1 min-h-0 flex flex-col max-w-4xl mx-auto w-full">
-            <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-50">
-              <div className="flex flex-col px-8 pt-4 pb-4">
-                {detailLoading && selectedId ? (
-                  <div className="flex-1 min-h-0 flex items-center justify-center py-16">
-                    <p className="text-sm text-[hsl(var(--text-secondary))]">Loading…</p>
-                  </div>
-                ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-50">
+            <div className="max-w-4xl mx-auto w-full px-8 pt-4 pb-4">
+              {detailLoading && selectedId ? (
+                <div className="flex items-center justify-center py-16">
+                  <p className="text-sm text-[hsl(var(--text-secondary))]">Loading…</p>
+                </div>
+              ) : (
                 <FeedbackDetail
                   sessionId={sessionId as string}
                   selectedItem={selectedItem}
@@ -563,19 +564,20 @@ export default function SessionPage() {
                   isCommentsOpen={isCommentsOpen}
                   onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}
                 />
-                )}
-              </div>
+              )}
             </div>
           </div>
-        </div>
+        </main>
 
         {isCommentsOpen && (
-            <aside className="w-[320px] shrink-0 min-h-0 overflow-y-auto hidden lg:block border-l border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-1))] px-6">
-              <ActivityPanel
+            <aside className="w-[320px] shrink-0 min-h-0 flex flex-col hidden lg:block border-l border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-1))]">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6">
+                <ActivityPanel
                 comments={comments}
                 loading={loadingComments}
                 sendComment={sendComment}
               />
+              </div>
             </aside>
           )}
       </div>
