@@ -51,8 +51,11 @@ html,
 body {
   height: 100%;
   overflow: hidden;
-  background-color: #F7F8FA;
-  color: #0F172A;
+  background-color: #F7F7F8;
+  color: #1F2937;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "SF Pro Text", "SF Pro Display",
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -62,11 +65,11 @@ body {
 ====================================== */
 
 .surface-rail {
-  background-color: #EEF0F3;
+  background-color: #F2F2F3;
 }
 
 .surface-sidebar {
-  background-color: #F3F4F6;
+  background-color: #F7F7F8;
 }
 
 .surface-main {

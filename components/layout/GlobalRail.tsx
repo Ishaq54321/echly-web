@@ -38,10 +38,10 @@ export default function GlobalRail() {
       <div className="relative group">
         <Link
           href="/dashboard"
-          className="flex items-center justify-center w-10 h-10 rounded-lg text-neutral-500 transition-all duration-150 ease-out hover:bg-white hover:text-brand-accent"
+          className="flex items-center justify-center w-10 h-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-white hover:text-neutral-900"
           aria-label="Echly home"
         >
-          <Box className="w-5 h-5" strokeWidth={1.5} />
+          <Box className="h-[18px] w-[18px]" strokeWidth={1.5} />
         </Link>
       </div>
 
@@ -52,16 +52,16 @@ export default function GlobalRail() {
             <div key={label} className="relative group">
               <Link
                 href={href}
-                className={`relative flex items-center justify-center w-10 h-10 rounded-lg text-neutral-500 transition-all duration-150 ease-out hover:bg-white hover:text-brand-accent ${
-                  active ? "bg-white text-brand-accent shadow-sm" : ""
+                className={`relative flex items-center justify-center w-10 h-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-white hover:text-neutral-900 ${
+                  active ? "bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)]" : ""
                 }`}
                 aria-label={label}
                 aria-current={active ? "page" : undefined}
               >
-                <Icon className="w-5 h-5" strokeWidth={1.5} />
+                <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
               </Link>
-              <span
-                className="absolute left-full ml-3 px-2 py-1 text-xs rounded-md bg-[hsl(var(--surface-1))] border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                <span
+                className="absolute left-full ml-3 px-2 py-1 text-xs rounded-md bg-white border border-neutral-200 shadow-[0_1px_2px_rgba(0,0,0,0.06)] opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                 role="tooltip"
               >
                 {label}

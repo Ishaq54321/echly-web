@@ -160,7 +160,7 @@ export function FeedbackContent({
                 </button>
                 {tagPopoverOpen && tagsToOffer.length > 0 && (
                   <div
-                    className={`absolute left-0 top-full mt-1.5 z-20 min-w-[180px] bg-white border border-neutral-200 rounded-xl shadow-lg py-2 transition-all duration-[120ms] ease-out ${
+                    className={`absolute left-0 top-full mt-1.5 z-20 min-w-[180px] bg-white border border-neutral-200 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] py-2 transition-all duration-[120ms] ease-out ${
                       dropdownAnimate ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
                     }`}
                   >
@@ -182,7 +182,7 @@ export function FeedbackContent({
                 )}
                 {tagPopoverOpen && tagsToOffer.length === 0 && (
                   <div
-                    className={`absolute left-0 top-full mt-1.5 z-20 min-w-[180px] bg-white border border-neutral-200 rounded-xl shadow-lg py-2 px-3 transition-all duration-[120ms] ease-out ${
+                    className={`absolute left-0 top-full mt-1.5 z-20 min-w-[180px] bg-white border border-neutral-200 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] py-2 px-3 transition-all duration-[120ms] ease-out ${
                       dropdownAnimate ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
                     }`}
                   >

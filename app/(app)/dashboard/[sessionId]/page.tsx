@@ -411,7 +411,7 @@ export default function SessionPage() {
           </div>
         </aside>
 
-        <main className="surface-main flex-1 min-h-0 flex flex-col shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        <main className="surface-main flex-1 min-h-0 flex flex-col shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
           <div className="max-w-4xl mx-auto w-full px-10 py-8 border-b border-neutral-200 shrink-0">
             <div className="flex justify-between items-center gap-4">
               <div className="min-w-0 flex-1">
@@ -468,7 +468,7 @@ export default function SessionPage() {
                         }
                       }}
                       autoFocus
-                      className="text-[18px] font-medium tracking-[-0.01em] text-neutral-900 w-full bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
+                      className="text-[18px] font-medium tracking-[-0.01em] text-neutral-900 w-full bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
                       aria-label="Session title"
                     />
                     <p className="text-[13px] text-neutral-500 mt-1">
@@ -631,7 +631,7 @@ export default function SessionPage() {
             aria-labelledby="delete-ticket-title"
           >
             <div
-              className="bg-[hsl(var(--surface-1))] rounded-lg shadow-xl max-w-sm w-full p-6 border border-[hsl(var(--border))]"
+              className="bg-[hsl(var(--surface-1))] rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] max-w-sm w-full p-6 border border-neutral-200"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 id="delete-ticket-title" className="text-[18px] font-medium leading-[1.35] text-neutral-900">

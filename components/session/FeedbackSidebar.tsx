@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Tag } from "@/components/ui/Tag";
 
 type SortKind = "recent" | "active";
 
@@ -103,7 +102,7 @@ export default function FeedbackSidebar({
                   aria-hidden
                   onClick={() => setSortOpen(false)}
                 />
-                <div className="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-md border border-neutral-200 bg-white py-1 shadow-sm">
+                <div className="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-md border border-neutral-200 bg-white py-1 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
                   <button
                     type="button"
                     onClick={() => {
@@ -145,7 +144,7 @@ export default function FeedbackSidebar({
             placeholder="Search feedback…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-full text-sm px-3 rounded-md bg-white border border-neutral-200 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
+            className="h-9 w-full text-sm px-3 rounded-md bg-white border border-neutral-200 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
             aria-label="Search feedback"
           />
         </div>
@@ -153,9 +152,8 @@ export default function FeedbackSidebar({
         {/* Ticket list (content flows; scroll is on parent panel) */}
         <div className="flex flex-col">
           <div>
-          {displayed.map((item, index) => {
+          {displayed.map((item) => {
             const isActive = item.id === selectedId;
-            const isLast = index === displayed.length - 1;
 
             return (
               <div
@@ -169,14 +167,13 @@ export default function FeedbackSidebar({
                     onSelect(item.id);
                   }
                 }}
-                className={`group flex flex-col px-3 py-2.5 cursor-pointer transition-all duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] focus-visible:ring-offset-0 border-b border-neutral-200
-                  ${isLast ? "border-b-0" : ""}
+                className={`group flex flex-col px-3 py-2.5 cursor-pointer text-[14px] font-medium text-neutral-700 rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-0
                   ${isActive
-                    ? "bg-white text-neutral-900 rounded-lg shadow-sm hover:bg-white"
-                    : "bg-transparent hover:bg-white/60"}`}
+                    ? "bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-white"
+                    : "hover:bg-neutral-100"}`}
               >
                 <div className="flex justify-between items-start gap-3">
-                  <span className={`text-[14px] font-medium truncate flex-1 min-w-0 ${isActive ? "text-neutral-900" : "text-neutral-700"}`}>
+                  <span className="truncate flex-1 min-w-0">
                     {item.title}
                   </span>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -193,9 +190,6 @@ export default function FeedbackSidebar({
                       </svg>
                     </button>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <Tag name={item.type} variant="sidebar" inactive={!isActive} />
                 </div>
               </div>
             );

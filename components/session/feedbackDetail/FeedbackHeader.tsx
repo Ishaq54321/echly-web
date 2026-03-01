@@ -71,6 +71,9 @@ export function FeedbackHeader({
 
   return (
     <div className="pt-4 pb-4">
+      <div className="mb-3 text-[12px] text-neutral-400">
+        {item.index} of {item.total}
+      </div>
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           {isEditingTitle && onSaveTitle ? (
@@ -83,7 +86,7 @@ export function FeedbackHeader({
                 onBlur={handleTitleBlur}
                 onFocus={(e) => e.currentTarget.select()}
                 onKeyDown={handleTitleKeyDown}
-                className="w-full text-[18px] font-medium leading-[1.35] text-neutral-900 bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
+                className="w-full text-[18px] font-medium leading-[1.35] text-neutral-900 bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
                 aria-label="Edit title"
               />
               <p className="text-[13px] text-neutral-500 mt-1">
@@ -137,7 +140,7 @@ export function FeedbackHeader({
             <button
               type="button"
               onClick={onRequestDelete}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium text-neutral-700 bg-white border border-neutral-200 hover:bg-neutral-50 transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium text-neutral-700 bg-white border border-neutral-200 hover:bg-neutral-50 transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
               aria-label="Delete ticket"
             >
               <Trash2 size={14} />
@@ -148,9 +151,9 @@ export function FeedbackHeader({
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
               isActivityOpen
-                ? "bg-neutral-100 text-brand-accent"
+                ? "bg-neutral-200 text-neutral-900"
                 : "bg-neutral-100 text-neutral-600 hover:text-neutral-900"
             }`}
             aria-pressed={isActivityOpen}
