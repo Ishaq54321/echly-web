@@ -17,6 +17,10 @@ export default function CaptureWidget({
   onComplete,
   onDelete,
   widgetToggleRef,
+  onRecordingChange,
+  expanded,
+  onExpandRequest,
+  onCollapseRequest,
 }: CaptureWidgetProps) {
   const {
     state,
@@ -30,7 +34,11 @@ export default function CaptureWidget({
     initialPointers,
     onComplete,
     onDelete,
+    onRecordingChange,
   });
+
+  const isControlled = expanded !== undefined;
+  const effectiveIsOpen = isControlled ? expanded : state.isOpen;
 
   React.useEffect(() => {
     if (!widgetToggleRef) return;
@@ -40,12 +48,12 @@ export default function CaptureWidget({
     };
   }, [handlers, widgetToggleRef]);
 
-  if (!state.isOpen) {
+  if (!effectiveIsOpen) {
     return (
       <div className="fixed bottom-10 right-10 z-50 capture-floating-wrapper">
         <button
           type="button"
-          onClick={() => handlers.setIsOpen(true)}
+          onClick={() => (onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true))}
           className="capture-floating-trigger
                      flex items-center gap-3
                      bg-white border border-[rgba(0,0,0,0.08)]
@@ -62,13 +70,6 @@ export default function CaptureWidget({
       </div>
     );
   }
-
-  // Debug: detect unwanted collapse triggers (remove after stabilization)
-  console.log("Widget state:", {
-    isOpen: state.isOpen,
-    isListening: state.state === "listening",
-    isStructuring: state.state === "processing" || state.state === "anticipation",
-  });
 
   return (
     <>
@@ -106,7 +107,7 @@ export default function CaptureWidget({
           onStartDrag={handlers.startDrag}
           onShare={handlers.handleShare}
           onMoreClick={() => handlers.setShowMenu((p) => !p)}
-          onClose={() => handlers.setIsOpen(false)}
+          onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
           showMenu={state.showMenu}
           onResetSession={handlers.resetSession}
           menuRef={refs.menuRef}

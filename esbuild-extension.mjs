@@ -69,3 +69,12 @@ await esbuild.build({
   plugins: [makeAliasPlugin(true)],
   absWorkingDir: root,
 });
+
+await esbuild.build({
+  entryPoints: [path.join(extDir, "src", "background.ts")],
+  bundle: true,
+  outfile: path.join(extDir, "background.js"),
+  platform: "browser",
+  target: "es2020",
+  absWorkingDir: root,
+});

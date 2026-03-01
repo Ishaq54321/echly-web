@@ -13,8 +13,8 @@
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
   var __export = (target, all) => {
-    for (var name6 in all)
-      __defProp(target, name6, { get: all[name6], enumerable: true });
+    for (var name5 in all)
+      __defProp(target, name5, { get: all[name5], enumerable: true });
   };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
@@ -153,8 +153,8 @@
           if ("object" === typeof type && null !== type && type.$$typeof === REACT_LAZY_TYPE)
             return "<...>";
           try {
-            var name6 = getComponentNameFromType(type);
-            return name6 ? "<" + name6 + ">" : "<...>";
+            var name5 = getComponentNameFromType(type);
+            return name5 ? "<" + name5 + ">" : "<...>";
           } catch (x2) {
             return "<...>";
           }
@@ -369,8 +369,8 @@
         function mapChildren(children, func, context) {
           if (null == children) return children;
           var result = [], count = 0;
-          mapIntoArray(children, result, "", "", function(child2) {
-            return func.call(context, child2, count++);
+          mapIntoArray(children, result, "", "", function(child) {
+            return func.call(context, child, count++);
           });
           return result;
         }
@@ -617,8 +617,8 @@
             return n;
           },
           toArray: function(children) {
-            return mapChildren(children, function(child2) {
-              return child2;
+            return mapChildren(children, function(child) {
+              return child;
             }) || [];
           },
           only: function(children) {
@@ -849,9 +849,9 @@
             get: function() {
               return ownName;
             },
-            set: function(name6) {
-              ownName = name6;
-              render.name || render.displayName || (Object.defineProperty(render, "name", { value: name6 }), render.displayName = name6);
+            set: function(name5) {
+              ownName = name5;
+              render.name || render.displayName || (Object.defineProperty(render, "name", { value: name5 }), render.displayName = name5);
             }
           });
           return elementType;
@@ -893,9 +893,9 @@
             get: function() {
               return ownName;
             },
-            set: function(name6) {
-              ownName = name6;
-              type.name || type.displayName || (Object.defineProperty(type, "name", { value: name6 }), type.displayName = name6);
+            set: function(name5) {
+              ownName = name5;
+              type.name || type.displayName || (Object.defineProperty(type, "name", { value: name5 }), type.displayName = name5);
             }
           });
           return compare;
@@ -959,8 +959,8 @@
         exports.useId = function() {
           return resolveDispatcher().useId();
         };
-        exports.useImperativeHandle = function(ref2, create, deps) {
-          return resolveDispatcher().useImperativeHandle(ref2, create, deps);
+        exports.useImperativeHandle = function(ref, create, deps) {
+          return resolveDispatcher().useImperativeHandle(ref, create, deps);
         };
         exports.useInsertionEffect = function(create, deps) {
           null == create && console.warn(
@@ -2020,7 +2020,7 @@
           else return "";
           return error;
         }
-        function describeBuiltInComponentFrame(name6) {
+        function describeBuiltInComponentFrame(name5) {
           if (void 0 === prefix)
             try {
               throw Error();
@@ -2029,7 +2029,7 @@
               prefix = match && match[1] || "";
               suffix = -1 < x2.stack.indexOf("\n    at") ? " (<anonymous>)" : -1 < x2.stack.indexOf("@") ? "@unknown:0:0" : "";
             }
-          return "\n" + prefix + name6 + suffix;
+          return "\n" + prefix + name5 + suffix;
         }
         function describeNativeComponentFrame(fn, construct) {
           if (!fn || reentry) return "";
@@ -2172,16 +2172,16 @@
                   if ("string" === typeof entry.name) {
                     var JSCompiler_temp_const = info;
                     a: {
-                      var name6 = entry.name, env = entry.env, location2 = entry.debugLocation;
+                      var name5 = entry.name, env = entry.env, location2 = entry.debugLocation;
                       if (null != location2) {
                         var childStack = formatOwnerStack(location2), idx = childStack.lastIndexOf("\n"), lastLine = -1 === idx ? childStack : childStack.slice(idx + 1);
-                        if (-1 !== lastLine.indexOf(name6)) {
+                        if (-1 !== lastLine.indexOf(name5)) {
                           var JSCompiler_inline_result = "\n" + lastLine;
                           break a;
                         }
                       }
                       JSCompiler_inline_result = describeBuiltInComponentFrame(
-                        name6 + (env ? " [" + env + "]" : "")
+                        name5 + (env ? " [" + env + "]" : "")
                       );
                     }
                     info = JSCompiler_temp_const + JSCompiler_inline_result;
@@ -2677,9 +2677,9 @@
           console.error("Invalid attribute name: `%s`", attributeName);
           return false;
         }
-        function getValueForAttributeOnCustomComponent(node, name6, expected) {
-          if (isAttributeNameSafe(name6)) {
-            if (!node.hasAttribute(name6)) {
+        function getValueForAttributeOnCustomComponent(node, name5, expected) {
+          if (isAttributeNameSafe(name5)) {
+            if (!node.hasAttribute(name5)) {
               switch (typeof expected) {
                 case "symbol":
                 case "object":
@@ -2691,61 +2691,61 @@
               }
               return void 0 === expected ? void 0 : null;
             }
-            node = node.getAttribute(name6);
+            node = node.getAttribute(name5);
             if ("" === node && true === expected) return true;
-            checkAttributeStringCoercion(expected, name6);
+            checkAttributeStringCoercion(expected, name5);
             return node === "" + expected ? expected : node;
           }
         }
-        function setValueForAttribute(node, name6, value) {
-          if (isAttributeNameSafe(name6))
-            if (null === value) node.removeAttribute(name6);
+        function setValueForAttribute(node, name5, value) {
+          if (isAttributeNameSafe(name5))
+            if (null === value) node.removeAttribute(name5);
             else {
               switch (typeof value) {
                 case "undefined":
                 case "function":
                 case "symbol":
-                  node.removeAttribute(name6);
+                  node.removeAttribute(name5);
                   return;
                 case "boolean":
-                  var prefix2 = name6.toLowerCase().slice(0, 5);
+                  var prefix2 = name5.toLowerCase().slice(0, 5);
                   if ("data-" !== prefix2 && "aria-" !== prefix2) {
-                    node.removeAttribute(name6);
+                    node.removeAttribute(name5);
                     return;
                   }
               }
-              checkAttributeStringCoercion(value, name6);
-              node.setAttribute(name6, "" + value);
+              checkAttributeStringCoercion(value, name5);
+              node.setAttribute(name5, "" + value);
             }
         }
-        function setValueForKnownAttribute(node, name6, value) {
-          if (null === value) node.removeAttribute(name6);
+        function setValueForKnownAttribute(node, name5, value) {
+          if (null === value) node.removeAttribute(name5);
           else {
             switch (typeof value) {
               case "undefined":
               case "function":
               case "symbol":
               case "boolean":
-                node.removeAttribute(name6);
+                node.removeAttribute(name5);
                 return;
             }
-            checkAttributeStringCoercion(value, name6);
-            node.setAttribute(name6, "" + value);
+            checkAttributeStringCoercion(value, name5);
+            node.setAttribute(name5, "" + value);
           }
         }
-        function setValueForNamespacedAttribute(node, namespace, name6, value) {
-          if (null === value) node.removeAttribute(name6);
+        function setValueForNamespacedAttribute(node, namespace, name5, value) {
+          if (null === value) node.removeAttribute(name5);
           else {
             switch (typeof value) {
               case "undefined":
               case "function":
               case "symbol":
               case "boolean":
-                node.removeAttribute(name6);
+                node.removeAttribute(name5);
                 return;
             }
-            checkAttributeStringCoercion(value, name6);
-            node.setAttributeNS(namespace, name6, "" + value);
+            checkAttributeStringCoercion(value, name5);
+            node.setAttributeNS(namespace, name5, "" + value);
           }
         }
         function getToStringValue(value) {
@@ -2851,7 +2851,7 @@
             props.type
           ), didWarnValueDefaultValue$1 = true);
         }
-        function updateInput(element, value, defaultValue, lastDefaultValue, checked, defaultChecked, type, name6) {
+        function updateInput(element, value, defaultValue, lastDefaultValue, checked, defaultChecked, type, name5) {
           element.name = "";
           null != type && "function" !== typeof type && "symbol" !== typeof type && "boolean" !== typeof type ? (checkAttributeStringCoercion(type, "type"), element.type = type) : element.removeAttribute("type");
           if (null != value)
@@ -2865,9 +2865,9 @@
           null != value ? setDefaultValue(element, type, getToStringValue(value)) : null != defaultValue ? setDefaultValue(element, type, getToStringValue(defaultValue)) : null != lastDefaultValue && element.removeAttribute("value");
           null == checked && null != defaultChecked && (element.defaultChecked = !!defaultChecked);
           null != checked && (element.checked = checked && "function" !== typeof checked && "symbol" !== typeof checked);
-          null != name6 && "function" !== typeof name6 && "symbol" !== typeof name6 && "boolean" !== typeof name6 ? (checkAttributeStringCoercion(name6, "name"), element.name = "" + getToStringValue(name6)) : element.removeAttribute("name");
+          null != name5 && "function" !== typeof name5 && "symbol" !== typeof name5 && "boolean" !== typeof name5 ? (checkAttributeStringCoercion(name5, "name"), element.name = "" + getToStringValue(name5)) : element.removeAttribute("name");
         }
-        function initInput(element, value, defaultValue, checked, defaultChecked, type, name6, isHydrating2) {
+        function initInput(element, value, defaultValue, checked, defaultChecked, type, name5, isHydrating2) {
           null != type && "function" !== typeof type && "symbol" !== typeof type && "boolean" !== typeof type && (checkAttributeStringCoercion(type, "type"), element.type = type);
           if (null != value || null != defaultValue) {
             if (!("submit" !== type && "reset" !== type || void 0 !== value && null !== value)) {
@@ -2883,15 +2883,15 @@
           checked = "function" !== typeof checked && "symbol" !== typeof checked && !!checked;
           element.checked = isHydrating2 ? element.checked : !!checked;
           element.defaultChecked = !!checked;
-          null != name6 && "function" !== typeof name6 && "symbol" !== typeof name6 && "boolean" !== typeof name6 && (checkAttributeStringCoercion(name6, "name"), element.name = name6);
+          null != name5 && "function" !== typeof name5 && "symbol" !== typeof name5 && "boolean" !== typeof name5 && (checkAttributeStringCoercion(name5, "name"), element.name = name5);
           track(element);
         }
         function setDefaultValue(node, type, value) {
           "number" === type && getActiveElement(node.ownerDocument) === node || node.defaultValue === "" + value || (node.defaultValue = "" + value);
         }
         function validateOptionProps(element, props) {
-          null == props.value && ("object" === typeof props.children && null !== props.children ? React7.Children.forEach(props.children, function(child2) {
-            null == child2 || "string" === typeof child2 || "number" === typeof child2 || "bigint" === typeof child2 || didWarnInvalidChild || (didWarnInvalidChild = true, console.error(
+          null == props.value && ("object" === typeof props.children && null !== props.children ? React7.Children.forEach(props.children, function(child) {
+            null == child || "string" === typeof child || "number" === typeof child || "bigint" === typeof child || didWarnInvalidChild || (didWarnInvalidChild = true, console.error(
               "Cannot infer the option value of complex children. Pass a `value` prop or use a plain string as children to <option>."
             ));
           }) : null == props.dangerouslySetInnerHTML || didWarnInvalidInnerHTML || (didWarnInvalidInnerHTML = true, console.error(
@@ -3051,9 +3051,9 @@
               if (isArrayImpl(value)) return "[...]";
               if (value.$$typeof === REACT_ELEMENT_TYPE)
                 return (maxLength = getComponentNameFromType(value.type)) ? "<" + maxLength + ">" : "<...>";
-              var name6 = objectName(value);
-              if ("Object" === name6) {
-                name6 = "";
+              var name5 = objectName(value);
+              if ("Object" === name5) {
+                name5 = "";
                 maxLength -= 2;
                 for (var propName in value)
                   if (value.hasOwnProperty(propName)) {
@@ -3066,14 +3066,14 @@
                     );
                     maxLength -= jsonPropName.length;
                     if (0 > maxLength) {
-                      name6 += "" === name6 ? "..." : ", ...";
+                      name5 += "" === name5 ? "..." : ", ...";
                       break;
                     }
-                    name6 += ("" === name6 ? "" : ",") + propName + ":" + jsonPropName;
+                    name5 += ("" === name5 ? "" : ",") + propName + ":" + jsonPropName;
                   }
-                return "{" + name6 + "}";
+                return "{" + name5 + "}";
               }
-              return name6;
+              return name5;
             case "function":
               return (maxLength = value.displayName || value.name) ? "function " + maxLength : "function";
             default:
@@ -3243,12 +3243,12 @@
             return "";
           }
         }
-        function describeAncestors(ancestor, child2, props) {
-          for (var fiber = child2, node = null, distanceFromLeaf = 0; fiber; )
+        function describeAncestors(ancestor, child, props) {
+          for (var fiber = child, node = null, distanceFromLeaf = 0; fiber; )
             fiber === ancestor && (distanceFromLeaf = 0), node = {
               fiber,
               children: null !== node ? [node] : [],
-              serverProps: fiber === child2 ? props : fiber === ancestor ? null : void 0,
+              serverProps: fiber === child ? props : fiber === ancestor ? null : void 0,
               serverTail: [],
               distanceFromLeaf
             }, distanceFromLeaf++, fiber = fiber.return;
@@ -3558,36 +3558,36 @@
               return true;
           }
         }
-        function getAttributeAlias(name6) {
-          return aliases.get(name6) || name6;
+        function getAttributeAlias(name5) {
+          return aliases.get(name5) || name5;
         }
-        function validateProperty$1(tagName, name6) {
-          if (hasOwnProperty.call(warnedProperties$1, name6) && warnedProperties$1[name6])
+        function validateProperty$1(tagName, name5) {
+          if (hasOwnProperty.call(warnedProperties$1, name5) && warnedProperties$1[name5])
             return true;
-          if (rARIACamel$1.test(name6)) {
-            tagName = "aria-" + name6.slice(4).toLowerCase();
+          if (rARIACamel$1.test(name5)) {
+            tagName = "aria-" + name5.slice(4).toLowerCase();
             tagName = ariaProperties.hasOwnProperty(tagName) ? tagName : null;
             if (null == tagName)
               return console.error(
                 "Invalid ARIA attribute `%s`. ARIA attributes follow the pattern aria-* and must be lowercase.",
-                name6
-              ), warnedProperties$1[name6] = true;
-            if (name6 !== tagName)
+                name5
+              ), warnedProperties$1[name5] = true;
+            if (name5 !== tagName)
               return console.error(
                 "Invalid ARIA attribute `%s`. Did you mean `%s`?",
-                name6,
+                name5,
                 tagName
-              ), warnedProperties$1[name6] = true;
+              ), warnedProperties$1[name5] = true;
           }
-          if (rARIA$1.test(name6)) {
-            tagName = name6.toLowerCase();
+          if (rARIA$1.test(name5)) {
+            tagName = name5.toLowerCase();
             tagName = ariaProperties.hasOwnProperty(tagName) ? tagName : null;
-            if (null == tagName) return warnedProperties$1[name6] = true, false;
-            name6 !== tagName && (console.error(
+            if (null == tagName) return warnedProperties$1[name5] = true, false;
+            name5 !== tagName && (console.error(
               "Unknown ARIA attribute `%s`. Did you mean `%s`?",
-              name6,
+              name5,
               tagName
-            ), warnedProperties$1[name6] = true);
+            ), warnedProperties$1[name5] = true);
           }
           return true;
         }
@@ -3608,70 +3608,70 @@
             type
           );
         }
-        function validateProperty(tagName, name6, value, eventRegistry) {
-          if (hasOwnProperty.call(warnedProperties, name6) && warnedProperties[name6])
+        function validateProperty(tagName, name5, value, eventRegistry) {
+          if (hasOwnProperty.call(warnedProperties, name5) && warnedProperties[name5])
             return true;
-          var lowerCasedName = name6.toLowerCase();
+          var lowerCasedName = name5.toLowerCase();
           if ("onfocusin" === lowerCasedName || "onfocusout" === lowerCasedName)
             return console.error(
               "React uses onFocus and onBlur instead of onFocusIn and onFocusOut. All React events are normalized to bubble, so onFocusIn and onFocusOut are not needed/supported by React."
-            ), warnedProperties[name6] = true;
-          if ("function" === typeof value && ("form" === tagName && "action" === name6 || "input" === tagName && "formAction" === name6 || "button" === tagName && "formAction" === name6))
+            ), warnedProperties[name5] = true;
+          if ("function" === typeof value && ("form" === tagName && "action" === name5 || "input" === tagName && "formAction" === name5 || "button" === tagName && "formAction" === name5))
             return true;
           if (null != eventRegistry) {
             tagName = eventRegistry.possibleRegistrationNames;
-            if (eventRegistry.registrationNameDependencies.hasOwnProperty(name6))
+            if (eventRegistry.registrationNameDependencies.hasOwnProperty(name5))
               return true;
             eventRegistry = tagName.hasOwnProperty(lowerCasedName) ? tagName[lowerCasedName] : null;
             if (null != eventRegistry)
               return console.error(
                 "Invalid event handler property `%s`. Did you mean `%s`?",
-                name6,
+                name5,
                 eventRegistry
-              ), warnedProperties[name6] = true;
-            if (EVENT_NAME_REGEX.test(name6))
+              ), warnedProperties[name5] = true;
+            if (EVENT_NAME_REGEX.test(name5))
               return console.error(
                 "Unknown event handler property `%s`. It will be ignored.",
-                name6
-              ), warnedProperties[name6] = true;
-          } else if (EVENT_NAME_REGEX.test(name6))
-            return INVALID_EVENT_NAME_REGEX.test(name6) && console.error(
+                name5
+              ), warnedProperties[name5] = true;
+          } else if (EVENT_NAME_REGEX.test(name5))
+            return INVALID_EVENT_NAME_REGEX.test(name5) && console.error(
               "Invalid event handler property `%s`. React events use the camelCase naming convention, for example `onClick`.",
-              name6
-            ), warnedProperties[name6] = true;
-          if (rARIA.test(name6) || rARIACamel.test(name6)) return true;
+              name5
+            ), warnedProperties[name5] = true;
+          if (rARIA.test(name5) || rARIACamel.test(name5)) return true;
           if ("innerhtml" === lowerCasedName)
             return console.error(
               "Directly setting property `innerHTML` is not permitted. For more information, lookup documentation on `dangerouslySetInnerHTML`."
-            ), warnedProperties[name6] = true;
+            ), warnedProperties[name5] = true;
           if ("aria" === lowerCasedName)
             return console.error(
               "The `aria` attribute is reserved for future use in React. Pass individual `aria-` attributes instead."
-            ), warnedProperties[name6] = true;
+            ), warnedProperties[name5] = true;
           if ("is" === lowerCasedName && null !== value && void 0 !== value && "string" !== typeof value)
             return console.error(
               "Received a `%s` for a string attribute `is`. If this is expected, cast the value to a string.",
               typeof value
-            ), warnedProperties[name6] = true;
+            ), warnedProperties[name5] = true;
           if ("number" === typeof value && isNaN(value))
             return console.error(
               "Received NaN for the `%s` attribute. If this is expected, cast the value to a string.",
-              name6
-            ), warnedProperties[name6] = true;
+              name5
+            ), warnedProperties[name5] = true;
           if (possibleStandardNames.hasOwnProperty(lowerCasedName)) {
-            if (lowerCasedName = possibleStandardNames[lowerCasedName], lowerCasedName !== name6)
+            if (lowerCasedName = possibleStandardNames[lowerCasedName], lowerCasedName !== name5)
               return console.error(
                 "Invalid DOM property `%s`. Did you mean `%s`?",
-                name6,
+                name5,
                 lowerCasedName
-              ), warnedProperties[name6] = true;
-          } else if (name6 !== lowerCasedName)
+              ), warnedProperties[name5] = true;
+          } else if (name5 !== lowerCasedName)
             return console.error(
               "React does not recognize the `%s` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `%s` instead. If you accidentally passed it from a parent component, remove it from the DOM element.",
-              name6,
+              name5,
               lowerCasedName
-            ), warnedProperties[name6] = true;
-          switch (name6) {
+            ), warnedProperties[name5] = true;
+          switch (name5) {
             case "dangerouslySetInnerHTML":
             case "children":
             case "style":
@@ -3688,7 +3688,7 @@
           }
           switch (typeof value) {
             case "boolean":
-              switch (name6) {
+              switch (name5) {
                 case "autoFocus":
                 case "checked":
                 case "multiple":
@@ -3729,34 +3729,34 @@
                 case "inert":
                   return true;
                 default:
-                  lowerCasedName = name6.toLowerCase().slice(0, 5);
+                  lowerCasedName = name5.toLowerCase().slice(0, 5);
                   if ("data-" === lowerCasedName || "aria-" === lowerCasedName)
                     return true;
                   value ? console.error(
                     'Received `%s` for a non-boolean attribute `%s`.\n\nIf you want to write it to the DOM, pass a string instead: %s="%s" or %s={value.toString()}.',
                     value,
-                    name6,
-                    name6,
+                    name5,
+                    name5,
                     value,
-                    name6
+                    name5
                   ) : console.error(
                     'Received `%s` for a non-boolean attribute `%s`.\n\nIf you want to write it to the DOM, pass a string instead: %s="%s" or %s={value.toString()}.\n\nIf you used to conditionally omit it with %s={condition && value}, pass %s={condition ? value : undefined} instead.',
                     value,
-                    name6,
-                    name6,
+                    name5,
+                    name5,
                     value,
-                    name6,
-                    name6,
-                    name6
+                    name5,
+                    name5,
+                    name5
                   );
-                  return warnedProperties[name6] = true;
+                  return warnedProperties[name5] = true;
               }
             case "function":
             case "symbol":
-              return warnedProperties[name6] = true, false;
+              return warnedProperties[name5] = true, false;
             case "string":
               if ("false" === value || "true" === value) {
-                switch (name6) {
+                switch (name5) {
                   case "checked":
                   case "selected":
                   case "multiple":
@@ -3791,12 +3791,12 @@
                 console.error(
                   "Received the string `%s` for the boolean attribute `%s`. %s Did you mean %s={%s}?",
                   value,
-                  name6,
+                  name5,
                   "false" === value ? "The browser will interpret it as a truthy value." : 'Although this works, it will not work as expected if you pass the string "false".',
-                  name6,
+                  name5,
                   value
                 );
-                warnedProperties[name6] = true;
+                warnedProperties[name5] = true;
               }
           }
           return true;
@@ -4431,33 +4431,33 @@
           logComponentTrigger(fiber, startTime, endTime, "Reconnect");
         }
         function logComponentRender(fiber, startTime, endTime, wasHydrated, committedLanes) {
-          var name6 = getComponentNameFromFiber(fiber);
-          if (null !== name6 && supportsUserTiming) {
+          var name5 = getComponentNameFromFiber(fiber);
+          if (null !== name5 && supportsUserTiming) {
             var alternate = fiber.alternate, selfTime = fiber.actualDuration;
             if (null === alternate || alternate.child !== fiber.child)
-              for (var child2 = fiber.child; null !== child2; child2 = child2.sibling)
-                selfTime -= child2.actualDuration;
+              for (var child = fiber.child; null !== child; child = child.sibling)
+                selfTime -= child.actualDuration;
             wasHydrated = 0.5 > selfTime ? wasHydrated ? "tertiary-light" : "primary-light" : 10 > selfTime ? wasHydrated ? "tertiary" : "primary" : 100 > selfTime ? wasHydrated ? "tertiary-dark" : "primary-dark" : "error";
             var props = fiber.memoizedProps;
             selfTime = fiber._debugTask;
-            null !== props && null !== alternate && alternate.memoizedProps !== props ? (child2 = [resuableChangedPropsEntry], props = addObjectDiffToProperties(
+            null !== props && null !== alternate && alternate.memoizedProps !== props ? (child = [resuableChangedPropsEntry], props = addObjectDiffToProperties(
               alternate.memoizedProps,
               props,
-              child2,
+              child,
               0
-            ), 1 < child2.length && (props && !alreadyWarnedForDeepEquality && 0 === (alternate.lanes & committedLanes) && 100 < fiber.actualDuration ? (alreadyWarnedForDeepEquality = true, child2[0] = reusableDeeplyEqualPropsEntry, reusableComponentDevToolDetails.color = "warning", reusableComponentDevToolDetails.tooltipText = DEEP_EQUALITY_WARNING) : (reusableComponentDevToolDetails.color = wasHydrated, reusableComponentDevToolDetails.tooltipText = name6), reusableComponentDevToolDetails.properties = child2, reusableComponentOptions.start = startTime, reusableComponentOptions.end = endTime, null != selfTime ? selfTime.run(
+            ), 1 < child.length && (props && !alreadyWarnedForDeepEquality && 0 === (alternate.lanes & committedLanes) && 100 < fiber.actualDuration ? (alreadyWarnedForDeepEquality = true, child[0] = reusableDeeplyEqualPropsEntry, reusableComponentDevToolDetails.color = "warning", reusableComponentDevToolDetails.tooltipText = DEEP_EQUALITY_WARNING) : (reusableComponentDevToolDetails.color = wasHydrated, reusableComponentDevToolDetails.tooltipText = name5), reusableComponentDevToolDetails.properties = child, reusableComponentOptions.start = startTime, reusableComponentOptions.end = endTime, null != selfTime ? selfTime.run(
               performance.measure.bind(
                 performance,
-                "\u200B" + name6,
+                "\u200B" + name5,
                 reusableComponentOptions
               )
             ) : performance.measure(
-              "\u200B" + name6,
+              "\u200B" + name5,
               reusableComponentOptions
             ))) : null != selfTime ? selfTime.run(
               console.timeStamp.bind(
                 console,
-                name6,
+                name5,
                 startTime,
                 endTime,
                 COMPONENTS_TRACK,
@@ -4465,7 +4465,7 @@
                 wasHydrated
               )
             ) : console.timeStamp(
-              name6,
+              name5,
               startTime,
               endTime,
               COMPONENTS_TRACK,
@@ -4476,8 +4476,8 @@
         }
         function logComponentErrored(fiber, startTime, endTime, errors) {
           if (supportsUserTiming) {
-            var name6 = getComponentNameFromFiber(fiber);
-            if (null !== name6) {
+            var name5 = getComponentNameFromFiber(fiber);
+            if (null !== name5) {
               for (var debugTask = null, properties = [], i = 0; i < errors.length; i++) {
                 var capturedValue = errors[i];
                 null == debugTask && null !== capturedValue.source && (debugTask = capturedValue.source._debugTask);
@@ -4503,16 +4503,16 @@
                 }
               };
               debugTask ? debugTask.run(
-                performance.measure.bind(performance, "\u200B" + name6, fiber)
-              ) : performance.measure("\u200B" + name6, fiber);
+                performance.measure.bind(performance, "\u200B" + name5, fiber)
+              ) : performance.measure("\u200B" + name5, fiber);
             }
           }
         }
         function logComponentEffect(fiber, startTime, endTime, selfTime, errors) {
           if (null !== errors) {
             if (supportsUserTiming) {
-              var name6 = getComponentNameFromFiber(fiber);
-              if (null !== name6) {
+              var name5 = getComponentNameFromFiber(fiber);
+              if (null !== name5) {
                 selfTime = [];
                 for (var i = 0; i < errors.length; i++) {
                   var error = errors[i].value;
@@ -4538,17 +4538,17 @@
                 (fiber = fiber._debugTask) ? fiber.run(
                   performance.measure.bind(
                     performance,
-                    "\u200B" + name6,
+                    "\u200B" + name5,
                     startTime
                   )
-                ) : performance.measure("\u200B" + name6, startTime);
+                ) : performance.measure("\u200B" + name5, startTime);
               }
             }
           } else
-            name6 = getComponentNameFromFiber(fiber), null !== name6 && supportsUserTiming && (errors = 1 > selfTime ? "secondary-light" : 100 > selfTime ? "secondary" : 500 > selfTime ? "secondary-dark" : "error", (fiber = fiber._debugTask) ? fiber.run(
+            name5 = getComponentNameFromFiber(fiber), null !== name5 && supportsUserTiming && (errors = 1 > selfTime ? "secondary-light" : 100 > selfTime ? "secondary" : 500 > selfTime ? "secondary-dark" : "error", (fiber = fiber._debugTask) ? fiber.run(
               console.timeStamp.bind(
                 console,
-                name6,
+                name5,
                 startTime,
                 endTime,
                 COMPONENTS_TRACK,
@@ -4556,7 +4556,7 @@
                 errors
               )
             ) : console.timeStamp(
-              name6,
+              name5,
               startTime,
               endTime,
               COMPONENTS_TRACK,
@@ -4839,7 +4839,7 @@
         }
         function scheduleFibersWithFamiliesRecursively(fiber, updatedFamilies, staleFamilies) {
           do {
-            var _fiber = fiber, alternate = _fiber.alternate, child2 = _fiber.child, sibling = _fiber.sibling, tag = _fiber.tag;
+            var _fiber = fiber, alternate = _fiber.alternate, child = _fiber.child, sibling = _fiber.sibling, tag = _fiber.tag;
             _fiber = _fiber.type;
             var candidateType = null;
             switch (tag) {
@@ -4860,8 +4860,8 @@
             _fiber && (fiber._debugNeedsRemount = true);
             if (_fiber || needsRender)
               alternate = enqueueConcurrentRenderForLane(fiber, 2), null !== alternate && scheduleUpdateOnFiber(alternate, fiber, 2);
-            null === child2 || _fiber || scheduleFibersWithFamiliesRecursively(
-              child2,
+            null === child || _fiber || scheduleFibersWithFamiliesRecursively(
+              child,
               updatedFamilies,
               staleFamilies
             );
@@ -5648,8 +5648,8 @@
           0 > componentEffectStartTime && (componentEffectStartTime = profilerStartTime);
         }
         function transferActualDuration(fiber) {
-          for (var child2 = fiber.child; child2; )
-            fiber.actualDuration += child2.actualDuration, child2 = child2.sibling;
+          for (var child = fiber.child; child; )
+            fiber.actualDuration += child.actualDuration, child = child.sibling;
         }
         function entangleAsyncAction(transition, thenable) {
           if (null === currentEntangledListeners) {
@@ -6170,13 +6170,13 @@
             "symbol" === typeof newChild && warnOnSymbolType(returnFiber, newChild);
             return null;
           }
-          function warnOnInvalidKey(returnFiber, workInProgress2, child2, knownKeys) {
-            if ("object" !== typeof child2 || null === child2) return knownKeys;
-            switch (child2.$$typeof) {
+          function warnOnInvalidKey(returnFiber, workInProgress2, child, knownKeys) {
+            if ("object" !== typeof child || null === child) return knownKeys;
+            switch (child.$$typeof) {
               case REACT_ELEMENT_TYPE:
               case REACT_PORTAL_TYPE:
-                warnForMissingKey(returnFiber, workInProgress2, child2);
-                var key = child2.key;
+                warnForMissingKey(returnFiber, workInProgress2, child);
+                var key = child.key;
                 if ("string" !== typeof key) break;
                 if (null === knownKeys) {
                   knownKeys = /* @__PURE__ */ new Set();
@@ -6195,7 +6195,7 @@
                 });
                 break;
               case REACT_LAZY_TYPE:
-                child2 = resolveLazy(child2), warnOnInvalidKey(returnFiber, workInProgress2, child2, knownKeys);
+                child = resolveLazy(child), warnOnInvalidKey(returnFiber, workInProgress2, child, knownKeys);
             }
             return knownKeys;
           }
@@ -6260,8 +6260,8 @@
                 currentFirstChild,
                 newIdx
               ), null === previousNewFiber ? resultingFirstChild = nextOldFiber : previousNewFiber.sibling = nextOldFiber, previousNewFiber = nextOldFiber);
-            shouldTrackSideEffects && oldFiber.forEach(function(child2) {
-              return deleteChild(returnFiber, child2);
+            shouldTrackSideEffects && oldFiber.forEach(function(child) {
+              return deleteChild(returnFiber, child);
             });
             isHydrating && pushTreeFork(returnFiber, newIdx);
             return resultingFirstChild;
@@ -6324,8 +6324,8 @@
                 currentFirstChild,
                 newIdx
               ), null === previousNewFiber ? resultingFirstChild = nextOldFiber : previousNewFiber.sibling = nextOldFiber, previousNewFiber = nextOldFiber);
-            shouldTrackSideEffects && oldFiber.forEach(function(child2) {
-              return deleteChild(returnFiber, child2);
+            shouldTrackSideEffects && oldFiber.forEach(function(child) {
+              return deleteChild(returnFiber, child);
             });
             isHydrating && pushTreeFork(returnFiber, newIdx);
             return resultingFirstChild;
@@ -7701,25 +7701,25 @@
           }
         }
         function mountEvent(callback) {
-          var hook = mountWorkInProgressHook(), ref2 = { impl: callback };
-          hook.memoizedState = ref2;
+          var hook = mountWorkInProgressHook(), ref = { impl: callback };
+          hook.memoizedState = ref;
           return function() {
             if ((executionContext & RenderContext) !== NoContext)
               throw Error(
                 "A function wrapped in useEffectEvent can't be called during rendering."
               );
-            return ref2.impl.apply(void 0, arguments);
+            return ref.impl.apply(void 0, arguments);
           };
         }
         function updateEvent(callback) {
-          var ref2 = updateWorkInProgressHook().memoizedState;
-          useEffectEventImpl({ ref: ref2, nextImpl: callback });
+          var ref = updateWorkInProgressHook().memoizedState;
+          useEffectEventImpl({ ref, nextImpl: callback });
           return function() {
             if ((executionContext & RenderContext) !== NoContext)
               throw Error(
                 "A function wrapped in useEffectEvent can't be called during rendering."
               );
-            return ref2.impl.apply(void 0, arguments);
+            return ref.impl.apply(void 0, arguments);
           };
         }
         function mountLayoutEffect(create, deps) {
@@ -7727,47 +7727,47 @@
           (currentlyRenderingFiber.mode & StrictEffectsMode) !== NoMode && (fiberFlags |= 134217728);
           return mountEffectImpl(fiberFlags, Layout, create, deps);
         }
-        function imperativeHandleEffect(create, ref2) {
-          if ("function" === typeof ref2) {
+        function imperativeHandleEffect(create, ref) {
+          if ("function" === typeof ref) {
             create = create();
-            var refCleanup = ref2(create);
+            var refCleanup = ref(create);
             return function() {
-              "function" === typeof refCleanup ? refCleanup() : ref2(null);
+              "function" === typeof refCleanup ? refCleanup() : ref(null);
             };
           }
-          if (null !== ref2 && void 0 !== ref2)
-            return ref2.hasOwnProperty("current") || console.error(
+          if (null !== ref && void 0 !== ref)
+            return ref.hasOwnProperty("current") || console.error(
               "Expected useImperativeHandle() first argument to either be a ref callback or React.createRef() object. Instead received: %s.",
-              "an object with keys {" + Object.keys(ref2).join(", ") + "}"
-            ), create = create(), ref2.current = create, function() {
-              ref2.current = null;
+              "an object with keys {" + Object.keys(ref).join(", ") + "}"
+            ), create = create(), ref.current = create, function() {
+              ref.current = null;
             };
         }
-        function mountImperativeHandle(ref2, create, deps) {
+        function mountImperativeHandle(ref, create, deps) {
           "function" !== typeof create && console.error(
             "Expected useImperativeHandle() second argument to be a function that creates a handle. Instead received: %s.",
             null !== create ? typeof create : "null"
           );
-          deps = null !== deps && void 0 !== deps ? deps.concat([ref2]) : null;
+          deps = null !== deps && void 0 !== deps ? deps.concat([ref]) : null;
           var fiberFlags = 4194308;
           (currentlyRenderingFiber.mode & StrictEffectsMode) !== NoMode && (fiberFlags |= 134217728);
           mountEffectImpl(
             fiberFlags,
             Layout,
-            imperativeHandleEffect.bind(null, create, ref2),
+            imperativeHandleEffect.bind(null, create, ref),
             deps
           );
         }
-        function updateImperativeHandle(ref2, create, deps) {
+        function updateImperativeHandle(ref, create, deps) {
           "function" !== typeof create && console.error(
             "Expected useImperativeHandle() second argument to be a function that creates a handle. Instead received: %s.",
             null !== create ? typeof create : "null"
           );
-          deps = null !== deps && void 0 !== deps ? deps.concat([ref2]) : null;
+          deps = null !== deps && void 0 !== deps ? deps.concat([ref]) : null;
           updateEffectImpl(
             4,
             Layout,
-            imperativeHandleEffect.bind(null, create, ref2),
+            imperativeHandleEffect.bind(null, create, ref),
             deps
           );
         }
@@ -8454,7 +8454,7 @@
         }
         function updateForwardRef(current2, workInProgress2, Component2, nextProps, renderLanes2) {
           Component2 = Component2.render;
-          var ref2 = workInProgress2.ref;
+          var ref = workInProgress2.ref;
           if ("ref" in nextProps) {
             var propsWithoutRef = {};
             for (var key in nextProps)
@@ -8466,7 +8466,7 @@
             workInProgress2,
             Component2,
             propsWithoutRef,
-            ref2,
+            ref,
             renderLanes2
           );
           key = checkDidRenderIdHook();
@@ -8708,15 +8708,15 @@
           return current2;
         }
         function markRef(current2, workInProgress2) {
-          var ref2 = workInProgress2.ref;
-          if (null === ref2)
+          var ref = workInProgress2.ref;
+          if (null === ref)
             null !== current2 && null !== current2.ref && (workInProgress2.flags |= 4194816);
           else {
-            if ("function" !== typeof ref2 && "object" !== typeof ref2)
+            if ("function" !== typeof ref && "object" !== typeof ref)
               throw Error(
                 "Expected ref to be a function, an object returned by React.createRef(), or undefined/null."
               );
-            if (null === current2 || current2.ref !== ref2)
+            if (null === current2 || current2.ref !== ref)
               workInProgress2.flags |= 4194816;
           }
         }
@@ -10159,8 +10159,8 @@
           else if ((completedWork.mode & ProfileMode) !== NoMode) {
             _treeBaseDuration = completedWork.actualDuration;
             _child2 = completedWork.selfBaseDuration;
-            for (var child2 = completedWork.child; null !== child2; )
-              newChildLanes |= child2.lanes | child2.childLanes, subtreeFlags |= child2.subtreeFlags, subtreeFlags |= child2.flags, _treeBaseDuration += child2.actualDuration, _child2 += child2.treeBaseDuration, child2 = child2.sibling;
+            for (var child = completedWork.child; null !== child; )
+              newChildLanes |= child.lanes | child.childLanes, subtreeFlags |= child.subtreeFlags, subtreeFlags |= child.flags, _treeBaseDuration += child.actualDuration, _child2 += child.treeBaseDuration, child = child.sibling;
             completedWork.actualDuration = _treeBaseDuration;
             completedWork.treeBaseDuration = _child2;
           } else
@@ -10822,8 +10822,8 @@
           );
         }
         function commitAttachRef(finishedWork) {
-          var ref2 = finishedWork.ref;
-          if (null !== ref2) {
+          var ref = finishedWork.ref;
+          if (null !== ref) {
             switch (finishedWork.tag) {
               case 26:
               case 27:
@@ -10836,19 +10836,19 @@
               default:
                 instanceToUse = finishedWork.stateNode;
             }
-            if ("function" === typeof ref2)
+            if ("function" === typeof ref)
               if (shouldProfile(finishedWork))
                 try {
-                  startEffectTimer(), finishedWork.refCleanup = ref2(instanceToUse);
+                  startEffectTimer(), finishedWork.refCleanup = ref(instanceToUse);
                 } finally {
                   recordEffectDuration();
                 }
-              else finishedWork.refCleanup = ref2(instanceToUse);
+              else finishedWork.refCleanup = ref(instanceToUse);
             else
-              "string" === typeof ref2 ? console.error("String refs are no longer supported.") : ref2.hasOwnProperty("current") || console.error(
+              "string" === typeof ref ? console.error("String refs are no longer supported.") : ref.hasOwnProperty("current") || console.error(
                 "Unexpected ref object provided for %s. Use either a ref-setter function or React.createRef().",
                 getComponentNameFromFiber(finishedWork)
-              ), ref2.current = instanceToUse;
+              ), ref.current = instanceToUse;
           }
         }
         function safelyAttachRef(current2, nearestMountedAncestor) {
@@ -10859,8 +10859,8 @@
           }
         }
         function safelyDetachRef(current2, nearestMountedAncestor) {
-          var ref2 = current2.ref, refCleanup = current2.refCleanup;
-          if (null !== ref2)
+          var ref = current2.ref, refCleanup = current2.refCleanup;
+          if (null !== ref)
             if ("function" === typeof refCleanup)
               try {
                 if (shouldProfile(current2))
@@ -10875,19 +10875,19 @@
               } finally {
                 current2.refCleanup = null, current2 = current2.alternate, null != current2 && (current2.refCleanup = null);
               }
-            else if ("function" === typeof ref2)
+            else if ("function" === typeof ref)
               try {
                 if (shouldProfile(current2))
                   try {
-                    startEffectTimer(), runWithFiberInDEV(current2, ref2, null);
+                    startEffectTimer(), runWithFiberInDEV(current2, ref, null);
                   } finally {
                     recordEffectDuration(current2);
                   }
-                else runWithFiberInDEV(current2, ref2, null);
+                else runWithFiberInDEV(current2, ref, null);
               } catch (error$7) {
                 captureCommitPhaseError(current2, nearestMountedAncestor, error$7);
               }
-            else ref2.current = null;
+            else ref.current = null;
         }
         function commitProfiler(finishedWork, current2, commitStartTime2, effectDuration) {
           var _finishedWork$memoize = finishedWork.memoizedProps, id = _finishedWork$memoize.id, onCommit = _finishedWork$memoize.onCommit;
@@ -12604,49 +12604,49 @@
         }
         function recursivelyTraverseAtomicPassiveEffects(finishedRoot$jscomp$0, parentFiber, committedLanes$jscomp$0, committedTransitions$jscomp$0, endTime$jscomp$0) {
           if (parentFiber.subtreeFlags & 10256 || 0 !== parentFiber.actualDuration && (null === parentFiber.alternate || parentFiber.alternate.child !== parentFiber.child))
-            for (var child2 = parentFiber.child; null !== child2; ) {
-              parentFiber = child2.sibling;
+            for (var child = parentFiber.child; null !== child; ) {
+              parentFiber = child.sibling;
               var finishedRoot = finishedRoot$jscomp$0, committedLanes = committedLanes$jscomp$0, committedTransitions = committedTransitions$jscomp$0, endTime = null !== parentFiber ? parentFiber.actualStartTime : endTime$jscomp$0, prevDeepEquality = alreadyWarnedForDeepEquality;
-              (child2.mode & ProfileMode) !== NoMode && 0 < child2.actualStartTime && 0 !== (child2.flags & 1) && logComponentRender(
-                child2,
-                child2.actualStartTime,
+              (child.mode & ProfileMode) !== NoMode && 0 < child.actualStartTime && 0 !== (child.flags & 1) && logComponentRender(
+                child,
+                child.actualStartTime,
                 endTime,
                 inHydratedSubtree,
                 committedLanes
               );
-              var flags = child2.flags;
-              switch (child2.tag) {
+              var flags = child.flags;
+              switch (child.tag) {
                 case 22:
                   recursivelyTraverseAtomicPassiveEffects(
                     finishedRoot,
-                    child2,
+                    child,
                     committedLanes,
                     committedTransitions,
                     endTime
                   );
-                  flags & 2048 && commitOffscreenPassiveMountEffects(child2.alternate, child2);
+                  flags & 2048 && commitOffscreenPassiveMountEffects(child.alternate, child);
                   break;
                 case 24:
                   recursivelyTraverseAtomicPassiveEffects(
                     finishedRoot,
-                    child2,
+                    child,
                     committedLanes,
                     committedTransitions,
                     endTime
                   );
-                  flags & 2048 && commitCachePassiveMountEffect(child2.alternate, child2);
+                  flags & 2048 && commitCachePassiveMountEffect(child.alternate, child);
                   break;
                 default:
                   recursivelyTraverseAtomicPassiveEffects(
                     finishedRoot,
-                    child2,
+                    child,
                     committedLanes,
                     committedTransitions,
                     endTime
                   );
               }
               alreadyWarnedForDeepEquality = prevDeepEquality;
-              child2 = parentFiber;
+              child = parentFiber;
             }
         }
         function recursivelyAccumulateSuspenseyCommit(parentFiber, committedLanes, suspendedState) {
@@ -13964,8 +13964,8 @@
             if ((unitOfWork.mode & ProfileMode) !== NoMode) {
               stopProfilerTimerIfRunningAndRecordIncompleteDuration(unitOfWork);
               next = unitOfWork.actualDuration;
-              for (var child2 = unitOfWork.child; null !== child2; )
-                next += child2.actualDuration, child2 = child2.sibling;
+              for (var child = unitOfWork.child; null !== child; )
+                next += child.actualDuration, child = child.sibling;
               unitOfWork.actualDuration = next;
             }
             next = unitOfWork.return;
@@ -16062,7 +16062,7 @@
             case "li":
               break;
             case "input":
-              var name6 = null, type = null, value = null, defaultValue = null, lastDefaultValue = null, checked = null, defaultChecked = null;
+              var name5 = null, type = null, value = null, defaultValue = null, lastDefaultValue = null, checked = null, defaultChecked = null;
               for (propKey in lastProps) {
                 var lastProp = lastProps[propKey];
                 if (lastProps.hasOwnProperty(propKey) && null != lastProp)
@@ -16093,7 +16093,7 @@
                       type = propKey;
                       break;
                     case "name":
-                      name6 = propKey;
+                      name5 = propKey;
                       break;
                     case "checked":
                       checked = propKey;
@@ -16141,7 +16141,7 @@
                 checked,
                 defaultChecked,
                 type,
-                name6
+                name5
               );
               return;
             case "select":
@@ -16163,9 +16163,9 @@
                         lastDefaultValue
                       );
                   }
-              for (name6 in nextProps)
-                if (type = nextProps[name6], lastDefaultValue = lastProps[name6], nextProps.hasOwnProperty(name6) && (null != type || null != lastDefaultValue))
-                  switch (name6) {
+              for (name5 in nextProps)
+                if (type = nextProps[name5], lastDefaultValue = lastProps[name5], nextProps.hasOwnProperty(name5) && (null != type || null != lastDefaultValue))
+                  switch (name5) {
                     case "value":
                       _propKey8 = type;
                       break;
@@ -16178,7 +16178,7 @@
                       type !== lastDefaultValue && setProp(
                         domElement,
                         tag,
-                        name6,
+                        name5,
                         type,
                         nextProps,
                         lastDefaultValue
@@ -16192,34 +16192,34 @@
             case "textarea":
               propKey = _propKey8 = null;
               for (defaultValue in lastProps)
-                if (name6 = lastProps[defaultValue], lastProps.hasOwnProperty(defaultValue) && null != name6 && !nextProps.hasOwnProperty(defaultValue))
+                if (name5 = lastProps[defaultValue], lastProps.hasOwnProperty(defaultValue) && null != name5 && !nextProps.hasOwnProperty(defaultValue))
                   switch (defaultValue) {
                     case "value":
                       break;
                     case "children":
                       break;
                     default:
-                      setProp(domElement, tag, defaultValue, null, nextProps, name6);
+                      setProp(domElement, tag, defaultValue, null, nextProps, name5);
                   }
               for (value in nextProps)
-                if (name6 = nextProps[value], type = lastProps[value], nextProps.hasOwnProperty(value) && (null != name6 || null != type))
+                if (name5 = nextProps[value], type = lastProps[value], nextProps.hasOwnProperty(value) && (null != name5 || null != type))
                   switch (value) {
                     case "value":
-                      _propKey8 = name6;
+                      _propKey8 = name5;
                       break;
                     case "defaultValue":
-                      propKey = name6;
+                      propKey = name5;
                       break;
                     case "children":
                       break;
                     case "dangerouslySetInnerHTML":
-                      if (null != name6)
+                      if (null != name5)
                         throw Error(
                           "`dangerouslySetInnerHTML` does not make sense on <textarea>."
                         );
                       break;
                     default:
-                      name6 !== type && setProp(domElement, tag, value, name6, nextProps, type);
+                      name5 !== type && setProp(domElement, tag, value, name5, nextProps, type);
                   }
               updateTextarea(domElement, _propKey8, propKey);
               return;
@@ -17180,11 +17180,11 @@
         function isSingletonScope(type) {
           return "head" === type;
         }
-        function removeChild(parentInstance, child2) {
-          parentInstance.removeChild(child2);
+        function removeChild(parentInstance, child) {
+          parentInstance.removeChild(child);
         }
-        function removeChildFromContainer(container, child2) {
-          (9 === container.nodeType ? container.body : "HTML" === container.nodeName ? container.ownerDocument.body : container).removeChild(child2);
+        function removeChildFromContainer(container, child) {
+          (9 === container.nodeType ? container.body : "HTML" === container.nodeName ? container.ownerDocument.body : container).removeChild(child);
         }
         function clearHydrationBoundary(parentInstance, hydrationInstance) {
           var node = hydrationInstance, depth = 0;
@@ -17286,8 +17286,8 @@
             } else if (!inRootOrSingleton)
               if ("input" === type && "hidden" === instance.type) {
                 checkAttributeStringCoercion(anyProps.name, "name");
-                var name6 = null == anyProps.name ? null : "" + anyProps.name;
-                if ("hidden" === anyProps.type && instance.getAttribute("name") === name6)
+                var name5 = null == anyProps.name ? null : "" + anyProps.name;
+                if ("hidden" === anyProps.type && instance.getAttribute("name") === name5)
                   return instance;
               } else return instance;
             else if (!instance[internalHoistableMarker])
@@ -17296,18 +17296,18 @@
                   if (!instance.hasAttribute("itemprop")) break;
                   return instance;
                 case "link":
-                  name6 = instance.getAttribute("rel");
-                  if ("stylesheet" === name6 && instance.hasAttribute("data-precedence"))
+                  name5 = instance.getAttribute("rel");
+                  if ("stylesheet" === name5 && instance.hasAttribute("data-precedence"))
                     break;
-                  else if (name6 !== anyProps.rel || instance.getAttribute("href") !== (null == anyProps.href || "" === anyProps.href ? null : anyProps.href) || instance.getAttribute("crossorigin") !== (null == anyProps.crossOrigin ? null : anyProps.crossOrigin) || instance.getAttribute("title") !== (null == anyProps.title ? null : anyProps.title))
+                  else if (name5 !== anyProps.rel || instance.getAttribute("href") !== (null == anyProps.href || "" === anyProps.href ? null : anyProps.href) || instance.getAttribute("crossorigin") !== (null == anyProps.crossOrigin ? null : anyProps.crossOrigin) || instance.getAttribute("title") !== (null == anyProps.title ? null : anyProps.title))
                     break;
                   return instance;
                 case "style":
                   if (instance.hasAttribute("data-precedence")) break;
                   return instance;
                 case "script":
-                  name6 = instance.getAttribute("src");
-                  if ((name6 !== (null == anyProps.src ? null : anyProps.src) || instance.getAttribute("type") !== (null == anyProps.type ? null : anyProps.type) || instance.getAttribute("crossorigin") !== (null == anyProps.crossOrigin ? null : anyProps.crossOrigin)) && name6 && instance.hasAttribute("async") && !instance.hasAttribute("itemprop"))
+                  name5 = instance.getAttribute("src");
+                  if ((name5 !== (null == anyProps.src ? null : anyProps.src) || instance.getAttribute("type") !== (null == anyProps.type ? null : anyProps.type) || instance.getAttribute("crossorigin") !== (null == anyProps.crossOrigin ? null : anyProps.crossOrigin)) && name5 && instance.hasAttribute("async") && !instance.hasAttribute("itemprop"))
                     break;
                   return instance;
                 default:
@@ -19863,23 +19863,23 @@
         var ownerHasKeyUseWarning = {};
         var ownerHasFunctionTypeWarning = {};
         var ownerHasSymbolTypeWarning = {};
-        warnForMissingKey = function(returnFiber, workInProgress2, child2) {
-          if (null !== child2 && "object" === typeof child2 && child2._store && (!child2._store.validated && null == child2.key || 2 === child2._store.validated)) {
-            if ("object" !== typeof child2._store)
+        warnForMissingKey = function(returnFiber, workInProgress2, child) {
+          if (null !== child && "object" === typeof child && child._store && (!child._store.validated && null == child.key || 2 === child._store.validated)) {
+            if ("object" !== typeof child._store)
               throw Error(
                 "React Component in warnForMissingKey should have a _store. This error is likely caused by a bug in React. Please file an issue."
               );
-            child2._store.validated = 1;
+            child._store.validated = 1;
             var componentName2 = getComponentNameFromFiber(returnFiber), componentKey = componentName2 || "null";
             if (!ownerHasKeyUseWarning[componentKey]) {
               ownerHasKeyUseWarning[componentKey] = true;
-              child2 = child2._owner;
+              child = child._owner;
               returnFiber = returnFiber._debugOwner;
               var currentComponentErrorInfo = "";
               returnFiber && "number" === typeof returnFiber.tag && (componentKey = getComponentNameFromFiber(returnFiber)) && (currentComponentErrorInfo = "\n\nCheck the render method of `" + componentKey + "`.");
               currentComponentErrorInfo || componentName2 && (currentComponentErrorInfo = "\n\nCheck the top-level render call using <" + componentName2 + ">.");
               var childOwnerAppendix = "";
-              null != child2 && returnFiber !== child2 && (componentName2 = null, "number" === typeof child2.tag ? componentName2 = getComponentNameFromFiber(child2) : "string" === typeof child2.name && (componentName2 = child2.name), componentName2 && (childOwnerAppendix = " It was passed a child from " + componentName2 + "."));
+              null != child && returnFiber !== child && (componentName2 = null, "number" === typeof child.tag ? componentName2 = getComponentNameFromFiber(child) : "string" === typeof child.name && (componentName2 = child.name), componentName2 && (childOwnerAppendix = " It was passed a child from " + componentName2 + "."));
               runWithFiberInDEV(workInProgress2, function() {
                 console.error(
                   'Each child in a list should have a unique "key" prop.%s%s See https://react.dev/link/warning-keys for more information.',
@@ -19947,11 +19947,11 @@
             checkDepsAreArrayDev(deps);
             return mountEffect(create, deps);
           },
-          useImperativeHandle: function(ref2, create, deps) {
+          useImperativeHandle: function(ref, create, deps) {
             currentHookNameInDev = "useImperativeHandle";
             mountHookTypesDev();
             checkDepsAreArrayDev(deps);
-            return mountImperativeHandle(ref2, create, deps);
+            return mountImperativeHandle(ref, create, deps);
           },
           useInsertionEffect: function(create, deps) {
             currentHookNameInDev = "useInsertionEffect";
@@ -20081,10 +20081,10 @@
             updateHookTypesDev();
             return mountEffect(create, deps);
           },
-          useImperativeHandle: function(ref2, create, deps) {
+          useImperativeHandle: function(ref, create, deps) {
             currentHookNameInDev = "useImperativeHandle";
             updateHookTypesDev();
-            return mountImperativeHandle(ref2, create, deps);
+            return mountImperativeHandle(ref, create, deps);
           },
           useInsertionEffect: function(create, deps) {
             currentHookNameInDev = "useInsertionEffect";
@@ -20211,10 +20211,10 @@
             updateHookTypesDev();
             updateEffectImpl(2048, Passive, create, deps);
           },
-          useImperativeHandle: function(ref2, create, deps) {
+          useImperativeHandle: function(ref, create, deps) {
             currentHookNameInDev = "useImperativeHandle";
             updateHookTypesDev();
-            return updateImperativeHandle(ref2, create, deps);
+            return updateImperativeHandle(ref, create, deps);
           },
           useInsertionEffect: function(create, deps) {
             currentHookNameInDev = "useInsertionEffect";
@@ -20341,10 +20341,10 @@
             updateHookTypesDev();
             updateEffectImpl(2048, Passive, create, deps);
           },
-          useImperativeHandle: function(ref2, create, deps) {
+          useImperativeHandle: function(ref, create, deps) {
             currentHookNameInDev = "useImperativeHandle";
             updateHookTypesDev();
-            return updateImperativeHandle(ref2, create, deps);
+            return updateImperativeHandle(ref, create, deps);
           },
           useInsertionEffect: function(create, deps) {
             currentHookNameInDev = "useInsertionEffect";
@@ -20478,11 +20478,11 @@
             mountHookTypesDev();
             return mountEffect(create, deps);
           },
-          useImperativeHandle: function(ref2, create, deps) {
+          useImperativeHandle: function(ref, create, deps) {
             currentHookNameInDev = "useImperativeHandle";
             warnInvalidHookAccess();
             mountHookTypesDev();
-            return mountImperativeHandle(ref2, create, deps);
+            return mountImperativeHandle(ref, create, deps);
           },
           useInsertionEffect: function(create, deps) {
             currentHookNameInDev = "useInsertionEffect";
@@ -20633,11 +20633,11 @@
             updateHookTypesDev();
             updateEffectImpl(2048, Passive, create, deps);
           },
-          useImperativeHandle: function(ref2, create, deps) {
+          useImperativeHandle: function(ref, create, deps) {
             currentHookNameInDev = "useImperativeHandle";
             warnInvalidHookAccess();
             updateHookTypesDev();
-            return updateImperativeHandle(ref2, create, deps);
+            return updateImperativeHandle(ref, create, deps);
           },
           useInsertionEffect: function(create, deps) {
             currentHookNameInDev = "useInsertionEffect";
@@ -20788,11 +20788,11 @@
             updateHookTypesDev();
             updateEffectImpl(2048, Passive, create, deps);
           },
-          useImperativeHandle: function(ref2, create, deps) {
+          useImperativeHandle: function(ref, create, deps) {
             currentHookNameInDev = "useImperativeHandle";
             warnInvalidHookAccess();
             updateHookTypesDev();
-            return updateImperativeHandle(ref2, create, deps);
+            return updateImperativeHandle(ref, create, deps);
           },
           useInsertionEffect: function(create, deps) {
             currentHookNameInDev = "useInsertionEffect";
@@ -21549,8 +21549,8 @@
           if ("object" === typeof type && null !== type && type.$$typeof === REACT_LAZY_TYPE)
             return "<...>";
           try {
-            var name6 = getComponentNameFromType(type);
-            return name6 ? "<" + name6 + ">" : "<...>";
+            var name5 = getComponentNameFromType(type);
+            return name5 ? "<" + name5 + ">" : "<...>";
           } catch (x2) {
             return "<...>";
           }
@@ -21743,6 +21743,139 @@
   // echly-extension/src/content.tsx
   var import_react9 = __toESM(require_react());
   var import_client = __toESM(require_client());
+
+  // echly-extension/src/contentAuthFetch.ts
+  var API_BASE = "https://echly-web.vercel.app";
+  function getFullUrl(input) {
+    if (typeof input === "string") {
+      return input.startsWith("http") ? input : API_BASE + input;
+    }
+    if (input instanceof URL) return input.href;
+    return input.url;
+  }
+  function authFetch(input, init = {}) {
+    const url = getFullUrl(input);
+    const method = init.method || "GET";
+    const headers = init.headers instanceof Headers ? Object.fromEntries(init.headers) : Array.isArray(init.headers) ? Object.fromEntries(init.headers) : { ...init.headers };
+    const body = init.body ?? null;
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: "echly-api", url, method, headers, body },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          if (!response) {
+            reject(new Error("No response from background"));
+            return;
+          }
+          const res = new Response(response.body ?? "", {
+            status: response.status ?? 0,
+            headers: response.headers ? new Headers(response.headers) : void 0
+          });
+          resolve(res);
+        }
+      );
+    });
+  }
+  async function apiFetch(path, options = {}) {
+    const url = path.startsWith("http") ? path : API_BASE + path;
+    return authFetch(url, options);
+  }
+
+  // echly-extension/src/contentScreenshot.ts
+  function generateFeedbackId() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return `fb-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  }
+  function uploadScreenshot(imageDataUrl, sessionId, feedbackId) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: "ECHLY_UPLOAD_SCREENSHOT", imageDataUrl, sessionId, feedbackId },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          if (response?.error) {
+            reject(new Error(response.error));
+            return;
+          }
+          if (response?.url) {
+            resolve(response.url);
+            return;
+          }
+          reject(new Error("No URL from background"));
+        }
+      );
+    });
+  }
+
+  // components/CaptureWidget/CaptureWidget.tsx
+  var import_react8 = __toESM(require_react());
+
+  // echly-extension/stubs/next-image.tsx
+  var import_react = __toESM(require_react());
+  function resolveSrc(src) {
+    if (typeof chrome !== "undefined" && chrome.runtime?.getURL && (src === "/Echly_logo.svg" || src.endsWith("Echly_logo.svg"))) {
+      return chrome.runtime.getURL("assets/Echly_logo.svg");
+    }
+    return src;
+  }
+  function Image2({ src, alt, width, height, className }) {
+    return /* @__PURE__ */ import_react.default.createElement(
+      "img",
+      {
+        src: resolveSrc(src),
+        alt,
+        width,
+        height,
+        className
+      }
+    );
+  }
+
+  // components/AudioWaveform.tsx
+  var import_react2 = __toESM(require_react());
+  var BAR_COUNT = 6;
+  var DELAYS = [0, 0.12, 0.28, 0.18, 0.34, 0.22];
+  var PEAKS = [18, 22, 20, 24, 19, 21];
+  function AudioWaveform({ isActive }) {
+    return /* @__PURE__ */ import_react2.default.createElement("div", { className: "flex items-center justify-center gap-[6px] h-[60px] waveform-root" }, [...Array(BAR_COUNT)].map((_, i) => /* @__PURE__ */ import_react2.default.createElement(
+      "span",
+      {
+        key: i,
+        className: `w-[4px] rounded-full bg-brand-accent transition-none waveform-bar ${isActive ? "waveform-bar--active" : "h-[6px] opacity-40"}`,
+        style: isActive ? {
+          animationDelay: `${DELAYS[i]}s`,
+          animationDuration: `${1.4 + i % 3 * 0.15}s`,
+          ["--peak"]: `${PEAKS[i]}px`
+        } : void 0
+      }
+    )), /* @__PURE__ */ import_react2.default.createElement("style", { jsx: true }, `
+        @keyframes waveform-organic {
+          0%, 100% {
+            height: 8px;
+            opacity: 0.85;
+          }
+          45% {
+            height: var(--peak, 20px);
+            opacity: 1;
+          }
+          55% {
+            height: var(--peak, 20px);
+            opacity: 1;
+          }
+        }
+
+        .waveform-bar--active {
+          animation: waveform-organic 1.55s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+        }
+      `));
+  }
 
   // node_modules/@firebase/util/dist/postinstall.mjs
   var getDefaultsFromPostinstall = () => void 0;
@@ -22057,7 +22190,7 @@
     }
   };
   var getDefaultAppConfig = () => getDefaults()?.config;
-  var getExperimentalSetting = (name6) => getDefaults()?.[`_${name6}`];
+  var getExperimentalSetting = (name5) => getDefaults()?.[`_${name5}`];
   var Deferred = class {
     constructor() {
       this.reject = () => {
@@ -22170,12 +22303,12 @@
     return { created, element: parentDiv };
   }
   var previouslyDismissed = false;
-  function updateEmulatorBanner(name6, isRunningEmulator) {
-    if (typeof window === "undefined" || typeof document === "undefined" || !isCloudWorkstation(window.location.host) || emulatorStatus[name6] === isRunningEmulator || emulatorStatus[name6] || // If already set to use emulator, can't go back to prod.
+  function updateEmulatorBanner(name5, isRunningEmulator) {
+    if (typeof window === "undefined" || typeof document === "undefined" || !isCloudWorkstation(window.location.host) || emulatorStatus[name5] === isRunningEmulator || emulatorStatus[name5] || // If already set to use emulator, can't go back to prod.
     previouslyDismissed) {
       return;
     }
-    emulatorStatus[name6] = isRunningEmulator;
+    emulatorStatus[name5] = isRunningEmulator;
     function prefixedId(id) {
       return `__firebase__banner__${id}`;
     }
@@ -22621,8 +22754,8 @@
      * @param instanceFactory Service factory responsible for creating the public interface
      * @param type whether the service provided by the component is public or private
      */
-    constructor(name6, instanceFactory, type) {
-      this.name = name6;
+    constructor(name5, instanceFactory, type) {
+      this.name = name5;
       this.instanceFactory = instanceFactory;
       this.type = type;
       this.multipleInstances = false;
@@ -22649,8 +22782,8 @@
   };
   var DEFAULT_ENTRY_NAME = "[DEFAULT]";
   var Provider = class {
-    constructor(name6, container) {
-      this.name = name6;
+    constructor(name5, container) {
+      this.name = name5;
       this.container = container;
       this.component = null;
       this.instances = /* @__PURE__ */ new Map();
@@ -22853,8 +22986,8 @@
     return component.instantiationMode === "EAGER";
   }
   var ComponentContainer = class {
-    constructor(name6) {
-      this.name = name6;
+    constructor(name5) {
+      this.name = name5;
       this.providers = /* @__PURE__ */ new Map();
     }
     /**
@@ -22887,12 +23020,12 @@
      * Firebase SDKs providing services should extend NameServiceMapping interface to register
      * themselves.
      */
-    getProvider(name6) {
-      if (this.providers.has(name6)) {
-        return this.providers.get(name6);
+    getProvider(name5) {
+      if (this.providers.has(name5)) {
+        return this.providers.get(name5);
       }
-      const provider = new Provider(name6, this);
-      this.providers.set(name6, provider);
+      const provider = new Provider(name5, this);
+      this.providers.set(name5, provider);
       return provider;
     }
     getProviders() {
@@ -22946,8 +23079,8 @@
      *
      * @param name The name that the logs will be associated with
      */
-    constructor(name6) {
-      this.name = name6;
+    constructor(name5) {
+      this.name = name5;
       this._logLevel = defaultLogLevel;
       this._logHandler = defaultLogHandler;
       this._userLogHandler = null;
@@ -23150,8 +23283,8 @@
   var unwrap = (value) => reverseTransformCache.get(value);
 
   // node_modules/idb/build/index.js
-  function openDB(name6, version6, { blocked, upgrade, blocking, terminated } = {}) {
-    const request = indexedDB.open(name6, version6);
+  function openDB(name5, version5, { blocked, upgrade, blocking, terminated } = {}) {
+    const request = indexedDB.open(name5, version5);
     const openPromise = wrap(request);
     if (upgrade) {
       request.addEventListener("upgradeneeded", (event) => {
@@ -23166,11 +23299,11 @@
         event
       ));
     }
-    openPromise.then((db3) => {
+    openPromise.then((db2) => {
       if (terminated)
-        db3.addEventListener("close", () => terminated());
+        db2.addEventListener("close", () => terminated());
       if (blocking) {
-        db3.addEventListener("versionchange", (event) => blocking(event.oldVersion, event.newVersion, event));
+        db2.addEventListener("versionchange", (event) => blocking(event.oldVersion, event.newVersion, event));
       }
     }).catch(() => {
     });
@@ -23301,11 +23434,11 @@
   var _apps = /* @__PURE__ */ new Map();
   var _serverApps = /* @__PURE__ */ new Map();
   var _components = /* @__PURE__ */ new Map();
-  function _addComponent(app3, component) {
+  function _addComponent(app2, component) {
     try {
-      app3.container.addComponent(component);
+      app2.container.addComponent(component);
     } catch (e) {
-      logger.debug(`Component ${component.name} failed to register with FirebaseApp ${app3.name}`, e);
+      logger.debug(`Component ${component.name} failed to register with FirebaseApp ${app2.name}`, e);
     }
   }
   function _registerComponent(component) {
@@ -23315,20 +23448,20 @@
       return false;
     }
     _components.set(componentName, component);
-    for (const app3 of _apps.values()) {
-      _addComponent(app3, component);
+    for (const app2 of _apps.values()) {
+      _addComponent(app2, component);
     }
     for (const serverApp of _serverApps.values()) {
       _addComponent(serverApp, component);
     }
     return true;
   }
-  function _getProvider(app3, name6) {
-    const heartbeatController = app3.container.getProvider("heartbeat").getImmediate({ optional: true });
+  function _getProvider(app2, name5) {
+    const heartbeatController = app2.container.getProvider("heartbeat").getImmediate({ optional: true });
     if (heartbeatController) {
       void heartbeatController.triggerHeartbeat();
     }
-    return app3.container.getProvider(name6);
+    return app2.container.getProvider(name5);
   }
   function _isFirebaseServerApp(obj) {
     if (obj === null || obj === void 0) {
@@ -23453,18 +23586,18 @@
   function initializeApp(_options, rawConfig = {}) {
     let options = _options;
     if (typeof rawConfig !== "object") {
-      const name7 = rawConfig;
-      rawConfig = { name: name7 };
+      const name6 = rawConfig;
+      rawConfig = { name: name6 };
     }
     const config = {
       name: DEFAULT_ENTRY_NAME2,
       automaticDataCollectionEnabled: true,
       ...rawConfig
     };
-    const name6 = config.name;
-    if (typeof name6 !== "string" || !name6) {
+    const name5 = config.name;
+    if (typeof name5 !== "string" || !name5) {
       throw ERROR_FACTORY.create("bad-app-name", {
-        appName: String(name6)
+        appName: String(name5)
       });
     }
     options || (options = getDefaultAppConfig());
@@ -23474,42 +23607,42 @@
         /* AppError.NO_OPTIONS */
       );
     }
-    const existingApp = _apps.get(name6);
+    const existingApp = _apps.get(name5);
     if (existingApp) {
       if (deepEqual(options, existingApp.options) && deepEqual(config, existingApp.config)) {
         return existingApp;
       } else {
-        throw ERROR_FACTORY.create("duplicate-app", { appName: name6 });
+        throw ERROR_FACTORY.create("duplicate-app", { appName: name5 });
       }
     }
-    const container = new ComponentContainer(name6);
+    const container = new ComponentContainer(name5);
     for (const component of _components.values()) {
       container.addComponent(component);
     }
     const newApp = new FirebaseAppImpl(options, config, container);
-    _apps.set(name6, newApp);
+    _apps.set(name5, newApp);
     return newApp;
   }
-  function getApp(name6 = DEFAULT_ENTRY_NAME2) {
-    const app3 = _apps.get(name6);
-    if (!app3 && name6 === DEFAULT_ENTRY_NAME2 && getDefaultAppConfig()) {
+  function getApp(name5 = DEFAULT_ENTRY_NAME2) {
+    const app2 = _apps.get(name5);
+    if (!app2 && name5 === DEFAULT_ENTRY_NAME2 && getDefaultAppConfig()) {
       return initializeApp();
     }
-    if (!app3) {
-      throw ERROR_FACTORY.create("no-app", { appName: name6 });
+    if (!app2) {
+      throw ERROR_FACTORY.create("no-app", { appName: name5 });
     }
-    return app3;
+    return app2;
   }
-  function registerVersion(libraryKeyOrName, version6, variant) {
+  function registerVersion(libraryKeyOrName, version5, variant) {
     let library = PLATFORM_LOG_STRING[libraryKeyOrName] ?? libraryKeyOrName;
     if (variant) {
       library += `-${variant}`;
     }
     const libraryMismatch = library.match(/\s|\//);
-    const versionMismatch = version6.match(/\s|\//);
+    const versionMismatch = version5.match(/\s|\//);
     if (libraryMismatch || versionMismatch) {
       const warning = [
-        `Unable to register library "${library}" with version "${version6}":`
+        `Unable to register library "${library}" with version "${version5}":`
       ];
       if (libraryMismatch) {
         warning.push(`library name "${library}" contains illegal characters (whitespace or "/")`);
@@ -23518,14 +23651,14 @@
         warning.push("and");
       }
       if (versionMismatch) {
-        warning.push(`version name "${version6}" contains illegal characters (whitespace or "/")`);
+        warning.push(`version name "${version5}" contains illegal characters (whitespace or "/")`);
       }
       logger.warn(warning.join(" "));
       return;
     }
     _registerComponent(new Component(
       `${library}-version`,
-      () => ({ library, version: version6 }),
+      () => ({ library, version: version5 }),
       "VERSION"
       /* ComponentType.VERSION */
     ));
@@ -23537,11 +23670,11 @@
   function getDbPromise() {
     if (!dbPromise) {
       dbPromise = openDB(DB_NAME, DB_VERSION, {
-        upgrade: (db3, oldVersion) => {
+        upgrade: (db2, oldVersion) => {
           switch (oldVersion) {
             case 0:
               try {
-                db3.createObjectStore(STORE_NAME);
+                db2.createObjectStore(STORE_NAME);
               } catch (e) {
                 console.warn(e);
               }
@@ -23555,11 +23688,11 @@
     }
     return dbPromise;
   }
-  async function readHeartbeatsFromIndexedDB(app3) {
+  async function readHeartbeatsFromIndexedDB(app2) {
     try {
-      const db3 = await getDbPromise();
-      const tx = db3.transaction(STORE_NAME);
-      const result = await tx.objectStore(STORE_NAME).get(computeKey(app3));
+      const db2 = await getDbPromise();
+      const tx = db2.transaction(STORE_NAME);
+      const result = await tx.objectStore(STORE_NAME).get(computeKey(app2));
       await tx.done;
       return result;
     } catch (e) {
@@ -23573,12 +23706,12 @@
       }
     }
   }
-  async function writeHeartbeatsToIndexedDB(app3, heartbeatObject) {
+  async function writeHeartbeatsToIndexedDB(app2, heartbeatObject) {
     try {
-      const db3 = await getDbPromise();
-      const tx = db3.transaction(STORE_NAME, "readwrite");
+      const db2 = await getDbPromise();
+      const tx = db2.transaction(STORE_NAME, "readwrite");
       const objectStore = tx.objectStore(STORE_NAME);
-      await objectStore.put(heartbeatObject, computeKey(app3));
+      await objectStore.put(heartbeatObject, computeKey(app2));
       await tx.done;
     } catch (e) {
       if (e instanceof FirebaseError) {
@@ -23591,8 +23724,8 @@
       }
     }
   }
-  function computeKey(app3) {
-    return `${app3.name}!${app3.options.appId}`;
+  function computeKey(app2) {
+    return `${app2.name}!${app2.options.appId}`;
   }
   var MAX_HEADER_BYTES = 1024;
   var MAX_NUM_STORED_HEARTBEATS = 30;
@@ -23600,8 +23733,8 @@
     constructor(container) {
       this.container = container;
       this._heartbeatsCache = null;
-      const app3 = this.container.getProvider("app").getImmediate();
-      this._storage = new HeartbeatStorageImpl(app3);
+      const app2 = this.container.getProvider("app").getImmediate();
+      this._storage = new HeartbeatStorageImpl(app2);
       this._heartbeatsCachePromise = this._storage.read().then((result) => {
         this._heartbeatsCache = result;
         return result;
@@ -23705,8 +23838,8 @@
     };
   }
   var HeartbeatStorageImpl = class {
-    constructor(app3) {
-      this.app = app3;
+    constructor(app2) {
+      this.app = app2;
       this._canUseIndexedDBPromise = this.runIndexedDBEnvironmentCheck();
     }
     async runIndexedDBEnvironmentCheck() {
@@ -23801,6 +23934,11 @@
   }
   registerCoreComponents("");
 
+  // node_modules/firebase/app/dist/esm/index.esm.js
+  var name2 = "firebase";
+  var version2 = "12.10.0";
+  registerVersion(name2, version2, "app");
+
   // node_modules/@firebase/auth/dist/esm/index-3398f4bb.js
   function _prodErrorMap() {
     return {
@@ -23829,18 +23967,18 @@
   function _createError(authOrCode, ...rest) {
     return createErrorInternal(authOrCode, ...rest);
   }
-  function _errorWithCustomMessage(auth3, code, message) {
+  function _errorWithCustomMessage(auth2, code, message) {
     const errorMap = {
       ...prodErrorMap(),
       [code]: message
     };
     const factory2 = new ErrorFactory("auth", "Firebase", errorMap);
     return factory2.create(code, {
-      appName: auth3.name
+      appName: auth2.name
     });
   }
-  function _serverAppCurrentUserOperationNotSupportedError(auth3) {
-    return _errorWithCustomMessage(auth3, "operation-not-supported-in-this-environment", "Operations that alter the current user are not supported in conjunction with FirebaseServerApp");
+  function _serverAppCurrentUserOperationNotSupportedError(auth2) {
+    return _errorWithCustomMessage(auth2, "operation-not-supported-in-this-environment", "Operations that alter the current user are not supported in conjunction with FirebaseServerApp");
   }
   function createErrorInternal(authOrCode, ...rest) {
     if (typeof authOrCode !== "string") {
@@ -24208,17 +24346,17 @@
     /* Endpoint.TOKEN */
   ];
   var DEFAULT_API_TIMEOUT_MS = new Delay(3e4, 6e4);
-  function _addTidIfNecessary(auth3, request) {
-    if (auth3.tenantId && !request.tenantId) {
+  function _addTidIfNecessary(auth2, request) {
+    if (auth2.tenantId && !request.tenantId) {
       return {
         ...request,
-        tenantId: auth3.tenantId
+        tenantId: auth2.tenantId
       };
     }
     return request;
   }
-  async function _performApiRequest(auth3, method, path, request, customErrorMap = {}) {
-    return _performFetchWithErrorHandling(auth3, customErrorMap, async () => {
+  async function _performApiRequest(auth2, method, path, request, customErrorMap = {}) {
+    return _performFetchWithErrorHandling(auth2, customErrorMap, async () => {
       let body = {};
       let params = {};
       if (request) {
@@ -24231,19 +24369,19 @@
         }
       }
       const query2 = querystring({
-        key: auth3.config.apiKey,
+        key: auth2.config.apiKey,
         ...params
       }).slice(1);
-      const headers = await auth3._getAdditionalHeaders();
+      const headers = await auth2._getAdditionalHeaders();
       headers[
         "Content-Type"
         /* HttpHeader.CONTENT_TYPE */
       ] = "application/json";
-      if (auth3.languageCode) {
+      if (auth2.languageCode) {
         headers[
           "X-Firebase-Locale"
           /* HttpHeader.X_FIREBASE_LOCALE */
-        ] = auth3.languageCode;
+        ] = auth2.languageCode;
       }
       const fetchArgs = {
         method,
@@ -24253,17 +24391,17 @@
       if (!isCloudflareWorker()) {
         fetchArgs.referrerPolicy = "no-referrer";
       }
-      if (auth3.emulatorConfig && isCloudWorkstation(auth3.emulatorConfig.host)) {
+      if (auth2.emulatorConfig && isCloudWorkstation(auth2.emulatorConfig.host)) {
         fetchArgs.credentials = "include";
       }
-      return FetchProvider.fetch()(await _getFinalTarget(auth3, auth3.config.apiHost, path, query2), fetchArgs);
+      return FetchProvider.fetch()(await _getFinalTarget(auth2, auth2.config.apiHost, path, query2), fetchArgs);
     });
   }
-  async function _performFetchWithErrorHandling(auth3, customErrorMap, fetchFn) {
-    auth3._canInitEmulator = false;
+  async function _performFetchWithErrorHandling(auth2, customErrorMap, fetchFn) {
+    auth2._canInitEmulator = false;
     const errorMap = { ...SERVER_ERROR_MAP, ...customErrorMap };
     try {
-      const networkTimeout = new NetworkTimeout(auth3);
+      const networkTimeout = new NetworkTimeout(auth2);
       const response = await Promise.race([
         fetchFn(),
         networkTimeout.promise
@@ -24271,7 +24409,7 @@
       networkTimeout.clearNetworkTimeout();
       const json = await response.json();
       if ("needConfirmation" in json) {
-        throw _makeTaggedError(auth3, "account-exists-with-different-credential", json);
+        throw _makeTaggedError(auth2, "account-exists-with-different-credential", json);
       }
       if (response.ok && !("errorMessage" in json)) {
         return json;
@@ -24279,39 +24417,39 @@
         const errorMessage = response.ok ? json.errorMessage : json.error.message;
         const [serverErrorCode, serverErrorMessage] = errorMessage.split(" : ");
         if (serverErrorCode === "FEDERATED_USER_ID_ALREADY_LINKED") {
-          throw _makeTaggedError(auth3, "credential-already-in-use", json);
+          throw _makeTaggedError(auth2, "credential-already-in-use", json);
         } else if (serverErrorCode === "EMAIL_EXISTS") {
-          throw _makeTaggedError(auth3, "email-already-in-use", json);
+          throw _makeTaggedError(auth2, "email-already-in-use", json);
         } else if (serverErrorCode === "USER_DISABLED") {
-          throw _makeTaggedError(auth3, "user-disabled", json);
+          throw _makeTaggedError(auth2, "user-disabled", json);
         }
         const authError = errorMap[serverErrorCode] || serverErrorCode.toLowerCase().replace(/[_\s]+/g, "-");
         if (serverErrorMessage) {
-          throw _errorWithCustomMessage(auth3, authError, serverErrorMessage);
+          throw _errorWithCustomMessage(auth2, authError, serverErrorMessage);
         } else {
-          _fail(auth3, authError);
+          _fail(auth2, authError);
         }
       }
     } catch (e) {
       if (e instanceof FirebaseError) {
         throw e;
       }
-      _fail(auth3, "network-request-failed", { "message": String(e) });
+      _fail(auth2, "network-request-failed", { "message": String(e) });
     }
   }
-  async function _performSignInRequest(auth3, method, path, request, customErrorMap = {}) {
-    const serverResponse = await _performApiRequest(auth3, method, path, request, customErrorMap);
+  async function _performSignInRequest(auth2, method, path, request, customErrorMap = {}) {
+    const serverResponse = await _performApiRequest(auth2, method, path, request, customErrorMap);
     if ("mfaPendingCredential" in serverResponse) {
-      _fail(auth3, "multi-factor-auth-required", {
+      _fail(auth2, "multi-factor-auth-required", {
         _serverResponse: serverResponse
       });
     }
     return serverResponse;
   }
-  async function _getFinalTarget(auth3, host, path, query2) {
+  async function _getFinalTarget(auth2, host, path, query2) {
     const base = `${host}${path}?${query2}`;
-    const authInternal = auth3;
-    const finalTarget = authInternal.config.emulator ? _emulatorUrl(auth3.config, base) : `${auth3.config.apiScheme}://${base}`;
+    const authInternal = auth2;
+    const finalTarget = authInternal.config.emulator ? _emulatorUrl(auth2.config, base) : `${auth2.config.apiScheme}://${base}`;
     if (CookieAuthProxiedEndpoints.includes(path)) {
       await authInternal._persistenceManagerAvailable;
       if (authInternal._getPersistenceType() === "COOKIE") {
@@ -24337,8 +24475,8 @@
     clearNetworkTimeout() {
       clearTimeout(this.timer);
     }
-    constructor(auth3) {
-      this.auth = auth3;
+    constructor(auth2) {
+      this.auth = auth2;
       this.timer = null;
       this.promise = new Promise((_, reject) => {
         this.timer = setTimeout(() => {
@@ -24351,9 +24489,9 @@
       });
     }
   };
-  function _makeTaggedError(auth3, code, response) {
+  function _makeTaggedError(auth2, code, response) {
     const errorParams = {
-      appName: auth3.name
+      appName: auth2.name
     };
     if (response.email) {
       errorParams.email = response.email;
@@ -24361,7 +24499,7 @@
     if (response.phoneNumber) {
       errorParams.phoneNumber = response.phoneNumber;
     }
-    const error = _createError(auth3, code, errorParams);
+    const error = _createError(auth2, code, errorParams);
     error.customData._tokenResponse = response;
     return error;
   }
@@ -24420,14 +24558,14 @@
       );
     }
   };
-  async function getRecaptchaConfig(auth3, request) {
-    return _performApiRequest(auth3, "GET", "/v2/recaptchaConfig", _addTidIfNecessary(auth3, request));
+  async function getRecaptchaConfig(auth2, request) {
+    return _performApiRequest(auth2, "GET", "/v2/recaptchaConfig", _addTidIfNecessary(auth2, request));
   }
-  async function deleteAccount(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v1/accounts:delete", request);
+  async function deleteAccount(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v1/accounts:delete", request);
   }
-  async function getAccountInfo(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v1/accounts:lookup", request);
+  async function getAccountInfo(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v1/accounts:lookup", request);
   }
   function utcTimestampToDateString(utcTimestamp) {
     if (!utcTimestamp) {
@@ -24608,12 +24746,12 @@
     }
   };
   async function _reloadWithoutSaving(user) {
-    const auth3 = user.auth;
+    const auth2 = user.auth;
     const idToken = await user.getIdToken();
-    const response = await _logoutIfInvalidated(user, getAccountInfo(auth3, { idToken }));
+    const response = await _logoutIfInvalidated(user, getAccountInfo(auth2, { idToken }));
     _assert(
       response?.users.length,
-      auth3,
+      auth2,
       "internal-error"
       /* AuthErrorCode.INTERNAL_ERROR */
     );
@@ -24660,15 +24798,15 @@
       };
     });
   }
-  async function requestStsToken(auth3, refreshToken) {
-    const response = await _performFetchWithErrorHandling(auth3, {}, async () => {
+  async function requestStsToken(auth2, refreshToken) {
+    const response = await _performFetchWithErrorHandling(auth2, {}, async () => {
       const body = querystring({
         "grant_type": "refresh_token",
         "refresh_token": refreshToken
       }).slice(1);
-      const { tokenApiHost, apiKey } = auth3.config;
-      const url = await _getFinalTarget(auth3, tokenApiHost, "/v1/token", `key=${apiKey}`);
-      const headers = await auth3._getAdditionalHeaders();
+      const { tokenApiHost, apiKey } = auth2.config;
+      const url = await _getFinalTarget(auth2, tokenApiHost, "/v1/token", `key=${apiKey}`);
+      const headers = await auth2._getAdditionalHeaders();
       headers[
         "Content-Type"
         /* HttpHeader.CONTENT_TYPE */
@@ -24678,7 +24816,7 @@
         headers,
         body
       };
-      if (auth3.emulatorConfig && isCloudWorkstation(auth3.emulatorConfig.host)) {
+      if (auth2.emulatorConfig && isCloudWorkstation(auth2.emulatorConfig.host)) {
         options.credentials = "include";
       }
       return FetchProvider.fetch()(url, options);
@@ -24689,8 +24827,8 @@
       refreshToken: response.refresh_token
     };
   }
-  async function revokeToken(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v2/accounts:revokeToken", _addTidIfNecessary(auth3, request));
+  async function revokeToken(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v2/accounts:revokeToken", _addTidIfNecessary(auth2, request));
   }
   var StsTokenManager = class _StsTokenManager {
     constructor() {
@@ -24729,18 +24867,18 @@
       const expiresIn = _tokenExpiresIn(idToken);
       this.updateTokensAndExpiration(idToken, null, expiresIn);
     }
-    async getToken(auth3, forceRefresh = false) {
+    async getToken(auth2, forceRefresh = false) {
       if (!forceRefresh && this.accessToken && !this.isExpired) {
         return this.accessToken;
       }
       _assert(
         this.refreshToken,
-        auth3,
+        auth2,
         "user-token-expired"
         /* AuthErrorCode.TOKEN_EXPIRED */
       );
       if (this.refreshToken) {
-        await this.refresh(auth3, this.refreshToken);
+        await this.refresh(auth2, this.refreshToken);
         return this.accessToken;
       }
       return null;
@@ -24748,8 +24886,8 @@
     clearRefreshToken() {
       this.refreshToken = null;
     }
-    async refresh(auth3, oldToken) {
-      const { accessToken, refreshToken, expiresIn } = await requestStsToken(auth3, oldToken);
+    async refresh(auth2, oldToken) {
+      const { accessToken, refreshToken, expiresIn } = await requestStsToken(auth2, oldToken);
       this.updateTokensAndExpiration(accessToken, refreshToken, Number(expiresIn));
     }
     updateTokensAndExpiration(accessToken, refreshToken, expiresInSec) {
@@ -24803,13 +24941,13 @@
     _assert(typeof assertion === "string" || typeof assertion === "undefined", "internal-error", { appName });
   }
   var UserImpl = class _UserImpl {
-    constructor({ uid, auth: auth3, stsTokenManager, ...opt }) {
+    constructor({ uid, auth: auth2, stsTokenManager, ...opt }) {
       this.providerId = "firebase";
       this.proactiveRefresh = new ProactiveRefresh(this);
       this.reloadUserInfo = null;
       this.reloadListener = null;
       this.uid = uid;
-      this.auth = auth3;
+      this.auth = auth2;
       this.stsTokenManager = stsTokenManager;
       this.accessToken = stsTokenManager.accessToken;
       this.displayName = opt.displayName || null;
@@ -24864,10 +25002,10 @@
       this.metadata._copy(user.metadata);
       this.stsTokenManager._assign(user.stsTokenManager);
     }
-    _clone(auth3) {
+    _clone(auth2) {
       const newUser = new _UserImpl({
         ...this,
-        auth: auth3,
+        auth: auth2,
         stsTokenManager: this.stsTokenManager._clone()
       });
       newUser.metadata._copy(this.metadata);
@@ -24899,13 +25037,13 @@
     _stopProactiveRefresh() {
       this.proactiveRefresh._stop();
     }
-    async _updateTokensIfNecessary(response, reload3 = false) {
+    async _updateTokensIfNecessary(response, reload2 = false) {
       let tokensRefreshed = false;
       if (response.idToken && response.idToken !== this.stsTokenManager.accessToken) {
         this.stsTokenManager.updateFromServerResponse(response);
         tokensRefreshed = true;
       }
-      if (reload3) {
+      if (reload2) {
         await _reloadWithoutSaving(this);
       }
       await this.auth._persistUserIfCurrent(this);
@@ -24948,7 +25086,7 @@
     get refreshToken() {
       return this.stsTokenManager.refreshToken || "";
     }
-    static _fromJSON(auth3, object) {
+    static _fromJSON(auth2, object) {
       const displayName = object.displayName ?? void 0;
       const email = object.email ?? void 0;
       const phoneNumber = object.phoneNumber ?? void 0;
@@ -24960,40 +25098,40 @@
       const { uid, emailVerified, isAnonymous, providerData, stsTokenManager: plainObjectTokenManager } = object;
       _assert(
         uid && plainObjectTokenManager,
-        auth3,
+        auth2,
         "internal-error"
         /* AuthErrorCode.INTERNAL_ERROR */
       );
       const stsTokenManager = StsTokenManager.fromJSON(this.name, plainObjectTokenManager);
       _assert(
         typeof uid === "string",
-        auth3,
+        auth2,
         "internal-error"
         /* AuthErrorCode.INTERNAL_ERROR */
       );
-      assertStringOrUndefined(displayName, auth3.name);
-      assertStringOrUndefined(email, auth3.name);
+      assertStringOrUndefined(displayName, auth2.name);
+      assertStringOrUndefined(email, auth2.name);
       _assert(
         typeof emailVerified === "boolean",
-        auth3,
+        auth2,
         "internal-error"
         /* AuthErrorCode.INTERNAL_ERROR */
       );
       _assert(
         typeof isAnonymous === "boolean",
-        auth3,
+        auth2,
         "internal-error"
         /* AuthErrorCode.INTERNAL_ERROR */
       );
-      assertStringOrUndefined(phoneNumber, auth3.name);
-      assertStringOrUndefined(photoURL, auth3.name);
-      assertStringOrUndefined(tenantId, auth3.name);
-      assertStringOrUndefined(_redirectEventId, auth3.name);
-      assertStringOrUndefined(createdAt, auth3.name);
-      assertStringOrUndefined(lastLoginAt, auth3.name);
+      assertStringOrUndefined(phoneNumber, auth2.name);
+      assertStringOrUndefined(photoURL, auth2.name);
+      assertStringOrUndefined(tenantId, auth2.name);
+      assertStringOrUndefined(_redirectEventId, auth2.name);
+      assertStringOrUndefined(createdAt, auth2.name);
+      assertStringOrUndefined(lastLoginAt, auth2.name);
       const user = new _UserImpl({
         uid,
-        auth: auth3,
+        auth: auth2,
         email,
         emailVerified,
         displayName,
@@ -25018,12 +25156,12 @@
      * @param auth
      * @param idTokenResponse
      */
-    static async _fromIdTokenResponse(auth3, idTokenResponse, isAnonymous = false) {
+    static async _fromIdTokenResponse(auth2, idTokenResponse, isAnonymous = false) {
       const stsTokenManager = new StsTokenManager();
       stsTokenManager.updateFromServerResponse(idTokenResponse);
       const user = new _UserImpl({
         uid: idTokenResponse.localId,
-        auth: auth3,
+        auth: auth2,
         stsTokenManager,
         isAnonymous
       });
@@ -25035,7 +25173,7 @@
      * @param auth
      * @param idTokenResponse
      */
-    static async _fromGetAccountInfoResponse(auth3, response, idToken) {
+    static async _fromGetAccountInfoResponse(auth2, response, idToken) {
       const coreAccount = response.users[0];
       _assert(
         coreAccount.localId !== void 0,
@@ -25048,7 +25186,7 @@
       stsTokenManager.updateFromIdToken(idToken);
       const user = new _UserImpl({
         uid: coreAccount.localId,
-        auth: auth3,
+        auth: auth2,
         stsTokenManager,
         isAnonymous
       });
@@ -25111,14 +25249,14 @@
     return `${"firebase"}:${key}:${apiKey}:${appName}`;
   }
   var PersistenceUserManager = class _PersistenceUserManager {
-    constructor(persistence, auth3, userKey) {
+    constructor(persistence, auth2, userKey) {
       this.persistence = persistence;
-      this.auth = auth3;
+      this.auth = auth2;
       this.userKey = userKey;
-      const { config, name: name6 } = this.auth;
-      this.fullUserKey = _persistenceKeyName(this.userKey, config.apiKey, name6);
-      this.fullPersistenceKey = _persistenceKeyName("persistence", config.apiKey, name6);
-      this.boundEventHandler = auth3._onStorageEvent.bind(auth3);
+      const { config, name: name5 } = this.auth;
+      this.fullUserKey = _persistenceKeyName(this.userKey, config.apiKey, name5);
+      this.fullPersistenceKey = _persistenceKeyName("persistence", config.apiKey, name5);
+      this.boundEventHandler = auth2._onStorageEvent.bind(auth2);
       this.persistence._addListener(this.fullUserKey, this.boundEventHandler);
     }
     setCurrentUser(user) {
@@ -25158,9 +25296,9 @@
     delete() {
       this.persistence._removeListener(this.fullUserKey, this.boundEventHandler);
     }
-    static async create(auth3, persistenceHierarchy, userKey = "authUser") {
+    static async create(auth2, persistenceHierarchy, userKey = "authUser") {
       if (!persistenceHierarchy.length) {
-        return new _PersistenceUserManager(_getInstance(inMemoryPersistence), auth3, userKey);
+        return new _PersistenceUserManager(_getInstance(inMemoryPersistence), auth2, userKey);
       }
       const availablePersistences = (await Promise.all(persistenceHierarchy.map(async (persistence) => {
         if (await persistence._isAvailable()) {
@@ -25169,7 +25307,7 @@
         return void 0;
       }))).filter((persistence) => persistence);
       let selectedPersistence = availablePersistences[0] || _getInstance(inMemoryPersistence);
-      const key = _persistenceKeyName(userKey, auth3.config.apiKey, auth3.name);
+      const key = _persistenceKeyName(userKey, auth2.config.apiKey, auth2.name);
       let userToMigrate = null;
       for (const persistence of persistenceHierarchy) {
         try {
@@ -25177,15 +25315,15 @@
           if (blob) {
             let user;
             if (typeof blob === "string") {
-              const response = await getAccountInfo(auth3, {
+              const response = await getAccountInfo(auth2, {
                 idToken: blob
               }).catch(() => void 0);
               if (!response) {
                 break;
               }
-              user = await UserImpl._fromGetAccountInfoResponse(auth3, response, blob);
+              user = await UserImpl._fromGetAccountInfoResponse(auth2, response, blob);
             } else {
-              user = UserImpl._fromJSON(auth3, blob);
+              user = UserImpl._fromJSON(auth2, blob);
             }
             if (persistence !== selectedPersistence) {
               userToMigrate = user;
@@ -25198,7 +25336,7 @@
       }
       const migrationHierarchy = availablePersistences.filter((p) => p._shouldAllowMigration);
       if (!selectedPersistence._shouldAllowMigration || !migrationHierarchy.length) {
-        return new _PersistenceUserManager(selectedPersistence, auth3, userKey);
+        return new _PersistenceUserManager(selectedPersistence, auth2, userKey);
       }
       selectedPersistence = migrationHierarchy[0];
       if (userToMigrate) {
@@ -25212,7 +25350,7 @@
           }
         }
       }));
-      return new _PersistenceUserManager(selectedPersistence, auth3, userKey);
+      return new _PersistenceUserManager(selectedPersistence, auth2, userKey);
     }
   };
   function _getBrowserName(userAgent) {
@@ -25298,8 +25436,8 @@
     return `${reportedPlatform}/${"JsCore"}/${SDK_VERSION}/${reportedFrameworks}`;
   }
   var AuthMiddlewareQueue = class {
-    constructor(auth3) {
-      this.auth = auth3;
+    constructor(auth2) {
+      this.auth = auth2;
       this.queue = [];
     }
     pushCallback(callback, onAbort) {
@@ -25344,8 +25482,8 @@
       }
     }
   };
-  async function _getPasswordPolicy(auth3, request = {}) {
-    return _performApiRequest(auth3, "GET", "/v2/passwordPolicy", _addTidIfNecessary(auth3, request));
+  async function _getPasswordPolicy(auth2, request = {}) {
+    return _performApiRequest(auth2, "GET", "/v2/passwordPolicy", _addTidIfNecessary(auth2, request));
   }
   var MINIMUM_MIN_PASSWORD_LENGTH = 6;
   var PasswordPolicyImpl = class {
@@ -25468,8 +25606,8 @@
     }
   };
   var AuthImpl = class {
-    constructor(app3, heartbeatServiceProvider, appCheckServiceProvider, config) {
-      this.app = app3;
+    constructor(app2, heartbeatServiceProvider, appCheckServiceProvider, config) {
+      this.app = app2;
       this.heartbeatServiceProvider = heartbeatServiceProvider;
       this.appCheckServiceProvider = appCheckServiceProvider;
       this.config = config;
@@ -25498,7 +25636,7 @@
       this.tenantId = null;
       this.settings = { appVerificationDisabledForTesting: false };
       this.frameworks = [];
-      this.name = app3.name;
+      this.name = app2.name;
       this.clientVersion = config.sdkClientVersion;
       this._persistenceManagerAvailable = new Promise((resolve) => this._resolvePersistenceManagerAvailable = resolve);
     }
@@ -25983,12 +26121,12 @@
       return appCheckTokenResult?.token;
     }
   };
-  function _castAuth(auth3) {
-    return getModularInstance(auth3);
+  function _castAuth(auth2) {
+    return getModularInstance(auth2);
   }
   var Subscription = class {
-    constructor(auth3) {
-      this.auth = auth3;
+    constructor(auth2) {
+      this.auth = auth2;
       this.observer = null;
       this.addObserver = createSubscribe((observer) => this.observer = observer);
     }
@@ -26068,17 +26206,17 @@
      * @returns A Promise for a token that can be used to assert the validity of a request.
      */
     async verify(action = "verify", forceRefresh = false) {
-      async function retrieveSiteKey(auth3) {
+      async function retrieveSiteKey(auth2) {
         if (!forceRefresh) {
-          if (auth3.tenantId == null && auth3._agentRecaptchaConfig != null) {
-            return auth3._agentRecaptchaConfig.siteKey;
+          if (auth2.tenantId == null && auth2._agentRecaptchaConfig != null) {
+            return auth2._agentRecaptchaConfig.siteKey;
           }
-          if (auth3.tenantId != null && auth3._tenantRecaptchaConfigs[auth3.tenantId] !== void 0) {
-            return auth3._tenantRecaptchaConfigs[auth3.tenantId].siteKey;
+          if (auth2.tenantId != null && auth2._tenantRecaptchaConfigs[auth2.tenantId] !== void 0) {
+            return auth2._tenantRecaptchaConfigs[auth2.tenantId].siteKey;
           }
         }
         return new Promise(async (resolve, reject) => {
-          getRecaptchaConfig(auth3, {
+          getRecaptchaConfig(auth2, {
             clientType: "CLIENT_TYPE_WEB",
             version: "RECAPTCHA_ENTERPRISE"
             /* RecaptchaVersion.ENTERPRISE */
@@ -26087,10 +26225,10 @@
               reject(new Error("recaptcha Enterprise site key undefined"));
             } else {
               const config = new RecaptchaConfig(response);
-              if (auth3.tenantId == null) {
-                auth3._agentRecaptchaConfig = config;
+              if (auth2.tenantId == null) {
+                auth2._agentRecaptchaConfig = config;
               } else {
-                auth3._tenantRecaptchaConfigs[auth3.tenantId] = config;
+                auth2._tenantRecaptchaConfigs[auth2.tenantId] = config;
               }
               return resolve(config.siteKey);
             }
@@ -26142,8 +26280,8 @@
       });
     }
   };
-  async function injectRecaptchaFields(auth3, request, action, isCaptchaResp = false, isFakeToken = false) {
-    const verifier = new RecaptchaEnterpriseVerifier(auth3);
+  async function injectRecaptchaFields(auth2, request, action, isCaptchaResp = false, isFakeToken = false) {
+    const verifier = new RecaptchaEnterpriseVerifier(auth2);
     let captchaResponse;
     if (isFakeToken) {
       captchaResponse = FAKE_TOKEN;
@@ -26272,8 +26410,8 @@
       return Promise.reject(recaptchaAuthProvider + " provider is not supported.");
     }
   }
-  async function _initializeRecaptchaConfig(auth3) {
-    const authInternal = _castAuth(auth3);
+  async function _initializeRecaptchaConfig(auth2) {
+    const authInternal = _castAuth(auth2);
     const response = await getRecaptchaConfig(authInternal, {
       clientType: "CLIENT_TYPE_WEB",
       version: "RECAPTCHA_ENTERPRISE"
@@ -26290,34 +26428,34 @@
       void verifier.verify();
     }
   }
-  function initializeAuth(app3, deps) {
-    const provider = _getProvider(app3, "auth");
+  function initializeAuth(app2, deps) {
+    const provider = _getProvider(app2, "auth");
     if (provider.isInitialized()) {
-      const auth4 = provider.getImmediate();
+      const auth3 = provider.getImmediate();
       const initialOptions = provider.getOptions();
       if (deepEqual(initialOptions, deps ?? {})) {
-        return auth4;
+        return auth3;
       } else {
         _fail(
-          auth4,
+          auth3,
           "already-initialized"
           /* AuthErrorCode.ALREADY_INITIALIZED */
         );
       }
     }
-    const auth3 = provider.initialize({ options: deps });
-    return auth3;
+    const auth2 = provider.initialize({ options: deps });
+    return auth2;
   }
-  function _initializeAuthInstance(auth3, deps) {
+  function _initializeAuthInstance(auth2, deps) {
     const persistence = deps?.persistence || [];
     const hierarchy = (Array.isArray(persistence) ? persistence : [persistence]).map(_getInstance);
     if (deps?.errorMap) {
-      auth3._updateErrorMap(deps.errorMap);
+      auth2._updateErrorMap(deps.errorMap);
     }
-    auth3._initializeWithPersistence(hierarchy, deps?.popupRedirectResolver);
+    auth2._initializeWithPersistence(hierarchy, deps?.popupRedirectResolver);
   }
-  function connectAuthEmulator(auth3, url, options) {
-    const authInternal = _castAuth(auth3);
+  function connectAuthEmulator(auth2, url, options) {
+    const authInternal = _castAuth(auth2);
     _assert(
       /^https?:\/\//.test(url),
       authInternal,
@@ -26446,17 +26584,17 @@
       return debugFail("not implemented");
     }
   };
-  async function linkEmailPassword(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v1/accounts:signUp", request);
+  async function linkEmailPassword(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v1/accounts:signUp", request);
   }
-  async function signInWithPassword(auth3, request) {
-    return _performSignInRequest(auth3, "POST", "/v1/accounts:signInWithPassword", _addTidIfNecessary(auth3, request));
+  async function signInWithPassword(auth2, request) {
+    return _performSignInRequest(auth2, "POST", "/v1/accounts:signInWithPassword", _addTidIfNecessary(auth2, request));
   }
-  async function signInWithEmailLink$1(auth3, request) {
-    return _performSignInRequest(auth3, "POST", "/v1/accounts:signInWithEmailLink", _addTidIfNecessary(auth3, request));
+  async function signInWithEmailLink$1(auth2, request) {
+    return _performSignInRequest(auth2, "POST", "/v1/accounts:signInWithEmailLink", _addTidIfNecessary(auth2, request));
   }
-  async function signInWithEmailLinkForLinking(auth3, request) {
-    return _performSignInRequest(auth3, "POST", "/v1/accounts:signInWithEmailLink", _addTidIfNecessary(auth3, request));
+  async function signInWithEmailLinkForLinking(auth2, request) {
+    return _performSignInRequest(auth2, "POST", "/v1/accounts:signInWithEmailLink", _addTidIfNecessary(auth2, request));
   }
   var EmailAuthCredential = class _EmailAuthCredential extends AuthCredential {
     /** @internal */
@@ -26508,7 +26646,7 @@
       return null;
     }
     /** @internal */
-    async _getIdTokenResponse(auth3) {
+    async _getIdTokenResponse(auth2) {
       switch (this.signInMethod) {
         case "password":
           const request = {
@@ -26519,7 +26657,7 @@
             /* RecaptchaClientType.WEB */
           };
           return handleRecaptchaFlow(
-            auth3,
+            auth2,
             request,
             "signInWithPassword",
             signInWithPassword,
@@ -26527,20 +26665,20 @@
             /* RecaptchaAuthProvider.EMAIL_PASSWORD_PROVIDER */
           );
         case "emailLink":
-          return signInWithEmailLink$1(auth3, {
+          return signInWithEmailLink$1(auth2, {
             email: this._email,
             oobCode: this._password
           });
         default:
           _fail(
-            auth3,
+            auth2,
             "internal-error"
             /* AuthErrorCode.INTERNAL_ERROR */
           );
       }
     }
     /** @internal */
-    async _linkToIdToken(auth3, idToken) {
+    async _linkToIdToken(auth2, idToken) {
       switch (this.signInMethod) {
         case "password":
           const request = {
@@ -26552,7 +26690,7 @@
             /* RecaptchaClientType.WEB */
           };
           return handleRecaptchaFlow(
-            auth3,
+            auth2,
             request,
             "signUpPassword",
             linkEmailPassword,
@@ -26560,26 +26698,26 @@
             /* RecaptchaAuthProvider.EMAIL_PASSWORD_PROVIDER */
           );
         case "emailLink":
-          return signInWithEmailLinkForLinking(auth3, {
+          return signInWithEmailLinkForLinking(auth2, {
             idToken,
             email: this._email,
             oobCode: this._password
           });
         default:
           _fail(
-            auth3,
+            auth2,
             "internal-error"
             /* AuthErrorCode.INTERNAL_ERROR */
           );
       }
     }
     /** @internal */
-    _getReauthenticationResolver(auth3) {
-      return this._getIdTokenResponse(auth3);
+    _getReauthenticationResolver(auth2) {
+      return this._getIdTokenResponse(auth2);
     }
   };
-  async function signInWithIdp(auth3, request) {
-    return _performSignInRequest(auth3, "POST", "/v1/accounts:signInWithIdp", _addTidIfNecessary(auth3, request));
+  async function signInWithIdp(auth2, request) {
+    return _performSignInRequest(auth2, "POST", "/v1/accounts:signInWithIdp", _addTidIfNecessary(auth2, request));
   }
   var IDP_REQUEST_URI$1 = "http://localhost";
   var OAuthCredential = class _OAuthCredential extends AuthCredential {
@@ -26650,21 +26788,21 @@
       return cred;
     }
     /** @internal */
-    _getIdTokenResponse(auth3) {
+    _getIdTokenResponse(auth2) {
       const request = this.buildRequest();
-      return signInWithIdp(auth3, request);
+      return signInWithIdp(auth2, request);
     }
     /** @internal */
-    _linkToIdToken(auth3, idToken) {
+    _linkToIdToken(auth2, idToken) {
       const request = this.buildRequest();
       request.idToken = idToken;
-      return signInWithIdp(auth3, request);
+      return signInWithIdp(auth2, request);
     }
     /** @internal */
-    _getReauthenticationResolver(auth3) {
+    _getReauthenticationResolver(auth2) {
       const request = this.buildRequest();
       request.autoCreate = false;
-      return signInWithIdp(auth3, request);
+      return signInWithIdp(auth2, request);
     }
     buildRequest() {
       const request = {
@@ -26693,16 +26831,16 @@
       return request;
     }
   };
-  async function sendPhoneVerificationCode(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v1/accounts:sendVerificationCode", _addTidIfNecessary(auth3, request));
+  async function sendPhoneVerificationCode(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v1/accounts:sendVerificationCode", _addTidIfNecessary(auth2, request));
   }
-  async function signInWithPhoneNumber$1(auth3, request) {
-    return _performSignInRequest(auth3, "POST", "/v1/accounts:signInWithPhoneNumber", _addTidIfNecessary(auth3, request));
+  async function signInWithPhoneNumber$1(auth2, request) {
+    return _performSignInRequest(auth2, "POST", "/v1/accounts:signInWithPhoneNumber", _addTidIfNecessary(auth2, request));
   }
-  async function linkWithPhoneNumber$1(auth3, request) {
-    const response = await _performSignInRequest(auth3, "POST", "/v1/accounts:signInWithPhoneNumber", _addTidIfNecessary(auth3, request));
+  async function linkWithPhoneNumber$1(auth2, request) {
+    const response = await _performSignInRequest(auth2, "POST", "/v1/accounts:signInWithPhoneNumber", _addTidIfNecessary(auth2, request));
     if (response.temporaryProof) {
-      throw _makeTaggedError(auth3, "account-exists-with-different-credential", response);
+      throw _makeTaggedError(auth2, "account-exists-with-different-credential", response);
     }
     return response;
   }
@@ -26713,12 +26851,12 @@
     ]: "user-not-found"
     /* AuthErrorCode.USER_DELETED */
   };
-  async function verifyPhoneNumberForExisting(auth3, request) {
+  async function verifyPhoneNumberForExisting(auth2, request) {
     const apiRequest = {
       ...request,
       operation: "REAUTH"
     };
-    return _performSignInRequest(auth3, "POST", "/v1/accounts:signInWithPhoneNumber", _addTidIfNecessary(auth3, apiRequest), VERIFY_PHONE_NUMBER_FOR_EXISTING_ERROR_MAP_);
+    return _performSignInRequest(auth2, "POST", "/v1/accounts:signInWithPhoneNumber", _addTidIfNecessary(auth2, apiRequest), VERIFY_PHONE_NUMBER_FOR_EXISTING_ERROR_MAP_);
   }
   var PhoneAuthCredential = class _PhoneAuthCredential extends AuthCredential {
     constructor(params) {
@@ -26738,19 +26876,19 @@
       return new _PhoneAuthCredential({ phoneNumber, temporaryProof });
     }
     /** @internal */
-    _getIdTokenResponse(auth3) {
-      return signInWithPhoneNumber$1(auth3, this._makeVerificationRequest());
+    _getIdTokenResponse(auth2) {
+      return signInWithPhoneNumber$1(auth2, this._makeVerificationRequest());
     }
     /** @internal */
-    _linkToIdToken(auth3, idToken) {
-      return linkWithPhoneNumber$1(auth3, {
+    _linkToIdToken(auth2, idToken) {
+      return linkWithPhoneNumber$1(auth2, {
         idToken,
         ...this._makeVerificationRequest()
       });
     }
     /** @internal */
-    _getReauthenticationResolver(auth3) {
-      return verifyPhoneNumberForExisting(auth3, this._makeVerificationRequest());
+    _getReauthenticationResolver(auth2) {
+      return verifyPhoneNumberForExisting(auth2, this._makeVerificationRequest());
     }
     /** @internal */
     _makeVerificationRequest() {
@@ -27243,8 +27381,8 @@
       this._tokenResponse = params._tokenResponse;
       this.operationType = params.operationType;
     }
-    static async _fromIdTokenResponse(auth3, operationType, idTokenResponse, isAnonymous = false) {
-      const user = await UserImpl._fromIdTokenResponse(auth3, idTokenResponse, isAnonymous);
+    static async _fromIdTokenResponse(auth2, operationType, idTokenResponse, isAnonymous = false) {
+      const user = await UserImpl._fromIdTokenResponse(auth2, idTokenResponse, isAnonymous);
       const providerId = providerIdForResponse(idTokenResponse);
       const userCred = new _UserCredentialImpl({
         user,
@@ -27279,27 +27417,27 @@
     return null;
   }
   var MultiFactorError = class _MultiFactorError extends FirebaseError {
-    constructor(auth3, error, operationType, user) {
+    constructor(auth2, error, operationType, user) {
       super(error.code, error.message);
       this.operationType = operationType;
       this.user = user;
       Object.setPrototypeOf(this, _MultiFactorError.prototype);
       this.customData = {
-        appName: auth3.name,
-        tenantId: auth3.tenantId ?? void 0,
+        appName: auth2.name,
+        tenantId: auth2.tenantId ?? void 0,
         _serverResponse: error.customData._serverResponse,
         operationType
       };
     }
-    static _fromErrorAndOperation(auth3, error, operationType, user) {
-      return new _MultiFactorError(auth3, error, operationType, user);
+    static _fromErrorAndOperation(auth2, error, operationType, user) {
+      return new _MultiFactorError(auth2, error, operationType, user);
     }
   };
-  function _processCredentialSavingMfaContextIfNecessary(auth3, operationType, credential, user) {
-    const idTokenProvider = operationType === "reauthenticate" ? credential._getReauthenticationResolver(auth3) : credential._getIdTokenResponse(auth3);
+  function _processCredentialSavingMfaContextIfNecessary(auth2, operationType, credential, user) {
+    const idTokenProvider = operationType === "reauthenticate" ? credential._getReauthenticationResolver(auth2) : credential._getIdTokenResponse(auth2);
     return idTokenProvider.catch((error) => {
       if (error.code === `auth/${"multi-factor-auth-required"}`) {
-        throw MultiFactorError._fromErrorAndOperation(auth3, error, operationType, user);
+        throw MultiFactorError._fromErrorAndOperation(auth2, error, operationType, user);
       }
       throw error;
     });
@@ -27309,30 +27447,30 @@
     return UserCredentialImpl._forOperation(user, "link", response);
   }
   async function _reauthenticate(user, credential, bypassAuthState = false) {
-    const { auth: auth3 } = user;
-    if (_isFirebaseServerApp(auth3.app)) {
-      return Promise.reject(_serverAppCurrentUserOperationNotSupportedError(auth3));
+    const { auth: auth2 } = user;
+    if (_isFirebaseServerApp(auth2.app)) {
+      return Promise.reject(_serverAppCurrentUserOperationNotSupportedError(auth2));
     }
     const operationType = "reauthenticate";
     try {
-      const response = await _logoutIfInvalidated(user, _processCredentialSavingMfaContextIfNecessary(auth3, operationType, credential, user), bypassAuthState);
+      const response = await _logoutIfInvalidated(user, _processCredentialSavingMfaContextIfNecessary(auth2, operationType, credential, user), bypassAuthState);
       _assert(
         response.idToken,
-        auth3,
+        auth2,
         "internal-error"
         /* AuthErrorCode.INTERNAL_ERROR */
       );
       const parsed = _parseToken(response.idToken);
       _assert(
         parsed,
-        auth3,
+        auth2,
         "internal-error"
         /* AuthErrorCode.INTERNAL_ERROR */
       );
       const { sub: localId } = parsed;
       _assert(
         user.uid === localId,
-        auth3,
+        auth2,
         "user-mismatch"
         /* AuthErrorCode.USER_MISMATCH */
       );
@@ -27340,7 +27478,7 @@
     } catch (e) {
       if (e?.code === `auth/${"user-not-found"}`) {
         _fail(
-          auth3,
+          auth2,
           "user-mismatch"
           /* AuthErrorCode.USER_MISMATCH */
         );
@@ -27348,38 +27486,35 @@
       throw e;
     }
   }
-  async function _signInWithCredential(auth3, credential, bypassAuthState = false) {
-    if (_isFirebaseServerApp(auth3.app)) {
-      return Promise.reject(_serverAppCurrentUserOperationNotSupportedError(auth3));
+  async function _signInWithCredential(auth2, credential, bypassAuthState = false) {
+    if (_isFirebaseServerApp(auth2.app)) {
+      return Promise.reject(_serverAppCurrentUserOperationNotSupportedError(auth2));
     }
     const operationType = "signIn";
-    const response = await _processCredentialSavingMfaContextIfNecessary(auth3, operationType, credential);
-    const userCredential = await UserCredentialImpl._fromIdTokenResponse(auth3, operationType, response);
+    const response = await _processCredentialSavingMfaContextIfNecessary(auth2, operationType, credential);
+    const userCredential = await UserCredentialImpl._fromIdTokenResponse(auth2, operationType, response);
     if (!bypassAuthState) {
-      await auth3._updateCurrentUser(userCredential.user);
+      await auth2._updateCurrentUser(userCredential.user);
     }
     return userCredential;
   }
-  async function signInWithCredential(auth3, credential) {
-    return _signInWithCredential(_castAuth(auth3), credential);
+  function onIdTokenChanged(auth2, nextOrObserver, error, completed) {
+    return getModularInstance(auth2).onIdTokenChanged(nextOrObserver, error, completed);
   }
-  function onIdTokenChanged(auth3, nextOrObserver, error, completed) {
-    return getModularInstance(auth3).onIdTokenChanged(nextOrObserver, error, completed);
+  function beforeAuthStateChanged(auth2, callback, onAbort) {
+    return getModularInstance(auth2).beforeAuthStateChanged(callback, onAbort);
   }
-  function beforeAuthStateChanged(auth3, callback, onAbort) {
-    return getModularInstance(auth3).beforeAuthStateChanged(callback, onAbort);
+  function startEnrollPhoneMfa(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v2/accounts/mfaEnrollment:start", _addTidIfNecessary(auth2, request));
   }
-  function startEnrollPhoneMfa(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v2/accounts/mfaEnrollment:start", _addTidIfNecessary(auth3, request));
+  function finalizeEnrollPhoneMfa(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v2/accounts/mfaEnrollment:finalize", _addTidIfNecessary(auth2, request));
   }
-  function finalizeEnrollPhoneMfa(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v2/accounts/mfaEnrollment:finalize", _addTidIfNecessary(auth3, request));
+  function startEnrollTotpMfa(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v2/accounts/mfaEnrollment:start", _addTidIfNecessary(auth2, request));
   }
-  function startEnrollTotpMfa(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v2/accounts/mfaEnrollment:start", _addTidIfNecessary(auth3, request));
-  }
-  function finalizeEnrollTotpMfa(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v2/accounts/mfaEnrollment:finalize", _addTidIfNecessary(auth3, request));
+  function finalizeEnrollTotpMfa(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v2/accounts/mfaEnrollment:finalize", _addTidIfNecessary(auth2, request));
   }
   var STORAGE_AVAILABLE_KEY = "__sak";
   var BrowserPersistenceClass = class {
@@ -27548,8 +27683,8 @@
   BrowserLocalPersistence.type = "LOCAL";
   var browserLocalPersistence = BrowserLocalPersistence;
   var POLLING_INTERVAL_MS = 1e3;
-  function getDocumentCookie(name6) {
-    const escapedName = name6.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+  function getDocumentCookie(name5) {
+    const escapedName = name5.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
     const matcher = RegExp(`${escapedName}=([^;]+)`);
     return document.cookie.match(matcher)?.[1] ?? null;
   }
@@ -27592,12 +27727,12 @@
       if (!this._isAvailable()) {
         return null;
       }
-      const name6 = getCookieName(key);
+      const name5 = getCookieName(key);
       if (window.cookieStore) {
-        const cookie = await window.cookieStore.get(name6);
+        const cookie = await window.cookieStore.get(name5);
         return cookie?.value;
       }
-      return getDocumentCookie(name6);
+      return getDocumentCookie(name5);
     }
     // Log out by overriding the idToken with a sentinel value of ""
     async _remove(key) {
@@ -27608,8 +27743,8 @@
       if (!existingValue) {
         return;
       }
-      const name6 = getCookieName(key);
-      document.cookie = `${name6}=;Max-Age=34560000;Partitioned;Secure;SameSite=Strict;Path=/;Priority=High`;
+      const name5 = getCookieName(key);
+      document.cookie = `${name5}=;Max-Age=34560000;Partitioned;Secure;SameSite=Strict;Path=/;Priority=High`;
       await fetch(`/__cookies__`, { method: "DELETE" }).catch(() => void 0);
     }
     // Listen for cookie changes, both cookieStore and fallback to polling document.cookie
@@ -27617,14 +27752,14 @@
       if (!this._isAvailable()) {
         return;
       }
-      const name6 = getCookieName(key);
+      const name5 = getCookieName(key);
       if (window.cookieStore) {
         const cb = (event) => {
-          const changedCookie = event.changed.find((change) => change.name === name6);
+          const changedCookie = event.changed.find((change) => change.name === name5);
           if (changedCookie) {
             listener(changedCookie.value);
           }
-          const deletedCookie = event.deleted.find((change) => change.name === name6);
+          const deletedCookie = event.deleted.find((change) => change.name === name5);
           if (deletedCookie) {
             listener(null);
           }
@@ -27633,9 +27768,9 @@
         this.listenerUnsubscribes.set(listener, unsubscribe2);
         return window.cookieStore.addEventListener("change", cb);
       }
-      let lastValue = getDocumentCookie(name6);
+      let lastValue = getDocumentCookie(name5);
       const interval = setInterval(() => {
-        const currentValue = getDocumentCookie(name6);
+        const currentValue = getDocumentCookie(name5);
         if (currentValue !== lastValue) {
           listener(currentValue);
           lastValue = currentValue;
@@ -27929,8 +28064,8 @@
       });
     }
   };
-  function getObjectStore(db3, isReadWrite) {
-    return db3.transaction([DB_OBJECTSTORE_NAME], isReadWrite ? "readwrite" : "readonly").objectStore(DB_OBJECTSTORE_NAME);
+  function getObjectStore(db2, isReadWrite) {
+    return db2.transaction([DB_OBJECTSTORE_NAME], isReadWrite ? "readwrite" : "readonly").objectStore(DB_OBJECTSTORE_NAME);
   }
   function _deleteDatabase() {
     const request = indexedDB.deleteDatabase(DB_NAME2);
@@ -27943,39 +28078,39 @@
         reject(request.error);
       });
       request.addEventListener("upgradeneeded", () => {
-        const db3 = request.result;
+        const db2 = request.result;
         try {
-          db3.createObjectStore(DB_OBJECTSTORE_NAME, { keyPath: DB_DATA_KEYPATH });
+          db2.createObjectStore(DB_OBJECTSTORE_NAME, { keyPath: DB_DATA_KEYPATH });
         } catch (e) {
           reject(e);
         }
       });
       request.addEventListener("success", async () => {
-        const db3 = request.result;
-        if (!db3.objectStoreNames.contains(DB_OBJECTSTORE_NAME)) {
-          db3.close();
+        const db2 = request.result;
+        if (!db2.objectStoreNames.contains(DB_OBJECTSTORE_NAME)) {
+          db2.close();
           await _deleteDatabase();
           resolve(await _openDatabase());
         } else {
-          resolve(db3);
+          resolve(db2);
         }
       });
     });
   }
-  async function _putObject(db3, key, value) {
-    const request = getObjectStore(db3, true).put({
+  async function _putObject(db2, key, value) {
+    const request = getObjectStore(db2, true).put({
       [DB_DATA_KEYPATH]: key,
       value
     });
     return new DBPromise(request).toPromise();
   }
-  async function getObject(db3, key) {
-    const request = getObjectStore(db3, false).get(key);
+  async function getObject(db2, key) {
+    const request = getObjectStore(db2, false).get(key);
     const data = await new DBPromise(request).toPromise();
     return data === void 0 ? null : data.value;
   }
-  function _deleteObject(db3, key) {
-    const request = getObjectStore(db3, true).delete(key);
+  function _deleteObject(db2, key) {
+    const request = getObjectStore(db2, true).delete(key);
     return new DBPromise(request).toPromise();
   }
   var _POLLING_INTERVAL_MS = 800;
@@ -28007,8 +28142,8 @@
       let numAttempts = 0;
       while (true) {
         try {
-          const db3 = await this._openDb();
-          return await op(db3);
+          const db2 = await this._openDb();
+          return await op(db2);
         } catch (e) {
           if (numAttempts++ > _TRANSACTION_RETRY_COUNT) {
             throw e;
@@ -28103,9 +28238,9 @@
         if (!indexedDB) {
           return false;
         }
-        const db3 = await _openDatabase();
-        await _putObject(db3, STORAGE_AVAILABLE_KEY, "1");
-        await _deleteObject(db3, STORAGE_AVAILABLE_KEY);
+        const db2 = await _openDatabase();
+        await _putObject(db2, STORAGE_AVAILABLE_KEY, "1");
+        await _deleteObject(db2, STORAGE_AVAILABLE_KEY);
         return true;
       } catch {
       }
@@ -28121,26 +28256,26 @@
     }
     async _set(key, value) {
       return this._withPendingWrite(async () => {
-        await this._withRetries((db3) => _putObject(db3, key, value));
+        await this._withRetries((db2) => _putObject(db2, key, value));
         this.localCache[key] = value;
         return this.notifyServiceWorker(key);
       });
     }
     async _get(key) {
-      const obj = await this._withRetries((db3) => getObject(db3, key));
+      const obj = await this._withRetries((db2) => getObject(db2, key));
       this.localCache[key] = obj;
       return obj;
     }
     async _remove(key) {
       return this._withPendingWrite(async () => {
-        await this._withRetries((db3) => _deleteObject(db3, key));
+        await this._withRetries((db2) => _deleteObject(db2, key));
         delete this.localCache[key];
         return this.notifyServiceWorker(key);
       });
     }
     async _poll() {
-      const result = await this._withRetries((db3) => {
-        const getAllRequest = getObjectStore(db3, false).getAll();
+      const result = await this._withRetries((db2) => {
+        const getAllRequest = getObjectStore(db2, false).getAll();
         return new DBPromise(getAllRequest).toPromise();
       });
       if (!result) {
@@ -28211,22 +28346,22 @@
   };
   IndexedDBLocalPersistence.type = "LOCAL";
   var indexedDBLocalPersistence = IndexedDBLocalPersistence;
-  function startSignInPhoneMfa(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v2/accounts/mfaSignIn:start", _addTidIfNecessary(auth3, request));
+  function startSignInPhoneMfa(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v2/accounts/mfaSignIn:start", _addTidIfNecessary(auth2, request));
   }
-  function finalizeSignInPhoneMfa(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v2/accounts/mfaSignIn:finalize", _addTidIfNecessary(auth3, request));
+  function finalizeSignInPhoneMfa(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v2/accounts/mfaSignIn:finalize", _addTidIfNecessary(auth2, request));
   }
-  function finalizeSignInTotpMfa(auth3, request) {
-    return _performApiRequest(auth3, "POST", "/v2/accounts/mfaSignIn:finalize", _addTidIfNecessary(auth3, request));
+  function finalizeSignInTotpMfa(auth2, request) {
+    return _performApiRequest(auth2, "POST", "/v2/accounts/mfaSignIn:finalize", _addTidIfNecessary(auth2, request));
   }
   var _JSLOAD_CALLBACK = _generateCallbackName("rcb");
   var NETWORK_TIMEOUT_DELAY = new Delay(3e4, 6e4);
   var RECAPTCHA_VERIFIER_TYPE = "recaptcha";
-  async function _verifyPhoneNumber(auth3, options, verifier) {
-    if (!auth3._getRecaptchaConfig()) {
+  async function _verifyPhoneNumber(auth2, options, verifier) {
+    if (!auth2._getRecaptchaConfig()) {
       try {
-        await _initializeRecaptchaConfig(auth3);
+        await _initializeRecaptchaConfig(auth2);
       } catch (error) {
         console.log("Failed to initialize reCAPTCHA Enterprise config. Triggering the reCAPTCHA v2 verification.");
       }
@@ -28245,7 +28380,7 @@
         if ("phoneNumber" in phoneInfoOptions) {
           _assert(
             session.type === "enroll",
-            auth3,
+            auth2,
             "internal-error"
             /* AuthErrorCode.INTERNAL_ERROR */
           );
@@ -28271,7 +28406,7 @@
             return startEnrollPhoneMfa(authInstance, request);
           };
           const startPhoneMfaEnrollmentResponse = handleRecaptchaFlow(
-            auth3,
+            auth2,
             startPhoneMfaEnrollmentRequest,
             "mfaSmsEnrollment",
             startEnrollPhoneMfaActionCallback,
@@ -28285,14 +28420,14 @@
         } else {
           _assert(
             session.type === "signin",
-            auth3,
+            auth2,
             "internal-error"
             /* AuthErrorCode.INTERNAL_ERROR */
           );
           const mfaEnrollmentId = phoneInfoOptions.multiFactorHint?.uid || phoneInfoOptions.multiFactorUid;
           _assert(
             mfaEnrollmentId,
-            auth3,
+            auth2,
             "missing-multi-factor-info"
             /* AuthErrorCode.MISSING_MFA_INFO */
           );
@@ -28318,7 +28453,7 @@
             return startSignInPhoneMfa(authInstance, request);
           };
           const startPhoneMfaSignInResponse = handleRecaptchaFlow(
-            auth3,
+            auth2,
             startPhoneMfaSignInRequest,
             "mfaSmsSignIn",
             startSignInPhoneMfaActionCallback,
@@ -28350,7 +28485,7 @@
           return sendPhoneVerificationCode(authInstance, request);
         };
         const sendPhoneVerificationCodeResponse = handleRecaptchaFlow(
-          auth3,
+          auth2,
           sendPhoneVerificationCodeRequest,
           "sendVerificationCode",
           sendPhoneVerificationCodeActionCallback,
@@ -28366,17 +28501,17 @@
       verifier?._reset();
     }
   }
-  async function injectRecaptchaV2Token(auth3, request, recaptchaV2Verifier) {
+  async function injectRecaptchaV2Token(auth2, request, recaptchaV2Verifier) {
     _assert(
       recaptchaV2Verifier.type === RECAPTCHA_VERIFIER_TYPE,
-      auth3,
+      auth2,
       "argument-error"
       /* AuthErrorCode.ARGUMENT_ERROR */
     );
     const recaptchaV2Token = await recaptchaV2Verifier.verify();
     _assert(
       typeof recaptchaV2Token === "string",
-      auth3,
+      auth2,
       "argument-error"
       /* AuthErrorCode.ARGUMENT_ERROR */
     );
@@ -28419,9 +28554,9 @@
      * @param auth - The Firebase {@link Auth} instance in which sign-ins should occur.
      *
      */
-    constructor(auth3) {
+    constructor(auth2) {
       this.providerId = _PhoneAuthProvider.PROVIDER_ID;
-      this.auth = _castAuth(auth3);
+      this.auth = _castAuth(auth2);
     }
     /**
      *
@@ -28545,17 +28680,17 @@
   };
   PhoneAuthProvider.PROVIDER_ID = "phone";
   PhoneAuthProvider.PHONE_SIGN_IN_METHOD = "phone";
-  function _withDefaultResolver(auth3, resolverOverride) {
+  function _withDefaultResolver(auth2, resolverOverride) {
     if (resolverOverride) {
       return _getInstance(resolverOverride);
     }
     _assert(
-      auth3._popupRedirectResolver,
-      auth3,
+      auth2._popupRedirectResolver,
+      auth2,
       "argument-error"
       /* AuthErrorCode.ARGUMENT_ERROR */
     );
-    return auth3._popupRedirectResolver;
+    return auth2._popupRedirectResolver;
   }
   var IdpCredential = class extends AuthCredential {
     constructor(params) {
@@ -28566,14 +28701,14 @@
       );
       this.params = params;
     }
-    _getIdTokenResponse(auth3) {
-      return signInWithIdp(auth3, this._buildIdpRequest());
+    _getIdTokenResponse(auth2) {
+      return signInWithIdp(auth2, this._buildIdpRequest());
     }
-    _linkToIdToken(auth3, idToken) {
-      return signInWithIdp(auth3, this._buildIdpRequest(idToken));
+    _linkToIdToken(auth2, idToken) {
+      return signInWithIdp(auth2, this._buildIdpRequest(idToken));
     }
-    _getReauthenticationResolver(auth3) {
-      return signInWithIdp(auth3, this._buildIdpRequest());
+    _getReauthenticationResolver(auth2) {
+      return signInWithIdp(auth2, this._buildIdpRequest());
     }
     _buildIdpRequest(idToken) {
       const request = {
@@ -28595,28 +28730,28 @@
     return _signInWithCredential(params.auth, new IdpCredential(params), params.bypassAuthState);
   }
   function _reauth(params) {
-    const { auth: auth3, user } = params;
+    const { auth: auth2, user } = params;
     _assert(
       user,
-      auth3,
+      auth2,
       "internal-error"
       /* AuthErrorCode.INTERNAL_ERROR */
     );
     return _reauthenticate(user, new IdpCredential(params), params.bypassAuthState);
   }
   async function _link(params) {
-    const { auth: auth3, user } = params;
+    const { auth: auth2, user } = params;
     _assert(
       user,
-      auth3,
+      auth2,
       "internal-error"
       /* AuthErrorCode.INTERNAL_ERROR */
     );
     return _link$1(user, new IdpCredential(params), params.bypassAuthState);
   }
   var AbstractPopupRedirectOperation = class {
-    constructor(auth3, filter, resolver, user, bypassAuthState = false) {
-      this.auth = auth3;
+    constructor(auth2, filter, resolver, user, bypassAuthState = false) {
+      this.auth = auth2;
       this.resolver = resolver;
       this.user = user;
       this.bypassAuthState = bypassAuthState;
@@ -28699,8 +28834,8 @@
   };
   var _POLL_WINDOW_CLOSE_TIMEOUT = new Delay(2e3, 1e4);
   var PopupOperation = class _PopupOperation extends AbstractPopupRedirectOperation {
-    constructor(auth3, filter, provider, resolver, user) {
-      super(auth3, filter, resolver, user);
+    constructor(auth2, filter, provider, resolver, user) {
+      super(auth2, filter, resolver, user);
       this.provider = provider;
       this.authWindow = null;
       this.pollId = null;
@@ -28791,8 +28926,8 @@
   var PENDING_REDIRECT_KEY = "pendingRedirect";
   var redirectOutcomeMap = /* @__PURE__ */ new Map();
   var RedirectAction = class extends AbstractPopupRedirectOperation {
-    constructor(auth3, resolver, bypassAuthState = false) {
-      super(auth3, [
+    constructor(auth2, resolver, bypassAuthState = false) {
+      super(auth2, [
         "signInViaRedirect",
         "linkViaRedirect",
         "reauthViaRedirect",
@@ -28844,8 +28979,8 @@
     cleanUp() {
     }
   };
-  async function _getAndClearPendingRedirectStatus(resolver, auth3) {
-    const key = pendingRedirectKey(auth3);
+  async function _getAndClearPendingRedirectStatus(resolver, auth2) {
+    const key = pendingRedirectKey(auth2);
     const persistence = resolverPersistence(resolver);
     if (!await persistence._isAvailable()) {
       return false;
@@ -28854,20 +28989,20 @@
     await persistence._remove(key);
     return hasPendingRedirect;
   }
-  function _overrideRedirectResult(auth3, result) {
-    redirectOutcomeMap.set(auth3._key(), result);
+  function _overrideRedirectResult(auth2, result) {
+    redirectOutcomeMap.set(auth2._key(), result);
   }
   function resolverPersistence(resolver) {
     return _getInstance(resolver._redirectPersistence);
   }
-  function pendingRedirectKey(auth3) {
-    return _persistenceKeyName(PENDING_REDIRECT_KEY, auth3.config.apiKey, auth3.name);
+  function pendingRedirectKey(auth2) {
+    return _persistenceKeyName(PENDING_REDIRECT_KEY, auth2.config.apiKey, auth2.name);
   }
-  async function _getRedirectResult(auth3, resolverExtern, bypassAuthState = false) {
-    if (_isFirebaseServerApp(auth3.app)) {
-      return Promise.reject(_serverAppCurrentUserOperationNotSupportedError(auth3));
+  async function _getRedirectResult(auth2, resolverExtern, bypassAuthState = false) {
+    if (_isFirebaseServerApp(auth2.app)) {
+      return Promise.reject(_serverAppCurrentUserOperationNotSupportedError(auth2));
     }
-    const authInternal = _castAuth(auth3);
+    const authInternal = _castAuth(auth2);
     const resolver = _withDefaultResolver(authInternal, resolverExtern);
     const action = new RedirectAction(authInternal, resolver, bypassAuthState);
     const result = await action.execute();
@@ -28880,8 +29015,8 @@
   }
   var EVENT_DUPLICATION_CACHE_DURATION_MS = 10 * 60 * 1e3;
   var AuthEventManager = class {
-    constructor(auth3) {
-      this.auth = auth3;
+    constructor(auth2) {
+      this.auth = auth2;
       this.cachedEventUids = /* @__PURE__ */ new Set();
       this.consumers = /* @__PURE__ */ new Set();
       this.queuedRedirectEvent = null;
@@ -28962,16 +29097,16 @@
         return false;
     }
   }
-  async function _getProjectConfig(auth3, request = {}) {
-    return _performApiRequest(auth3, "GET", "/v1/projects", request);
+  async function _getProjectConfig(auth2, request = {}) {
+    return _performApiRequest(auth2, "GET", "/v1/projects", request);
   }
   var IP_ADDRESS_REGEX = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
   var HTTP_REGEX = /^https?/;
-  async function _validateOrigin(auth3) {
-    if (auth3.config.emulator) {
+  async function _validateOrigin(auth2) {
+    if (auth2.config.emulator) {
       return;
     }
-    const { authorizedDomains } = await _getProjectConfig(auth3);
+    const { authorizedDomains } = await _getProjectConfig(auth2);
     for (const domain of authorizedDomains) {
       try {
         if (matchDomain(domain)) {
@@ -28981,7 +29116,7 @@
       }
     }
     _fail(
-      auth3,
+      auth2,
       "unauthorized-domain"
       /* AuthErrorCode.INVALID_ORIGIN */
     );
@@ -29022,7 +29157,7 @@
       }
     }
   }
-  function loadGapi(auth3) {
+  function loadGapi(auth2) {
     return new Promise((resolve, reject) => {
       function loadGapiIframe() {
         resetUnloadedGapiModules();
@@ -29033,7 +29168,7 @@
           ontimeout: () => {
             resetUnloadedGapiModules();
             reject(_createError(
-              auth3,
+              auth2,
               "network-request-failed"
               /* AuthErrorCode.NETWORK_REQUEST_FAILED */
             ));
@@ -29052,7 +29187,7 @@
             loadGapiIframe();
           } else {
             reject(_createError(
-              auth3,
+              auth2,
               "network-request-failed"
               /* AuthErrorCode.NETWORK_REQUEST_FAILED */
             ));
@@ -29066,8 +29201,8 @@
     });
   }
   var cachedGApiLoader = null;
-  function _loadGapi(auth3) {
-    cachedGApiLoader = cachedGApiLoader || loadGapi(auth3);
+  function _loadGapi(auth2) {
+    cachedGApiLoader = cachedGApiLoader || loadGapi(auth2);
     return cachedGApiLoader;
   }
   var PING_TIMEOUT = new Delay(5e3, 15e3);
@@ -29091,42 +29226,42 @@
     ["test-identitytoolkit.sandbox.googleapis.com", "t"]
     // test
   ]);
-  function getIframeUrl(auth3) {
-    const config = auth3.config;
+  function getIframeUrl(auth2) {
+    const config = auth2.config;
     _assert(
       config.authDomain,
-      auth3,
+      auth2,
       "auth-domain-config-required"
       /* AuthErrorCode.MISSING_AUTH_DOMAIN */
     );
-    const url = config.emulator ? _emulatorUrl(config, EMULATED_IFRAME_PATH) : `https://${auth3.config.authDomain}/${IFRAME_PATH}`;
+    const url = config.emulator ? _emulatorUrl(config, EMULATED_IFRAME_PATH) : `https://${auth2.config.authDomain}/${IFRAME_PATH}`;
     const params = {
       apiKey: config.apiKey,
-      appName: auth3.name,
+      appName: auth2.name,
       v: SDK_VERSION
     };
-    const eid = EID_FROM_APIHOST.get(auth3.config.apiHost);
+    const eid = EID_FROM_APIHOST.get(auth2.config.apiHost);
     if (eid) {
       params.eid = eid;
     }
-    const frameworks = auth3._getFrameworks();
+    const frameworks = auth2._getFrameworks();
     if (frameworks.length) {
       params.fw = frameworks.join(",");
     }
     return `${url}?${querystring(params).slice(1)}`;
   }
-  async function _openIframe(auth3) {
-    const context = await _loadGapi(auth3);
+  async function _openIframe(auth2) {
+    const context = await _loadGapi(auth2);
     const gapi2 = _window().gapi;
     _assert(
       gapi2,
-      auth3,
+      auth2,
       "internal-error"
       /* AuthErrorCode.INTERNAL_ERROR */
     );
     return context.open({
       where: document.body,
-      url: getIframeUrl(auth3),
+      url: getIframeUrl(auth2),
       messageHandlersFilter: gapi2.iframes.CROSS_ORIGIN_IFRAMES_FILTER,
       attributes: IFRAME_ATTRIBUTES,
       dontclear: true
@@ -29136,7 +29271,7 @@
         setHideOnLeave: false
       });
       const networkError = _createError(
-        auth3,
+        auth2,
         "network-request-failed"
         /* AuthErrorCode.NETWORK_REQUEST_FAILED */
       );
@@ -29176,7 +29311,7 @@
       }
     }
   };
-  function _open(auth3, url, name6, width = DEFAULT_WIDTH, height = DEFAULT_HEIGHT) {
+  function _open(auth2, url, name5, width = DEFAULT_WIDTH, height = DEFAULT_HEIGHT) {
     const top = Math.max((window.screen.availHeight - height) / 2, 0).toString();
     const left = Math.max((window.screen.availWidth - width) / 2, 0).toString();
     let target = "";
@@ -29188,8 +29323,8 @@
       left
     };
     const ua = getUA().toLowerCase();
-    if (name6) {
-      target = _isChromeIOS(ua) ? TARGET_BLANK : name6;
+    if (name5) {
+      target = _isChromeIOS(ua) ? TARGET_BLANK : name5;
     }
     if (_isFirefox(ua)) {
       url = url || FIREFOX_EMPTY_URL;
@@ -29203,7 +29338,7 @@
     const newWin = window.open(url || "", target, optionsString);
     _assert(
       newWin,
-      auth3,
+      auth2,
       "popup-blocked"
       /* AuthErrorCode.POPUP_BLOCKED */
     );
@@ -29224,29 +29359,29 @@
   var WIDGET_PATH = "__/auth/handler";
   var EMULATOR_WIDGET_PATH = "emulator/auth/handler";
   var FIREBASE_APP_CHECK_FRAGMENT_ID = encodeURIComponent("fac");
-  async function _getRedirectUrl(auth3, provider, authType, redirectUrl, eventId, additionalParams) {
+  async function _getRedirectUrl(auth2, provider, authType, redirectUrl, eventId, additionalParams) {
     _assert(
-      auth3.config.authDomain,
-      auth3,
+      auth2.config.authDomain,
+      auth2,
       "auth-domain-config-required"
       /* AuthErrorCode.MISSING_AUTH_DOMAIN */
     );
     _assert(
-      auth3.config.apiKey,
-      auth3,
+      auth2.config.apiKey,
+      auth2,
       "invalid-api-key"
       /* AuthErrorCode.INVALID_API_KEY */
     );
     const params = {
-      apiKey: auth3.config.apiKey,
-      appName: auth3.name,
+      apiKey: auth2.config.apiKey,
+      appName: auth2.name,
       authType,
       redirectUrl,
       v: SDK_VERSION,
       eventId
     };
     if (provider instanceof FederatedAuthProvider) {
-      provider.setDefaultLanguage(auth3.languageCode);
+      provider.setDefaultLanguage(auth2.languageCode);
       params.providerId = provider.providerId || "";
       if (!isEmpty(provider.getCustomParameters())) {
         params.customParameters = JSON.stringify(provider.getCustomParameters());
@@ -29261,8 +29396,8 @@
         params.scopes = scopes.join(",");
       }
     }
-    if (auth3.tenantId) {
-      params.tid = auth3.tenantId;
+    if (auth2.tenantId) {
+      params.tid = auth2.tenantId;
     }
     const paramsDict = params;
     for (const key of Object.keys(paramsDict)) {
@@ -29270,9 +29405,9 @@
         delete paramsDict[key];
       }
     }
-    const appCheckToken = await auth3._getAppCheckToken();
+    const appCheckToken = await auth2._getAppCheckToken();
     const appCheckTokenFragment = appCheckToken ? `#${FIREBASE_APP_CHECK_FRAGMENT_ID}=${encodeURIComponent(appCheckToken)}` : "";
-    return `${getHandlerBase(auth3)}?${querystring(paramsDict).slice(1)}${appCheckTokenFragment}`;
+    return `${getHandlerBase(auth2)}?${querystring(paramsDict).slice(1)}${appCheckTokenFragment}`;
   }
   function getHandlerBase({ config }) {
     if (!config.emulator) {
@@ -29292,20 +29427,20 @@
     }
     // Wrapping in async even though we don't await anywhere in order
     // to make sure errors are raised as promise rejections
-    async _openPopup(auth3, provider, authType, eventId) {
-      debugAssert(this.eventManagers[auth3._key()]?.manager, "_initialize() not called before _openPopup()");
-      const url = await _getRedirectUrl(auth3, provider, authType, _getCurrentUrl(), eventId);
-      return _open(auth3, url, _generateEventId());
+    async _openPopup(auth2, provider, authType, eventId) {
+      debugAssert(this.eventManagers[auth2._key()]?.manager, "_initialize() not called before _openPopup()");
+      const url = await _getRedirectUrl(auth2, provider, authType, _getCurrentUrl(), eventId);
+      return _open(auth2, url, _generateEventId());
     }
-    async _openRedirect(auth3, provider, authType, eventId) {
-      await this._originValidation(auth3);
-      const url = await _getRedirectUrl(auth3, provider, authType, _getCurrentUrl(), eventId);
+    async _openRedirect(auth2, provider, authType, eventId) {
+      await this._originValidation(auth2);
+      const url = await _getRedirectUrl(auth2, provider, authType, _getCurrentUrl(), eventId);
       _setWindowLocation(url);
       return new Promise(() => {
       });
     }
-    _initialize(auth3) {
-      const key = auth3._key();
+    _initialize(auth2) {
+      const key = auth2._key();
       if (this.eventManagers[key]) {
         const { manager, promise: promise2 } = this.eventManagers[key];
         if (manager) {
@@ -29315,20 +29450,20 @@
           return promise2;
         }
       }
-      const promise = this.initAndGetManager(auth3);
+      const promise = this.initAndGetManager(auth2);
       this.eventManagers[key] = { promise };
       promise.catch(() => {
         delete this.eventManagers[key];
       });
       return promise;
     }
-    async initAndGetManager(auth3) {
-      const iframe = await _openIframe(auth3);
-      const manager = new AuthEventManager(auth3);
+    async initAndGetManager(auth2) {
+      const iframe = await _openIframe(auth2);
+      const manager = new AuthEventManager(auth2);
       iframe.register("authEvent", (iframeEvent) => {
         _assert(
           iframeEvent?.authEvent,
-          auth3,
+          auth2,
           "invalid-auth-event"
           /* AuthErrorCode.INVALID_AUTH_EVENT */
         );
@@ -29338,28 +29473,28 @@
           /* GapiOutcome.ERROR */
         };
       }, gapi.iframes.CROSS_ORIGIN_IFRAMES_FILTER);
-      this.eventManagers[auth3._key()] = { manager };
-      this.iframes[auth3._key()] = iframe;
+      this.eventManagers[auth2._key()] = { manager };
+      this.iframes[auth2._key()] = iframe;
       return manager;
     }
-    _isIframeWebStorageSupported(auth3, cb) {
-      const iframe = this.iframes[auth3._key()];
+    _isIframeWebStorageSupported(auth2, cb) {
+      const iframe = this.iframes[auth2._key()];
       iframe.send(WEB_STORAGE_SUPPORT_KEY, { type: WEB_STORAGE_SUPPORT_KEY }, (result) => {
         const isSupported = result?.[0]?.[WEB_STORAGE_SUPPORT_KEY];
         if (isSupported !== void 0) {
           cb(!!isSupported);
         }
         _fail(
-          auth3,
+          auth2,
           "internal-error"
           /* AuthErrorCode.INTERNAL_ERROR */
         );
       }, gapi.iframes.CROSS_ORIGIN_IFRAMES_FILTER);
     }
-    _originValidation(auth3) {
-      const key = auth3._key();
+    _originValidation(auth2) {
+      const key = auth2._key();
       if (!this.originValidationPromises[key]) {
-        this.originValidationPromises[key] = _validateOrigin(auth3);
+        this.originValidationPromises[key] = _validateOrigin(auth2);
       }
       return this.originValidationPromises[key];
     }
@@ -29372,12 +29507,12 @@
     constructor(factorId) {
       this.factorId = factorId;
     }
-    _process(auth3, session, displayName) {
+    _process(auth2, session, displayName) {
       switch (session.type) {
         case "enroll":
-          return this._finalizeEnroll(auth3, session.credential, displayName);
+          return this._finalizeEnroll(auth2, session.credential, displayName);
         case "signin":
-          return this._finalizeSignIn(auth3, session.credential);
+          return this._finalizeSignIn(auth2, session.credential);
         default:
           return debugFail("unexpected MultiFactorSessionType");
       }
@@ -29396,16 +29531,16 @@
       return new _PhoneMultiFactorAssertionImpl(credential);
     }
     /** @internal */
-    _finalizeEnroll(auth3, idToken, displayName) {
-      return finalizeEnrollPhoneMfa(auth3, {
+    _finalizeEnroll(auth2, idToken, displayName) {
+      return finalizeEnrollPhoneMfa(auth2, {
         idToken,
         displayName,
         phoneVerificationInfo: this.credential._makeVerificationRequest()
       });
     }
     /** @internal */
-    _finalizeSignIn(auth3, mfaPendingCredential) {
-      return finalizeSignInPhoneMfa(auth3, {
+    _finalizeSignIn(auth2, mfaPendingCredential) {
+      return finalizeSignInPhoneMfa(auth2, {
         mfaPendingCredential,
         phoneVerificationInfo: this.credential._makeVerificationRequest()
       });
@@ -29498,29 +29633,29 @@
       return new _TotpMultiFactorAssertionImpl(otp, enrollmentId);
     }
     /** @internal */
-    async _finalizeEnroll(auth3, idToken, displayName) {
+    async _finalizeEnroll(auth2, idToken, displayName) {
       _assert(
         typeof this.secret !== "undefined",
-        auth3,
+        auth2,
         "argument-error"
         /* AuthErrorCode.ARGUMENT_ERROR */
       );
-      return finalizeEnrollTotpMfa(auth3, {
+      return finalizeEnrollTotpMfa(auth2, {
         idToken,
         displayName,
         totpVerificationInfo: this.secret._makeTotpVerificationInfo(this.otp)
       });
     }
     /** @internal */
-    async _finalizeSignIn(auth3, mfaPendingCredential) {
+    async _finalizeSignIn(auth2, mfaPendingCredential) {
       _assert(
         this.enrollmentId !== void 0 && this.otp !== void 0,
-        auth3,
+        auth2,
         "argument-error"
         /* AuthErrorCode.ARGUMENT_ERROR */
       );
       const totpVerificationInfo = { verificationCode: this.otp };
-      return finalizeSignInTotpMfa(auth3, {
+      return finalizeSignInTotpMfa(auth2, {
         mfaPendingCredential,
         mfaEnrollmentId: this.enrollmentId,
         totpVerificationInfo
@@ -29529,9 +29664,9 @@
   };
   var TotpSecret = class _TotpSecret {
     // The public members are declared outside the constructor so the docs can be generated.
-    constructor(secretKey, hashingAlgorithm, codeLength, codeIntervalSeconds, enrollmentCompletionDeadline, sessionInfo, auth3) {
+    constructor(secretKey, hashingAlgorithm, codeLength, codeIntervalSeconds, enrollmentCompletionDeadline, sessionInfo, auth2) {
       this.sessionInfo = sessionInfo;
-      this.auth = auth3;
+      this.auth = auth2;
       this.secretKey = secretKey;
       this.hashingAlgorithm = hashingAlgorithm;
       this.codeLength = codeLength;
@@ -29539,8 +29674,8 @@
       this.enrollmentCompletionDeadline = enrollmentCompletionDeadline;
     }
     /** @internal */
-    static _fromStartTotpMfaEnrollmentResponse(response, auth3) {
-      return new _TotpSecret(response.totpSessionInfo.sharedSecretKey, response.totpSessionInfo.hashingAlgorithm, response.totpSessionInfo.verificationCodeLength, response.totpSessionInfo.periodSec, new Date(response.totpSessionInfo.finalizeEnrollmentTime).toUTCString(), response.totpSessionInfo.sessionInfo, auth3);
+    static _fromStartTotpMfaEnrollmentResponse(response, auth2) {
+      return new _TotpSecret(response.totpSessionInfo.sharedSecretKey, response.totpSessionInfo.hashingAlgorithm, response.totpSessionInfo.verificationCodeLength, response.totpSessionInfo.periodSec, new Date(response.totpSessionInfo.finalizeEnrollmentTime).toUTCString(), response.totpSessionInfo.sessionInfo, auth2);
     }
     /** @internal */
     _makeTotpVerificationInfo(otp) {
@@ -29575,11 +29710,11 @@
   function _isEmptyString(input) {
     return typeof input === "undefined" || input?.length === 0;
   }
-  var name2 = "@firebase/auth";
-  var version2 = "1.12.1";
+  var name3 = "@firebase/auth";
+  var version3 = "1.12.1";
   var AuthInterop = class {
-    constructor(auth3) {
-      this.auth = auth3;
+    constructor(auth2) {
+      this.auth = auth2;
       this.internalListeners = /* @__PURE__ */ new Map();
     }
     getUid() {
@@ -29651,11 +29786,11 @@
     _registerComponent(new Component(
       "auth",
       (container, { options: deps }) => {
-        const app3 = container.getProvider("app").getImmediate();
+        const app2 = container.getProvider("app").getImmediate();
         const heartbeatServiceProvider = container.getProvider("heartbeat");
         const appCheckServiceProvider = container.getProvider("app-check-internal");
-        const { apiKey, authDomain } = app3.options;
-        _assert(apiKey && !apiKey.includes(":"), "invalid-api-key", { appName: app3.name });
+        const { apiKey, authDomain } = app2.options;
+        _assert(apiKey && !apiKey.includes(":"), "invalid-api-key", { appName: app2.name });
         const config = {
           apiKey,
           authDomain,
@@ -29665,7 +29800,7 @@
           apiScheme: "https",
           sdkClientVersion: _getClientVersion(clientPlatform)
         };
-        const authInstance = new AuthImpl(app3, heartbeatServiceProvider, appCheckServiceProvider, config);
+        const authInstance = new AuthImpl(app2, heartbeatServiceProvider, appCheckServiceProvider, config);
         _initializeAuthInstance(authInstance, deps);
         return authInstance;
       },
@@ -29684,11 +29819,11 @@
     _registerComponent(new Component(
       "auth-internal",
       (container) => {
-        const auth3 = _castAuth(container.getProvider(
+        const auth2 = _castAuth(container.getProvider(
           "auth"
           /* _ComponentName.AUTH */
         ).getImmediate());
-        return ((auth4) => new AuthInterop(auth4))(auth3);
+        return ((auth3) => new AuthInterop(auth3))(auth2);
       },
       "PRIVATE"
       /* ComponentType.PRIVATE */
@@ -29696,8 +29831,8 @@
       "EXPLICIT"
       /* InstantiationMode.EXPLICIT */
     ));
-    registerVersion(name2, version2, getVersionForPlatform(clientPlatform));
-    registerVersion(name2, version2, "esm2020");
+    registerVersion(name3, version3, getVersionForPlatform(clientPlatform));
+    registerVersion(name3, version3, "esm2020");
   }
   var DEFAULT_ID_TOKEN_MAX_AGE = 5 * 60;
   var authIdTokenMaxAge = getExperimentalSetting("authIdTokenMaxAge") || DEFAULT_ID_TOKEN_MAX_AGE;
@@ -29720,12 +29855,12 @@
       } : {}
     });
   };
-  function getAuth(app3 = getApp()) {
-    const provider = _getProvider(app3, "auth");
+  function getAuth(app2 = getApp()) {
+    const provider = _getProvider(app2, "auth");
     if (provider.isInitialized()) {
       return provider.getImmediate();
     }
-    const auth3 = initializeAuth(app3, {
+    const auth2 = initializeAuth(app2, {
       popupRedirectResolver: browserPopupRedirectResolver,
       persistence: [
         indexedDBLocalPersistence,
@@ -29738,15 +29873,15 @@
       const authTokenSyncUrl = new URL(authTokenSyncPath, location.origin);
       if (location.origin === authTokenSyncUrl.origin) {
         const mintCookie = mintCookieFactory(authTokenSyncUrl.toString());
-        beforeAuthStateChanged(auth3, mintCookie, () => mintCookie(auth3.currentUser));
-        onIdTokenChanged(auth3, (user) => mintCookie(user));
+        beforeAuthStateChanged(auth2, mintCookie, () => mintCookie(auth2.currentUser));
+        onIdTokenChanged(auth2, (user) => mintCookie(user));
       }
     }
     const authEmulatorHost = getDefaultEmulatorHost("auth");
     if (authEmulatorHost) {
-      connectAuthEmulator(auth3, `http://${authEmulatorHost}`);
+      connectAuthEmulator(auth2, `http://${authEmulatorHost}`);
     }
-    return auth3;
+    return auth2;
   }
   function getScriptParentElement() {
     return document.getElementsByTagName("head")?.[0] ?? document;
@@ -29778,4154 +29913,6 @@
     "Browser"
     /* ClientPlatform.BROWSER */
   );
-
-  // node_modules/@firebase/auth/dist/web-extension-esm/register-7238101c.js
-  function _prodErrorMap2() {
-    return {
-      [
-        "dependent-sdk-initialized-before-auth"
-        /* AuthErrorCode.DEPENDENT_SDK_INIT_BEFORE_AUTH */
-      ]: "Another Firebase SDK was initialized and is trying to use Auth before Auth is initialized. Please be sure to call `initializeAuth` or `getAuth` before starting any other Firebase SDK."
-    };
-  }
-  var prodErrorMap2 = _prodErrorMap2;
-  var _DEFAULT_AUTH_ERROR_FACTORY2 = new ErrorFactory("auth", "Firebase", _prodErrorMap2());
-  var logClient2 = new Logger("@firebase/auth");
-  function _logWarn2(msg, ...args) {
-    if (logClient2.logLevel <= LogLevel.WARN) {
-      logClient2.warn(`Auth (${SDK_VERSION}): ${msg}`, ...args);
-    }
-  }
-  function _logError2(msg, ...args) {
-    if (logClient2.logLevel <= LogLevel.ERROR) {
-      logClient2.error(`Auth (${SDK_VERSION}): ${msg}`, ...args);
-    }
-  }
-  function _fail2(authOrCode, ...rest) {
-    throw createErrorInternal2(authOrCode, ...rest);
-  }
-  function _createError2(authOrCode, ...rest) {
-    return createErrorInternal2(authOrCode, ...rest);
-  }
-  function _errorWithCustomMessage2(auth3, code, message) {
-    const errorMap = {
-      ...prodErrorMap2(),
-      [code]: message
-    };
-    const factory2 = new ErrorFactory("auth", "Firebase", errorMap);
-    return factory2.create(code, {
-      appName: auth3.name
-    });
-  }
-  function _serverAppCurrentUserOperationNotSupportedError2(auth3) {
-    return _errorWithCustomMessage2(auth3, "operation-not-supported-in-this-environment", "Operations that alter the current user are not supported in conjunction with FirebaseServerApp");
-  }
-  function createErrorInternal2(authOrCode, ...rest) {
-    if (typeof authOrCode !== "string") {
-      const code = rest[0];
-      const fullParams = [...rest.slice(1)];
-      if (fullParams[0]) {
-        fullParams[0].appName = authOrCode.name;
-      }
-      return authOrCode._errorFactory.create(code, ...fullParams);
-    }
-    return _DEFAULT_AUTH_ERROR_FACTORY2.create(authOrCode, ...rest);
-  }
-  function _assert2(assertion, authOrCode, ...rest) {
-    if (!assertion) {
-      throw createErrorInternal2(authOrCode, ...rest);
-    }
-  }
-  function debugFail2(failure) {
-    const message = `INTERNAL ASSERTION FAILED: ` + failure;
-    _logError2(message);
-    throw new Error(message);
-  }
-  function debugAssert2(assertion, message) {
-    if (!assertion) {
-      debugFail2(message);
-    }
-  }
-  function _isHttpOrHttps2() {
-    return _getCurrentScheme2() === "http:" || _getCurrentScheme2() === "https:";
-  }
-  function _getCurrentScheme2() {
-    return typeof self !== "undefined" && self.location?.protocol || null;
-  }
-  function _isOnline2() {
-    if (typeof navigator !== "undefined" && navigator && "onLine" in navigator && typeof navigator.onLine === "boolean" && // Apply only for traditional web apps and Chrome extensions.
-    // This is especially true for Cordova apps which have unreliable
-    // navigator.onLine behavior unless cordova-plugin-network-information is
-    // installed which overwrites the native navigator.onLine value and
-    // defines navigator.connection.
-    (_isHttpOrHttps2() || isBrowserExtension() || "connection" in navigator)) {
-      return navigator.onLine;
-    }
-    return true;
-  }
-  function _getUserLanguage2() {
-    if (typeof navigator === "undefined") {
-      return null;
-    }
-    const navigatorLanguage = navigator;
-    return (
-      // Most reliable, but only supported in Chrome/Firefox.
-      navigatorLanguage.languages && navigatorLanguage.languages[0] || // Supported in most browsers, but returns the language of the browser
-      // UI, not the language set in browser settings.
-      navigatorLanguage.language || // Couldn't determine language.
-      null
-    );
-  }
-  var Delay2 = class {
-    constructor(shortDelay, longDelay) {
-      this.shortDelay = shortDelay;
-      this.longDelay = longDelay;
-      debugAssert2(longDelay > shortDelay, "Short delay should be less than long delay!");
-      this.isMobile = isMobileCordova() || isReactNative();
-    }
-    get() {
-      if (!_isOnline2()) {
-        return Math.min(5e3, this.shortDelay);
-      }
-      return this.isMobile ? this.longDelay : this.shortDelay;
-    }
-  };
-  function _emulatorUrl2(config, path) {
-    debugAssert2(config.emulator, "Emulator should always be set here");
-    const { url } = config.emulator;
-    if (!path) {
-      return url;
-    }
-    return `${url}${path.startsWith("/") ? path.slice(1) : path}`;
-  }
-  var FetchProvider2 = class {
-    static initialize(fetchImpl, headersImpl, responseImpl) {
-      this.fetchImpl = fetchImpl;
-      if (headersImpl) {
-        this.headersImpl = headersImpl;
-      }
-      if (responseImpl) {
-        this.responseImpl = responseImpl;
-      }
-    }
-    static fetch() {
-      if (this.fetchImpl) {
-        return this.fetchImpl;
-      }
-      if (typeof self !== "undefined" && "fetch" in self) {
-        return self.fetch;
-      }
-      if (typeof globalThis !== "undefined" && globalThis.fetch) {
-        return globalThis.fetch;
-      }
-      if (typeof fetch !== "undefined") {
-        return fetch;
-      }
-      debugFail2("Could not find fetch implementation, make sure you call FetchProvider.initialize() with an appropriate polyfill");
-    }
-    static headers() {
-      if (this.headersImpl) {
-        return this.headersImpl;
-      }
-      if (typeof self !== "undefined" && "Headers" in self) {
-        return self.Headers;
-      }
-      if (typeof globalThis !== "undefined" && globalThis.Headers) {
-        return globalThis.Headers;
-      }
-      if (typeof Headers !== "undefined") {
-        return Headers;
-      }
-      debugFail2("Could not find Headers implementation, make sure you call FetchProvider.initialize() with an appropriate polyfill");
-    }
-    static response() {
-      if (this.responseImpl) {
-        return this.responseImpl;
-      }
-      if (typeof self !== "undefined" && "Response" in self) {
-        return self.Response;
-      }
-      if (typeof globalThis !== "undefined" && globalThis.Response) {
-        return globalThis.Response;
-      }
-      if (typeof Response !== "undefined") {
-        return Response;
-      }
-      debugFail2("Could not find Response implementation, make sure you call FetchProvider.initialize() with an appropriate polyfill");
-    }
-  };
-  var SERVER_ERROR_MAP2 = {
-    // Custom token errors.
-    [
-      "CREDENTIAL_MISMATCH"
-      /* ServerError.CREDENTIAL_MISMATCH */
-    ]: "custom-token-mismatch",
-    // This can only happen if the SDK sends a bad request.
-    [
-      "MISSING_CUSTOM_TOKEN"
-      /* ServerError.MISSING_CUSTOM_TOKEN */
-    ]: "internal-error",
-    // Create Auth URI errors.
-    [
-      "INVALID_IDENTIFIER"
-      /* ServerError.INVALID_IDENTIFIER */
-    ]: "invalid-email",
-    // This can only happen if the SDK sends a bad request.
-    [
-      "MISSING_CONTINUE_URI"
-      /* ServerError.MISSING_CONTINUE_URI */
-    ]: "internal-error",
-    // Sign in with email and password errors (some apply to sign up too).
-    [
-      "INVALID_PASSWORD"
-      /* ServerError.INVALID_PASSWORD */
-    ]: "wrong-password",
-    // This can only happen if the SDK sends a bad request.
-    [
-      "MISSING_PASSWORD"
-      /* ServerError.MISSING_PASSWORD */
-    ]: "missing-password",
-    // Thrown if Email Enumeration Protection is enabled in the project and the email or password is
-    // invalid.
-    [
-      "INVALID_LOGIN_CREDENTIALS"
-      /* ServerError.INVALID_LOGIN_CREDENTIALS */
-    ]: "invalid-credential",
-    // Sign up with email and password errors.
-    [
-      "EMAIL_EXISTS"
-      /* ServerError.EMAIL_EXISTS */
-    ]: "email-already-in-use",
-    [
-      "PASSWORD_LOGIN_DISABLED"
-      /* ServerError.PASSWORD_LOGIN_DISABLED */
-    ]: "operation-not-allowed",
-    // Verify assertion for sign in with credential errors:
-    [
-      "INVALID_IDP_RESPONSE"
-      /* ServerError.INVALID_IDP_RESPONSE */
-    ]: "invalid-credential",
-    [
-      "INVALID_PENDING_TOKEN"
-      /* ServerError.INVALID_PENDING_TOKEN */
-    ]: "invalid-credential",
-    [
-      "FEDERATED_USER_ID_ALREADY_LINKED"
-      /* ServerError.FEDERATED_USER_ID_ALREADY_LINKED */
-    ]: "credential-already-in-use",
-    // This can only happen if the SDK sends a bad request.
-    [
-      "MISSING_REQ_TYPE"
-      /* ServerError.MISSING_REQ_TYPE */
-    ]: "internal-error",
-    // Send Password reset email errors:
-    [
-      "EMAIL_NOT_FOUND"
-      /* ServerError.EMAIL_NOT_FOUND */
-    ]: "user-not-found",
-    [
-      "RESET_PASSWORD_EXCEED_LIMIT"
-      /* ServerError.RESET_PASSWORD_EXCEED_LIMIT */
-    ]: "too-many-requests",
-    [
-      "EXPIRED_OOB_CODE"
-      /* ServerError.EXPIRED_OOB_CODE */
-    ]: "expired-action-code",
-    [
-      "INVALID_OOB_CODE"
-      /* ServerError.INVALID_OOB_CODE */
-    ]: "invalid-action-code",
-    // This can only happen if the SDK sends a bad request.
-    [
-      "MISSING_OOB_CODE"
-      /* ServerError.MISSING_OOB_CODE */
-    ]: "internal-error",
-    // Operations that require ID token in request:
-    [
-      "CREDENTIAL_TOO_OLD_LOGIN_AGAIN"
-      /* ServerError.CREDENTIAL_TOO_OLD_LOGIN_AGAIN */
-    ]: "requires-recent-login",
-    [
-      "INVALID_ID_TOKEN"
-      /* ServerError.INVALID_ID_TOKEN */
-    ]: "invalid-user-token",
-    [
-      "TOKEN_EXPIRED"
-      /* ServerError.TOKEN_EXPIRED */
-    ]: "user-token-expired",
-    [
-      "USER_NOT_FOUND"
-      /* ServerError.USER_NOT_FOUND */
-    ]: "user-token-expired",
-    // Other errors.
-    [
-      "TOO_MANY_ATTEMPTS_TRY_LATER"
-      /* ServerError.TOO_MANY_ATTEMPTS_TRY_LATER */
-    ]: "too-many-requests",
-    [
-      "PASSWORD_DOES_NOT_MEET_REQUIREMENTS"
-      /* ServerError.PASSWORD_DOES_NOT_MEET_REQUIREMENTS */
-    ]: "password-does-not-meet-requirements",
-    // Phone Auth related errors.
-    [
-      "INVALID_CODE"
-      /* ServerError.INVALID_CODE */
-    ]: "invalid-verification-code",
-    [
-      "INVALID_SESSION_INFO"
-      /* ServerError.INVALID_SESSION_INFO */
-    ]: "invalid-verification-id",
-    [
-      "INVALID_TEMPORARY_PROOF"
-      /* ServerError.INVALID_TEMPORARY_PROOF */
-    ]: "invalid-credential",
-    [
-      "MISSING_SESSION_INFO"
-      /* ServerError.MISSING_SESSION_INFO */
-    ]: "missing-verification-id",
-    [
-      "SESSION_EXPIRED"
-      /* ServerError.SESSION_EXPIRED */
-    ]: "code-expired",
-    // Other action code errors when additional settings passed.
-    // MISSING_CONTINUE_URI is getting mapped to INTERNAL_ERROR above.
-    // This is OK as this error will be caught by client side validation.
-    [
-      "MISSING_ANDROID_PACKAGE_NAME"
-      /* ServerError.MISSING_ANDROID_PACKAGE_NAME */
-    ]: "missing-android-pkg-name",
-    [
-      "UNAUTHORIZED_DOMAIN"
-      /* ServerError.UNAUTHORIZED_DOMAIN */
-    ]: "unauthorized-continue-uri",
-    // getProjectConfig errors when clientId is passed.
-    [
-      "INVALID_OAUTH_CLIENT_ID"
-      /* ServerError.INVALID_OAUTH_CLIENT_ID */
-    ]: "invalid-oauth-client-id",
-    // User actions (sign-up or deletion) disabled errors.
-    [
-      "ADMIN_ONLY_OPERATION"
-      /* ServerError.ADMIN_ONLY_OPERATION */
-    ]: "admin-restricted-operation",
-    // Multi factor related errors.
-    [
-      "INVALID_MFA_PENDING_CREDENTIAL"
-      /* ServerError.INVALID_MFA_PENDING_CREDENTIAL */
-    ]: "invalid-multi-factor-session",
-    [
-      "MFA_ENROLLMENT_NOT_FOUND"
-      /* ServerError.MFA_ENROLLMENT_NOT_FOUND */
-    ]: "multi-factor-info-not-found",
-    [
-      "MISSING_MFA_ENROLLMENT_ID"
-      /* ServerError.MISSING_MFA_ENROLLMENT_ID */
-    ]: "missing-multi-factor-info",
-    [
-      "MISSING_MFA_PENDING_CREDENTIAL"
-      /* ServerError.MISSING_MFA_PENDING_CREDENTIAL */
-    ]: "missing-multi-factor-session",
-    [
-      "SECOND_FACTOR_EXISTS"
-      /* ServerError.SECOND_FACTOR_EXISTS */
-    ]: "second-factor-already-in-use",
-    [
-      "SECOND_FACTOR_LIMIT_EXCEEDED"
-      /* ServerError.SECOND_FACTOR_LIMIT_EXCEEDED */
-    ]: "maximum-second-factor-count-exceeded",
-    // Blocking functions related errors.
-    [
-      "BLOCKING_FUNCTION_ERROR_RESPONSE"
-      /* ServerError.BLOCKING_FUNCTION_ERROR_RESPONSE */
-    ]: "internal-error",
-    // Recaptcha related errors.
-    [
-      "RECAPTCHA_NOT_ENABLED"
-      /* ServerError.RECAPTCHA_NOT_ENABLED */
-    ]: "recaptcha-not-enabled",
-    [
-      "MISSING_RECAPTCHA_TOKEN"
-      /* ServerError.MISSING_RECAPTCHA_TOKEN */
-    ]: "missing-recaptcha-token",
-    [
-      "INVALID_RECAPTCHA_TOKEN"
-      /* ServerError.INVALID_RECAPTCHA_TOKEN */
-    ]: "invalid-recaptcha-token",
-    [
-      "INVALID_RECAPTCHA_ACTION"
-      /* ServerError.INVALID_RECAPTCHA_ACTION */
-    ]: "invalid-recaptcha-action",
-    [
-      "MISSING_CLIENT_TYPE"
-      /* ServerError.MISSING_CLIENT_TYPE */
-    ]: "missing-client-type",
-    [
-      "MISSING_RECAPTCHA_VERSION"
-      /* ServerError.MISSING_RECAPTCHA_VERSION */
-    ]: "missing-recaptcha-version",
-    [
-      "INVALID_RECAPTCHA_VERSION"
-      /* ServerError.INVALID_RECAPTCHA_VERSION */
-    ]: "invalid-recaptcha-version",
-    [
-      "INVALID_REQ_TYPE"
-      /* ServerError.INVALID_REQ_TYPE */
-    ]: "invalid-req-type"
-    /* AuthErrorCode.INVALID_REQ_TYPE */
-  };
-  var CookieAuthProxiedEndpoints2 = [
-    "/v1/accounts:signInWithCustomToken",
-    "/v1/accounts:signInWithEmailLink",
-    "/v1/accounts:signInWithIdp",
-    "/v1/accounts:signInWithPassword",
-    "/v1/accounts:signInWithPhoneNumber",
-    "/v1/token"
-    /* Endpoint.TOKEN */
-  ];
-  var DEFAULT_API_TIMEOUT_MS2 = new Delay2(3e4, 6e4);
-  function _addTidIfNecessary2(auth3, request) {
-    if (auth3.tenantId && !request.tenantId) {
-      return {
-        ...request,
-        tenantId: auth3.tenantId
-      };
-    }
-    return request;
-  }
-  async function _performApiRequest2(auth3, method, path, request, customErrorMap = {}) {
-    return _performFetchWithErrorHandling2(auth3, customErrorMap, async () => {
-      let body = {};
-      let params = {};
-      if (request) {
-        if (method === "GET") {
-          params = request;
-        } else {
-          body = {
-            body: JSON.stringify(request)
-          };
-        }
-      }
-      const query2 = querystring({
-        key: auth3.config.apiKey,
-        ...params
-      }).slice(1);
-      const headers = await auth3._getAdditionalHeaders();
-      headers[
-        "Content-Type"
-        /* HttpHeader.CONTENT_TYPE */
-      ] = "application/json";
-      if (auth3.languageCode) {
-        headers[
-          "X-Firebase-Locale"
-          /* HttpHeader.X_FIREBASE_LOCALE */
-        ] = auth3.languageCode;
-      }
-      const fetchArgs = {
-        method,
-        headers,
-        ...body
-      };
-      if (!isCloudflareWorker()) {
-        fetchArgs.referrerPolicy = "no-referrer";
-      }
-      if (auth3.emulatorConfig && isCloudWorkstation(auth3.emulatorConfig.host)) {
-        fetchArgs.credentials = "include";
-      }
-      return FetchProvider2.fetch()(await _getFinalTarget2(auth3, auth3.config.apiHost, path, query2), fetchArgs);
-    });
-  }
-  async function _performFetchWithErrorHandling2(auth3, customErrorMap, fetchFn) {
-    auth3._canInitEmulator = false;
-    const errorMap = { ...SERVER_ERROR_MAP2, ...customErrorMap };
-    try {
-      const networkTimeout = new NetworkTimeout2(auth3);
-      const response = await Promise.race([
-        fetchFn(),
-        networkTimeout.promise
-      ]);
-      networkTimeout.clearNetworkTimeout();
-      const json = await response.json();
-      if ("needConfirmation" in json) {
-        throw _makeTaggedError2(auth3, "account-exists-with-different-credential", json);
-      }
-      if (response.ok && !("errorMessage" in json)) {
-        return json;
-      } else {
-        const errorMessage = response.ok ? json.errorMessage : json.error.message;
-        const [serverErrorCode, serverErrorMessage] = errorMessage.split(" : ");
-        if (serverErrorCode === "FEDERATED_USER_ID_ALREADY_LINKED") {
-          throw _makeTaggedError2(auth3, "credential-already-in-use", json);
-        } else if (serverErrorCode === "EMAIL_EXISTS") {
-          throw _makeTaggedError2(auth3, "email-already-in-use", json);
-        } else if (serverErrorCode === "USER_DISABLED") {
-          throw _makeTaggedError2(auth3, "user-disabled", json);
-        }
-        const authError = errorMap[serverErrorCode] || serverErrorCode.toLowerCase().replace(/[_\s]+/g, "-");
-        if (serverErrorMessage) {
-          throw _errorWithCustomMessage2(auth3, authError, serverErrorMessage);
-        } else {
-          _fail2(auth3, authError);
-        }
-      }
-    } catch (e) {
-      if (e instanceof FirebaseError) {
-        throw e;
-      }
-      _fail2(auth3, "network-request-failed", { "message": String(e) });
-    }
-  }
-  async function _performSignInRequest2(auth3, method, path, request, customErrorMap = {}) {
-    const serverResponse = await _performApiRequest2(auth3, method, path, request, customErrorMap);
-    if ("mfaPendingCredential" in serverResponse) {
-      _fail2(auth3, "multi-factor-auth-required", {
-        _serverResponse: serverResponse
-      });
-    }
-    return serverResponse;
-  }
-  async function _getFinalTarget2(auth3, host, path, query2) {
-    const base = `${host}${path}?${query2}`;
-    const authInternal = auth3;
-    const finalTarget = authInternal.config.emulator ? _emulatorUrl2(auth3.config, base) : `${auth3.config.apiScheme}://${base}`;
-    if (CookieAuthProxiedEndpoints2.includes(path)) {
-      await authInternal._persistenceManagerAvailable;
-      if (authInternal._getPersistenceType() === "COOKIE") {
-        const cookiePersistence = authInternal._getPersistence();
-        return cookiePersistence._getFinalTarget(finalTarget).toString();
-      }
-    }
-    return finalTarget;
-  }
-  function _parseEnforcementState2(enforcementStateStr) {
-    switch (enforcementStateStr) {
-      case "ENFORCE":
-        return "ENFORCE";
-      case "AUDIT":
-        return "AUDIT";
-      case "OFF":
-        return "OFF";
-      default:
-        return "ENFORCEMENT_STATE_UNSPECIFIED";
-    }
-  }
-  var NetworkTimeout2 = class {
-    clearNetworkTimeout() {
-      clearTimeout(this.timer);
-    }
-    constructor(auth3) {
-      this.auth = auth3;
-      this.timer = null;
-      this.promise = new Promise((_, reject) => {
-        this.timer = setTimeout(() => {
-          return reject(_createError2(
-            this.auth,
-            "network-request-failed"
-            /* AuthErrorCode.NETWORK_REQUEST_FAILED */
-          ));
-        }, DEFAULT_API_TIMEOUT_MS2.get());
-      });
-    }
-  };
-  function _makeTaggedError2(auth3, code, response) {
-    const errorParams = {
-      appName: auth3.name
-    };
-    if (response.email) {
-      errorParams.email = response.email;
-    }
-    if (response.phoneNumber) {
-      errorParams.phoneNumber = response.phoneNumber;
-    }
-    const error = _createError2(auth3, code, errorParams);
-    error.customData._tokenResponse = response;
-    return error;
-  }
-  function isEnterprise2(grecaptcha) {
-    return grecaptcha !== void 0 && grecaptcha.enterprise !== void 0;
-  }
-  var RecaptchaConfig2 = class {
-    constructor(response) {
-      this.siteKey = "";
-      this.recaptchaEnforcementState = [];
-      if (response.recaptchaKey === void 0) {
-        throw new Error("recaptchaKey undefined");
-      }
-      this.siteKey = response.recaptchaKey.split("/")[3];
-      this.recaptchaEnforcementState = response.recaptchaEnforcementState;
-    }
-    /**
-     * Returns the reCAPTCHA Enterprise enforcement state for the given provider.
-     *
-     * @param providerStr - The provider whose enforcement state is to be returned.
-     * @returns The reCAPTCHA Enterprise enforcement state for the given provider.
-     */
-    getProviderEnforcementState(providerStr) {
-      if (!this.recaptchaEnforcementState || this.recaptchaEnforcementState.length === 0) {
-        return null;
-      }
-      for (const recaptchaEnforcementState of this.recaptchaEnforcementState) {
-        if (recaptchaEnforcementState.provider && recaptchaEnforcementState.provider === providerStr) {
-          return _parseEnforcementState2(recaptchaEnforcementState.enforcementState);
-        }
-      }
-      return null;
-    }
-    /**
-     * Returns true if the reCAPTCHA Enterprise enforcement state for the provider is set to ENFORCE or AUDIT.
-     *
-     * @param providerStr - The provider whose enablement state is to be returned.
-     * @returns Whether or not reCAPTCHA Enterprise protection is enabled for the given provider.
-     */
-    isProviderEnabled(providerStr) {
-      return this.getProviderEnforcementState(providerStr) === "ENFORCE" || this.getProviderEnforcementState(providerStr) === "AUDIT";
-    }
-    /**
-     * Returns true if reCAPTCHA Enterprise protection is enabled in at least one provider, otherwise
-     * returns false.
-     *
-     * @returns Whether or not reCAPTCHA Enterprise protection is enabled for at least one provider.
-     */
-    isAnyProviderEnabled() {
-      return this.isProviderEnabled(
-        "EMAIL_PASSWORD_PROVIDER"
-        /* RecaptchaAuthProvider.EMAIL_PASSWORD_PROVIDER */
-      ) || this.isProviderEnabled(
-        "PHONE_PROVIDER"
-        /* RecaptchaAuthProvider.PHONE_PROVIDER */
-      );
-    }
-  };
-  async function getRecaptchaConfig2(auth3, request) {
-    return _performApiRequest2(auth3, "GET", "/v2/recaptchaConfig", _addTidIfNecessary2(auth3, request));
-  }
-  async function deleteAccount2(auth3, request) {
-    return _performApiRequest2(auth3, "POST", "/v1/accounts:delete", request);
-  }
-  async function getAccountInfo2(auth3, request) {
-    return _performApiRequest2(auth3, "POST", "/v1/accounts:lookup", request);
-  }
-  function utcTimestampToDateString2(utcTimestamp) {
-    if (!utcTimestamp) {
-      return void 0;
-    }
-    try {
-      const date = new Date(Number(utcTimestamp));
-      if (!isNaN(date.getTime())) {
-        return date.toUTCString();
-      }
-    } catch (e) {
-    }
-    return void 0;
-  }
-  async function getIdTokenResult2(user, forceRefresh = false) {
-    const userInternal = getModularInstance(user);
-    const token = await userInternal.getIdToken(forceRefresh);
-    const claims = _parseToken2(token);
-    _assert2(
-      claims && claims.exp && claims.auth_time && claims.iat,
-      userInternal.auth,
-      "internal-error"
-      /* AuthErrorCode.INTERNAL_ERROR */
-    );
-    const firebase = typeof claims.firebase === "object" ? claims.firebase : void 0;
-    const signInProvider = firebase?.["sign_in_provider"];
-    return {
-      claims,
-      token,
-      authTime: utcTimestampToDateString2(secondsStringToMilliseconds2(claims.auth_time)),
-      issuedAtTime: utcTimestampToDateString2(secondsStringToMilliseconds2(claims.iat)),
-      expirationTime: utcTimestampToDateString2(secondsStringToMilliseconds2(claims.exp)),
-      signInProvider: signInProvider || null,
-      signInSecondFactor: firebase?.["sign_in_second_factor"] || null
-    };
-  }
-  function secondsStringToMilliseconds2(seconds) {
-    return Number(seconds) * 1e3;
-  }
-  function _parseToken2(token) {
-    const [algorithm, payload, signature] = token.split(".");
-    if (algorithm === void 0 || payload === void 0 || signature === void 0) {
-      _logError2("JWT malformed, contained fewer than 3 sections");
-      return null;
-    }
-    try {
-      const decoded = base64Decode(payload);
-      if (!decoded) {
-        _logError2("Failed to decode base64 JWT payload");
-        return null;
-      }
-      return JSON.parse(decoded);
-    } catch (e) {
-      _logError2("Caught error parsing JWT payload as JSON", e?.toString());
-      return null;
-    }
-  }
-  function _tokenExpiresIn2(token) {
-    const parsedToken = _parseToken2(token);
-    _assert2(
-      parsedToken,
-      "internal-error"
-      /* AuthErrorCode.INTERNAL_ERROR */
-    );
-    _assert2(
-      typeof parsedToken.exp !== "undefined",
-      "internal-error"
-      /* AuthErrorCode.INTERNAL_ERROR */
-    );
-    _assert2(
-      typeof parsedToken.iat !== "undefined",
-      "internal-error"
-      /* AuthErrorCode.INTERNAL_ERROR */
-    );
-    return Number(parsedToken.exp) - Number(parsedToken.iat);
-  }
-  async function _logoutIfInvalidated2(user, promise, bypassAuthState = false) {
-    if (bypassAuthState) {
-      return promise;
-    }
-    try {
-      return await promise;
-    } catch (e) {
-      if (e instanceof FirebaseError && isUserInvalidated2(e)) {
-        if (user.auth.currentUser === user) {
-          await user.auth.signOut();
-        }
-      }
-      throw e;
-    }
-  }
-  function isUserInvalidated2({ code }) {
-    return code === `auth/${"user-disabled"}` || code === `auth/${"user-token-expired"}`;
-  }
-  var ProactiveRefresh2 = class {
-    constructor(user) {
-      this.user = user;
-      this.isRunning = false;
-      this.timerId = null;
-      this.errorBackoff = 3e4;
-    }
-    _start() {
-      if (this.isRunning) {
-        return;
-      }
-      this.isRunning = true;
-      this.schedule();
-    }
-    _stop() {
-      if (!this.isRunning) {
-        return;
-      }
-      this.isRunning = false;
-      if (this.timerId !== null) {
-        clearTimeout(this.timerId);
-      }
-    }
-    getInterval(wasError) {
-      if (wasError) {
-        const interval = this.errorBackoff;
-        this.errorBackoff = Math.min(
-          this.errorBackoff * 2,
-          96e4
-          /* Duration.RETRY_BACKOFF_MAX */
-        );
-        return interval;
-      } else {
-        this.errorBackoff = 3e4;
-        const expTime = this.user.stsTokenManager.expirationTime ?? 0;
-        const interval = expTime - Date.now() - 3e5;
-        return Math.max(0, interval);
-      }
-    }
-    schedule(wasError = false) {
-      if (!this.isRunning) {
-        return;
-      }
-      const interval = this.getInterval(wasError);
-      this.timerId = setTimeout(async () => {
-        await this.iteration();
-      }, interval);
-    }
-    async iteration() {
-      try {
-        await this.user.getIdToken(true);
-      } catch (e) {
-        if (e?.code === `auth/${"network-request-failed"}`) {
-          this.schedule(
-            /* wasError */
-            true
-          );
-        }
-        return;
-      }
-      this.schedule();
-    }
-  };
-  var UserMetadata2 = class {
-    constructor(createdAt, lastLoginAt) {
-      this.createdAt = createdAt;
-      this.lastLoginAt = lastLoginAt;
-      this._initializeTime();
-    }
-    _initializeTime() {
-      this.lastSignInTime = utcTimestampToDateString2(this.lastLoginAt);
-      this.creationTime = utcTimestampToDateString2(this.createdAt);
-    }
-    _copy(metadata) {
-      this.createdAt = metadata.createdAt;
-      this.lastLoginAt = metadata.lastLoginAt;
-      this._initializeTime();
-    }
-    toJSON() {
-      return {
-        createdAt: this.createdAt,
-        lastLoginAt: this.lastLoginAt
-      };
-    }
-  };
-  async function _reloadWithoutSaving2(user) {
-    const auth3 = user.auth;
-    const idToken = await user.getIdToken();
-    const response = await _logoutIfInvalidated2(user, getAccountInfo2(auth3, { idToken }));
-    _assert2(
-      response?.users.length,
-      auth3,
-      "internal-error"
-      /* AuthErrorCode.INTERNAL_ERROR */
-    );
-    const coreAccount = response.users[0];
-    user._notifyReloadListener(coreAccount);
-    const newProviderData = coreAccount.providerUserInfo?.length ? extractProviderData2(coreAccount.providerUserInfo) : [];
-    const providerData = mergeProviderData2(user.providerData, newProviderData);
-    const oldIsAnonymous = user.isAnonymous;
-    const newIsAnonymous = !(user.email && coreAccount.passwordHash) && !providerData?.length;
-    const isAnonymous = !oldIsAnonymous ? false : newIsAnonymous;
-    const updates = {
-      uid: coreAccount.localId,
-      displayName: coreAccount.displayName || null,
-      photoURL: coreAccount.photoUrl || null,
-      email: coreAccount.email || null,
-      emailVerified: coreAccount.emailVerified || false,
-      phoneNumber: coreAccount.phoneNumber || null,
-      tenantId: coreAccount.tenantId || null,
-      providerData,
-      metadata: new UserMetadata2(coreAccount.createdAt, coreAccount.lastLoginAt),
-      isAnonymous
-    };
-    Object.assign(user, updates);
-  }
-  async function reload2(user) {
-    const userInternal = getModularInstance(user);
-    await _reloadWithoutSaving2(userInternal);
-    await userInternal.auth._persistUserIfCurrent(userInternal);
-    userInternal.auth._notifyListenersIfCurrent(userInternal);
-  }
-  function mergeProviderData2(original, newData) {
-    const deduped = original.filter((o) => !newData.some((n) => n.providerId === o.providerId));
-    return [...deduped, ...newData];
-  }
-  function extractProviderData2(providers) {
-    return providers.map(({ providerId, ...provider }) => {
-      return {
-        providerId,
-        uid: provider.rawId || "",
-        displayName: provider.displayName || null,
-        email: provider.email || null,
-        phoneNumber: provider.phoneNumber || null,
-        photoURL: provider.photoUrl || null
-      };
-    });
-  }
-  async function requestStsToken2(auth3, refreshToken) {
-    const response = await _performFetchWithErrorHandling2(auth3, {}, async () => {
-      const body = querystring({
-        "grant_type": "refresh_token",
-        "refresh_token": refreshToken
-      }).slice(1);
-      const { tokenApiHost, apiKey } = auth3.config;
-      const url = await _getFinalTarget2(auth3, tokenApiHost, "/v1/token", `key=${apiKey}`);
-      const headers = await auth3._getAdditionalHeaders();
-      headers[
-        "Content-Type"
-        /* HttpHeader.CONTENT_TYPE */
-      ] = "application/x-www-form-urlencoded";
-      const options = {
-        method: "POST",
-        headers,
-        body
-      };
-      if (auth3.emulatorConfig && isCloudWorkstation(auth3.emulatorConfig.host)) {
-        options.credentials = "include";
-      }
-      return FetchProvider2.fetch()(url, options);
-    });
-    return {
-      accessToken: response.access_token,
-      expiresIn: response.expires_in,
-      refreshToken: response.refresh_token
-    };
-  }
-  async function revokeToken2(auth3, request) {
-    return _performApiRequest2(auth3, "POST", "/v2/accounts:revokeToken", _addTidIfNecessary2(auth3, request));
-  }
-  var StsTokenManager2 = class _StsTokenManager {
-    constructor() {
-      this.refreshToken = null;
-      this.accessToken = null;
-      this.expirationTime = null;
-    }
-    get isExpired() {
-      return !this.expirationTime || Date.now() > this.expirationTime - 3e4;
-    }
-    updateFromServerResponse(response) {
-      _assert2(
-        response.idToken,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      _assert2(
-        typeof response.idToken !== "undefined",
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      _assert2(
-        typeof response.refreshToken !== "undefined",
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      const expiresIn = "expiresIn" in response && typeof response.expiresIn !== "undefined" ? Number(response.expiresIn) : _tokenExpiresIn2(response.idToken);
-      this.updateTokensAndExpiration(response.idToken, response.refreshToken, expiresIn);
-    }
-    updateFromIdToken(idToken) {
-      _assert2(
-        idToken.length !== 0,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      const expiresIn = _tokenExpiresIn2(idToken);
-      this.updateTokensAndExpiration(idToken, null, expiresIn);
-    }
-    async getToken(auth3, forceRefresh = false) {
-      if (!forceRefresh && this.accessToken && !this.isExpired) {
-        return this.accessToken;
-      }
-      _assert2(
-        this.refreshToken,
-        auth3,
-        "user-token-expired"
-        /* AuthErrorCode.TOKEN_EXPIRED */
-      );
-      if (this.refreshToken) {
-        await this.refresh(auth3, this.refreshToken);
-        return this.accessToken;
-      }
-      return null;
-    }
-    clearRefreshToken() {
-      this.refreshToken = null;
-    }
-    async refresh(auth3, oldToken) {
-      const { accessToken, refreshToken, expiresIn } = await requestStsToken2(auth3, oldToken);
-      this.updateTokensAndExpiration(accessToken, refreshToken, Number(expiresIn));
-    }
-    updateTokensAndExpiration(accessToken, refreshToken, expiresInSec) {
-      this.refreshToken = refreshToken || null;
-      this.accessToken = accessToken || null;
-      this.expirationTime = Date.now() + expiresInSec * 1e3;
-    }
-    static fromJSON(appName, object) {
-      const { refreshToken, accessToken, expirationTime } = object;
-      const manager = new _StsTokenManager();
-      if (refreshToken) {
-        _assert2(typeof refreshToken === "string", "internal-error", {
-          appName
-        });
-        manager.refreshToken = refreshToken;
-      }
-      if (accessToken) {
-        _assert2(typeof accessToken === "string", "internal-error", {
-          appName
-        });
-        manager.accessToken = accessToken;
-      }
-      if (expirationTime) {
-        _assert2(typeof expirationTime === "number", "internal-error", {
-          appName
-        });
-        manager.expirationTime = expirationTime;
-      }
-      return manager;
-    }
-    toJSON() {
-      return {
-        refreshToken: this.refreshToken,
-        accessToken: this.accessToken,
-        expirationTime: this.expirationTime
-      };
-    }
-    _assign(stsTokenManager) {
-      this.accessToken = stsTokenManager.accessToken;
-      this.refreshToken = stsTokenManager.refreshToken;
-      this.expirationTime = stsTokenManager.expirationTime;
-    }
-    _clone() {
-      return Object.assign(new _StsTokenManager(), this.toJSON());
-    }
-    _performRefresh() {
-      return debugFail2("not implemented");
-    }
-  };
-  function assertStringOrUndefined2(assertion, appName) {
-    _assert2(typeof assertion === "string" || typeof assertion === "undefined", "internal-error", { appName });
-  }
-  var UserImpl2 = class _UserImpl {
-    constructor({ uid, auth: auth3, stsTokenManager, ...opt }) {
-      this.providerId = "firebase";
-      this.proactiveRefresh = new ProactiveRefresh2(this);
-      this.reloadUserInfo = null;
-      this.reloadListener = null;
-      this.uid = uid;
-      this.auth = auth3;
-      this.stsTokenManager = stsTokenManager;
-      this.accessToken = stsTokenManager.accessToken;
-      this.displayName = opt.displayName || null;
-      this.email = opt.email || null;
-      this.emailVerified = opt.emailVerified || false;
-      this.phoneNumber = opt.phoneNumber || null;
-      this.photoURL = opt.photoURL || null;
-      this.isAnonymous = opt.isAnonymous || false;
-      this.tenantId = opt.tenantId || null;
-      this.providerData = opt.providerData ? [...opt.providerData] : [];
-      this.metadata = new UserMetadata2(opt.createdAt || void 0, opt.lastLoginAt || void 0);
-    }
-    async getIdToken(forceRefresh) {
-      const accessToken = await _logoutIfInvalidated2(this, this.stsTokenManager.getToken(this.auth, forceRefresh));
-      _assert2(
-        accessToken,
-        this.auth,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      if (this.accessToken !== accessToken) {
-        this.accessToken = accessToken;
-        await this.auth._persistUserIfCurrent(this);
-        this.auth._notifyListenersIfCurrent(this);
-      }
-      return accessToken;
-    }
-    getIdTokenResult(forceRefresh) {
-      return getIdTokenResult2(this, forceRefresh);
-    }
-    reload() {
-      return reload2(this);
-    }
-    _assign(user) {
-      if (this === user) {
-        return;
-      }
-      _assert2(
-        this.uid === user.uid,
-        this.auth,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      this.displayName = user.displayName;
-      this.photoURL = user.photoURL;
-      this.email = user.email;
-      this.emailVerified = user.emailVerified;
-      this.phoneNumber = user.phoneNumber;
-      this.isAnonymous = user.isAnonymous;
-      this.tenantId = user.tenantId;
-      this.providerData = user.providerData.map((userInfo) => ({ ...userInfo }));
-      this.metadata._copy(user.metadata);
-      this.stsTokenManager._assign(user.stsTokenManager);
-    }
-    _clone(auth3) {
-      const newUser = new _UserImpl({
-        ...this,
-        auth: auth3,
-        stsTokenManager: this.stsTokenManager._clone()
-      });
-      newUser.metadata._copy(this.metadata);
-      return newUser;
-    }
-    _onReload(callback) {
-      _assert2(
-        !this.reloadListener,
-        this.auth,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      this.reloadListener = callback;
-      if (this.reloadUserInfo) {
-        this._notifyReloadListener(this.reloadUserInfo);
-        this.reloadUserInfo = null;
-      }
-    }
-    _notifyReloadListener(userInfo) {
-      if (this.reloadListener) {
-        this.reloadListener(userInfo);
-      } else {
-        this.reloadUserInfo = userInfo;
-      }
-    }
-    _startProactiveRefresh() {
-      this.proactiveRefresh._start();
-    }
-    _stopProactiveRefresh() {
-      this.proactiveRefresh._stop();
-    }
-    async _updateTokensIfNecessary(response, reload3 = false) {
-      let tokensRefreshed = false;
-      if (response.idToken && response.idToken !== this.stsTokenManager.accessToken) {
-        this.stsTokenManager.updateFromServerResponse(response);
-        tokensRefreshed = true;
-      }
-      if (reload3) {
-        await _reloadWithoutSaving2(this);
-      }
-      await this.auth._persistUserIfCurrent(this);
-      if (tokensRefreshed) {
-        this.auth._notifyListenersIfCurrent(this);
-      }
-    }
-    async delete() {
-      if (_isFirebaseServerApp(this.auth.app)) {
-        return Promise.reject(_serverAppCurrentUserOperationNotSupportedError2(this.auth));
-      }
-      const idToken = await this.getIdToken();
-      await _logoutIfInvalidated2(this, deleteAccount2(this.auth, { idToken }));
-      this.stsTokenManager.clearRefreshToken();
-      return this.auth.signOut();
-    }
-    toJSON() {
-      return {
-        uid: this.uid,
-        email: this.email || void 0,
-        emailVerified: this.emailVerified,
-        displayName: this.displayName || void 0,
-        isAnonymous: this.isAnonymous,
-        photoURL: this.photoURL || void 0,
-        phoneNumber: this.phoneNumber || void 0,
-        tenantId: this.tenantId || void 0,
-        providerData: this.providerData.map((userInfo) => ({ ...userInfo })),
-        stsTokenManager: this.stsTokenManager.toJSON(),
-        // Redirect event ID must be maintained in case there is a pending
-        // redirect event.
-        _redirectEventId: this._redirectEventId,
-        ...this.metadata.toJSON(),
-        // Required for compatibility with the legacy SDK (go/firebase-auth-sdk-persistence-parsing):
-        apiKey: this.auth.config.apiKey,
-        appName: this.auth.name
-        // Missing authDomain will be tolerated by the legacy SDK.
-        // stsTokenManager.apiKey isn't actually required (despite the legacy SDK persisting it).
-      };
-    }
-    get refreshToken() {
-      return this.stsTokenManager.refreshToken || "";
-    }
-    static _fromJSON(auth3, object) {
-      const displayName = object.displayName ?? void 0;
-      const email = object.email ?? void 0;
-      const phoneNumber = object.phoneNumber ?? void 0;
-      const photoURL = object.photoURL ?? void 0;
-      const tenantId = object.tenantId ?? void 0;
-      const _redirectEventId = object._redirectEventId ?? void 0;
-      const createdAt = object.createdAt ?? void 0;
-      const lastLoginAt = object.lastLoginAt ?? void 0;
-      const { uid, emailVerified, isAnonymous, providerData, stsTokenManager: plainObjectTokenManager } = object;
-      _assert2(
-        uid && plainObjectTokenManager,
-        auth3,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      const stsTokenManager = StsTokenManager2.fromJSON(this.name, plainObjectTokenManager);
-      _assert2(
-        typeof uid === "string",
-        auth3,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      assertStringOrUndefined2(displayName, auth3.name);
-      assertStringOrUndefined2(email, auth3.name);
-      _assert2(
-        typeof emailVerified === "boolean",
-        auth3,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      _assert2(
-        typeof isAnonymous === "boolean",
-        auth3,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      assertStringOrUndefined2(phoneNumber, auth3.name);
-      assertStringOrUndefined2(photoURL, auth3.name);
-      assertStringOrUndefined2(tenantId, auth3.name);
-      assertStringOrUndefined2(_redirectEventId, auth3.name);
-      assertStringOrUndefined2(createdAt, auth3.name);
-      assertStringOrUndefined2(lastLoginAt, auth3.name);
-      const user = new _UserImpl({
-        uid,
-        auth: auth3,
-        email,
-        emailVerified,
-        displayName,
-        isAnonymous,
-        photoURL,
-        phoneNumber,
-        tenantId,
-        stsTokenManager,
-        createdAt,
-        lastLoginAt
-      });
-      if (providerData && Array.isArray(providerData)) {
-        user.providerData = providerData.map((userInfo) => ({ ...userInfo }));
-      }
-      if (_redirectEventId) {
-        user._redirectEventId = _redirectEventId;
-      }
-      return user;
-    }
-    /**
-     * Initialize a User from an idToken server response
-     * @param auth
-     * @param idTokenResponse
-     */
-    static async _fromIdTokenResponse(auth3, idTokenResponse, isAnonymous = false) {
-      const stsTokenManager = new StsTokenManager2();
-      stsTokenManager.updateFromServerResponse(idTokenResponse);
-      const user = new _UserImpl({
-        uid: idTokenResponse.localId,
-        auth: auth3,
-        stsTokenManager,
-        isAnonymous
-      });
-      await _reloadWithoutSaving2(user);
-      return user;
-    }
-    /**
-     * Initialize a User from an idToken server response
-     * @param auth
-     * @param idTokenResponse
-     */
-    static async _fromGetAccountInfoResponse(auth3, response, idToken) {
-      const coreAccount = response.users[0];
-      _assert2(
-        coreAccount.localId !== void 0,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      const providerData = coreAccount.providerUserInfo !== void 0 ? extractProviderData2(coreAccount.providerUserInfo) : [];
-      const isAnonymous = !(coreAccount.email && coreAccount.passwordHash) && !providerData?.length;
-      const stsTokenManager = new StsTokenManager2();
-      stsTokenManager.updateFromIdToken(idToken);
-      const user = new _UserImpl({
-        uid: coreAccount.localId,
-        auth: auth3,
-        stsTokenManager,
-        isAnonymous
-      });
-      const updates = {
-        uid: coreAccount.localId,
-        displayName: coreAccount.displayName || null,
-        photoURL: coreAccount.photoUrl || null,
-        email: coreAccount.email || null,
-        emailVerified: coreAccount.emailVerified || false,
-        phoneNumber: coreAccount.phoneNumber || null,
-        tenantId: coreAccount.tenantId || null,
-        providerData,
-        metadata: new UserMetadata2(coreAccount.createdAt, coreAccount.lastLoginAt),
-        isAnonymous: !(coreAccount.email && coreAccount.passwordHash) && !providerData?.length
-      };
-      Object.assign(user, updates);
-      return user;
-    }
-  };
-  var instanceCache2 = /* @__PURE__ */ new Map();
-  function _getInstance2(cls) {
-    debugAssert2(cls instanceof Function, "Expected a class definition");
-    let instance = instanceCache2.get(cls);
-    if (instance) {
-      debugAssert2(instance instanceof cls, "Instance stored in cache mismatched with class");
-      return instance;
-    }
-    instance = new cls();
-    instanceCache2.set(cls, instance);
-    return instance;
-  }
-  var InMemoryPersistence2 = class {
-    constructor() {
-      this.type = "NONE";
-      this.storage = {};
-    }
-    async _isAvailable() {
-      return true;
-    }
-    async _set(key, value) {
-      this.storage[key] = value;
-    }
-    async _get(key) {
-      const value = this.storage[key];
-      return value === void 0 ? null : value;
-    }
-    async _remove(key) {
-      delete this.storage[key];
-    }
-    _addListener(_key, _listener) {
-      return;
-    }
-    _removeListener(_key, _listener) {
-      return;
-    }
-  };
-  InMemoryPersistence2.type = "NONE";
-  var inMemoryPersistence2 = InMemoryPersistence2;
-  function _persistenceKeyName2(key, apiKey, appName) {
-    return `${"firebase"}:${key}:${apiKey}:${appName}`;
-  }
-  var PersistenceUserManager2 = class _PersistenceUserManager {
-    constructor(persistence, auth3, userKey) {
-      this.persistence = persistence;
-      this.auth = auth3;
-      this.userKey = userKey;
-      const { config, name: name6 } = this.auth;
-      this.fullUserKey = _persistenceKeyName2(this.userKey, config.apiKey, name6);
-      this.fullPersistenceKey = _persistenceKeyName2("persistence", config.apiKey, name6);
-      this.boundEventHandler = auth3._onStorageEvent.bind(auth3);
-      this.persistence._addListener(this.fullUserKey, this.boundEventHandler);
-    }
-    setCurrentUser(user) {
-      return this.persistence._set(this.fullUserKey, user.toJSON());
-    }
-    async getCurrentUser() {
-      const blob = await this.persistence._get(this.fullUserKey);
-      if (!blob) {
-        return null;
-      }
-      if (typeof blob === "string") {
-        const response = await getAccountInfo2(this.auth, { idToken: blob }).catch(() => void 0);
-        if (!response) {
-          return null;
-        }
-        return UserImpl2._fromGetAccountInfoResponse(this.auth, response, blob);
-      }
-      return UserImpl2._fromJSON(this.auth, blob);
-    }
-    removeCurrentUser() {
-      return this.persistence._remove(this.fullUserKey);
-    }
-    savePersistenceForRedirect() {
-      return this.persistence._set(this.fullPersistenceKey, this.persistence.type);
-    }
-    async setPersistence(newPersistence) {
-      if (this.persistence === newPersistence) {
-        return;
-      }
-      const currentUser = await this.getCurrentUser();
-      await this.removeCurrentUser();
-      this.persistence = newPersistence;
-      if (currentUser) {
-        return this.setCurrentUser(currentUser);
-      }
-    }
-    delete() {
-      this.persistence._removeListener(this.fullUserKey, this.boundEventHandler);
-    }
-    static async create(auth3, persistenceHierarchy, userKey = "authUser") {
-      if (!persistenceHierarchy.length) {
-        return new _PersistenceUserManager(_getInstance2(inMemoryPersistence2), auth3, userKey);
-      }
-      const availablePersistences = (await Promise.all(persistenceHierarchy.map(async (persistence) => {
-        if (await persistence._isAvailable()) {
-          return persistence;
-        }
-        return void 0;
-      }))).filter((persistence) => persistence);
-      let selectedPersistence = availablePersistences[0] || _getInstance2(inMemoryPersistence2);
-      const key = _persistenceKeyName2(userKey, auth3.config.apiKey, auth3.name);
-      let userToMigrate = null;
-      for (const persistence of persistenceHierarchy) {
-        try {
-          const blob = await persistence._get(key);
-          if (blob) {
-            let user;
-            if (typeof blob === "string") {
-              const response = await getAccountInfo2(auth3, {
-                idToken: blob
-              }).catch(() => void 0);
-              if (!response) {
-                break;
-              }
-              user = await UserImpl2._fromGetAccountInfoResponse(auth3, response, blob);
-            } else {
-              user = UserImpl2._fromJSON(auth3, blob);
-            }
-            if (persistence !== selectedPersistence) {
-              userToMigrate = user;
-            }
-            selectedPersistence = persistence;
-            break;
-          }
-        } catch {
-        }
-      }
-      const migrationHierarchy = availablePersistences.filter((p) => p._shouldAllowMigration);
-      if (!selectedPersistence._shouldAllowMigration || !migrationHierarchy.length) {
-        return new _PersistenceUserManager(selectedPersistence, auth3, userKey);
-      }
-      selectedPersistence = migrationHierarchy[0];
-      if (userToMigrate) {
-        await selectedPersistence._set(key, userToMigrate.toJSON());
-      }
-      await Promise.all(persistenceHierarchy.map(async (persistence) => {
-        if (persistence !== selectedPersistence) {
-          try {
-            await persistence._remove(key);
-          } catch {
-          }
-        }
-      }));
-      return new _PersistenceUserManager(selectedPersistence, auth3, userKey);
-    }
-  };
-  function _getBrowserName2(userAgent) {
-    const ua = userAgent.toLowerCase();
-    if (ua.includes("opera/") || ua.includes("opr/") || ua.includes("opios/")) {
-      return "Opera";
-    } else if (_isIEMobile2(ua)) {
-      return "IEMobile";
-    } else if (ua.includes("msie") || ua.includes("trident/")) {
-      return "IE";
-    } else if (ua.includes("edge/")) {
-      return "Edge";
-    } else if (_isFirefox2(ua)) {
-      return "Firefox";
-    } else if (ua.includes("silk/")) {
-      return "Silk";
-    } else if (_isBlackBerry2(ua)) {
-      return "Blackberry";
-    } else if (_isWebOS2(ua)) {
-      return "Webos";
-    } else if (_isSafari2(ua)) {
-      return "Safari";
-    } else if ((ua.includes("chrome/") || _isChromeIOS2(ua)) && !ua.includes("edge/")) {
-      return "Chrome";
-    } else if (_isAndroid2(ua)) {
-      return "Android";
-    } else {
-      const re = /([a-zA-Z\d\.]+)\/[a-zA-Z\d\.]*$/;
-      const matches = userAgent.match(re);
-      if (matches?.length === 2) {
-        return matches[1];
-      }
-    }
-    return "Other";
-  }
-  function _isFirefox2(ua = getUA()) {
-    return /firefox\//i.test(ua);
-  }
-  function _isSafari2(userAgent = getUA()) {
-    const ua = userAgent.toLowerCase();
-    return ua.includes("safari/") && !ua.includes("chrome/") && !ua.includes("crios/") && !ua.includes("android");
-  }
-  function _isChromeIOS2(ua = getUA()) {
-    return /crios\//i.test(ua);
-  }
-  function _isIEMobile2(ua = getUA()) {
-    return /iemobile/i.test(ua);
-  }
-  function _isAndroid2(ua = getUA()) {
-    return /android/i.test(ua);
-  }
-  function _isBlackBerry2(ua = getUA()) {
-    return /blackberry/i.test(ua);
-  }
-  function _isWebOS2(ua = getUA()) {
-    return /webos/i.test(ua);
-  }
-  function _getClientVersion2(clientPlatform, frameworks = []) {
-    let reportedPlatform;
-    switch (clientPlatform) {
-      case "Browser":
-        reportedPlatform = _getBrowserName2(getUA());
-        break;
-      case "Worker":
-        reportedPlatform = `${_getBrowserName2(getUA())}-${clientPlatform}`;
-        break;
-      default:
-        reportedPlatform = clientPlatform;
-    }
-    const reportedFrameworks = frameworks.length ? frameworks.join(",") : "FirebaseCore-web";
-    return `${reportedPlatform}/${"JsCore"}/${SDK_VERSION}/${reportedFrameworks}`;
-  }
-  var AuthMiddlewareQueue2 = class {
-    constructor(auth3) {
-      this.auth = auth3;
-      this.queue = [];
-    }
-    pushCallback(callback, onAbort) {
-      const wrappedCallback = (user) => new Promise((resolve, reject) => {
-        try {
-          const result = callback(user);
-          resolve(result);
-        } catch (e) {
-          reject(e);
-        }
-      });
-      wrappedCallback.onAbort = onAbort;
-      this.queue.push(wrappedCallback);
-      const index = this.queue.length - 1;
-      return () => {
-        this.queue[index] = () => Promise.resolve();
-      };
-    }
-    async runMiddleware(nextUser) {
-      if (this.auth.currentUser === nextUser) {
-        return;
-      }
-      const onAbortStack = [];
-      try {
-        for (const beforeStateCallback of this.queue) {
-          await beforeStateCallback(nextUser);
-          if (beforeStateCallback.onAbort) {
-            onAbortStack.push(beforeStateCallback.onAbort);
-          }
-        }
-      } catch (e) {
-        onAbortStack.reverse();
-        for (const onAbort of onAbortStack) {
-          try {
-            onAbort();
-          } catch (_) {
-          }
-        }
-        throw this.auth._errorFactory.create("login-blocked", {
-          originalMessage: e?.message
-        });
-      }
-    }
-  };
-  async function _getPasswordPolicy2(auth3, request = {}) {
-    return _performApiRequest2(auth3, "GET", "/v2/passwordPolicy", _addTidIfNecessary2(auth3, request));
-  }
-  var MINIMUM_MIN_PASSWORD_LENGTH2 = 6;
-  var PasswordPolicyImpl2 = class {
-    constructor(response) {
-      const responseOptions = response.customStrengthOptions;
-      this.customStrengthOptions = {};
-      this.customStrengthOptions.minPasswordLength = responseOptions.minPasswordLength ?? MINIMUM_MIN_PASSWORD_LENGTH2;
-      if (responseOptions.maxPasswordLength) {
-        this.customStrengthOptions.maxPasswordLength = responseOptions.maxPasswordLength;
-      }
-      if (responseOptions.containsLowercaseCharacter !== void 0) {
-        this.customStrengthOptions.containsLowercaseLetter = responseOptions.containsLowercaseCharacter;
-      }
-      if (responseOptions.containsUppercaseCharacter !== void 0) {
-        this.customStrengthOptions.containsUppercaseLetter = responseOptions.containsUppercaseCharacter;
-      }
-      if (responseOptions.containsNumericCharacter !== void 0) {
-        this.customStrengthOptions.containsNumericCharacter = responseOptions.containsNumericCharacter;
-      }
-      if (responseOptions.containsNonAlphanumericCharacter !== void 0) {
-        this.customStrengthOptions.containsNonAlphanumericCharacter = responseOptions.containsNonAlphanumericCharacter;
-      }
-      this.enforcementState = response.enforcementState;
-      if (this.enforcementState === "ENFORCEMENT_STATE_UNSPECIFIED") {
-        this.enforcementState = "OFF";
-      }
-      this.allowedNonAlphanumericCharacters = response.allowedNonAlphanumericCharacters?.join("") ?? "";
-      this.forceUpgradeOnSignin = response.forceUpgradeOnSignin ?? false;
-      this.schemaVersion = response.schemaVersion;
-    }
-    validatePassword(password) {
-      const status = {
-        isValid: true,
-        passwordPolicy: this
-      };
-      this.validatePasswordLengthOptions(password, status);
-      this.validatePasswordCharacterOptions(password, status);
-      status.isValid && (status.isValid = status.meetsMinPasswordLength ?? true);
-      status.isValid && (status.isValid = status.meetsMaxPasswordLength ?? true);
-      status.isValid && (status.isValid = status.containsLowercaseLetter ?? true);
-      status.isValid && (status.isValid = status.containsUppercaseLetter ?? true);
-      status.isValid && (status.isValid = status.containsNumericCharacter ?? true);
-      status.isValid && (status.isValid = status.containsNonAlphanumericCharacter ?? true);
-      return status;
-    }
-    /**
-     * Validates that the password meets the length options for the policy.
-     *
-     * @param password Password to validate.
-     * @param status Validation status.
-     */
-    validatePasswordLengthOptions(password, status) {
-      const minPasswordLength = this.customStrengthOptions.minPasswordLength;
-      const maxPasswordLength = this.customStrengthOptions.maxPasswordLength;
-      if (minPasswordLength) {
-        status.meetsMinPasswordLength = password.length >= minPasswordLength;
-      }
-      if (maxPasswordLength) {
-        status.meetsMaxPasswordLength = password.length <= maxPasswordLength;
-      }
-    }
-    /**
-     * Validates that the password meets the character options for the policy.
-     *
-     * @param password Password to validate.
-     * @param status Validation status.
-     */
-    validatePasswordCharacterOptions(password, status) {
-      this.updatePasswordCharacterOptionsStatuses(
-        status,
-        /* containsLowercaseCharacter= */
-        false,
-        /* containsUppercaseCharacter= */
-        false,
-        /* containsNumericCharacter= */
-        false,
-        /* containsNonAlphanumericCharacter= */
-        false
-      );
-      let passwordChar;
-      for (let i = 0; i < password.length; i++) {
-        passwordChar = password.charAt(i);
-        this.updatePasswordCharacterOptionsStatuses(
-          status,
-          /* containsLowercaseCharacter= */
-          passwordChar >= "a" && passwordChar <= "z",
-          /* containsUppercaseCharacter= */
-          passwordChar >= "A" && passwordChar <= "Z",
-          /* containsNumericCharacter= */
-          passwordChar >= "0" && passwordChar <= "9",
-          /* containsNonAlphanumericCharacter= */
-          this.allowedNonAlphanumericCharacters.includes(passwordChar)
-        );
-      }
-    }
-    /**
-     * Updates the running validation status with the statuses for the character options.
-     * Expected to be called each time a character is processed to update each option status
-     * based on the current character.
-     *
-     * @param status Validation status.
-     * @param containsLowercaseCharacter Whether the character is a lowercase letter.
-     * @param containsUppercaseCharacter Whether the character is an uppercase letter.
-     * @param containsNumericCharacter Whether the character is a numeric character.
-     * @param containsNonAlphanumericCharacter Whether the character is a non-alphanumeric character.
-     */
-    updatePasswordCharacterOptionsStatuses(status, containsLowercaseCharacter, containsUppercaseCharacter, containsNumericCharacter, containsNonAlphanumericCharacter) {
-      if (this.customStrengthOptions.containsLowercaseLetter) {
-        status.containsLowercaseLetter || (status.containsLowercaseLetter = containsLowercaseCharacter);
-      }
-      if (this.customStrengthOptions.containsUppercaseLetter) {
-        status.containsUppercaseLetter || (status.containsUppercaseLetter = containsUppercaseCharacter);
-      }
-      if (this.customStrengthOptions.containsNumericCharacter) {
-        status.containsNumericCharacter || (status.containsNumericCharacter = containsNumericCharacter);
-      }
-      if (this.customStrengthOptions.containsNonAlphanumericCharacter) {
-        status.containsNonAlphanumericCharacter || (status.containsNonAlphanumericCharacter = containsNonAlphanumericCharacter);
-      }
-    }
-  };
-  var AuthImpl2 = class {
-    constructor(app3, heartbeatServiceProvider, appCheckServiceProvider, config) {
-      this.app = app3;
-      this.heartbeatServiceProvider = heartbeatServiceProvider;
-      this.appCheckServiceProvider = appCheckServiceProvider;
-      this.config = config;
-      this.currentUser = null;
-      this.emulatorConfig = null;
-      this.operations = Promise.resolve();
-      this.authStateSubscription = new Subscription2(this);
-      this.idTokenSubscription = new Subscription2(this);
-      this.beforeStateQueue = new AuthMiddlewareQueue2(this);
-      this.redirectUser = null;
-      this.isProactiveRefreshEnabled = false;
-      this.EXPECTED_PASSWORD_POLICY_SCHEMA_VERSION = 1;
-      this._canInitEmulator = true;
-      this._isInitialized = false;
-      this._deleted = false;
-      this._initializationPromise = null;
-      this._popupRedirectResolver = null;
-      this._errorFactory = _DEFAULT_AUTH_ERROR_FACTORY2;
-      this._agentRecaptchaConfig = null;
-      this._tenantRecaptchaConfigs = {};
-      this._projectPasswordPolicy = null;
-      this._tenantPasswordPolicies = {};
-      this._resolvePersistenceManagerAvailable = void 0;
-      this.lastNotifiedUid = void 0;
-      this.languageCode = null;
-      this.tenantId = null;
-      this.settings = { appVerificationDisabledForTesting: false };
-      this.frameworks = [];
-      this.name = app3.name;
-      this.clientVersion = config.sdkClientVersion;
-      this._persistenceManagerAvailable = new Promise((resolve) => this._resolvePersistenceManagerAvailable = resolve);
-    }
-    _initializeWithPersistence(persistenceHierarchy, popupRedirectResolver) {
-      if (popupRedirectResolver) {
-        this._popupRedirectResolver = _getInstance2(popupRedirectResolver);
-      }
-      this._initializationPromise = this.queue(async () => {
-        if (this._deleted) {
-          return;
-        }
-        this.persistenceManager = await PersistenceUserManager2.create(this, persistenceHierarchy);
-        this._resolvePersistenceManagerAvailable?.();
-        if (this._deleted) {
-          return;
-        }
-        if (this._popupRedirectResolver?._shouldInitProactively) {
-          try {
-            await this._popupRedirectResolver._initialize(this);
-          } catch (e) {
-          }
-        }
-        await this.initializeCurrentUser(popupRedirectResolver);
-        this.lastNotifiedUid = this.currentUser?.uid || null;
-        if (this._deleted) {
-          return;
-        }
-        this._isInitialized = true;
-      });
-      return this._initializationPromise;
-    }
-    /**
-     * If the persistence is changed in another window, the user manager will let us know
-     */
-    async _onStorageEvent() {
-      if (this._deleted) {
-        return;
-      }
-      const user = await this.assertedPersistence.getCurrentUser();
-      if (!this.currentUser && !user) {
-        return;
-      }
-      if (this.currentUser && user && this.currentUser.uid === user.uid) {
-        this._currentUser._assign(user);
-        await this.currentUser.getIdToken();
-        return;
-      }
-      await this._updateCurrentUser(
-        user,
-        /* skipBeforeStateCallbacks */
-        true
-      );
-    }
-    async initializeCurrentUserFromIdToken(idToken) {
-      try {
-        const response = await getAccountInfo2(this, { idToken });
-        const user = await UserImpl2._fromGetAccountInfoResponse(this, response, idToken);
-        await this.directlySetCurrentUser(user);
-      } catch (err) {
-        console.warn("FirebaseServerApp could not login user with provided authIdToken: ", err);
-        await this.directlySetCurrentUser(null);
-      }
-    }
-    async initializeCurrentUser(popupRedirectResolver) {
-      if (_isFirebaseServerApp(this.app)) {
-        const idToken = this.app.settings.authIdToken;
-        if (idToken) {
-          return new Promise((resolve) => {
-            setTimeout(() => this.initializeCurrentUserFromIdToken(idToken).then(resolve, resolve));
-          });
-        } else {
-          return this.directlySetCurrentUser(null);
-        }
-      }
-      const previouslyStoredUser = await this.assertedPersistence.getCurrentUser();
-      let futureCurrentUser = previouslyStoredUser;
-      let needsTocheckMiddleware = false;
-      if (popupRedirectResolver && this.config.authDomain) {
-        await this.getOrInitRedirectPersistenceManager();
-        const redirectUserEventId = this.redirectUser?._redirectEventId;
-        const storedUserEventId = futureCurrentUser?._redirectEventId;
-        const result = await this.tryRedirectSignIn(popupRedirectResolver);
-        if ((!redirectUserEventId || redirectUserEventId === storedUserEventId) && result?.user) {
-          futureCurrentUser = result.user;
-          needsTocheckMiddleware = true;
-        }
-      }
-      if (!futureCurrentUser) {
-        return this.directlySetCurrentUser(null);
-      }
-      if (!futureCurrentUser._redirectEventId) {
-        if (needsTocheckMiddleware) {
-          try {
-            await this.beforeStateQueue.runMiddleware(futureCurrentUser);
-          } catch (e) {
-            futureCurrentUser = previouslyStoredUser;
-            this._popupRedirectResolver._overrideRedirectResult(this, () => Promise.reject(e));
-          }
-        }
-        if (futureCurrentUser) {
-          return this.reloadAndSetCurrentUserOrClear(futureCurrentUser);
-        } else {
-          return this.directlySetCurrentUser(null);
-        }
-      }
-      _assert2(
-        this._popupRedirectResolver,
-        this,
-        "argument-error"
-        /* AuthErrorCode.ARGUMENT_ERROR */
-      );
-      await this.getOrInitRedirectPersistenceManager();
-      if (this.redirectUser && this.redirectUser._redirectEventId === futureCurrentUser._redirectEventId) {
-        return this.directlySetCurrentUser(futureCurrentUser);
-      }
-      return this.reloadAndSetCurrentUserOrClear(futureCurrentUser);
-    }
-    async tryRedirectSignIn(redirectResolver) {
-      let result = null;
-      try {
-        result = await this._popupRedirectResolver._completeRedirectFn(this, redirectResolver, true);
-      } catch (e) {
-        await this._setRedirectUser(null);
-      }
-      return result;
-    }
-    async reloadAndSetCurrentUserOrClear(user) {
-      try {
-        await _reloadWithoutSaving2(user);
-      } catch (e) {
-        if (e?.code !== `auth/${"network-request-failed"}`) {
-          return this.directlySetCurrentUser(null);
-        }
-      }
-      return this.directlySetCurrentUser(user);
-    }
-    useDeviceLanguage() {
-      this.languageCode = _getUserLanguage2();
-    }
-    async _delete() {
-      this._deleted = true;
-    }
-    async updateCurrentUser(userExtern) {
-      if (_isFirebaseServerApp(this.app)) {
-        return Promise.reject(_serverAppCurrentUserOperationNotSupportedError2(this));
-      }
-      const user = userExtern ? getModularInstance(userExtern) : null;
-      if (user) {
-        _assert2(
-          user.auth.config.apiKey === this.config.apiKey,
-          this,
-          "invalid-user-token"
-          /* AuthErrorCode.INVALID_AUTH */
-        );
-      }
-      return this._updateCurrentUser(user && user._clone(this));
-    }
-    async _updateCurrentUser(user, skipBeforeStateCallbacks = false) {
-      if (this._deleted) {
-        return;
-      }
-      if (user) {
-        _assert2(
-          this.tenantId === user.tenantId,
-          this,
-          "tenant-id-mismatch"
-          /* AuthErrorCode.TENANT_ID_MISMATCH */
-        );
-      }
-      if (!skipBeforeStateCallbacks) {
-        await this.beforeStateQueue.runMiddleware(user);
-      }
-      return this.queue(async () => {
-        await this.directlySetCurrentUser(user);
-        this.notifyAuthListeners();
-      });
-    }
-    async signOut() {
-      if (_isFirebaseServerApp(this.app)) {
-        return Promise.reject(_serverAppCurrentUserOperationNotSupportedError2(this));
-      }
-      await this.beforeStateQueue.runMiddleware(null);
-      if (this.redirectPersistenceManager || this._popupRedirectResolver) {
-        await this._setRedirectUser(null);
-      }
-      return this._updateCurrentUser(
-        null,
-        /* skipBeforeStateCallbacks */
-        true
-      );
-    }
-    setPersistence(persistence) {
-      if (_isFirebaseServerApp(this.app)) {
-        return Promise.reject(_serverAppCurrentUserOperationNotSupportedError2(this));
-      }
-      return this.queue(async () => {
-        await this.assertedPersistence.setPersistence(_getInstance2(persistence));
-      });
-    }
-    _getRecaptchaConfig() {
-      if (this.tenantId == null) {
-        return this._agentRecaptchaConfig;
-      } else {
-        return this._tenantRecaptchaConfigs[this.tenantId];
-      }
-    }
-    async validatePassword(password) {
-      if (!this._getPasswordPolicyInternal()) {
-        await this._updatePasswordPolicy();
-      }
-      const passwordPolicy = this._getPasswordPolicyInternal();
-      if (passwordPolicy.schemaVersion !== this.EXPECTED_PASSWORD_POLICY_SCHEMA_VERSION) {
-        return Promise.reject(this._errorFactory.create("unsupported-password-policy-schema-version", {}));
-      }
-      return passwordPolicy.validatePassword(password);
-    }
-    _getPasswordPolicyInternal() {
-      if (this.tenantId === null) {
-        return this._projectPasswordPolicy;
-      } else {
-        return this._tenantPasswordPolicies[this.tenantId];
-      }
-    }
-    async _updatePasswordPolicy() {
-      const response = await _getPasswordPolicy2(this);
-      const passwordPolicy = new PasswordPolicyImpl2(response);
-      if (this.tenantId === null) {
-        this._projectPasswordPolicy = passwordPolicy;
-      } else {
-        this._tenantPasswordPolicies[this.tenantId] = passwordPolicy;
-      }
-    }
-    _getPersistenceType() {
-      return this.assertedPersistence.persistence.type;
-    }
-    _getPersistence() {
-      return this.assertedPersistence.persistence;
-    }
-    _updateErrorMap(errorMap) {
-      this._errorFactory = new ErrorFactory("auth", "Firebase", errorMap());
-    }
-    onAuthStateChanged(nextOrObserver, error, completed) {
-      return this.registerStateListener(this.authStateSubscription, nextOrObserver, error, completed);
-    }
-    beforeAuthStateChanged(callback, onAbort) {
-      return this.beforeStateQueue.pushCallback(callback, onAbort);
-    }
-    onIdTokenChanged(nextOrObserver, error, completed) {
-      return this.registerStateListener(this.idTokenSubscription, nextOrObserver, error, completed);
-    }
-    authStateReady() {
-      return new Promise((resolve, reject) => {
-        if (this.currentUser) {
-          resolve();
-        } else {
-          const unsubscribe = this.onAuthStateChanged(() => {
-            unsubscribe();
-            resolve();
-          }, reject);
-        }
-      });
-    }
-    /**
-     * Revokes the given access token. Currently only supports Apple OAuth access tokens.
-     */
-    async revokeAccessToken(token) {
-      if (this.currentUser) {
-        const idToken = await this.currentUser.getIdToken();
-        const request = {
-          providerId: "apple.com",
-          tokenType: "ACCESS_TOKEN",
-          token,
-          idToken
-        };
-        if (this.tenantId != null) {
-          request.tenantId = this.tenantId;
-        }
-        await revokeToken2(this, request);
-      }
-    }
-    toJSON() {
-      return {
-        apiKey: this.config.apiKey,
-        authDomain: this.config.authDomain,
-        appName: this.name,
-        currentUser: this._currentUser?.toJSON()
-      };
-    }
-    async _setRedirectUser(user, popupRedirectResolver) {
-      const redirectManager = await this.getOrInitRedirectPersistenceManager(popupRedirectResolver);
-      return user === null ? redirectManager.removeCurrentUser() : redirectManager.setCurrentUser(user);
-    }
-    async getOrInitRedirectPersistenceManager(popupRedirectResolver) {
-      if (!this.redirectPersistenceManager) {
-        const resolver = popupRedirectResolver && _getInstance2(popupRedirectResolver) || this._popupRedirectResolver;
-        _assert2(
-          resolver,
-          this,
-          "argument-error"
-          /* AuthErrorCode.ARGUMENT_ERROR */
-        );
-        this.redirectPersistenceManager = await PersistenceUserManager2.create(
-          this,
-          [_getInstance2(resolver._redirectPersistence)],
-          "redirectUser"
-          /* KeyName.REDIRECT_USER */
-        );
-        this.redirectUser = await this.redirectPersistenceManager.getCurrentUser();
-      }
-      return this.redirectPersistenceManager;
-    }
-    async _redirectUserForId(id) {
-      if (this._isInitialized) {
-        await this.queue(async () => {
-        });
-      }
-      if (this._currentUser?._redirectEventId === id) {
-        return this._currentUser;
-      }
-      if (this.redirectUser?._redirectEventId === id) {
-        return this.redirectUser;
-      }
-      return null;
-    }
-    async _persistUserIfCurrent(user) {
-      if (user === this.currentUser) {
-        return this.queue(async () => this.directlySetCurrentUser(user));
-      }
-    }
-    /** Notifies listeners only if the user is current */
-    _notifyListenersIfCurrent(user) {
-      if (user === this.currentUser) {
-        this.notifyAuthListeners();
-      }
-    }
-    _key() {
-      return `${this.config.authDomain}:${this.config.apiKey}:${this.name}`;
-    }
-    _startProactiveRefresh() {
-      this.isProactiveRefreshEnabled = true;
-      if (this.currentUser) {
-        this._currentUser._startProactiveRefresh();
-      }
-    }
-    _stopProactiveRefresh() {
-      this.isProactiveRefreshEnabled = false;
-      if (this.currentUser) {
-        this._currentUser._stopProactiveRefresh();
-      }
-    }
-    /** Returns the current user cast as the internal type */
-    get _currentUser() {
-      return this.currentUser;
-    }
-    notifyAuthListeners() {
-      if (!this._isInitialized) {
-        return;
-      }
-      this.idTokenSubscription.next(this.currentUser);
-      const currentUid = this.currentUser?.uid ?? null;
-      if (this.lastNotifiedUid !== currentUid) {
-        this.lastNotifiedUid = currentUid;
-        this.authStateSubscription.next(this.currentUser);
-      }
-    }
-    registerStateListener(subscription, nextOrObserver, error, completed) {
-      if (this._deleted) {
-        return () => {
-        };
-      }
-      const cb = typeof nextOrObserver === "function" ? nextOrObserver : nextOrObserver.next.bind(nextOrObserver);
-      let isUnsubscribed = false;
-      const promise = this._isInitialized ? Promise.resolve() : this._initializationPromise;
-      _assert2(
-        promise,
-        this,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      promise.then(() => {
-        if (isUnsubscribed) {
-          return;
-        }
-        cb(this.currentUser);
-      });
-      if (typeof nextOrObserver === "function") {
-        const unsubscribe = subscription.addObserver(nextOrObserver, error, completed);
-        return () => {
-          isUnsubscribed = true;
-          unsubscribe();
-        };
-      } else {
-        const unsubscribe = subscription.addObserver(nextOrObserver);
-        return () => {
-          isUnsubscribed = true;
-          unsubscribe();
-        };
-      }
-    }
-    /**
-     * Unprotected (from race conditions) method to set the current user. This
-     * should only be called from within a queued callback. This is necessary
-     * because the queue shouldn't rely on another queued callback.
-     */
-    async directlySetCurrentUser(user) {
-      if (this.currentUser && this.currentUser !== user) {
-        this._currentUser._stopProactiveRefresh();
-      }
-      if (user && this.isProactiveRefreshEnabled) {
-        user._startProactiveRefresh();
-      }
-      this.currentUser = user;
-      if (user) {
-        await this.assertedPersistence.setCurrentUser(user);
-      } else {
-        await this.assertedPersistence.removeCurrentUser();
-      }
-    }
-    queue(action) {
-      this.operations = this.operations.then(action, action);
-      return this.operations;
-    }
-    get assertedPersistence() {
-      _assert2(
-        this.persistenceManager,
-        this,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      return this.persistenceManager;
-    }
-    _logFramework(framework) {
-      if (!framework || this.frameworks.includes(framework)) {
-        return;
-      }
-      this.frameworks.push(framework);
-      this.frameworks.sort();
-      this.clientVersion = _getClientVersion2(this.config.clientPlatform, this._getFrameworks());
-    }
-    _getFrameworks() {
-      return this.frameworks;
-    }
-    async _getAdditionalHeaders() {
-      const headers = {
-        [
-          "X-Client-Version"
-          /* HttpHeader.X_CLIENT_VERSION */
-        ]: this.clientVersion
-      };
-      if (this.app.options.appId) {
-        headers[
-          "X-Firebase-gmpid"
-          /* HttpHeader.X_FIREBASE_GMPID */
-        ] = this.app.options.appId;
-      }
-      const heartbeatsHeader = await this.heartbeatServiceProvider.getImmediate({
-        optional: true
-      })?.getHeartbeatsHeader();
-      if (heartbeatsHeader) {
-        headers[
-          "X-Firebase-Client"
-          /* HttpHeader.X_FIREBASE_CLIENT */
-        ] = heartbeatsHeader;
-      }
-      const appCheckToken = await this._getAppCheckToken();
-      if (appCheckToken) {
-        headers[
-          "X-Firebase-AppCheck"
-          /* HttpHeader.X_FIREBASE_APP_CHECK */
-        ] = appCheckToken;
-      }
-      return headers;
-    }
-    async _getAppCheckToken() {
-      if (_isFirebaseServerApp(this.app) && this.app.settings.appCheckToken) {
-        return this.app.settings.appCheckToken;
-      }
-      const appCheckTokenResult = await this.appCheckServiceProvider.getImmediate({ optional: true })?.getToken();
-      if (appCheckTokenResult?.error) {
-        _logWarn2(`Error while retrieving App Check token: ${appCheckTokenResult.error}`);
-      }
-      return appCheckTokenResult?.token;
-    }
-  };
-  function _castAuth2(auth3) {
-    return getModularInstance(auth3);
-  }
-  var Subscription2 = class {
-    constructor(auth3) {
-      this.auth = auth3;
-      this.observer = null;
-      this.addObserver = createSubscribe((observer) => this.observer = observer);
-    }
-    get next() {
-      _assert2(
-        this.observer,
-        this.auth,
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      return this.observer.next.bind(this.observer);
-    }
-  };
-  var externalJSProvider2 = {
-    async loadJS() {
-      throw new Error("Unable to load external scripts");
-    },
-    recaptchaV2Script: "",
-    recaptchaEnterpriseScript: "",
-    gapiScript: ""
-  };
-  function _loadJS2(url) {
-    return externalJSProvider2.loadJS(url);
-  }
-  function _recaptchaEnterpriseScriptUrl2() {
-    return externalJSProvider2.recaptchaEnterpriseScript;
-  }
-  var MockGreCAPTCHATopLevel2 = class {
-    constructor() {
-      this.enterprise = new MockGreCAPTCHA2();
-    }
-    ready(callback) {
-      callback();
-    }
-    execute(_siteKey, _options) {
-      return Promise.resolve("token");
-    }
-    render(_container, _parameters) {
-      return "";
-    }
-  };
-  var MockGreCAPTCHA2 = class {
-    ready(callback) {
-      callback();
-    }
-    execute(_siteKey, _options) {
-      return Promise.resolve("token");
-    }
-    render(_container, _parameters) {
-      return "";
-    }
-  };
-  var RECAPTCHA_ENTERPRISE_VERIFIER_TYPE2 = "recaptcha-enterprise";
-  var FAKE_TOKEN2 = "NO_RECAPTCHA";
-  var RecaptchaEnterpriseVerifier2 = class {
-    /**
-     *
-     * @param authExtern - The corresponding Firebase {@link Auth} instance.
-     *
-     */
-    constructor(authExtern) {
-      this.type = RECAPTCHA_ENTERPRISE_VERIFIER_TYPE2;
-      this.auth = _castAuth2(authExtern);
-    }
-    /**
-     * Executes the verification process.
-     *
-     * @returns A Promise for a token that can be used to assert the validity of a request.
-     */
-    async verify(action = "verify", forceRefresh = false) {
-      async function retrieveSiteKey(auth3) {
-        if (!forceRefresh) {
-          if (auth3.tenantId == null && auth3._agentRecaptchaConfig != null) {
-            return auth3._agentRecaptchaConfig.siteKey;
-          }
-          if (auth3.tenantId != null && auth3._tenantRecaptchaConfigs[auth3.tenantId] !== void 0) {
-            return auth3._tenantRecaptchaConfigs[auth3.tenantId].siteKey;
-          }
-        }
-        return new Promise(async (resolve, reject) => {
-          getRecaptchaConfig2(auth3, {
-            clientType: "CLIENT_TYPE_WEB",
-            version: "RECAPTCHA_ENTERPRISE"
-            /* RecaptchaVersion.ENTERPRISE */
-          }).then((response) => {
-            if (response.recaptchaKey === void 0) {
-              reject(new Error("recaptcha Enterprise site key undefined"));
-            } else {
-              const config = new RecaptchaConfig2(response);
-              if (auth3.tenantId == null) {
-                auth3._agentRecaptchaConfig = config;
-              } else {
-                auth3._tenantRecaptchaConfigs[auth3.tenantId] = config;
-              }
-              return resolve(config.siteKey);
-            }
-          }).catch((error) => {
-            reject(error);
-          });
-        });
-      }
-      function retrieveRecaptchaToken(siteKey, resolve, reject) {
-        const grecaptcha = window.grecaptcha;
-        if (isEnterprise2(grecaptcha)) {
-          grecaptcha.enterprise.ready(() => {
-            grecaptcha.enterprise.execute(siteKey, { action }).then((token) => {
-              resolve(token);
-            }).catch(() => {
-              resolve(FAKE_TOKEN2);
-            });
-          });
-        } else {
-          reject(Error("No reCAPTCHA enterprise script loaded."));
-        }
-      }
-      if (this.auth.settings.appVerificationDisabledForTesting) {
-        const mockRecaptcha = new MockGreCAPTCHATopLevel2();
-        return mockRecaptcha.execute("siteKey", { action: "verify" });
-      }
-      return new Promise((resolve, reject) => {
-        retrieveSiteKey(this.auth).then((siteKey) => {
-          if (!forceRefresh && isEnterprise2(window.grecaptcha)) {
-            retrieveRecaptchaToken(siteKey, resolve, reject);
-          } else {
-            if (typeof window === "undefined") {
-              reject(new Error("RecaptchaVerifier is only supported in browser"));
-              return;
-            }
-            let url = _recaptchaEnterpriseScriptUrl2();
-            if (url.length !== 0) {
-              url += siteKey;
-            }
-            _loadJS2(url).then(() => {
-              retrieveRecaptchaToken(siteKey, resolve, reject);
-            }).catch((error) => {
-              reject(error);
-            });
-          }
-        }).catch((error) => {
-          reject(error);
-        });
-      });
-    }
-  };
-  async function injectRecaptchaFields2(auth3, request, action, isCaptchaResp = false, isFakeToken = false) {
-    const verifier = new RecaptchaEnterpriseVerifier2(auth3);
-    let captchaResponse;
-    if (isFakeToken) {
-      captchaResponse = FAKE_TOKEN2;
-    } else {
-      try {
-        captchaResponse = await verifier.verify(action);
-      } catch (error) {
-        captchaResponse = await verifier.verify(action, true);
-      }
-    }
-    const newRequest = { ...request };
-    if (action === "mfaSmsEnrollment" || action === "mfaSmsSignIn") {
-      if ("phoneEnrollmentInfo" in newRequest) {
-        const phoneNumber = newRequest.phoneEnrollmentInfo.phoneNumber;
-        const recaptchaToken = newRequest.phoneEnrollmentInfo.recaptchaToken;
-        Object.assign(newRequest, {
-          "phoneEnrollmentInfo": {
-            phoneNumber,
-            recaptchaToken,
-            captchaResponse,
-            "clientType": "CLIENT_TYPE_WEB",
-            "recaptchaVersion": "RECAPTCHA_ENTERPRISE"
-            /* RecaptchaVersion.ENTERPRISE */
-          }
-        });
-      } else if ("phoneSignInInfo" in newRequest) {
-        const recaptchaToken = newRequest.phoneSignInInfo.recaptchaToken;
-        Object.assign(newRequest, {
-          "phoneSignInInfo": {
-            recaptchaToken,
-            captchaResponse,
-            "clientType": "CLIENT_TYPE_WEB",
-            "recaptchaVersion": "RECAPTCHA_ENTERPRISE"
-            /* RecaptchaVersion.ENTERPRISE */
-          }
-        });
-      }
-      return newRequest;
-    }
-    if (!isCaptchaResp) {
-      Object.assign(newRequest, { captchaResponse });
-    } else {
-      Object.assign(newRequest, { "captchaResp": captchaResponse });
-    }
-    Object.assign(newRequest, {
-      "clientType": "CLIENT_TYPE_WEB"
-      /* RecaptchaClientType.WEB */
-    });
-    Object.assign(newRequest, {
-      "recaptchaVersion": "RECAPTCHA_ENTERPRISE"
-      /* RecaptchaVersion.ENTERPRISE */
-    });
-    return newRequest;
-  }
-  async function handleRecaptchaFlow2(authInstance, request, actionName, actionMethod, recaptchaAuthProvider) {
-    if (recaptchaAuthProvider === "EMAIL_PASSWORD_PROVIDER") {
-      if (authInstance._getRecaptchaConfig()?.isProviderEnabled(
-        "EMAIL_PASSWORD_PROVIDER"
-        /* RecaptchaAuthProvider.EMAIL_PASSWORD_PROVIDER */
-      )) {
-        const requestWithRecaptcha = await injectRecaptchaFields2(
-          authInstance,
-          request,
-          actionName,
-          actionName === "getOobCode"
-          /* RecaptchaActionName.GET_OOB_CODE */
-        );
-        return actionMethod(authInstance, requestWithRecaptcha);
-      } else {
-        return actionMethod(authInstance, request).catch(async (error) => {
-          if (error.code === `auth/${"missing-recaptcha-token"}`) {
-            console.log(`${actionName} is protected by reCAPTCHA Enterprise for this project. Automatically triggering the reCAPTCHA flow and restarting the flow.`);
-            const requestWithRecaptcha = await injectRecaptchaFields2(
-              authInstance,
-              request,
-              actionName,
-              actionName === "getOobCode"
-              /* RecaptchaActionName.GET_OOB_CODE */
-            );
-            return actionMethod(authInstance, requestWithRecaptcha);
-          } else {
-            return Promise.reject(error);
-          }
-        });
-      }
-    } else if (recaptchaAuthProvider === "PHONE_PROVIDER") {
-      if (authInstance._getRecaptchaConfig()?.isProviderEnabled(
-        "PHONE_PROVIDER"
-        /* RecaptchaAuthProvider.PHONE_PROVIDER */
-      )) {
-        const requestWithRecaptcha = await injectRecaptchaFields2(authInstance, request, actionName);
-        return actionMethod(authInstance, requestWithRecaptcha).catch(async (error) => {
-          if (authInstance._getRecaptchaConfig()?.getProviderEnforcementState(
-            "PHONE_PROVIDER"
-            /* RecaptchaAuthProvider.PHONE_PROVIDER */
-          ) === "AUDIT") {
-            if (error.code === `auth/${"missing-recaptcha-token"}` || error.code === `auth/${"invalid-app-credential"}`) {
-              console.log(`Failed to verify with reCAPTCHA Enterprise. Automatically triggering the reCAPTCHA v2 flow to complete the ${actionName} flow.`);
-              const requestWithRecaptchaFields = await injectRecaptchaFields2(
-                authInstance,
-                request,
-                actionName,
-                false,
-                // isCaptchaResp
-                true
-                // isFakeToken
-              );
-              return actionMethod(authInstance, requestWithRecaptchaFields);
-            }
-          }
-          return Promise.reject(error);
-        });
-      } else {
-        const requestWithRecaptchaFields = await injectRecaptchaFields2(
-          authInstance,
-          request,
-          actionName,
-          false,
-          // isCaptchaResp
-          true
-          // isFakeToken
-        );
-        return actionMethod(authInstance, requestWithRecaptchaFields);
-      }
-    } else {
-      return Promise.reject(recaptchaAuthProvider + " provider is not supported.");
-    }
-  }
-  function initializeAuth2(app3, deps) {
-    const provider = _getProvider(app3, "auth");
-    if (provider.isInitialized()) {
-      const auth4 = provider.getImmediate();
-      const initialOptions = provider.getOptions();
-      if (deepEqual(initialOptions, deps ?? {})) {
-        return auth4;
-      } else {
-        _fail2(
-          auth4,
-          "already-initialized"
-          /* AuthErrorCode.ALREADY_INITIALIZED */
-        );
-      }
-    }
-    const auth3 = provider.initialize({ options: deps });
-    return auth3;
-  }
-  function _initializeAuthInstance2(auth3, deps) {
-    const persistence = deps?.persistence || [];
-    const hierarchy = (Array.isArray(persistence) ? persistence : [persistence]).map(_getInstance2);
-    if (deps?.errorMap) {
-      auth3._updateErrorMap(deps.errorMap);
-    }
-    auth3._initializeWithPersistence(hierarchy, deps?.popupRedirectResolver);
-  }
-  function connectAuthEmulator2(auth3, url, options) {
-    const authInternal = _castAuth2(auth3);
-    _assert2(
-      /^https?:\/\//.test(url),
-      authInternal,
-      "invalid-emulator-scheme"
-      /* AuthErrorCode.INVALID_EMULATOR_SCHEME */
-    );
-    const disableWarnings = !!options?.disableWarnings;
-    const protocol = extractProtocol2(url);
-    const { host, port } = extractHostAndPort2(url);
-    const portStr = port === null ? "" : `:${port}`;
-    const emulator = { url: `${protocol}//${host}${portStr}/` };
-    const emulatorConfig = Object.freeze({
-      host,
-      port,
-      protocol: protocol.replace(":", ""),
-      options: Object.freeze({ disableWarnings })
-    });
-    if (!authInternal._canInitEmulator) {
-      _assert2(
-        authInternal.config.emulator && authInternal.emulatorConfig,
-        authInternal,
-        "emulator-config-failed"
-        /* AuthErrorCode.EMULATOR_CONFIG_FAILED */
-      );
-      _assert2(
-        deepEqual(emulator, authInternal.config.emulator) && deepEqual(emulatorConfig, authInternal.emulatorConfig),
-        authInternal,
-        "emulator-config-failed"
-        /* AuthErrorCode.EMULATOR_CONFIG_FAILED */
-      );
-      return;
-    }
-    authInternal.config.emulator = emulator;
-    authInternal.emulatorConfig = emulatorConfig;
-    authInternal.settings.appVerificationDisabledForTesting = true;
-    if (isCloudWorkstation(host)) {
-      void pingServer(`${protocol}//${host}${portStr}`);
-      updateEmulatorBanner("Auth", true);
-    } else if (!disableWarnings) {
-      emitEmulatorWarning2();
-    }
-  }
-  function extractProtocol2(url) {
-    const protocolEnd = url.indexOf(":");
-    return protocolEnd < 0 ? "" : url.substr(0, protocolEnd + 1);
-  }
-  function extractHostAndPort2(url) {
-    const protocol = extractProtocol2(url);
-    const authority = /(\/\/)?([^?#/]+)/.exec(url.substr(protocol.length));
-    if (!authority) {
-      return { host: "", port: null };
-    }
-    const hostAndPort = authority[2].split("@").pop() || "";
-    const bracketedIPv6 = /^(\[[^\]]+\])(:|$)/.exec(hostAndPort);
-    if (bracketedIPv6) {
-      const host = bracketedIPv6[1];
-      return { host, port: parsePort2(hostAndPort.substr(host.length + 1)) };
-    } else {
-      const [host, port] = hostAndPort.split(":");
-      return { host, port: parsePort2(port) };
-    }
-  }
-  function parsePort2(portStr) {
-    if (!portStr) {
-      return null;
-    }
-    const port = Number(portStr);
-    if (isNaN(port)) {
-      return null;
-    }
-    return port;
-  }
-  function emitEmulatorWarning2() {
-    function attachBanner() {
-      const el = document.createElement("p");
-      const sty = el.style;
-      el.innerText = "Running in emulator mode. Do not use with production credentials.";
-      sty.position = "fixed";
-      sty.width = "100%";
-      sty.backgroundColor = "#ffffff";
-      sty.border = ".1em solid #000000";
-      sty.color = "#b50000";
-      sty.bottom = "0px";
-      sty.left = "0px";
-      sty.margin = "0px";
-      sty.zIndex = "10000";
-      sty.textAlign = "center";
-      el.classList.add("firebase-emulator-warning");
-      document.body.appendChild(el);
-    }
-    if (typeof console !== "undefined" && typeof console.info === "function") {
-      console.info("WARNING: You are using the Auth Emulator, which is intended for local testing only.  Do not use with production credentials.");
-    }
-    if (typeof window !== "undefined" && typeof document !== "undefined") {
-      if (document.readyState === "loading") {
-        window.addEventListener("DOMContentLoaded", attachBanner);
-      } else {
-        attachBanner();
-      }
-    }
-  }
-  var AuthCredential2 = class {
-    /** @internal */
-    constructor(providerId, signInMethod) {
-      this.providerId = providerId;
-      this.signInMethod = signInMethod;
-    }
-    /**
-     * Returns a JSON-serializable representation of this object.
-     *
-     * @returns a JSON-serializable representation of this object.
-     */
-    toJSON() {
-      return debugFail2("not implemented");
-    }
-    /** @internal */
-    _getIdTokenResponse(_auth) {
-      return debugFail2("not implemented");
-    }
-    /** @internal */
-    _linkToIdToken(_auth, _idToken) {
-      return debugFail2("not implemented");
-    }
-    /** @internal */
-    _getReauthenticationResolver(_auth) {
-      return debugFail2("not implemented");
-    }
-  };
-  async function linkEmailPassword2(auth3, request) {
-    return _performApiRequest2(auth3, "POST", "/v1/accounts:signUp", request);
-  }
-  async function signInWithPassword2(auth3, request) {
-    return _performSignInRequest2(auth3, "POST", "/v1/accounts:signInWithPassword", _addTidIfNecessary2(auth3, request));
-  }
-  async function signInWithEmailLink$12(auth3, request) {
-    return _performSignInRequest2(auth3, "POST", "/v1/accounts:signInWithEmailLink", _addTidIfNecessary2(auth3, request));
-  }
-  async function signInWithEmailLinkForLinking2(auth3, request) {
-    return _performSignInRequest2(auth3, "POST", "/v1/accounts:signInWithEmailLink", _addTidIfNecessary2(auth3, request));
-  }
-  var EmailAuthCredential2 = class _EmailAuthCredential extends AuthCredential2 {
-    /** @internal */
-    constructor(_email, _password, signInMethod, _tenantId = null) {
-      super("password", signInMethod);
-      this._email = _email;
-      this._password = _password;
-      this._tenantId = _tenantId;
-    }
-    /** @internal */
-    static _fromEmailAndPassword(email, password) {
-      return new _EmailAuthCredential(
-        email,
-        password,
-        "password"
-        /* SignInMethod.EMAIL_PASSWORD */
-      );
-    }
-    /** @internal */
-    static _fromEmailAndCode(email, oobCode, tenantId = null) {
-      return new _EmailAuthCredential(email, oobCode, "emailLink", tenantId);
-    }
-    /** {@inheritdoc AuthCredential.toJSON} */
-    toJSON() {
-      return {
-        email: this._email,
-        password: this._password,
-        signInMethod: this.signInMethod,
-        tenantId: this._tenantId
-      };
-    }
-    /**
-     * Static method to deserialize a JSON representation of an object into an {@link  AuthCredential}.
-     *
-     * @param json - Either `object` or the stringified representation of the object. When string is
-     * provided, `JSON.parse` would be called first.
-     *
-     * @returns If the JSON input does not represent an {@link AuthCredential}, null is returned.
-     */
-    static fromJSON(json) {
-      const obj = typeof json === "string" ? JSON.parse(json) : json;
-      if (obj?.email && obj?.password) {
-        if (obj.signInMethod === "password") {
-          return this._fromEmailAndPassword(obj.email, obj.password);
-        } else if (obj.signInMethod === "emailLink") {
-          return this._fromEmailAndCode(obj.email, obj.password, obj.tenantId);
-        }
-      }
-      return null;
-    }
-    /** @internal */
-    async _getIdTokenResponse(auth3) {
-      switch (this.signInMethod) {
-        case "password":
-          const request = {
-            returnSecureToken: true,
-            email: this._email,
-            password: this._password,
-            clientType: "CLIENT_TYPE_WEB"
-            /* RecaptchaClientType.WEB */
-          };
-          return handleRecaptchaFlow2(
-            auth3,
-            request,
-            "signInWithPassword",
-            signInWithPassword2,
-            "EMAIL_PASSWORD_PROVIDER"
-            /* RecaptchaAuthProvider.EMAIL_PASSWORD_PROVIDER */
-          );
-        case "emailLink":
-          return signInWithEmailLink$12(auth3, {
-            email: this._email,
-            oobCode: this._password
-          });
-        default:
-          _fail2(
-            auth3,
-            "internal-error"
-            /* AuthErrorCode.INTERNAL_ERROR */
-          );
-      }
-    }
-    /** @internal */
-    async _linkToIdToken(auth3, idToken) {
-      switch (this.signInMethod) {
-        case "password":
-          const request = {
-            idToken,
-            returnSecureToken: true,
-            email: this._email,
-            password: this._password,
-            clientType: "CLIENT_TYPE_WEB"
-            /* RecaptchaClientType.WEB */
-          };
-          return handleRecaptchaFlow2(
-            auth3,
-            request,
-            "signUpPassword",
-            linkEmailPassword2,
-            "EMAIL_PASSWORD_PROVIDER"
-            /* RecaptchaAuthProvider.EMAIL_PASSWORD_PROVIDER */
-          );
-        case "emailLink":
-          return signInWithEmailLinkForLinking2(auth3, {
-            idToken,
-            email: this._email,
-            oobCode: this._password
-          });
-        default:
-          _fail2(
-            auth3,
-            "internal-error"
-            /* AuthErrorCode.INTERNAL_ERROR */
-          );
-      }
-    }
-    /** @internal */
-    _getReauthenticationResolver(auth3) {
-      return this._getIdTokenResponse(auth3);
-    }
-  };
-  async function signInWithIdp2(auth3, request) {
-    return _performSignInRequest2(auth3, "POST", "/v1/accounts:signInWithIdp", _addTidIfNecessary2(auth3, request));
-  }
-  var IDP_REQUEST_URI$12 = "http://localhost";
-  var OAuthCredential2 = class _OAuthCredential extends AuthCredential2 {
-    constructor() {
-      super(...arguments);
-      this.pendingToken = null;
-    }
-    /** @internal */
-    static _fromParams(params) {
-      const cred = new _OAuthCredential(params.providerId, params.signInMethod);
-      if (params.idToken || params.accessToken) {
-        if (params.idToken) {
-          cred.idToken = params.idToken;
-        }
-        if (params.accessToken) {
-          cred.accessToken = params.accessToken;
-        }
-        if (params.nonce && !params.pendingToken) {
-          cred.nonce = params.nonce;
-        }
-        if (params.pendingToken) {
-          cred.pendingToken = params.pendingToken;
-        }
-      } else if (params.oauthToken && params.oauthTokenSecret) {
-        cred.accessToken = params.oauthToken;
-        cred.secret = params.oauthTokenSecret;
-      } else {
-        _fail2(
-          "argument-error"
-          /* AuthErrorCode.ARGUMENT_ERROR */
-        );
-      }
-      return cred;
-    }
-    /** {@inheritdoc AuthCredential.toJSON}  */
-    toJSON() {
-      return {
-        idToken: this.idToken,
-        accessToken: this.accessToken,
-        secret: this.secret,
-        nonce: this.nonce,
-        pendingToken: this.pendingToken,
-        providerId: this.providerId,
-        signInMethod: this.signInMethod
-      };
-    }
-    /**
-     * Static method to deserialize a JSON representation of an object into an
-     * {@link  AuthCredential}.
-     *
-     * @param json - Input can be either Object or the stringified representation of the object.
-     * When string is provided, JSON.parse would be called first.
-     *
-     * @returns If the JSON input does not represent an {@link  AuthCredential}, null is returned.
-     */
-    static fromJSON(json) {
-      const obj = typeof json === "string" ? JSON.parse(json) : json;
-      const { providerId, signInMethod, ...rest } = obj;
-      if (!providerId || !signInMethod) {
-        return null;
-      }
-      const cred = new _OAuthCredential(providerId, signInMethod);
-      cred.idToken = rest.idToken || void 0;
-      cred.accessToken = rest.accessToken || void 0;
-      cred.secret = rest.secret;
-      cred.nonce = rest.nonce;
-      cred.pendingToken = rest.pendingToken || null;
-      return cred;
-    }
-    /** @internal */
-    _getIdTokenResponse(auth3) {
-      const request = this.buildRequest();
-      return signInWithIdp2(auth3, request);
-    }
-    /** @internal */
-    _linkToIdToken(auth3, idToken) {
-      const request = this.buildRequest();
-      request.idToken = idToken;
-      return signInWithIdp2(auth3, request);
-    }
-    /** @internal */
-    _getReauthenticationResolver(auth3) {
-      const request = this.buildRequest();
-      request.autoCreate = false;
-      return signInWithIdp2(auth3, request);
-    }
-    buildRequest() {
-      const request = {
-        requestUri: IDP_REQUEST_URI$12,
-        returnSecureToken: true
-      };
-      if (this.pendingToken) {
-        request.pendingToken = this.pendingToken;
-      } else {
-        const postBody = {};
-        if (this.idToken) {
-          postBody["id_token"] = this.idToken;
-        }
-        if (this.accessToken) {
-          postBody["access_token"] = this.accessToken;
-        }
-        if (this.secret) {
-          postBody["oauth_token_secret"] = this.secret;
-        }
-        postBody["providerId"] = this.providerId;
-        if (this.nonce && !this.pendingToken) {
-          postBody["nonce"] = this.nonce;
-        }
-        request.postBody = querystring(postBody);
-      }
-      return request;
-    }
-  };
-  function parseMode2(mode) {
-    switch (mode) {
-      case "recoverEmail":
-        return "RECOVER_EMAIL";
-      case "resetPassword":
-        return "PASSWORD_RESET";
-      case "signIn":
-        return "EMAIL_SIGNIN";
-      case "verifyEmail":
-        return "VERIFY_EMAIL";
-      case "verifyAndChangeEmail":
-        return "VERIFY_AND_CHANGE_EMAIL";
-      case "revertSecondFactorAddition":
-        return "REVERT_SECOND_FACTOR_ADDITION";
-      default:
-        return null;
-    }
-  }
-  function parseDeepLink2(url) {
-    const link = querystringDecode(extractQuerystring(url))["link"];
-    const doubleDeepLink = link ? querystringDecode(extractQuerystring(link))["deep_link_id"] : null;
-    const iOSDeepLink = querystringDecode(extractQuerystring(url))["deep_link_id"];
-    const iOSDoubleDeepLink = iOSDeepLink ? querystringDecode(extractQuerystring(iOSDeepLink))["link"] : null;
-    return iOSDoubleDeepLink || iOSDeepLink || doubleDeepLink || link || url;
-  }
-  var ActionCodeURL2 = class _ActionCodeURL {
-    /**
-     * @param actionLink - The link from which to extract the URL.
-     * @returns The {@link ActionCodeURL} object, or null if the link is invalid.
-     *
-     * @internal
-     */
-    constructor(actionLink) {
-      const searchParams = querystringDecode(extractQuerystring(actionLink));
-      const apiKey = searchParams[
-        "apiKey"
-        /* QueryField.API_KEY */
-      ] ?? null;
-      const code = searchParams[
-        "oobCode"
-        /* QueryField.CODE */
-      ] ?? null;
-      const operation = parseMode2(searchParams[
-        "mode"
-        /* QueryField.MODE */
-      ] ?? null);
-      _assert2(
-        apiKey && code && operation,
-        "argument-error"
-        /* AuthErrorCode.ARGUMENT_ERROR */
-      );
-      this.apiKey = apiKey;
-      this.operation = operation;
-      this.code = code;
-      this.continueUrl = searchParams[
-        "continueUrl"
-        /* QueryField.CONTINUE_URL */
-      ] ?? null;
-      this.languageCode = searchParams[
-        "lang"
-        /* QueryField.LANGUAGE_CODE */
-      ] ?? null;
-      this.tenantId = searchParams[
-        "tenantId"
-        /* QueryField.TENANT_ID */
-      ] ?? null;
-    }
-    /**
-     * Parses the email action link string and returns an {@link ActionCodeURL} if the link is valid,
-     * otherwise returns null.
-     *
-     * @param link  - The email action link string.
-     * @returns The {@link ActionCodeURL} object, or null if the link is invalid.
-     *
-     * @public
-     */
-    static parseLink(link) {
-      const actionLink = parseDeepLink2(link);
-      try {
-        return new _ActionCodeURL(actionLink);
-      } catch {
-        return null;
-      }
-    }
-  };
-  var EmailAuthProvider2 = class _EmailAuthProvider {
-    constructor() {
-      this.providerId = _EmailAuthProvider.PROVIDER_ID;
-    }
-    /**
-     * Initialize an {@link AuthCredential} using an email and password.
-     *
-     * @example
-     * ```javascript
-     * const authCredential = EmailAuthProvider.credential(email, password);
-     * const userCredential = await signInWithCredential(auth, authCredential);
-     * ```
-     *
-     * @example
-     * ```javascript
-     * const userCredential = await signInWithEmailAndPassword(auth, email, password);
-     * ```
-     *
-     * @param email - Email address.
-     * @param password - User account password.
-     * @returns The auth provider credential.
-     */
-    static credential(email, password) {
-      return EmailAuthCredential2._fromEmailAndPassword(email, password);
-    }
-    /**
-     * Initialize an {@link AuthCredential} using an email and an email link after a sign in with
-     * email link operation.
-     *
-     * @example
-     * ```javascript
-     * const authCredential = EmailAuthProvider.credentialWithLink(auth, email, emailLink);
-     * const userCredential = await signInWithCredential(auth, authCredential);
-     * ```
-     *
-     * @example
-     * ```javascript
-     * await sendSignInLinkToEmail(auth, email);
-     * // Obtain emailLink from user.
-     * const userCredential = await signInWithEmailLink(auth, email, emailLink);
-     * ```
-     *
-     * @param auth - The {@link Auth} instance used to verify the link.
-     * @param email - Email address.
-     * @param emailLink - Sign-in email link.
-     * @returns - The auth provider credential.
-     */
-    static credentialWithLink(email, emailLink) {
-      const actionCodeUrl = ActionCodeURL2.parseLink(emailLink);
-      _assert2(
-        actionCodeUrl,
-        "argument-error"
-        /* AuthErrorCode.ARGUMENT_ERROR */
-      );
-      return EmailAuthCredential2._fromEmailAndCode(email, actionCodeUrl.code, actionCodeUrl.tenantId);
-    }
-  };
-  EmailAuthProvider2.PROVIDER_ID = "password";
-  EmailAuthProvider2.EMAIL_PASSWORD_SIGN_IN_METHOD = "password";
-  EmailAuthProvider2.EMAIL_LINK_SIGN_IN_METHOD = "emailLink";
-  var FederatedAuthProvider2 = class {
-    /**
-     * Constructor for generic OAuth providers.
-     *
-     * @param providerId - Provider for which credentials should be generated.
-     */
-    constructor(providerId) {
-      this.providerId = providerId;
-      this.defaultLanguageCode = null;
-      this.customParameters = {};
-    }
-    /**
-     * Set the language gode.
-     *
-     * @param languageCode - language code
-     */
-    setDefaultLanguage(languageCode) {
-      this.defaultLanguageCode = languageCode;
-    }
-    /**
-     * Sets the OAuth custom parameters to pass in an OAuth request for popup and redirect sign-in
-     * operations.
-     *
-     * @remarks
-     * For a detailed list, check the reserved required OAuth 2.0 parameters such as `client_id`,
-     * `redirect_uri`, `scope`, `response_type`, and `state` are not allowed and will be ignored.
-     *
-     * @param customOAuthParameters - The custom OAuth parameters to pass in the OAuth request.
-     */
-    setCustomParameters(customOAuthParameters) {
-      this.customParameters = customOAuthParameters;
-      return this;
-    }
-    /**
-     * Retrieve the current list of {@link CustomParameters}.
-     */
-    getCustomParameters() {
-      return this.customParameters;
-    }
-  };
-  var BaseOAuthProvider2 = class extends FederatedAuthProvider2 {
-    constructor() {
-      super(...arguments);
-      this.scopes = [];
-    }
-    /**
-     * Add an OAuth scope to the credential.
-     *
-     * @param scope - Provider OAuth scope to add.
-     */
-    addScope(scope) {
-      if (!this.scopes.includes(scope)) {
-        this.scopes.push(scope);
-      }
-      return this;
-    }
-    /**
-     * Retrieve the current list of OAuth scopes.
-     */
-    getScopes() {
-      return [...this.scopes];
-    }
-  };
-  var FacebookAuthProvider2 = class _FacebookAuthProvider extends BaseOAuthProvider2 {
-    constructor() {
-      super(
-        "facebook.com"
-        /* ProviderId.FACEBOOK */
-      );
-    }
-    /**
-     * Creates a credential for Facebook.
-     *
-     * @example
-     * ```javascript
-     * // `event` from the Facebook auth.authResponseChange callback.
-     * const credential = FacebookAuthProvider.credential(event.authResponse.accessToken);
-     * const result = await signInWithCredential(credential);
-     * ```
-     *
-     * @param accessToken - Facebook access token.
-     */
-    static credential(accessToken) {
-      return OAuthCredential2._fromParams({
-        providerId: _FacebookAuthProvider.PROVIDER_ID,
-        signInMethod: _FacebookAuthProvider.FACEBOOK_SIGN_IN_METHOD,
-        accessToken
-      });
-    }
-    /**
-     * Used to extract the underlying {@link OAuthCredential} from a {@link UserCredential}.
-     *
-     * @param userCredential - The user credential.
-     */
-    static credentialFromResult(userCredential) {
-      return _FacebookAuthProvider.credentialFromTaggedObject(userCredential);
-    }
-    /**
-     * Used to extract the underlying {@link OAuthCredential} from a {@link AuthError} which was
-     * thrown during a sign-in, link, or reauthenticate operation.
-     *
-     * @param userCredential - The user credential.
-     */
-    static credentialFromError(error) {
-      return _FacebookAuthProvider.credentialFromTaggedObject(error.customData || {});
-    }
-    static credentialFromTaggedObject({ _tokenResponse: tokenResponse }) {
-      if (!tokenResponse || !("oauthAccessToken" in tokenResponse)) {
-        return null;
-      }
-      if (!tokenResponse.oauthAccessToken) {
-        return null;
-      }
-      try {
-        return _FacebookAuthProvider.credential(tokenResponse.oauthAccessToken);
-      } catch {
-        return null;
-      }
-    }
-  };
-  FacebookAuthProvider2.FACEBOOK_SIGN_IN_METHOD = "facebook.com";
-  FacebookAuthProvider2.PROVIDER_ID = "facebook.com";
-  var GoogleAuthProvider2 = class _GoogleAuthProvider extends BaseOAuthProvider2 {
-    constructor() {
-      super(
-        "google.com"
-        /* ProviderId.GOOGLE */
-      );
-      this.addScope("profile");
-    }
-    /**
-     * Creates a credential for Google. At least one of ID token and access token is required.
-     *
-     * @example
-     * ```javascript
-     * // \`googleUser\` from the onsuccess Google Sign In callback.
-     * const credential = GoogleAuthProvider.credential(googleUser.getAuthResponse().id_token);
-     * const result = await signInWithCredential(credential);
-     * ```
-     *
-     * @param idToken - Google ID token.
-     * @param accessToken - Google access token.
-     */
-    static credential(idToken, accessToken) {
-      return OAuthCredential2._fromParams({
-        providerId: _GoogleAuthProvider.PROVIDER_ID,
-        signInMethod: _GoogleAuthProvider.GOOGLE_SIGN_IN_METHOD,
-        idToken,
-        accessToken
-      });
-    }
-    /**
-     * Used to extract the underlying {@link OAuthCredential} from a {@link UserCredential}.
-     *
-     * @param userCredential - The user credential.
-     */
-    static credentialFromResult(userCredential) {
-      return _GoogleAuthProvider.credentialFromTaggedObject(userCredential);
-    }
-    /**
-     * Used to extract the underlying {@link OAuthCredential} from a {@link AuthError} which was
-     * thrown during a sign-in, link, or reauthenticate operation.
-     *
-     * @param userCredential - The user credential.
-     */
-    static credentialFromError(error) {
-      return _GoogleAuthProvider.credentialFromTaggedObject(error.customData || {});
-    }
-    static credentialFromTaggedObject({ _tokenResponse: tokenResponse }) {
-      if (!tokenResponse) {
-        return null;
-      }
-      const { oauthIdToken, oauthAccessToken } = tokenResponse;
-      if (!oauthIdToken && !oauthAccessToken) {
-        return null;
-      }
-      try {
-        return _GoogleAuthProvider.credential(oauthIdToken, oauthAccessToken);
-      } catch {
-        return null;
-      }
-    }
-  };
-  GoogleAuthProvider2.GOOGLE_SIGN_IN_METHOD = "google.com";
-  GoogleAuthProvider2.PROVIDER_ID = "google.com";
-  var GithubAuthProvider2 = class _GithubAuthProvider extends BaseOAuthProvider2 {
-    constructor() {
-      super(
-        "github.com"
-        /* ProviderId.GITHUB */
-      );
-    }
-    /**
-     * Creates a credential for GitHub.
-     *
-     * @param accessToken - GitHub access token.
-     */
-    static credential(accessToken) {
-      return OAuthCredential2._fromParams({
-        providerId: _GithubAuthProvider.PROVIDER_ID,
-        signInMethod: _GithubAuthProvider.GITHUB_SIGN_IN_METHOD,
-        accessToken
-      });
-    }
-    /**
-     * Used to extract the underlying {@link OAuthCredential} from a {@link UserCredential}.
-     *
-     * @param userCredential - The user credential.
-     */
-    static credentialFromResult(userCredential) {
-      return _GithubAuthProvider.credentialFromTaggedObject(userCredential);
-    }
-    /**
-     * Used to extract the underlying {@link OAuthCredential} from a {@link AuthError} which was
-     * thrown during a sign-in, link, or reauthenticate operation.
-     *
-     * @param userCredential - The user credential.
-     */
-    static credentialFromError(error) {
-      return _GithubAuthProvider.credentialFromTaggedObject(error.customData || {});
-    }
-    static credentialFromTaggedObject({ _tokenResponse: tokenResponse }) {
-      if (!tokenResponse || !("oauthAccessToken" in tokenResponse)) {
-        return null;
-      }
-      if (!tokenResponse.oauthAccessToken) {
-        return null;
-      }
-      try {
-        return _GithubAuthProvider.credential(tokenResponse.oauthAccessToken);
-      } catch {
-        return null;
-      }
-    }
-  };
-  GithubAuthProvider2.GITHUB_SIGN_IN_METHOD = "github.com";
-  GithubAuthProvider2.PROVIDER_ID = "github.com";
-  var TwitterAuthProvider2 = class _TwitterAuthProvider extends BaseOAuthProvider2 {
-    constructor() {
-      super(
-        "twitter.com"
-        /* ProviderId.TWITTER */
-      );
-    }
-    /**
-     * Creates a credential for Twitter.
-     *
-     * @param token - Twitter access token.
-     * @param secret - Twitter secret.
-     */
-    static credential(token, secret) {
-      return OAuthCredential2._fromParams({
-        providerId: _TwitterAuthProvider.PROVIDER_ID,
-        signInMethod: _TwitterAuthProvider.TWITTER_SIGN_IN_METHOD,
-        oauthToken: token,
-        oauthTokenSecret: secret
-      });
-    }
-    /**
-     * Used to extract the underlying {@link OAuthCredential} from a {@link UserCredential}.
-     *
-     * @param userCredential - The user credential.
-     */
-    static credentialFromResult(userCredential) {
-      return _TwitterAuthProvider.credentialFromTaggedObject(userCredential);
-    }
-    /**
-     * Used to extract the underlying {@link OAuthCredential} from a {@link AuthError} which was
-     * thrown during a sign-in, link, or reauthenticate operation.
-     *
-     * @param userCredential - The user credential.
-     */
-    static credentialFromError(error) {
-      return _TwitterAuthProvider.credentialFromTaggedObject(error.customData || {});
-    }
-    static credentialFromTaggedObject({ _tokenResponse: tokenResponse }) {
-      if (!tokenResponse) {
-        return null;
-      }
-      const { oauthAccessToken, oauthTokenSecret } = tokenResponse;
-      if (!oauthAccessToken || !oauthTokenSecret) {
-        return null;
-      }
-      try {
-        return _TwitterAuthProvider.credential(oauthAccessToken, oauthTokenSecret);
-      } catch {
-        return null;
-      }
-    }
-  };
-  TwitterAuthProvider2.TWITTER_SIGN_IN_METHOD = "twitter.com";
-  TwitterAuthProvider2.PROVIDER_ID = "twitter.com";
-  function onAuthStateChanged2(auth3, nextOrObserver, error, completed) {
-    return getModularInstance(auth3).onAuthStateChanged(nextOrObserver, error, completed);
-  }
-  function startEnrollTotpMfa2(auth3, request) {
-    return _performApiRequest2(auth3, "POST", "/v2/accounts/mfaEnrollment:start", _addTidIfNecessary2(auth3, request));
-  }
-  function finalizeEnrollTotpMfa2(auth3, request) {
-    return _performApiRequest2(auth3, "POST", "/v2/accounts/mfaEnrollment:finalize", _addTidIfNecessary2(auth3, request));
-  }
-  var STORAGE_AVAILABLE_KEY2 = "__sak";
-  function _allSettled2(promises) {
-    return Promise.all(promises.map(async (promise) => {
-      try {
-        const value = await promise;
-        return {
-          fulfilled: true,
-          value
-        };
-      } catch (reason) {
-        return {
-          fulfilled: false,
-          reason
-        };
-      }
-    }));
-  }
-  var Receiver2 = class _Receiver {
-    constructor(eventTarget) {
-      this.eventTarget = eventTarget;
-      this.handlersMap = {};
-      this.boundEventHandler = this.handleEvent.bind(this);
-    }
-    /**
-     * Obtain an instance of a Receiver for a given event target, if none exists it will be created.
-     *
-     * @param eventTarget - An event target (such as window or self) through which the underlying
-     * messages will be received.
-     */
-    static _getInstance(eventTarget) {
-      const existingInstance = this.receivers.find((receiver) => receiver.isListeningto(eventTarget));
-      if (existingInstance) {
-        return existingInstance;
-      }
-      const newInstance = new _Receiver(eventTarget);
-      this.receivers.push(newInstance);
-      return newInstance;
-    }
-    isListeningto(eventTarget) {
-      return this.eventTarget === eventTarget;
-    }
-    /**
-     * Fans out a MessageEvent to the appropriate listeners.
-     *
-     * @remarks
-     * Sends an {@link Status.ACK} upon receipt and a {@link Status.DONE} once all handlers have
-     * finished processing.
-     *
-     * @param event - The MessageEvent.
-     *
-     */
-    async handleEvent(event) {
-      const messageEvent = event;
-      const { eventId, eventType, data } = messageEvent.data;
-      const handlers = this.handlersMap[eventType];
-      if (!handlers?.size) {
-        return;
-      }
-      messageEvent.ports[0].postMessage({
-        status: "ack",
-        eventId,
-        eventType
-      });
-      const promises = Array.from(handlers).map(async (handler) => handler(messageEvent.origin, data));
-      const response = await _allSettled2(promises);
-      messageEvent.ports[0].postMessage({
-        status: "done",
-        eventId,
-        eventType,
-        response
-      });
-    }
-    /**
-     * Subscribe an event handler for a particular event.
-     *
-     * @param eventType - Event name to subscribe to.
-     * @param eventHandler - The event handler which should receive the events.
-     *
-     */
-    _subscribe(eventType, eventHandler) {
-      if (Object.keys(this.handlersMap).length === 0) {
-        this.eventTarget.addEventListener("message", this.boundEventHandler);
-      }
-      if (!this.handlersMap[eventType]) {
-        this.handlersMap[eventType] = /* @__PURE__ */ new Set();
-      }
-      this.handlersMap[eventType].add(eventHandler);
-    }
-    /**
-     * Unsubscribe an event handler from a particular event.
-     *
-     * @param eventType - Event name to unsubscribe from.
-     * @param eventHandler - Optional event handler, if none provided, unsubscribe all handlers on this event.
-     *
-     */
-    _unsubscribe(eventType, eventHandler) {
-      if (this.handlersMap[eventType] && eventHandler) {
-        this.handlersMap[eventType].delete(eventHandler);
-      }
-      if (!eventHandler || this.handlersMap[eventType].size === 0) {
-        delete this.handlersMap[eventType];
-      }
-      if (Object.keys(this.handlersMap).length === 0) {
-        this.eventTarget.removeEventListener("message", this.boundEventHandler);
-      }
-    }
-  };
-  Receiver2.receivers = [];
-  function _generateEventId2(prefix = "", digits = 10) {
-    let random = "";
-    for (let i = 0; i < digits; i++) {
-      random += Math.floor(Math.random() * 10);
-    }
-    return prefix + random;
-  }
-  var Sender2 = class {
-    constructor(target) {
-      this.target = target;
-      this.handlers = /* @__PURE__ */ new Set();
-    }
-    /**
-     * Unsubscribe the handler and remove it from our tracking Set.
-     *
-     * @param handler - The handler to unsubscribe.
-     */
-    removeMessageHandler(handler) {
-      if (handler.messageChannel) {
-        handler.messageChannel.port1.removeEventListener("message", handler.onMessage);
-        handler.messageChannel.port1.close();
-      }
-      this.handlers.delete(handler);
-    }
-    /**
-     * Send a message to the Receiver located at {@link target}.
-     *
-     * @remarks
-     * We'll first wait a bit for an ACK , if we get one we will wait significantly longer until the
-     * receiver has had a chance to fully process the event.
-     *
-     * @param eventType - Type of event to send.
-     * @param data - The payload of the event.
-     * @param timeout - Timeout for waiting on an ACK from the receiver.
-     *
-     * @returns An array of settled promises from all the handlers that were listening on the receiver.
-     */
-    async _send(eventType, data, timeout = 50) {
-      const messageChannel = typeof MessageChannel !== "undefined" ? new MessageChannel() : null;
-      if (!messageChannel) {
-        throw new Error(
-          "connection_unavailable"
-          /* _MessageError.CONNECTION_UNAVAILABLE */
-        );
-      }
-      let completionTimer;
-      let handler;
-      return new Promise((resolve, reject) => {
-        const eventId = _generateEventId2("", 20);
-        messageChannel.port1.start();
-        const ackTimer = setTimeout(() => {
-          reject(new Error(
-            "unsupported_event"
-            /* _MessageError.UNSUPPORTED_EVENT */
-          ));
-        }, timeout);
-        handler = {
-          messageChannel,
-          onMessage(event) {
-            const messageEvent = event;
-            if (messageEvent.data.eventId !== eventId) {
-              return;
-            }
-            switch (messageEvent.data.status) {
-              case "ack":
-                clearTimeout(ackTimer);
-                completionTimer = setTimeout(
-                  () => {
-                    reject(new Error(
-                      "timeout"
-                      /* _MessageError.TIMEOUT */
-                    ));
-                  },
-                  3e3
-                  /* _TimeoutDuration.COMPLETION */
-                );
-                break;
-              case "done":
-                clearTimeout(completionTimer);
-                resolve(messageEvent.data.response);
-                break;
-              default:
-                clearTimeout(ackTimer);
-                clearTimeout(completionTimer);
-                reject(new Error(
-                  "invalid_response"
-                  /* _MessageError.INVALID_RESPONSE */
-                ));
-                break;
-            }
-          }
-        };
-        this.handlers.add(handler);
-        messageChannel.port1.addEventListener("message", handler.onMessage);
-        this.target.postMessage({
-          eventType,
-          eventId,
-          data
-        }, [messageChannel.port2]);
-      }).finally(() => {
-        if (handler) {
-          this.removeMessageHandler(handler);
-        }
-      });
-    }
-  };
-  function _window2() {
-    return window;
-  }
-  function _isWorker2() {
-    return typeof _window2()["WorkerGlobalScope"] !== "undefined" && typeof _window2()["importScripts"] === "function";
-  }
-  async function _getActiveServiceWorker2() {
-    if (!navigator?.serviceWorker) {
-      return null;
-    }
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      return registration.active;
-    } catch {
-      return null;
-    }
-  }
-  function _getServiceWorkerController2() {
-    return navigator?.serviceWorker?.controller || null;
-  }
-  function _getWorkerGlobalScope2() {
-    return _isWorker2() ? self : null;
-  }
-  var DB_NAME3 = "firebaseLocalStorageDb";
-  var DB_VERSION3 = 1;
-  var DB_OBJECTSTORE_NAME2 = "firebaseLocalStorage";
-  var DB_DATA_KEYPATH2 = "fbase_key";
-  var DBPromise2 = class {
-    constructor(request) {
-      this.request = request;
-    }
-    toPromise() {
-      return new Promise((resolve, reject) => {
-        this.request.addEventListener("success", () => {
-          resolve(this.request.result);
-        });
-        this.request.addEventListener("error", () => {
-          reject(this.request.error);
-        });
-      });
-    }
-  };
-  function getObjectStore2(db3, isReadWrite) {
-    return db3.transaction([DB_OBJECTSTORE_NAME2], isReadWrite ? "readwrite" : "readonly").objectStore(DB_OBJECTSTORE_NAME2);
-  }
-  function _deleteDatabase2() {
-    const request = indexedDB.deleteDatabase(DB_NAME3);
-    return new DBPromise2(request).toPromise();
-  }
-  function _openDatabase2() {
-    const request = indexedDB.open(DB_NAME3, DB_VERSION3);
-    return new Promise((resolve, reject) => {
-      request.addEventListener("error", () => {
-        reject(request.error);
-      });
-      request.addEventListener("upgradeneeded", () => {
-        const db3 = request.result;
-        try {
-          db3.createObjectStore(DB_OBJECTSTORE_NAME2, { keyPath: DB_DATA_KEYPATH2 });
-        } catch (e) {
-          reject(e);
-        }
-      });
-      request.addEventListener("success", async () => {
-        const db3 = request.result;
-        if (!db3.objectStoreNames.contains(DB_OBJECTSTORE_NAME2)) {
-          db3.close();
-          await _deleteDatabase2();
-          resolve(await _openDatabase2());
-        } else {
-          resolve(db3);
-        }
-      });
-    });
-  }
-  async function _putObject2(db3, key, value) {
-    const request = getObjectStore2(db3, true).put({
-      [DB_DATA_KEYPATH2]: key,
-      value
-    });
-    return new DBPromise2(request).toPromise();
-  }
-  async function getObject2(db3, key) {
-    const request = getObjectStore2(db3, false).get(key);
-    const data = await new DBPromise2(request).toPromise();
-    return data === void 0 ? null : data.value;
-  }
-  function _deleteObject2(db3, key) {
-    const request = getObjectStore2(db3, true).delete(key);
-    return new DBPromise2(request).toPromise();
-  }
-  var _POLLING_INTERVAL_MS2 = 800;
-  var _TRANSACTION_RETRY_COUNT2 = 3;
-  var IndexedDBLocalPersistence2 = class {
-    constructor() {
-      this.type = "LOCAL";
-      this._shouldAllowMigration = true;
-      this.listeners = {};
-      this.localCache = {};
-      this.pollTimer = null;
-      this.pendingWrites = 0;
-      this.receiver = null;
-      this.sender = null;
-      this.serviceWorkerReceiverAvailable = false;
-      this.activeServiceWorker = null;
-      this._workerInitializationPromise = this.initializeServiceWorkerMessaging().then(() => {
-      }, () => {
-      });
-    }
-    async _openDb() {
-      if (this.db) {
-        return this.db;
-      }
-      this.db = await _openDatabase2();
-      return this.db;
-    }
-    async _withRetries(op) {
-      let numAttempts = 0;
-      while (true) {
-        try {
-          const db3 = await this._openDb();
-          return await op(db3);
-        } catch (e) {
-          if (numAttempts++ > _TRANSACTION_RETRY_COUNT2) {
-            throw e;
-          }
-          if (this.db) {
-            this.db.close();
-            this.db = void 0;
-          }
-        }
-      }
-    }
-    /**
-     * IndexedDB events do not propagate from the main window to the worker context.  We rely on a
-     * postMessage interface to send these events to the worker ourselves.
-     */
-    async initializeServiceWorkerMessaging() {
-      return _isWorker2() ? this.initializeReceiver() : this.initializeSender();
-    }
-    /**
-     * As the worker we should listen to events from the main window.
-     */
-    async initializeReceiver() {
-      this.receiver = Receiver2._getInstance(_getWorkerGlobalScope2());
-      this.receiver._subscribe("keyChanged", async (_origin, data) => {
-        const keys = await this._poll();
-        return {
-          keyProcessed: keys.includes(data.key)
-        };
-      });
-      this.receiver._subscribe("ping", async (_origin, _data) => {
-        return [
-          "keyChanged"
-          /* _EventType.KEY_CHANGED */
-        ];
-      });
-    }
-    /**
-     * As the main window, we should let the worker know when keys change (set and remove).
-     *
-     * @remarks
-     * {@link https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerContainer/ready | ServiceWorkerContainer.ready}
-     * may not resolve.
-     */
-    async initializeSender() {
-      this.activeServiceWorker = await _getActiveServiceWorker2();
-      if (!this.activeServiceWorker) {
-        return;
-      }
-      this.sender = new Sender2(this.activeServiceWorker);
-      const results = await this.sender._send(
-        "ping",
-        {},
-        800
-        /* _TimeoutDuration.LONG_ACK */
-      );
-      if (!results) {
-        return;
-      }
-      if (results[0]?.fulfilled && results[0]?.value.includes(
-        "keyChanged"
-        /* _EventType.KEY_CHANGED */
-      )) {
-        this.serviceWorkerReceiverAvailable = true;
-      }
-    }
-    /**
-     * Let the worker know about a changed key, the exact key doesn't technically matter since the
-     * worker will just trigger a full sync anyway.
-     *
-     * @remarks
-     * For now, we only support one service worker per page.
-     *
-     * @param key - Storage key which changed.
-     */
-    async notifyServiceWorker(key) {
-      if (!this.sender || !this.activeServiceWorker || _getServiceWorkerController2() !== this.activeServiceWorker) {
-        return;
-      }
-      try {
-        await this.sender._send(
-          "keyChanged",
-          { key },
-          // Use long timeout if receiver has previously responded to a ping from us.
-          this.serviceWorkerReceiverAvailable ? 800 : 50
-          /* _TimeoutDuration.ACK */
-        );
-      } catch {
-      }
-    }
-    async _isAvailable() {
-      try {
-        if (!indexedDB) {
-          return false;
-        }
-        const db3 = await _openDatabase2();
-        await _putObject2(db3, STORAGE_AVAILABLE_KEY2, "1");
-        await _deleteObject2(db3, STORAGE_AVAILABLE_KEY2);
-        return true;
-      } catch {
-      }
-      return false;
-    }
-    async _withPendingWrite(write) {
-      this.pendingWrites++;
-      try {
-        await write();
-      } finally {
-        this.pendingWrites--;
-      }
-    }
-    async _set(key, value) {
-      return this._withPendingWrite(async () => {
-        await this._withRetries((db3) => _putObject2(db3, key, value));
-        this.localCache[key] = value;
-        return this.notifyServiceWorker(key);
-      });
-    }
-    async _get(key) {
-      const obj = await this._withRetries((db3) => getObject2(db3, key));
-      this.localCache[key] = obj;
-      return obj;
-    }
-    async _remove(key) {
-      return this._withPendingWrite(async () => {
-        await this._withRetries((db3) => _deleteObject2(db3, key));
-        delete this.localCache[key];
-        return this.notifyServiceWorker(key);
-      });
-    }
-    async _poll() {
-      const result = await this._withRetries((db3) => {
-        const getAllRequest = getObjectStore2(db3, false).getAll();
-        return new DBPromise2(getAllRequest).toPromise();
-      });
-      if (!result) {
-        return [];
-      }
-      if (this.pendingWrites !== 0) {
-        return [];
-      }
-      const keys = [];
-      const keysInResult = /* @__PURE__ */ new Set();
-      if (result.length !== 0) {
-        for (const { fbase_key: key, value } of result) {
-          keysInResult.add(key);
-          if (JSON.stringify(this.localCache[key]) !== JSON.stringify(value)) {
-            this.notifyListeners(key, value);
-            keys.push(key);
-          }
-        }
-      }
-      for (const localKey of Object.keys(this.localCache)) {
-        if (this.localCache[localKey] && !keysInResult.has(localKey)) {
-          this.notifyListeners(localKey, null);
-          keys.push(localKey);
-        }
-      }
-      return keys;
-    }
-    notifyListeners(key, newValue) {
-      this.localCache[key] = newValue;
-      const listeners = this.listeners[key];
-      if (listeners) {
-        for (const listener of Array.from(listeners)) {
-          listener(newValue);
-        }
-      }
-    }
-    startPolling() {
-      this.stopPolling();
-      this.pollTimer = setInterval(async () => this._poll(), _POLLING_INTERVAL_MS2);
-    }
-    stopPolling() {
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer);
-        this.pollTimer = null;
-      }
-    }
-    _addListener(key, listener) {
-      if (Object.keys(this.listeners).length === 0) {
-        this.startPolling();
-      }
-      if (!this.listeners[key]) {
-        this.listeners[key] = /* @__PURE__ */ new Set();
-        void this._get(key);
-      }
-      this.listeners[key].add(listener);
-    }
-    _removeListener(key, listener) {
-      if (this.listeners[key]) {
-        this.listeners[key].delete(listener);
-        if (this.listeners[key].size === 0) {
-          delete this.listeners[key];
-        }
-      }
-      if (Object.keys(this.listeners).length === 0) {
-        this.stopPolling();
-      }
-    }
-  };
-  IndexedDBLocalPersistence2.type = "LOCAL";
-  var indexedDBLocalPersistence2 = IndexedDBLocalPersistence2;
-  function finalizeSignInTotpMfa2(auth3, request) {
-    return _performApiRequest2(auth3, "POST", "/v2/accounts/mfaSignIn:finalize", _addTidIfNecessary2(auth3, request));
-  }
-  var MultiFactorAssertionImpl2 = class {
-    constructor(factorId) {
-      this.factorId = factorId;
-    }
-    _process(auth3, session, displayName) {
-      switch (session.type) {
-        case "enroll":
-          return this._finalizeEnroll(auth3, session.credential, displayName);
-        case "signin":
-          return this._finalizeSignIn(auth3, session.credential);
-        default:
-          return debugFail2("unexpected MultiFactorSessionType");
-      }
-    }
-  };
-  var TotpMultiFactorGenerator2 = class {
-    /**
-     * Provides a {@link TotpMultiFactorAssertion} to confirm ownership of
-     * the TOTP (time-based one-time password) second factor.
-     * This assertion is used to complete enrollment in TOTP second factor.
-     *
-     * @param secret A {@link TotpSecret} containing the shared secret key and other TOTP parameters.
-     * @param oneTimePassword One-time password from TOTP App.
-     * @returns A {@link TotpMultiFactorAssertion} which can be used with
-     * {@link MultiFactorUser.enroll}.
-     */
-    static assertionForEnrollment(secret, oneTimePassword) {
-      return TotpMultiFactorAssertionImpl2._fromSecret(secret, oneTimePassword);
-    }
-    /**
-     * Provides a {@link TotpMultiFactorAssertion} to confirm ownership of the TOTP second factor.
-     * This assertion is used to complete signIn with TOTP as the second factor.
-     *
-     * @param enrollmentId identifies the enrolled TOTP second factor.
-     * @param oneTimePassword One-time password from TOTP App.
-     * @returns A {@link TotpMultiFactorAssertion} which can be used with
-     * {@link MultiFactorResolver.resolveSignIn}.
-     */
-    static assertionForSignIn(enrollmentId, oneTimePassword) {
-      return TotpMultiFactorAssertionImpl2._fromEnrollmentId(enrollmentId, oneTimePassword);
-    }
-    /**
-     * Returns a promise to {@link TotpSecret} which contains the TOTP shared secret key and other parameters.
-     * Creates a TOTP secret as part of enrolling a TOTP second factor.
-     * Used for generating a QR code URL or inputting into a TOTP app.
-     * This method uses the auth instance corresponding to the user in the multiFactorSession.
-     *
-     * @param session The {@link MultiFactorSession} that the user is part of.
-     * @returns A promise to {@link TotpSecret}.
-     */
-    static async generateSecret(session) {
-      const mfaSession = session;
-      _assert2(
-        typeof mfaSession.user?.auth !== "undefined",
-        "internal-error"
-        /* AuthErrorCode.INTERNAL_ERROR */
-      );
-      const response = await startEnrollTotpMfa2(mfaSession.user.auth, {
-        idToken: mfaSession.credential,
-        totpEnrollmentInfo: {}
-      });
-      return TotpSecret2._fromStartTotpMfaEnrollmentResponse(response, mfaSession.user.auth);
-    }
-  };
-  TotpMultiFactorGenerator2.FACTOR_ID = "totp";
-  var TotpMultiFactorAssertionImpl2 = class _TotpMultiFactorAssertionImpl extends MultiFactorAssertionImpl2 {
-    constructor(otp, enrollmentId, secret) {
-      super(
-        "totp"
-        /* FactorId.TOTP */
-      );
-      this.otp = otp;
-      this.enrollmentId = enrollmentId;
-      this.secret = secret;
-    }
-    /** @internal */
-    static _fromSecret(secret, otp) {
-      return new _TotpMultiFactorAssertionImpl(otp, void 0, secret);
-    }
-    /** @internal */
-    static _fromEnrollmentId(enrollmentId, otp) {
-      return new _TotpMultiFactorAssertionImpl(otp, enrollmentId);
-    }
-    /** @internal */
-    async _finalizeEnroll(auth3, idToken, displayName) {
-      _assert2(
-        typeof this.secret !== "undefined",
-        auth3,
-        "argument-error"
-        /* AuthErrorCode.ARGUMENT_ERROR */
-      );
-      return finalizeEnrollTotpMfa2(auth3, {
-        idToken,
-        displayName,
-        totpVerificationInfo: this.secret._makeTotpVerificationInfo(this.otp)
-      });
-    }
-    /** @internal */
-    async _finalizeSignIn(auth3, mfaPendingCredential) {
-      _assert2(
-        this.enrollmentId !== void 0 && this.otp !== void 0,
-        auth3,
-        "argument-error"
-        /* AuthErrorCode.ARGUMENT_ERROR */
-      );
-      const totpVerificationInfo = { verificationCode: this.otp };
-      return finalizeSignInTotpMfa2(auth3, {
-        mfaPendingCredential,
-        mfaEnrollmentId: this.enrollmentId,
-        totpVerificationInfo
-      });
-    }
-  };
-  var TotpSecret2 = class _TotpSecret {
-    // The public members are declared outside the constructor so the docs can be generated.
-    constructor(secretKey, hashingAlgorithm, codeLength, codeIntervalSeconds, enrollmentCompletionDeadline, sessionInfo, auth3) {
-      this.sessionInfo = sessionInfo;
-      this.auth = auth3;
-      this.secretKey = secretKey;
-      this.hashingAlgorithm = hashingAlgorithm;
-      this.codeLength = codeLength;
-      this.codeIntervalSeconds = codeIntervalSeconds;
-      this.enrollmentCompletionDeadline = enrollmentCompletionDeadline;
-    }
-    /** @internal */
-    static _fromStartTotpMfaEnrollmentResponse(response, auth3) {
-      return new _TotpSecret(response.totpSessionInfo.sharedSecretKey, response.totpSessionInfo.hashingAlgorithm, response.totpSessionInfo.verificationCodeLength, response.totpSessionInfo.periodSec, new Date(response.totpSessionInfo.finalizeEnrollmentTime).toUTCString(), response.totpSessionInfo.sessionInfo, auth3);
-    }
-    /** @internal */
-    _makeTotpVerificationInfo(otp) {
-      return { sessionInfo: this.sessionInfo, verificationCode: otp };
-    }
-    /**
-     * Returns a QR code URL as described in
-     * https://github.com/google/google-authenticator/wiki/Key-Uri-Format
-     * This can be displayed to the user as a QR code to be scanned into a TOTP app like Google Authenticator.
-     * If the optional parameters are unspecified, an accountName of <userEmail> and issuer of <firebaseAppName> are used.
-     *
-     * @param accountName the name of the account/app along with a user identifier.
-     * @param issuer issuer of the TOTP (likely the app name).
-     * @returns A QR code URL string.
-     */
-    generateQrCodeUrl(accountName, issuer) {
-      let useDefaults = false;
-      if (_isEmptyString2(accountName) || _isEmptyString2(issuer)) {
-        useDefaults = true;
-      }
-      if (useDefaults) {
-        if (_isEmptyString2(accountName)) {
-          accountName = this.auth.currentUser?.email || "unknownuser";
-        }
-        if (_isEmptyString2(issuer)) {
-          issuer = this.auth.name;
-        }
-      }
-      return `otpauth://totp/${issuer}:${accountName}?secret=${this.secretKey}&issuer=${issuer}&algorithm=${this.hashingAlgorithm}&digits=${this.codeLength}`;
-    }
-  };
-  function _isEmptyString2(input) {
-    return typeof input === "undefined" || input?.length === 0;
-  }
-  var name3 = "@firebase/auth";
-  var version3 = "1.12.1";
-  var AuthInterop2 = class {
-    constructor(auth3) {
-      this.auth = auth3;
-      this.internalListeners = /* @__PURE__ */ new Map();
-    }
-    getUid() {
-      this.assertAuthConfigured();
-      return this.auth.currentUser?.uid || null;
-    }
-    async getToken(forceRefresh) {
-      this.assertAuthConfigured();
-      await this.auth._initializationPromise;
-      if (!this.auth.currentUser) {
-        return null;
-      }
-      const accessToken = await this.auth.currentUser.getIdToken(forceRefresh);
-      return { accessToken };
-    }
-    addAuthTokenListener(listener) {
-      this.assertAuthConfigured();
-      if (this.internalListeners.has(listener)) {
-        return;
-      }
-      const unsubscribe = this.auth.onIdTokenChanged((user) => {
-        listener(user?.stsTokenManager.accessToken || null);
-      });
-      this.internalListeners.set(listener, unsubscribe);
-      this.updateProactiveRefresh();
-    }
-    removeAuthTokenListener(listener) {
-      this.assertAuthConfigured();
-      const unsubscribe = this.internalListeners.get(listener);
-      if (!unsubscribe) {
-        return;
-      }
-      this.internalListeners.delete(listener);
-      unsubscribe();
-      this.updateProactiveRefresh();
-    }
-    assertAuthConfigured() {
-      _assert2(
-        this.auth._initializationPromise,
-        "dependent-sdk-initialized-before-auth"
-        /* AuthErrorCode.DEPENDENT_SDK_INIT_BEFORE_AUTH */
-      );
-    }
-    updateProactiveRefresh() {
-      if (this.internalListeners.size > 0) {
-        this.auth._startProactiveRefresh();
-      } else {
-        this.auth._stopProactiveRefresh();
-      }
-    }
-  };
-  function getVersionForPlatform2(clientPlatform) {
-    switch (clientPlatform) {
-      case "Node":
-        return "node";
-      case "ReactNative":
-        return "rn";
-      case "Worker":
-        return "webworker";
-      case "Cordova":
-        return "cordova";
-      case "WebExtension":
-        return "web-extension";
-      default:
-        return void 0;
-    }
-  }
-  function registerAuth2(clientPlatform) {
-    _registerComponent(new Component(
-      "auth",
-      (container, { options: deps }) => {
-        const app3 = container.getProvider("app").getImmediate();
-        const heartbeatServiceProvider = container.getProvider("heartbeat");
-        const appCheckServiceProvider = container.getProvider("app-check-internal");
-        const { apiKey, authDomain } = app3.options;
-        _assert2(apiKey && !apiKey.includes(":"), "invalid-api-key", { appName: app3.name });
-        const config = {
-          apiKey,
-          authDomain,
-          clientPlatform,
-          apiHost: "identitytoolkit.googleapis.com",
-          tokenApiHost: "securetoken.googleapis.com",
-          apiScheme: "https",
-          sdkClientVersion: _getClientVersion2(clientPlatform)
-        };
-        const authInstance = new AuthImpl2(app3, heartbeatServiceProvider, appCheckServiceProvider, config);
-        _initializeAuthInstance2(authInstance, deps);
-        return authInstance;
-      },
-      "PUBLIC"
-      /* ComponentType.PUBLIC */
-    ).setInstantiationMode(
-      "EXPLICIT"
-      /* InstantiationMode.EXPLICIT */
-    ).setInstanceCreatedCallback((container, _instanceIdentifier, _instance) => {
-      const authInternalProvider = container.getProvider(
-        "auth-internal"
-        /* _ComponentName.AUTH_INTERNAL */
-      );
-      authInternalProvider.initialize();
-    }));
-    _registerComponent(new Component(
-      "auth-internal",
-      (container) => {
-        const auth3 = _castAuth2(container.getProvider(
-          "auth"
-          /* _ComponentName.AUTH */
-        ).getImmediate());
-        return ((auth4) => new AuthInterop2(auth4))(auth3);
-      },
-      "PRIVATE"
-      /* ComponentType.PRIVATE */
-    ).setInstantiationMode(
-      "EXPLICIT"
-      /* InstantiationMode.EXPLICIT */
-    ));
-    registerVersion(name3, version3, getVersionForPlatform2(clientPlatform));
-    registerVersion(name3, version3, "esm2020");
-  }
-
-  // node_modules/@firebase/auth/dist/web-extension-esm/index.js
-  function getAuth2(app3 = getApp()) {
-    const provider = _getProvider(app3, "auth");
-    if (provider.isInitialized()) {
-      return provider.getImmediate();
-    }
-    const auth3 = initializeAuth2(app3, {
-      persistence: [indexedDBLocalPersistence2]
-    });
-    const authEmulatorHost = getDefaultEmulatorHost("auth");
-    if (authEmulatorHost) {
-      connectAuthEmulator2(auth3, `http://${authEmulatorHost}`);
-    }
-    return auth3;
-  }
-  registerAuth2(
-    "WebExtension"
-    /* ClientPlatform.WEB_EXTENSION */
-  );
-
-  // node_modules/firebase/app/dist/esm/index.esm.js
-  var name4 = "firebase";
-  var version4 = "12.10.0";
-  registerVersion(name4, version4, "app");
 
   // node_modules/@firebase/webchannel-wrapper/dist/bloom-blob/esm/bloom_blob_es2018.js
   var commonjsGlobal = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : {};
@@ -34878,7 +30865,7 @@
     };
     var ab = l.JSON.stringify;
     var cb = l.JSON.parse;
-    var db3 = class {
+    var db2 = class {
       stringify(a) {
         return l.JSON.stringify(a, void 0);
       }
@@ -35570,7 +31557,7 @@
       }
     }
     function Dc() {
-      this.g = new db3();
+      this.g = new db2();
     }
     function Ec(a) {
       this.i = a.Sb || null;
@@ -46031,22 +42018,6 @@ ${this.customData.serverResponse}`;
     const message = "An unknown error occurred, please check the error payload for server response.";
     return new StorageError(StorageErrorCode.UNKNOWN, message);
   }
-  function objectNotFound(path) {
-    return new StorageError(StorageErrorCode.OBJECT_NOT_FOUND, "Object '" + path + "' does not exist.");
-  }
-  function quotaExceeded(bucket) {
-    return new StorageError(StorageErrorCode.QUOTA_EXCEEDED, "Quota for bucket '" + bucket + "' exceeded, please view quota on https://firebase.google.com/pricing/.");
-  }
-  function unauthenticated() {
-    const message = "User is not authenticated, please authenticate using Firebase Authentication and try again.";
-    return new StorageError(StorageErrorCode.UNAUTHENTICATED, message);
-  }
-  function unauthorizedApp() {
-    return new StorageError(StorageErrorCode.UNAUTHORIZED_APP, "This app does not have permission to access Firebase Storage on this project.");
-  }
-  function unauthorized(path) {
-    return new StorageError(StorageErrorCode.UNAUTHORIZED, "User does not have permission to access '" + path + "'.");
-  }
   function retryLimitExceeded() {
     return new StorageError(StorageErrorCode.RETRY_LIMIT_EXCEEDED, "Max retry time for operation exceeded, please try again.");
   }
@@ -46059,32 +42030,14 @@ ${this.customData.serverResponse}`;
   function invalidDefaultBucket(bucket) {
     return new StorageError(StorageErrorCode.INVALID_DEFAULT_BUCKET, "Invalid default bucket '" + bucket + "'.");
   }
-  function noDefaultBucket() {
-    return new StorageError(StorageErrorCode.NO_DEFAULT_BUCKET, "No default bucket found. Did you set the '" + CONFIG_STORAGE_BUCKET_KEY + "' property when initializing the app?");
-  }
-  function cannotSliceBlob() {
-    return new StorageError(StorageErrorCode.CANNOT_SLICE_BLOB, "Cannot slice blob for upload. Please retry the upload.");
-  }
-  function noDownloadURL() {
-    return new StorageError(StorageErrorCode.NO_DOWNLOAD_URL, "The given file does not have any download URLs.");
-  }
-  function missingPolyFill(polyFill) {
-    return new StorageError(StorageErrorCode.UNSUPPORTED_ENVIRONMENT, `${polyFill} is missing. Make sure to install the required polyfills. See https://firebase.google.com/docs/web/environments-js-sdk#polyfills for more information.`);
-  }
   function invalidArgument(message) {
     return new StorageError(StorageErrorCode.INVALID_ARGUMENT, message);
   }
   function appDeleted() {
     return new StorageError(StorageErrorCode.APP_DELETED, "The Firebase app was deleted.");
   }
-  function invalidRootOperation(name6) {
-    return new StorageError(StorageErrorCode.INVALID_ROOT_OPERATION, "The operation '" + name6 + "' cannot be performed on a root reference, create a non-root reference using child, such as .child('file.png').");
-  }
-  function invalidFormat(format, message) {
-    return new StorageError(StorageErrorCode.INVALID_FORMAT, "String does not match format '" + format + "': " + message);
-  }
-  function internalError(message) {
-    throw new StorageError(StorageErrorCode.INTERNAL_ERROR, "Internal error: " + message);
+  function invalidRootOperation(name5) {
+    return new StorageError(StorageErrorCode.INVALID_ROOT_OPERATION, "The operation '" + name5 + "' cannot be performed on a root reference, create a non-root reference using child, such as .child('file.png').");
   }
   var Location = class _Location {
     constructor(bucket, path) {
@@ -46132,10 +42085,10 @@ ${this.customData.serverResponse}`;
       function httpModify(loc) {
         loc.path_ = decodeURIComponent(loc.path);
       }
-      const version6 = "v[A-Za-z0-9_]+";
+      const version5 = "v[A-Za-z0-9_]+";
       const firebaseStorageHost = host.replace(/[.]/g, "\\.");
       const firebaseStoragePath = "(/([^?#]*).*)?$";
-      const firebaseStorageRegExp = new RegExp(`^https?://${firebaseStorageHost}/${version6}/b/${bucketDomain}/o${firebaseStoragePath}`, "i");
+      const firebaseStorageRegExp = new RegExp(`^https?://${firebaseStorageHost}/${version5}/b/${bucketDomain}/o${firebaseStoragePath}`, "i");
       const firebaseStorageIndices = { bucket: 1, path: 3 };
       const cloudStorageHost = host === DEFAULT_HOST ? "(?:storage.googleapis.com|storage.cloud.google.com)" : host;
       const cloudStoragePath = "([^?#]*)";
@@ -46276,18 +42229,6 @@ ${this.customData.serverResponse}`;
   function isJustDef(p) {
     return p !== void 0;
   }
-  function isNonArrayObject(p) {
-    return typeof p === "object" && !Array.isArray(p);
-  }
-  function isString(p) {
-    return typeof p === "string" || p instanceof String;
-  }
-  function isNativeBlob(p) {
-    return isNativeBlobDefined() && p instanceof Blob;
-  }
-  function isNativeBlobDefined() {
-    return typeof Blob !== "undefined";
-  }
   function validateNumber(argument, minValue, maxValue, value) {
     if (value < minValue) {
       throw invalidArgument(`Invalid value for '${argument}'. Expected ${minValue} or greater.`);
@@ -46295,13 +42236,6 @@ ${this.customData.serverResponse}`;
     if (value > maxValue) {
       throw invalidArgument(`Invalid value for '${argument}'. Expected ${maxValue} or less.`);
     }
-  }
-  function makeUrl(urlPart, host, protocol) {
-    let origin = host;
-    if (protocol == null) {
-      origin = `https://${host}`;
-    }
-    return `${protocol}://${origin}/v0${urlPart}`;
   }
   function makeQueryString(params) {
     const encode = encodeURIComponent;
@@ -46487,308 +42421,6 @@ ${this.customData.serverResponse}`;
     addAppCheckHeader_(headers, appCheckToken);
     return new NetworkRequest(url, requestInfo.method, headers, requestInfo.body, requestInfo.successCodes, requestInfo.additionalRetryCodes, requestInfo.handler, requestInfo.errorHandler, requestInfo.timeout, requestInfo.progressCallback, requestFactory, retry, isUsingEmulator);
   }
-  function getBlobBuilder() {
-    if (typeof BlobBuilder !== "undefined") {
-      return BlobBuilder;
-    } else if (typeof WebKitBlobBuilder !== "undefined") {
-      return WebKitBlobBuilder;
-    } else {
-      return void 0;
-    }
-  }
-  function getBlob$1(...args) {
-    const BlobBuilder2 = getBlobBuilder();
-    if (BlobBuilder2 !== void 0) {
-      const bb = new BlobBuilder2();
-      for (let i = 0; i < args.length; i++) {
-        bb.append(args[i]);
-      }
-      return bb.getBlob();
-    } else {
-      if (isNativeBlobDefined()) {
-        return new Blob(args);
-      } else {
-        throw new StorageError(StorageErrorCode.UNSUPPORTED_ENVIRONMENT, "This browser doesn't seem to support creating Blobs");
-      }
-    }
-  }
-  function sliceBlob(blob, start2, end) {
-    if (blob.webkitSlice) {
-      return blob.webkitSlice(start2, end);
-    } else if (blob.mozSlice) {
-      return blob.mozSlice(start2, end);
-    } else if (blob.slice) {
-      return blob.slice(start2, end);
-    }
-    return null;
-  }
-  function decodeBase64(encoded) {
-    if (typeof atob === "undefined") {
-      throw missingPolyFill("base-64");
-    }
-    return atob(encoded);
-  }
-  var StringFormat = {
-    /**
-     * Indicates the string should be interpreted "raw", that is, as normal text.
-     * The string will be interpreted as UTF-16, then uploaded as a UTF-8 byte
-     * sequence.
-     * Example: The string 'Hello! \\ud83d\\ude0a' becomes the byte sequence
-     * 48 65 6c 6c 6f 21 20 f0 9f 98 8a
-     */
-    RAW: "raw",
-    /**
-     * Indicates the string should be interpreted as base64-encoded data.
-     * Padding characters (trailing '='s) are optional.
-     * Example: The string 'rWmO++E6t7/rlw==' becomes the byte sequence
-     * ad 69 8e fb e1 3a b7 bf eb 97
-     */
-    BASE64: "base64",
-    /**
-     * Indicates the string should be interpreted as base64url-encoded data.
-     * Padding characters (trailing '='s) are optional.
-     * Example: The string 'rWmO--E6t7_rlw==' becomes the byte sequence
-     * ad 69 8e fb e1 3a b7 bf eb 97
-     */
-    BASE64URL: "base64url",
-    /**
-     * Indicates the string is a data URL, such as one obtained from
-     * canvas.toDataURL().
-     * Example: the string 'data:application/octet-stream;base64,aaaa'
-     * becomes the byte sequence
-     * 69 a6 9a
-     * (the content-type "application/octet-stream" is also applied, but can
-     * be overridden in the metadata object).
-     */
-    DATA_URL: "data_url"
-  };
-  var StringData = class {
-    constructor(data, contentType) {
-      this.data = data;
-      this.contentType = contentType || null;
-    }
-  };
-  function dataFromString(format, stringData) {
-    switch (format) {
-      case StringFormat.RAW:
-        return new StringData(utf8Bytes_(stringData));
-      case StringFormat.BASE64:
-      case StringFormat.BASE64URL:
-        return new StringData(base64Bytes_(format, stringData));
-      case StringFormat.DATA_URL:
-        return new StringData(dataURLBytes_(stringData), dataURLContentType_(stringData));
-    }
-    throw unknown();
-  }
-  function utf8Bytes_(value) {
-    const b = [];
-    for (let i = 0; i < value.length; i++) {
-      let c = value.charCodeAt(i);
-      if (c <= 127) {
-        b.push(c);
-      } else {
-        if (c <= 2047) {
-          b.push(192 | c >> 6, 128 | c & 63);
-        } else {
-          if ((c & 64512) === 55296) {
-            const valid = i < value.length - 1 && (value.charCodeAt(i + 1) & 64512) === 56320;
-            if (!valid) {
-              b.push(239, 191, 189);
-            } else {
-              const hi = c;
-              const lo = value.charCodeAt(++i);
-              c = 65536 | (hi & 1023) << 10 | lo & 1023;
-              b.push(240 | c >> 18, 128 | c >> 12 & 63, 128 | c >> 6 & 63, 128 | c & 63);
-            }
-          } else {
-            if ((c & 64512) === 56320) {
-              b.push(239, 191, 189);
-            } else {
-              b.push(224 | c >> 12, 128 | c >> 6 & 63, 128 | c & 63);
-            }
-          }
-        }
-      }
-    }
-    return new Uint8Array(b);
-  }
-  function percentEncodedBytes_(value) {
-    let decoded;
-    try {
-      decoded = decodeURIComponent(value);
-    } catch (e) {
-      throw invalidFormat(StringFormat.DATA_URL, "Malformed data URL.");
-    }
-    return utf8Bytes_(decoded);
-  }
-  function base64Bytes_(format, value) {
-    switch (format) {
-      case StringFormat.BASE64: {
-        const hasMinus = value.indexOf("-") !== -1;
-        const hasUnder = value.indexOf("_") !== -1;
-        if (hasMinus || hasUnder) {
-          const invalidChar = hasMinus ? "-" : "_";
-          throw invalidFormat(format, "Invalid character '" + invalidChar + "' found: is it base64url encoded?");
-        }
-        break;
-      }
-      case StringFormat.BASE64URL: {
-        const hasPlus = value.indexOf("+") !== -1;
-        const hasSlash = value.indexOf("/") !== -1;
-        if (hasPlus || hasSlash) {
-          const invalidChar = hasPlus ? "+" : "/";
-          throw invalidFormat(format, "Invalid character '" + invalidChar + "' found: is it base64 encoded?");
-        }
-        value = value.replace(/-/g, "+").replace(/_/g, "/");
-        break;
-      }
-    }
-    let bytes;
-    try {
-      bytes = decodeBase64(value);
-    } catch (e) {
-      if (e.message.includes("polyfill")) {
-        throw e;
-      }
-      throw invalidFormat(format, "Invalid character found");
-    }
-    const array = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i++) {
-      array[i] = bytes.charCodeAt(i);
-    }
-    return array;
-  }
-  var DataURLParts = class {
-    constructor(dataURL) {
-      this.base64 = false;
-      this.contentType = null;
-      const matches = dataURL.match(/^data:([^,]+)?,/);
-      if (matches === null) {
-        throw invalidFormat(StringFormat.DATA_URL, "Must be formatted 'data:[<mediatype>][;base64],<data>");
-      }
-      const middle = matches[1] || null;
-      if (middle != null) {
-        this.base64 = endsWith(middle, ";base64");
-        this.contentType = this.base64 ? middle.substring(0, middle.length - ";base64".length) : middle;
-      }
-      this.rest = dataURL.substring(dataURL.indexOf(",") + 1);
-    }
-  };
-  function dataURLBytes_(dataUrl) {
-    const parts = new DataURLParts(dataUrl);
-    if (parts.base64) {
-      return base64Bytes_(StringFormat.BASE64, parts.rest);
-    } else {
-      return percentEncodedBytes_(parts.rest);
-    }
-  }
-  function dataURLContentType_(dataUrl) {
-    const parts = new DataURLParts(dataUrl);
-    return parts.contentType;
-  }
-  function endsWith(s, end) {
-    const longEnough = s.length >= end.length;
-    if (!longEnough) {
-      return false;
-    }
-    return s.substring(s.length - end.length) === end;
-  }
-  var FbsBlob = class _FbsBlob {
-    constructor(data, elideCopy) {
-      let size = 0;
-      let blobType = "";
-      if (isNativeBlob(data)) {
-        this.data_ = data;
-        size = data.size;
-        blobType = data.type;
-      } else if (data instanceof ArrayBuffer) {
-        if (elideCopy) {
-          this.data_ = new Uint8Array(data);
-        } else {
-          this.data_ = new Uint8Array(data.byteLength);
-          this.data_.set(new Uint8Array(data));
-        }
-        size = this.data_.length;
-      } else if (data instanceof Uint8Array) {
-        if (elideCopy) {
-          this.data_ = data;
-        } else {
-          this.data_ = new Uint8Array(data.length);
-          this.data_.set(data);
-        }
-        size = data.length;
-      }
-      this.size_ = size;
-      this.type_ = blobType;
-    }
-    size() {
-      return this.size_;
-    }
-    type() {
-      return this.type_;
-    }
-    slice(startByte, endByte) {
-      if (isNativeBlob(this.data_)) {
-        const realBlob = this.data_;
-        const sliced = sliceBlob(realBlob, startByte, endByte);
-        if (sliced === null) {
-          return null;
-        }
-        return new _FbsBlob(sliced);
-      } else {
-        const slice = new Uint8Array(this.data_.buffer, startByte, endByte - startByte);
-        return new _FbsBlob(slice, true);
-      }
-    }
-    static getBlob(...args) {
-      if (isNativeBlobDefined()) {
-        const blobby = args.map((val) => {
-          if (val instanceof _FbsBlob) {
-            return val.data_;
-          } else {
-            return val;
-          }
-        });
-        return new _FbsBlob(getBlob$1.apply(null, blobby));
-      } else {
-        const uint8Arrays = args.map((val) => {
-          if (isString(val)) {
-            return dataFromString(StringFormat.RAW, val).data;
-          } else {
-            return val.data_;
-          }
-        });
-        let finalLength = 0;
-        uint8Arrays.forEach((array) => {
-          finalLength += array.byteLength;
-        });
-        const merged = new Uint8Array(finalLength);
-        let index = 0;
-        uint8Arrays.forEach((array) => {
-          for (let i = 0; i < array.length; i++) {
-            merged[index++] = array[i];
-          }
-        });
-        return new _FbsBlob(merged, true);
-      }
-    }
-    uploadData() {
-      return this.data_;
-    }
-  };
-  function jsonObjectOrNull(s) {
-    let obj;
-    try {
-      obj = JSON.parse(s);
-    } catch (e) {
-      return null;
-    }
-    if (isNonArrayObject(obj)) {
-      return obj;
-    } else {
-      return null;
-    }
-  }
   function parent(path) {
     if (path.length === 0) {
       return null;
@@ -46800,14 +42432,6 @@ ${this.customData.serverResponse}`;
     const newPath = path.slice(0, index);
     return newPath;
   }
-  function child(path, childPath) {
-    const canonicalChildPath = childPath.split("/").filter((component) => component.length > 0).join("/");
-    if (path.length === 0) {
-      return canonicalChildPath;
-    } else {
-      return path + "/" + canonicalChildPath;
-    }
-  }
   function lastComponent(path) {
     const index = path.lastIndexOf("/", path.length - 2);
     if (index === -1) {
@@ -46816,359 +42440,7 @@ ${this.customData.serverResponse}`;
       return path.slice(index + 1);
     }
   }
-  function noXform_(metadata, value) {
-    return value;
-  }
-  var Mapping = class {
-    constructor(server, local, writable, xform) {
-      this.server = server;
-      this.local = local || server;
-      this.writable = !!writable;
-      this.xform = xform || noXform_;
-    }
-  };
-  var mappings_ = null;
-  function xformPath(fullPath) {
-    if (!isString(fullPath) || fullPath.length < 2) {
-      return fullPath;
-    } else {
-      return lastComponent(fullPath);
-    }
-  }
-  function getMappings() {
-    if (mappings_) {
-      return mappings_;
-    }
-    const mappings = [];
-    mappings.push(new Mapping("bucket"));
-    mappings.push(new Mapping("generation"));
-    mappings.push(new Mapping("metageneration"));
-    mappings.push(new Mapping("name", "fullPath", true));
-    function mappingsXformPath(_metadata, fullPath) {
-      return xformPath(fullPath);
-    }
-    const nameMapping = new Mapping("name");
-    nameMapping.xform = mappingsXformPath;
-    mappings.push(nameMapping);
-    function xformSize(_metadata, size) {
-      if (size !== void 0) {
-        return Number(size);
-      } else {
-        return size;
-      }
-    }
-    const sizeMapping = new Mapping("size");
-    sizeMapping.xform = xformSize;
-    mappings.push(sizeMapping);
-    mappings.push(new Mapping("timeCreated"));
-    mappings.push(new Mapping("updated"));
-    mappings.push(new Mapping("md5Hash", null, true));
-    mappings.push(new Mapping("cacheControl", null, true));
-    mappings.push(new Mapping("contentDisposition", null, true));
-    mappings.push(new Mapping("contentEncoding", null, true));
-    mappings.push(new Mapping("contentLanguage", null, true));
-    mappings.push(new Mapping("contentType", null, true));
-    mappings.push(new Mapping("metadata", "customMetadata", true));
-    mappings_ = mappings;
-    return mappings_;
-  }
-  function addRef(metadata, service) {
-    function generateRef() {
-      const bucket = metadata["bucket"];
-      const path = metadata["fullPath"];
-      const loc = new Location(bucket, path);
-      return service._makeStorageReference(loc);
-    }
-    Object.defineProperty(metadata, "ref", { get: generateRef });
-  }
-  function fromResource(service, resource, mappings) {
-    const metadata = {};
-    metadata["type"] = "file";
-    const len = mappings.length;
-    for (let i = 0; i < len; i++) {
-      const mapping = mappings[i];
-      metadata[mapping.local] = mapping.xform(metadata, resource[mapping.server]);
-    }
-    addRef(metadata, service);
-    return metadata;
-  }
-  function fromResourceString(service, resourceString, mappings) {
-    const obj = jsonObjectOrNull(resourceString);
-    if (obj === null) {
-      return null;
-    }
-    const resource = obj;
-    return fromResource(service, resource, mappings);
-  }
-  function downloadUrlFromResourceString(metadata, resourceString, host, protocol) {
-    const obj = jsonObjectOrNull(resourceString);
-    if (obj === null) {
-      return null;
-    }
-    if (!isString(obj["downloadTokens"])) {
-      return null;
-    }
-    const tokens = obj["downloadTokens"];
-    if (tokens.length === 0) {
-      return null;
-    }
-    const encode = encodeURIComponent;
-    const tokensList = tokens.split(",");
-    const urls = tokensList.map((token) => {
-      const bucket = metadata["bucket"];
-      const path = metadata["fullPath"];
-      const urlPart = "/b/" + encode(bucket) + "/o/" + encode(path);
-      const base = makeUrl(urlPart, host, protocol);
-      const queryString = makeQueryString({
-        alt: "media",
-        token
-      });
-      return base + queryString;
-    });
-    return urls[0];
-  }
-  function toResourceString(metadata, mappings) {
-    const resource = {};
-    const len = mappings.length;
-    for (let i = 0; i < len; i++) {
-      const mapping = mappings[i];
-      if (mapping.writable) {
-        resource[mapping.server] = metadata[mapping.local];
-      }
-    }
-    return JSON.stringify(resource);
-  }
-  var RequestInfo = class {
-    constructor(url, method, handler, timeout) {
-      this.url = url;
-      this.method = method;
-      this.handler = handler;
-      this.timeout = timeout;
-      this.urlParams = {};
-      this.headers = {};
-      this.body = null;
-      this.errorHandler = null;
-      this.progressCallback = null;
-      this.successCodes = [200];
-      this.additionalRetryCodes = [];
-    }
-  };
-  function handlerCheck(cndn) {
-    if (!cndn) {
-      throw unknown();
-    }
-  }
-  function metadataHandler(service, mappings) {
-    function handler(xhr, text) {
-      const metadata = fromResourceString(service, text, mappings);
-      handlerCheck(metadata !== null);
-      return metadata;
-    }
-    return handler;
-  }
-  function downloadUrlHandler(service, mappings) {
-    function handler(xhr, text) {
-      const metadata = fromResourceString(service, text, mappings);
-      handlerCheck(metadata !== null);
-      return downloadUrlFromResourceString(metadata, text, service.host, service._protocol);
-    }
-    return handler;
-  }
-  function sharedErrorHandler(location2) {
-    function errorHandler(xhr, err) {
-      let newErr;
-      if (xhr.getStatus() === 401) {
-        if (
-          // This exact message string is the only consistent part of the
-          // server's error response that identifies it as an App Check error.
-          xhr.getErrorText().includes("Firebase App Check token is invalid")
-        ) {
-          newErr = unauthorizedApp();
-        } else {
-          newErr = unauthenticated();
-        }
-      } else {
-        if (xhr.getStatus() === 402) {
-          newErr = quotaExceeded(location2.bucket);
-        } else {
-          if (xhr.getStatus() === 403) {
-            newErr = unauthorized(location2.path);
-          } else {
-            newErr = err;
-          }
-        }
-      }
-      newErr.status = xhr.getStatus();
-      newErr.serverResponse = err.serverResponse;
-      return newErr;
-    }
-    return errorHandler;
-  }
-  function objectErrorHandler(location2) {
-    const shared = sharedErrorHandler(location2);
-    function errorHandler(xhr, err) {
-      let newErr = shared(xhr, err);
-      if (xhr.getStatus() === 404) {
-        newErr = objectNotFound(location2.path);
-      }
-      newErr.serverResponse = err.serverResponse;
-      return newErr;
-    }
-    return errorHandler;
-  }
-  function getDownloadUrl(service, location2, mappings) {
-    const urlPart = location2.fullServerUrl();
-    const url = makeUrl(urlPart, service.host, service._protocol);
-    const method = "GET";
-    const timeout = service.maxOperationRetryTime;
-    const requestInfo = new RequestInfo(url, method, downloadUrlHandler(service, mappings), timeout);
-    requestInfo.errorHandler = objectErrorHandler(location2);
-    return requestInfo;
-  }
-  function determineContentType_(metadata, blob) {
-    return metadata && metadata["contentType"] || blob && blob.type() || "application/octet-stream";
-  }
-  function metadataForUpload_(location2, blob, metadata) {
-    const metadataClone = Object.assign({}, metadata);
-    metadataClone["fullPath"] = location2.path;
-    metadataClone["size"] = blob.size();
-    if (!metadataClone["contentType"]) {
-      metadataClone["contentType"] = determineContentType_(null, blob);
-    }
-    return metadataClone;
-  }
-  function multipartUpload(service, location2, mappings, blob, metadata) {
-    const urlPart = location2.bucketOnlyServerUrl();
-    const headers = {
-      "X-Goog-Upload-Protocol": "multipart"
-    };
-    function genBoundary() {
-      let str = "";
-      for (let i = 0; i < 2; i++) {
-        str = str + Math.random().toString().slice(2);
-      }
-      return str;
-    }
-    const boundary = genBoundary();
-    headers["Content-Type"] = "multipart/related; boundary=" + boundary;
-    const metadata_ = metadataForUpload_(location2, blob, metadata);
-    const metadataString = toResourceString(metadata_, mappings);
-    const preBlobPart = "--" + boundary + "\r\nContent-Type: application/json; charset=utf-8\r\n\r\n" + metadataString + "\r\n--" + boundary + "\r\nContent-Type: " + metadata_["contentType"] + "\r\n\r\n";
-    const postBlobPart = "\r\n--" + boundary + "--";
-    const body = FbsBlob.getBlob(preBlobPart, blob, postBlobPart);
-    if (body === null) {
-      throw cannotSliceBlob();
-    }
-    const urlParams = { name: metadata_["fullPath"] };
-    const url = makeUrl(urlPart, service.host, service._protocol);
-    const method = "POST";
-    const timeout = service.maxUploadRetryTime;
-    const requestInfo = new RequestInfo(url, method, metadataHandler(service, mappings), timeout);
-    requestInfo.urlParams = urlParams;
-    requestInfo.headers = headers;
-    requestInfo.body = body.uploadData();
-    requestInfo.errorHandler = sharedErrorHandler(location2);
-    return requestInfo;
-  }
   var RESUMABLE_UPLOAD_CHUNK_SIZE = 256 * 1024;
-  var textFactoryOverride = null;
-  var XhrConnection = class {
-    constructor() {
-      this.sent_ = false;
-      this.xhr_ = new XMLHttpRequest();
-      this.initXhr();
-      this.errorCode_ = ErrorCode2.NO_ERROR;
-      this.sendPromise_ = new Promise((resolve) => {
-        this.xhr_.addEventListener("abort", () => {
-          this.errorCode_ = ErrorCode2.ABORT;
-          resolve();
-        });
-        this.xhr_.addEventListener("error", () => {
-          this.errorCode_ = ErrorCode2.NETWORK_ERROR;
-          resolve();
-        });
-        this.xhr_.addEventListener("load", () => {
-          resolve();
-        });
-      });
-    }
-    send(url, method, isUsingEmulator, body, headers) {
-      if (this.sent_) {
-        throw internalError("cannot .send() more than once");
-      }
-      if (isCloudWorkstation(url) && isUsingEmulator) {
-        this.xhr_.withCredentials = true;
-      }
-      this.sent_ = true;
-      this.xhr_.open(method, url, true);
-      if (headers !== void 0) {
-        for (const key in headers) {
-          if (headers.hasOwnProperty(key)) {
-            this.xhr_.setRequestHeader(key, headers[key].toString());
-          }
-        }
-      }
-      if (body !== void 0) {
-        this.xhr_.send(body);
-      } else {
-        this.xhr_.send();
-      }
-      return this.sendPromise_;
-    }
-    getErrorCode() {
-      if (!this.sent_) {
-        throw internalError("cannot .getErrorCode() before sending");
-      }
-      return this.errorCode_;
-    }
-    getStatus() {
-      if (!this.sent_) {
-        throw internalError("cannot .getStatus() before sending");
-      }
-      try {
-        return this.xhr_.status;
-      } catch (e) {
-        return -1;
-      }
-    }
-    getResponse() {
-      if (!this.sent_) {
-        throw internalError("cannot .getResponse() before sending");
-      }
-      return this.xhr_.response;
-    }
-    getErrorText() {
-      if (!this.sent_) {
-        throw internalError("cannot .getErrorText() before sending");
-      }
-      return this.xhr_.statusText;
-    }
-    /** Aborts the request. */
-    abort() {
-      this.xhr_.abort();
-    }
-    getResponseHeader(header) {
-      return this.xhr_.getResponseHeader(header);
-    }
-    addUploadProgressListener(listener) {
-      if (this.xhr_.upload != null) {
-        this.xhr_.upload.addEventListener("progress", listener);
-      }
-    }
-    removeUploadProgressListener(listener) {
-      if (this.xhr_.upload != null) {
-        this.xhr_.upload.removeEventListener("progress", listener);
-      }
-    }
-  };
-  var XhrTextConnection = class extends XhrConnection {
-    initXhr() {
-      this.xhr_.responseType = "text";
-    }
-  };
-  function newTextConnection() {
-    return textFactoryOverride ? textFactoryOverride() : new XhrTextConnection();
-  }
   var Reference = class _Reference {
     constructor(_service, location2) {
       this._service = _service;
@@ -47236,83 +42508,12 @@ ${this.customData.serverResponse}`;
     /**
      * Utility function to throw an error in methods that do not accept a root reference.
      */
-    _throwIfRoot(name6) {
+    _throwIfRoot(name5) {
       if (this._location.path === "") {
-        throw invalidRootOperation(name6);
+        throw invalidRootOperation(name5);
       }
     }
   };
-  function uploadBytes$1(ref2, data, metadata) {
-    ref2._throwIfRoot("uploadBytes");
-    const requestInfo = multipartUpload(ref2.storage, ref2._location, getMappings(), new FbsBlob(data, true), metadata);
-    return ref2.storage.makeRequestWithTokens(requestInfo, newTextConnection).then((finalMetadata) => {
-      return {
-        metadata: finalMetadata,
-        ref: ref2
-      };
-    });
-  }
-  function uploadString$1(ref2, value, format = StringFormat.RAW, metadata) {
-    ref2._throwIfRoot("uploadString");
-    const data = dataFromString(format, value);
-    const metadataClone = { ...metadata };
-    if (metadataClone["contentType"] == null && data.contentType != null) {
-      metadataClone["contentType"] = data.contentType;
-    }
-    return uploadBytes$1(ref2, data.data, metadataClone);
-  }
-  function getDownloadURL$1(ref2) {
-    ref2._throwIfRoot("getDownloadURL");
-    const requestInfo = getDownloadUrl(ref2.storage, ref2._location, getMappings());
-    return ref2.storage.makeRequestWithTokens(requestInfo, newTextConnection).then((url) => {
-      if (url === null) {
-        throw noDownloadURL();
-      }
-      return url;
-    });
-  }
-  function _getChild$1(ref2, childPath) {
-    const newPath = child(ref2._location.path, childPath);
-    const location2 = new Location(ref2._location.bucket, newPath);
-    return new Reference(ref2.storage, location2);
-  }
-  function isUrl(path) {
-    return /^[A-Za-z]+:\/\//.test(path);
-  }
-  function refFromURL(service, url) {
-    return new Reference(service, url);
-  }
-  function refFromPath(ref2, path) {
-    if (ref2 instanceof FirebaseStorageImpl) {
-      const service = ref2;
-      if (service._bucket == null) {
-        throw noDefaultBucket();
-      }
-      const reference = new Reference(service, service._bucket);
-      if (path != null) {
-        return refFromPath(reference, path);
-      } else {
-        return reference;
-      }
-    } else {
-      if (path !== void 0) {
-        return _getChild$1(ref2, path);
-      } else {
-        return ref2;
-      }
-    }
-  }
-  function ref$1(serviceOrRef, pathOrUrl) {
-    if (pathOrUrl && isUrl(pathOrUrl)) {
-      if (serviceOrRef instanceof FirebaseStorageImpl) {
-        return refFromURL(serviceOrRef, pathOrUrl);
-      } else {
-        throw invalidArgument("To use ref(service, url), the first argument must be a Storage instance.");
-      }
-    } else {
-      return refFromPath(serviceOrRef, pathOrUrl);
-    }
-  }
   function extractBucket(host, config) {
     const bucketString = config?.[CONFIG_STORAGE_BUCKET_KEY];
     if (bucketString == null) {
@@ -47320,23 +42521,23 @@ ${this.customData.serverResponse}`;
     }
     return Location.makeFromBucketSpec(bucketString, host);
   }
-  function connectStorageEmulator$1(storage3, host, port, options = {}) {
-    storage3.host = `${host}:${port}`;
+  function connectStorageEmulator$1(storage2, host, port, options = {}) {
+    storage2.host = `${host}:${port}`;
     const useSsl = isCloudWorkstation(host);
     if (useSsl) {
-      void pingServer(`https://${storage3.host}/b`);
+      void pingServer(`https://${storage2.host}/b`);
       updateEmulatorBanner("Storage", true);
     }
-    storage3._isUsingEmulator = true;
-    storage3._protocol = useSsl ? "https" : "http";
+    storage2._isUsingEmulator = true;
+    storage2._protocol = useSsl ? "https" : "http";
     const { mockUserToken } = options;
     if (mockUserToken) {
-      storage3._overrideAuthToken = typeof mockUserToken === "string" ? mockUserToken : createMockUserToken(mockUserToken, storage3.app.options.projectId);
+      storage2._overrideAuthToken = typeof mockUserToken === "string" ? mockUserToken : createMockUserToken(mockUserToken, storage2.app.options.projectId);
     }
   }
   var FirebaseStorageImpl = class {
-    constructor(app3, _authProvider, _appCheckProvider, _url, _firebaseVersion, _isUsingEmulator = false) {
-      this.app = app3;
+    constructor(app2, _authProvider, _appCheckProvider, _url, _firebaseVersion, _isUsingEmulator = false) {
+      this.app = app2;
       this._authProvider = _authProvider;
       this._appCheckProvider = _appCheckProvider;
       this._url = _url;
@@ -47410,9 +42611,9 @@ ${this.customData.serverResponse}`;
       if (this._overrideAuthToken) {
         return this._overrideAuthToken;
       }
-      const auth3 = this._authProvider.getImmediate({ optional: true });
-      if (auth3) {
-        const tokenData = await auth3.getToken();
+      const auth2 = this._authProvider.getImmediate({ optional: true });
+      if (auth2) {
+        const tokenData = await auth2.getToken();
         if (tokenData !== null) {
           return tokenData.accessToken;
         }
@@ -47470,24 +42671,12 @@ ${this.customData.serverResponse}`;
       return this._makeRequest(requestInfo, requestFactory, authToken, appCheckToken).getPromise();
     }
   };
-  var name5 = "@firebase/storage";
-  var version5 = "0.14.1";
+  var name4 = "@firebase/storage";
+  var version4 = "0.14.1";
   var STORAGE_TYPE = "storage";
-  function uploadString(ref2, value, format, metadata) {
-    ref2 = getModularInstance(ref2);
-    return uploadString$1(ref2, value, format, metadata);
-  }
-  function getDownloadURL(ref2) {
-    ref2 = getModularInstance(ref2);
-    return getDownloadURL$1(ref2);
-  }
-  function ref(serviceOrRef, pathOrUrl) {
-    serviceOrRef = getModularInstance(serviceOrRef);
-    return ref$1(serviceOrRef, pathOrUrl);
-  }
-  function getStorage(app3 = getApp(), bucketUrl) {
-    app3 = getModularInstance(app3);
-    const storageProvider = _getProvider(app3, STORAGE_TYPE);
+  function getStorage(app2 = getApp(), bucketUrl) {
+    app2 = getModularInstance(app2);
+    const storageProvider = _getProvider(app2, STORAGE_TYPE);
     const storageInstance = storageProvider.getImmediate({
       identifier: bucketUrl
     });
@@ -47497,14 +42686,14 @@ ${this.customData.serverResponse}`;
     }
     return storageInstance;
   }
-  function connectStorageEmulator(storage3, host, port, options = {}) {
-    connectStorageEmulator$1(storage3, host, port, options);
+  function connectStorageEmulator(storage2, host, port, options = {}) {
+    connectStorageEmulator$1(storage2, host, port, options);
   }
   function factory(container, { instanceIdentifier: url }) {
-    const app3 = container.getProvider("app").getImmediate();
+    const app2 = container.getProvider("app").getImmediate();
     const authProvider = container.getProvider("auth-internal");
     const appCheckProvider = container.getProvider("app-check-internal");
-    return new FirebaseStorageImpl(app3, authProvider, appCheckProvider, url, SDK_VERSION);
+    return new FirebaseStorageImpl(app2, authProvider, appCheckProvider, url, SDK_VERSION);
   }
   function registerStorage() {
     _registerComponent(new Component(
@@ -47513,12 +42702,12 @@ ${this.customData.serverResponse}`;
       "PUBLIC"
       /* ComponentType.PUBLIC */
     ).setMultipleInstances(true));
-    registerVersion(name5, version5, "");
-    registerVersion(name5, version5, "esm2020");
+    registerVersion(name4, version4, "");
+    registerVersion(name4, version4, "esm2020");
   }
   registerStorage();
 
-  // echly-extension/src/firebase.ts
+  // lib/firebase.ts
   var firebaseConfig = {
     apiKey: "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM",
     authDomain: "echly-b74cc.firebaseapp.com",
@@ -47529,17 +42718,11 @@ ${this.customData.serverResponse}`;
     measurementId: "G-Q0C7DP8QVR"
   };
   var app = initializeApp(firebaseConfig);
-  var auth = getAuth2(app);
+  var auth = getAuth(app);
   var db = getFirestore(app);
   var storage = getStorage(app);
 
-  // echly-extension/src/auth.ts
-  function subscribeToAuthState(callback) {
-    return onAuthStateChanged2(auth, callback);
-  }
-
-  // echly-extension/src/contentAuthFetch.ts
-  var API_BASE = "https://echly-web.vercel.app";
+  // lib/authFetch.ts
   var cachedToken = null;
   var tokenExpiry = null;
   async function getCachedIdToken(user) {
@@ -47553,172 +42736,6 @@ ${this.customData.serverResponse}`;
     tokenExpiry = result.expirationTime ? new Date(result.expirationTime).getTime() - 6e4 : now + 6e4;
     return token;
   }
-  function clearAuthTokenCache() {
-    cachedToken = null;
-    tokenExpiry = null;
-  }
-  function getFullUrl(input) {
-    if (typeof input === "string") {
-      return input.startsWith("http") ? input : API_BASE + input;
-    }
-    if (input instanceof URL) return input.href;
-    return input.url;
-  }
-  async function authFetch(input, init = {}) {
-    const user = auth.currentUser;
-    if (!user) throw new Error("User not authenticated");
-    const token = await getCachedIdToken(user);
-    const url = getFullUrl(input);
-    const method = init.method || "GET";
-    const headers = init.headers instanceof Headers ? Object.fromEntries(init.headers) : Array.isArray(init.headers) ? Object.fromEntries(init.headers) : { ...init.headers };
-    const body = init.body ?? null;
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(
-        {
-          type: "echly-api",
-          url,
-          method,
-          headers,
-          body,
-          token
-        },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-            return;
-          }
-          if (!response) {
-            reject(new Error("No response from background"));
-            return;
-          }
-          const res = new Response(response.body ?? "", {
-            status: response.status ?? 0,
-            headers: response.headers ? new Headers(response.headers) : void 0
-          });
-          resolve(res);
-        }
-      );
-    });
-  }
-  async function apiFetch(path, options = {}) {
-    const url = path.startsWith("http") ? path : API_BASE + path;
-    return authFetch(url, options);
-  }
-
-  // lib/firebase.ts
-  var firebaseConfig2 = {
-    apiKey: "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM",
-    authDomain: "echly-b74cc.firebaseapp.com",
-    projectId: "echly-b74cc",
-    storageBucket: "echly-b74cc.firebasestorage.app",
-    messagingSenderId: "609478020649",
-    appId: "1:609478020649:web:54cd1ab0dc2b8277131638",
-    measurementId: "G-Q0C7DP8QVR"
-  };
-  var app2 = initializeApp(firebaseConfig2);
-  var auth2 = getAuth(app2);
-  var db2 = getFirestore(app2);
-  var storage2 = getStorage(app2);
-
-  // lib/screenshot.ts
-  function generateFeedbackId() {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    return `fb-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-  }
-  async function uploadScreenshot(imageDataUrl, sessionId, feedbackId) {
-    const timestamp = Date.now();
-    const path = `sessions/${sessionId}/feedback/${feedbackId}/${timestamp}.png`;
-    const screenshotRef = ref(storage2, path);
-    await uploadString(
-      screenshotRef,
-      imageDataUrl,
-      "data_url",
-      {
-        contentType: "image/png"
-      }
-    );
-    return await getDownloadURL(screenshotRef);
-  }
-
-  // components/CaptureWidget/CaptureWidget.tsx
-  var import_react8 = __toESM(require_react());
-
-  // echly-extension/stubs/next-image.tsx
-  var import_react = __toESM(require_react());
-  function resolveSrc(src) {
-    if (typeof chrome !== "undefined" && chrome.runtime?.getURL && (src === "/Echly_logo.svg" || src.endsWith("Echly_logo.svg"))) {
-      return chrome.runtime.getURL("assets/Echly_logo.svg");
-    }
-    return src;
-  }
-  function Image2({ src, alt, width, height, className }) {
-    return /* @__PURE__ */ import_react.default.createElement(
-      "img",
-      {
-        src: resolveSrc(src),
-        alt,
-        width,
-        height,
-        className
-      }
-    );
-  }
-
-  // components/AudioWaveform.tsx
-  var import_react2 = __toESM(require_react());
-  var BAR_COUNT = 6;
-  var DELAYS = [0, 0.12, 0.28, 0.18, 0.34, 0.22];
-  var PEAKS = [18, 22, 20, 24, 19, 21];
-  function AudioWaveform({ isActive }) {
-    return /* @__PURE__ */ import_react2.default.createElement("div", { className: "flex items-center justify-center gap-[6px] h-[60px] waveform-root" }, [...Array(BAR_COUNT)].map((_, i) => /* @__PURE__ */ import_react2.default.createElement(
-      "span",
-      {
-        key: i,
-        className: `w-[4px] rounded-full bg-brand-accent transition-none waveform-bar ${isActive ? "waveform-bar--active" : "h-[6px] opacity-40"}`,
-        style: isActive ? {
-          animationDelay: `${DELAYS[i]}s`,
-          animationDuration: `${1.4 + i % 3 * 0.15}s`,
-          ["--peak"]: `${PEAKS[i]}px`
-        } : void 0
-      }
-    )), /* @__PURE__ */ import_react2.default.createElement("style", { jsx: true }, `
-        @keyframes waveform-organic {
-          0%, 100% {
-            height: 8px;
-            opacity: 0.85;
-          }
-          45% {
-            height: var(--peak, 20px);
-            opacity: 1;
-          }
-          55% {
-            height: var(--peak, 20px);
-            opacity: 1;
-          }
-        }
-
-        .waveform-bar--active {
-          animation: waveform-organic 1.55s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
-        }
-      `));
-  }
-
-  // lib/authFetch.ts
-  var cachedToken2 = null;
-  var tokenExpiry2 = null;
-  async function getCachedIdToken2(user) {
-    const now = Date.now();
-    if (cachedToken2 && tokenExpiry2 && now < tokenExpiry2) {
-      return cachedToken2;
-    }
-    const token = await user.getIdToken();
-    const result = await user.getIdTokenResult();
-    cachedToken2 = token;
-    tokenExpiry2 = result.expirationTime ? new Date(result.expirationTime).getTime() - 6e4 : now + 6e4;
-    return token;
-  }
   function resolveInput(input) {
     const base = typeof window !== "undefined" && window.__ECHLY_API_BASE__;
     if (!base) return input;
@@ -47726,11 +42743,11 @@ ${this.customData.serverResponse}`;
     return path.startsWith("http") ? input : base + path;
   }
   async function authFetch2(input, init = {}) {
-    const user = auth2.currentUser;
+    const user = auth.currentUser;
     if (!user) {
       throw new Error("User not authenticated");
     }
-    const token = await getCachedIdToken2(user);
+    const token = await getCachedIdToken(user);
     const headers = new Headers(init.headers || {});
     headers.set("Authorization", `Bearer ${token}`);
     return fetch(resolveInput(input), {
@@ -47784,7 +42801,7 @@ ${this.customData.serverResponse}`;
   }
   async function getSessionFeedbackPageRepo(sessionId, pageSize = FEEDBACK_PAGE_SIZE_DEFAULT, startAfterDoc) {
     assertQueryLimit(pageSize, "getSessionFeedbackPageRepo");
-    const coll = collection(db2, "feedback");
+    const coll = collection(db, "feedback");
     const q = startAfterDoc != null ? query(
       coll,
       where("sessionId", "==", sessionId),
@@ -47819,12 +42836,14 @@ ${this.customData.serverResponse}`;
     }
     return `rec-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   }
+  var RECORDING_STATES = ["capturing", "listening", "processing", "anticipation"];
   function useCaptureWidget({
     sessionId,
     extensionMode = false,
     initialPointers,
     onComplete,
-    onDelete
+    onDelete,
+    onRecordingChange
   }) {
     const [recordings, setRecordings] = (0, import_react3.useState)([]);
     const [activeRecordingId, setActiveRecordingId] = (0, import_react3.useState)(null);
@@ -47866,6 +42885,18 @@ ${this.customData.serverResponse}`;
         trayLockedRef.current = false;
       }
     }, [state]);
+    const wasRecordingRef = (0, import_react3.useRef)(false);
+    (0, import_react3.useEffect)(() => {
+      if (!onRecordingChange) return;
+      const recording = RECORDING_STATES.includes(state);
+      if (recording) {
+        wasRecordingRef.current = true;
+        onRecordingChange(true);
+      } else if (wasRecordingRef.current) {
+        wasRecordingRef.current = false;
+        onRecordingChange(false);
+      }
+    }, [state, onRecordingChange]);
     const setIsOpen = (0, import_react3.useCallback)((next) => {
       if (next === false) {
         if (trayLockedRef.current) return;
@@ -48014,6 +43045,24 @@ ${this.customData.serverResponse}`;
         return;
       }
       setState("processing");
+      if (extensionMode) {
+        onComplete(active.transcript, active.screenshot, {
+          onSuccess: (structured) => {
+            setRecordings(
+              (prev) => prev.map(
+                (r) => r.id === activeId ? { ...r, structuredOutput: structured } : r
+              )
+            );
+            setPendingStructured(structured);
+            setState("anticipation");
+          },
+          onError: () => {
+            setErrorMessage("AI processing failed.");
+            setState("error");
+          }
+        });
+        return;
+      }
       try {
         const structured = await onComplete(active.transcript, active.screenshot);
         if (!structured) {
@@ -48032,7 +43081,7 @@ ${this.customData.serverResponse}`;
         setErrorMessage("AI processing failed.");
         setState("error");
       }
-    }, [onComplete]);
+    }, [onComplete, extensionMode]);
     (0, import_react3.useEffect)(() => {
       if (state !== "anticipation" || !pendingStructured) return;
       const t = setTimeout(() => {
@@ -48290,10 +43339,10 @@ ${this.customData.serverResponse}`;
       children,
       iconNode,
       ...rest
-    }, ref2) => (0, import_react4.createElement)(
+    }, ref) => (0, import_react4.createElement)(
       "svg",
       {
-        ref: ref2,
+        ref,
         ...defaultAttributes,
         width: size,
         height: size,
@@ -48313,8 +43362,8 @@ ${this.customData.serverResponse}`;
   // node_modules/lucide-react/dist/esm/createLucideIcon.js
   var createLucideIcon = (iconName, iconNode) => {
     const Component2 = (0, import_react5.forwardRef)(
-      ({ className, ...props }, ref2) => (0, import_react5.createElement)(Icon, {
-        ref: ref2,
+      ({ className, ...props }, ref) => (0, import_react5.createElement)(Icon, {
+        ref,
         iconNode,
         className: mergeClasses(
           `lucide-${toKebabCase(toPascalCase(iconName))}`,
@@ -48626,7 +43675,11 @@ ${this.customData.serverResponse}`;
     initialPointers,
     onComplete,
     onDelete,
-    widgetToggleRef
+    widgetToggleRef,
+    onRecordingChange,
+    expanded,
+    onExpandRequest,
+    onCollapseRequest
   }) {
     const {
       state,
@@ -48639,8 +43692,11 @@ ${this.customData.serverResponse}`;
       extensionMode,
       initialPointers,
       onComplete,
-      onDelete
+      onDelete,
+      onRecordingChange
     });
+    const isControlled = expanded !== void 0;
+    const effectiveIsOpen = isControlled ? expanded : state.isOpen;
     import_react8.default.useEffect(() => {
       if (!widgetToggleRef) return;
       widgetToggleRef.current = handlers.toggleOpen;
@@ -48648,12 +43704,12 @@ ${this.customData.serverResponse}`;
         widgetToggleRef.current = null;
       };
     }, [handlers, widgetToggleRef]);
-    if (!state.isOpen) {
+    if (!effectiveIsOpen) {
       return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "fixed bottom-10 right-10 z-50 capture-floating-wrapper", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
         "button",
         {
           type: "button",
-          onClick: () => handlers.setIsOpen(true),
+          onClick: () => onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true),
           className: "capture-floating-trigger\r\n                     flex items-center gap-3\r\n                     bg-white border border-[rgba(0,0,0,0.08)]\r\n                     px-5 py-2.5 rounded-[20px]\r\n                     text-[#111827] font-semibold\r\n                     shadow-[0_10px_30px_rgba(0,0,0,0.12),0_4px_10px_rgba(0,0,0,0.06)]\r\n                     transition-[transform_80ms_ease-in,box-shadow_150ms_ease-out]\r\n                     hover:-translate-y-px hover:shadow-[0_12px_34px_rgba(0,0,0,0.14),0_5px_12px_rgba(0,0,0,0.08)]\r\n                     active:scale-[0.98] cursor-pointer",
           children: [
             /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Image2, { src: "/Echly_logo.svg", alt: "Echly", width: 26, height: 26, className: "shrink-0" }),
@@ -48662,11 +43718,6 @@ ${this.customData.serverResponse}`;
         }
       ) });
     }
-    console.log("Widget state:", {
-      isOpen: state.isOpen,
-      isListening: state.state === "listening",
-      isStructuring: state.state === "processing" || state.state === "anticipation"
-    });
     return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
       !extensionMode && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
         "div",
@@ -48695,7 +43746,7 @@ ${this.customData.serverResponse}`;
                 onStartDrag: handlers.startDrag,
                 onShare: handlers.handleShare,
                 onMoreClick: () => handlers.setShowMenu((p) => !p),
-                onClose: () => handlers.setIsOpen(false),
+                onClose: () => onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false),
                 showMenu: state.showMenu,
                 onResetSession: handlers.resetSession,
                 menuRef: refs.menuRef
@@ -48772,25 +43823,8 @@ ${this.customData.serverResponse}`;
     if (v2 === "low" || v2 === "medium" || v2 === "high" || v2 === "critical") return v2;
     return "medium";
   }
-  function contentSignIn() {
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ type: "LOGIN" }, async (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        if (!response?.success || !response.token) {
-          reject(new Error(response?.error?.message ?? "Login failed"));
-          return;
-        }
-        try {
-          const credential = GoogleAuthProvider.credential(null, response.token);
-          await signInWithCredential(auth, credential);
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      });
+  function requestOpenPopup() {
+    chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {
     });
   }
   function ContentApp() {
@@ -48798,7 +43832,14 @@ ${this.customData.serverResponse}`;
     const [sessionId, setSessionId] = import_react9.default.useState(null);
     const [sessionMessage, setSessionMessage] = import_react9.default.useState(null);
     const [authChecked, setAuthChecked] = import_react9.default.useState(false);
+    const [globalState, setGlobalState] = import_react9.default.useState({
+      visible: false,
+      expanded: false,
+      isRecording: false,
+      sessionId: null
+    });
     const widgetToggleRef = import_react9.default.useRef(null);
+    const logoUrl = typeof chrome !== "undefined" && chrome.runtime?.getURL ? chrome.runtime.getURL("assets/Echly_logo.svg") : "/Echly_logo.svg";
     import_react9.default.useEffect(() => {
       const toggleHandler = () => {
         widgetToggleRef.current?.();
@@ -48809,14 +43850,42 @@ ${this.customData.serverResponse}`;
       };
     }, []);
     import_react9.default.useEffect(() => {
-      const unsub = subscribeToAuthState((u) => {
-        if (!u) {
-          clearAuthTokenCache();
-        }
-        setUser(u ?? null);
-        setAuthChecked(true);
+      const handler = (e) => {
+        const s = e.detail?.state;
+        if (s) setGlobalState(s);
+      };
+      window.addEventListener("ECHLY_GLOBAL_STATE", handler);
+      return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler);
+    }, []);
+    const onRecordingChange = import_react9.default.useCallback((recording) => {
+      chrome.runtime.sendMessage({ type: recording ? "START_RECORDING" : "STOP_RECORDING" }).catch(() => {
       });
-      return () => unsub();
+    }, []);
+    const onExpandRequest = import_react9.default.useCallback(() => {
+      chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {
+      });
+    }, []);
+    const onCollapseRequest = import_react9.default.useCallback(() => {
+      chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {
+      });
+    }, []);
+    import_react9.default.useEffect(() => {
+      chrome.runtime.sendMessage(
+        { type: "ECHLY_GET_AUTH_STATE" },
+        (response) => {
+          if (response?.authenticated && response.user?.uid) {
+            setUser({
+              uid: response.user.uid,
+              name: response.user.name ?? null,
+              email: response.user.email ?? null,
+              photoURL: response.user.photoURL ?? null
+            });
+          } else {
+            setUser(null);
+          }
+          setAuthChecked(true);
+        }
+      );
     }, []);
     import_react9.default.useEffect(() => {
       if (!user) {
@@ -48856,8 +43925,38 @@ ${this.customData.serverResponse}`;
       };
     }, [user]);
     const handleComplete = import_react9.default.useCallback(
-      async (transcript, screenshot) => {
-        if (!sessionId || !user) return void 0;
+      async (transcript, screenshot, callbacks) => {
+        if (!sessionId || !user) {
+          callbacks?.onError();
+          return void 0;
+        }
+        if (callbacks) {
+          chrome.runtime.sendMessage(
+            {
+              type: "ECHLY_PROCESS_FEEDBACK",
+              payload: { transcript, screenshot, sessionId }
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                console.error("[Echly] Processing failed (runtime):", chrome.runtime.lastError.message);
+                callbacks.onError();
+                return;
+              }
+              if (!response?.success || !response.ticket) {
+                console.error("[Echly] Processing failed:", response?.error ?? "No success or ticket");
+                callbacks.onError();
+                return;
+              }
+              callbacks.onSuccess({
+                id: response.ticket.id,
+                title: response.ticket.title,
+                description: response.ticket.description,
+                type: response.ticket.type ?? "Feedback"
+              });
+            }
+          );
+          return;
+        }
         const res = await apiFetch("/api/structure-feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -48911,39 +44010,72 @@ ${this.customData.serverResponse}`;
     const handleDelete = import_react9.default.useCallback(async (_id) => {
     }, []);
     if (!authChecked) {
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { padding: 16, fontSize: 14, color: "#666" }, children: "Loading\u2026" });
+      return null;
     }
     if (!user) {
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: { padding: 16, minWidth: 280 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { style: { marginBottom: 12, fontSize: 14, color: "#333" }, children: "Sign in to capture and submit feedback." }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-          "button",
-          {
-            type: "button",
-            onClick: () => contentSignIn().catch(console.error),
-            style: {
-              padding: "10px 16px",
-              fontSize: 14,
-              fontWeight: 600,
-              color: "#fff",
-              background: "#111827",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer"
-            },
-            children: "Sign in with Google"
-          }
-        )
-      ] });
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { pointerEvents: "auto" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+        "button",
+        {
+          type: "button",
+          title: "Sign in from extension",
+          onClick: requestOpenPopup,
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "10px 20px",
+            borderRadius: "20px",
+            border: "1px solid rgba(0,0,0,0.08)",
+            background: "#fff",
+            color: "#6b7280",
+            fontSize: "14px",
+            fontWeight: 600,
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
+          },
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("img", { src: logoUrl, alt: "", width: 22, height: 22, style: { display: "block" } }),
+            "Sign in from extension"
+          ]
+        }
+      ) });
     }
     if (sessionMessage && !sessionId) {
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: { padding: 16, minWidth: 280 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { style: { fontSize: 14, color: "#666" }, children: sessionMessage }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { style: { fontSize: 12, color: "#999", marginTop: 8 }, children: "Open the dashboard to create a session." })
-      ] });
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+        "div",
+        {
+          style: {
+            pointerEvents: "auto",
+            padding: "16px",
+            minWidth: "260px",
+            background: "#fff",
+            borderRadius: "12px",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+            border: "1px solid rgba(0,0,0,0.06)"
+          },
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { style: { fontSize: "14px", color: "#374151", margin: 0 }, children: sessionMessage }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { style: { fontSize: "12px", color: "#6b7280", marginTop: "8px", marginBottom: 0 }, children: "Open the dashboard to create a session." })
+          ]
+        }
+      );
     }
     if (!sessionId) {
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { padding: 16, fontSize: 14, color: "#666" }, children: "Loading session\u2026" });
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        "div",
+        {
+          style: {
+            pointerEvents: "auto",
+            padding: "12px 20px",
+            background: "#fff",
+            borderRadius: "12px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            fontSize: "14px",
+            color: "#6b7280"
+          },
+          children: "Loading session\u2026"
+        }
+      );
     }
     return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       CaptureWidget,
@@ -48953,7 +44085,11 @@ ${this.customData.serverResponse}`;
         extensionMode: true,
         onComplete: handleComplete,
         onDelete: handleDelete,
-        widgetToggleRef
+        widgetToggleRef,
+        onRecordingChange,
+        expanded: globalState.expanded,
+        onExpandRequest,
+        onCollapseRequest
       }
     );
   }
@@ -48974,24 +44110,7 @@ ${this.customData.serverResponse}`;
     reset.textContent = SHADOW_RESET;
     shadowRoot.appendChild(reset);
   }
-  function main() {
-    if (window.__ECHLY_INJECTED__) {
-      return;
-    }
-    window.__ECHLY_INJECTED__ = true;
-    const host = document.createElement("div");
-    host.id = SHADOW_HOST_ID;
-    Object.assign(host.style, {
-      position: "fixed",
-      top: "0",
-      left: "0",
-      width: "100vw",
-      height: "100vh",
-      zIndex: "2147483647",
-      pointerEvents: "none"
-    });
-    host.style.outline = "2px solid red";
-    document.body.appendChild(host);
+  function mountReactApp(host) {
     const shadowRoot = host.attachShadow({ mode: "open" });
     injectShadowStyles(shadowRoot);
     const container = document.createElement("div");
@@ -48999,21 +44118,67 @@ ${this.customData.serverResponse}`;
     container.style.all = "initial";
     container.style.boxSizing = "border-box";
     container.style.pointerEvents = "auto";
-    container.style.position = "fixed";
-    container.style.top = "0";
-    container.style.left = "0";
-    container.style.width = "100vw";
-    container.style.height = "100vh";
-    container.style.zIndex = "2147483647";
+    container.style.width = "auto";
+    container.style.height = "auto";
     shadowRoot.appendChild(container);
     const reactRoot = (0, import_client.createRoot)(container);
     reactRoot.render(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ContentApp, {}));
+  }
+  function syncInitialGlobalState(host) {
+    chrome.runtime.sendMessage(
+      { type: "ECHLY_GET_GLOBAL_STATE" },
+      (state) => {
+        if (!state) return;
+        host.style.display = state.visible ? "block" : "none";
+        window.dispatchEvent(
+          new CustomEvent("ECHLY_GLOBAL_STATE", {
+            detail: {
+              state: {
+                visible: state.visible ?? false,
+                expanded: state.expanded ?? false,
+                isRecording: state.isRecording ?? false,
+                sessionId: state.sessionId ?? null
+              }
+            }
+          })
+        );
+      }
+    );
+  }
+  function ensureMessageListener(host) {
+    const win = window;
+    if (win.__ECHLY_MESSAGE_LISTENER__) return;
+    win.__ECHLY_MESSAGE_LISTENER__ = true;
     chrome.runtime.onMessage.addListener((msg) => {
+      const h = document.getElementById(SHADOW_HOST_ID);
+      if (!h) return;
+      if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
+        h.style.display = msg.state.visible ? "block" : "none";
+        window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: msg.state } }));
+      }
       if (msg.type === "ECHLY_TOGGLE") {
-        const event = new CustomEvent("ECHLY_TOGGLE_WIDGET");
-        window.dispatchEvent(event);
+        window.dispatchEvent(new CustomEvent("ECHLY_TOGGLE_WIDGET"));
       }
     });
+  }
+  function main() {
+    let host = document.getElementById(SHADOW_HOST_ID);
+    if (!host) {
+      host = document.createElement("div");
+      host.id = SHADOW_HOST_ID;
+      host.style.position = "fixed";
+      host.style.bottom = "24px";
+      host.style.right = "24px";
+      host.style.width = "auto";
+      host.style.height = "auto";
+      host.style.zIndex = "2147483647";
+      host.style.pointerEvents = "auto";
+      host.style.display = "none";
+      document.documentElement.appendChild(host);
+      mountReactApp(host);
+    }
+    ensureMessageListener(host);
+    syncInitialGlobalState(host);
   }
   main();
 })();
@@ -49530,6 +44695,24 @@ react/cjs/react-jsx-runtime.development.js:
    * limitations under the License.
    *)
 
+firebase/app/dist/esm/index.esm.js:
+  (**
+   * @license
+   * Copyright 2020 Google LLC
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   *)
+
 @firebase/auth/dist/esm/index-3398f4bb.js:
   (**
    * @license
@@ -50516,946 +45699,6 @@ react/cjs/react-jsx-runtime.development.js:
   (**
    * @license
    * Copyright 2021 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-  (**
-   * @license
-   * Copyright 2019 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-  (**
-   * @license
-   * Copyright 2022 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-  (**
-   * @license
-   * Copyright 2023 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-  (**
-   * @license
-   * Copyright 2019 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2019 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2019 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2019 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2019 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC.
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-  (**
-   * @license
-   * Copyright 2019 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/register-7238101c.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-@firebase/auth/dist/web-extension-esm/index.js:
-  (**
-   * @license
-   * Copyright 2023 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
-firebase/app/dist/esm/index.esm.js:
-  (**
-   * @license
-   * Copyright 2020 Google LLC
    *
    * Licensed under the Apache License, Version 2.0 (the "License");
    * you may not use this file except in compliance with the License.
@@ -53477,6 +47720,8 @@ firebase/app/dist/esm/index.esm.js:
    * See the License for the specific language governing permissions and
    * limitations under the License.
    *)
+
+@firebase/storage/dist/index.esm.js:
   (**
    * @license
    * Copyright 2022 Google LLC
@@ -53495,6 +47740,24 @@ firebase/app/dist/esm/index.esm.js:
    *)
   (**
    * @license
+   * Copyright 2017 Google LLC
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   *)
+
+@firebase/storage/dist/index.esm.js:
+  (**
+   * @license
    * Copyright 2021 Google LLC
    *
    * Licensed under the Apache License, Version 2.0 (the "License");
@@ -53509,6 +47772,98 @@ firebase/app/dist/esm/index.esm.js:
    * See the License for the specific language governing permissions and
    * limitations under the License.
    *)
+
+@firebase/storage/dist/index.esm.js:
+  (**
+   * @license
+   * Copyright 2017 Google LLC
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   *)
+
+@firebase/storage/dist/index.esm.js:
+  (**
+   * @license
+   * Copyright 2017 Google LLC
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   *)
+
+@firebase/storage/dist/index.esm.js:
+  (**
+   * @license
+   * Copyright 2017 Google LLC
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   *)
+
+@firebase/storage/dist/index.esm.js:
+  (**
+   * @license
+   * Copyright 2017 Google LLC
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   *)
+
+@firebase/storage/dist/index.esm.js:
+  (**
+   * @license
+   * Copyright 2017 Google LLC
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   *)
+
+@firebase/storage/dist/index.esm.js:
   (**
    * @license
    * Copyright 2019 Google LLC
@@ -53669,6 +48024,8 @@ firebase/app/dist/esm/index.esm.js:
    * See the License for the specific language governing permissions and
    * limitations under the License.
    *)
+
+@firebase/storage/dist/index.esm.js:
   (**
    * @license
    * Copyright 2020 Google LLC

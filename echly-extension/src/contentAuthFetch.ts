@@ -1,35 +1,11 @@
 /**
- * authFetch for content script: proxies requests through background to avoid CORS.
- * Same interface as lib/authFetch so CaptureWidget works unchanged.
+ * authFetch for content script: proxies requests through background (no Firebase in content).
+ * Background adds Bearer token via ECHLY_GET_TOKEN / getValidToken().
  */
-import { auth } from "./firebase";
-
 const API_BASE = "https://echly-web.vercel.app";
 
-let cachedToken: string | null = null;
-let tokenExpiry: number | null = null;
-
-async function getCachedIdToken(user: { getIdToken(): Promise<string>; getIdTokenResult(): Promise<{ expirationTime?: string }> }): Promise<string> {
-  const now = Date.now();
-
-  if (cachedToken && tokenExpiry && now < tokenExpiry) {
-    return cachedToken;
-  }
-
-  const token = await user.getIdToken();
-  const result = await user.getIdTokenResult();
-
-  cachedToken = token;
-  tokenExpiry = result.expirationTime
-    ? new Date(result.expirationTime).getTime() - 60000
-    : now + 60000; // fallback 1 min
-
-  return token;
-}
-
 export function clearAuthTokenCache(): void {
-  cachedToken = null;
-  tokenExpiry = null;
+  // No-op: token cache lives in background.
 }
 
 function getFullUrl(input: RequestInfo | URL): string {
@@ -40,13 +16,7 @@ function getFullUrl(input: RequestInfo | URL): string {
   return input.url;
 }
 
-export async function authFetch(
-  input: RequestInfo | URL,
-  init: RequestInit = {}
-): Promise<Response> {
-  const user = auth.currentUser;
-  if (!user) throw new Error("User not authenticated");
-  const token = await getCachedIdToken(user);
+export function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const url = getFullUrl(input);
   const method = (init.method || "GET") as string;
   const headers: Record<string, string> =
@@ -59,14 +29,7 @@ export async function authFetch(
 
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(
-      {
-        type: "echly-api",
-        url,
-        method,
-        headers,
-        body,
-        token,
-      },
+      { type: "echly-api", url, method, headers, body },
       (response: { ok?: boolean; status?: number; headers?: Record<string, string>; body?: string } | undefined) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
@@ -86,7 +49,6 @@ export async function authFetch(
   });
 }
 
-/** Same as api.ts apiFetch; use in content for handleComplete etc. */
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const url = path.startsWith("http") ? path : API_BASE + path;
   return authFetch(url, options);

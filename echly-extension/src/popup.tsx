@@ -1,232 +1,170 @@
 /**
- * Extension popup: single-source CaptureWidget from @/components/CaptureWidget.
- * Auth, session fetch, and same Tailwind/globals as web.
+ * Popup: login-only. If not authenticated → show Continue with Google.
+ * If authenticated → close immediately and toggle widget visibility.
  */
-import "@/app/globals.css";
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { signInWithGoogle, subscribeToAuthState } from "./auth";
-import { apiFetch, API_BASE } from "./api";
-import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
-import CaptureWidget from "@/components/CaptureWidget";
-import "./firebase";
 
-if (typeof window !== "undefined") {
-  (window as unknown as { __ECHLY_API_BASE__?: string }).__ECHLY_API_BASE__ = API_BASE;
+function getAuthState(): Promise<{
+  authenticated: boolean;
+  user: { uid: string; name: string | null; email: string | null; photoURL: string | null } | null;
+}> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      { type: "ECHLY_GET_AUTH_STATE" },
+      (r: { authenticated?: boolean; user?: { uid: string; name: string | null; email: string | null; photoURL: string | null } | null }) => {
+        resolve({
+          authenticated: !!r?.authenticated,
+          user: r?.user ?? null,
+        });
+      }
+    );
+  });
 }
 
-type SessionOption = {
-  id: string;
-  title: string;
-  userId: string;
-  createdAt?: string;
-  [key: string]: unknown;
-};
-
-function normalizePriority(s: string | undefined): "low" | "medium" | "high" | "critical" {
-  const v = (s ?? "medium").toLowerCase();
-  if (v === "low" || v === "medium" || v === "high" || v === "critical") return v;
-  return "medium";
+function startLogin(): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      { type: "ECHLY_START_LOGIN" },
+      (r: { success?: boolean; error?: string } | undefined) => {
+        if (chrome.runtime.lastError) {
+          resolve({ success: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+        resolve({ success: !!r?.success, error: r?.error });
+      }
+    );
+  });
 }
 
-function App() {
-  const [user, setUser] = React.useState<{ uid: string } | null>(null);
-  const [sessionId, setSessionId] = React.useState<string | null>(null);
-  const [sessionMessage, setSessionMessage] = React.useState<string | null>(null);
+function toggleVisibility(): void {
+  chrome.runtime.sendMessage({ type: "ECHLY_TOGGLE_VISIBILITY" }).catch(() => {});
+}
+
+function GoogleLogoIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden style={{ flexShrink: 0 }}>
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 6.168-2.172l-2.908-2.258c-.806.54-1.837.86-3.26.86-2.513 0-4.662-1.697-5.42-4.02H.957v2.332C2.438 15.983 5.482 18 9 18z" />
+      <path fill="#FBBC05" d="M3.58 10.712c-.18-.54-.282-1.117-.282-1.71 0-.593.102-1.17.282-1.71V4.96H.957C.347 6.175 0 7.55 0 9s.348 2.825.957 4.04l2.625-2.04-.002-.288z" />
+      <path fill="#EA4335" d="M9 3.58c1.414 0 2.679.478 3.634 1.418l2.718-2.718C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.96L3.58 7.29C4.338 4.967 6.487 3.58 9 3.58z" />
+    </svg>
+  );
+}
+
+function PopupApp() {
   const [authChecked, setAuthChecked] = React.useState(false);
+  const [authenticated, setAuthenticated] = React.useState(false);
+  const [loginLoading, setLoginLoading] = React.useState(false);
+  const [loginError, setLoginError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const unsub = subscribeToAuthState((u) => {
-      setUser(u ?? null);
+    getAuthState().then(({ authenticated: auth }) => {
+      setAuthenticated(auth);
       setAuthChecked(true);
+      if (auth) {
+        toggleVisibility();
+        window.close();
+      }
     });
-    return () => unsub();
   }, []);
 
-  React.useEffect(() => {
-    if (!user) {
-      setSessionId(null);
-      setSessionMessage(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch("/api/sessions");
-        const json = (await res.json()) as {
-          success?: boolean;
-          sessions?: SessionOption[];
-          error?: string;
-        };
-        if (cancelled || !json.success) {
-          if (!cancelled) setSessionMessage(json.error || "Failed to load sessions");
+  const handleContinueWithGoogle = React.useCallback(() => {
+    setLoginError(null);
+    setLoginLoading(true);
+    startLogin()
+      .then(({ success, error }) => {
+        setLoginLoading(false);
+        if (success) {
+          toggleVisibility();
+          window.close();
           return;
         }
-        const sessions = json.sessions ?? [];
-        if (sessions.length === 0) {
-          setSessionMessage("Create a session in dashboard first.");
-          setSessionId(null);
-          return;
-        }
-        const sorted = [...sessions].sort((a, b) => {
-          const aT = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bT = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return bT - aT;
-        });
-        setSessionId(sorted[0].id);
-        setSessionMessage(null);
-      } catch {
-        if (!cancelled) setSessionMessage("Failed to load sessions");
-        setSessionId(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  const handleComplete = React.useCallback(
-    async (transcript: string, screenshot: string | null): Promise<
-      { id: string; title: string; description: string; type: string } | undefined
-    > => {
-      if (!sessionId || !user) return undefined;
-      const res = await apiFetch("/api/structure-feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript }),
+        setLoginError(error ?? "Sign in failed");
+      })
+      .catch(() => {
+        setLoginLoading(false);
+        setLoginError("Sign in failed");
       });
-      const data = (await res.json()) as {
-        success?: boolean;
-        tickets?: Array<{
-          title?: string;
-          contextSummary?: string;
-          suggestedTags?: string[];
-          actionItems?: string[];
-          impact?: string | null;
-          suggestedPriority?: string;
-        }>;
-        error?: string;
-      };
-      const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-      if (!data.success || tickets.length === 0) return undefined;
-
-      let screenshotUrl: string | null = null;
-      if (tickets.length > 0 && screenshot) {
-        const firstFeedbackId = generateFeedbackId();
-        screenshotUrl = await uploadScreenshot(screenshot, sessionId, firstFeedbackId);
-      }
-
-      let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
-      for (let i = 0; i < tickets.length; i++) {
-        const t = tickets[i];
-        const body = {
-          sessionId,
-          title: t.title ?? "",
-          description: t.contextSummary ?? t.title ?? "",
-          type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-          contextSummary: t.contextSummary ?? null,
-          actionItems: t.actionItems ?? [],
-          impact: t.impact ?? null,
-          suggestedTags: t.suggestedTags,
-          priority: normalizePriority(t.suggestedPriority),
-          screenshotUrl: i === 0 ? screenshotUrl : null,
-          metadata: { clientTimestamp: Date.now() },
-        };
-        const feedbackRes = await apiFetch("/api/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const feedbackJson = (await feedbackRes.json()) as {
-          success?: boolean;
-          ticket?: { id: string; title: string; description: string; type?: string };
-        };
-        if (feedbackJson.success && feedbackJson.ticket) {
-          const tick = feedbackJson.ticket;
-          if (!firstCreated)
-            firstCreated = {
-              id: tick.id,
-              title: tick.title,
-              description: tick.description,
-              type: tick.type ?? "Feedback",
-            };
-        }
-      }
-      return firstCreated;
-    },
-    [sessionId, user]
-  );
-
-  const handleDelete = React.useCallback(async (_id: string) => {
-    // No-op in extension when DELETE /api/tickets/:id is not implemented
   }, []);
 
   if (!authChecked) {
     return (
-      <div style={{ padding: 16, fontSize: 14, color: "#666" }}>
+      <div style={{ minHeight: "120px", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontSize: 14, color: "#6b7280" }}>
         Loading…
       </div>
     );
   }
 
-  if (!user) {
+  if (authenticated) {
     return (
-      <div style={{ padding: 16, minWidth: 280 }}>
-        <p style={{ marginBottom: 12, fontSize: 14, color: "#333" }}>
-          Sign in to capture and submit feedback.
-        </p>
-        <button
-          type="button"
-          onClick={() => signInWithGoogle().catch(console.error)}
-          style={{
-            padding: "10px 16px",
-            fontSize: 14,
-            fontWeight: 600,
-            color: "#fff",
-            background: "#111827",
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-          }}
-        >
-          Sign in with Google
-        </button>
-      </div>
-    );
-  }
-
-  if (sessionMessage && !sessionId) {
-    return (
-      <div style={{ padding: 16, minWidth: 280 }}>
-        <p style={{ fontSize: 14, color: "#666" }}>{sessionMessage}</p>
-        <p style={{ fontSize: 12, color: "#999", marginTop: 8 }}>
-          Open the dashboard to create a session.
-        </p>
-      </div>
-    );
-  }
-
-  if (!sessionId) {
-    return (
-      <div style={{ padding: 16, fontSize: 14, color: "#666" }}>
-        Loading session…
+      <div style={{ minHeight: "80px", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontSize: 14, color: "#6b7280" }}>
+        Closing…
       </div>
     );
   }
 
   return (
-    <CaptureWidget
-      sessionId={sessionId}
-      userId={user.uid}
-      extensionMode={true}
-      onComplete={handleComplete}
-      onDelete={handleDelete}
-    />
+    <div
+      style={{
+        width: "400px",
+        padding: "24px",
+        borderRadius: "16px",
+        fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        fontSize: 15,
+        color: "#1F2937",
+        background: "#F7F7F8",
+      }}
+    >
+      <img
+        src={chrome.runtime.getURL("assets/Echly_logo.svg")}
+        alt="Echly"
+        width={40}
+        height={40}
+        style={{ marginBottom: 24 }}
+      />
+      <h1 style={{ fontSize: 20, fontWeight: 600, color: "#111827", margin: 0, marginBottom: 8 }}>
+        Sign in to Echly
+      </h1>
+      <p style={{ fontSize: 14, color: "#6b7280", margin: 0, marginBottom: 24, lineHeight: 1.5 }}>
+        Capture feedback instantly across any website.
+      </p>
+      {loginError && (
+        <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 16 }}>{loginError}</p>
+      )}
+      <button
+        type="button"
+        onClick={handleContinueWithGoogle}
+        disabled={loginLoading}
+        style={{
+          width: "100%",
+          height: 48,
+          borderRadius: 12,
+          background: "#fff",
+          border: "1px solid rgba(0,0,0,0.12)",
+          cursor: loginLoading ? "not-allowed" : "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+          fontSize: 15,
+          fontWeight: 500,
+          color: "#1f2937",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+        }}
+      >
+        <GoogleLogoIcon />
+        {loginLoading ? "Signing in…" : "Continue with Google"}
+      </button>
+      <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 16, marginBottom: 0, lineHeight: 1.4 }}>
+        We only use your Google account for authentication.
+      </p>
+    </div>
   );
 }
 
 const rootEl = document.getElementById("root");
 if (rootEl) {
   const root = createRoot(rootEl);
-  root.render(<App />);
+  root.render(<PopupApp />);
 }

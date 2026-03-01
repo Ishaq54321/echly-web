@@ -23,12 +23,15 @@ function generateRecordingId(): string {
   return `rec-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
+const RECORDING_STATES: CaptureState[] = ["capturing", "listening", "processing", "anticipation"];
+
 export function useCaptureWidget({
   sessionId,
   extensionMode = false,
   initialPointers,
   onComplete,
   onDelete,
+  onRecordingChange,
 }: CaptureWidgetProps) {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
@@ -75,6 +78,20 @@ export function useCaptureWidget({
       trayLockedRef.current = false;
     }
   }, [state]);
+
+  /** Notify extension when recording starts or stops (global sticky state). Only on actual transition, not on mount. */
+  const wasRecordingRef = useRef(false);
+  useEffect(() => {
+    if (!onRecordingChange) return;
+    const recording = RECORDING_STATES.includes(state);
+    if (recording) {
+      wasRecordingRef.current = true;
+      onRecordingChange(true);
+    } else if (wasRecordingRef.current) {
+      wasRecordingRef.current = false;
+      onRecordingChange(false);
+    }
+  }, [state, onRecordingChange]);
 
   /** Guarded setter: in extension mode or during capturing/listening/structuring/edit, do not close. */
   const setIsOpen = useCallback((next: boolean) => {
@@ -256,6 +273,24 @@ export function useCaptureWidget({
       return;
     }
     setState("processing");
+    if (extensionMode) {
+      onComplete(active.transcript, active.screenshot, {
+        onSuccess: (structured) => {
+          setRecordings((prev) =>
+            prev.map((r) =>
+              r.id === activeId ? { ...r, structuredOutput: structured } : r
+            )
+          );
+          setPendingStructured(structured);
+          setState("anticipation");
+        },
+        onError: () => {
+          setErrorMessage("AI processing failed.");
+          setState("error");
+        },
+      });
+      return;
+    }
     try {
       const structured = await onComplete(active.transcript, active.screenshot);
       if (!structured) {
@@ -274,7 +309,7 @@ export function useCaptureWidget({
       setErrorMessage("AI processing failed.");
       setState("error");
     }
-  }, [onComplete]);
+  }, [onComplete, extensionMode]);
 
   /* Anticipation: 160ms pause then show result */
   useEffect(() => {

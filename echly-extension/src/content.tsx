@@ -1,17 +1,13 @@
 /**
- * Content script: injected when user clicks extension icon.
- * Single entry point: CaptureWidget (no external launcher). Shadow host + root
- * mounted once per page load; never unmounted or re-injected on tab/url changes.
+ * Content script: ultra-thin UI layer. Auto-injected via manifest on all URLs.
+ * Single mount, visibility controlled by background (ECHLY_VISIBILITY). No blocking overlays.
+ * Auth in popup only; unauthenticated = minimal disabled state with "Sign in from extension" tooltip.
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { signInWithCredential, GoogleAuthProvider } from "firebase/auth";
-import { subscribeToAuthState } from "./auth";
-import { auth } from "./firebase";
-import { apiFetch, clearAuthTokenCache } from "./contentAuthFetch";
-import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
+import { apiFetch } from "./contentAuthFetch";
+import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
 import CaptureWidget from "@/components/CaptureWidget";
-import "./firebase";
 
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
@@ -30,35 +26,31 @@ function normalizePriority(s: string | undefined): "low" | "medium" | "high" | "
   return "medium";
 }
 
-/** Sign in via background chrome.identity.getAuthToken; then Firebase credential. */
-function contentSignIn(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ type: "LOGIN" }, async (response: { success?: boolean; token?: string; error?: unknown }) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-      if (!response?.success || !response.token) {
-        reject(new Error((response as { error?: { message?: string } })?.error?.message ?? "Login failed"));
-        return;
-      }
-      try {
-        const credential = GoogleAuthProvider.credential(null, response.token);
-        await signInWithCredential(auth, credential);
-        resolve();
-      } catch (e) {
-        reject(e);
-      }
-    });
-  });
+type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
+
+type GlobalUIState = { visible: boolean; expanded: boolean; isRecording: boolean; sessionId: string | null };
+
+/** Ask background to open popup (e.g. in a new tab) so user can sign in. */
+function requestOpenPopup(): void {
+  chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {});
 }
 
 function ContentApp() {
-  const [user, setUser] = React.useState<{ uid: string } | null>(null);
+  const [user, setUser] = React.useState<AuthUser | null>(null);
   const [sessionId, setSessionId] = React.useState<string | null>(null);
   const [sessionMessage, setSessionMessage] = React.useState<string | null>(null);
   const [authChecked, setAuthChecked] = React.useState(false);
+  const [globalState, setGlobalState] = React.useState<GlobalUIState>({
+    visible: false,
+    expanded: false,
+    isRecording: false,
+    sessionId: null,
+  });
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
+  const logoUrl =
+    typeof chrome !== "undefined" && chrome.runtime?.getURL
+      ? chrome.runtime.getURL("assets/Echly_logo.svg")
+      : "/Echly_logo.svg";
 
   React.useEffect(() => {
     const toggleHandler = () => {
@@ -72,15 +64,44 @@ function ContentApp() {
     };
   }, []);
 
+  /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). No local source of truth. */
   React.useEffect(() => {
-    const unsub = subscribeToAuthState((u) => {
-      if (!u) {
-        clearAuthTokenCache();
+    const handler = (e: CustomEvent<{ state: typeof globalState }>) => {
+      const s = e.detail?.state;
+      if (s) setGlobalState(s);
+    };
+    window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
+    return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
+  }, []);
+
+  const onRecordingChange = React.useCallback((recording: boolean) => {
+    chrome.runtime.sendMessage({ type: recording ? "START_RECORDING" : "STOP_RECORDING" }).catch(() => {});
+  }, []);
+
+  const onExpandRequest = React.useCallback(() => {
+    chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {});
+  }, []);
+  const onCollapseRequest = React.useCallback(() => {
+    chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    chrome.runtime.sendMessage(
+      { type: "ECHLY_GET_AUTH_STATE" },
+      (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
+        if (response?.authenticated && response.user?.uid) {
+          setUser({
+            uid: response.user.uid,
+            name: response.user.name ?? null,
+            email: response.user.email ?? null,
+            photoURL: response.user.photoURL ?? null,
+          });
+        } else {
+          setUser(null);
+        }
+        setAuthChecked(true);
       }
-      setUser(u ?? null);
-      setAuthChecked(true);
-    });
-    return () => unsub();
+    );
   }, []);
 
   React.useEffect(() => {
@@ -126,10 +147,45 @@ function ContentApp() {
   }, [user]);
 
   const handleComplete = React.useCallback(
-    async (transcript: string, screenshot: string | null): Promise<
-      { id: string; title: string; description: string; type: string } | undefined
-    > => {
-      if (!sessionId || !user) return undefined;
+    async (
+      transcript: string,
+      screenshot: string | null,
+      callbacks?: {
+        onSuccess: (ticket: { id: string; title: string; description: string; type: string }) => void;
+        onError: () => void;
+      }
+    ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
+      if (!sessionId || !user) {
+        callbacks?.onError();
+        return undefined;
+      }
+      if (callbacks) {
+        chrome.runtime.sendMessage(
+          {
+            type: "ECHLY_PROCESS_FEEDBACK",
+            payload: { transcript, screenshot, sessionId },
+          },
+          (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
+            if (chrome.runtime.lastError) {
+              console.error("[Echly] Processing failed (runtime):", chrome.runtime.lastError.message);
+              callbacks.onError();
+              return;
+            }
+            if (!response?.success || !response.ticket) {
+              console.error("[Echly] Processing failed:", response?.error ?? "No success or ticket");
+              callbacks.onError();
+              return;
+            }
+            callbacks.onSuccess({
+              id: response.ticket.id,
+              title: response.ticket.title,
+              description: response.ticket.description,
+              type: response.ticket.type ?? "Feedback",
+            });
+          }
+        );
+        return;
+      }
       const res = await apiFetch("/api/structure-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -200,34 +256,33 @@ function ContentApp() {
   const handleDelete = React.useCallback(async (_id: string) => {}, []);
 
   if (!authChecked) {
-    return (
-      <div style={{ padding: 16, fontSize: 14, color: "#666" }}>
-        Loading…
-      </div>
-    );
+    return null;
   }
 
   if (!user) {
     return (
-      <div style={{ padding: 16, minWidth: 280 }}>
-        <p style={{ marginBottom: 12, fontSize: 14, color: "#333" }}>
-          Sign in to capture and submit feedback.
-        </p>
+      <div style={{ pointerEvents: "auto" }}>
         <button
           type="button"
-          onClick={() => contentSignIn().catch(console.error)}
+          title="Sign in from extension"
+          onClick={requestOpenPopup}
           style={{
-            padding: "10px 16px",
-            fontSize: 14,
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "10px 20px",
+            borderRadius: "20px",
+            border: "1px solid rgba(0,0,0,0.08)",
+            background: "#fff",
+            color: "#6b7280",
+            fontSize: "14px",
             fontWeight: 600,
-            color: "#fff",
-            background: "#111827",
-            border: "none",
-            borderRadius: 8,
             cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
           }}
         >
-          Sign in with Google
+          <img src={logoUrl} alt="" width={22} height={22} style={{ display: "block" }} />
+          Sign in from extension
         </button>
       </div>
     );
@@ -235,9 +290,19 @@ function ContentApp() {
 
   if (sessionMessage && !sessionId) {
     return (
-      <div style={{ padding: 16, minWidth: 280 }}>
-        <p style={{ fontSize: 14, color: "#666" }}>{sessionMessage}</p>
-        <p style={{ fontSize: 12, color: "#999", marginTop: 8 }}>
+      <div
+        style={{
+          pointerEvents: "auto",
+          padding: "16px",
+          minWidth: "260px",
+          background: "#fff",
+          borderRadius: "12px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+          border: "1px solid rgba(0,0,0,0.06)",
+        }}
+      >
+        <p style={{ fontSize: "14px", color: "#374151", margin: 0 }}>{sessionMessage}</p>
+        <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px", marginBottom: 0 }}>
           Open the dashboard to create a session.
         </p>
       </div>
@@ -246,7 +311,17 @@ function ContentApp() {
 
   if (!sessionId) {
     return (
-      <div style={{ padding: 16, fontSize: 14, color: "#666" }}>
+      <div
+        style={{
+          pointerEvents: "auto",
+          padding: "12px 20px",
+          background: "#fff",
+          borderRadius: "12px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          fontSize: "14px",
+          color: "#6b7280",
+        }}
+      >
         Loading session…
       </div>
     );
@@ -260,6 +335,10 @@ function ContentApp() {
       onComplete={handleComplete}
       onDelete={handleDelete}
       widgetToggleRef={widgetToggleRef}
+      onRecordingChange={onRecordingChange}
+      expanded={globalState.expanded}
+      onExpandRequest={onExpandRequest}
+      onCollapseRequest={onCollapseRequest}
     />
   );
 }
@@ -285,28 +364,8 @@ function injectShadowStyles(shadowRoot: ShadowRoot): void {
   shadowRoot.appendChild(reset);
 }
 
-/** Mount once per page load; no re-injection on tabs.onUpdated or location change. */
-function main(): void {
-  if ((window as any).__ECHLY_INJECTED__) {
-    return;
-  }
-  (window as any).__ECHLY_INJECTED__ = true;
-
-  const host = document.createElement("div");
-  host.id = SHADOW_HOST_ID;
-  Object.assign(host.style, {
-    position: "fixed",
-    top: "0",
-    left: "0",
-    width: "100vw",
-    height: "100vh",
-    zIndex: "2147483647",
-    pointerEvents: "none",
-  });
-  // Temporary: confirm host covers entire viewport (remove after verifying layout)
-  host.style.outline = "2px solid red";
-  document.body.appendChild(host);
-
+/** Create shadow root, styles, container; mount React. Call only once per host. */
+function mountReactApp(host: HTMLDivElement): void {
   const shadowRoot = host.attachShadow({ mode: "open" });
   injectShadowStyles(shadowRoot);
 
@@ -315,23 +374,78 @@ function main(): void {
   container.style.all = "initial";
   container.style.boxSizing = "border-box";
   container.style.pointerEvents = "auto";
-  container.style.position = "fixed";
-  container.style.top = "0";
-  container.style.left = "0";
-  container.style.width = "100vw";
-  container.style.height = "100vh";
-  container.style.zIndex = "2147483647";
+  container.style.width = "auto";
+  container.style.height = "auto";
   shadowRoot.appendChild(container);
 
   const reactRoot = createRoot(container);
   reactRoot.render(<ContentApp />);
+}
 
-  chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
+/** Request initial global state from background. Restores visibility, expanded, recording on load/refresh. */
+function syncInitialGlobalState(host: HTMLDivElement): void {
+  chrome.runtime.sendMessage(
+    { type: "ECHLY_GET_GLOBAL_STATE" },
+    (state: { visible?: boolean; expanded?: boolean; isRecording?: boolean; sessionId?: string | null } | undefined) => {
+      if (!state) return;
+      host.style.display = state.visible ? "block" : "none";
+      window.dispatchEvent(
+        new CustomEvent("ECHLY_GLOBAL_STATE", {
+          detail: {
+            state: {
+              visible: state.visible ?? false,
+              expanded: state.expanded ?? false,
+              isRecording: state.isRecording ?? false,
+              sessionId: state.sessionId ?? null,
+            },
+          },
+        })
+      );
+    }
+  );
+}
+
+/** Listen for global state; single listener. Background is source of truth. */
+function ensureMessageListener(host: HTMLDivElement): void {
+  const win = window as Window & { __ECHLY_MESSAGE_LISTENER__?: boolean };
+  if (win.__ECHLY_MESSAGE_LISTENER__) return;
+  win.__ECHLY_MESSAGE_LISTENER__ = true;
+  chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState }) => {
+    const h = document.getElementById(SHADOW_HOST_ID);
+    if (!h) return;
+    if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
+      (h as HTMLDivElement).style.display = msg.state.visible ? "block" : "none";
+      window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: msg.state } }));
+    }
     if (msg.type === "ECHLY_TOGGLE") {
-      const event = new CustomEvent("ECHLY_TOGGLE_WIDGET");
-      window.dispatchEvent(event);
+      window.dispatchEvent(new CustomEvent("ECHLY_TOGGLE_WIDGET"));
     }
   });
+}
+
+/**
+ * Single mount: create host once, mount React once, default hidden.
+ * Visibility via ECHLY_VISIBILITY from background. No re-mount, no injection logic.
+ */
+function main(): void {
+  let host = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
+  if (!host) {
+    host = document.createElement("div");
+    host.id = SHADOW_HOST_ID;
+    host.style.position = "fixed";
+    host.style.bottom = "24px";
+    host.style.right = "24px";
+    host.style.width = "auto";
+    host.style.height = "auto";
+    host.style.zIndex = "2147483647";
+    host.style.pointerEvents = "auto";
+    host.style.display = "none";
+    document.documentElement.appendChild(host);
+    mountReactApp(host);
+  }
+
+  ensureMessageListener(host);
+  syncInitialGlobalState(host);
 }
 
 main();
