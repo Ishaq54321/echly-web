@@ -83,14 +83,14 @@ export function FeedbackHeader({
                 onBlur={handleTitleBlur}
                 onFocus={(e) => e.currentTarget.select()}
                 onKeyDown={handleTitleKeyDown}
-                className="w-full text-[20px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))] bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
+                className="w-full text-[18px] font-medium leading-snug text-neutral-900 bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
                 aria-label="Edit title"
               />
               <p className="text-xs text-neutral-400 mt-1">
                 Enter to save
               </p>
               {isSaving && (
-                <p className="text-xs text-neutral-500 mt-0.5 transition-opacity duration-150">
+                <p className="text-[13px] text-neutral-500 mt-0.5 transition-opacity duration-150">
                   Saving...
                 </p>
               )}
@@ -109,7 +109,7 @@ export function FeedbackHeader({
               }}
               aria-label={onSaveTitle ? "Edit title" : undefined}
             >
-              <h1 className="text-[20px] font-medium tracking-tight leading-snug text-[hsl(var(--text-primary))] truncate">
+              <h1 className="text-[18px] font-medium text-neutral-900 truncate">
                 {item.title}
               </h1>
               {onSaveTitle && (
@@ -118,7 +118,7 @@ export function FeedbackHeader({
                 ) : (
                   <Pencil
                     size={14}
-                    className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[hsl(var(--text-secondary))] shrink-0 flex-shrink-0"
+                    className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-neutral-600 shrink-0 flex-shrink-0"
                     aria-hidden
                   />
                 )
@@ -150,8 +150,8 @@ export function FeedbackHeader({
             onClick={onToggleActivity}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 ${
               isActivityOpen
-                ? "bg-[hsl(var(--surface-2))] text-active"
-                : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))] hover:text-primary"
+                ? "bg-neutral-100 text-brand-accent"
+                : "bg-neutral-100 text-neutral-600 hover:text-neutral-900"
             }`}
             aria-pressed={isActivityOpen}
           >
@@ -160,7 +160,7 @@ export function FeedbackHeader({
           </button>
         </div>
       </div>
-      <div className="mt-4 border-b border-neutral-200" />
+      <div className="my-6 border-b border-neutral-200" />
     </div>
   );
 }

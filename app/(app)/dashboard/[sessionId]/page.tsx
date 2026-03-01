@@ -395,7 +395,7 @@ export default function SessionPage() {
   return (
     <>
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside className="w-[280px] shrink-0 min-h-0 flex flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]">
+        <aside className="surface-sidebar w-[280px] shrink-0 min-h-0 flex flex-col border-r border-neutral-200">
           <div className="flex-1 min-h-0 overflow-y-auto">
             <FeedbackSidebar
             feedback={feedback}
@@ -411,8 +411,8 @@ export default function SessionPage() {
           </div>
         </aside>
 
-        <main className="flex-1 min-h-0 flex flex-col bg-neutral-50">
-          <div className="max-w-4xl mx-auto w-full px-8 pt-5 pb-4 border-b border-neutral-200 shrink-0">
+        <main className="surface-main flex-1 min-h-0 flex flex-col shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <div className="max-w-4xl mx-auto w-full px-10 py-8 border-b border-neutral-200 shrink-0">
             <div className="flex justify-between items-center gap-4">
               <div className="min-w-0 flex-1">
                 {isEditingSessionTitle ? (
@@ -468,7 +468,7 @@ export default function SessionPage() {
                         }
                       }}
                       autoFocus
-                      className="text-[26px] font-semibold tracking-[-0.01em] text-[hsl(var(--text-primary))] w-full bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
+                      className="text-[18px] font-medium tracking-[-0.01em] text-neutral-900 w-full bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
                       aria-label="Session title"
                     />
                     <p className="text-xs text-neutral-400 mt-1">
@@ -499,7 +499,7 @@ export default function SessionPage() {
                       }}
                       aria-label="Edit session title"
                     >
-                      <h1 className="text-[26px] font-semibold tracking-[-0.01em] text-[hsl(var(--text-primary))]">
+                      <h1 className="text-[18px] font-medium text-neutral-900">
                         {session?.title ?? "Session"}
                       </h1>
                       {saveSessionTitleSuccess ? (
@@ -521,7 +521,7 @@ export default function SessionPage() {
                   </>
                 )}
               </div>
-              <div className="text-sm text-neutral-500 font-medium flex-shrink-0 flex items-center">
+              <div className="text-[13px] text-neutral-500 flex-shrink-0 flex items-center">
                 {(() => {
                   const { dateStr, timeStr } = formatSessionCreatedMeta(session?.createdAt);
                   return (
@@ -546,11 +546,11 @@ export default function SessionPage() {
               </div>
             </div>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-50">
-            <div className="max-w-4xl mx-auto w-full px-8 pt-4 pb-4">
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="max-w-4xl mx-auto w-full px-10 py-8">
               {detailLoading && selectedId ? (
                 <div className="flex items-center justify-center py-16">
-                  <p className="text-sm text-[hsl(var(--text-secondary))]">Loading…</p>
+                  <p className="text-[13px] text-neutral-500">Loading…</p>
                 </div>
               ) : (
                 <FeedbackDetail

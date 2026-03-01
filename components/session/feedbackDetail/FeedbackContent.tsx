@@ -111,9 +111,11 @@ export function FeedbackContent({
       ) : (
         actionItems.length > 0 && (
           <Section title="Action items">
-            <ul className="list-disc list-inside space-y-1">
+            <ul className="list-none space-y-2 p-0 m-0">
               {actionItems.map((action, i) => (
-                <li key={i}>{action}</li>
+                <li key={i} className="font-mono text-[13px] text-neutral-900 bg-neutral-100 px-2 py-1 rounded-md inline-block">
+                  {action}
+                </li>
               ))}
             </ul>
           </Section>
@@ -173,7 +175,7 @@ export function FeedbackContent({
                           className={`w-1.5 h-1.5 rounded-full shrink-0 ${getTagDotClass(tag)}`}
                           aria-hidden
                         />
-                        <span className="text-sm font-medium text-neutral-900">{tag}</span>
+                        <span className="text-[14px] font-medium text-neutral-900">{tag}</span>
                       </button>
                     ))}
                   </div>

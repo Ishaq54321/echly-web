@@ -77,7 +77,7 @@ export function ActionItemsSection({
       <ul className="list-none space-y-2 p-0 m-0">
         {items.map((text, i) => (
           <li key={i} className="flex items-center gap-2 group">
-            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[hsl(var(--surface-3))] flex items-center justify-center text-[10px] font-medium text-[hsl(var(--text-muted))]">
+            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-neutral-400">
               {i + 1}
             </span>
             {editingIndex === i ? (
@@ -91,14 +91,14 @@ export function ActionItemsSection({
                     if (e.key === "Enter") void saveEdit();
                     if (e.key === "Escape") cancelEdit();
                   }}
-                  className="flex-1 text-sm px-2 py-1.5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] text-[hsl(var(--text-primary))] focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
+                  className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-900 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
                   autoFocus
                   aria-label={`Edit action item ${i + 1}`}
                 />
                 <button
                   type="button"
                   onClick={() => void saveEdit()}
-                  className="text-xs font-medium text-[hsl(var(--brand))] hover:underline"
+                  className="text-xs font-medium text-brand-accent hover:underline"
                 >
                   Save
                 </button>
@@ -108,14 +108,14 @@ export function ActionItemsSection({
                 <button
                   type="button"
                   onClick={() => startEdit(i)}
-                  className="flex-1 text-left text-sm text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-2))]/50 rounded px-2 py-1 -mx-2 cursor-text"
+                  className="flex-1 text-left font-mono text-[13px] text-neutral-900 bg-neutral-100 px-2 py-1 rounded-md hover:bg-neutral-200/80 -mx-2 cursor-text transition-colors duration-150"
                 >
                   {text}
                 </button>
                 <button
                   type="button"
                   onClick={() => void removeItem(i)}
-                  className="flex-shrink-0 p-1 rounded text-[hsl(var(--text-muted))] hover:text-neutral-600 hover:bg-neutral-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="flex-shrink-0 p-1 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 opacity-0 group-hover:opacity-100 transition-opacity"
                   aria-label={`Remove action item ${i + 1}`}
                 >
                   <Trash2 size={14} />
@@ -126,7 +126,7 @@ export function ActionItemsSection({
         ))}
         {isAdding && (
           <li className="flex items-center gap-2">
-            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[hsl(var(--surface-3))] flex items-center justify-center text-[10px] font-medium text-[hsl(var(--text-muted))]">
+            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-neutral-400">
               {items.length + 1}
             </span>
             <input
@@ -139,7 +139,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action item…"
-              className="flex-1 text-sm px-2 py-1.5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-muted))] focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
+              className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
               autoFocus
               aria-label="New action item"
             />
@@ -150,7 +150,7 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-2 flex items-center gap-2 text-xs font-medium text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))] transition-colors"
+          className="mt-2 flex items-center gap-2 text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
         >
           <Plus size={14} />
           Add action item

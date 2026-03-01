@@ -51,10 +51,26 @@ html,
 body {
   height: 100%;
   overflow: hidden;
-  background-color: #FAFAFB;
-  color: #111827;
+  background-color: #F7F8FA;
+  color: #0F172A;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ======================================
+   SURFACE LAYERING (rail → sidebar → main)
+====================================== */
+
+.surface-rail {
+  background-color: #EEF0F3;
+}
+
+.surface-sidebar {
+  background-color: #F3F4F6;
+}
+
+.surface-main {
+  background-color: #FFFFFF;
 }
 
 /* Ensure consistent borders */

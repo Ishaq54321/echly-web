@@ -70,7 +70,7 @@ export function DescriptionSection({
               onChange={(e) => onDraftChange?.(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
-              className="w-full min-h-[100px] rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-[hsl(var(--text-primary))] leading-relaxed focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 resize-none overflow-hidden"
+              className="w-full min-h-[100px] rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900 leading-relaxed focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 resize-none overflow-hidden"
               autoFocus
               aria-label="Edit description"
             />
@@ -100,7 +100,7 @@ export function DescriptionSection({
             role={hasEdit ? "button" : undefined}
             tabIndex={hasEdit ? 0 : undefined}
           >
-            <p className="text-[14px] leading-[1.55] text-[hsl(var(--text-primary))] flex-1 pr-6">
+            <p className="text-[14px] leading-[1.55] text-neutral-900 flex-1 pr-6">
               {displayValue || (hasEdit ? "Add description…" : "")}
             </p>
             {hasEdit && (

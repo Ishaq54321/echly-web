@@ -45,24 +45,24 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col w-full min-h-[40vh] bg-[hsl(var(--surface-2))]">
-        <div className="mx-auto w-full max-w-[1800px] px-8 pt-8 pb-8 flex items-center justify-center">
-          <p className="text-[13px] text-[hsl(var(--text-secondary))]">Loading workspace…</p>
+      <div className="surface-main flex flex-col w-full min-h-[40vh]">
+        <div className="mx-auto w-full max-w-[1800px] px-10 py-8 flex items-center justify-center">
+          <p className="text-[13px] text-neutral-500">Loading workspace…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col w-full min-h-0 bg-[hsl(var(--surface-2))]">
-      <div className="mx-auto w-full max-w-[1800px] px-8 pt-8 pb-8">
+    <div className="surface-main flex flex-col w-full min-h-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+      <div className="mx-auto w-full max-w-[1800px] px-10 py-8">
         {/* Header */}
         <header className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-semibold tracking-[-0.02em] text-[hsl(var(--text-primary))]">
+            <h1 className="text-[18px] font-medium text-neutral-900">
               Workspaces
             </h1>
-            <p className="mt-2 text-sm text-[hsl(var(--text-secondary))]">
+            <p className="mt-2 text-[14px] text-neutral-600">
               Sessions and feedback in one place.
             </p>
           </div>
@@ -72,7 +72,7 @@ export default function DashboardPage() {
               placeholder="Search sessions"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="focus-ring-brand h-9 px-3 bg-white border border-[hsl(var(--border))] rounded-xl text-[13px] text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-muted))] focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 min-w-[180px]"
+              className="focus-ring-brand h-9 px-3 bg-white border border-neutral-200 rounded-xl text-[13px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 min-w-[180px]"
               aria-label="Search sessions"
             />
             <button
@@ -103,7 +103,7 @@ export default function DashboardPage() {
             ))}
           </div>
           {filteredSessions.length === 0 && (
-            <p className="text-[13px] text-[hsl(var(--text-secondary))] py-8">
+            <p className="text-[13px] text-neutral-500 py-8">
               {search.trim()
                 ? "No sessions match your search."
                 : "No sessions yet. Create one to get started."}

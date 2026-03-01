@@ -77,25 +77,14 @@ export default function FeedbackSidebar({
 
   return (
     <div className="flex flex-col">
-      <style dangerouslySetInnerHTML={{ __html: `
-        .feedback-sidebar-active-rail::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 3px;
-          background-color: hsl(var(--brand));
-        }
-      `}} />
       <div className="flex flex-col gap-3 px-4 pt-5 pb-4">
         {/* Header (fixed) */}
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
-            <h2 className="text-sm font-semibold uppercase tracking-[0.02em] text-[#111827]">
+            <h2 className="text-[11px] font-semibold tracking-[0.08em] text-neutral-500 uppercase">
               Feedback
             </h2>
-            <p className="text-xs text-[#4B5563] mt-1">
+            <p className="text-[12px] text-neutral-400 mt-1">
               {subline}
             </p>
           </div>
@@ -103,7 +92,7 @@ export default function FeedbackSidebar({
             <button
               type="button"
               onClick={() => setSortOpen((o) => !o)}
-              className="text-xs bg-transparent border-none focus:ring-0 text-[#4B5563] hover:text-[#374151] transition-all duration-150 ease-out cursor-pointer py-0.5"
+              className="text-[12px] bg-transparent border-none focus:ring-0 text-neutral-400 hover:text-neutral-600 transition-all duration-150 ease-out cursor-pointer py-0.5"
             >
               {sort === "recent" ? "Most Recent" : "Most Active"}
             </button>
@@ -114,7 +103,7 @@ export default function FeedbackSidebar({
                   aria-hidden
                   onClick={() => setSortOpen(false)}
                 />
-                <div className="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] py-1">
+                <div className="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-md border border-neutral-200 bg-white py-1 shadow-sm">
                   <button
                     type="button"
                     onClick={() => {
@@ -123,8 +112,8 @@ export default function FeedbackSidebar({
                     }}
                     className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 transition-colors duration-150 ${
                       sort === "recent"
-                        ? "font-medium text-active"
-                        : "text-[hsl(var(--text-muted))] hover:text-primary"
+                        ? "font-medium text-neutral-900"
+                        : "text-neutral-400 hover:text-neutral-600"
                     }`}
                   >
                     Most Recent
@@ -137,8 +126,8 @@ export default function FeedbackSidebar({
                     }}
                     className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 transition-colors duration-150 ${
                       sort === "active"
-                        ? "font-medium text-active"
-                        : "text-[hsl(var(--text-muted))] hover:text-primary"
+                        ? "font-medium text-neutral-900"
+                        : "text-neutral-400 hover:text-neutral-600"
                     }`}
                   >
                     Most Active
@@ -156,7 +145,7 @@ export default function FeedbackSidebar({
             placeholder="Search feedback…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-full text-sm px-3 rounded-md bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] placeholder:text-[hsl(var(--text-muted))] focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
+            className="h-9 w-full text-sm px-3 rounded-md bg-white border border-neutral-200 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
             aria-label="Search feedback"
           />
         </div>
@@ -180,20 +169,20 @@ export default function FeedbackSidebar({
                     onSelect(item.id);
                   }
                 }}
-                className={`group flex flex-col px-3 py-2.5 cursor-pointer transition-[background-color] duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] focus-visible:ring-offset-0 border-b border-neutral-100
+                className={`group flex flex-col px-3 py-2.5 cursor-pointer transition-all duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] focus-visible:ring-offset-0 border-b border-neutral-200
                   ${isLast ? "border-b-0" : ""}
                   ${isActive
-                    ? "relative bg-[var(--surface-selected)] feedback-sidebar-active-rail hover:bg-[#e4e7ec]"
-                    : "bg-[var(--surface-card)] hover:bg-[rgba(0,0,0,0.02)]"}`}
+                    ? "bg-white text-neutral-900 rounded-lg shadow-sm hover:bg-white"
+                    : "bg-transparent hover:bg-white/60"}`}
               >
                 <div className="flex justify-between items-start gap-3">
-                  <span className={`text-sm leading-snug truncate flex-1 min-w-0 ${isActive ? "font-semibold text-[#2A2A2A]" : "font-medium text-[hsl(var(--text-muted))]"}`}>
+                  <span className={`text-[14px] font-medium leading-snug truncate flex-1 min-w-0 ${isActive ? "text-neutral-900" : "text-neutral-700"}`}>
                     {item.title}
                   </span>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      className="opacity-0 group-hover:opacity-100 transition-all duration-150 ease-out p-0.5 rounded text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text-primary))] cursor-pointer border-0 bg-transparent"
+                      className="opacity-0 group-hover:opacity-100 transition-all duration-150 ease-out p-0.5 rounded text-neutral-400 hover:text-neutral-900 cursor-pointer border-0 bg-transparent"
                       onClick={(e) => e.stopPropagation()}
                       aria-label="More actions"
                     >
@@ -214,17 +203,17 @@ export default function FeedbackSidebar({
           </div>
           {loadMoreRef && <div ref={loadMoreRef} />}
           {loadingMore && (
-            <div className="text-sm text-neutral-400 py-4 text-center">
+            <div className="text-[13px] text-neutral-500 py-4 text-center">
               Loading…
             </div>
           )}
           {!hasMore && feedback.length > 0 && (
-            <div className="text-neutral-400 text-sm py-4 text-center">
+            <div className="text-[12px] text-neutral-400 py-4 text-center">
               No more feedback
             </div>
           )}
           {hasReachedLimit && feedback.length > 0 && (
-            <div className="shrink-0 px-3 py-1.5 text-xs text-[hsl(var(--text-muted))] text-center">
+            <div className="shrink-0 px-3 py-1.5 text-[12px] text-neutral-400 text-center">
               Reached maximum items
             </div>
           )}

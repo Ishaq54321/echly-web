@@ -43,7 +43,7 @@ export default function FeedbackDetail({
   if (!selectedItem) {
     return (
       <div className="flex flex-1 min-h-0 items-center justify-center py-16">
-        <p className="text-sm text-[hsl(var(--text-secondary))]">
+        <p className="text-sm text-neutral-500">
           Select a feedback item
         </p>
       </div>

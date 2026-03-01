@@ -4,7 +4,7 @@ import { getTagPillClass } from "@/lib/tagConfig";
 
 export type TagVariant = "default" | "sidebar";
 
-const SIDEBAR_NEUTRAL_CLASS = "bg-neutral-100 text-neutral-500";
+const SIDEBAR_NEUTRAL_CLASS = "bg-neutral-100 text-[12px] text-neutral-400";
 
 interface TagProps {
   name: string;
@@ -18,7 +18,7 @@ interface TagProps {
 
 const variantClasses: Record<TagVariant, string> = {
   default: "rounded-full px-3 py-1 text-xs font-medium",
-  sidebar: "rounded-full px-2 py-0.5 text-[10px] font-medium",
+  sidebar: "rounded-full px-2 py-0.5 text-[12px] font-medium",
 };
 
 export function Tag({ name, variant = "default", inactive = false, className = "", children }: TagProps) {
