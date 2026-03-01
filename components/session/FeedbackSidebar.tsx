@@ -156,14 +156,17 @@ export default function FeedbackSidebar({
             const isActive = item.id === selectedId;
             const totalCount = displayed.length;
             const status = (item.status ?? "open").toLowerCase();
+  const statusColorMap: Record<string, string> = {
+    resolved: "text-semantic-success",
+    done: "text-semantic-success",
+    pending: "text-semantic-attention",
+    in_progress: "text-semantic-attention",
+    in_review: "text-semantic-attention",
+    archived: "text-neutral-400",
+    open: "text-semantic-system",
+  };
   const statusAccentClass =
-    status === "resolved" || status === "done"
-      ? "text-accent-green"
-      : status === "pending" || status === "in_progress" || status === "in_review"
-        ? "text-accent-amber"
-        : status === "archived"
-          ? "text-neutral-500"
-          : "text-accent-purple";
+    statusColorMap[status] ?? "text-semantic-system";
 
             return (
               <div
@@ -179,16 +182,16 @@ export default function FeedbackSidebar({
                 }}
                 className={`group relative flex flex-col px-3 py-2.5 cursor-pointer text-[14px] rounded-lg transition-all duration-150 outline-none focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1
                   ${isActive
-                    ? "bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-white font-medium"
-                    : "text-neutral-600 hover:bg-neutral-100"}`}
+                    ? "bg-semantic-system text-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-semantic-system font-medium"
+                    : "text-neutral-400 hover:bg-neutral-100"}`}
               >
                 {isActive && (
-                  <div className="absolute left-0 top-0 h-full w-[3px] bg-accent-blue rounded-r-md opacity-80" aria-hidden />
+                  <div className="absolute left-0 top-0 h-full w-[3px] bg-white rounded-r-md opacity-80" aria-hidden />
                 )}
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex items-start gap-2 min-w-0 flex-1">
                     <span
-                      className={`text-[12px] mt-[2px] w-[36px] shrink-0 ${isActive ? "text-accent-blue" : "text-neutral-400"}`}
+                      className={`text-[12px] mt-[2px] w-[36px] shrink-0 ${isActive ? "text-white" : "text-neutral-400"}`}
                     >
                       {index + 1}/{totalCount}
                     </span>
@@ -212,7 +215,7 @@ export default function FeedbackSidebar({
                   </div>
                 </div>
                 {isActive && (
-                  <span className={`text-[11px] mt-1 ml-[calc(36px+0.5rem)] ${statusAccentClass}`}>
+                  <span className="text-[11px] mt-1 ml-[calc(36px+0.5rem)] text-white">
                     {status === "resolved" || status === "done"
                       ? "Resolved"
                       : status === "pending" || status === "in_progress" || status === "in_review"

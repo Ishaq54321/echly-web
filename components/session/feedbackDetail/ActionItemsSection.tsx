@@ -9,11 +9,14 @@ const MAX_VISIBLE = 3;
 interface ActionItemsSectionProps {
   actionItems: string[];
   onSave: (items: string[]) => Promise<void>;
+  /** When true, show items as resolved (line-through, muted). */
+  isResolved?: boolean;
 }
 
 export function ActionItemsSection({
   actionItems,
   onSave,
+  isResolved = false,
 }: ActionItemsSectionProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
@@ -112,11 +115,11 @@ export function ActionItemsSection({
   }
 
   return (
-    <Section title="Action items">
+    <Section title="Decisions" titleSemantic="attention">
       <ul className="list-none space-y-2 p-0 m-0">
         {visibleItems.map((text, i) => (
           <li key={i} className="flex items-center gap-2 group">
-            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-neutral-400">
+            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-semantic-attention">
               {i + 1}
             </span>
             {editingIndex === i ? (
@@ -147,7 +150,11 @@ export function ActionItemsSection({
                 <button
                   type="button"
                   onClick={() => startEdit(i)}
-                  className="flex-1 text-left font-mono text-[13px] text-neutral-900 bg-neutral-100 px-2 py-1 rounded-md hover:bg-neutral-200/80 -mx-2 cursor-text transition-colors duration-150"
+                  className={`flex-1 text-left font-mono text-[13px] bg-neutral-100 px-2 py-1 rounded-md -mx-2 cursor-text transition-colors duration-150 ${
+                    isResolved
+                      ? "line-through text-neutral-400"
+                      : "text-neutral-900 hover:bg-neutral-200/80"
+                  }`}
                 >
                   {text}
                 </button>

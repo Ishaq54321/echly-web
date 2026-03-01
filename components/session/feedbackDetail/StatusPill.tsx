@@ -29,14 +29,15 @@ export function StatusPill({
   const displayLabel =
     STATUS_OPTIONS.find((o) => o.value === value)?.label ??
     (value === "done" ? "Resolved" : value === "in_progress" ? "In Review" : "Open");
-  const statusTextClass =
-    value === "resolved" || value === "done"
-      ? "text-accent-green"
-      : value === "in_review" || value === "in_progress"
-        ? "text-accent-amber"
-        : value === "archived"
-          ? "text-neutral-500"
-          : "text-accent-purple";
+  const statusColorMap: Record<string, string> = {
+    resolved: "text-semantic-success",
+    done: "text-semantic-success",
+    in_review: "text-semantic-attention",
+    in_progress: "text-semantic-attention",
+    archived: "text-neutral-400",
+    open: "text-semantic-system",
+  };
+  const statusTextClass = statusColorMap[value] ?? "text-semantic-system";
 
   useEffect(() => {
     if (!open) return;

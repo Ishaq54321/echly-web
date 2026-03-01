@@ -107,10 +107,14 @@ export function FeedbackContent({
         <ActionItemsSection
           actionItems={actionItems}
           onSave={onSaveActionItems}
+          isResolved={
+            (item.status ?? "open") === "resolved" ||
+            (item.status ?? "open") === "done"
+          }
         />
       ) : (
         actionItems.length > 0 && (
-          <Section title="Action items">
+          <Section title="Decisions" titleSemantic="attention">
             <ul className="list-none space-y-2 p-0 m-0">
               {actionItems.map((action, i) => (
                 <li key={i} className="font-mono text-[13px] text-neutral-900 bg-neutral-100 px-2 py-1 rounded-md inline-block">

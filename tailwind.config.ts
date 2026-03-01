@@ -4,6 +4,7 @@ const config: Config = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
@@ -20,6 +21,13 @@ const config: Config = {
           purple: "#7C3AED",
           green: "#059669",
           amber: "#D97706",
+        },
+        semantic: {
+          system: "#2563EB",
+          insight: "#7C3AED",
+          success: "#059669",
+          attention: "#D97706",
+          danger: "#DC2626",
         },
       },
     },

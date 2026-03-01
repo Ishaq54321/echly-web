@@ -56,6 +56,10 @@ export default function DashboardPage() {
   return (
     <div className="surface-main flex flex-col w-full min-h-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
       <div className="mx-auto w-full max-w-[1800px] px-10 py-8">
+        {/* Temporary: semantic color test — remove after verification */}
+        <div className="text-semantic-system text-sm mb-2" aria-hidden>
+          COLOR TEST
+        </div>
         {/* Header */}
         <header className="flex items-start justify-between">
           <div>

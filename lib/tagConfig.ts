@@ -7,17 +7,18 @@ export const TAG_COLOR_MAP: Record<
   string,
   { pill: string; dot: string }
 > = {
-  UX: { pill: "bg-indigo-50 text-indigo-600", dot: "bg-indigo-500" },
-  Bug: { pill: "bg-neutral-100/70 text-neutral-700", dot: "bg-neutral-400" },
-  Performance: { pill: "bg-amber-50 text-amber-600", dot: "bg-amber-500" },
-  Copy: { pill: "bg-emerald-50 text-emerald-600", dot: "bg-emerald-500" },
-  Interaction: { pill: "bg-blue-50 text-blue-600", dot: "bg-blue-500" },
-  Responsive: { pill: "bg-violet-50 text-violet-600", dot: "bg-violet-500" },
-  Backend: { pill: "bg-slate-100 text-slate-700", dot: "bg-slate-500" },
-  Data: { pill: "bg-cyan-50 text-cyan-600", dot: "bg-cyan-500" },
-  Blocking: { pill: "bg-neutral-100/70 text-neutral-700", dot: "bg-neutral-400" },
-  Accessibility: { pill: "bg-teal-50 text-teal-600", dot: "bg-teal-500" },
-  "Visual Hierarchy": { pill: "bg-fuchsia-50 text-fuchsia-600", dot: "bg-fuchsia-500" },
+  Product: { pill: "bg-semantic-system/10 text-semantic-system", dot: "bg-semantic-system" },
+  UX: { pill: "bg-semantic-insight/10 text-semantic-insight", dot: "bg-semantic-insight" },
+  Performance: { pill: "bg-semantic-success/10 text-semantic-success", dot: "bg-semantic-success" },
+  Bug: { pill: "bg-semantic-danger/10 text-semantic-danger", dot: "bg-semantic-danger" },
+  Copy: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
+  Interaction: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
+  Responsive: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
+  Backend: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
+  Data: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
+  Blocking: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
+  Accessibility: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
+  "Visual Hierarchy": { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
 };
 
 const FALLBACK = { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" };
@@ -44,6 +45,7 @@ export function getTagDotClass(name: string): string {
 
 /** All available tags for the add-tag dropdown. Order defines display order. */
 export const AVAILABLE_TAGS = [
+  "Product",
   "UX",
   "Bug",
   "Performance",

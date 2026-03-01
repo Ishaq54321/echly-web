@@ -82,7 +82,7 @@ export function FeedbackHeader({
 
   return (
     <div className="pt-4 pb-4">
-      <div className="text-[12px] text-accent-purple mb-3">
+      <div className="text-[12px] text-semantic-system mb-3">
         {item.index} of {item.total}
       </div>
       <div className="flex items-start justify-between gap-4">

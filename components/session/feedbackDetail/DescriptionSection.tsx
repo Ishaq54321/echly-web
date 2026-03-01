@@ -60,8 +60,8 @@ export function DescriptionSection({
   };
 
   return (
-    <Section title="Description">
-      <div className="flex flex-col gap-2">
+    <Section title="Description" titleSemantic="insight">
+      <div className="flex flex-col gap-2 border-l-2 border-semantic-insight/40 pl-4">
         {isEditing && hasEdit ? (
           <>
             <textarea
@@ -106,7 +106,7 @@ export function DescriptionSection({
             {hasEdit && (
               <span className="absolute top-0 right-0 flex items-center gap-1.5">
                 {saveSuccess ? (
-                  <span className="text-xs text-green-600 flex items-center gap-1.5 transition-opacity duration-150">
+                  <span className="text-xs text-semantic-success flex items-center gap-1.5 transition-opacity duration-150">
                     <Check size={14} className="shrink-0" aria-hidden />
                     Saved
                   </span>

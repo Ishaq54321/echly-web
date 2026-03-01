@@ -30,6 +30,8 @@ export function WorkspaceCard({
   const feedbackCount = counts.open + counts.in_progress + counts.resolved;
   const openFeedbackCount = counts.open;
   const openCount = openFeedbackCount;
+  const activeEntries = counts.open + counts.in_progress;
+  const allCompleted = feedbackCount > 0 && activeEntries === 0;
   const viewCount = session.viewCount ?? 0;
   const commentCount = session.commentCount ?? 0;
 
@@ -354,12 +356,18 @@ export function WorkspaceCard({
                 <h3 className="text-[15px] font-medium leading-[1.35] tracking-[-0.01em] text-neutral-900 line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
                   {session.title}
                 </h3>
-                {openFeedbackCount > 0 && (
-                  <span
-                    className="ml-2 mt-2 h-2 w-2 shrink-0 rounded-full bg-neutral-400 opacity-70"
-                    aria-hidden
-                  />
-                )}
+                <span
+                  className={`ml-2 mt-2 h-2 w-2 shrink-0 rounded-full opacity-80 ${
+                    feedbackCount === 0
+                      ? "bg-neutral-300"
+                      : activeEntries > 0
+                        ? "bg-semantic-attention"
+                        : allCompleted
+                          ? "bg-semantic-success"
+                          : "bg-neutral-300"
+                  }`}
+                  aria-hidden
+                />
               </div>
             </div>
 

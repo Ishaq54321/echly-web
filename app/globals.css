@@ -1,12 +1,18 @@
 @import "tailwindcss";
 
-/* Tailwind theme extension: brand colors */
+/* Tailwind theme extension: brand + semantic colors */
 @theme {
   --color-primary: #2A2A2A;
   --color-active: #6E6E6E;
   --color-brand-primary: #111827;
   --color-brand-accent: #2563EB;
   --color-brand-soft: #F3F4F6;
+  /* Semantic color system (must be in @theme for Tailwind v4) */
+  --color-semantic-system: #2563EB;
+  --color-semantic-insight: #7C3AED;
+  --color-semantic-success: #059669;
+  --color-semantic-attention: #D97706;
+  --color-semantic-danger: #DC2626;
 }
 
 /* ======================================
