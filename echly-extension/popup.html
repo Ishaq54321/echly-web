@@ -12,9 +12,10 @@
   <div id="formSection" style="display: none;">
     <p>Signed in as <span id="userEmail"></span> <button type="button" id="signOutBtn">Sign out</button></p>
     <form id="form">
-      <div>
-        <label for="sessionId">Session ID</label>
-        <input type="text" id="sessionId" name="sessionId" required>
+      <div id="sessionSelectWrap">
+        <label for="sessionSelect">Session</label>
+        <div id="sessionSelectState"></div>
+        <select id="sessionSelect" name="sessionId" style="display: none;"></select>
       </div>
       <div>
         <label for="title">Title</label>

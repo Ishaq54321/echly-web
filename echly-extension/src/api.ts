@@ -5,7 +5,7 @@
 
 import { auth } from "./firebase";
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = "https://echly-web.vercel.app";
 
 export { API_BASE };
 
