@@ -197,41 +197,63 @@ export function WorkspaceCard({
         onKeyDown={handleCardKeyDown}
         className="
           focus-ring-brand
+          group
           relative
+          w-full
           rounded-2xl
-          border border-[rgba(0,0,0,0.05)]
+          border border-[hsl(var(--border))]
           bg-white
-          py-6 px-6
+          px-6 py-6
           cursor-pointer
           outline-none
-          transition-shadow duration-200
-          hover:shadow-[0_6px_18px_rgba(0,0,0,0.06)]
+          transition-[box-shadow,border-color] duration-200 ease-out
+          hover:ring-1
+          hover:ring-[hsl(var(--brand-red))]
+          hover:ring-offset-0
+          hover:shadow-[0_6px_20px_rgba(0,0,0,0.05)]
         "
-        style={{ animationDelay: `${index * 40}ms` }}
+        style={
+          {
+            "--tw-ring-color": "hsl(var(--brand-red))",
+            animationDelay: `${index * 40}ms`,
+          } as React.CSSProperties
+        }
         data-session-id={session.id}
       >
         {/* ROW 1 — HEADER */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2 min-w-0 flex-1">
-            <Folder className="w-4 h-4 mt-[4px] shrink-0 text-[hsl(var(--text-secondary))]" aria-hidden />
-            <div className="min-w-0 flex-1 flex items-start gap-2">
-              <h3 className="
-                text-[17px]
-                font-semibold
-                tracking-[-0.015em]
-                text-[hsl(var(--text-primary))]
-                leading-snug
-                line-clamp-2
-                overflow-hidden
-                text-ellipsis
-                min-w-0
-              ">
-                {session.title}
-              </h3>
-              {openFeedbackCount > 0 && (
-                <span className="ml-2 mt-[6px] h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--brand-red))]" aria-hidden />
-              )}
-            </div>
+            <Folder
+              className="
+                w-4 h-4
+                shrink-0
+                text-[hsl(var(--text-secondary))]
+                transition-colors duration-200
+                group-hover:text-[hsl(var(--brand-red))]
+              "
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <h3 className="
+              text-[17px]
+              font-semibold
+              tracking-[-0.015em]
+              text-[hsl(var(--text-primary))]
+              leading-snug
+              line-clamp-2
+              overflow-hidden
+              text-ellipsis
+              min-w-0
+              flex-1
+            ">
+              {session.title}
+            </h3>
+            {openFeedbackCount > 0 && (
+              <span
+                className="ml-2 mt-[6px] h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--brand-red))]"
+                aria-hidden
+              />
+            )}
           </div>
           <div data-card-actions className="relative z-20 shrink-0">
             <div
@@ -369,7 +391,7 @@ export function WorkspaceCard({
         </div>
 
         {/* ROW 2 — FEEDBACK SUMMARY */}
-        <div className="mt-3 text-sm text-[hsl(var(--text-secondary))] font-medium">
+        <div className="mt-2 text-sm text-[hsl(var(--text-secondary))] font-medium">
           <span className="text-[hsl(var(--text-primary))]">
             {feedbackCount}
           </span>
@@ -381,7 +403,7 @@ export function WorkspaceCard({
         </div>
 
         {/* ROW 3 — META (VIEWS + COMMENTS) */}
-        <div className="mt-4 flex items-center gap-6 text-sm text-[hsl(var(--text-secondary))]">
+        <div className="mt-3 flex items-center gap-6 text-sm text-[hsl(var(--text-secondary))]">
           <div className="flex items-center gap-1.5">
             <Eye className="w-4 h-4 shrink-0 opacity-70" aria-hidden />
             <span className="font-medium text-[hsl(var(--text-primary))]">

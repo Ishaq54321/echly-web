@@ -23,25 +23,6 @@ function filterAndSortSessions(sessions: SessionWithCounts[], search: string): S
   });
 }
 
-function EchlySymbol({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M4 6h16M4 12h12M4 18h8" />
-    </svg>
-  );
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const {
@@ -64,40 +45,35 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col w-full min-h-[40vh] bg-[#F7F8FA]">
-        <div className="w-full max-w-[1400px] mx-auto px-6 py-6 flex items-center justify-center">
-          <p className="text-[13px] text-neutral-500">Loading workspace…</p>
+      <div className="flex flex-col w-full min-h-[40vh] bg-[hsl(var(--surface-2))]">
+        <div className="mx-auto w-full max-w-[1800px] px-10 pt-10 pb-16 flex items-center justify-center">
+          <p className="text-[13px] text-[hsl(var(--text-secondary))]">Loading workspace…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col w-full min-h-0 bg-[#F7F8FA]">
-      <div className="w-full max-w-[1400px] mx-auto px-6 py-6">
+    <div className="flex flex-col w-full min-h-0 bg-[hsl(var(--surface-2))]">
+      <div className="mx-auto w-full max-w-[1800px] px-10 pt-10 pb-16">
         {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-4">
-          <div className="flex items-start gap-3">
-            <span className="text-neutral-600 mt-0.5 inline-flex hover:text-brand-primary transition-colors duration-200" aria-hidden>
-              <EchlySymbol />
-            </span>
-            <div>
-              <h1 className="text-[30px] font-medium tracking-[-0.01em] text-neutral-900">
-                Workspaces
-              </h1>
-              <p className="text-[13px] text-neutral-500 mt-1">
-                Sessions and feedback in one place.
-              </p>
-            </div>
+        <header className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-[-0.02em] text-[hsl(var(--text-primary))]">
+              Workspaces
+            </h1>
+            <p className="mt-2 text-sm text-[hsl(var(--text-secondary))]">
+              Sessions and feedback in one place.
+            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <input
-            type="search"
-            placeholder="Search sessions"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="focus-ring-brand h-9 px-3 bg-white border border-neutral-200/70 rounded-xl text-[13px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none min-w-[180px]"
-            aria-label="Search sessions"
+              type="search"
+              placeholder="Search sessions"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="focus-ring-brand h-9 px-3 bg-white border border-[hsl(var(--border))] rounded-xl text-[13px] text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-muted))] focus:outline-none min-w-[180px]"
+              aria-label="Search sessions"
             />
             <button
               type="button"
@@ -109,9 +85,9 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <main className="mt-8 flex-1">
+        <main className="flex-1">
           {/* TODO: Future: Archived view to list archived sessions. */}
-          <div className="grid w-full gap-8 grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-10">
+          <div className="grid w-full gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
             {filteredSessions.map((item, index) => (
               <WorkspaceCard
                 key={item.session.id}
@@ -127,7 +103,7 @@ export default function DashboardPage() {
             ))}
           </div>
           {filteredSessions.length === 0 && (
-            <p className="text-[13px] text-neutral-500 py-8">
+            <p className="text-[13px] text-[hsl(var(--text-secondary))] py-8">
               {search.trim()
                 ? "No sessions match your search."
                 : "No sessions yet. Create one to get started."}
