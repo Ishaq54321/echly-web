@@ -343,6 +343,27 @@ export default function SessionPage() {
     }
   };
 
+  const handleMarkAllResolved = useCallback(async () => {
+    const active = feedback.filter((item) => !(item.isResolved ?? false));
+    if (active.length === 0) return;
+    await Promise.all(
+      active.map((item) =>
+        fetch(`/api/tickets/${item.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isResolved: true }),
+        })
+      )
+    );
+    setFeedback((prev) =>
+      prev.map((item) => ({ ...item, isResolved: true }))
+    );
+    if (detailTicket && selectedId) {
+      setDetailTicket((t) => (t ? { ...t, isResolved: true } : null));
+    }
+    await refetchFeedbackFirstPage();
+  }, [feedback, detailTicket, selectedId, refetchFeedbackFirstPage]);
+
   /* ================= AI SAVE (Elite Structuring) ================= */
 
   const normalizePriority = (s: string | undefined): "low" | "medium" | "high" | "critical" => {
@@ -430,18 +451,19 @@ export default function SessionPage() {
         <aside className="surface-sidebar w-[280px] shrink-0 min-h-0 flex flex-col border-r border-neutral-200">
           <div className="flex-1 min-h-0 overflow-y-auto">
             <FeedbackSidebar
-            feedback={feedback}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            selectedIndex={selectedIndex}
-            total={feedbackTotal}
-            activeCount={feedbackActiveCount}
-            resolvedCount={feedbackResolvedCount}
-            loadingMore={feedbackLoadingMore}
-            hasMore={hasMoreFeedback}
-            hasReachedLimit={feedbackReachedLimit}
-            loadMoreRef={feedbackLoadMoreRef}
-          />
+              feedback={feedback}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              selectedIndex={selectedIndex}
+              total={feedbackTotal}
+              activeCount={feedbackActiveCount}
+              resolvedCount={feedbackResolvedCount}
+              loadingMore={feedbackLoadingMore}
+              hasMore={hasMoreFeedback}
+              hasReachedLimit={feedbackReachedLimit}
+              loadMoreRef={feedbackLoadMoreRef}
+              onMarkAllResolved={handleMarkAllResolved}
+            />
           </div>
         </aside>
 

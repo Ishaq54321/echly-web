@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-
-type SortKind = "recent" | "active";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { MoreHorizontal } from "lucide-react";
 
 interface FeedbackItem {
   id: string;
@@ -31,6 +30,8 @@ interface Props {
   hasReachedLimit?: boolean;
   /** Ref for sentinel div (intersection observer). */
   loadMoreRef?: React.RefObject<HTMLDivElement | null>;
+  /** Called when "Mark all as resolved" is chosen; batch update then refetch. */
+  onMarkAllResolved?: () => Promise<void>;
 }
 
 export default function FeedbackSidebar({
@@ -44,10 +45,20 @@ export default function FeedbackSidebar({
   hasMore = false,
   hasReachedLimit = false,
   loadMoreRef,
+  onMarkAllResolved,
 }: Props) {
-  const [sort, setSort] = useState<SortKind>("recent");
-  const [sortOpen, setSortOpen] = useState(false);
+  const [filter, setFilter] = useState<"all" | "active" | "resolved">("all");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const filteredItems = useMemo(() => {
+    return feedback.filter((item) => {
+      if (filter === "active") return !(item.isResolved ?? false);
+      if (filter === "resolved") return item.isResolved === true;
+      return true;
+    });
+  }, [feedback, filter]);
 
   const displayed = useMemo(() => {
     const getTime = (f: FeedbackItem): number => {
@@ -57,15 +68,21 @@ export default function FeedbackSidebar({
       return 0;
     };
     const q = searchQuery.trim().toLowerCase();
-    const filtered = q
-      ? feedback.filter((f) => f.title.toLowerCase().includes(q))
-      : feedback;
-    const sorted =
-      sort === "recent"
-        ? [...filtered].sort((a, b) => getTime(b) - getTime(a))
-        : [...filtered].sort((a, b) => (b.commentCount ?? 0) - (a.commentCount ?? 0));
-    return sorted;
-  }, [feedback, searchQuery, sort]);
+    const searchFiltered = q
+      ? filteredItems.filter((f) => f.title.toLowerCase().includes(q))
+      : filteredItems;
+    return [...searchFiltered].sort((a, b) => getTime(b) - getTime(a));
+  }, [filteredItems, searchQuery]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current?.contains(e.target as Node)) return;
+      setMenuOpen(false);
+    };
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, [menuOpen]);
 
   const total = typeof totalProp === "number" ? totalProp : feedback.length;
   const activeCount =
@@ -99,55 +116,65 @@ export default function FeedbackSidebar({
               {subline}
             </p>
           </div>
-          <div className="relative">
+          <div className="relative shrink-0" ref={menuRef}>
             <button
               type="button"
-              onClick={() => setSortOpen((o) => !o)}
-              className="inline-flex items-center text-[12px] bg-transparent border-none focus:ring-0 text-neutral-400 hover:text-neutral-600 transition-all duration-150 ease-out cursor-pointer py-0.5"
+              onClick={() => setMenuOpen((o) => !o)}
+              className="p-1.5 rounded-md cursor-pointer hover:bg-neutral-100 transition-colors duration-150"
+              aria-label="Options"
             >
-              <span className="text-neutral-500 text-[13px]">Sorted by</span>
-              <span className="ml-1 text-neutral-900 font-medium hover:underline">
-                {sort === "recent" ? "Newest first" : "Most active"}
-              </span>
+              <MoreHorizontal className="h-4 w-4 text-neutral-500" />
             </button>
-            {sortOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-10 cursor-pointer"
-                  aria-hidden
-                  onClick={() => setSortOpen(false)}
-                />
-                <div className="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-md border border-neutral-200 bg-white py-1 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSort("recent");
-                      setSortOpen(false);
-                    }}
-                    className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 cursor-pointer transition-colors duration-120 hover:bg-neutral-100 ${
-                      sort === "recent"
-                        ? "font-medium text-neutral-900"
-                        : "text-neutral-400 hover:text-neutral-600"
-                    }`}
-                  >
-                    Newest first
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSort("active");
-                      setSortOpen(false);
-                    }}
-                    className={`block w-full text-left px-3 py-1.5 text-xs bg-transparent border-none focus:ring-0 cursor-pointer transition-colors duration-120 hover:bg-neutral-100 ${
-                      sort === "active"
-                        ? "font-medium text-neutral-900"
-                        : "text-neutral-400 hover:text-neutral-600"
-                    }`}
-                  >
-                    Most active
-                  </button>
-                </div>
-              </>
+            {menuOpen && (
+              <div
+                className="absolute right-0 mt-2 w-52 rounded-lg border border-neutral-200 bg-white shadow-sm transition-opacity duration-120 z-20"
+                role="menu"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                  onClick={() => {
+                    setFilter("all");
+                    setMenuOpen(false);
+                  }}
+                >
+                  Show all
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                  onClick={() => {
+                    setFilter("active");
+                    setMenuOpen(false);
+                  }}
+                >
+                  Show active only
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                  onClick={() => {
+                    setFilter("resolved");
+                    setMenuOpen(false);
+                  }}
+                >
+                  Show resolved only
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                  onClick={async () => {
+                    setMenuOpen(false);
+                    await onMarkAllResolved?.();
+                  }}
+                >
+                  Mark all as resolved
+                </button>
+              </div>
             )}
           </div>
         </div>
