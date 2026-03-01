@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
+import { requireAuth } from "@/lib/server/auth";
 import {
   getFeedbackByIdRepo,
   updateFeedbackRepo,
@@ -8,9 +9,15 @@ import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepositor
 
 /** GET /api/tickets/:id — return single ticket (feedback) from DB. */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (res) {
+    return res as Response;
+  }
   const { id } = await params;
   if (!id) {
     return NextResponse.json(
@@ -24,6 +31,12 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: "Not found" },
         { status: 404 }
+      );
+    }
+    if (ticket.userId !== user.uid) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
       );
     }
     return NextResponse.json({
@@ -44,6 +57,12 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (res) {
+    return res as Response;
+  }
   const { id } = await params;
   if (!id) {
     return NextResponse.json(
@@ -60,6 +79,19 @@ export async function PATCH(
       { status: 400 }
     );
   }
+  const existingForOwnership = await getFeedbackByIdRepo(id);
+  if (!existingForOwnership) {
+    return NextResponse.json(
+      { success: false, error: "Not found" },
+      { status: 404 }
+    );
+  }
+  if (existingForOwnership.userId !== user.uid) {
+    return NextResponse.json(
+      { success: false, error: "Forbidden" },
+      { status: 403 }
+    );
+  }
   const updates: Parameters<typeof updateFeedbackRepo>[1] = {};
   if (typeof body.title === "string") updates.title = body.title;
   if (typeof body.description === "string") updates.description = body.description;
@@ -68,16 +100,9 @@ export async function PATCH(
   if (typeof body.isResolved === "boolean") updates.isResolved = body.isResolved;
 
   if (Object.keys(updates).length === 0) {
-    const existing = await getFeedbackByIdRepo(id);
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: "Not found" },
-        { status: 404 }
-      );
-    }
     return NextResponse.json({
       success: true,
-      ticket: serializeTicket(existing),
+      ticket: serializeTicket(existingForOwnership),
     });
   }
   try {
@@ -89,7 +114,6 @@ export async function PATCH(
         { status: 404 }
       );
     }
-    // Update only this ticket's parent session last activity (no other sessions)
     await updateSessionUpdatedAtRepo(updated.sessionId);
     return NextResponse.json({
       success: true,

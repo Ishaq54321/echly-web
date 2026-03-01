@@ -1,9 +1,36 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { requireAuth } from "@/lib/server/auth";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+
+const rateLimitMap = new Map<
+  string,
+  { count: number; windowStart: number }
+>();
+
+function checkRateLimit(uid: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(uid);
+  if (!entry) {
+    rateLimitMap.set(uid, { count: 1, windowStart: now });
+    return true;
+  }
+  if (now - entry.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(uid, { count: 1, windowStart: now });
+    return true;
+  }
+  entry.count += 1;
+  if (entry.count > RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+  return true;
+}
 
 const ADAPTIVE_STRUCTURE_SYSTEM = `You are Echly's Adaptive Structuring Engine. Your job is to intelligently adjust output depth based on feedback complexity.
 
@@ -106,9 +133,22 @@ function parseStructuredTickets(
   }
 }
 
-export async function POST(req: Request): Promise<NextResponse<StructureResponse>> {
+export async function POST(req: Request): Promise<Response> {
   const stableFailure = (error: string): NextResponse<StructureResponse> =>
     NextResponse.json({ success: false, tickets: [], error }, { status: 200 });
+
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (res) {
+    return res as Response;
+  }
+  if (!checkRateLimit(user.uid)) {
+    return NextResponse.json(
+      { success: false, tickets: [], error: "Rate limit exceeded. Try again later." },
+      { status: 429 }
+    );
+  }
 
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(

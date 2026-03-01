@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
+import { requireAuth } from "@/lib/server/auth";
 import {
   getSessionFeedbackPageWithStringCursorRepo,
   getSessionFeedbackCountRepo,
   getSessionFeedbackCountsRepo,
 } from "@/lib/repositories/feedbackRepository";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 
 function serializeFeedback(item: Feedback): Record<string, unknown> {
   const out = { ...item } as Record<string, unknown>;
@@ -22,6 +24,12 @@ function serializeFeedback(item: Feedback): Record<string, unknown> {
  * Returns { feedback: [], nextCursor: string | null, hasMore: boolean }
  */
 export async function GET(req: Request) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (res) {
+    return res as Response;
+  }
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId");
   const cursor = searchParams.get("cursor") ?? "";
@@ -32,6 +40,20 @@ export async function GET(req: Request) {
     return NextResponse.json(
       { error: "Missing sessionId" },
       { status: 400 }
+    );
+  }
+
+  const session = await getSessionByIdRepo(sessionId);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404 }
+    );
+  }
+  if (session.userId !== user.uid) {
+    return NextResponse.json(
+      { error: "Forbidden" },
+      { status: 403 }
     );
   }
 

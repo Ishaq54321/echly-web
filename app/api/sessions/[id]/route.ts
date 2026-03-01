@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Session } from "@/lib/domain/session";
+import { requireAuth } from "@/lib/server/auth";
 import {
   deleteSessionRepo,
   getSessionByIdRepo,
@@ -14,6 +15,12 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (res) {
+    return res as Response;
+  }
   const { id } = await params;
   if (!id) {
     return NextResponse.json(
@@ -36,6 +43,12 @@ export async function PATCH(
     return NextResponse.json(
       { success: false, error: "Not found" },
       { status: 404 }
+    );
+  }
+  if (existing.userId !== user.uid) {
+    return NextResponse.json(
+      { success: false, error: "Forbidden" },
+      { status: 403 }
     );
   }
 
@@ -78,9 +91,15 @@ export async function PATCH(
 
 /** DELETE /api/sessions/:id — permanently delete session and all tickets/comments. */
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (res) {
+    return res as Response;
+  }
   const { id } = await params;
   if (!id) {
     return NextResponse.json(
@@ -93,6 +112,12 @@ export async function DELETE(
     return NextResponse.json(
       { success: false, error: "Not found" },
       { status: 404 }
+    );
+  }
+  if (existing.userId !== user.uid) {
+    return NextResponse.json(
+      { success: false, error: "Forbidden" },
+      { status: 403 }
     );
   }
   try {
