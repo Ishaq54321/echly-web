@@ -4,6 +4,7 @@
 @theme {
   --color-primary: #2A2A2A;
   --color-active: #6E6E6E;
+  --color-brand-primary: #E10600;
 }
 
 /* ======================================
@@ -13,6 +14,11 @@
 
 :root {
   --radius: 14px;
+
+  /* Premium brand accent — intentional use only (metrics, active states, hover, focus) */
+  --brand-primary: #E10600;
+  --brand-primary-rgb: 225, 6, 0;
+  --brand-subtle: rgba(225, 6, 0, 0.06);
 
   /* Brand foundation — signal only, never decoration */
   --brand-900: #0F172A;
@@ -35,25 +41,21 @@
   --text-secondary: 220 9% 46%;     /* #6B7280 */
   --text-muted: 220 8% 60%;
 
-  /* Accent */
-  --accent: 243 75% 59%;
-  --accent-hover: 243 75% 65%;
-
   /* Brand (selected state, focus ring — use sparingly) */
-  --brand: 0 72% 51%;
-  --brand-ring: 0 72% 51% / 0.35;
+  --brand: 0 84% 45%;
+  --brand-ring: 0 84% 45% / 0.35;
 
   /* Dashboard / executive layer — subtle authority (no bright colors) */
   --brand-accent: #111111;
   --brand-muted: #6B7280;
 
-  /* Tag semantic tints (muted, 8–10% max) */
+  /* Tag semantic tints (muted, 8–10% max; no blue/indigo) */
   --tag-bug-bg: hsl(0 80% 96%);
   --tag-bug-text: hsl(0 60% 40%);
-  --tag-ux-bg: hsl(235 60% 96%);
-  --tag-ux-text: hsl(235 40% 45%);
-  --tag-ui-bg: hsl(210 40% 96%);
-  --tag-ui-text: hsl(210 30% 45%);
+  --tag-ux-bg: hsl(0 0% 96%);
+  --tag-ux-text: hsl(0 0% 40%);
+  --tag-ui-bg: hsl(0 0% 96%);
+  --tag-ui-text: hsl(0 0% 40%);
 }
 
 /* ======================================
@@ -74,6 +76,11 @@ body {
 *::before,
 *::after {
   border-color: hsl(var(--border));
+}
+
+/* Prevent accidental Tailwind ring colors (no blue default) */
+* {
+  --tw-ring-color: transparent;
 }
 
 /* ======================================
@@ -110,8 +117,8 @@ body {
 }
 
 /* ======================================
-   WORKSPACE DASHBOARD — GROK / PRODUCT OS
-   Gradient, noise, section fade, card stagger
+   WORKSPACE DASHBOARD — COMPACT OPERATIONAL MODE
+   Flat background, section fade, card stagger
 ====================================== */
 
 /* Page section: fade in 300ms */
@@ -123,7 +130,7 @@ body {
   to { opacity: 1; }
 }
 
-/* Card: stagger 40ms (set via style animationDelay), no translateY on reveal */
+/* Card: stagger 40ms (set via style animationDelay) */
 .dashboard-workspace-card {
   opacity: 0;
   animation: dashboard-workspace-card-in 300ms ease-out forwards;
@@ -131,15 +138,6 @@ body {
 @keyframes dashboard-workspace-card-in {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-/* Subtle noise overlay — 2% opacity (Grok product OS) */
-.dashboard-workspace-noise {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.02;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* ======================================
@@ -158,10 +156,12 @@ h3 {
   letter-spacing: -0.01em;
 }
 
-/* Brand focus-visible ring (disciplined use) */
+/* Brand focus-visible ring (disciplined use — premium red only) */
 .focus-ring-brand:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--brand));
+  box-shadow:
+    0 0 0 2px hsl(var(--background)),
+    0 0 0 4px hsl(var(--brand));
 }
 
 /* ======================================

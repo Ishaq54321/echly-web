@@ -18,7 +18,7 @@ export default function WidgetFooter({
   ${
     !isIdle
       ? "bg-gray-300 text-active cursor-not-allowed"
-      : "bg-gradient-to-r from-rose-600 to-red-600 text-white hover:brightness-[0.96] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40"
+      : "focus-ring-brand bg-gradient-to-r from-rose-600 to-red-600 text-white hover:brightness-[0.96] active:scale-[0.98] focus-visible:outline-none"
   }`}
     >
       + Add Feedback

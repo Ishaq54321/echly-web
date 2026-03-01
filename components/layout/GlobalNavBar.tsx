@@ -38,7 +38,7 @@ export function GlobalNavBar() {
       <div className="flex items-center gap-4">
         <button
           type="button"
-          className="text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 font-medium transition-colors duration-150"
+          className="focus-ring-brand text-sm px-4 py-2 rounded-md bg-brand-primary text-white hover:opacity-90 font-medium transition-colors duration-150"
         >
           Share
         </button>

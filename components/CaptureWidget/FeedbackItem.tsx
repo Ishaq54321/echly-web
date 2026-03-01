@@ -53,22 +53,20 @@ export default function FeedbackItem({
               <input
                 value={editedTitle}
                 onChange={(e) => onEditedTitleChange(e.target.value)}
-                className="w-full mb-2 px-3 py-2
+                className="focus-ring-brand w-full mb-2 px-3 py-2
                                      bg-white text-slate-900
                                      border border-slate-300
                                      rounded-sm text-sm font-medium
-                                     focus:ring-2 focus:ring-rose-500
                                      outline-none transition"
               />
               <textarea
                 value={editedDescription}
                 onChange={(e) => onEditedDescriptionChange(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2
+                className="focus-ring-brand w-full px-3 py-2
                                      bg-white text-slate-800
                                      border border-slate-300
                                      rounded-sm text-sm
-                                     focus:ring-2 focus:ring-rose-500
                                      outline-none transition resize-none"
               />
             </>

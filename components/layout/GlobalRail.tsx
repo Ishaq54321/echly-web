@@ -61,7 +61,7 @@ export default function GlobalRail() {
                 <Icon className="w-5 h-5" strokeWidth={1.75} />
                 {active && (
                   <span
-                    className="absolute right-1 w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent))]"
+                    className="absolute right-1 w-1.5 h-1.5 rounded-full bg-[hsl(var(--brand))]"
                     aria-hidden
                   />
                 )}
