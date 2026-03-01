@@ -28,7 +28,7 @@ export type CaptureWidgetProps = {
   onComplete: (
     transcript: string,
     screenshot: string | null
-  ) => Promise<StructuredFeedback>;
+  ) => Promise<StructuredFeedback | undefined>;
   onDelete: (id: string) => Promise<void>;
 };
 

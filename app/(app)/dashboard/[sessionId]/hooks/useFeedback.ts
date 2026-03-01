@@ -92,21 +92,25 @@ export function useFeedback({
   const handleTranscript = async (
     transcript: string,
     screenshot: string | null
-  ): Promise<{ id: string; title: string; description: string; type: string }> => {
+  ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
     const res = await fetch("/api/structure-feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transcript }),
     });
 
-    const { tickets } = (await res.json()) as { tickets: EliteTicket[] };
-    if (!tickets?.length) {
-      throw new Error("No structured tickets returned");
+    const data = (await res.json()) as { success?: boolean; tickets?: EliteTicket[]; error?: string };
+    console.log("STRUCTURING RESPONSE:", data);
+
+    const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+    if (!data.success || tickets.length === 0) {
+      console.warn("No structured tickets returned", data);
+      return;
     }
 
     let screenshotUrl: string | null = null;
     let firstFeedbackId: string | null = null;
-    if (screenshot) {
+    if (tickets.length > 0 && screenshot) {
       firstFeedbackId = generateFeedbackId();
       screenshotUrl = await uploadScreenshot(screenshot, sessionId, firstFeedbackId);
     }

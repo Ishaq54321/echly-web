@@ -163,14 +163,18 @@ export default function SessionPage() {
       body: JSON.stringify({ transcript }),
     });
 
-    const { tickets } = await res.json();
-    if (!tickets?.length) {
-      throw new Error("No structured tickets returned");
+    const data = (await res.json()) as { success?: boolean; tickets?: any[]; error?: string };
+    console.log("STRUCTURING RESPONSE:", data);
+
+    const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+    if (!data.success || tickets.length === 0) {
+      console.warn("No structured tickets returned", data);
+      return;
     }
 
     let screenshotUrl: string | null = null;
     let firstFeedbackId: string | null = null;
-    if (screenshot) {
+    if (tickets.length > 0 && screenshot) {
       firstFeedbackId = generateFeedbackId();
       screenshotUrl = await uploadScreenshot(screenshot, sessionId as string, firstFeedbackId);
     }

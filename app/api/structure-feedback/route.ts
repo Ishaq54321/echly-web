@@ -77,25 +77,61 @@ FULL MODE response shape:
 
 If the input is empty or unintelligible, return: { "mode": "light", "tickets": [] }`;
 
-export async function POST(req: Request) {
+/** Stable response shape. Never return {} or raw AI output. */
+type StructureResponse = {
+  success: boolean;
+  tickets: Array<Record<string, unknown>>;
+  error?: string;
+};
+
+function parseStructuredTickets(
+  content: string | null | undefined
+): { mode: "light" | "full"; tickets: Array<Record<string, unknown>> } {
+  const empty = { mode: "light" as const, tickets: [] as Array<Record<string, unknown>> };
+  if (content == null || typeof content !== "string") return empty;
+  const trimmed = content.replace(/```json/g, "").replace(/```/g, "").trim();
+  if (!trimmed) return empty;
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: "Missing OpenAI API key" },
-        { status: 500 }
-      );
+    const parsed = JSON.parse(trimmed);
+    if (!parsed || typeof parsed !== "object") return empty;
+    if (!Array.isArray(parsed.tickets)) {
+      console.error("STRUCTURING: parsed.tickets is not an array", parsed);
+      return empty;
     }
+    const mode = parsed.mode === "full" ? "full" : "light";
+    return { mode, tickets: parsed.tickets };
+  } catch (e) {
+    console.error("STRUCTURING: JSON parse failed", e);
+    return empty;
+  }
+}
 
-    const body = await req.json();
-    const transcript = body?.transcript;
+export async function POST(req: Request): Promise<NextResponse<StructureResponse>> {
+  const stableFailure = (error: string): NextResponse<StructureResponse> =>
+    NextResponse.json({ success: false, tickets: [], error }, { status: 200 });
 
-    if (!transcript || typeof transcript !== "string") {
-      return NextResponse.json(
-        { error: "No valid transcript provided" },
-        { status: 400 }
-      );
-    }
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { success: false, tickets: [], error: "Missing OpenAI API key" },
+      { status: 200 }
+    );
+  }
 
+  let body: { transcript?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return stableFailure("Invalid request body");
+  }
+  const transcript = body?.transcript;
+  if (!transcript || typeof transcript !== "string") {
+    return NextResponse.json(
+      { success: false, tickets: [], error: "No valid transcript provided" },
+      { status: 200 }
+    );
+  }
+
+  try {
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.2,
@@ -108,25 +144,16 @@ export async function POST(req: Request) {
       ],
     });
 
-    let content = completion.choices[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("No content returned from OpenAI");
+    const content = completion.choices[0]?.message?.content;
+    const { mode, tickets: parsedTickets } = parseStructuredTickets(content);
+    if (!Array.isArray(parsedTickets)) {
+      console.error("STRUCTURING: parsedTickets is not an array", parsedTickets);
+      return NextResponse.json({ success: true, tickets: [] });
     }
 
-    content = content.replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(content);
-
-    if (!parsed.tickets || !Array.isArray(parsed.tickets)) {
-      throw new Error("Invalid AI response: missing tickets array");
-    }
-
-    const mode = parsed.mode === "full" ? "full" : "light";
-
-    const valid = parsed.tickets
+    const valid = parsedTickets
       .filter(
-        (t: Record<string, unknown>) =>
-          t && typeof t.title === "string"
+        (t: Record<string, unknown>) => t && typeof t.title === "string"
       )
       .map((t: Record<string, unknown>) => {
         const title = t.title as string;
@@ -166,12 +193,12 @@ export async function POST(req: Request) {
         };
       });
 
-    return NextResponse.json({ tickets: valid });
-  } catch (error) {
-    console.error("AI STRUCTURE ERROR:", error);
+    return NextResponse.json({ success: true, tickets: valid });
+  } catch (err) {
+    console.error("STRUCTURING ERROR:", err);
     return NextResponse.json(
-      { error: "Failed to structure feedback" },
-      { status: 500 }
+      { success: false, tickets: [], error: "Structuring failed" },
+      { status: 200 }
     );
   }
 }

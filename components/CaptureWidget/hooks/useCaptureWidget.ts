@@ -201,6 +201,10 @@ export function useCaptureWidget({
     setState("processing");
     try {
       const structured = await onComplete(active.transcript, active.screenshot);
+      if (!structured) {
+        setState("idle");
+        return;
+      }
       setRecordings((prev) =>
         prev.map((r) =>
           r.id === activeId ? { ...r, structuredOutput: structured } : r

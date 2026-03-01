@@ -30,12 +30,10 @@ export default function FeedbackDetail({
 }: FeedbackDetailProps) {
   if (!selectedItem) {
     return (
-      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 flex items-center justify-center py-16">
-          <p className="text-sm text-[hsl(var(--text-secondary))]">
-            Select a feedback item
-          </p>
-        </div>
+      <div className="flex flex-1 min-h-0 items-center justify-center py-16">
+        <p className="text-sm text-[hsl(var(--text-secondary))]">
+          Select a feedback item
+        </p>
       </div>
     );
   }

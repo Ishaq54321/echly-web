@@ -204,7 +204,7 @@ function StatusSection({
       </div>
       <Link
         href={viewAllHref}
-        className="text-xs font-medium text-[hsl(var(--text-active))] hover:underline mt-1.5 inline-block"
+        className="text-xs font-medium text-[hsl(var(--text-active))] mt-1.5 inline-block"
       >
         View all →
       </Link>
@@ -238,7 +238,7 @@ function HighImpactSection({
       </div>
       <Link
         href={`/dashboard/${sessionId}`}
-        className="text-xs font-medium text-[hsl(var(--text-active))] hover:underline mt-1.5 inline-block"
+        className="text-xs font-medium text-[hsl(var(--text-active))] mt-1.5 inline-block"
       >
         View all →
       </Link>

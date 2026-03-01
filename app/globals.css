@@ -20,12 +20,6 @@
   --brand-primary-rgb: 225, 6, 0;
   --brand-subtle: rgba(225, 6, 0, 0.06);
 
-  /* Brand foundation — signal only, never decoration */
-  --brand-900: #0F172A;
-  --brand-700: #1F2937;
-  --brand-500: #374151;
-  --neutral-weak: #F9FAFB;
-
   /* Base Surfaces */
   --background: 207 6% 100%;      /* #F7F8FA */
   --surface-1: 207 6% 100%;          /* #FFFFFF */
@@ -45,17 +39,6 @@
   --brand: 0 84% 45%;
   --brand-ring: 0 84% 45% / 0.35;
 
-  /* Dashboard / executive layer — subtle authority (no bright colors) */
-  --brand-accent: #111111;
-  --brand-muted: #6B7280;
-
-  /* Tag semantic tints (muted, 8–10% max; no blue/indigo) */
-  --tag-bug-bg: hsl(0 80% 96%);
-  --tag-bug-text: hsl(0 60% 40%);
-  --tag-ux-bg: hsl(0 0% 96%);
-  --tag-ux-text: hsl(0 0% 40%);
-  --tag-ui-bg: hsl(0 0% 96%);
-  --tag-ui-text: hsl(0 0% 40%);
 }
 
 /* ======================================
@@ -104,39 +87,15 @@ body {
   background: hsl(var(--border));
 }
 
-/* Dashboard folder entrance choreography */
-@keyframes fade-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* ======================================
-   WORKSPACE DASHBOARD — COMPACT OPERATIONAL MODE
-   Flat background, section fade, card stagger
+   WORKSPACE DASHBOARD — SECTION FADE
 ====================================== */
 
-/* Page section: fade in 300ms */
 .dashboard-workspace-section {
   opacity: 0;
   animation: dashboard-section-in 300ms ease-out forwards;
 }
 @keyframes dashboard-section-in {
-  to { opacity: 1; }
-}
-
-/* Card: stagger 40ms (set via style animationDelay) */
-.dashboard-workspace-card {
-  opacity: 0;
-  animation: dashboard-workspace-card-in 300ms ease-out forwards;
-}
-@keyframes dashboard-workspace-card-in {
-  from { opacity: 0; }
   to { opacity: 1; }
 }
 
