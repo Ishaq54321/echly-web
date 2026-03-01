@@ -18,6 +18,8 @@ export interface UseSessionFeedbackPaginatedResult {
   hasMore: boolean;
   hasReachedLimit: boolean;
   fetchNextPage: () => Promise<void>;
+  /** Refetch first page from DB (e.g. after capture creates a ticket). */
+  refetchFirstPage: () => Promise<void>;
 }
 
 /**
@@ -83,6 +85,20 @@ export function useSessionFeedbackPaginated(
     }
   }, [sessionId, initialLoadDone, loading, hasMore, hasReachedLimit, feedback.length]);
 
+  const refetchFirstPage = useCallback(async () => {
+    if (!sessionId) return;
+    setLoading(true);
+    try {
+      const { feedback: page, lastVisibleDoc: last, hasMore: more } =
+        await getSessionFeedbackPage(sessionId, PAGE_SIZE);
+      setFeedback(page);
+      lastVisibleDocRef.current = last;
+      setHasMore(more);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
   return {
     feedback,
     setFeedback,
@@ -90,5 +106,6 @@ export function useSessionFeedbackPaginated(
     hasMore,
     hasReachedLimit,
     fetchNextPage,
+    refetchFirstPage,
   };
 }

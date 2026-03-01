@@ -4,6 +4,7 @@ import { DescriptionSection } from "./DescriptionSection";
 import { Section } from "./Section";
 import { ScreenshotBlock } from "./ScreenshotBlock";
 import { SuggestionSection } from "./SuggestionSection";
+import { ActionItemsSection } from "./ActionItemsSection";
 import type { FeedbackItemShape } from "./types";
 
 interface FeedbackContentProps {
@@ -12,7 +13,8 @@ interface FeedbackContentProps {
   descriptionDraft: string;
   setIsEditingDescription: (v: boolean) => void;
   setDescriptionDraft: (v: string) => void;
-  saveDescription: () => void;
+  saveDescription: () => void | Promise<void>;
+  onSaveActionItems?: (actionItems: string[]) => Promise<void>;
   onExpandImage: () => void;
 }
 
@@ -23,8 +25,11 @@ export function FeedbackContent({
   setIsEditingDescription,
   setDescriptionDraft,
   saveDescription,
+  onSaveActionItems,
   onExpandImage,
 }: FeedbackContentProps) {
+  const actionItems = Array.isArray(item.actionItems) ? item.actionItems : [];
+
   return (
     <>
       <DescriptionSection
@@ -50,14 +55,21 @@ export function FeedbackContent({
       {item.suggestion != null && item.suggestion !== "" && (
         <SuggestionSection suggestion={item.suggestion} />
       )}
-      {Array.isArray(item.actionItems) && item.actionItems.length > 0 && (
-        <Section title="Action items">
-          <ul className="list-disc list-inside space-y-1">
-            {item.actionItems.map((action, i) => (
-              <li key={i}>{action}</li>
-            ))}
-          </ul>
-        </Section>
+      {onSaveActionItems ? (
+        <ActionItemsSection
+          actionItems={actionItems}
+          onSave={onSaveActionItems}
+        />
+      ) : (
+        actionItems.length > 0 && (
+          <Section title="Action items">
+            <ul className="list-disc list-inside space-y-1">
+              {actionItems.map((action, i) => (
+                <li key={i}>{action}</li>
+              ))}
+            </ul>
+          </Section>
+        )
       )}
       {item.impact && (
         <Section title="Impact">

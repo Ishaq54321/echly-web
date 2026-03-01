@@ -11,7 +11,10 @@ export interface FeedbackDetailProps {
   descriptionDraft: string;
   setIsEditingDescription: (v: boolean) => void;
   setDescriptionDraft: (v: string) => void;
-  saveDescription: () => void;
+  saveDescription: () => void | Promise<void>;
+  onSaveTitle?: (newTitle: string) => Promise<void>;
+  onRequestDelete?: () => void;
+  onSaveActionItems?: (actionItems: string[]) => Promise<void>;
   setIsImageExpanded: (v: boolean) => void;
   isCommentsOpen: boolean;
   onToggleActivity: () => void;
@@ -24,6 +27,9 @@ export default function FeedbackDetail({
   setIsEditingDescription,
   setDescriptionDraft,
   saveDescription,
+  onSaveTitle,
+  onRequestDelete,
+  onSaveActionItems,
   setIsImageExpanded,
   isCommentsOpen,
   onToggleActivity,
@@ -44,6 +50,8 @@ export default function FeedbackDetail({
         item={selectedItem}
         isActivityOpen={isCommentsOpen}
         onToggleActivity={onToggleActivity}
+        onSaveTitle={onSaveTitle}
+        onRequestDelete={onRequestDelete}
       />
       <FeedbackContent
         item={selectedItem}
@@ -52,6 +60,7 @@ export default function FeedbackDetail({
         setIsEditingDescription={setIsEditingDescription}
         setDescriptionDraft={setDescriptionDraft}
         saveDescription={saveDescription}
+        onSaveActionItems={onSaveActionItems}
         onExpandImage={() => setIsImageExpanded(true)}
       />
     </div>

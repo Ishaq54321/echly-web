@@ -6,7 +6,7 @@ import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { addFeedback, deleteFeedback } from "@/lib/feedback";
+import { addFeedback, deleteFeedback, updateFeedback } from "@/lib/feedback";
 import CaptureWidget from "@/components/CaptureWidget";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import FeedbackSidebar from "@/components/session/FeedbackSidebar";
@@ -55,11 +55,13 @@ export default function SessionPage() {
     hasMore: hasMoreFeedback,
     hasReachedLimit: feedbackReachedLimit,
     fetchNextPage: fetchNextFeedbackPage,
+    refetchFirstPage: refetchFeedbackFirstPage,
   } = useSessionFeedbackPaginated(sessionId as string | undefined);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [isImageExpanded, setIsImageExpanded] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   /* ================= LOAD SESSION ================= */
 
@@ -132,17 +134,71 @@ export default function SessionPage() {
     }
   }, [selectedId]);
 
-  /* ================= SAVE DESCRIPTION ================= */
+  /* ================= SAVE TITLE (inline, optimistic + revert on fail) ================= */
 
-  const saveDescription = () => {
+  const saveTitle = async (newTitle: string) => {
+    if (!selectedId || newTitle.trim() === "") return;
+    const prevTitle = feedback.find((f) => f.id === selectedId)?.title ?? "";
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === selectedId
-          ? { ...item, description: descriptionDraft }
-          : item
+        item.id === selectedId ? { ...item, title: newTitle.trim() } : item
+      )
+    );
+    try {
+      await updateFeedback(selectedId, { title: newTitle.trim() });
+    } catch {
+      setFeedback((prev) =>
+        prev.map((item) =>
+          item.id === selectedId ? { ...item, title: prevTitle } : item
+        )
+      );
+    }
+  };
+
+  /* ================= SAVE DESCRIPTION (PATCH on blur) ================= */
+
+  const saveDescription = async () => {
+    if (!selectedId || descriptionDraft === feedback.find((f) => f.id === selectedId)?.description) {
+      setIsEditingDescription(false);
+      return;
+    }
+    setFeedback((prev) =>
+      prev.map((item) =>
+        item.id === selectedId ? { ...item, description: descriptionDraft } : item
       )
     );
     setIsEditingDescription(false);
+    try {
+      await updateFeedback(selectedId, { description: descriptionDraft });
+    } catch {
+      const prevDescription = feedback.find((f) => f.id === selectedId)?.description ?? "";
+      setFeedback((prev) =>
+        prev.map((item) =>
+          item.id === selectedId ? { ...item, description: prevDescription } : item
+        )
+      );
+    }
+  };
+
+  /* ================= SAVE ACTION ITEMS ================= */
+
+  const saveActionItems = async (actionItems: string[]) => {
+    if (!selectedId) return;
+    setFeedback((prev) =>
+      prev.map((item) =>
+        item.id === selectedId ? { ...item, actionItems } : item
+      )
+    );
+    try {
+      await updateFeedback(selectedId, { actionItems });
+    } catch {
+      const prevItems = feedback.find((f) => f.id === selectedId)?.actionItems ?? null;
+      setFeedback((prev) =>
+        prev.map((item) =>
+          item.id === selectedId ? { ...item, actionItems: prevItems } : item
+        )
+      );
+    }
   };
 
   /* ================= AI SAVE (Elite Structuring) ================= */
@@ -212,6 +268,7 @@ export default function SessionPage() {
 
     setFeedback((prev) => [...created, ...prev]);
     setSelectedId(created[0].id);
+    await refetchFeedbackFirstPage();
 
     return created[0];
   };
@@ -219,6 +276,8 @@ export default function SessionPage() {
   const handleDeleteFeedback = async (id: string) => {
     await deleteFeedback(id);
     setFeedback((prev) => prev.filter((item) => item.id !== id));
+    setShowDeleteModal(false);
+    router.push(`/dashboard/${sessionId}`);
   };
 
   if (sessionLoading) return null;
@@ -272,6 +331,9 @@ export default function SessionPage() {
                   setIsEditingDescription={setIsEditingDescription}
                   setDescriptionDraft={setDescriptionDraft}
                   saveDescription={saveDescription}
+                  onSaveTitle={saveTitle}
+                  onRequestDelete={() => setShowDeleteModal(true)}
+                  onSaveActionItems={saveActionItems}
                   setIsImageExpanded={setIsImageExpanded}
                   isCommentsOpen={isCommentsOpen}
                   onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}
@@ -322,6 +384,44 @@ export default function SessionPage() {
               alt="Expanded Screenshot"
               className="max-h-full max-w-full rounded-xl"
             />
+          </div>
+        )}
+
+        {showDeleteModal && selectedId && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            onClick={() => setShowDeleteModal(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-ticket-title"
+          >
+            <div
+              className="bg-[hsl(var(--surface-1))] rounded-lg shadow-xl max-w-sm w-full p-6 border border-[hsl(var(--border))]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="delete-ticket-title" className="text-lg font-semibold text-[hsl(var(--text-primary))]">
+                Delete ticket?
+              </h2>
+              <p className="mt-2 text-sm text-[hsl(var(--text-secondary))]">
+                This cannot be undone.
+              </p>
+              <div className="mt-6 flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 text-sm font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-3))] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteFeedback(selectedId)}
+                  className="px-4 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

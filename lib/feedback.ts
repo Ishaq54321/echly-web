@@ -59,13 +59,14 @@ export async function addFeedback(
 export async function updateFeedback(
   feedbackId: string,
   data: Partial<{
-  title: string;
-  description: string;
-  type: string;
-  status: FeedbackStatus;
-  priority: FeedbackPriority;
-  screenshotUrl: string | null;
-}>
+    title: string;
+    description: string;
+    type: string;
+    status: FeedbackStatus;
+    priority: FeedbackPriority;
+    screenshotUrl: string | null;
+    actionItems: string[] | null;
+  }>
 ) {
   await updateFeedbackRepo(feedbackId, data);
 }
