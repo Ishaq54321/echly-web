@@ -220,41 +220,14 @@ export function WorkspaceCard({
         }
         data-session-id={session.id}
       >
-        {/* ROW 1 — HEADER */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2 min-w-0 flex-1">
-            <Folder
-              className="
-                w-4 h-4
-                shrink-0
-                text-[hsl(var(--text-secondary))]
-                transition-colors duration-200
-                group-hover:text-[hsl(var(--brand-red))]
-              "
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            <h3 className="
-              text-[17px]
-              font-semibold
-              tracking-[-0.015em]
-              text-[hsl(var(--text-primary))]
-              leading-snug
-              line-clamp-2
-              overflow-hidden
-              text-ellipsis
-              min-w-0
-              flex-1
-            ">
-              {session.title}
-            </h3>
-            {openFeedbackCount > 0 && (
-              <span
-                className="ml-2 mt-[6px] h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--brand-red))]"
-                aria-hidden
-              />
-            )}
-          </div>
+        {/* 3-DOTS — ABSOLUTELY POSITIONED */}
+        <div
+          className="
+            absolute
+            top-4
+            right-4
+          "
+        >
           <div data-card-actions className="relative z-20 shrink-0">
             <div
               className="relative h-10 w-10"
@@ -386,6 +359,43 @@ export function WorkspaceCard({
               >
                 Link copied
               </span>
+            )}
+          </div>
+        </div>
+
+        {/* ROW 1 — HEADER */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2 min-w-0 flex-1 pr-10">
+            <Folder
+              className="
+                w-4 h-4
+                shrink-0
+                text-[hsl(var(--text-secondary))]
+                transition-colors duration-200
+                group-hover:text-[hsl(var(--brand-red))]
+              "
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <h3 className="
+              text-[17px]
+              font-semibold
+              tracking-[-0.015em]
+              text-[hsl(var(--text-primary))]
+              leading-snug
+              line-clamp-2
+              overflow-hidden
+              text-ellipsis
+              min-w-0
+              flex-1
+            ">
+              {session.title}
+            </h3>
+            {openFeedbackCount > 0 && (
+              <span
+                className="ml-2 mt-[6px] h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--brand-red))]"
+                aria-hidden
+              />
             )}
           </div>
         </div>
