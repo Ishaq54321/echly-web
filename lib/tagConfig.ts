@@ -8,14 +8,14 @@ export const TAG_COLOR_MAP: Record<
   { pill: string; dot: string }
 > = {
   UX: { pill: "bg-indigo-50 text-indigo-600", dot: "bg-indigo-500" },
-  Bug: { pill: "bg-red-50 text-red-600", dot: "bg-red-500" },
+  Bug: { pill: "bg-neutral-100/70 text-neutral-700", dot: "bg-neutral-400" },
   Performance: { pill: "bg-amber-50 text-amber-600", dot: "bg-amber-500" },
   Copy: { pill: "bg-emerald-50 text-emerald-600", dot: "bg-emerald-500" },
   Interaction: { pill: "bg-blue-50 text-blue-600", dot: "bg-blue-500" },
   Responsive: { pill: "bg-violet-50 text-violet-600", dot: "bg-violet-500" },
   Backend: { pill: "bg-slate-100 text-slate-700", dot: "bg-slate-500" },
   Data: { pill: "bg-cyan-50 text-cyan-600", dot: "bg-cyan-500" },
-  Blocking: { pill: "bg-rose-100 text-rose-700", dot: "bg-rose-500" },
+  Blocking: { pill: "bg-neutral-100/70 text-neutral-700", dot: "bg-neutral-400" },
   Accessibility: { pill: "bg-teal-50 text-teal-600", dot: "bg-teal-500" },
   "Visual Hierarchy": { pill: "bg-fuchsia-50 text-fuchsia-600", dot: "bg-fuchsia-500" },
 };

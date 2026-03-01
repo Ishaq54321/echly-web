@@ -14,7 +14,7 @@ export default function AudioWaveform({ isActive }: Props) {
       {[...Array(BAR_COUNT)].map((_, i) => (
         <span
           key={i}
-          className={`w-[4px] rounded-full bg-gradient-to-b from-rose-500 to-red-600 transition-none waveform-bar ${
+          className={`w-[4px] rounded-full bg-brand-accent transition-none waveform-bar ${
             isActive ? "waveform-bar--active" : "h-[6px] opacity-40"
           }`}
           style={

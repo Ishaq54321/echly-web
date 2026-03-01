@@ -25,17 +25,18 @@ export default function CommentInput({ onSend }: Props) {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          className="focus-ring-brand flex-1 w-full rounded-3xl bg-[hsl(var(--surface-2))] px-5 py-3.5 text-sm outline-none
+          className="focus-ring-brand flex-1 w-full rounded-3xl bg-[hsl(var(--surface-2))] border border-transparent px-5 py-3.5 text-sm outline-none
             placeholder:text-[hsl(var(--text-muted))]
+            focus:ring-1 focus:ring-brand-accent focus:border-brand-accent
             transition-all duration-150"
         />
         <button
           type="button"
           onClick={handleSend}
-          className="flex-shrink-0 p-2 text-[hsl(var(--brand))] transition-all duration-150"
+          className="flex-shrink-0 p-2 text-brand-accent transition-all duration-150"
           aria-label="Send comment"
         >
-          <Send size={18} />
+          <Send size={18} strokeWidth={1.5} />
         </button>
       </div>
     </div>

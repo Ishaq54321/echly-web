@@ -70,7 +70,7 @@ export function DescriptionSection({
               onChange={(e) => onDraftChange?.(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
-              className="w-full min-h-[100px] rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-[hsl(var(--text-primary))] leading-relaxed focus:outline-none focus:ring-2 focus:ring-black/10 resize-none overflow-hidden"
+              className="w-full min-h-[100px] rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-[hsl(var(--text-primary))] leading-relaxed focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 resize-none overflow-hidden"
               autoFocus
               aria-label="Edit description"
             />
@@ -78,7 +78,7 @@ export function DescriptionSection({
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-xs px-3 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 transition-colors focus:outline-none focus:ring-2 focus:ring-black/10"
+                className="text-xs px-3 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent"
               >
                 Cancel
               </button>
@@ -86,7 +86,7 @@ export function DescriptionSection({
                 type="button"
                 onClick={triggerSave}
                 disabled={isSaving || draft === description}
-                className="text-xs px-3 py-1.5 rounded-md bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-50 disabled:pointer-events-none transition-colors focus:outline-none focus:ring-2 focus:ring-black/10"
+                className="text-xs px-3 py-1.5 rounded-md bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-brand-accent"
               >
                 {isSaving ? "Saving..." : "Save"}
               </button>

@@ -91,7 +91,7 @@ export function ActionItemsSection({
                     if (e.key === "Enter") void saveEdit();
                     if (e.key === "Escape") cancelEdit();
                   }}
-                  className="flex-1 text-sm px-2 py-1.5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] text-[hsl(var(--text-primary))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand)/0.4)]"
+                  className="flex-1 text-sm px-2 py-1.5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] text-[hsl(var(--text-primary))] focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
                   autoFocus
                   aria-label={`Edit action item ${i + 1}`}
                 />
@@ -115,7 +115,7 @@ export function ActionItemsSection({
                 <button
                   type="button"
                   onClick={() => void removeItem(i)}
-                  className="flex-shrink-0 p-1 rounded text-[hsl(var(--text-muted))] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="flex-shrink-0 p-1 rounded text-[hsl(var(--text-muted))] hover:text-neutral-600 hover:bg-neutral-50 opacity-0 group-hover:opacity-100 transition-opacity"
                   aria-label={`Remove action item ${i + 1}`}
                 >
                   <Trash2 size={14} />
@@ -139,7 +139,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action item…"
-              className="flex-1 text-sm px-2 py-1.5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-muted))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand)/0.4)]"
+              className="flex-1 text-sm px-2 py-1.5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-muted))] focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
               autoFocus
               aria-label="New action item"
             />

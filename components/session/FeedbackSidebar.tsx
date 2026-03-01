@@ -156,7 +156,7 @@ export default function FeedbackSidebar({
             placeholder="Search feedback…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-full text-sm px-3 rounded-md bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] placeholder:text-[hsl(var(--text-muted))] focus:ring-2 focus:ring-[hsl(var(--brand)/0.35)] focus:outline-none transition-all duration-150 ease-out"
+            className="h-9 w-full text-sm px-3 rounded-md bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] placeholder:text-[hsl(var(--text-muted))] focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
             aria-label="Search feedback"
           />
         </div>

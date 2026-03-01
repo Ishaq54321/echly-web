@@ -69,7 +69,7 @@ export function DeleteSessionModal({
             type="button"
             onClick={handleConfirm}
             disabled={deleting}
-            className="focus-ring-brand px-4 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60"
+            className="focus-ring-brand px-4 py-2 text-sm font-medium rounded-lg bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] transition-transform duration-100 ease-out disabled:opacity-60"
           >
             {deleting ? "Deleting…" : "Delete"}
           </button>

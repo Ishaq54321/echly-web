@@ -124,12 +124,12 @@ export default function CaptureWidget({
               </div>
               <div className="flex justify-between">
                 <button onClick={handlers.discardListening} className="text-sm text-slate-600 hover:text-slate-900 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]">Cancel</button>
-                <button onClick={handlers.finishListening} className="bg-gradient-to-r from-rose-600 to-red-600 hover:brightness-[0.96] text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]">Done</button>
+                <button onClick={handlers.finishListening} className="bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] px-5 py-2 rounded-lg text-sm font-medium transition-transform duration-100 ease-out">Done</button>
               </div>
             </div>
           )}
           {state.errorMessage && (
-            <div className="text-sm text-rose-600 bg-rose-50/80 border border-rose-200 rounded-md px-4 py-3">
+            <div className="text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3">
               {state.errorMessage}
             </div>
           )}

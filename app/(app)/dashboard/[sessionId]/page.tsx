@@ -468,7 +468,7 @@ export default function SessionPage() {
                         }
                       }}
                       autoFocus
-                      className="text-[26px] font-semibold tracking-[-0.01em] text-[hsl(var(--text-primary))] w-full bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-black/10"
+                      className="text-[26px] font-semibold tracking-[-0.01em] text-[hsl(var(--text-primary))] w-full bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
                       aria-label="Session title"
                     />
                     <p className="text-xs text-neutral-400 mt-1">
@@ -651,7 +651,7 @@ export default function SessionPage() {
                 <button
                   type="button"
                   onClick={() => handleDeleteFeedback(selectedId)}
-                  className="px-4 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] transition-transform duration-100 ease-out"
                 >
                   Delete
                 </button>

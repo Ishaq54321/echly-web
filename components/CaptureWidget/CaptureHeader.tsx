@@ -40,36 +40,36 @@ export default function CaptureHeader({
           onClick={onShare}
           className="flex items-center gap-2 h-8 px-2 rounded-sm
                          text-sm font-medium text-slate-600
-                         hover:bg-[rgba(0,0,0,0.04)] transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+                         hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
         >
-          <Share2 size={14} strokeWidth={2} className="shrink-0" />
+          <Share2 size={16} strokeWidth={1.5} className="shrink-0 text-neutral-500" />
           Share
         </button>
 
         <button
           type="button"
           onClick={onMoreClick}
-          className="flex items-center justify-center w-8 h-8 rounded-sm hover:bg-[rgba(0,0,0,0.04)] transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+          className="flex items-center justify-center w-8 h-8 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
         >
-          <MoreVertical size={18} strokeWidth={2} className="text-slate-500" />
+          <MoreVertical size={18} strokeWidth={1.5} />
         </button>
 
         <button
           type="button"
           onClick={onClose}
-          className="flex items-center justify-center w-8 h-8 rounded-sm hover:bg-[rgba(0,0,0,0.04)] transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+          className="flex items-center justify-center w-8 h-8 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
         >
-          <X size={18} strokeWidth={2} className="text-slate-500" />
+          <X size={18} strokeWidth={1.5} />
         </button>
 
         {showMenu && (
-          <div className="absolute right-0 top-12
+          <div className="dropdown-enter absolute right-0 top-12
                               bg-white border border-slate-200
                               rounded-lg shadow-md w-56 py-2">
             <button
               onClick={onResetSession}
               className="w-full text-left px-4 py-2 text-sm
-                             hover:bg-slate-50 text-rose-600 transition"
+                             hover:bg-neutral-50 text-brand-accent transition"
             >
               Reset Feedback Session
             </button>

@@ -89,13 +89,13 @@ export function RenameSessionModal({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={saving}
-          className="focus-ring-brand mt-4 w-full h-10 px-3 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-secondary))] focus:outline-none disabled:opacity-60"
+          className="focus-ring-brand mt-4 w-full h-10 px-3 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-secondary))] focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 disabled:opacity-60"
           aria-label="Session title"
           aria-invalid={!!error}
           aria-describedby={error ? "rename-error" : undefined}
         />
         {error && (
-          <p id="rename-error" className="mt-2 text-sm text-red-600" role="alert">
+          <p id="rename-error" className="mt-2 text-sm text-neutral-600" role="alert">
             {error}
           </p>
         )}

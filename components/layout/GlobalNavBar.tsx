@@ -21,7 +21,7 @@ export function GlobalNavBar() {
   }, []);
 
   const iconButtonClass =
-    "h-9 w-9 flex items-center justify-center rounded-md hover:bg-[hsl(var(--surface-2))] transition-colors duration-150 shrink-0";
+    "h-9 w-9 flex items-center justify-center rounded-md text-neutral-500 hover:bg-[hsl(var(--surface-2))] hover:text-brand-accent transition-colors duration-150 shrink-0";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 w-full bg-white border-b border-[hsl(var(--border))] flex items-center justify-between px-6">
@@ -38,7 +38,7 @@ export function GlobalNavBar() {
       <div className="flex items-center gap-4">
         <button
           type="button"
-          className="focus-ring-brand text-sm px-4 py-2 rounded-md bg-brand-primary text-white hover:opacity-90 font-medium transition-colors duration-150"
+          className="focus-ring-brand text-sm px-4 py-2 rounded-lg bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] font-medium transition-transform duration-100 ease-out"
         >
           Share
         </button>
@@ -49,28 +49,28 @@ export function GlobalNavBar() {
           title={copied ? "Copied" : "Copy link"}
           aria-label={copied ? "Copied" : "Copy link"}
         >
-          <Link2 className="h-4 w-4 text-[hsl(var(--text-primary))]" />
+          <Link2 className="h-4 w-4" strokeWidth={1.5} />
         </button>
         <button
           type="button"
           className={iconButtonClass}
           aria-label="More options"
         >
-          <MoreHorizontal className="h-4 w-4 text-[hsl(var(--text-primary))]" />
+          <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
         </button>
         <button
           type="button"
           className={iconButtonClass}
           aria-label="Search"
         >
-          <Search className="h-4 w-4 text-[hsl(var(--text-primary))]" />
+          <Search className="h-4 w-4" strokeWidth={1.5} />
         </button>
         <button
           type="button"
           className={iconButtonClass}
           aria-label="Notifications"
         >
-          <Bell className="h-4 w-4 text-[hsl(var(--text-primary))]" />
+          <Bell className="h-4 w-4" strokeWidth={1.5} />
         </button>
         <button
           type="button"

@@ -83,7 +83,7 @@ export function FeedbackHeader({
                 onBlur={handleTitleBlur}
                 onFocus={(e) => e.currentTarget.select()}
                 onKeyDown={handleTitleKeyDown}
-                className="w-full text-[20px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))] bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-black/10"
+                className="w-full text-[20px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))] bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
                 aria-label="Edit title"
               />
               <p className="text-xs text-neutral-400 mt-1">
@@ -109,7 +109,7 @@ export function FeedbackHeader({
               }}
               aria-label={onSaveTitle ? "Edit title" : undefined}
             >
-              <h1 className="text-[20px] font-semibold tracking-tight leading-snug text-[hsl(var(--text-primary))] truncate">
+              <h1 className="text-[20px] font-medium tracking-tight leading-snug text-[hsl(var(--text-primary))] truncate">
                 {item.title}
               </h1>
               {onSaveTitle && (
@@ -137,7 +137,7 @@ export function FeedbackHeader({
             <button
               type="button"
               onClick={onRequestDelete}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30 border border-red-200 dark:border-red-800/50 transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium text-neutral-700 bg-white border border-neutral-200 hover:bg-neutral-50 transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40"
               aria-label="Delete ticket"
             >
               <Trash2 size={14} />
@@ -148,7 +148,7 @@ export function FeedbackHeader({
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand)/0.4)] ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 ${
               isActivityOpen
                 ? "bg-[hsl(var(--surface-2))] text-active"
                 : "bg-[hsl(var(--surface-2))] text-[hsl(var(--text-secondary))] hover:text-primary"

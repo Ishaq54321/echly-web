@@ -201,24 +201,19 @@ export function WorkspaceCard({
           group
           relative
           w-full
-          rounded-2xl
-          border border-[hsl(var(--border))]
+          rounded-xl
+          border border-neutral-200
           bg-white
+          shadow-sm
           px-6 py-6
           cursor-pointer
           outline-none
-          transition-[box-shadow,border-color] duration-200 ease-out
-          hover:ring-1
-          hover:ring-[hsl(var(--brand-red))]
-          hover:ring-offset-0
-          hover:shadow-[0_6px_20px_rgba(0,0,0,0.05)]
+          transition-all duration-150 ease-out
+          will-change-transform
+          hover:shadow-md
+          hover:-translate-y-[1px]
         "
-        style={
-          {
-            "--tw-ring-color": "hsl(var(--brand-red))",
-            animationDelay: `${index * 40}ms`,
-          } as React.CSSProperties
-        }
+        style={{ animationDelay: `${index * 40}ms` } as React.CSSProperties}
         data-session-id={session.id}
       >
         {/* 3-DOTS — ABSOLUTELY POSITIONED */}
@@ -260,21 +255,22 @@ export function WorkspaceCard({
                   flex items-center justify-center
                   h-10 w-10
                   rounded-lg
-                  text-[hsl(var(--text-secondary))]
+                  text-neutral-500
                   transition-colors duration-150
                   hover:bg-[hsl(var(--surface-2))]
-                  hover:text-[hsl(var(--text-primary))]
+                  hover:text-brand-accent
                   focus-visible:outline-none
                   focus-visible:ring-2
-                  focus-visible:ring-[hsl(var(--brand))]
+                  focus-visible:ring-brand-accent/40
                   cursor-pointer
                 "
               >
-                <MoreHorizontal className="w-4 h-4 pointer-events-none" aria-hidden />
+                <MoreHorizontal className="w-4 h-4 pointer-events-none" strokeWidth={1.5} aria-hidden />
               </button>
               {showTooltip && (
                 <span
                   className="
+                    tooltip-enter
                     absolute
                     top-full
                     right-0
@@ -286,7 +282,6 @@ export function WorkspaceCard({
                     text-white
                     shadow-lg
                     pointer-events-none
-                    transition-opacity duration-150
                     whitespace-nowrap
                   "
                 >
@@ -297,7 +292,7 @@ export function WorkspaceCard({
                 <div
                   ref={menuRef}
                   data-card-actions
-                  className="absolute right-0 top-full mt-1 py-1 min-w-[160px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] shadow-lg z-10"
+                  className="dropdown-enter absolute right-0 top-full mt-1 py-1 min-w-[160px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] shadow-lg z-10"
                   role="menu"
                   aria-label="Workspace actions"
                 >
@@ -343,7 +338,7 @@ export function WorkspaceCard({
                   <button
                     type="button"
                     onClick={handleDeleteClick}
-                    className="focus-ring-brand w-full px-3 py-2 text-left text-sm rounded-md text-red-500 hover:bg-red-50 transition-colors duration-150 flex items-center gap-2"
+                    className="focus-ring-brand w-full px-3 py-2 text-left text-sm rounded-md text-neutral-600 hover:bg-neutral-50 transition-colors duration-150 flex items-center gap-2"
                     role="menuitem"
                   >
                     <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -354,7 +349,7 @@ export function WorkspaceCard({
             </div>
             {copyTooltip && (
               <span
-                className="absolute right-12 top-0 mt-2 px-3 py-1.5 text-xs rounded-md bg-black text-white shadow-lg whitespace-nowrap z-20 pointer-events-none transition-opacity duration-150"
+                className="tooltip-enter absolute right-12 top-0 mt-2 px-3 py-1.5 text-xs rounded-md bg-black text-white shadow-lg whitespace-nowrap z-20 pointer-events-none"
                 role="status"
                 aria-live="polite"
               >
@@ -370,20 +365,14 @@ export function WorkspaceCard({
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-2 min-w-0 flex-1 pr-10">
                 <Folder
-                  className="
-                    w-4 h-4
-                    shrink-0
-                    text-[hsl(var(--text-secondary))]
-                    transition-colors duration-200
-                    group-hover:text-[hsl(var(--brand-red))]
-                  "
-                  strokeWidth={1.75}
+                  className="w-4 h-4 shrink-0 text-neutral-500 transition-colors duration-150 group-hover:text-brand-accent"
+                  strokeWidth={1.5}
                   aria-hidden
                 />
                 <h3 className="
-                  text-[17px]
-                  font-semibold
-                  tracking-[-0.015em]
+                  text-[16px]
+                  font-medium
+                  tracking-tight
                   text-[hsl(var(--text-primary))]
                   leading-snug
                   line-clamp-2
@@ -396,16 +385,16 @@ export function WorkspaceCard({
                 </h3>
                 {openFeedbackCount > 0 && (
                   <span
-                    className="ml-2 mt-[6px] h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--brand-red))]"
+                    className="ml-2 mt-[6px] h-2 w-2 shrink-0 rounded-full bg-brand-accent opacity-80"
                     aria-hidden
                   />
                 )}
               </div>
             </div>
 
-            {/* Metrics row — premium metadata tags */}
+            {/* Metrics row — premium metadata tags (informational, no hover) */}
             <div className="mt-4 flex items-center gap-3">
-              <div className="inline-flex items-center rounded-sm bg-neutral-100/60 px-2.5 py-1">
+              <div className="inline-flex items-center rounded-sm bg-neutral-100/60 px-2.5 py-1 transition-colors duration-150">
                 <span className="text-[13px] font-medium text-neutral-900">
                   {feedbackCount}
                 </span>
@@ -413,18 +402,10 @@ export function WorkspaceCard({
                   feedback
                 </span>
               </div>
-              <div
-                className={`inline-flex items-center rounded-sm px-2.5 py-1 ${
-                  openCount > 0
-                    ? "bg-[hsl(var(--brand-red))]/8"
-                    : "bg-neutral-100/60"
-                }`}
-              >
+              <div className="inline-flex items-center rounded-sm px-2.5 py-1 bg-neutral-100/70 transition-colors duration-150">
                 <span
                   className={`text-[13px] font-medium ${
-                    openCount > 0
-                      ? "text-[hsl(var(--brand-red))]"
-                      : "text-neutral-900"
+                    openCount > 0 ? "text-brand-accent" : "text-neutral-900"
                   }`}
                 >
                   {openCount}
@@ -440,13 +421,13 @@ export function WorkspaceCard({
             {/* Activity row (views + comments) */}
             <div className="flex items-center gap-6 text-sm text-[hsl(var(--text-secondary))]">
               <div className="flex items-center gap-1.5">
-                <Eye className="w-4 h-4 shrink-0 opacity-70" aria-hidden />
+                <Eye className="w-4 h-4 shrink-0 text-neutral-500" strokeWidth={1.5} aria-hidden />
                 <span className="font-medium text-[hsl(var(--text-primary))]">
                   {viewCount}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
-                <MessageCircle className="w-4 h-4 shrink-0 opacity-70" aria-hidden />
+                <MessageCircle className="w-4 h-4 shrink-0 text-neutral-500" strokeWidth={1.5} aria-hidden />
                 <span className="font-medium text-[hsl(var(--text-primary))]">
                   {commentCount}
                 </span>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  FolderOpen,
+  Folder,
   Camera,
   BarChart3,
   Settings,
@@ -13,7 +13,7 @@ import {
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/dashboard", icon: FolderOpen, label: "Sessions" },
+  { href: "/dashboard", icon: Folder, label: "Sessions" },
   { href: "/capture", icon: Camera, label: "Capture" },
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/settings", icon: Settings, label: "Settings" },
@@ -41,7 +41,7 @@ export default function GlobalRail() {
           className="flex items-center justify-center w-10 h-10 rounded-xl text-[hsl(var(--text-primary))] transition-all duration-150 ease-out hover:bg-[hsl(var(--surface-1))]"
           aria-label="Echly home"
         >
-          <Box className="w-5 h-5" strokeWidth={2} />
+          <Box className="w-5 h-5 text-neutral-500" strokeWidth={1.5} />
         </Link>
       </div>
 
@@ -52,16 +52,16 @@ export default function GlobalRail() {
             <div key={label} className="relative group">
               <Link
                 href={href}
-                className={`relative flex items-center justify-center w-10 h-10 rounded-xl text-[hsl(var(--text-secondary))] transition-all duration-150 ease-out hover:bg-[hsl(var(--surface-1))] ${
-                  active ? "bg-[hsl(var(--surface-1))] text-active" : ""
+                className={`relative flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 transition-all duration-150 ease-out hover:bg-[hsl(var(--surface-1))] ${
+                  active ? "bg-[hsl(var(--surface-1))] text-brand-accent" : ""
                 }`}
                 aria-label={label}
                 aria-current={active ? "page" : undefined}
               >
-                <Icon className="w-5 h-5" strokeWidth={1.75} />
+                <Icon className="w-5 h-5" strokeWidth={1.5} />
                 {active && (
                   <span
-                    className="absolute right-1 w-1.5 h-1.5 rounded-full bg-[hsl(var(--brand))]"
+                    className="absolute right-1 w-2 h-2 rounded-full bg-brand-accent opacity-80"
                     aria-hidden
                   />
                 )}

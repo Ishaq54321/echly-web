@@ -13,12 +13,12 @@ export default function WidgetFooter({
     <button
       type="button"
       onClick={onAddFeedback}
-      className={`mt-3 w-full px-6 py-2.5 rounded-md flex items-center justify-center text-sm font-semibold tracking-tight
-  transition-[color,filter,transform] duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]
+      className={`mt-3 w-full px-6 py-2.5 rounded-lg flex items-center justify-center text-sm font-medium tracking-tight
+  transition-all duration-150 ease-out
   ${
     !isIdle
-      ? "bg-gray-300 text-active cursor-not-allowed"
-      : "focus-ring-brand bg-gradient-to-r from-rose-600 to-red-600 text-white hover:brightness-[0.96] active:scale-[0.98] focus-visible:outline-none"
+      ? "bg-neutral-200 text-neutral-500 cursor-not-allowed"
+      : "focus-ring-brand bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] focus-visible:outline-none transition-transform duration-100 ease-out"
   }`}
     >
       + Add Feedback

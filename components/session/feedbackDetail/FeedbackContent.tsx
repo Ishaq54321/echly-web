@@ -137,7 +137,7 @@ export function FeedbackContent({
                       e.stopPropagation();
                       handleRemoveTag(tag);
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-neutral-400 hover:text-red-500"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-neutral-400 hover:text-neutral-600"
                     aria-label={`Remove ${tag}`}
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>

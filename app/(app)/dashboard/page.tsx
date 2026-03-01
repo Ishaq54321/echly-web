@@ -72,13 +72,13 @@ export default function DashboardPage() {
               placeholder="Search sessions"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="focus-ring-brand h-9 px-3 bg-white border border-[hsl(var(--border))] rounded-xl text-[13px] text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-muted))] focus:outline-none min-w-[180px]"
+              className="focus-ring-brand h-9 px-3 bg-white border border-[hsl(var(--border))] rounded-xl text-[13px] text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-muted))] focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 min-w-[180px]"
               aria-label="Search sessions"
             />
             <button
               type="button"
               onClick={handleCreateSession}
-              className="focus-ring-brand h-9 rounded-xl bg-neutral-900 text-white text-[13px] px-4 font-medium hover:bg-neutral-800 focus:outline-none transition-colors"
+              className="focus-ring-brand h-9 rounded-xl bg-neutral-900 text-white text-[13px] px-4 font-medium hover:brightness-95 active:scale-[0.98] focus:outline-none transition-transform duration-100 ease-out"
             >
               New Session
             </button>

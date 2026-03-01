@@ -57,7 +57,7 @@ export default function FeedbackItem({
                                      bg-white text-slate-900
                                      border border-slate-300
                                      rounded-sm text-sm font-medium
-                                     outline-none transition"
+                                     outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
               />
               <textarea
                 value={editedDescription}
@@ -67,7 +67,7 @@ export default function FeedbackItem({
                                      bg-white text-slate-800
                                      border border-slate-300
                                      rounded-sm text-sm
-                                     outline-none transition resize-none"
+                                     outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 resize-none"
               />
             </>
           ) : (
@@ -88,35 +88,35 @@ export default function FeedbackItem({
           <button
             type="button"
             onClick={onExpand}
-            className="flex items-center justify-center w-6 h-6 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-slate-700 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+            className="flex items-center justify-center w-6 h-6 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
           >
-            <Expand size={18} strokeWidth={2} />
+            <Expand size={18} strokeWidth={1.5} />
           </button>
 
           {isEditing ? (
             <button
               type="button"
               onClick={onSaveEdit}
-              className="flex items-center justify-center w-6 h-6 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-emerald-600 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+              className="flex items-center justify-center w-6 h-6 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
             >
-              <Check size={18} strokeWidth={2} />
+              <Check size={18} strokeWidth={1.5} />
             </button>
           ) : (
             <button
               type="button"
               onClick={onEdit}
-              className="flex items-center justify-center w-6 h-6 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-slate-700 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+              className="flex items-center justify-center w-6 h-6 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
             >
-              <Pencil size={18} strokeWidth={2} />
+              <Pencil size={18} strokeWidth={1.5} />
             </button>
           )}
 
           <button
             type="button"
             onClick={onDelete}
-            className="flex items-center justify-center w-6 h-6 rounded-sm hover:bg-[rgba(0,0,0,0.04)] hover:text-rose-600 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+            className="flex items-center justify-center w-6 h-6 rounded-sm text-neutral-500 hover:bg-[rgba(0,0,0,0.04)] hover:text-brand-accent transition-colors duration-150"
           >
-            <Trash2 size={18} strokeWidth={2} />
+            <Trash2 size={18} strokeWidth={1.5} />
           </button>
         </div>
       </div>
