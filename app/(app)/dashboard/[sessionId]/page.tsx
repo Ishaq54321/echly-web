@@ -386,14 +386,8 @@ export default function SessionPage() {
 
   return (
     <>
-      <div
-        className={`h-full grid grid-cols-1 ${
-          isCommentsOpen
-            ? "grid-rows-[0_1fr_1fr_1fr] lg:grid-cols-[340px_1fr_380px] lg:grid-rows-none"
-            : "grid-rows-[0_1fr_1fr] lg:grid-cols-[340px_1fr] lg:grid-rows-none"
-        }`}
-      >
-        <aside className="flex flex-col h-full min-h-0 border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]">
+      <div className="h-screen flex overflow-hidden">
+        <aside className="w-[280px] shrink-0 border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] overflow-y-auto">
           <FeedbackSidebar
             feedback={feedback}
             selectedId={selectedId}
@@ -407,7 +401,7 @@ export default function SessionPage() {
           />
         </aside>
 
-        <div className="flex flex-col h-full min-h-0 overflow-hidden bg-neutral-50">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-neutral-50">
           <div className="max-w-4xl mx-auto w-full px-8 pt-5 pb-4 border-b border-neutral-200 shrink-0">
             <div className="flex justify-between items-center gap-4">
               <div className="min-w-0 flex-1">
@@ -542,7 +536,7 @@ export default function SessionPage() {
               </div>
             </div>
           </div>
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col max-w-4xl mx-auto w-full">
+          <div className="flex-1 min-h-0 flex flex-col max-w-4xl mx-auto w-full overflow-hidden">
             <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-50">
               <div className="flex flex-col h-full px-8 pt-4 pb-4">
                 {detailLoading && selectedId ? (
@@ -575,7 +569,7 @@ export default function SessionPage() {
         </div>
 
         {isCommentsOpen && (
-            <aside className="flex flex-col h-full min-h-0 hidden lg:block bg-[hsl(var(--surface-1))] border-l border-[hsl(var(--border)/0.8)] px-6">
+            <aside className="w-[320px] shrink-0 hidden lg:block border-l border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-1))] overflow-y-auto px-6">
               <ActivityPanel
                 comments={comments}
                 loading={loadingComments}

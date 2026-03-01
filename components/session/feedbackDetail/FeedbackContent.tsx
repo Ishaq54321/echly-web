@@ -126,7 +126,7 @@ export function FeedbackContent({
       )}
       {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (
         <Section title="Tags">
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap gap-2 mt-3 max-w-full">
             {tags.map((tag, i) => (
               <span key={`${tag}-${i}`} className="group/tag inline-flex items-center">
                 <Tag name={tag} variant="default" className="hover:opacity-90">
