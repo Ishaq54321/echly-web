@@ -187,7 +187,7 @@ export function WorkspaceCard({
   };
 
   const menuItemClass =
-    "focus-ring-brand w-full px-3 py-2 text-left text-sm rounded-md text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-2))] transition-colors duration-150 flex items-center gap-2";
+    "w-full px-3 py-2 text-left text-sm rounded-md text-neutral-800 hover:bg-neutral-100 transition-colors duration-150 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300";
 
   return (
     <>
@@ -197,7 +197,6 @@ export function WorkspaceCard({
         onClick={handleCardClick}
         onKeyDown={handleCardKeyDown}
         className="
-          focus-ring-brand
           group
           relative
           w-full
@@ -208,6 +207,7 @@ export function WorkspaceCard({
           p-5
           cursor-pointer
           outline-none
+          focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2
           transition-all duration-150 ease-out
           will-change-transform
           hover:shadow-md
@@ -216,9 +216,9 @@ export function WorkspaceCard({
         style={{ animationDelay: `${index * 40}ms` } as React.CSSProperties}
         data-session-id={session.id}
       >
-        {/* 3-DOTS — ABSOLUTELY POSITIONED */}
+        {/* 3-DOTS — ABSOLUTELY POSITIONED, visible on hover */}
         <div className="absolute top-4 right-4">
-          <div data-card-actions className="relative z-20 shrink-0">
+          <div data-card-actions className="relative z-20 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
             <div
               className="relative h-10 w-10"
               ref={moreRef}
@@ -245,19 +245,7 @@ export function WorkspaceCard({
                 aria-label="More actions"
                 aria-expanded={moreOpen}
                 aria-haspopup="menu"
-                className="
-                  flex items-center justify-center
-                  h-10 w-10
-                  rounded-lg
-                  text-neutral-500
-                  transition-colors duration-150
-                  hover:bg-[hsl(var(--surface-2))]
-                  hover:text-brand-accent
-                  focus-visible:outline-none
-                  focus-visible:ring-2
-                  focus-visible:ring-brand-accent/40
-                  cursor-pointer
-                "
+                className="flex items-center justify-center h-10 w-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-neutral-100 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 cursor-pointer"
               >
                 <MoreHorizontal className="h-[16px] w-[16px] relative top-[1px] pointer-events-none" strokeWidth={1.5} aria-hidden />
               </button>
@@ -332,7 +320,7 @@ export function WorkspaceCard({
                   <button
                     type="button"
                     onClick={handleDeleteClick}
-                    className="focus-ring-brand w-full px-3 py-2 text-left text-sm rounded-md text-neutral-600 hover:bg-neutral-50 transition-colors duration-150 flex items-center gap-2"
+                    className="w-full px-3 py-2 text-left text-sm rounded-md text-neutral-600 hover:bg-neutral-100 transition-colors duration-150 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
                     role="menuitem"
                   >
                     <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -359,7 +347,7 @@ export function WorkspaceCard({
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-2 min-w-0 flex-1 pr-8">
                 <Folder
-                  className="h-[16px] w-[16px] relative top-[1px] shrink-0 text-neutral-500 transition-colors duration-150 group-hover:text-brand-accent"
+                  className="h-[16px] w-[16px] relative top-[1px] shrink-0 text-neutral-400 transition-colors duration-150 group-hover:text-neutral-600"
                   strokeWidth={1.5}
                   aria-hidden
                 />
@@ -368,17 +356,17 @@ export function WorkspaceCard({
                 </h3>
                 {openFeedbackCount > 0 && (
                   <span
-                    className="ml-2 mt-2 h-2 w-2 shrink-0 rounded-full bg-brand-accent opacity-80"
+                    className="ml-2 mt-2 h-2 w-2 shrink-0 rounded-full bg-neutral-400 opacity-70"
                     aria-hidden
                   />
                 )}
               </div>
             </div>
 
-            {/* Metrics row — premium metadata tags (informational, no hover) */}
+            {/* Metrics row — low emphasis */}
             <div className="mt-3 flex items-center gap-3">
               <div className="inline-flex items-center rounded-md bg-neutral-100/60 px-2.5 py-[5px] transition-colors duration-150">
-                <span className="text-[13px] font-medium text-neutral-900">
+                <span className="text-[13px] font-medium text-neutral-700">
                   {feedbackCount}
                 </span>
                 <span className="ml-1 text-[12px] text-neutral-500">
@@ -386,11 +374,7 @@ export function WorkspaceCard({
                 </span>
               </div>
               <div className="inline-flex items-center rounded-md bg-neutral-100/70 px-2.5 py-[5px] transition-colors duration-150">
-                <span
-                  className={`text-[13px] font-medium ${
-                    openCount > 0 ? "text-brand-accent" : "text-neutral-900"
-                  }`}
-                >
+                <span className="text-[13px] font-medium text-neutral-700">
                   {openCount}
                 </span>
                 <span className="ml-1 text-[12px] text-neutral-500">
@@ -401,14 +385,14 @@ export function WorkspaceCard({
           </div>
 
           <div className="mt-5 flex flex-col">
-            {/* Activity row (views + comments) */}
-            <div className="flex items-center gap-4 text-[12px] text-neutral-500">
+            {/* Activity row (views + comments) — low visual weight */}
+            <div className="flex items-center gap-4 text-[12px] text-neutral-400">
               <div className="flex items-center gap-1.5">
-                <Eye className="h-[16px] w-[16px] relative top-[1px] shrink-0 text-neutral-500" strokeWidth={1.5} aria-hidden />
+                <Eye className="h-[14px] w-[14px] shrink-0 text-neutral-400" strokeWidth={1.5} aria-hidden />
                 <span>{viewCount}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <MessageCircle className="h-[16px] w-[16px] relative top-[1px] shrink-0 text-neutral-500" strokeWidth={1.5} aria-hidden />
+                <MessageCircle className="h-[14px] w-[14px] shrink-0 text-neutral-400" strokeWidth={1.5} aria-hidden />
                 <span>{commentCount}</span>
               </div>
             </div>

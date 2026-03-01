@@ -49,17 +49,17 @@ export function StatusPill({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-md border border-[hsl(var(--border))] bg-neutral-50 hover:bg-neutral-100 transition-all duration-150 ease-out text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40"
+        className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
         aria-label={ariaLabel}
         aria-expanded={open}
         aria-haspopup="listbox"
       >
         {displayLabel}
-        <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+        <ChevronDown className="h-3.5 w-3.5 opacity-80" />
       </button>
       {open && (
         <div
-          className="absolute top-full left-0 mt-1 min-w-[7.5rem] rounded-md border border-[hsl(var(--border))] bg-white shadow-sm text-xs py-1 z-10"
+          className="absolute top-full left-0 mt-1 min-w-[7.5rem] rounded-lg border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] text-xs py-1 z-10"
           role="listbox"
           aria-label={ariaLabel}
         >
@@ -69,7 +69,7 @@ export function StatusPill({
               type="button"
               role="option"
               aria-selected={opt.value === value}
-              className="w-full text-left px-3 py-1.5 hover:bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] transition-all duration-150 ease-out"
+              className="w-full text-left px-3 py-2 hover:bg-neutral-100 text-neutral-800 transition-all duration-150 ease-out"
               onClick={() => handleSelect(opt.value)}
             >
               {opt.label}

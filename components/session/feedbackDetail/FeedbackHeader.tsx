@@ -136,25 +136,23 @@ export function FeedbackHeader({
           )}
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
+          <StatusPill defaultValue={item.status ?? "open"} aria-label="Status" />
           {onRequestDelete && (
             <button
               type="button"
               onClick={onRequestDelete}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium text-neutral-700 bg-white border border-neutral-200 hover:bg-neutral-50 transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
+              className="flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 rounded"
               aria-label="Delete ticket"
             >
               <Trash2 size={14} />
               Delete Ticket
             </button>
           )}
-          <StatusPill defaultValue={item.status ?? "open"} aria-label="Status" />
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 ${
-              isActivityOpen
-                ? "bg-neutral-200 text-neutral-900"
-                : "bg-neutral-100 text-neutral-600 hover:text-neutral-900"
+            className={`flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 rounded ${
+              isActivityOpen ? "text-neutral-700" : ""
             }`}
             aria-pressed={isActivityOpen}
           >

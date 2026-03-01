@@ -167,10 +167,10 @@ export default function FeedbackSidebar({
                     onSelect(item.id);
                   }
                 }}
-                className={`group flex flex-col px-3 py-2.5 cursor-pointer text-[14px] font-medium text-neutral-700 rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-0
+                className={`group flex flex-col px-3 py-2.5 cursor-pointer text-[14px] rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-0
                   ${isActive
-                    ? "bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-white"
-                    : "hover:bg-neutral-100"}`}
+                    ? "bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-white font-medium"
+                    : "text-neutral-600 hover:bg-neutral-100"}`}
               >
                 <div className="flex justify-between items-start gap-3">
                   <span className="truncate flex-1 min-w-0">

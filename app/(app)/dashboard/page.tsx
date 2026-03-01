@@ -67,21 +67,21 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleCreateSession}
+              className="h-9 rounded-lg bg-neutral-900 text-white text-[13px] px-4 font-medium hover:bg-neutral-800 active:scale-[0.98] focus:outline-none focus:ring-1 focus:ring-neutral-300 transition-all duration-150"
+            >
+              New Session
+            </button>
             <input
               type="search"
               placeholder="Search sessions"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="focus-ring-brand h-9 px-3 bg-white border border-neutral-200 rounded-xl text-[13px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 min-w-[180px]"
+              className="h-9 px-3 min-w-[160px] rounded-lg bg-white border border-neutral-200 text-[13px] text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-300 transition-all duration-150"
               aria-label="Search sessions"
             />
-            <button
-              type="button"
-              onClick={handleCreateSession}
-              className="focus-ring-brand h-9 rounded-xl bg-neutral-900 text-white text-[13px] px-4 font-medium hover:brightness-95 active:scale-[0.98] focus:outline-none transition-transform duration-100 ease-out"
-            >
-              New Session
-            </button>
           </div>
         </header>
 
