@@ -9,7 +9,6 @@ import { db } from "@/lib/firebase";
 import { addFeedback, deleteFeedback } from "@/lib/feedback";
 import CaptureWidget from "@/components/CaptureWidget";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
-import GlobalRail from "@/components/layout/GlobalRail";
 import FeedbackSidebar from "@/components/session/FeedbackSidebar";
 import FeedbackDetail from "@/components/session/feedbackDetail/FeedbackDetail";
 import { ActivityPanel } from "@/components/session/feedbackDetail/ActivityPanel";
@@ -225,14 +224,10 @@ export default function SessionPage() {
       <div
         className={`h-full grid grid-cols-1 ${
           isCommentsOpen
-            ? "grid-rows-[0_1fr_1fr_1fr] lg:grid-cols-[72px_340px_1fr_380px] lg:grid-rows-none"
-            : "grid-rows-[0_1fr_1fr] lg:grid-cols-[72px_340px_1fr] lg:grid-rows-none"
+            ? "grid-rows-[0_1fr_1fr_1fr] lg:grid-cols-[340px_1fr_380px] lg:grid-rows-none"
+            : "grid-rows-[0_1fr_1fr] lg:grid-cols-[340px_1fr] lg:grid-rows-none"
         }`}
       >
-        <div className="hidden lg:block min-h-0 h-full">
-          <GlobalRail />
-        </div>
-
         <aside className="flex flex-col h-full min-h-0 border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]">
           <FeedbackSidebar
             feedback={feedback}
