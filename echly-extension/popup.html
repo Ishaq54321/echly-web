@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Echly</title>
+</head>
+<body>
+  <form id="form">
+    <div>
+      <label for="sessionId">Session ID</label>
+      <input type="text" id="sessionId" name="sessionId" required>
+    </div>
+    <div>
+      <label for="title">Title</label>
+      <input type="text" id="title" name="title" required>
+    </div>
+    <div>
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="3" required></textarea>
+    </div>
+    <button type="submit" id="captureBtn">Capture</button>
+  </form>
+  <p id="status"></p>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

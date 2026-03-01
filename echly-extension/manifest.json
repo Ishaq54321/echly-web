@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Echly",
+  "version": "1.0",
+  "description": "Capture screenshots and submit feedback",
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": [
+    "https://YOUR_DOMAIN.com/*",
+    "https://*.firebaseapp.com/*",
+    "https://www.gstatic.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
