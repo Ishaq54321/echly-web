@@ -29,6 +29,7 @@ export function WorkspaceCard({
   const { session, counts } = item;
   const feedbackCount = counts.open + counts.in_progress + counts.resolved;
   const openFeedbackCount = counts.open;
+  const openCount = openFeedbackCount;
   const viewCount = session.viewCount ?? 0;
   const commentCount = session.commentCount ?? 0;
 
@@ -363,68 +364,94 @@ export function WorkspaceCard({
           </div>
         </div>
 
-        {/* ROW 1 — HEADER */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2 min-w-0 flex-1 pr-10">
-            <Folder
-              className="
-                w-4 h-4
-                shrink-0
-                text-[hsl(var(--text-secondary))]
-                transition-colors duration-200
-                group-hover:text-[hsl(var(--brand-red))]
-              "
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            <h3 className="
-              text-[17px]
-              font-semibold
-              tracking-[-0.015em]
-              text-[hsl(var(--text-primary))]
-              leading-snug
-              line-clamp-2
-              overflow-hidden
-              text-ellipsis
-              min-w-0
-              flex-1
-            ">
-              {session.title}
-            </h3>
-            {openFeedbackCount > 0 && (
-              <span
-                className="ml-2 mt-[6px] h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--brand-red))]"
-                aria-hidden
-              />
-            )}
-          </div>
-        </div>
+        <div className="flex h-full flex-col justify-between">
+          <div>
+            {/* Title row */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2 min-w-0 flex-1 pr-10">
+                <Folder
+                  className="
+                    w-4 h-4
+                    shrink-0
+                    text-[hsl(var(--text-secondary))]
+                    transition-colors duration-200
+                    group-hover:text-[hsl(var(--brand-red))]
+                  "
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                <h3 className="
+                  text-[17px]
+                  font-semibold
+                  tracking-[-0.015em]
+                  text-[hsl(var(--text-primary))]
+                  leading-snug
+                  line-clamp-2
+                  overflow-hidden
+                  text-ellipsis
+                  min-w-0
+                  flex-1
+                ">
+                  {session.title}
+                </h3>
+                {openFeedbackCount > 0 && (
+                  <span
+                    className="ml-2 mt-[6px] h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--brand-red))]"
+                    aria-hidden
+                  />
+                )}
+              </div>
+            </div>
 
-        {/* ROW 2 — FEEDBACK SUMMARY */}
-        <div className="mt-2 text-sm text-[hsl(var(--text-secondary))] font-medium">
-          <span className="text-[hsl(var(--text-primary))]">
-            {feedbackCount}
-          </span>
-          {" "}Feedback ·{" "}
-          <span className="text-[hsl(var(--text-primary))]">
-            {openFeedbackCount}
-          </span>
-          {" "}Open
-        </div>
-
-        {/* ROW 3 — META (VIEWS + COMMENTS) */}
-        <div className="mt-3 flex items-center gap-6 text-sm text-[hsl(var(--text-secondary))]">
-          <div className="flex items-center gap-1.5">
-            <Eye className="w-4 h-4 shrink-0 opacity-70" aria-hidden />
-            <span className="font-medium text-[hsl(var(--text-primary))]">
-              {viewCount}
-            </span>
+            {/* Metrics row — premium metadata tags */}
+            <div className="mt-4 flex items-center gap-3">
+              <div className="inline-flex items-center rounded-sm bg-neutral-100/60 px-2.5 py-1">
+                <span className="text-[13px] font-medium text-neutral-900">
+                  {feedbackCount}
+                </span>
+                <span className="ml-1 text-[12px] text-neutral-500">
+                  feedback
+                </span>
+              </div>
+              <div
+                className={`inline-flex items-center rounded-sm px-2.5 py-1 ${
+                  openCount > 0
+                    ? "bg-[hsl(var(--brand-red))]/8"
+                    : "bg-neutral-100/60"
+                }`}
+              >
+                <span
+                  className={`text-[13px] font-medium ${
+                    openCount > 0
+                      ? "text-[hsl(var(--brand-red))]"
+                      : "text-neutral-900"
+                  }`}
+                >
+                  {openCount}
+                </span>
+                <span className="ml-1 text-[12px] text-neutral-500">
+                  open
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <MessageCircle className="w-4 h-4 shrink-0 opacity-70" aria-hidden />
-            <span className="font-medium text-[hsl(var(--text-primary))]">
-              {commentCount}
-            </span>
+
+          <div className="mt-6">
+            {/* Activity row (views + comments) */}
+            <div className="flex items-center gap-6 text-sm text-[hsl(var(--text-secondary))]">
+              <div className="flex items-center gap-1.5">
+                <Eye className="w-4 h-4 shrink-0 opacity-70" aria-hidden />
+                <span className="font-medium text-[hsl(var(--text-primary))]">
+                  {viewCount}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <MessageCircle className="w-4 h-4 shrink-0 opacity-70" aria-hidden />
+                <span className="font-medium text-[hsl(var(--text-primary))]">
+                  {commentCount}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
