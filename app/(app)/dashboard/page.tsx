@@ -57,12 +57,12 @@ export default function DashboardPage() {
     <div className="surface-main flex flex-col w-full min-h-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
       <div className="mx-auto w-full max-w-[1800px] px-10 py-8">
         {/* Header */}
-        <header className="flex items-start justify-between mb-8">
+        <header className="flex items-start justify-between">
           <div>
-            <h1 className="text-[18px] font-medium text-neutral-900">
+            <h1 className="text-[20px] font-medium leading-[1.3] text-neutral-900">
               Workspaces
             </h1>
-            <p className="mt-2 text-[14px] text-neutral-600">
+            <p className="mt-2 text-[14px] text-neutral-500">
               Sessions and feedback in one place.
             </p>
           </div>
@@ -85,7 +85,7 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <main className="flex-1">
+        <main className="flex-1 mt-8">
           {/* TODO: Future: Archived view to list archived sessions. */}
           <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
             {filteredSessions.map((item, index) => (

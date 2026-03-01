@@ -81,7 +81,7 @@ export default function FeedbackSidebar({
         {/* Header (fixed) */}
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
-            <h2 className="text-[11px] font-semibold tracking-[0.08em] text-neutral-500 uppercase">
+            <h2 className="text-[11px] uppercase tracking-[0.08em] text-neutral-400">
               Feedback
             </h2>
             <p className="text-[12px] text-neutral-400 mt-1">
@@ -176,7 +176,7 @@ export default function FeedbackSidebar({
                     : "bg-transparent hover:bg-white/60"}`}
               >
                 <div className="flex justify-between items-start gap-3">
-                  <span className={`text-[14px] font-medium leading-snug truncate flex-1 min-w-0 ${isActive ? "text-neutral-900" : "text-neutral-700"}`}>
+                  <span className={`text-[14px] font-medium truncate flex-1 min-w-0 ${isActive ? "text-neutral-900" : "text-neutral-700"}`}>
                     {item.title}
                   </span>
                   <div className="flex items-center gap-1.5 shrink-0">

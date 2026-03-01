@@ -73,10 +73,10 @@ function OverviewSessionHeader({
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-neutral-200">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--text-primary))]">
+        <h1 className="text-[18px] font-medium leading-[1.35] text-neutral-900">
           {title || "Session"}
         </h1>
-        <p className="text-sm text-[hsl(var(--text-muted))] mt-0.5">
+        <p className="text-[13px] text-neutral-500 mt-0.5">
           {dateStr} • Owner • —
         </p>
       </div>
@@ -120,10 +120,10 @@ function MetricCard({
 }) {
   return (
     <div className="rounded-md border border-neutral-200 p-4 bg-white">
-      <p className="text-xs uppercase tracking-wide text-[hsl(var(--text-muted))]">
+      <p className="text-[11px] uppercase tracking-[0.08em] text-neutral-400">
         {label}
       </p>
-      <p className="text-xl font-semibold text-[hsl(var(--text-primary))] mt-1">
+      <p className="text-[13px] font-medium text-neutral-900 mt-1">
         {value}
       </p>
       {progressPercent !== undefined && (

@@ -363,7 +363,7 @@ export function WorkspaceCard({
                   strokeWidth={1.5}
                   aria-hidden
                 />
-                <h3 className="text-[15px] font-medium leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary))] line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
+                <h3 className="text-[15px] font-medium leading-[1.35] tracking-[-0.01em] text-neutral-900 line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
                   {session.title}
                 </h3>
                 {openFeedbackCount > 0 && (

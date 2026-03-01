@@ -128,7 +128,7 @@ export function FeedbackContent({
       )}
       {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (
         <Section title="Tags">
-          <div className="flex flex-wrap gap-2 mt-3 max-w-full">
+          <div className="flex flex-wrap gap-2 mt-4 max-w-full">
             {tags.map((tag, i) => (
               <Tag key={`${tag}-${i}`} name={tag} variant="default">
                 {onSaveTags && (
@@ -154,7 +154,7 @@ export function FeedbackContent({
                 <button
                   type="button"
                   onClick={() => setTagPopoverOpen((o) => !o)}
-                  className="text-xs font-medium px-3 py-1 rounded-full border border-dashed border-neutral-300 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 transition-colors duration-150 ease-out"
+                  className="text-[13px] font-medium px-3 py-1 rounded-full border border-dashed border-neutral-300 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 transition-colors duration-150 ease-out"
                 >
                   + Add tag
                 </button>
@@ -175,7 +175,7 @@ export function FeedbackContent({
                           className={`w-1.5 h-1.5 rounded-full shrink-0 ${getTagDotClass(tag)}`}
                           aria-hidden
                         />
-                        <span className="text-[14px] font-medium text-neutral-900">{tag}</span>
+                        <span className="text-[14px] text-neutral-800">{tag}</span>
                       </button>
                     ))}
                   </div>
@@ -186,7 +186,7 @@ export function FeedbackContent({
                       dropdownAnimate ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
                     }`}
                   >
-                    <p className="text-xs text-neutral-500">All tags added</p>
+                    <p className="text-[13px] text-neutral-500">All tags added</p>
                   </div>
                 )}
               </div>

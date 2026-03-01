@@ -78,7 +78,7 @@ export function RenameSessionModal({
       >
         <h2
           id="rename-session-title"
-          className="text-lg font-semibold text-[hsl(var(--text-primary))]"
+          className="text-[18px] font-medium leading-[1.35] text-neutral-900"
         >
           Rename session
         </h2>

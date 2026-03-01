@@ -28,7 +28,7 @@ export function ActivityPanel({
   return (
     <div className="flex flex-col">
       <div className="shrink-0 px-6 pt-4 pb-4 border-b border-neutral-200">
-        <h2 className="text-sm font-semibold text-[hsl(var(--text-primary))]">Activity</h2>
+        <h2 className="text-[11px] uppercase tracking-[0.08em] text-neutral-400">Activity</h2>
       </div>
 
       <div className="shrink-0 px-6 py-4 border-b border-neutral-100">

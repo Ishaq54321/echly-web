@@ -43,7 +43,7 @@ export function DeleteSessionModal({
       >
         <h2
           id="delete-session-title"
-          className="text-lg font-semibold text-[hsl(var(--text-primary))]"
+          className="text-[18px] font-medium leading-[1.35] text-neutral-900"
         >
           Delete session?
         </h2>

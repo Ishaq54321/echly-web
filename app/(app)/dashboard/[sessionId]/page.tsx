@@ -471,11 +471,11 @@ export default function SessionPage() {
                       className="text-[18px] font-medium tracking-[-0.01em] text-neutral-900 w-full bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
                       aria-label="Session title"
                     />
-                    <p className="text-xs text-neutral-400 mt-1">
+                    <p className="text-[13px] text-neutral-500 mt-1">
                       Enter to save
                     </p>
                     {isSavingSessionTitle && (
-                      <p className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+                      <p className="text-[13px] text-neutral-500 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
                         Saving...
                       </p>
                     )}
@@ -513,7 +513,7 @@ export default function SessionPage() {
                       )}
                     </div>
                     {saveSessionTitleSuccess && (
-                      <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+                      <p className="text-[13px] text-green-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
                         <Check size={12} className="shrink-0" aria-hidden />
                         Saved
                       </p>
@@ -634,24 +634,24 @@ export default function SessionPage() {
               className="bg-[hsl(var(--surface-1))] rounded-lg shadow-xl max-w-sm w-full p-6 border border-[hsl(var(--border))]"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 id="delete-ticket-title" className="text-lg font-semibold text-[hsl(var(--text-primary))]">
+              <h2 id="delete-ticket-title" className="text-[18px] font-medium leading-[1.35] text-neutral-900">
                 Delete ticket?
               </h2>
-              <p className="mt-2 text-sm text-[hsl(var(--text-secondary))]">
+              <p className="mt-2 text-[14px] text-neutral-500">
                 This cannot be undone.
               </p>
               <div className="mt-6 flex gap-3 justify-end">
                 <button
                   type="button"
                   onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 text-sm font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-3))] transition-colors"
+                  className="px-4 py-2 text-[13px] font-medium rounded-md bg-[hsl(var(--surface-2))] text-neutral-900 hover:bg-[hsl(var(--surface-3))] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeleteFeedback(selectedId)}
-                  className="px-4 py-2 text-sm font-medium rounded-lg bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] transition-transform duration-100 ease-out"
+                  className="px-4 py-2 text-[13px] font-medium rounded-lg bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] transition-transform duration-100 ease-out"
                 >
                   Delete
                 </button>

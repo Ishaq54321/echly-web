@@ -21,7 +21,7 @@ export default function FeedbackList({
   getHandlers,
 }: FeedbackListProps) {
   return (
-    <div className="capture-feedback-list flex flex-col gap-4">
+    <div className="capture-feedback-list flex flex-col space-y-2">
       {items.map((p) => (
         <FeedbackItem
           key={p.id}

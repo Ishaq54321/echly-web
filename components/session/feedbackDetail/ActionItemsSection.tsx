@@ -98,7 +98,7 @@ export function ActionItemsSection({
                 <button
                   type="button"
                   onClick={() => void saveEdit()}
-                  className="text-xs font-medium text-brand-accent hover:underline"
+                  className="text-[13px] font-medium text-brand-accent hover:underline"
                 >
                   Save
                 </button>
@@ -150,7 +150,7 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-2 flex items-center gap-2 text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+          className="mt-2 flex items-center gap-2 text-[13px] font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
         >
           <Plus size={14} />
           Add action item

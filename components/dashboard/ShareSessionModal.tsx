@@ -33,7 +33,7 @@ export function ShareSessionModal({
       >
         <h2
           id="share-session-title"
-          className="text-lg font-semibold text-[hsl(var(--text-primary))]"
+          className="text-[18px] font-medium leading-[1.35] text-neutral-900"
         >
           Share session
         </h2>

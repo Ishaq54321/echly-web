@@ -18,7 +18,7 @@ interface TagProps {
 
 const variantClasses: Record<TagVariant, string> = {
   default: "rounded-full px-3 py-1 text-xs font-medium",
-  sidebar: "rounded-full px-2 py-0.5 text-[12px] font-medium",
+  sidebar: "rounded-full px-2 py-0.5 text-[12px]",
 };
 
 export function Tag({ name, variant = "default", inactive = false, className = "", children }: TagProps) {
