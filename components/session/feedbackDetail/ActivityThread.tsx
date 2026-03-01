@@ -26,13 +26,23 @@ export function ActivityThread({ comments, loading }: ActivityThreadProps) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-0">
       <AnimatePresence initial={false}>
         {comments.map((comment) => {
           let timestamp: Date | null = null;
           if (comment.createdAt?.seconds) {
             timestamp = new Date(comment.createdAt.seconds * 1000);
           }
+          const formattedDate =
+            timestamp
+              ? timestamp.toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "Just now";
+
           return (
             <motion.div
               key={comment.id}
@@ -41,9 +51,9 @@ export function ActivityThread({ comments, loading }: ActivityThreadProps) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
-              className="flex gap-3"
+              className="flex gap-3 py-4 rounded-lg px-2 -mx-2 hover:bg-neutral-50 transition-colors duration-150"
             >
-              <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 flex-shrink-0">
+              <div className="h-8 w-8 shrink-0 rounded-full overflow-hidden bg-neutral-200">
                 {comment.userAvatar ? (
                   <img
                     src={comment.userAvatar}
@@ -51,29 +61,21 @@ export function ActivityThread({ comments, loading }: ActivityThreadProps) {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-sm font-medium text-slate-600">
+                  <div className="w-full h-full flex items-center justify-center text-xs font-medium text-neutral-600">
                     {comment.userName?.charAt(0)}
                   </div>
                 )}
               </div>
-
               <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 mb-0.5">
-                  <span className="text-sm font-semibold text-slate-900">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-sm truncate text-neutral-900">
                     {comment.userName}
                   </span>
-                  <span className="text-xs text-slate-400 tabular-nums">
-                    {timestamp
-                      ? timestamp.toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "Just now"}
+                  <span className="text-xs text-neutral-500 whitespace-nowrap">
+                    {formattedDate}
                   </span>
                 </div>
-                <p className="text-sm text-slate-700 leading-relaxed">
+                <p className="mt-1 text-sm text-neutral-700 leading-relaxed">
                   {comment.message}
                 </p>
               </div>

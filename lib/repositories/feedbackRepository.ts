@@ -165,6 +165,43 @@ export async function getSessionFeedbackPageRepo(
   return { feedback, lastVisibleDoc, hasMore };
 }
 
+/** Cursor-based page for API: cursor is last document ID (opaque string). Returns nextCursor as last doc id or null. */
+export async function getSessionFeedbackPageWithStringCursorRepo(
+  sessionId: string,
+  pageSize: number = FEEDBACK_PAGE_SIZE_DEFAULT,
+  cursorDocId?: string | null
+): Promise<{ feedback: Feedback[]; nextCursor: string | null; hasMore: boolean }> {
+  assertQueryLimit(pageSize, "getSessionFeedbackPageWithStringCursorRepo");
+  const coll = collection(db, "feedback");
+  let startAfterDoc: QueryDocumentSnapshot | null = null;
+  if (cursorDocId && cursorDocId.trim() !== "") {
+    const cursorSnap = await getDoc(doc(db, "feedback", cursorDocId));
+    if (cursorSnap.exists()) startAfterDoc = cursorSnap as QueryDocumentSnapshot;
+  }
+  const q =
+    startAfterDoc != null
+      ? query(
+          coll,
+          where("sessionId", "==", sessionId),
+          orderBy("createdAt", "desc"),
+          limit(pageSize),
+          startAfter(startAfterDoc)
+        )
+      : query(
+          coll,
+          where("sessionId", "==", sessionId),
+          orderBy("createdAt", "desc"),
+          limit(pageSize)
+        );
+  const snapshot = await getDocs(q);
+  const docs = snapshot.docs;
+  const feedback = docs.map(docToFeedback);
+  const lastDoc = docs.length > 0 ? docs[docs.length - 1] : null;
+  const nextCursor = lastDoc ? lastDoc.id : null;
+  const hasMore = docs.length === pageSize;
+  return { feedback, nextCursor, hasMore };
+}
+
 export async function deleteFeedbackRepo(feedbackId: string): Promise<void> {
   await deleteDoc(doc(db, "feedback", feedbackId));
 }

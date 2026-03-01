@@ -1,13 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  getSessionFeedbackPage,
-  type Feedback,
-  type FeedbackPageCursor,
-} from "@/lib/feedback";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import type { Feedback } from "@/lib/domain/feedback";
 
 const PAGE_SIZE = 20;
+const DEBOUNCE_MS = 150;
 /** Client-side read cap: stop loading more after this many items (cost protection). */
 const FEEDBACK_LOAD_CAP = 200;
 
@@ -17,49 +14,115 @@ export interface UseSessionFeedbackPaginatedResult {
   loading: boolean;
   hasMore: boolean;
   hasReachedLimit: boolean;
+  loadingMore: boolean;
   fetchNextPage: () => Promise<void>;
-  /** Refetch first page from DB (e.g. after capture creates a ticket). */
   refetchFirstPage: () => Promise<void>;
+  /** Ref to attach to sentinel div for intersection observer. */
+  loadMoreRef: React.RefObject<HTMLDivElement | null>;
 }
 
 /**
- * Manages paginated feedback for a session. Loads first page when sessionId is set;
- * fetchNextPage() appends further pages. Respects FEEDBACK_LOAD_CAP (200 items).
+ * Infinite scroll: GET /api/feedback with 150ms debounce, intersection observer.
+ * Append-only; no duplicate fetch; no simultaneous requests.
  */
 export function useSessionFeedbackPaginated(
   sessionId: string | undefined
 ): UseSessionFeedbackPaginatedResult {
-  const [feedback, setFeedback] = useState<Feedback[]>([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<Feedback[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
-  const lastVisibleDocRef = useRef<FeedbackPageCursor | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  const hasReachedLimit = feedback.length >= FEEDBACK_LOAD_CAP;
+  const hasReachedLimit = items.length >= FEEDBACK_LOAD_CAP;
+
+  const loadMore = useCallback(async () => {
+    if (!sessionId || !initialLoadDone || !hasMore || loadingMore || hasReachedLimit) return;
+
+    setLoadingMore(true);
+    try {
+      const url = `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=${encodeURIComponent(cursor ?? "")}&limit=${PAGE_SIZE}`;
+      const res = await fetch(url);
+      const data = (await res.json()) as {
+        feedback?: Feedback[];
+        nextCursor?: string | null;
+        hasMore?: boolean;
+      };
+
+      if (data.feedback?.length) {
+        setItems((prev) => [...prev, ...data.feedback!]);
+        setCursor(data.nextCursor ?? null);
+        setHasMore(data.hasMore ?? false);
+      } else {
+        setHasMore(false);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [sessionId, initialLoadDone, cursor, hasMore, loadingMore, hasReachedLimit]);
+
+  const debouncedLoadMore = useMemo(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    return () => {
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        loadMore();
+      }, DEBOUNCE_MS);
+    };
+  }, [loadMore]);
+
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          debouncedLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [debouncedLoadMore]);
 
   // Initial load: first page when sessionId becomes available.
   useEffect(() => {
     if (!sessionId) {
-      setFeedback([]);
-      lastVisibleDocRef.current = null;
-      setHasMore(false);
+      setItems([]);
+      setCursor(null);
+      setHasMore(true);
       setInitialLoadDone(false);
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
+    setInitialLoading(true);
+    setInitialLoadDone(false);
 
-    getSessionFeedbackPage(sessionId, PAGE_SIZE)
-      .then(({ feedback: page, lastVisibleDoc: last, hasMore: more }) => {
+    fetch(
+      `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
+    )
+      .then((res) => res.json())
+      .then((data: { feedback?: Feedback[]; nextCursor?: string | null; hasMore?: boolean }) => {
         if (cancelled) return;
-        setFeedback(page);
-        lastVisibleDocRef.current = last;
-        setHasMore(more);
+        if (data.feedback?.length) {
+          setItems(data.feedback);
+          setCursor(data.nextCursor ?? null);
+          setHasMore(data.hasMore ?? false);
+        } else {
+          setItems([]);
+          setCursor(null);
+          setHasMore(false);
+        }
         setInitialLoadDone(true);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setInitialLoading(false);
       });
 
     return () => {
@@ -67,45 +130,41 @@ export function useSessionFeedbackPaginated(
     };
   }, [sessionId]);
 
-  const fetchNextPage = useCallback(async () => {
-    if (!sessionId || !initialLoadDone || loading || !hasMore || hasReachedLimit)
-      return;
-    if (feedback.length >= FEEDBACK_LOAD_CAP) return;
-
-    const cursor = lastVisibleDocRef.current;
-    setLoading(true);
-    try {
-      const { feedback: page, lastVisibleDoc: last, hasMore: more } =
-        await getSessionFeedbackPage(sessionId, PAGE_SIZE, cursor);
-      setFeedback((prev) => [...prev, ...page]);
-      lastVisibleDocRef.current = last;
-      setHasMore(more);
-    } finally {
-      setLoading(false);
-    }
-  }, [sessionId, initialLoadDone, loading, hasMore, hasReachedLimit, feedback.length]);
-
   const refetchFirstPage = useCallback(async () => {
     if (!sessionId) return;
-    setLoading(true);
+    setInitialLoading(true);
     try {
-      const { feedback: page, lastVisibleDoc: last, hasMore: more } =
-        await getSessionFeedbackPage(sessionId, PAGE_SIZE);
-      setFeedback(page);
-      lastVisibleDocRef.current = last;
-      setHasMore(more);
+      const res = await fetch(
+        `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
+      );
+      const data = (await res.json()) as {
+        feedback?: Feedback[];
+        nextCursor?: string | null;
+        hasMore?: boolean;
+      };
+      if (data.feedback?.length) {
+        setItems(data.feedback);
+        setCursor(data.nextCursor ?? null);
+        setHasMore(data.hasMore ?? false);
+      } else {
+        setItems([]);
+        setCursor(null);
+        setHasMore(false);
+      }
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   }, [sessionId]);
 
   return {
-    feedback,
-    setFeedback,
-    loading,
+    feedback: items,
+    setFeedback: setItems,
+    loading: initialLoading,
     hasMore,
     hasReachedLimit,
-    fetchNextPage,
+    loadingMore,
+    fetchNextPage: loadMore,
     refetchFirstPage,
+    loadMoreRef,
   };
 }

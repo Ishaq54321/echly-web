@@ -128,26 +128,24 @@ export function FeedbackContent({
         <Section title="Tags">
           <div className="flex flex-wrap gap-2 mt-3 max-w-full">
             {tags.map((tag, i) => (
-              <span key={`${tag}-${i}`} className="group/tag inline-flex items-center">
-                <Tag name={tag} variant="default" className="hover:opacity-90">
-                  {onSaveTags && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleRemoveTag(tag);
-                      }}
-                      className="opacity-0 group-hover/tag:opacity-100 ml-0.5 p-0.5 rounded transition-opacity duration-150 ease-out hover:bg-black/10"
-                      aria-label={`Remove ${tag}`}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                        <path d="M2 2l8 8M10 2L2 10" />
-                      </svg>
-                    </button>
-                  )}
-                </Tag>
-              </span>
+              <Tag key={`${tag}-${i}`} name={tag} variant="default">
+                {onSaveTags && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleRemoveTag(tag);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-neutral-400 hover:text-red-500"
+                    aria-label={`Remove ${tag}`}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                      <path d="M2 2l8 8M10 2L2 10" />
+                    </svg>
+                  </button>
+                )}
+              </Tag>
             ))}
             {onSaveTags && (
               <div className="relative" ref={tagPopoverRef}>

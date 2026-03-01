@@ -22,11 +22,12 @@ interface Props {
   onSelect: (id: string) => void;
   selectedIndex?: number;
   total?: number;
-  /** Pagination: show "Load more" and call when user requests next page. */
+  /** Infinite scroll: loading next page. */
   loadingMore?: boolean;
   hasMore?: boolean;
   hasReachedLimit?: boolean;
-  onLoadMore?: () => void;
+  /** Ref for sentinel div (intersection observer). */
+  loadMoreRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export default function FeedbackSidebar({
@@ -36,7 +37,7 @@ export default function FeedbackSidebar({
   loadingMore = false,
   hasMore = false,
   hasReachedLimit = false,
-  onLoadMore,
+  loadMoreRef,
 }: Props) {
   const [sort, setSort] = useState<SortKind>("recent");
   const [sortOpen, setSortOpen] = useState(false);
@@ -75,7 +76,7 @@ export default function FeedbackSidebar({
       : "0 total";
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col min-h-0">
       <style dangerouslySetInnerHTML={{ __html: `
         .feedback-sidebar-active-rail::before {
           content: "";
@@ -211,17 +212,15 @@ export default function FeedbackSidebar({
             );
           })}
           </div>
-          {/* Cost protection: load more only when allowed; append results. */}
-          {hasMore && !hasReachedLimit && onLoadMore && (
-            <div className="shrink-0 px-3 py-2 border-t border-neutral-100">
-              <button
-                type="button"
-                onClick={() => onLoadMore()}
-                disabled={loadingMore}
-                className="w-full text-xs py-2 rounded-md bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] text-[hsl(var(--text-secondary))] hover:bg-[hsl(var(--surface-2))] disabled:opacity-60 transition-colors"
-              >
-                {loadingMore ? "Loading…" : "Load more"}
-              </button>
+          {loadMoreRef && <div ref={loadMoreRef} />}
+          {loadingMore && (
+            <div className="text-sm text-neutral-400 py-4 text-center">
+              Loading…
+            </div>
+          )}
+          {!hasMore && feedback.length > 0 && (
+            <div className="text-neutral-400 text-sm py-4 text-center">
+              No more feedback
             </div>
           )}
           {hasReachedLimit && feedback.length > 0 && (

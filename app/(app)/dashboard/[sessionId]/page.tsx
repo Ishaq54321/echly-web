@@ -81,8 +81,9 @@ export default function SessionPage() {
     loading: feedbackLoading,
     hasMore: hasMoreFeedback,
     hasReachedLimit: feedbackReachedLimit,
-    fetchNextPage: fetchNextFeedbackPage,
+    loadingMore: feedbackLoadingMore,
     refetchFirstPage: refetchFeedbackFirstPage,
+    loadMoreRef: feedbackLoadMoreRef,
   } = useSessionFeedbackPaginated(sessionId as string | undefined);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -387,21 +388,21 @@ export default function SessionPage() {
   return (
     <>
       <div className="h-screen flex overflow-hidden">
-        <aside className="w-[280px] shrink-0 border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] overflow-y-auto">
+        <aside className="w-[280px] shrink-0 min-h-0 overflow-y-auto border-r border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]">
           <FeedbackSidebar
             feedback={feedback}
             selectedId={selectedId}
             onSelect={setSelectedId}
             selectedIndex={selectedIndex}
             total={feedback.length}
-            loadingMore={feedbackLoading}
+            loadingMore={feedbackLoadingMore}
             hasMore={hasMoreFeedback}
             hasReachedLimit={feedbackReachedLimit}
-            onLoadMore={fetchNextFeedbackPage}
+            loadMoreRef={feedbackLoadMoreRef}
           />
         </aside>
 
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-neutral-50">
+        <div className="flex-1 min-h-0 flex flex-col bg-neutral-50">
           <div className="max-w-4xl mx-auto w-full px-8 pt-5 pb-4 border-b border-neutral-200 shrink-0">
             <div className="flex justify-between items-center gap-4">
               <div className="min-w-0 flex-1">
@@ -536,9 +537,9 @@ export default function SessionPage() {
               </div>
             </div>
           </div>
-          <div className="flex-1 min-h-0 flex flex-col max-w-4xl mx-auto w-full overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col max-w-4xl mx-auto w-full">
             <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-50">
-              <div className="flex flex-col h-full px-8 pt-4 pb-4">
+              <div className="flex flex-col px-8 pt-4 pb-4">
                 {detailLoading && selectedId ? (
                   <div className="flex-1 min-h-0 flex items-center justify-center py-16">
                     <p className="text-sm text-[hsl(var(--text-secondary))]">Loading…</p>
@@ -569,7 +570,7 @@ export default function SessionPage() {
         </div>
 
         {isCommentsOpen && (
-            <aside className="w-[320px] shrink-0 hidden lg:block border-l border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-1))] overflow-y-auto px-6">
+            <aside className="w-[320px] shrink-0 min-h-0 overflow-y-auto hidden lg:block border-l border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-1))] px-6">
               <ActivityPanel
                 comments={comments}
                 loading={loadingComments}

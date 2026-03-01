@@ -28,7 +28,7 @@ export function Tag({ name, variant = "default", inactive = false, className = "
 
   return (
     <span
-      className={`inline-flex items-center gap-1 transition-all duration-150 ease-out ${baseClass} ${colorClass} ${className}`}
+      className={`relative group inline-flex items-center ${baseClass} ${colorClass} ${children ? "pr-6" : ""} ${className}`}
     >
       <span>{name}</span>
       {children}
