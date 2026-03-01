@@ -71,20 +71,31 @@ export default function CaptureWidget({
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-40 backdrop-blur-[4px] bg-black/8"
-        aria-hidden
-        style={extensionMode ? { pointerEvents: "none" } : undefined}
-      />
+      {!extensionMode && (
+        <div
+          className="fixed inset-0 z-40 backdrop-blur-[4px] bg-black/8"
+          aria-hidden
+        />
+      )}
       <div
         ref={refs.widgetRef}
-        className={`fixed z-50 w-[480px] transition-all duration-200 ${
-          state.position ? "" : "bottom-10 right-10"
-        }`}
-        style={{
-          ...(state.position ? { left: state.position.x, top: state.position.y } : {}),
-          ...(extensionMode ? { pointerEvents: "auto" } : {}),
-        }}
+        className={`fixed w-[480px] transition-all duration-200 ${
+          !extensionMode && state.position ? "" : !extensionMode ? "bottom-10 right-10" : ""
+        } ${extensionMode ? "" : "z-50"}`}
+        style={
+          extensionMode
+            ? {
+                position: "fixed",
+                ...(state.position
+                  ? { left: state.position.x, top: state.position.y }
+                  : { bottom: "24px", right: "24px" }),
+                zIndex: 2147483647,
+                pointerEvents: "auto",
+              }
+            : {
+                ...(state.position ? { left: state.position.x, top: state.position.y } : {}),
+              }
+        }
       >
         <div className="bg-white rounded-lg
                         border border-slate-200/80
@@ -109,6 +120,18 @@ export default function CaptureWidget({
             editedDescription={state.editedDescription}
             getHandlers={getFeedbackItemHandlers}
           />
+
+          {state.errorMessage && (
+            <div className="text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3">
+              {state.errorMessage}
+            </div>
+          )}
+
+          {state.state === "capturing" && (
+            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 text-sm text-slate-600">
+              Capturing screenshot…
+            </div>
+          )}
 
           {(state.state === "processing" || state.state === "anticipation") && (
             <div className="capture-processing-enter relative flex items-center gap-4 text-sm text-slate-600 py-3 pr-4 min-h-[52px]">
@@ -140,11 +163,6 @@ export default function CaptureWidget({
                 <button type="button" onClick={handlers.discardListening} className="text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-neutral-100 transition-colors duration-120 cursor-pointer px-3 py-2 rounded-md">Cancel</button>
                 <button type="button" onClick={handlers.finishListening} className="bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-colors duration-150 cursor-pointer">Done</button>
               </div>
-            </div>
-          )}
-          {state.errorMessage && (
-            <div className="text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3">
-              {state.errorMessage}
             </div>
           )}
 

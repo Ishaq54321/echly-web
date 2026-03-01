@@ -21741,7 +21741,7 @@
   });
 
   // echly-extension/src/content.tsx
-  var import_react5 = __toESM(require_react());
+  var import_react6 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // node_modules/@firebase/util/dist/postinstall.mjs
@@ -47647,11 +47647,12 @@ ${this.customData.serverResponse}`;
   }
 
   // components/AudioWaveform.tsx
+  var import_react2 = __toESM(require_react());
   var BAR_COUNT = 6;
   var DELAYS = [0, 0.12, 0.28, 0.18, 0.34, 0.22];
   var PEAKS = [18, 22, 20, 24, 19, 21];
   function AudioWaveform({ isActive }) {
-    return /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-center gap-[6px] h-[60px] waveform-root" }, [...Array(BAR_COUNT)].map((_, i) => /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ import_react2.default.createElement("div", { className: "flex items-center justify-center gap-[6px] h-[60px] waveform-root" }, [...Array(BAR_COUNT)].map((_, i) => /* @__PURE__ */ import_react2.default.createElement(
       "span",
       {
         key: i,
@@ -47662,7 +47663,7 @@ ${this.customData.serverResponse}`;
           ["--peak"]: `${PEAKS[i]}px`
         } : void 0
       }
-    )), /* @__PURE__ */ React.createElement("style", { jsx: true }, `
+    )), /* @__PURE__ */ import_react2.default.createElement("style", { jsx: true }, `
         @keyframes waveform-organic {
           0%, 100% {
             height: 8px;
@@ -47706,7 +47707,7 @@ ${this.customData.serverResponse}`;
   }
 
   // components/CaptureWidget/hooks/useCaptureWidget.ts
-  var import_react2 = __toESM(require_react());
+  var import_react3 = __toESM(require_react());
 
   // lib/querySafety.ts
   var isDev = typeof process !== "undefined" && true;
@@ -47792,49 +47793,64 @@ ${this.customData.serverResponse}`;
     onComplete,
     onDelete
   }) {
-    const [recordings, setRecordings] = (0, import_react2.useState)([]);
-    const [activeRecordingId, setActiveRecordingId] = (0, import_react2.useState)(null);
-    const [isOpen, setIsOpenState] = (0, import_react2.useState)(false);
-    const [state, setState] = (0, import_react2.useState)("idle");
-    const [errorMessage, setErrorMessage] = (0, import_react2.useState)(null);
-    const [pointers, setPointers] = (0, import_react2.useState)(
+    const [recordings, setRecordings] = (0, import_react3.useState)([]);
+    const [activeRecordingId, setActiveRecordingId] = (0, import_react3.useState)(null);
+    const [isOpen, setIsOpenState] = (0, import_react3.useState)(false);
+    const [state, setState] = (0, import_react3.useState)("idle");
+    const [errorMessage, setErrorMessage] = (0, import_react3.useState)(null);
+    const [pointers, setPointers] = (0, import_react3.useState)(
       initialPointers ?? []
     );
-    const [expandedId, setExpandedId] = (0, import_react2.useState)(null);
-    const [editingId, setEditingId] = (0, import_react2.useState)(null);
-    const [editedTitle, setEditedTitle] = (0, import_react2.useState)("");
-    const [editedDescription, setEditedDescription] = (0, import_react2.useState)("");
-    const [seconds, setSeconds] = (0, import_react2.useState)(0);
-    const [showMenu, setShowMenu] = (0, import_react2.useState)(false);
-    const [position, setPosition] = (0, import_react2.useState)(null);
-    const [isDragging, setIsDragging] = (0, import_react2.useState)(false);
-    const [pendingStructured, setPendingStructured] = (0, import_react2.useState)(null);
-    const dragOffset = (0, import_react2.useRef)({ x: 0, y: 0 });
-    const widgetRef = (0, import_react2.useRef)(null);
-    const recognitionRef = (0, import_react2.useRef)(null);
-    const timerRef = (0, import_react2.useRef)(null);
-    const menuRef = (0, import_react2.useRef)(null);
-    const activeRecordingIdRef = (0, import_react2.useRef)(null);
-    const recordingsRef = (0, import_react2.useRef)(recordings);
-    const stateRef = (0, import_react2.useRef)(state);
-    (0, import_react2.useEffect)(() => {
+    const [expandedId, setExpandedId] = (0, import_react3.useState)(null);
+    const [editingId, setEditingId] = (0, import_react3.useState)(null);
+    const [editedTitle, setEditedTitle] = (0, import_react3.useState)("");
+    const [editedDescription, setEditedDescription] = (0, import_react3.useState)("");
+    const [seconds, setSeconds] = (0, import_react3.useState)(0);
+    const [showMenu, setShowMenu] = (0, import_react3.useState)(false);
+    const [position, setPosition] = (0, import_react3.useState)(null);
+    const [isDragging, setIsDragging] = (0, import_react3.useState)(false);
+    const [pendingStructured, setPendingStructured] = (0, import_react3.useState)(null);
+    const dragOffset = (0, import_react3.useRef)({ x: 0, y: 0 });
+    const widgetRef = (0, import_react3.useRef)(null);
+    const recognitionRef = (0, import_react3.useRef)(null);
+    const timerRef = (0, import_react3.useRef)(null);
+    const menuRef = (0, import_react3.useRef)(null);
+    const activeRecordingIdRef = (0, import_react3.useRef)(null);
+    const recordingsRef = (0, import_react3.useRef)(recordings);
+    const stateRef = (0, import_react3.useRef)(state);
+    const editingIdRef = (0, import_react3.useRef)(null);
+    const trayLockedRef = (0, import_react3.useRef)(false);
+    (0, import_react3.useEffect)(() => {
       stateRef.current = state;
+    }, [state]);
+    (0, import_react3.useEffect)(() => {
+      editingIdRef.current = editingId;
+    }, [editingId]);
+    (0, import_react3.useEffect)(() => {
+      if (state === "capturing" || state === "listening" || state === "processing" || state === "anticipation") {
+        trayLockedRef.current = true;
+      } else {
+        trayLockedRef.current = false;
+      }
     }, [state]);
     const setIsOpen = (next) => {
       if (next === false) {
+        if (trayLockedRef.current) return;
         if (extensionMode) return;
         const s = stateRef.current;
-        if (s === "listening" || s === "processing" || s === "anticipation") return;
+        if (s === "capturing" || s === "listening" || s === "processing" || s === "anticipation")
+          return;
+        if (editingIdRef.current) return;
       }
       setIsOpenState(next);
     };
-    (0, import_react2.useEffect)(() => {
+    (0, import_react3.useEffect)(() => {
       activeRecordingIdRef.current = activeRecordingId;
     }, [activeRecordingId]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react3.useEffect)(() => {
       recordingsRef.current = recordings;
     }, [recordings]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react3.useEffect)(() => {
       const handleMouseMove = (e) => {
         if (!isDragging || !widgetRef.current) return;
         e.preventDefault();
@@ -47872,7 +47888,7 @@ ${this.customData.serverResponse}`;
       };
       setPosition({ x: rect.left, y: rect.top });
     };
-    (0, import_react2.useEffect)(() => {
+    (0, import_react3.useEffect)(() => {
       if (initialPointers != null) {
         setPointers(initialPointers);
         return;
@@ -47891,7 +47907,7 @@ ${this.customData.serverResponse}`;
       };
       loadFeedback();
     }, [sessionId, initialPointers]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react3.useEffect)(() => {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) return;
       const recognition = new SpeechRecognition();
@@ -47981,7 +47997,7 @@ ${this.customData.serverResponse}`;
         setState("error");
       }
     };
-    (0, import_react2.useEffect)(() => {
+    (0, import_react3.useEffect)(() => {
       if (state !== "anticipation" || !pendingStructured) return;
       const t = setTimeout(() => {
         setPointers((prev) => [
@@ -48022,7 +48038,7 @@ ${this.customData.serverResponse}`;
       setEditingId(null);
       setShowMenu(false);
     };
-    (0, import_react2.useEffect)(() => {
+    (0, import_react3.useEffect)(() => {
       if (extensionMode) return;
       const handleClickOutside = (event) => {
         if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -48088,6 +48104,7 @@ ${this.customData.serverResponse}`;
     };
     const handleAddFeedback = async () => {
       if (state !== "idle") return;
+      setIsOpen(true);
       setErrorMessage(null);
       recognitionRef.current?.stop();
       setState("capturing");
@@ -48156,7 +48173,7 @@ ${this.customData.serverResponse}`;
   }
 
   // node_modules/lucide-react/dist/esm/createLucideIcon.js
-  var import_react4 = __toESM(require_react());
+  var import_react5 = __toESM(require_react());
 
   // node_modules/lucide-react/dist/esm/shared/src/utils/mergeClasses.js
   var mergeClasses = (...classes) => classes.filter((className, index, array) => {
@@ -48179,7 +48196,7 @@ ${this.customData.serverResponse}`;
   };
 
   // node_modules/lucide-react/dist/esm/Icon.js
-  var import_react3 = __toESM(require_react());
+  var import_react4 = __toESM(require_react());
 
   // node_modules/lucide-react/dist/esm/defaultAttributes.js
   var defaultAttributes = {
@@ -48205,7 +48222,7 @@ ${this.customData.serverResponse}`;
   };
 
   // node_modules/lucide-react/dist/esm/Icon.js
-  var Icon = (0, import_react3.forwardRef)(
+  var Icon = (0, import_react4.forwardRef)(
     ({
       color = "currentColor",
       size = 24,
@@ -48215,7 +48232,7 @@ ${this.customData.serverResponse}`;
       children,
       iconNode,
       ...rest
-    }, ref2) => (0, import_react3.createElement)(
+    }, ref2) => (0, import_react4.createElement)(
       "svg",
       {
         ref: ref2,
@@ -48229,7 +48246,7 @@ ${this.customData.serverResponse}`;
         ...rest
       },
       [
-        ...iconNode.map(([tag, attrs]) => (0, import_react3.createElement)(tag, attrs)),
+        ...iconNode.map(([tag, attrs]) => (0, import_react4.createElement)(tag, attrs)),
         ...Array.isArray(children) ? children : [children]
       ]
     )
@@ -48237,8 +48254,8 @@ ${this.customData.serverResponse}`;
 
   // node_modules/lucide-react/dist/esm/createLucideIcon.js
   var createLucideIcon = (iconName, iconNode) => {
-    const Component2 = (0, import_react4.forwardRef)(
-      ({ className, ...props }, ref2) => (0, import_react4.createElement)(Icon, {
+    const Component2 = (0, import_react5.forwardRef)(
+      ({ className, ...props }, ref2) => (0, import_react5.createElement)(Icon, {
         ref: ref2,
         iconNode,
         className: mergeClasses(
@@ -48564,22 +48581,25 @@ ${this.customData.serverResponse}`;
       isStructuring: state.state === "processing" || state.state === "anticipation"
     });
     return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      !extensionMode && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
         "div",
         {
           className: "fixed inset-0 z-40 backdrop-blur-[4px] bg-black/8",
-          "aria-hidden": true,
-          style: extensionMode ? { pointerEvents: "none" } : void 0
+          "aria-hidden": true
         }
       ),
       /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
         "div",
         {
           ref: refs.widgetRef,
-          className: `fixed z-50 w-[480px] transition-all duration-200 ${state.position ? "" : "bottom-10 right-10"}`,
-          style: {
-            ...state.position ? { left: state.position.x, top: state.position.y } : {},
-            ...extensionMode ? { pointerEvents: "auto" } : {}
+          className: `fixed w-[480px] transition-all duration-200 ${!extensionMode && state.position ? "" : !extensionMode ? "bottom-10 right-10" : ""} ${extensionMode ? "" : "z-50"}`,
+          style: extensionMode ? {
+            position: "fixed",
+            ...state.position ? { left: state.position.x, top: state.position.y } : { bottom: "24px", right: "24px" },
+            zIndex: 2147483647,
+            pointerEvents: "auto"
+          } : {
+            ...state.position ? { left: state.position.x, top: state.position.y } : {}
           },
           children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "bg-white rounded-lg\r\n                        border border-slate-200/80\r\n                        shadow-[0_16px_40px_rgba(0,0,0,0.12),0_6px_16px_rgba(0,0,0,0.08)]\r\n                        overflow-hidden font-sans", children: [
             /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
@@ -48606,6 +48626,8 @@ ${this.customData.serverResponse}`;
                   getHandlers: getFeedbackItemHandlers
                 }
               ),
+              state.errorMessage && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3", children: state.errorMessage }),
+              state.state === "capturing" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "border border-slate-200 rounded-lg p-4 bg-slate-50 text-sm text-slate-600", children: "Capturing screenshot\u2026" }),
               (state.state === "processing" || state.state === "anticipation") && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "capture-processing-enter relative flex items-center gap-4 text-sm text-slate-600 py-3 pr-4 min-h-[52px]", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "capture-structuring-text flex items-center gap-2 flex-1", children: [
                   /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-slate-600", children: "Structuring your feedback" }),
@@ -48635,7 +48657,6 @@ ${this.customData.serverResponse}`;
                   /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { type: "button", onClick: handlers.finishListening, className: "bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-colors duration-150 cursor-pointer", children: "Done" })
                 ] })
               ] }),
-              state.errorMessage && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3", children: state.errorMessage }),
               state.state === "idle" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
                 WidgetFooter,
                 {
@@ -48681,18 +48702,18 @@ ${this.customData.serverResponse}`;
     });
   }
   function ContentApp() {
-    const [user, setUser] = import_react5.default.useState(null);
-    const [sessionId, setSessionId] = import_react5.default.useState(null);
-    const [sessionMessage, setSessionMessage] = import_react5.default.useState(null);
-    const [authChecked, setAuthChecked] = import_react5.default.useState(false);
-    import_react5.default.useEffect(() => {
+    const [user, setUser] = import_react6.default.useState(null);
+    const [sessionId, setSessionId] = import_react6.default.useState(null);
+    const [sessionMessage, setSessionMessage] = import_react6.default.useState(null);
+    const [authChecked, setAuthChecked] = import_react6.default.useState(false);
+    import_react6.default.useEffect(() => {
       const unsub = subscribeToAuthState((u) => {
         setUser(u ?? null);
         setAuthChecked(true);
       });
       return () => unsub();
     }, []);
-    import_react5.default.useEffect(() => {
+    import_react6.default.useEffect(() => {
       if (!user) {
         setSessionId(null);
         setSessionMessage(null);
@@ -48729,7 +48750,7 @@ ${this.customData.serverResponse}`;
         cancelled = true;
       };
     }, [user]);
-    const handleComplete = import_react5.default.useCallback(
+    const handleComplete = import_react6.default.useCallback(
       async (transcript, screenshot) => {
         if (!sessionId || !user) return void 0;
         const res = await apiFetch("/api/structure-feedback", {
@@ -48782,7 +48803,7 @@ ${this.customData.serverResponse}`;
       },
       [sessionId, user]
     );
-    const handleDelete = import_react5.default.useCallback(async (_id) => {
+    const handleDelete = import_react6.default.useCallback(async (_id) => {
     }, []);
     if (!authChecked) {
       return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { padding: 16, fontSize: 14, color: "#666" }, children: "Loading\u2026" });
@@ -48863,6 +48884,7 @@ ${this.customData.serverResponse}`;
       zIndex: "2147483647",
       pointerEvents: "none"
     });
+    host.style.outline = "2px solid red";
     document.body.appendChild(host);
     const shadowRoot = host.attachShadow({ mode: "open" });
     injectShadowStyles(shadowRoot);
@@ -48872,8 +48894,11 @@ ${this.customData.serverResponse}`;
     container.style.boxSizing = "border-box";
     container.style.pointerEvents = "auto";
     container.style.position = "fixed";
-    container.style.inset = "0";
-    container.style.zIndex = "999998";
+    container.style.top = "0";
+    container.style.left = "0";
+    container.style.width = "100vw";
+    container.style.height = "100vh";
+    container.style.zIndex = "2147483647";
     shadowRoot.appendChild(container);
     const reactRoot = (0, import_client.createRoot)(container);
     reactRoot.render(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ContentApp, {}));

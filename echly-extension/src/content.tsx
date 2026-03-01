@@ -286,6 +286,8 @@ function main(): void {
     zIndex: "2147483647",
     pointerEvents: "none",
   });
+  // Temporary: confirm host covers entire viewport (remove after verifying layout)
+  host.style.outline = "2px solid red";
   document.body.appendChild(host);
 
   const shadowRoot = host.attachShadow({ mode: "open" });
@@ -297,8 +299,11 @@ function main(): void {
   container.style.boxSizing = "border-box";
   container.style.pointerEvents = "auto";
   container.style.position = "fixed";
-  container.style.inset = "0";
-  container.style.zIndex = "999998";
+  container.style.top = "0";
+  container.style.left = "0";
+  container.style.width = "100vw";
+  container.style.height = "100vh";
+  container.style.zIndex = "2147483647";
   shadowRoot.appendChild(container);
 
   const reactRoot = createRoot(container);

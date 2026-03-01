@@ -56,17 +56,40 @@ export function useCaptureWidget({
   const activeRecordingIdRef = useRef<string | null>(null);
   const recordingsRef = useRef<Recording[]>(recordings);
   const stateRef = useRef<CaptureState>(state);
+  const editingIdRef = useRef<string | null>(null);
+  const trayLockedRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
-  /** Guarded setter: in extension mode or during listening/structuring, do not close. */
+  useEffect(() => {
+    editingIdRef.current = editingId;
+  }, [editingId]);
+
+  /** Keep tray locked during capture → listen → process so it never collapses. */
+  useEffect(() => {
+    if (state === "capturing" || state === "listening" || state === "processing" || state === "anticipation") {
+      trayLockedRef.current = true;
+    } else {
+      trayLockedRef.current = false;
+    }
+  }, [state]);
+
+  /** Guarded setter: in extension mode or during capturing/listening/structuring/edit, do not close. */
   const setIsOpen = (next: boolean) => {
     if (next === false) {
+      if (trayLockedRef.current) return;
       if (extensionMode) return;
       const s = stateRef.current;
-      if (s === "listening" || s === "processing" || s === "anticipation") return;
+      if (
+        s === "capturing" ||
+        s === "listening" ||
+        s === "processing" ||
+        s === "anticipation"
+      )
+        return;
+      if (editingIdRef.current) return;
     }
     setIsOpenState(next);
   };
@@ -378,6 +401,7 @@ export function useCaptureWidget({
 
   const handleAddFeedback = async () => {
     if (state !== "idle") return;
+    setIsOpen(true);
     setErrorMessage(null);
     // Stop recognition before screenshot; do NOT call setIsOpen(false), setCollapsed(true), or setVisible(false).
     recognitionRef.current?.stop();
