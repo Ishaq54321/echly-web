@@ -33,21 +33,21 @@ export function ShareSessionModal({
       >
         <h2
           id="share-session-title"
-          className="text-[18px] font-medium leading-[1.35] text-neutral-900"
+          className="text-[20px] font-medium leading-[1.35] text-neutral-900"
         >
           Share session
         </h2>
-        <p className="mt-2 text-sm text-[hsl(var(--text-secondary))]">
+        <p className="mt-2 text-[15px] text-[hsl(var(--text-secondary))]">
           {sessionTitle || "Session"}
         </p>
-        <p className="mt-4 text-sm text-[hsl(var(--text-secondary))]">
+        <p className="mt-4 text-[15px] text-[hsl(var(--text-secondary))]">
           Invite by email — coming soon.
         </p>
         <div className="mt-6 flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="focus-ring-brand px-4 py-2 text-sm font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-3))] transition-colors"
+            className="focus-ring-brand px-4 py-2 text-[14px] font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-3))] transition-colors"
           >
             Close
           </button>

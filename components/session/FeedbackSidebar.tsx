@@ -80,10 +80,10 @@ export default function FeedbackSidebar({
         {/* Header (fixed) */}
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
-            <h2 className="text-[11px] uppercase tracking-[0.08em] text-neutral-400">
+            <h2 className="text-[12px] uppercase tracking-[0.08em] text-neutral-400">
               Feedback
             </h2>
-            <p className="text-[12px] text-neutral-400 mt-1">
+            <p className="text-[13px] text-neutral-400 mt-1">
               {subline}
             </p>
           </div>
@@ -144,7 +144,7 @@ export default function FeedbackSidebar({
             placeholder="Search feedback…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-full text-sm px-3 rounded-md bg-white border border-neutral-200 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
+            className="h-9 w-full text-[15px] px-3 rounded-md bg-white border border-neutral-200 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
             aria-label="Search feedback"
           />
         </div>
@@ -180,9 +180,9 @@ export default function FeedbackSidebar({
                     onSelect(item.id);
                   }
                 }}
-                className={`group relative flex flex-col px-3 py-2.5 cursor-pointer text-[14px] rounded-lg transition-all duration-150 outline-none focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1
+                className={`group relative flex flex-col px-3 py-2.5 cursor-pointer text-[15px] font-medium rounded-lg transition-all duration-150 outline-none focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1
                   ${isActive
-                    ? "bg-semantic-system text-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-semantic-system font-medium"
+                    ? "bg-semantic-system text-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-semantic-system"
                     : "text-neutral-400 hover:bg-neutral-100"}`}
               >
                 {isActive && (
@@ -191,11 +191,11 @@ export default function FeedbackSidebar({
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex items-start gap-2 min-w-0 flex-1">
                     <span
-                      className={`text-[12px] mt-[2px] w-[36px] shrink-0 ${isActive ? "text-white" : "text-neutral-400"}`}
+                      className={`text-[13px] mt-[2px] w-[36px] shrink-0 ${isActive ? "text-white" : "text-neutral-400"}`}
                     >
                       {index + 1}/{totalCount}
                     </span>
-                    <span className="truncate text-[14px] font-medium">
+                    <span className="truncate text-[15px] font-medium">
                       {item.title}
                     </span>
                   </div>
@@ -215,7 +215,7 @@ export default function FeedbackSidebar({
                   </div>
                 </div>
                 {isActive && (
-                  <span className="text-[11px] mt-1 ml-[calc(36px+0.5rem)] text-white">
+                  <span className="text-[12px] mt-1 ml-[calc(36px+0.5rem)] text-white">
                     {status === "resolved" || status === "done"
                       ? "Resolved"
                       : status === "pending" || status === "in_progress" || status === "in_review"
@@ -231,7 +231,7 @@ export default function FeedbackSidebar({
           </div>
           {loadMoreRef && <div ref={loadMoreRef} />}
           {loadingMore && (
-            <div className="text-[13px] text-neutral-500 py-4 text-center">
+            <div className="text-[14px] text-neutral-500 py-4 text-center">
               Loading…
             </div>
           )}

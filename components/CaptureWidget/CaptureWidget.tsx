@@ -123,8 +123,8 @@ export default function CaptureWidget({
                 <AudioWaveform isActive={state.state === "listening"} />
               </div>
               <div className="flex justify-between">
-                <button onClick={handlers.discardListening} className="text-sm text-slate-600 hover:text-slate-900 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]">Cancel</button>
-                <button onClick={handlers.finishListening} className="bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] px-5 py-2 rounded-lg text-sm font-medium transition-transform duration-100 ease-out">Done</button>
+                <button onClick={handlers.discardListening} className="text-[14px] font-medium text-slate-600 hover:text-slate-900 transition-colors duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]">Cancel</button>
+                <button onClick={handlers.finishListening} className="bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-transform duration-100 ease-out">Done</button>
               </div>
             </div>
           )}

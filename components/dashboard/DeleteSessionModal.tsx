@@ -43,7 +43,7 @@ export function DeleteSessionModal({
       >
         <h2
           id="delete-session-title"
-          className="text-[18px] font-medium leading-[1.35] text-neutral-900"
+          className="text-[20px] font-medium leading-[1.35] text-neutral-900"
         >
           Delete session permanently?
         </h2>
@@ -60,7 +60,7 @@ export function DeleteSessionModal({
             type="button"
             onClick={onClose}
             disabled={deleting}
-            className="px-4 py-2 text-[13px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors disabled:opacity-60"
+            className="px-4 py-2 text-[14px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors disabled:opacity-60"
           >
             Cancel
           </button>
@@ -68,7 +68,7 @@ export function DeleteSessionModal({
             type="button"
             onClick={handleConfirm}
             disabled={deleting}
-            className="px-4 py-2 text-[13px] font-medium rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors disabled:opacity-60"
+            className="px-4 py-2 text-[14px] font-medium rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors disabled:opacity-60"
           >
             {deleting ? "Deleting…" : "Delete permanently"}
           </button>

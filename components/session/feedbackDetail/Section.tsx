@@ -20,10 +20,10 @@ export function Section({ title, children, titleMuted, titleSemantic }: SectionP
           : "text-neutral-400";
   return (
     <section className="my-6">
-      <h2 className={`text-[11px] uppercase tracking-[0.08em] mb-2 ${titleClass}`}>
+      <h2 className={`text-[12px] uppercase tracking-[0.08em] mb-2 ${titleClass}`}>
         {title}
       </h2>
-      <div className="gap-2 flex flex-col text-[14px] leading-[1.65] text-neutral-800">
+      <div className="gap-2 flex flex-col text-[15px] leading-[1.7] text-neutral-800">
         {children}
       </div>
     </section>

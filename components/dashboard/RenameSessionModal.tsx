@@ -78,7 +78,7 @@ export function RenameSessionModal({
       >
         <h2
           id="rename-session-title"
-          className="text-[18px] font-medium leading-[1.35] text-neutral-900"
+          className="text-[20px] font-medium leading-[1.35] text-neutral-900"
         >
           Rename session
         </h2>
@@ -95,7 +95,7 @@ export function RenameSessionModal({
           aria-describedby={error ? "rename-error" : undefined}
         />
         {error && (
-          <p id="rename-error" className="mt-2 text-sm text-neutral-600" role="alert">
+          <p id="rename-error" className="mt-2 text-[14px] text-neutral-600" role="alert">
             {error}
           </p>
         )}
@@ -104,7 +104,7 @@ export function RenameSessionModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="focus-ring-brand px-4 py-2 text-sm font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-3))] transition-colors disabled:opacity-60"
+            className="focus-ring-brand px-4 py-2 text-[14px] font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:bg-[hsl(var(--surface-3))] transition-colors disabled:opacity-60"
           >
             Cancel
           </button>
@@ -112,7 +112,7 @@ export function RenameSessionModal({
             type="button"
             onClick={handleSave}
             disabled={saving || value.trim() === ""}
-            className="focus-ring-brand px-4 py-2 text-sm font-medium rounded-md bg-neutral-900 text-white hover:bg-neutral-800 transition-colors disabled:opacity-60"
+            className="focus-ring-brand px-4 py-2 text-[14px] font-medium rounded-md bg-neutral-900 text-white hover:bg-neutral-800 transition-colors disabled:opacity-60"
           >
             {saving ? "Saving…" : "Save"}
           </button>

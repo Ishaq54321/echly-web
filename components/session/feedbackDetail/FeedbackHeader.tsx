@@ -82,9 +82,9 @@ export function FeedbackHeader({
 
   return (
     <div className="pt-4 pb-4">
-      <div className="text-[12px] text-semantic-system mb-3">
-        {item.index} of {item.total}
-      </div>
+<div className="text-[13px] text-neutral-400 mb-3">
+      {item.index} of {item.total}
+    </div>
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           {isEditingTitle && onSaveTitle ? (
@@ -97,14 +97,14 @@ export function FeedbackHeader({
                 onBlur={handleTitleBlur}
                 onFocus={(e) => e.currentTarget.select()}
                 onKeyDown={handleTitleKeyDown}
-                className="w-full text-[18px] font-medium leading-[1.35] text-neutral-900 bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
+                className="w-full text-[20px] font-medium leading-[1.35] text-neutral-900 bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
                 aria-label="Edit title"
               />
-              <p className="text-[13px] text-neutral-500 mt-1">
+              <p className="text-[14px] text-neutral-500 mt-1">
                 Enter to save
               </p>
               {isSaving && (
-                <p className="text-[13px] text-neutral-500 mt-0.5 transition-opacity duration-150">
+                <p className="text-[14px] text-neutral-500 mt-0.5 transition-opacity duration-150">
                   Saving...
                 </p>
               )}
@@ -123,7 +123,7 @@ export function FeedbackHeader({
               }}
               aria-label={onSaveTitle ? "Edit title" : undefined}
             >
-              <h1 className="text-[18px] font-medium leading-[1.35] text-neutral-900 truncate">
+              <h1 className="text-[20px] font-medium leading-[1.35] text-neutral-900 truncate">
                 {item.title}
               </h1>
               {onSaveTitle && (
@@ -140,7 +140,7 @@ export function FeedbackHeader({
             </div>
           )}
           {saveSuccess && !isEditingTitle && (
-            <p className="text-[13px] text-neutral-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+            <p className="text-[14px] text-neutral-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
               <Check size={12} className="shrink-0" aria-hidden />
               Saved
             </p>
@@ -152,7 +152,7 @@ export function FeedbackHeader({
             <button
               type="button"
               onClick={onRequestDelete}
-              className="flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 rounded"
+              className="flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 rounded"
               aria-label="Delete permanently"
             >
               <Trash2 size={14} />
@@ -162,7 +162,7 @@ export function FeedbackHeader({
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 rounded ${
+            className={`flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-neutral-500 hover:text-neutral-700 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 rounded ${
               isActivityOpen ? "text-neutral-700" : ""
             }`}
             aria-pressed={isActivityOpen}
@@ -173,13 +173,13 @@ export function FeedbackHeader({
         </div>
       </div>
       {(item.createdAt != null || item.updatedAt != null) && (
-        <div className="mt-1 text-[12px] text-neutral-400">
+        <div className="mt-1 text-[14px] text-neutral-500">
           {item.updatedAt != null
             ? `Created ${formatRelative(item.createdAt ?? null)} • Updated ${formatRelative(item.updatedAt)}`
             : `Created ${formatRelative(item.createdAt ?? null)}`}
         </div>
       )}
-      <div className="my-6 border-b border-neutral-200" />
+      <div className="my-5 border-b border-neutral-200" />
     </div>
   );
 }

@@ -38,7 +38,7 @@ export function GlobalNavBar() {
       <div className="flex items-center gap-4">
         <button
           type="button"
-          className="focus-ring-brand text-sm px-4 py-2 rounded-lg bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] font-medium transition-transform duration-100 ease-out"
+          className="focus-ring-brand text-[14px] px-4 py-2 rounded-lg bg-brand-primary text-white hover:brightness-95 active:scale-[0.98] font-medium transition-transform duration-100 ease-out"
         >
           Share
         </button>
@@ -77,7 +77,7 @@ export function GlobalNavBar() {
           className={`${iconButtonClass} rounded-full overflow-hidden`}
           aria-label="User menu"
         >
-          <div className="h-8 w-8 rounded-full bg-neutral-200 flex items-center justify-center text-sm font-medium text-neutral-600">
+          <div className="h-8 w-8 rounded-full bg-neutral-200 flex items-center justify-center text-[14px] font-medium text-neutral-600">
             U
           </div>
         </button>

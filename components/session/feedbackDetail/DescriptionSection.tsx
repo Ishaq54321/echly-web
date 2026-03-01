@@ -70,7 +70,7 @@ export function DescriptionSection({
               onChange={(e) => onDraftChange?.(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
-              className="w-full min-h-[100px] rounded-md border border-neutral-200 bg-neutral-50 p-3 text-[14px] leading-[1.65] text-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150 resize-none overflow-hidden"
+              className="w-full min-h-[100px] rounded-md border border-neutral-200 bg-neutral-50 p-3 text-[15px] leading-[1.7] text-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150 resize-none overflow-hidden"
               autoFocus
               aria-label="Edit description"
             />
@@ -78,7 +78,7 @@ export function DescriptionSection({
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-[13px] font-medium px-3 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300"
+                className="text-[14px] font-medium px-3 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300"
               >
                 Cancel
               </button>
@@ -86,7 +86,7 @@ export function DescriptionSection({
                 type="button"
                 onClick={triggerSave}
                 disabled={isSaving || draft === description}
-                className="text-[13px] font-medium px-3 py-1.5 rounded-md bg-neutral-800 text-white hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                className="text-[14px] font-medium px-3 py-1.5 rounded-md bg-neutral-800 text-white hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400"
               >
                 {isSaving ? "Saving..." : "Save"}
               </button>
@@ -100,7 +100,7 @@ export function DescriptionSection({
             role={hasEdit ? "button" : undefined}
             tabIndex={hasEdit ? 0 : undefined}
           >
-            <p className="text-[14px] leading-[1.65] text-neutral-800 flex-1 pr-6">
+            <p className="text-[15px] leading-[1.7] text-neutral-800 flex-1 pr-6">
               {displayValue || (hasEdit ? "Add description…" : "")}
             </p>
             {hasEdit && (

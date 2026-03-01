@@ -189,7 +189,7 @@ export function WorkspaceCard({
   };
 
   const menuItemClass =
-    "w-full px-3 py-2 text-left text-sm rounded-md text-neutral-800 hover:bg-neutral-100 transition-colors duration-150 flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1";
+    "w-full px-3 py-2 text-left text-[14px] font-medium rounded-md text-neutral-800 hover:bg-neutral-100 transition-colors duration-150 flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1";
 
   return (
     <>
@@ -322,7 +322,7 @@ export function WorkspaceCard({
                   <button
                     type="button"
                     onClick={handleDeleteClick}
-                    className="w-full px-3 py-2 text-left text-sm rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors duration-150 flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1"
+                    className="w-full px-3 py-2 text-left text-[14px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors duration-150 flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1"
                     role="menuitem"
                   >
                     <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -353,7 +353,7 @@ export function WorkspaceCard({
                   strokeWidth={1.5}
                   aria-hidden
                 />
-                <h3 className="text-[15px] font-medium leading-[1.35] tracking-[-0.01em] text-neutral-900 line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
+                <h3 className="text-[16px] font-medium leading-[1.4] tracking-[-0.01em] text-neutral-900 line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
                   {session.title}
                 </h3>
                 <span
@@ -374,18 +374,18 @@ export function WorkspaceCard({
             {/* Metrics row — low emphasis */}
             <div className="mt-3 flex items-center gap-3">
               <div className="inline-flex items-center rounded-md bg-neutral-100/60 px-2.5 py-[5px] transition-colors duration-150">
-                <span className="text-[13px] font-medium text-neutral-700">
+                <span className="text-[14px] font-medium text-neutral-700">
                   {feedbackCount}
                 </span>
-                <span className="ml-1 text-[12px] text-neutral-500">
+                <span className="ml-1 text-[13px] text-neutral-500">
                   feedback
                 </span>
               </div>
               <div className="inline-flex items-center rounded-md bg-neutral-100/70 px-2.5 py-[5px] transition-colors duration-150">
-                <span className="text-[13px] font-medium text-neutral-700">
+                <span className="text-[14px] font-medium text-neutral-700">
                   {openCount}
                 </span>
-                <span className="ml-1 text-[12px] text-neutral-500">
+                <span className="ml-1 text-[13px] text-neutral-500">
                   open
                 </span>
               </div>
@@ -394,7 +394,7 @@ export function WorkspaceCard({
 
           <div className="mt-5 flex flex-col">
             {/* Activity row (views + comments) — low visual weight */}
-            <div className="flex items-center gap-4 text-[12px] text-neutral-400">
+            <div className="flex items-center gap-4 text-[13px] text-neutral-500">
               <div className="flex items-center gap-1.5">
                 <Eye className="h-[14px] w-[14px] shrink-0 text-neutral-400" strokeWidth={1.5} aria-hidden />
                 <span>{viewCount}</span>
