@@ -2,8 +2,10 @@ export type { Session } from "@/lib/domain/session";
 import type { Session } from "@/lib/domain/session";
 import {
   createSessionRepo,
+  deleteSessionRepo,
   getSessionByIdRepo,
   getUserSessionsRepo,
+  updateSessionArchivedRepo,
   updateSessionTitleRepo,
 } from "@/lib/repositories/sessionsRepository";
 
@@ -47,4 +49,23 @@ export async function updateSessionTitle(
 
 export async function getSessionById(sessionId: string): Promise<Session | null> {
   return await getSessionByIdRepo(sessionId);
+}
+
+/* ================================
+   ARCHIVE SESSION
+================================ */
+
+export async function updateSessionArchived(
+  sessionId: string,
+  archived: boolean
+): Promise<void> {
+  await updateSessionArchivedRepo(sessionId, archived);
+}
+
+/* ================================
+   DELETE SESSION
+================================ */
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  await deleteSessionRepo(sessionId);
 }

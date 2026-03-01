@@ -47,7 +47,13 @@ function EchlySymbol({ className }: { className?: string }) {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { sessions, loading, handleCreateSession } = useWorkspaceOverview();
+  const {
+    sessions,
+    loading,
+    handleCreateSession,
+    updateSession,
+    removeSession,
+  } = useWorkspaceOverview();
   const [search, setSearch] = useState("");
 
   const filteredSessions = useMemo(
@@ -107,6 +113,7 @@ export default function DashboardPage() {
         </header>
 
         <main className="mt-8 flex-1">
+          {/* TODO: Future: Archived view to list archived sessions. */}
           <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-10">
             {filteredSessions.map((item, index) => (
               <WorkspaceCard
@@ -114,6 +121,11 @@ export default function DashboardPage() {
                 item={item}
                 onView={handleView}
                 index={index}
+                onRenameSuccess={(session) =>
+                  updateSession(session.id, { title: session.title })
+                }
+                onArchiveSuccess={removeSession}
+                onDeleteSuccess={removeSession}
               />
             ))}
           </div>

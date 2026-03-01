@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   getDocs,
   limit,
   onSnapshot,
@@ -111,6 +112,23 @@ export async function getSessionRecentCommentsRepo(
     id: docSnap.id,
     ...(docSnap.data() as Omit<Comment, "id">),
   }));
+}
+
+const DELETE_SESSION_COMMENTS_LIMIT = 500;
+
+/**
+ * Deletes all comments for a session. Used when deleting a session.
+ */
+export async function deleteAllCommentsForSessionRepo(
+  sessionId: string
+): Promise<void> {
+  const q = query(
+    collection(db, "comments"),
+    where("sessionId", "==", sessionId),
+    limit(DELETE_SESSION_COMMENTS_LIMIT)
+  );
+  const snapshot = await getDocs(q);
+  await Promise.all(snapshot.docs.map((d) => deleteDoc(d.ref)));
 }
 
 

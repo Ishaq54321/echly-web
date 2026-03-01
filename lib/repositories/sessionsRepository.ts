@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -15,6 +16,8 @@ import {
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Session } from "@/lib/domain/session";
+import { deleteAllCommentsForSessionRepo } from "@/lib/repositories/commentsRepository";
+import { deleteAllFeedbackForSessionRepo } from "@/lib/repositories/feedbackRepository";
 
 type SessionDoc = Omit<Session, "id"> & { createdAt?: Timestamp | null; updatedAt?: Timestamp | null };
 
@@ -54,10 +57,12 @@ export async function getUserSessionsRepo(
 
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...(docSnap.data() as SessionDoc),
-  }));
+  return snapshot.docs
+    .filter((docSnap) => (docSnap.data() as { archived?: boolean }).archived !== true)
+    .map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as SessionDoc),
+    }));
 }
 
 export async function getSessionByIdRepo(
@@ -82,6 +87,16 @@ export async function updateSessionTitleRepo(
   });
 }
 
+export async function updateSessionArchivedRepo(
+  sessionId: string,
+  archived: boolean
+): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    archived,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 /**
  * Updates only the given session's updatedAt (last activity). Call only when
  * activity occurred inside that session (ticket create/edit/delete, comment,
@@ -95,5 +110,15 @@ export async function updateSessionUpdatedAtRepo(sessionId: string): Promise<voi
   await updateDoc(doc(db, "sessions", sessionId), {
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Permanently deletes a session and all associated data: feedback (tickets),
+ * comments. Screenshots in Storage are left as-is (TODO: optional cleanup).
+ */
+export async function deleteSessionRepo(sessionId: string): Promise<void> {
+  await deleteAllFeedbackForSessionRepo(sessionId);
+  await deleteAllCommentsForSessionRepo(sessionId);
+  await deleteDoc(doc(db, "sessions", sessionId));
 }
 

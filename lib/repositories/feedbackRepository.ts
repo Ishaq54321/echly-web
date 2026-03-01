@@ -246,6 +246,24 @@ export async function getSessionFeedbackTotalCountRepo(
   return snap.data().count;
 }
 
+const DELETE_SESSION_FEEDBACK_LIMIT = 500;
+
+/**
+ * Deletes all feedback (tickets) for a session. Used when deleting a session.
+ * Screenshot URLs in Storage are not removed here (TODO: optional cleanup).
+ */
+export async function deleteAllFeedbackForSessionRepo(
+  sessionId: string
+): Promise<void> {
+  const q = query(
+    collection(db, "feedback"),
+    where("sessionId", "==", sessionId),
+    limit(DELETE_SESSION_FEEDBACK_LIMIT)
+  );
+  const snapshot = await getDocs(q);
+  await Promise.all(snapshot.docs.map((d) => deleteDoc(d.ref)));
+}
+
 const OVERVIEW_HIGH_IMPACT_LIMIT = 5;
 
 const OVERVIEW_PREVIEW_PER_STATUS_LIMIT = 3;

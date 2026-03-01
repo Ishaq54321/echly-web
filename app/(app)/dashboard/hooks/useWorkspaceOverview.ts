@@ -11,6 +11,19 @@ import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepositor
 
 const SESSION_LIMIT = 50;
 
+async function loadSessionsAndCounts(uid: string): Promise<{
+  sessions: Session[];
+  counts: Record<string, SessionFeedbackCounts>;
+}> {
+  const userSessions = await getUserSessions(uid, SESSION_LIMIT);
+  const counts = await Promise.all(
+    userSessions.map((s) =>
+      getSessionFeedbackCountsByStatus(s.id).then((c) => [s.id, c] as const)
+    )
+  );
+  return { sessions: userSessions, counts: Object.fromEntries(counts) };
+}
+
 export interface WorkspaceStats {
   totalSessions: number;
   activeSessions: number;
@@ -30,6 +43,19 @@ export function useWorkspaceOverview() {
   const [sessionCounts, setSessionCounts] = useState<Record<string, SessionFeedbackCounts>>({});
   const [loading, setLoading] = useState(true);
 
+  const refreshSessions = useCallback(async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    setLoading(true);
+    try {
+      const { sessions: userSessions, counts: newCounts } = await loadSessionsAndCounts(currentUser.uid);
+      setSessions(userSessions);
+      setSessionCounts(newCounts);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -39,14 +65,9 @@ export function useWorkspaceOverview() {
       setUser(currentUser);
       setLoading(true);
       try {
-        const userSessions = await getUserSessions(currentUser.uid, SESSION_LIMIT);
+        const { sessions: userSessions, counts: newCounts } = await loadSessionsAndCounts(currentUser.uid);
         setSessions(userSessions);
-        const counts = await Promise.all(
-          userSessions.map((s) =>
-            getSessionFeedbackCountsByStatus(s.id).then((c) => [s.id, c] as const)
-          )
-        );
-        setSessionCounts(Object.fromEntries(counts));
+        setSessionCounts(newCounts);
       } finally {
         setLoading(false);
       }
@@ -78,11 +99,29 @@ export function useWorkspaceOverview() {
     router.push(`/dashboard/${sessionId}`);
   }, [user, router]);
 
+  const updateSession = useCallback((sessionId: string, patch: Partial<Session>) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.id === sessionId ? { ...s, ...patch } : s))
+    );
+  }, []);
+
+  const removeSession = useCallback((sessionId: string) => {
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    setSessionCounts((prev) => {
+      const next = { ...prev };
+      delete next[sessionId];
+      return next;
+    });
+  }, []);
+
   return {
     user,
     sessions: sessionsWithCounts,
     stats,
     loading,
     handleCreateSession,
+    refreshSessions,
+    updateSession,
+    removeSession,
   };
 }
