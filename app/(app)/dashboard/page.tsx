@@ -15,11 +15,8 @@ function filterAndSortSessions(sessions: SessionWithCounts[], search: string): S
     : [...sessions];
 
   return [...list].sort((a, b) => {
-    const openA = a.counts.open;
-    const openB = b.counts.open;
-    if (openB !== openA) return openB - openA;
-    const ta = a.session.createdAt as { seconds?: number } | null | undefined;
-    const tb = b.session.createdAt as { seconds?: number } | null | undefined;
+    const ta = a.session.updatedAt as { seconds?: number } | null | undefined;
+    const tb = b.session.updatedAt as { seconds?: number } | null | undefined;
     const sa = ta?.seconds ?? 0;
     const sb = tb?.seconds ?? 0;
     return sb - sa;

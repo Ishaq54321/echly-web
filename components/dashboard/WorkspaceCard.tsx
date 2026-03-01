@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2 } from "lucide-react";
+import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
-import { formatFullDateTime } from "@/lib/utils/date";
+import { formatRelativeTime } from "@/lib/utils/time";
+import { Avatar } from "@/components/ui/Avatar";
 import { ShareSessionModal } from "./ShareSessionModal";
 import { RenameSessionModal } from "./RenameSessionModal";
 import { DeleteSessionModal } from "./DeleteSessionModal";
@@ -28,11 +29,18 @@ export function WorkspaceCard({
   onDeleteSuccess,
 }: WorkspaceCardProps) {
   const { session, counts } = item;
-  const feedbackCount = counts.open + counts.in_progress + counts.resolved;
   const openIssues = counts.open;
   const isActive = openIssues > 0;
+  const createdBy = session.createdBy;
+  const creatorName = createdBy
+    ? [createdBy.firstName, createdBy.lastName].filter(Boolean).join(" ") || "Unknown"
+    : "Unknown";
+  const viewCount = session.viewCount ?? 0;
+  const commentCount = session.commentCount ?? 0;
 
   const [copyTooltip, setCopyTooltip] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -41,6 +49,12 @@ export function WorkspaceCard({
   const moreRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
+  }, []);
 
   const closeMenu = useCallback(() => setMoreOpen(false), []);
 
@@ -187,7 +201,7 @@ export function WorkspaceCard({
         tabIndex={0}
         onClick={handleCardClick}
         onKeyDown={handleCardKeyDown}
-        className={`focus-ring-brand group relative flex flex-col min-h-[132px] w-full bg-white rounded-[16px] px-5 py-5 border cursor-pointer outline-none transition-[border-color,box-shadow] duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
+        className={`focus-ring-brand relative flex flex-col min-h-[132px] w-full bg-white rounded-[16px] px-5 py-5 border cursor-pointer outline-none transition-[border-color,box-shadow] duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
           isActive
             ? "border-neutral-200 shadow-[0_6px_18px_rgba(0,0,0,0.05)] hover:border-neutral-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.09)]"
             : "border-neutral-200/70 shadow-[0_4px_12px_rgba(0,0,0,0.025)] hover:border-neutral-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.09)]"
@@ -198,9 +212,24 @@ export function WorkspaceCard({
         {/* Action bar: 3-dot menu only */}
         <div
           data-card-actions
-          className="absolute top-3 right-3 flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+          className="absolute top-3 right-3 z-20"
         >
-          <div className="relative" ref={moreRef}>
+          <div
+            className="relative h-10 w-10"
+            ref={moreRef}
+            onMouseEnter={() => {
+              hoverTimeoutRef.current = setTimeout(() => {
+                setShowTooltip(true);
+              }, 300);
+            }}
+            onMouseLeave={() => {
+              if (hoverTimeoutRef.current) {
+                clearTimeout(hoverTimeoutRef.current);
+                hoverTimeoutRef.current = null;
+              }
+              setShowTooltip(false);
+            }}
+          >
             <button
               type="button"
               onClick={(e) => {
@@ -208,22 +237,43 @@ export function WorkspaceCard({
                 e.stopPropagation();
                 setMoreOpen((prev) => !prev);
               }}
-              className="
-                h-10 w-10
-                flex items-center justify-center
-                rounded-lg
-                text-[hsl(var(--text-secondary))] hover:text-[hsl(var(--text-primary))]
-                transition-all duration-150
-                hover:bg-[hsl(var(--surface-2))]
-                focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand))]
-                cursor-pointer
-              "
-              aria-label="Workspace actions"
+              aria-label="More actions"
               aria-expanded={moreOpen}
               aria-haspopup="menu"
+              className="
+                flex items-center justify-center
+                h-10 w-10
+                rounded-lg
+                text-[hsl(var(--text-secondary))]
+                transition-colors duration-150
+                hover:bg-[hsl(var(--surface-2))]
+                hover:text-[hsl(var(--text-primary))]
+                focus-visible:outline-none
+                focus-visible:ring-2
+                focus-visible:ring-[hsl(var(--brand))]
+                cursor-pointer
+              "
             >
-              <MoreHorizontal className="h-4 w-4" aria-hidden />
+              <MoreHorizontal className="w-4 h-4 pointer-events-none" aria-hidden />
             </button>
+            {showTooltip && (
+              <span
+                className="
+                  absolute right-0 top-full mt-1
+                  whitespace-nowrap
+                  px-2 py-1
+                  text-xs
+                  rounded-md
+                  bg-[hsl(var(--surface-3))]
+                  border border-[hsl(var(--border))]
+                  shadow-md
+                  text-[hsl(var(--text-primary))]
+                  pointer-events-none
+                "
+              >
+                More actions…
+              </span>
+            )}
             {moreOpen && (
               <div
                 ref={menuRef}
@@ -294,39 +344,40 @@ export function WorkspaceCard({
           )}
         </div>
 
-        <div className={`flex items-center gap-2 min-w-0 ${!isActive ? "opacity-90" : ""}`}>
-          <svg
-            className="shrink-0 w-[14px] h-[14px] text-[hsl(var(--text-secondary))] transition-colors duration-150 group-hover:text-[hsl(var(--brand))]"
-            fill="none"
-            strokeWidth={1.4}
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            viewBox="0 0 24 24"
-            aria-hidden
-          >
-            <path d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44l-2.122-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6z" />
-          </svg>
-          <h2 className="text-[15px] font-medium tracking-[-0.01em] text-neutral-900 truncate min-w-0">
-            {session.title}
-          </h2>
-          <span
-            className={`shrink-0 w-[6px] h-[6px] rounded-full ${isActive ? "bg-[var(--color-brand-primary)]" : "bg-neutral-300"}`}
-            aria-hidden
+        {/* Creator line: [Avatar] Name · relative time */}
+        <div className={`flex items-center gap-2 min-w-0 text-xs text-[hsl(var(--text-secondary))] ${!isActive ? "opacity-90" : ""}`}>
+          <Avatar
+            id={createdBy?.id ?? session.userId}
+            firstName={createdBy?.firstName ?? ""}
+            lastName={createdBy?.lastName ?? ""}
+            avatarUrl={createdBy?.avatarUrl}
+            size="sm"
+            className="shrink-0"
           />
+          <span className="truncate min-w-0">
+            {creatorName}
+            <span aria-hidden className="mx-1">·</span>
+            {formatRelativeTime(session.updatedAt ?? session.createdAt)}
+          </span>
         </div>
 
-        <div className={`mt-1.5 text-[14px] text-neutral-600 ${!isActive ? "opacity-[0.85]" : ""}`}>
-          {feedbackCount} Feedback ·{" "}
-          <span className={openIssues > 0 ? "text-[var(--color-brand-primary)]" : ""}>{openIssues}</span> Open
-        </div>
+        {/* Session title */}
+        <h2 className="mt-1.5 text-base font-medium tracking-[-0.01em] text-neutral-900 truncate min-w-0">
+          {session.title}
+        </h2>
 
-        <div className="mt-1.5 flex justify-between items-center">
-          <span className="text-xs text-[hsl(var(--text-secondary))] tracking-tight">
-            Last activity · {formatFullDateTime(session.updatedAt ?? session.createdAt)}
+        {/* Counts row: views, comments */}
+        <div className="mt-1.5 flex items-center gap-4 text-sm text-[hsl(var(--text-secondary))]">
+          <span className="inline-flex items-center gap-1.5">
+            <Eye className="w-3.5 h-3.5 shrink-0 opacity-80" aria-hidden />
+            {viewCount}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <MessageCircle className="w-3.5 h-3.5 shrink-0 opacity-80" aria-hidden />
+            {commentCount}
           </span>
           <span
-            className="opacity-0 group-hover:opacity-100 transition-opacity duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] inline-flex text-neutral-400"
+            className="opacity-0 group-hover:opacity-100 transition-opacity duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] inline-flex text-neutral-400 ml-auto"
             aria-hidden
           >
             <svg

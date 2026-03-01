@@ -7,6 +7,8 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { addFeedback, deleteFeedback } from "@/lib/feedback";
+import { recordSessionViewIfNew } from "@/lib/sessions";
+import { getViewerId } from "@/lib/viewerId";
 import CaptureWidget from "@/components/CaptureWidget";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import FeedbackSidebar from "@/components/session/FeedbackSidebar";
@@ -127,6 +129,11 @@ export default function SessionPage() {
       );
       setUserPhotoURL(currentUser.photoURL ?? null);
       setSessionLoading(false);
+
+      const viewerId = getViewerId(currentUser.uid);
+      if (viewerId) {
+        recordSessionViewIfNew(sessionSnap.id, viewerId).catch(() => {});
+      }
     });
 
     return () => unsubscribe();

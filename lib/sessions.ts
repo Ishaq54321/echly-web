@@ -1,5 +1,5 @@
-export type { Session } from "@/lib/domain/session";
-import type { Session } from "@/lib/domain/session";
+export type { Session, SessionCreatedBy } from "@/lib/domain/session";
+import type { Session, SessionCreatedBy } from "@/lib/domain/session";
 import {
   createSessionRepo,
   deleteSessionRepo,
@@ -7,6 +7,7 @@ import {
   getUserSessionsRepo,
   updateSessionArchivedRepo,
   updateSessionTitleRepo,
+  recordSessionViewIfNewRepo,
 } from "@/lib/repositories/sessionsRepository";
 
 /* ================================
@@ -17,8 +18,22 @@ import {
    CREATE SESSION
 ================================ */
 
-export async function createSession(userId: string) {
-  return await createSessionRepo(userId);
+export async function createSession(
+  userId: string,
+  createdBy?: SessionCreatedBy | null
+): Promise<string> {
+  return await createSessionRepo(userId, createdBy);
+}
+
+/* ================================
+   RECORD SESSION VIEW (Loom-style)
+================================ */
+
+export async function recordSessionViewIfNew(
+  sessionId: string,
+  viewerId: string
+): Promise<void> {
+  await recordSessionViewIfNewRepo(sessionId, viewerId);
 }
 
 /* ================================

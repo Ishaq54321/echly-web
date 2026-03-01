@@ -14,6 +14,7 @@ import {
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Comment } from "@/lib/domain/comment";
+import { incrementSessionCommentCountRepo } from "@/lib/repositories/sessionsRepository";
 
 export async function addCommentRepo(
   sessionId: string,
@@ -25,7 +26,6 @@ export async function addCommentRepo(
     message: string;
   }
 ): Promise<void> {
-  console.log("ADDING COMMENT TO FIRESTORE", { sessionId, feedbackId, data });
   const collectionRef = collection(db, "comments");
   const payload = {
     sessionId,
@@ -37,26 +37,8 @@ export async function addCommentRepo(
     createdAt: serverTimestamp(),
   };
 
-  console.log("[commentsRepository.addCommentRepo] Firestore path used", {
-    collectionPath: collectionRef.path,
-  });
-
-  console.log("[commentsRepository.addCommentRepo] Data being written", payload);
-
-  try {
-    const docRef = await addDoc(collectionRef, payload);
-
-    console.log("[commentsRepository.addCommentRepo] addDoc result", {
-      id: docRef.id,
-      path: docRef.path,
-    });
-  } catch (error) {
-    console.error(
-      "[commentsRepository.addCommentRepo] Error adding comment",
-      error
-    );
-    throw error;
-  }
+  const docRef = await addDoc(collectionRef, payload);
+  await incrementSessionCommentCountRepo(sessionId);
 }
 
 /** Max comments per feedback thread (cost protection). */

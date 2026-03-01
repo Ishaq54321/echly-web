@@ -18,7 +18,8 @@ export async function addComment(
     message: string;
   }
 ) {
-  return addCommentRepo(sessionId, feedbackId, data);
+  await addCommentRepo(sessionId, feedbackId, data);
+  await updateSessionUpdatedAtRepo(sessionId);
 }
 
 export async function resolveFeedback(feedbackId: string, sessionId?: string) {

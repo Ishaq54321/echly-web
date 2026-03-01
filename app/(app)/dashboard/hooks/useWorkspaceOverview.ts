@@ -95,7 +95,16 @@ export function useWorkspaceOverview() {
 
   const handleCreateSession = useCallback(async () => {
     if (!user) return;
-    const sessionId = await createSession(user.uid);
+    const parts = (auth.currentUser?.displayName || "User").trim().split(/\s+/);
+    const firstName = parts[0] || "User";
+    const lastName = parts.slice(1).join(" ") || "";
+    const createdBy = {
+      id: user.uid,
+      firstName,
+      lastName,
+      avatarUrl: auth.currentUser?.photoURL ?? undefined,
+    };
+    const sessionId = await createSession(user.uid, createdBy);
     router.push(`/dashboard/${sessionId}`);
   }, [user, router]);
 

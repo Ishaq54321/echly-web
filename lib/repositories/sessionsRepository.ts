@@ -8,14 +8,17 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
+  increment,
   type Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
-import type { Session } from "@/lib/domain/session";
+import type { Session, SessionCreatedBy } from "@/lib/domain/session";
 import { deleteAllCommentsForSessionRepo } from "@/lib/repositories/commentsRepository";
 import { deleteAllFeedbackForSessionRepo } from "@/lib/repositories/feedbackRepository";
 
@@ -23,25 +26,28 @@ type SessionDoc = Omit<Session, "id"> & { createdAt?: Timestamp | null; updatedA
 
 /**
  * Creates a single new session. Only writes ONE document; never modifies
- * existing session documents. Do not update session.updatedAt for other
- * sessions when creating a new one.
+ * existing session documents. Sets createdBy, viewCount, commentCount.
  */
-export async function createSessionRepo(userId: string): Promise<string> {
+export async function createSessionRepo(
+  userId: string,
+  createdBy?: SessionCreatedBy | null
+): Promise<string> {
   const docRef = await addDoc(collection(db, "sessions"), {
     userId,
     title: "Untitled Session",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    createdBy: createdBy ?? null,
+    viewCount: 0,
+    commentCount: 0,
   });
 
   return docRef.id;
 }
 
 /**
- * Lists user sessions. Each document's updatedAt is that session's own last
- * activity only (no cross-session mutation). Sorted by creation; for "most
- * recent by activity" use orderBy("updatedAt", "desc") with composite index
- * (userId Ascending, updatedAt Descending).
+ * Lists user sessions. Sorted by most recent activity (updatedAt desc).
+ * Composite index required: (userId Ascending, updatedAt Descending).
  */
 export async function getUserSessionsRepo(
   userId: string,
@@ -51,7 +57,7 @@ export async function getUserSessionsRepo(
   const q = query(
     collection(db, "sessions"),
     where("userId", "==", userId),
-    orderBy("createdAt", "desc"),
+    orderBy("updatedAt", "desc"),
     limit(max)
   );
 
@@ -113,12 +119,45 @@ export async function updateSessionUpdatedAtRepo(sessionId: string): Promise<voi
 }
 
 /**
+ * Atomically increment session.commentCount. Call when a comment is created.
+ */
+export async function incrementSessionCommentCountRepo(sessionId: string): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    commentCount: increment(1),
+  });
+}
+
+/**
+ * Loom-style view tracking: sessionViews/{sessionId}/views/{viewerId}.
+ * If viewer has not viewed this session, creates the viewer doc and atomically
+ * increments session.viewCount. Only counts once per viewer per session.
+ */
+export async function recordSessionViewIfNewRepo(
+  sessionId: string,
+  viewerId: string
+): Promise<void> {
+  const viewerRef = doc(db, "sessionViews", sessionId, "views", viewerId);
+  const sessionRef = doc(db, "sessions", sessionId);
+
+  await runTransaction(db, async (tx) => {
+    const viewerSnap = await tx.get(viewerRef);
+    if (viewerSnap.exists()) return;
+
+    tx.set(viewerRef, { viewedAt: serverTimestamp() });
+    tx.update(sessionRef, { viewCount: increment(1) });
+  });
+}
+
+/**
  * Permanently deletes a session and all associated data: feedback (tickets),
- * comments. Screenshots in Storage are left as-is (TODO: optional cleanup).
+ * comments, view records. Screenshots in Storage are left as-is (TODO: optional cleanup).
  */
 export async function deleteSessionRepo(sessionId: string): Promise<void> {
   await deleteAllFeedbackForSessionRepo(sessionId);
   await deleteAllCommentsForSessionRepo(sessionId);
+  const viewsRef = collection(db, "sessionViews", sessionId, "views");
+  const viewsSnap = await getDocs(viewsRef);
+  await Promise.all(viewsSnap.docs.map((d) => deleteDoc(d.ref)));
   await deleteDoc(doc(db, "sessions", sessionId));
 }
 
