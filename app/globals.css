@@ -38,6 +38,8 @@
   /* Brand (selected state, focus ring — use sparingly) */
   --brand: 0 84% 45%;
   --brand-ring: 0 84% 45% / 0.35;
+  /* Brand red — status dot, alerts (no full backgrounds) */
+  --brand-red: 0 84% 45%;
 
 }
 

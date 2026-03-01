@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle } from "lucide-react";
+import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle, Folder } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
-import { formatRelativeTime } from "@/lib/utils/time";
-import { Avatar } from "@/components/ui/Avatar";
 import { ShareSessionModal } from "./ShareSessionModal";
 import { RenameSessionModal } from "./RenameSessionModal";
 import { DeleteSessionModal } from "./DeleteSessionModal";
@@ -29,12 +27,8 @@ export function WorkspaceCard({
   onDeleteSuccess,
 }: WorkspaceCardProps) {
   const { session, counts } = item;
-  const openIssues = counts.open;
-  const isActive = openIssues > 0;
-  const createdBy = session.createdBy;
-  const creatorName = createdBy
-    ? [createdBy.firstName, createdBy.lastName].filter(Boolean).join(" ") || "Unknown"
-    : "Unknown";
+  const feedbackCount = counts.open + counts.in_progress + counts.resolved;
+  const openFeedbackCount = counts.open;
   const viewCount = session.viewCount ?? 0;
   const commentCount = session.commentCount ?? 0;
 
@@ -201,198 +195,205 @@ export function WorkspaceCard({
         tabIndex={0}
         onClick={handleCardClick}
         onKeyDown={handleCardKeyDown}
-        className={`focus-ring-brand relative flex flex-col min-h-[132px] w-full bg-white rounded-[16px] px-5 py-5 border cursor-pointer outline-none transition-[border-color,box-shadow] duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
-          isActive
-            ? "border-neutral-200 shadow-[0_6px_18px_rgba(0,0,0,0.05)] hover:border-neutral-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.09)]"
-            : "border-neutral-200/70 shadow-[0_4px_12px_rgba(0,0,0,0.025)] hover:border-neutral-300 hover:shadow-[0_12px_36px_rgba(0,0,0,0.09)]"
-        }`}
+        className="
+          focus-ring-brand
+          relative
+          rounded-2xl
+          border border-[rgba(0,0,0,0.05)]
+          bg-white
+          py-6 px-6
+          cursor-pointer
+          outline-none
+          transition-shadow duration-200
+          hover:shadow-[0_6px_18px_rgba(0,0,0,0.06)]
+        "
         style={{ animationDelay: `${index * 40}ms` }}
         data-session-id={session.id}
       >
-        {/* Action bar: 3-dot menu only */}
-        <div
-          data-card-actions
-          className="absolute top-3 right-3 z-20"
-        >
-          <div
-            className="relative h-10 w-10"
-            ref={moreRef}
-            onMouseEnter={() => {
-              hoverTimeoutRef.current = setTimeout(() => {
-                setShowTooltip(true);
-              }, 300);
-            }}
-            onMouseLeave={() => {
-              if (hoverTimeoutRef.current) {
-                clearTimeout(hoverTimeoutRef.current);
-                hoverTimeoutRef.current = null;
-              }
-              setShowTooltip(false);
-            }}
-          >
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setMoreOpen((prev) => !prev);
+        {/* ROW 1 — HEADER */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2 min-w-0 flex-1">
+            <Folder className="w-4 h-4 mt-[4px] shrink-0 text-[hsl(var(--text-secondary))]" aria-hidden />
+            <div className="min-w-0 flex-1 flex items-start gap-2">
+              <h3 className="
+                text-[17px]
+                font-semibold
+                tracking-[-0.015em]
+                text-[hsl(var(--text-primary))]
+                leading-snug
+                line-clamp-2
+                overflow-hidden
+                text-ellipsis
+                min-w-0
+              ">
+                {session.title}
+              </h3>
+              {openFeedbackCount > 0 && (
+                <span className="ml-2 mt-[6px] h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--brand-red))]" aria-hidden />
+              )}
+            </div>
+          </div>
+          <div data-card-actions className="relative z-20 shrink-0">
+            <div
+              className="relative h-10 w-10"
+              ref={moreRef}
+              onMouseEnter={() => {
+                hoverTimeoutRef.current = setTimeout(() => {
+                  setShowTooltip(true);
+                }, 300);
               }}
-              aria-label="More actions"
-              aria-expanded={moreOpen}
-              aria-haspopup="menu"
-              className="
-                flex items-center justify-center
-                h-10 w-10
-                rounded-lg
-                text-[hsl(var(--text-secondary))]
-                transition-colors duration-150
-                hover:bg-[hsl(var(--surface-2))]
-                hover:text-[hsl(var(--text-primary))]
-                focus-visible:outline-none
-                focus-visible:ring-2
-                focus-visible:ring-[hsl(var(--brand))]
-                cursor-pointer
-              "
+              onMouseLeave={() => {
+                if (hoverTimeoutRef.current) {
+                  clearTimeout(hoverTimeoutRef.current);
+                  hoverTimeoutRef.current = null;
+                }
+                setShowTooltip(false);
+              }}
             >
-              <MoreHorizontal className="w-4 h-4 pointer-events-none" aria-hidden />
-            </button>
-            {showTooltip && (
-              <span
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMoreOpen((prev) => !prev);
+                }}
+                aria-label="More actions"
+                aria-expanded={moreOpen}
+                aria-haspopup="menu"
                 className="
-                  absolute right-0 top-full mt-1
-                  whitespace-nowrap
-                  px-2 py-1
-                  text-xs
-                  rounded-md
-                  bg-[hsl(var(--surface-3))]
-                  border border-[hsl(var(--border))]
-                  shadow-md
-                  text-[hsl(var(--text-primary))]
-                  pointer-events-none
+                  flex items-center justify-center
+                  h-10 w-10
+                  rounded-lg
+                  text-[hsl(var(--text-secondary))]
+                  transition-colors duration-150
+                  hover:bg-[hsl(var(--surface-2))]
+                  hover:text-[hsl(var(--text-primary))]
+                  focus-visible:outline-none
+                  focus-visible:ring-2
+                  focus-visible:ring-[hsl(var(--brand))]
+                  cursor-pointer
                 "
               >
-                More actions…
+                <MoreHorizontal className="w-4 h-4 pointer-events-none" aria-hidden />
+              </button>
+              {showTooltip && (
+                <span
+                  className="
+                    absolute
+                    top-full
+                    right-0
+                    mt-2
+                    px-3 py-1.5
+                    text-xs
+                    rounded-md
+                    bg-black
+                    text-white
+                    shadow-lg
+                    pointer-events-none
+                    transition-opacity duration-150
+                    whitespace-nowrap
+                  "
+                >
+                  More actions…
+                </span>
+              )}
+              {moreOpen && (
+                <div
+                  ref={menuRef}
+                  data-card-actions
+                  className="absolute right-0 top-full mt-1 py-1 min-w-[160px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] shadow-lg z-10"
+                  role="menu"
+                  aria-label="Workspace actions"
+                >
+                  <button
+                    ref={firstMenuItemRef}
+                    type="button"
+                    onClick={handleCopyLink}
+                    className={menuItemClass}
+                    role="menuitem"
+                  >
+                    <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Copy link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className={menuItemClass}
+                    role="menuitem"
+                  >
+                    <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Share
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRenameClick}
+                    className={menuItemClass}
+                    role="menuitem"
+                  >
+                    <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Rename
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleArchiveClick}
+                    disabled={archiving}
+                    className={`${menuItemClass} disabled:opacity-60`}
+                    role="menuitem"
+                  >
+                    <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    {archiving ? "Archiving…" : "Archive"}
+                  </button>
+                  <div className="my-1 border-t border-[hsl(var(--border))]" role="separator" aria-hidden />
+                  <button
+                    type="button"
+                    onClick={handleDeleteClick}
+                    className="focus-ring-brand w-full px-3 py-2 text-left text-sm rounded-md text-red-500 hover:bg-red-50 transition-colors duration-150 flex items-center gap-2"
+                    role="menuitem"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+            {copyTooltip && (
+              <span
+                className="absolute right-12 top-0 mt-2 px-3 py-1.5 text-xs rounded-md bg-black text-white shadow-lg whitespace-nowrap z-20 pointer-events-none transition-opacity duration-150"
+                role="status"
+                aria-live="polite"
+              >
+                Link copied
               </span>
             )}
-            {moreOpen && (
-              <div
-                ref={menuRef}
-                data-card-actions
-                className="absolute right-0 top-full mt-1 py-1 min-w-[160px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] shadow-lg z-10"
-                role="menu"
-                aria-label="Workspace actions"
-              >
-                <button
-                  ref={firstMenuItemRef}
-                  type="button"
-                  onClick={handleCopyLink}
-                  className={menuItemClass}
-                  role="menuitem"
-                >
-                  <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Copy link
-                </button>
-                <button
-                  type="button"
-                  onClick={handleShare}
-                  className={menuItemClass}
-                  role="menuitem"
-                >
-                  <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Share
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRenameClick}
-                  className={menuItemClass}
-                  role="menuitem"
-                >
-                  <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  onClick={handleArchiveClick}
-                  disabled={archiving}
-                  className={`${menuItemClass} disabled:opacity-60`}
-                  role="menuitem"
-                >
-                  <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  {archiving ? "Archiving…" : "Archive"}
-                </button>
-                <div className="my-1 border-t border-[hsl(var(--border))]" role="separator" aria-hidden />
-                <button
-                  type="button"
-                  onClick={handleDeleteClick}
-                  className="focus-ring-brand w-full px-3 py-2 text-left text-sm rounded-md text-red-500 hover:bg-red-50 transition-colors duration-150 flex items-center gap-2"
-                  role="menuitem"
-                >
-                  <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Delete
-                </button>
-              </div>
-            )}
           </div>
-          {copyTooltip && (
-            <span
-              className="absolute right-12 top-0 px-2 py-1 text-xs font-medium rounded-md bg-neutral-800 text-white whitespace-nowrap z-20 pointer-events-none"
-              role="status"
-              aria-live="polite"
-            >
-              Link copied
+        </div>
+
+        {/* ROW 2 — FEEDBACK SUMMARY */}
+        <div className="mt-3 text-sm text-[hsl(var(--text-secondary))] font-medium">
+          <span className="text-[hsl(var(--text-primary))]">
+            {feedbackCount}
+          </span>
+          {" "}Feedback ·{" "}
+          <span className="text-[hsl(var(--text-primary))]">
+            {openFeedbackCount}
+          </span>
+          {" "}Open
+        </div>
+
+        {/* ROW 3 — META (VIEWS + COMMENTS) */}
+        <div className="mt-4 flex items-center gap-6 text-sm text-[hsl(var(--text-secondary))]">
+          <div className="flex items-center gap-1.5">
+            <Eye className="w-4 h-4 shrink-0 opacity-70" aria-hidden />
+            <span className="font-medium text-[hsl(var(--text-primary))]">
+              {viewCount}
             </span>
-          )}
-        </div>
-
-        {/* Creator line: [Avatar] Name · relative time */}
-        <div className={`flex items-center gap-2 min-w-0 text-xs text-[hsl(var(--text-secondary))] ${!isActive ? "opacity-90" : ""}`}>
-          <Avatar
-            id={createdBy?.id ?? session.userId}
-            firstName={createdBy?.firstName ?? ""}
-            lastName={createdBy?.lastName ?? ""}
-            avatarUrl={createdBy?.avatarUrl}
-            size="sm"
-            className="shrink-0"
-          />
-          <span className="truncate min-w-0">
-            {creatorName}
-            <span aria-hidden className="mx-1">·</span>
-            {formatRelativeTime(session.updatedAt ?? session.createdAt)}
-          </span>
-        </div>
-
-        {/* Session title */}
-        <h2 className="mt-1.5 text-base font-medium tracking-[-0.01em] text-neutral-900 truncate min-w-0">
-          {session.title}
-        </h2>
-
-        {/* Counts row: views, comments */}
-        <div className="mt-1.5 flex items-center gap-4 text-sm text-[hsl(var(--text-secondary))]">
-          <span className="inline-flex items-center gap-1.5">
-            <Eye className="w-3.5 h-3.5 shrink-0 opacity-80" aria-hidden />
-            {viewCount}
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <MessageCircle className="w-3.5 h-3.5 shrink-0 opacity-80" aria-hidden />
-            {commentCount}
-          </span>
-          <span
-            className="opacity-0 group-hover:opacity-100 transition-opacity duration-[120ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] inline-flex text-neutral-400 ml-auto"
-            aria-hidden
-          >
-            <svg
-              width={14}
-              height={14}
-              viewBox="0 0 24 24"
-              fill="none"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <MessageCircle className="w-4 h-4 shrink-0 opacity-70" aria-hidden />
+            <span className="font-medium text-[hsl(var(--text-primary))]">
+              {commentCount}
+            </span>
+          </div>
         </div>
       </div>
 
