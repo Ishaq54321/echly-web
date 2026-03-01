@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
+import type { FeedbackPriority } from "@/lib/domain/feedback";
 import { requireAuth } from "@/lib/server/auth";
+import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
+  addFeedbackRepo,
+  getFeedbackByIdRepo,
   getSessionFeedbackPageWithStringCursorRepo,
   getSessionFeedbackCountRepo,
   getSessionFeedbackCountsRepo,
 } from "@/lib/repositories/feedbackRepository";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
+import {
+  getSessionByIdRepo,
+  updateSessionUpdatedAtRepo,
+} from "@/lib/repositories/sessionsRepository";
 
 function serializeFeedback(item: Feedback): Record<string, unknown> {
   const out = { ...item } as Record<string, unknown>;
@@ -87,6 +94,129 @@ export async function GET(req: Request) {
     console.error("GET /api/feedback:", err);
     return NextResponse.json(
       { error: "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/** POST /api/feedback — create feedback (ticket) for a session. Returns same shape as GET /api/tickets/:id. */
+const POST_BODY_PRIORITY: FeedbackPriority[] = ["low", "medium", "high", "critical"];
+
+export async function POST(req: Request) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (res) {
+    return res as Response;
+  }
+
+  let body: {
+    sessionId?: string;
+    title?: string;
+    description?: string;
+    suggestion?: string;
+    screenshotUrl?: string;
+    contextSummary?: string;
+    actionItems?: string[];
+    impact?: string;
+    suggestedTags?: string[];
+    priority?: string;
+    metadata?: {
+      url?: string;
+      viewportWidth?: number;
+      viewportHeight?: number;
+      userAgent?: string;
+      clientTimestamp?: number;
+    };
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Invalid JSON body" },
+      { status: 400 }
+    );
+  }
+
+  const sessionId =
+    typeof body.sessionId === "string" ? body.sessionId.trim() : "";
+  if (!sessionId) {
+    return NextResponse.json(
+      { success: false, error: "sessionId is required" },
+      { status: 400 }
+    );
+  }
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const description =
+    typeof body.description === "string" ? body.description.trim() : "";
+  if (!title || !description) {
+    return NextResponse.json(
+      { success: false, error: "title and description are required" },
+      { status: 400 }
+    );
+  }
+
+  const session = await getSessionByIdRepo(sessionId);
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: "Session not found" },
+      { status: 404 }
+    );
+  }
+  if (session.userId !== user.uid) {
+    return NextResponse.json(
+      { success: false, error: "Forbidden" },
+      { status: 403 }
+    );
+  }
+
+  const meta = body.metadata;
+  const priority =
+    typeof body.priority === "string" &&
+    POST_BODY_PRIORITY.includes(body.priority as FeedbackPriority)
+      ? (body.priority as FeedbackPriority)
+      : "medium";
+
+  const structuredData = {
+    title,
+    description,
+    suggestion: typeof body.suggestion === "string" ? body.suggestion : undefined,
+    type: "general" as const,
+    contextSummary:
+      typeof body.contextSummary === "string" ? body.contextSummary : undefined,
+    actionItems: Array.isArray(body.actionItems) ? body.actionItems : undefined,
+    impact: typeof body.impact === "string" ? body.impact : undefined,
+    suggestedTags: Array.isArray(body.suggestedTags)
+      ? body.suggestedTags
+      : undefined,
+    priority,
+    screenshotUrl:
+      typeof body.screenshotUrl === "string" ? body.screenshotUrl : undefined,
+    url: meta?.url,
+    viewportWidth: meta?.viewportWidth,
+    viewportHeight: meta?.viewportHeight,
+    userAgent: meta?.userAgent,
+    timestamp: meta?.clientTimestamp,
+  };
+
+  try {
+    const docRef = await addFeedbackRepo(sessionId, user.uid, structuredData);
+    const created = await getFeedbackByIdRepo(docRef.id);
+    if (!created) {
+      return NextResponse.json(
+        { success: false, error: "Feedback created but could not be read" },
+        { status: 500 }
+      );
+    }
+    await updateSessionUpdatedAtRepo(sessionId);
+    return NextResponse.json({
+      success: true,
+      ticket: serializeTicket(created),
+    });
+  } catch (err) {
+    console.error("POST /api/feedback:", err);
+    return NextResponse.json(
+      { success: false, error: "Server error" },
       { status: 500 }
     );
   }

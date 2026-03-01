@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
 import { requireAuth } from "@/lib/server/auth";
+import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
   getFeedbackByIdRepo,
   updateFeedbackRepo,
@@ -126,14 +127,4 @@ export async function PATCH(
       { status: 500 }
     );
   }
-}
-
-/** Make Firestore Timestamp JSON-serializable for API response. */
-function serializeTicket(ticket: Feedback): Record<string, unknown> {
-  const out = { ...ticket } as Record<string, unknown>;
-  const createdAt = ticket.createdAt as { toDate?: () => Date } | null;
-  if (createdAt != null && typeof createdAt.toDate === "function") {
-    out.createdAt = createdAt.toDate().toISOString();
-  }
-  return out;
 }

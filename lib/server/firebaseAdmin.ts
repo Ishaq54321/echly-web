@@ -33,3 +33,4 @@ function getFirebaseAdminApp(): admin.app.App {
 
 export const adminAuth = getFirebaseAdminApp().auth();
 export const adminDb = getFirebaseAdminApp().firestore();
+export const adminStorage = getFirebaseAdminApp().storage();
