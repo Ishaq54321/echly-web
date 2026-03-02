@@ -204,6 +204,7 @@ export async function POST(req: Request) {
       );
     }
     await updateSessionUpdatedAtRepo(sessionId);
+
     log("[API] POST /api/feedback duration:", Date.now() - start);
     return NextResponse.json({
       success: true,
