@@ -943,7 +943,7 @@ textarea:focus-visible {
 .echly-recording-capsule--expanded {
   width: 420px;
   min-width: 420px;
-  padding: 18px 24px;
+  padding: 26px 24px;
   gap: 24px;
   justify-content: flex-start;
 }
