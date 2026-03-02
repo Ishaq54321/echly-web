@@ -364,7 +364,12 @@ function ContentApp() {
 /** Minimal CSS reset inside shadow root for style isolation. */
 const SHADOW_RESET = `
   :host { all: initial; }
-  #echly-root { box-sizing: border-box; }
+  #echly-root {
+    all: initial;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
+    color-scheme: dark;
+  }
   #echly-root * { box-sizing: border-box; }
 `;
 

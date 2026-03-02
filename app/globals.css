@@ -575,21 +575,30 @@ textarea:focus-visible {
 }
 
 /* ======================================
-   ECHLY — Confident AI layer
-   Deep graphite, no black. Intentional color hierarchy.
-   Motion: 140ms cubic-bezier(0.2, 0.8, 0.2, 1)
+   ECHLY — UI stabilization: identical on all sites (light/dark/mixed).
+   Hard-isolated colors, controlled glass, no page inheritance.
 ====================================== */
 
 :root {
   --echly-surface: #181A1F;
   --echly-elevated: #20232A;
   --echly-accent-neutral: #2B2F36;
-  --echly-text-primary: rgba(255, 255, 255, 0.92);
-  --echly-text-secondary: rgba(255, 255, 255, 0.55);
   --echly-divider: rgba(255, 255, 255, 0.04);
   --echly-accent: #466EFF;
   --echly-alert: #FF4D4F;
   --echly-resolved: #22c55e;
+}
+
+/* Isolation: extension sets this on #echly-root in shadow DOM; app can scope widget the same */
+#echly-root {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
+  color-scheme: dark;
+}
+.echly-title {
+  color: rgba(255, 255, 255, 0.92);
+}
+.echly-meta {
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .echly-motion {
@@ -597,20 +606,33 @@ textarea:focus-visible {
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* ---- Sidebar: deep graphite + layered translucency (no black) ---- */
+/* ---- Sidebar: controlled glass 0.96 + internal glow (not page-dependent) ---- */
 .echly-sidebar-container {
   width: 480px;
   transition: opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
     transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .echly-sidebar-surface {
+  position: relative;
   border-radius: 18px;
-  background: rgba(24, 26, 31, 0.82);
-  backdrop-filter: blur(22px) saturate(130%);
-  -webkit-backdrop-filter: blur(22px) saturate(130%);
+  background: linear-gradient(180deg, rgba(28, 30, 36, 0.96), rgba(22, 24, 30, 0.96));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
+}
+.echly-sidebar-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 30% 20%,
+    rgba(255, 255, 255, 0.05),
+    transparent 60%
+  );
+  pointer-events: none;
 }
 .echly-sidebar-header {
   padding: 24px 20px 0;
@@ -627,13 +649,13 @@ textarea:focus-visible {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.2px;
-  color: var(--echly-text-primary);
+  color: rgba(255, 255, 255, 0.92);
 }
 .echly-sidebar-summary {
   display: block;
   margin-top: 4px;
   font-size: 12px;
-  color: var(--echly-text-secondary);
+  color: rgba(255, 255, 255, 0.55);
 }
 .echly-sidebar-close {
   opacity: 0;
@@ -641,7 +663,7 @@ textarea:focus-visible {
   padding: 6px;
   border: none;
   background: transparent;
-  color: var(--echly-text-secondary);
+  color: rgba(255, 255, 255, 0.55);
   cursor: pointer;
   border-radius: 8px;
 }
@@ -668,7 +690,7 @@ textarea:focus-visible {
 }
 .echly-sidebar-error {
   font-size: 13px;
-  color: var(--echly-text-secondary);
+  color: rgba(255, 255, 255, 0.55);
   padding: 12px 0;
 }
 /* Add insight: primary action, sticky bottom */
@@ -703,8 +725,8 @@ textarea:focus-visible {
   transform: scale(0.96);
 }
 .echly-add-insight-btn--disabled {
-  background: var(--echly-accent-neutral);
-  color: var(--echly-text-secondary);
+  background: #2B2F36;
+  color: rgba(255, 255, 255, 0.55);
   cursor: not-allowed;
   box-shadow: none;
 }
@@ -778,7 +800,7 @@ textarea:focus-visible {
   background: rgba(255, 255, 255, 0.35);
 }
 .echly-feedback-item[data-priority="critical"] .echly-priority-dot {
-  background: var(--echly-alert);
+  background: #FF4D4F;
 }
 .echly-feedback-item[data-priority="high"] .echly-priority-dot {
   background: #ea580c;
@@ -805,16 +827,16 @@ textarea:focus-visible {
   font-size: 14px;
   line-height: 1.4;
   letter-spacing: -0.2px;
-  color: var(--echly-text-primary);
+  color: rgba(255, 255, 255, 0.92);
 }
 .echly-widget-item-desc {
   font-size: 13px;
   line-height: 1.4;
-  color: var(--echly-text-secondary);
+  color: rgba(255, 255, 255, 0.55);
   margin-top: 6px;
 }
 .echly-feedback-item .echly-widget-action-icon--delete:hover {
-  color: var(--echly-alert);
+  color: #FF4D4F;
   opacity: 1;
 }
 .echly-feedback-item-input,
@@ -858,15 +880,15 @@ textarea:focus-visible {
   padding: 8px 12px;
   border: none;
   background: transparent;
-  color: var(--echly-text-secondary);
-  font-size: 14px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: color 120ms ease;
   flex-shrink: 0;
 }
 .echly-capsule-cancel:hover {
-  color: var(--echly-text-primary);
+  color: rgba(255, 255, 255, 0.92);
 }
 .echly-capsule-wrapper {
   transition: opacity 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -875,18 +897,29 @@ textarea:focus-visible {
   opacity: 0;
   pointer-events: none;
 }
+/* Growing pill: idle 44px circle → listening 240px over 180ms */
 .echly-capsule {
-  height: 56px;
+  height: 44px;
+  width: 44px;
+  min-width: 44px;
   border-radius: 999px;
-  background: rgba(30, 32, 38, 0.95);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  padding: 0 22px;
+  background: rgba(28, 30, 36, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 0;
   display: flex;
   align-items: center;
-  gap: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  gap: 0;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
+  transition: width 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.echly-capsule--expanded {
+  width: 240px;
+  min-width: 240px;
+  padding: 0 16px 0 8px;
+  gap: 12px;
 }
 .echly-capsule-orb {
   flex-shrink: 0;
@@ -898,6 +931,7 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   gap: 2px;
   min-width: 0;
   flex: 1;
@@ -909,7 +943,7 @@ textarea:focus-visible {
   font-weight: 500;
   letter-spacing: -0.1px;
   position: relative;
-  font-family: inherit;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
 }
 .echly-capsule-underline {
   position: absolute;
@@ -928,39 +962,39 @@ textarea:focus-visible {
 }
 .echly-ai-preview {
   font-size: 13px;
-  opacity: 0.6;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 280px;
 }
 .echly-capsule-done {
-  height: 36px;
-  padding: 0 18px;
-  margin-left: 8px;
+  height: 34px;
+  padding: 0 16px;
   border-radius: 999px;
   background: #fff;
-  color: #181A1F;
+  color: #000;
   font-size: 14px;
   font-weight: 600;
   border: none;
   cursor: pointer;
   transition: transform 100ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    background 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
   flex-shrink: 0;
 }
 .echly-capsule-done:hover {
-  opacity: 0.95;
+  background: rgba(255, 255, 255, 0.9);
 }
 .echly-capsule-done:active {
   transform: scale(0.97);
 }
 
-/* ---- Mic orb: 48px, #FF4D4F → #D9363E, breathe 2.5s, success green ---- */
+/* ---- Mic orb: 48px default; 44px in capsule. #FF4D4F soft glow. Processing: orb shrinks, no bars ---- */
 .echly-mic-orb-wrapper {
   width: 48px;
   height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   flex-shrink: 0;
   position: relative;
   display: flex;
@@ -968,10 +1002,29 @@ textarea:focus-visible {
   justify-content: center;
   transition: transform 100ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+.echly-mic-orb-wrapper--44 {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.echly-mic-orb-wrapper--44 .echly-mic-orb {
+  width: 44px;
+  height: 44px;
+}
+.echly-mic-orb-wrapper--44 .echly-mic-orb-ring {
+  width: 44px;
+  height: 44px;
+  margin-left: -22px;
+  margin-top: -22px;
+}
 .echly-mic-orb-wrapper.echly-mic-orb--exiting .echly-mic-orb {
   transform: scale(0.96);
 }
 .echly-mic-orb-wrapper.echly-mic-orb--processing .echly-mic-orb {
+  transform: scale(0.92);
+}
+.echly-mic-orb-wrapper.echly-mic-orb--processing .echly-mic-orb-processing-line {
   display: none;
 }
 .echly-mic-orb {
@@ -1017,13 +1070,7 @@ textarea:focus-visible {
   box-shadow: 0 0 28px rgba(255, 77, 79, 0.35);
 }
 .echly-mic-orb-processing-line {
-  position: absolute;
-  width: 72px;
-  height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, #FF4D4F, #D9363E, #FF4D4F);
-  background-size: 200% 100%;
-  animation: echly-gradient-shift 1.2s infinite linear;
+  display: none;
 }
 .echly-ticket-highlight {
   animation: echly-ticket-pulse 1.2s ease-out;

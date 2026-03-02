@@ -9,14 +9,15 @@ type Props = {
   audioLevel?: number;
   isExiting?: boolean;
   isProcessing?: boolean;
-  /** Brief green pulse after success (200ms) */
   isSuccess?: boolean;
   sentiment?: SentimentGlow;
+  /** Orb diameter in px (default 48; capsule uses 44) */
+  size?: number;
 };
 
 /**
- * Mic orb: 48px, gradient #FF4D4F → #D9363E.
- * Idle: breathe 2.5s. Speaking: ring + glow. Processing: thin light bar. Success: green pulse.
+ * Mic orb: 44px in capsule, 48px elsewhere. #FF4D4F soft glow.
+ * Idle: breathe. Speaking: ring + glow. Processing: orb shrinks slightly. Success: green pulse.
  */
 export function MicOrb({
   isSpeaking = false,
@@ -25,6 +26,7 @@ export function MicOrb({
   isProcessing = false,
   isSuccess = false,
   sentiment = "neutral",
+  size = 48,
 }: Props) {
   const ringScale = isSpeaking ? 1 + Math.min(0.22, audioLevel * 0.28) : 1;
 
@@ -32,11 +34,13 @@ export function MicOrb({
     <div
       className={`
         echly-mic-orb-wrapper
+        ${size === 44 ? "echly-mic-orb-wrapper--44" : ""}
         ${isExiting ? "echly-mic-orb--exiting" : ""}
         ${isProcessing ? "echly-mic-orb--processing" : ""}
         ${isSuccess ? "echly-mic-orb--success" : ""}
         echly-mic-orb-sentiment--${sentiment}
       `}
+      style={size !== 48 ? { width: size, height: size, minWidth: size, minHeight: size } : undefined}
     >
       {!isProcessing && (
         <div
@@ -52,12 +56,7 @@ export function MicOrb({
           aria-hidden
         />
       )}
-      {isProcessing && (
-        <div className="echly-mic-orb-processing-line" aria-hidden />
-      )}
-      {!isProcessing && (
-        <div className="echly-mic-orb" aria-hidden />
-      )}
+      <div className="echly-mic-orb" aria-hidden />
     </div>
   );
 }

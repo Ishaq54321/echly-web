@@ -9,11 +9,8 @@ export type VoiceBubbleProps = {
   isExiting?: boolean;
   audioLevel: number;
   sentiment: "negative" | "neutral" | "positive";
-  /** Live transcript of what user is saying */
   liveTranscript?: string;
-  /** Live AI title suggestion (below transcript) */
   aiPreviewTitle?: string | null;
-  /** Brief green pulse after success */
   orbSuccess?: boolean;
   onDone: () => void;
 };
@@ -21,8 +18,8 @@ export type VoiceBubbleProps = {
 const MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
 
 /**
- * AI voice capsule. Renders in #echly-ai-root only.
- * Structure: [ Mic Orb ] [ Live Transcript Preview (transcript + AI title below) ]
+ * Growing pill: starts as 44px circle, expands to 240px over 180ms.
+ * [ Mic Orb ] [ Transcript ] [ Done ]
  */
 export function VoiceBubble({
   isListening,
@@ -36,32 +33,42 @@ export function VoiceBubble({
   onDone,
 }: VoiceBubbleProps) {
   const isSpeaking = isListening && audioLevel > 0.12;
+  const [expanded, setExpanded] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [showAiPreview, setShowAiPreview] = useState(false);
 
-  const wordCount = liveTranscript.trim() ? liveTranscript.trim().split(/\s+/).length : 0;
+  const shouldExpand = isListening || isProcessing || isExiting;
 
+  useEffect(() => {
+    if (shouldExpand) {
+      const id = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setExpanded(true));
+      });
+      return () => cancelAnimationFrame(id);
+    }
+    setExpanded(false);
+  }, [shouldExpand]);
+
+  const wordCount = liveTranscript.trim() ? liveTranscript.trim().split(/\s+/).length : 0;
   useEffect(() => {
     if (wordCount > 5) {
       const t = setTimeout(() => setShowTranscript(true), 80);
       return () => clearTimeout(t);
-    } else {
-      setShowTranscript(false);
     }
+    setShowTranscript(false);
   }, [wordCount]);
 
   useEffect(() => {
     if (aiPreviewTitle && aiPreviewTitle.length > 5) {
       const t = setTimeout(() => setShowAiPreview(true), 80);
       return () => clearTimeout(t);
-    } else {
-      setShowAiPreview(false);
     }
+    setShowAiPreview(false);
   }, [aiPreviewTitle]);
 
   return (
     <div
-      className={`echly-capsule ${isExiting ? "echly-capsule--exiting" : ""}`}
+      className={`echly-capsule ${expanded ? "echly-capsule--expanded" : ""} ${isExiting ? "echly-capsule--exiting" : ""}`}
       role="status"
       aria-live="polite"
       aria-label={isProcessing ? "Structuring insight" : "Describe the issue"}
@@ -74,6 +81,7 @@ export function VoiceBubble({
           isProcessing={isProcessing}
           isSuccess={orbSuccess}
           sentiment={sentiment}
+          size={44}
         />
       </div>
       <div className="echly-capsule-transcript-block">
@@ -98,7 +106,7 @@ export function VoiceBubble({
                 className="echly-ai-preview"
                 style={{
                   opacity: showAiPreview ? 1 : 0,
-                  transition: `opacity 200ms ease-out`,
+                  transition: "opacity 200ms ease-out",
                 }}
               >
                 {aiPreviewTitle}
