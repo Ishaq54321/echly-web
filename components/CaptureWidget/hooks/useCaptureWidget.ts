@@ -611,75 +611,6 @@ export function useCaptureWidget({
     [startListening]
   );
 
-  const handleRegionConfirmOnly = useCallback(
-    (croppedDataUrl: string, context?: CaptureContext | null) => {
-      const id = generateRecordingId();
-      const newRecording: Recording = {
-        id,
-        screenshot: croppedDataUrl,
-        transcript: "Screenshot",
-        structuredOutput: null,
-        context: context ?? null,
-        createdAt: Date.now(),
-      };
-      setRecordings((prev) => [...prev, newRecording]);
-      setActiveRecordingId(id);
-      setState("processing");
-      const processRecording = async () => {
-        if (extensionMode) {
-          onComplete("Screenshot", croppedDataUrl, {
-            onSuccess: (ticket) => {
-              setPointers((prev) => [
-                { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
-                ...prev,
-              ]);
-              setRecordings((prev) => prev.filter((r) => r.id !== id));
-              setActiveRecordingId(null);
-              setHighlightTicketId(ticket.id);
-              setTimeout(() => setHighlightTicketId(null), 1200);
-              removeCaptureRoot();
-              restoreWidget();
-            },
-            onError: () => {
-              setErrorMessage("AI processing failed.");
-              setState("idle");
-              removeCaptureRoot();
-              restoreWidget();
-            },
-          }, context ?? undefined);
-          return;
-        }
-        try {
-          const structured = await onComplete("Screenshot", croppedDataUrl);
-          if (!structured) {
-            setState("idle");
-            removeCaptureRoot();
-            restoreWidget();
-            return;
-          }
-          setPointers((prev) => [
-            { id: structured.id, title: structured.title, description: structured.description, type: structured.type },
-            ...prev,
-          ]);
-          setRecordings((prev) => prev.filter((r) => r.id !== id));
-          setActiveRecordingId(null);
-          setHighlightTicketId(structured.id);
-          setTimeout(() => setHighlightTicketId(null), 1200);
-          removeCaptureRoot();
-          restoreWidget();
-        } catch (err) {
-          console.error(err);
-          setErrorMessage("AI processing failed.");
-          setState("idle");
-          removeCaptureRoot();
-          restoreWidget();
-        }
-      };
-      processRecording();
-    },
-    [extensionMode, onComplete, removeCaptureRoot, restoreWidget]
-  );
-
   const handleCancelCapture = useCallback(() => {
     setState("cancelled");
     removeCaptureRoot();
@@ -748,7 +679,6 @@ export function useCaptureWidget({
       setEditedDescription,
       handleAddFeedback,
       handleRegionCaptured,
-      handleRegionConfirmOnly,
       handleRegionSelectStart,
       handleCancelCapture,
       getFullTabImage,
@@ -766,7 +696,6 @@ export function useCaptureWidget({
       startEditing,
       saveEdit,
       handleAddFeedback,
-      handleRegionConfirmOnly,
       handleRegionCaptured,
       handleRegionSelectStart,
       handleCancelCapture,

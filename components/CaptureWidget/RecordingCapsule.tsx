@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { RecordingMicOrb } from "./RecordingMicOrb";
 
 export type RecordingCapsuleProps = {
@@ -20,12 +20,11 @@ export function RecordingCapsule({
   isActive,
   isProcessing,
   isExiting = false,
-  liveTranscript = "",
+  audioLevel,
   onDone,
   onCancel,
 }: RecordingCapsuleProps) {
   const [expanded, setExpanded] = useState(false);
-  const transcriptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isActive || isProcessing) {
@@ -37,17 +36,13 @@ export function RecordingCapsule({
     setExpanded(false);
   }, [isActive, isProcessing]);
 
-  const transcriptText = useMemo(() => {
-    if (isProcessing) return "Structuring insight…";
-    const t = liveTranscript.trim();
-    if (t) return t;
-    return "Listening…";
-  }, [isProcessing, liveTranscript]);
+  const statusText = isProcessing
+    ? "Structuring your feedback…"
+    : isActive
+      ? "Listening…"
+      : "Tell us what's happening — we'll structure it.";
 
-  const statusText = useMemo(() => {
-    if (isProcessing) return "Optimizing your insight…";
-    return "Listening — we'll structure this.";
-  }, [isProcessing]);
+  const showEscHint = isActive && !isProcessing;
 
   if (!visible) return null;
 
@@ -64,19 +59,18 @@ export function RecordingCapsule({
           .join(" ")}
       >
         <div className="echly-recording-orb">
-          <RecordingMicOrb isRecording={isActive} isProcessing={isProcessing} />
+          <RecordingMicOrb
+            isRecording={isActive}
+            isProcessing={isProcessing}
+            audioLevel={audioLevel}
+          />
         </div>
 
         <div className="echly-recording-center">
           <span className="echly-recording-status">{statusText}</span>
-          <div className="echly-recording-transcript" ref={transcriptRef}>
-            <span className="echly-recording-text">
-              {transcriptText}
-              {isProcessing && (
-                <span className="echly-recording-underline" aria-hidden />
-              )}
-            </span>
-          </div>
+          {showEscHint && (
+            <span className="echly-recording-esc-hint">Press Esc to cancel</span>
+          )}
           <div className="echly-recording-action-row">
             <button
               type="button"

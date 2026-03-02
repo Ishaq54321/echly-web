@@ -103,7 +103,6 @@ export default function CaptureWidget({
             state={state.state}
             getFullTabImage={handlers.getFullTabImage}
             onRegionCaptured={handlers.handleRegionCaptured}
-            onRegionConfirmOnly={handlers.handleRegionConfirmOnly}
             onRegionSelectStart={handlers.handleRegionSelectStart}
             onCancelCapture={handlers.handleCancelCapture}
           />

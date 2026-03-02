@@ -13,7 +13,6 @@ export type Region = { x: number; y: number; w: number; h: number };
 export type RegionCaptureOverlayProps = {
   getFullTabImage: () => Promise<string | null>;
   onAddVoice: (croppedDataUrl: string, context: CaptureContext | null) => void;
-  onConfirmOnly: (croppedDataUrl: string, context: CaptureContext | null) => void;
   onCancel: () => void;
   onSelectionStart?: () => void;
 };
@@ -54,7 +53,6 @@ async function cropImageToRegion(
 export function RegionCaptureOverlay({
   getFullTabImage,
   onAddVoice,
-  onConfirmOnly,
   onCancel,
   onSelectionStart,
 }: RegionCaptureOverlayProps) {
@@ -101,7 +99,7 @@ export function RegionCaptureOverlay({
   }, [cancel]);
 
   const performCapture = useCallback(
-    async (targetRect: Region, withVoice: boolean) => {
+    async (targetRect: Region) => {
       if (confirming) return;
       setConfirming(true);
       playShutterSound();
@@ -136,16 +134,11 @@ export function RegionCaptureOverlay({
 
       const context: CaptureContext | null =
         typeof window !== "undefined" ? buildCaptureContext(window, null) : null;
-
-      if (withVoice) {
-        onAddVoice(cropped, context);
-      } else {
-        onConfirmOnly(cropped, context);
-      }
+      onAddVoice(cropped, context);
       setConfirming(false);
       setReleasedRect(null);
     },
-    [getFullTabImage, onAddVoice, onConfirmOnly, onCancel, confirming]
+    [getFullTabImage, onAddVoice, onCancel, confirming]
   );
 
   const handleRetake = useCallback(() => {
@@ -290,7 +283,7 @@ export function RegionCaptureOverlay({
         />
       )}
 
-      {/* Confirmation bar near selection */}
+      {/* Confirmation bar: Retake | Speak feedback */}
       {showReleased && releasedRect && (
         <div
           className="echly-region-confirm-bar"
@@ -329,7 +322,7 @@ export function RegionCaptureOverlay({
           </button>
           <button
             type="button"
-            onClick={() => performCapture(releasedRect!, true)}
+            onClick={() => performCapture(releasedRect!)}
             disabled={confirming}
             className="echly-region-confirm-btn"
             style={{
@@ -343,25 +336,7 @@ export function RegionCaptureOverlay({
               cursor: confirming ? "not-allowed" : "pointer",
             }}
           >
-            Add voice
-          </button>
-          <button
-            type="button"
-            onClick={() => performCapture(releasedRect!, false)}
-            disabled={confirming}
-            className="echly-region-confirm-btn"
-            style={{
-              padding: "8px 14px",
-              borderRadius: 999,
-              border: "none",
-              background: "#fff",
-              color: "#000",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: confirming ? "not-allowed" : "pointer",
-            }}
-          >
-            Confirm
+            Speak feedback
           </button>
         </div>
       )}
