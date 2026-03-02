@@ -643,6 +643,60 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
   };
 
+  // Non-intrusive: fetch session insight after main content renders (no spinners).
+  // Must be declared before any conditional returns (React hook ordering).
+  useEffect(() => {
+    if (authLoading) return;
+    if (!authUser || !sessionId) return;
+    if (!session) return;
+    if (feedbackLoading) return;
+
+    const existing =
+      typeof session.aiInsightSummary === "string"
+        ? session.aiInsightSummary.trim()
+        : "";
+    const existingCount =
+      typeof session.aiInsightSummaryFeedbackCount === "number"
+        ? session.aiInsightSummaryFeedbackCount
+        : null;
+    const currentCount = typeof feedbackTotal === "number" ? feedbackTotal : 0;
+
+    if (currentCount <= 0) return;
+
+    const shouldFetch =
+      !existing || (existingCount != null && existingCount !== currentCount);
+    if (!shouldFetch) return;
+
+    let cancelled = false;
+    authFetch("/api/session-insight", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    })
+      .then((res) => res.json())
+      .then((data: { summary?: unknown }) => {
+        if (cancelled) return;
+        if (typeof data?.summary === "string" && data.summary.trim() !== "") {
+          setSession((prev) =>
+            prev
+              ? ({
+                  ...prev,
+                  aiInsightSummary: data.summary.trim(),
+                  aiInsightSummaryFeedbackCount: currentCount,
+                } as Session)
+              : prev
+          );
+        }
+      })
+      .catch(() => {
+        // Fail silently
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, authUser, sessionId, session, feedbackLoading, feedbackTotal]);
+
   // If auth is still settling, keep the UI stable but show a lightweight skeleton.
   if (authLoading) return <SessionPageSkeleton />;
 
@@ -660,6 +714,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               onSelect={setSelectedId}
               selectedIndex={selectedIndex}
               total={feedbackTotal}
+              aiInsightSummary={session?.aiInsightSummary ?? null}
               activeCount={feedbackActiveCount}
               resolvedCount={feedbackResolvedCount}
               loadingMore={feedbackLoadingMore}

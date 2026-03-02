@@ -118,6 +118,25 @@ export async function updateSessionUpdatedAtRepo(sessionId: string): Promise<voi
 }
 
 /**
+ * Saves a lightweight AI insight summary for a session.
+ * Non-intrusive: does NOT change session.updatedAt (avoid reordering session lists).
+ */
+export async function updateSessionAiInsightSummaryRepo(
+  sessionId: string,
+  summary: string,
+  feedbackCount: number
+): Promise<void> {
+  if (!sessionId || typeof sessionId !== "string" || sessionId.trim() === "") return;
+  const trimmed = typeof summary === "string" ? summary.trim() : "";
+  if (!trimmed) return;
+  await updateDoc(doc(db, "sessions", sessionId), {
+    aiInsightSummary: trimmed,
+    aiInsightSummaryFeedbackCount: feedbackCount,
+    aiInsightSummaryUpdatedAt: serverTimestamp(),
+  });
+}
+
+/**
  * Atomically increment session.commentCount. Call when a comment is created.
  */
 export async function incrementSessionCommentCountRepo(sessionId: string): Promise<void> {
