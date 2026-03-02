@@ -23,6 +23,8 @@ You are Echly’s Session Intelligence Engine.
 Your task:
 Generate a concise executive-level summary strictly based on the provided feedback data.
 
+Summarize patterns across ALL provided feedback items. Do not focus only on the most recent entries.
+
 RULES:
 
 1. Use ONLY the information explicitly present in:
@@ -46,11 +48,13 @@ RULES:
 4. If feedback items are unrelated, summarize them neutrally without forcing a narrative.
 
 5. Keep summary:
-   - 2–4 sentences maximum.
+   - Maximum 3 sentences.
+   - Maximum 90–120 words total.
    - Calm.
    - Factual.
    - Direct.
    - No filler phrases.
+   - Even for sessions with many items, stay within this limit.
 
 6. Do not use:
    - "This suggests"
@@ -186,9 +190,10 @@ export async function POST(req: Request): Promise<Response> {
     return stable({ success: true, summary: null, generated: false, cached: false });
   }
 
+  const SESSION_INSIGHT_FEEDBACK_LIMIT = 200;
   const { feedback } = await getSessionFeedbackPageWithStringCursorRepo(
     sessionId,
-    50,
+    SESSION_INSIGHT_FEEDBACK_LIMIT,
     undefined
   );
 
@@ -216,28 +221,40 @@ export async function POST(req: Request): Promise<Response> {
     return stable({ success: false, summary: null, generated: false, cached: false });
   }
 
-  const itemsForModel = feedback.map((f) => ({
-    title: f.title ?? "",
-    contextSummary: f.contextSummary ?? "",
-    tags: Array.isArray(f.suggestedTags) ? f.suggestedTags : [],
-    actionSteps: Array.isArray(f.actionSteps) ? f.actionSteps : [],
-  }));
+  const ACTION_SUMMARY_MAX_CHARS = 120;
+  const CONTEXT_MAX_CHARS = 300;
+  function truncate(s: string, max: number): string {
+    const t = (s ?? "").trim();
+    if (t.length <= max) return t;
+    return t.slice(0, max).trim() + "…";
+  }
+  const condensedLines: string[] = [
+    `Session feedback count: ${totalCount}`,
+    `Feedback items (up to ${SESSION_INSIGHT_FEEDBACK_LIMIT} most recent):`,
+    "",
+  ];
+  feedback.forEach((f, i) => {
+    const title = (f.title ?? "").trim() || "—";
+    const context = truncate((f.contextSummary ?? f.description ?? "").trim(), CONTEXT_MAX_CHARS);
+    const tagList = Array.isArray(f.suggestedTags) ? (f.suggestedTags as string[]).join(", ") : "";
+    const steps = Array.isArray(f.actionSteps) ? (f.actionSteps as string[]).join(" ") : "";
+    const stepsShort = steps ? truncate(steps, ACTION_SUMMARY_MAX_CHARS) : "";
+    condensedLines.push(`${i + 1}. Title: ${title}`);
+    condensedLines.push(`   Context: ${context || "—"}`);
+    condensedLines.push(`   Tags: ${tagList || "—"}`);
+    if (stepsShort) condensedLines.push(`   Action: ${stepsShort}`);
+    condensedLines.push("");
+  });
+  const userContent = condensedLines.join("\n");
 
   try {
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.2,
-      max_tokens: 180,
+      max_tokens: 160,
       messages: [
         { role: "system", content: SESSION_INSIGHT_SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: [
-            `Session feedback count: ${totalCount}`,
-            `Below are up to 50 newest feedback items with extracted fields.`,
-            JSON.stringify(itemsForModel),
-          ].join("\n"),
-        },
+        { role: "user", content: userContent },
       ],
     });
 
