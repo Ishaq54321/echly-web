@@ -48557,15 +48557,33 @@ This typically indicates that your device does not have a healthy Internet conne
 
   // components/CaptureWidget/CaptureHeader.tsx
   var import_jsx_runtime = __toESM(require_jsx_runtime());
+  var SunIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", { cx: "12", cy: "12", r: "4" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" })
+  ] });
+  var MoonIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" }) });
   function CaptureHeader({
     onClose,
-    summary = null
+    summary = null,
+    theme = "dark",
+    onThemeToggle
   }) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "echly-sidebar-header", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "echly-sidebar-header-left", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "echly-sidebar-title", children: "Echly" }),
         summary && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "echly-sidebar-summary", children: summary })
       ] }),
+      onThemeToggle && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        "button",
+        {
+          type: "button",
+          id: "theme-toggle",
+          onClick: onThemeToggle,
+          className: "echly-theme-toggle",
+          "aria-label": theme === "dark" ? "Switch to light mode" : "Switch to dark mode",
+          children: theme === "dark" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SunIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MoonIcon, {})
+        }
+      ),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "button",
         {
@@ -49299,7 +49317,9 @@ This typically indicates that your device does not have a healthy Internet conne
     onExpandRequest,
     onCollapseRequest,
     liveStructureFetch,
-    captureDisabled = false
+    captureDisabled = false,
+    theme = "dark",
+    onThemeToggle
   }) {
     const {
       state,
@@ -49412,7 +49432,9 @@ This typically indicates that your device does not have a healthy Internet conne
                 CaptureHeader,
                 {
                   onClose: () => onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false),
-                  summary
+                  summary,
+                  theme,
+                  onThemeToggle
                 }
               ),
               /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
@@ -49462,6 +49484,23 @@ This typically indicates that your device does not have a healthy Internet conne
   var import_jsx_runtime9 = __toESM(require_jsx_runtime());
   var ROOT_ID = "echly-root";
   var SHADOW_HOST_ID = "echly-shadow-host";
+  var THEME_STORAGE_KEY = "widget-theme";
+  function getPreferredTheme() {
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === "dark" || saved === "light") return saved;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    } catch {
+      return "dark";
+    }
+  }
+  function applyThemeToRoot(root, theme) {
+    root.setAttribute("data-theme", theme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+    }
+  }
   function normalizePriority(s) {
     const v2 = (s ?? "medium").toLowerCase();
     if (v2 === "low" || v2 === "medium" || v2 === "high" || v2 === "critical") return v2;
@@ -49471,10 +49510,11 @@ This typically indicates that your device does not have a healthy Internet conne
     chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {
     });
   }
-  function ContentApp() {
+  function ContentApp({ widgetRoot, initialTheme }) {
     const [user, setUser] = import_react8.default.useState(null);
     const [sessionMessage, setSessionMessage] = import_react8.default.useState(null);
     const [authChecked, setAuthChecked] = import_react8.default.useState(false);
+    const [theme, setTheme] = import_react8.default.useState(initialTheme);
     const [globalState, setGlobalState] = import_react8.default.useState({
       visible: false,
       expanded: false,
@@ -49550,6 +49590,11 @@ This typically indicates that your device does not have a healthy Internet conne
       chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {
       });
     }, []);
+    const onThemeToggle = import_react8.default.useCallback(() => {
+      const next = theme === "dark" ? "light" : "dark";
+      setTheme(next);
+      applyThemeToRoot(widgetRoot, next);
+    }, [theme, widgetRoot]);
     import_react8.default.useEffect(() => {
       chrome.runtime.sendMessage(
         { type: "ECHLY_GET_AUTH_STATE" },
@@ -49743,7 +49788,9 @@ This typically indicates that your device does not have a healthy Internet conne
         onExpandRequest,
         onCollapseRequest,
         liveStructureFetch,
-        captureDisabled: !effectiveSessionId
+        captureDisabled: !effectiveSessionId,
+        theme,
+        onThemeToggle
       }
     );
   }
@@ -49753,7 +49800,6 @@ This typically indicates that your device does not have a healthy Internet conne
     all: initial;
     box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
-    color-scheme: dark;
   }
   #echly-root * { box-sizing: border-box; }
 `;
@@ -49779,9 +49825,11 @@ This typically indicates that your device does not have a healthy Internet conne
     container.style.pointerEvents = "auto";
     container.style.width = "auto";
     container.style.height = "auto";
+    const initialTheme = getPreferredTheme();
+    container.setAttribute("data-theme", initialTheme);
     shadowRoot.appendChild(container);
     const reactRoot = (0, import_client.createRoot)(container);
-    reactRoot.render(/* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ContentApp, {}));
+    reactRoot.render(/* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ContentApp, { widgetRoot: container, initialTheme }));
   }
   function syncInitialGlobalState(host) {
     chrome.runtime.sendMessage(

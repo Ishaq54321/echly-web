@@ -13,6 +13,24 @@ import CaptureWidget from "@/components/CaptureWidget";
 
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
+const THEME_STORAGE_KEY = "widget-theme";
+
+function getPreferredTheme(): "dark" | "light" {
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === "dark" || saved === "light") return saved;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  } catch {
+    return "dark";
+  }
+}
+
+function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
+  root.setAttribute("data-theme", theme);
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {}
+}
 
 function normalizePriority(s: string | undefined): "low" | "medium" | "high" | "critical" {
   const v = (s ?? "medium").toLowerCase();
@@ -29,10 +47,16 @@ function requestOpenPopup(): void {
   chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {});
 }
 
-function ContentApp() {
+type ContentAppProps = {
+  widgetRoot: HTMLElement;
+  initialTheme: "dark" | "light";
+};
+
+function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [sessionMessage, setSessionMessage] = React.useState<string | null>(null);
   const [authChecked, setAuthChecked] = React.useState(false);
+  const [theme, setTheme] = React.useState<"dark" | "light">(initialTheme);
   const [globalState, setGlobalState] = React.useState<GlobalUIState>({
     visible: false,
     expanded: false,
@@ -117,6 +141,12 @@ function ContentApp() {
   const onCollapseRequest = React.useCallback(() => {
     chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {});
   }, []);
+
+  const onThemeToggle = React.useCallback(() => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    applyThemeToRoot(widgetRoot, next);
+  }, [theme, widgetRoot]);
 
   React.useEffect(() => {
     chrome.runtime.sendMessage(
@@ -357,18 +387,19 @@ function ContentApp() {
       onCollapseRequest={onCollapseRequest}
       liveStructureFetch={liveStructureFetch}
       captureDisabled={!effectiveSessionId}
+      theme={theme}
+      onThemeToggle={onThemeToggle}
     />
   );
 }
 
-/** Minimal CSS reset inside shadow root for style isolation. */
+/** Minimal CSS reset inside shadow root for style isolation. Theme (data-theme) and color-scheme come from globals.css. */
 const SHADOW_RESET = `
   :host { all: initial; }
   #echly-root {
     all: initial;
     box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
-    color-scheme: dark;
   }
   #echly-root * { box-sizing: border-box; }
 `;
@@ -399,10 +430,12 @@ function mountReactApp(host: HTMLDivElement): void {
   container.style.pointerEvents = "auto";
   container.style.width = "auto";
   container.style.height = "auto";
+  const initialTheme = getPreferredTheme();
+  container.setAttribute("data-theme", initialTheme);
   shadowRoot.appendChild(container);
 
   const reactRoot = createRoot(container);
-  reactRoot.render(<ContentApp />);
+  reactRoot.render(<ContentApp widgetRoot={container} initialTheme={initialTheme} />);
 }
 
 /** Request initial global state from background. Restores visibility, expanded, recording on load/refresh. */

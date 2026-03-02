@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { Pencil, Trash2, Expand, Check } from "lucide-react";
 import type { StructuredFeedback } from "./types";
 
@@ -45,6 +45,7 @@ function FeedbackItem({
   const isEditing = editingId === item.id;
   const isHighlighted = highlightTicketId === item.id;
   const priority = priorityFromType(item.type);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   const handleExpand = useCallback(() => {
     onExpand(isExpanded ? null : item.id);
@@ -56,6 +57,8 @@ function FeedbackItem({
 
   const handleSave = useCallback(() => {
     onSaveEdit(item.id);
+    setShowSaveSuccess(true);
+    setTimeout(() => setShowSaveSuccess(false), 220);
   }, [item.id, onSaveEdit]);
 
   const handleDelete = useCallback(() => {
@@ -103,7 +106,12 @@ function FeedbackItem({
             <Expand size={16} strokeWidth={1.5} />
           </button>
           {isEditing ? (
-            <button type="button" onClick={handleSave} className="echly-widget-action-icon" aria-label="Save">
+            <button
+              type="button"
+              onClick={handleSave}
+              className={`echly-widget-action-icon echly-widget-action-icon--confirm ${showSaveSuccess ? "echly-widget-action-icon--confirm-success" : ""}`}
+              aria-label="Save"
+            >
               <Check size={16} strokeWidth={1.5} />
             </button>
           ) : (

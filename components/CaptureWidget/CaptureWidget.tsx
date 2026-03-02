@@ -26,6 +26,8 @@ export default function CaptureWidget({
   onCollapseRequest,
   liveStructureFetch,
   captureDisabled = false,
+  theme = "dark",
+  onThemeToggle,
 }: CaptureWidgetProps) {
   const {
     state,
@@ -161,6 +163,8 @@ export default function CaptureWidget({
               <CaptureHeader
                 onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
                 summary={summary}
+                theme={theme}
+                onThemeToggle={onThemeToggle}
               />
 
               <div

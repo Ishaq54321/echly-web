@@ -71,6 +71,10 @@ export type CaptureWidgetProps = {
   liveStructureFetch?: (transcript: string) => Promise<{ title: string; tags: string[]; priority: string } | null>;
   /** When true, Add Feedback button is disabled (e.g. no active session in extension). No message shown. */
   captureDisabled?: boolean;
+  /** Theme for widget (dark/light). When provided with onThemeToggle, theme toggle is shown. */
+  theme?: "dark" | "light";
+  /** Called when user clicks theme toggle. */
+  onThemeToggle?: () => void;
 };
 
 export type LiveStructured = { title: string; tags: string[]; priority: string };
