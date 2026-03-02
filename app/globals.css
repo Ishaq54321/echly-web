@@ -262,6 +262,32 @@ textarea:focus-visible {
   background-size: 200px 100%;
 }
 
+/* Skeleton card — integrated status footer (subtle, premium) */
+.capture-skeleton-footer {
+  margin-top: 16px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.capture-processing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  animation: captureProcessingPulse 1.4s infinite ease-in-out;
+}
+.capture-processing-text {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.5);
+}
+@keyframes captureProcessingPulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
 /* 3 & 4. Result arrival — fade in 200ms; 2% tint flash 100ms */
 .capture-feedback-list > div:first-child {
   animation: captureFeedbackItemEnter 200ms ease-out forwards,

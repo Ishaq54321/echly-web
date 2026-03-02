@@ -144,12 +144,7 @@ export default function CaptureWidget({
           <div className="capture-feedback-list flex flex-col space-y-2">
             {/* First slot: skeleton (when publishing) or first ticket (when idle) — no layout shift */}
             {state.state === "saving-feedback" || state.state === "anticipation" || processingExiting ? (
-              <>
-                <ProcessingSkeletonCard exiting={processingExiting} />
-                <div className="capture-processing-enter flex flex-col gap-0.5 py-1">
-                  <p className="text-sm font-medium text-slate-700">Publishing to your session...</p>
-                </div>
-              </>
+              <ProcessingSkeletonCard exiting={processingExiting} />
             ) : state.pointers[0] ? (
               <FeedbackItem
                 item={state.pointers[0]}
@@ -193,14 +188,6 @@ export default function CaptureWidget({
           {state.state === "capturing" && !extensionMode && (
             <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 text-sm text-slate-600">
               Capturing screenshot…
-            </div>
-          )}
-
-          {/* processing-structure: header pulse + "Understanding your feedback..." */}
-          {(state.state === "processing" || state.state === "processing-structure") && (
-            <div className="capture-processing-enter flex flex-col gap-1 py-3">
-              <p className="text-sm font-medium text-slate-700">Understanding your feedback...</p>
-              <p className="text-xs text-slate-500">Extracting key insights</p>
             </div>
           )}
 

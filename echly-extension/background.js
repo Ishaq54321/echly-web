@@ -16,16 +16,28 @@
     isRecording: false,
     sessionId: null
   };
-  chrome.storage.local.get(["activeSessionId"], (result) => {
-    activeSessionId = result.activeSessionId ?? null;
-    globalUIState.sessionId = activeSessionId;
-  });
-  chrome.storage.local.get(["auth_idToken", "auth_refreshToken", "auth_expiresAtMs", "auth_user"], (result) => {
-    tokenState.idToken = typeof result.auth_idToken === "string" ? result.auth_idToken : null;
-    tokenState.refreshToken = typeof result.auth_refreshToken === "string" ? result.auth_refreshToken : null;
-    tokenState.expiresAtMs = typeof result.auth_expiresAtMs === "number" ? result.auth_expiresAtMs : 0;
-    tokenState.user = result.auth_user ?? null;
-  });
+  chrome.storage.local.get(
+    ["activeSessionId"],
+    (result) => {
+      const stored = result.activeSessionId;
+      activeSessionId = typeof stored === "string" ? stored : null;
+      globalUIState.sessionId = activeSessionId;
+    }
+  );
+  function isStoredUser(v) {
+    if (!v || typeof v !== "object") return false;
+    const o = v;
+    return typeof o.uid === "string" && (o.name === null || typeof o.name === "string") && (o.email === null || typeof o.email === "string") && (o.photoURL === null || typeof o.photoURL === "string");
+  }
+  chrome.storage.local.get(
+    ["auth_idToken", "auth_refreshToken", "auth_expiresAtMs", "auth_user"],
+    (result) => {
+      tokenState.idToken = typeof result.auth_idToken === "string" ? result.auth_idToken : null;
+      tokenState.refreshToken = typeof result.auth_refreshToken === "string" ? result.auth_refreshToken : null;
+      tokenState.expiresAtMs = typeof result.auth_expiresAtMs === "number" ? result.auth_expiresAtMs : 0;
+      tokenState.user = isStoredUser(result.auth_user) ? result.auth_user : null;
+    }
+  );
   function setTokenState(next) {
     tokenState = { ...tokenState, ...next };
     chrome.storage.local.set({

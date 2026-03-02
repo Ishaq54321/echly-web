@@ -48495,7 +48495,8 @@ This typically indicates that your device does not have a healthy Internet conne
     onClose,
     showMenu,
     onResetSession,
-    menuRef
+    menuRef,
+    isProcessingStructure = false
   }) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
       "div",
@@ -48503,10 +48504,16 @@ This typically indicates that your device does not have a healthy Internet conne
         onMouseDown: onStartDrag,
         className: "px-6 py-4 flex justify-between items-center\r\n                 bg-[rgba(0,0,0,0.03)] border-b border-[rgba(0,0,0,0.06)]\r\n                 cursor-move",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2 min-h-8", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Image2, { src: "/Echly_logo.svg", alt: "Echly", width: 24, height: 24, className: "shrink-0" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-base font-semibold text-slate-900 leading-none", children: "Echly" })
-          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+            "div",
+            {
+              className: `flex items-center gap-2 min-h-8 ${isProcessingStructure ? "capture-header-pulse" : ""}`,
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Image2, { src: "/Echly_logo.svg", alt: "Echly", width: 24, height: 24, className: "shrink-0" }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-base font-semibold text-slate-900 leading-none", children: "Echly" })
+              ]
+            }
+          ),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2 relative", ref: menuRef, children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
               "button",
@@ -48713,6 +48720,39 @@ This typically indicates that your device does not have a healthy Internet conne
     );
   }
 
+  // components/CaptureWidget/ProcessingSkeletonCard.tsx
+  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
+  function ProcessingSkeletonCard({
+    exiting = false
+  }) {
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      "div",
+      {
+        className: `
+        capture-processing-skeleton
+        bg-white px-6 py-4 border-b border-[rgba(0,0,0,0.05)]
+        shadow-[0_2px_6px_rgba(0,0,0,0.03)]
+        transition-opacity duration-200 ease-out
+        ${exiting ? "opacity-0" : "opacity-100"}
+      `,
+        "aria-hidden": true,
+        children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex justify-between gap-4", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex-1 min-w-0 space-y-3", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "capture-skeleton-line capture-skeleton-title h-4 w-3/4 rounded" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "capture-skeleton-line h-3 w-full rounded" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "capture-skeleton-line h-3 w-5/6 rounded" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "capture-skeleton-line h-3 w-4/6 rounded" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-2 shrink-0", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "capture-skeleton-dot h-6 w-6 rounded-md" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "capture-skeleton-dot h-6 w-6 rounded-md" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "capture-skeleton-dot h-6 w-6 rounded-md" })
+          ] })
+        ] })
+      }
+    );
+  }
+
   // components/CaptureWidget/RegionCaptureOverlay.tsx
   var import_react8 = __toESM(require_react());
 
@@ -48783,7 +48823,7 @@ This typically indicates that your device does not have a healthy Internet conne
   }
 
   // components/CaptureWidget/RegionCaptureOverlay.tsx
-  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
   var MIN_SIZE = 24;
   var EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
   var BRAND_COLOR = "#2563EB";
@@ -48987,7 +49027,7 @@ This typically indicates that your device does not have a healthy Internet conne
     const isConfirming = phase === "confirming" || phase === "confirmingDone";
     const rectScale = isConfirming && !confirmScaleOne ? 0.98 : 1;
     const showHover = !!hoverRect && !rect && phase === "selecting";
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
       "div",
       {
         ref: overlayRef,
@@ -49015,7 +49055,7 @@ This typically indicates that your device does not have a healthy Internet conne
           hoveredElementRef.current = null;
         },
         children: [
-          showHover && hoverRect && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          showHover && hoverRect && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
             "div",
             {
               className: "region-capture-hover",
@@ -49033,7 +49073,7 @@ This typically indicates that your device does not have a healthy Internet conne
               }
             }
           ),
-          showRect && rect && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          showRect && rect && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
             "div",
             {
               className: "region-capture-rect",
@@ -49060,7 +49100,7 @@ This typically indicates that your device does not have a healthy Internet conne
   }
 
   // components/CaptureWidget/CaptureWidget.tsx
-  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
   function CaptureWidget({
     sessionId,
     userId,
@@ -49093,6 +49133,17 @@ This typically indicates that your device does not have a healthy Internet conne
     });
     const isControlled = expanded !== void 0;
     const effectiveIsOpen = isControlled ? expanded : state.isOpen;
+    const [processingExiting, setProcessingExiting] = (0, import_react9.useState)(false);
+    const prevStateRef = (0, import_react9.useRef)(state.state);
+    (0, import_react9.useEffect)(() => {
+      const wasProcessing = prevStateRef.current === "saving-feedback" || prevStateRef.current === "anticipation";
+      if (state.state === "idle" && wasProcessing) {
+        setProcessingExiting(true);
+        const t = setTimeout(() => setProcessingExiting(false), 200);
+        return () => clearTimeout(t);
+      }
+      prevStateRef.current = state.state;
+    }, [state.state]);
     import_react9.default.useEffect(() => {
       if (!widgetToggleRef) return;
       widgetToggleRef.current = handlers.toggleOpen;
@@ -49101,28 +49152,28 @@ This typically indicates that your device does not have a healthy Internet conne
       };
     }, [handlers, widgetToggleRef]);
     if (!effectiveIsOpen) {
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "fixed bottom-10 right-10 z-50 capture-floating-wrapper", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+      return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "fixed bottom-10 right-10 z-50 capture-floating-wrapper", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
         "button",
         {
           type: "button",
           onClick: () => onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true),
           className: "capture-floating-trigger\r\n                     flex items-center gap-3\r\n                     bg-white border border-[rgba(0,0,0,0.08)]\r\n                     px-5 py-2.5 rounded-[20px]\r\n                     text-[#111827] font-semibold\r\n                     shadow-[0_10px_30px_rgba(0,0,0,0.12),0_4px_10px_rgba(0,0,0,0.06)]\r\n                     transition-[transform_80ms_ease-in,box-shadow_150ms_ease-out]\r\n                     hover:-translate-y-px hover:shadow-[0_12px_34px_rgba(0,0,0,0.14),0_5px_12px_rgba(0,0,0,0.08)]\r\n                     active:scale-[0.98] cursor-pointer",
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Image2, { src: "/Echly_logo.svg", alt: "Echly", width: 26, height: 26, className: "shrink-0" }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Image2, { src: "/Echly_logo.svg", alt: "Echly", width: 26, height: 26, className: "shrink-0" }),
             "Capture Feedback"
           ]
         }
       ) });
     }
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
-      !extensionMode && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+      !extensionMode && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
         "div",
         {
           className: "fixed inset-0 z-40 backdrop-blur-[4px] bg-black/8",
           "aria-hidden": true
         }
       ),
-      extensionMode && state.state === "capturing" && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      extensionMode && state.state === "capturing" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
         RegionCaptureOverlay,
         {
           getFullTabImage: handlers.getFullTabImage,
@@ -49130,7 +49181,7 @@ This typically indicates that your device does not have a healthy Internet conne
           onCancel: handlers.handleCancelCapture
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
         "div",
         {
           ref: refs.widgetRef,
@@ -49143,8 +49194,8 @@ This typically indicates that your device does not have a healthy Internet conne
           } : {
             ...state.position ? { left: state.position.x, top: state.position.y } : {}
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-white rounded-lg\r\n                        border border-slate-200/80\r\n                        shadow-[0_16px_40px_rgba(0,0,0,0.12),0_6px_16px_rgba(0,0,0,0.08)]\r\n                        overflow-hidden font-sans", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-white rounded-lg\r\n                        border border-slate-200/80\r\n                        shadow-[0_16px_40px_rgba(0,0,0,0.12),0_6px_16px_rgba(0,0,0,0.08)]\r\n                        overflow-hidden font-sans", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
               CaptureHeader,
               {
                 onStartDrag: handlers.startDrag,
@@ -49153,60 +49204,68 @@ This typically indicates that your device does not have a healthy Internet conne
                 onClose: () => onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false),
                 showMenu: state.showMenu,
                 onResetSession: handlers.resetSession,
-                menuRef: refs.menuRef
+                menuRef: refs.menuRef,
+                isProcessingStructure: state.state === "processing-structure"
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "px-6 py-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                FeedbackList_default,
-                {
-                  items: state.pointers,
-                  expandedId: state.expandedId,
-                  editingId: state.editingId,
-                  editedTitle: state.editedTitle,
-                  editedDescription: state.editedDescription,
-                  onExpand: handlers.setExpandedId,
-                  onStartEdit: handlers.startEditing,
-                  onSaveEdit: handlers.saveEdit,
-                  onDelete: handlers.deletePointer,
-                  onEditedTitleChange: handlers.setEditedTitle,
-                  onEditedDescriptionChange: handlers.setEditedDescription
-                }
-              ),
-              state.errorMessage && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3", children: state.errorMessage }),
-              state.state === "capturing" && !extensionMode && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "border border-slate-200 rounded-lg p-4 bg-slate-50 text-sm text-slate-600", children: "Capturing screenshot\u2026" }),
-              (state.state === "processing" || state.state === "processing-structure" || state.state === "saving-feedback" || state.state === "anticipation") && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "capture-processing-enter relative flex items-center gap-4 text-sm text-slate-600 py-3 pr-4 min-h-[52px]", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "capture-structuring-text flex items-center gap-2 flex-1", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-slate-600", children: state.state === "saving-feedback" ? "Adding to your session\u2026" : "Structuring your feedback\u2026" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "capture-ellipsis inline-flex gap-0.5", "aria-hidden": true, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: "." }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: "." }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: "." })
-                  ] })
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                  "div",
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-6 py-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "capture-feedback-list flex flex-col space-y-2", children: [
+                state.state === "saving-feedback" || state.state === "anticipation" || processingExiting ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ProcessingSkeletonCard, { exiting: processingExiting }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "capture-processing-enter flex flex-col gap-0.5 py-1", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm font-medium text-slate-700", children: "Publishing to your session..." }) })
+                ] }) : state.pointers[0] ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                  FeedbackItem_default,
                   {
-                    className: `capture-structuring-progress ${state.state === "anticipation" ? "capture-structuring-progress--complete" : ""}`,
-                    "aria-hidden": true,
-                    children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "capture-structuring-progress-fill" })
+                    item: state.pointers[0],
+                    expandedId: state.expandedId,
+                    editingId: state.editingId,
+                    editedTitle: state.editedTitle,
+                    editedDescription: state.editedDescription,
+                    onExpand: handlers.setExpandedId,
+                    onStartEdit: handlers.startEditing,
+                    onSaveEdit: handlers.saveEdit,
+                    onDelete: handlers.deletePointer,
+                    onEditedTitleChange: handlers.setEditedTitle,
+                    onEditedDescriptionChange: handlers.setEditedDescription
+                  }
+                ) : null,
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                  FeedbackList_default,
+                  {
+                    items: state.state === "saving-feedback" || state.state === "anticipation" || processingExiting ? state.pointers : state.pointers.slice(1),
+                    expandedId: state.expandedId,
+                    editingId: state.editingId,
+                    editedTitle: state.editedTitle,
+                    editedDescription: state.editedDescription,
+                    onExpand: handlers.setExpandedId,
+                    onStartEdit: handlers.startEditing,
+                    onSaveEdit: handlers.saveEdit,
+                    onDelete: handlers.deletePointer,
+                    onEditedTitleChange: handlers.setEditedTitle,
+                    onEditedDescriptionChange: handlers.setEditedDescription
                   }
                 )
               ] }),
-              state.state === "listening" && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "capture-listening-enter border border-slate-200 rounded-lg p-4 bg-slate-50", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between mb-4", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-sm font-medium text-slate-800", children: "Listening..." }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "capture-timer text-sm text-slate-500", children: derivedValues.formatTime() })
+              state.errorMessage && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3", children: state.errorMessage }),
+              state.state === "capturing" && !extensionMode && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "border border-slate-200 rounded-lg p-4 bg-slate-50 text-sm text-slate-600", children: "Capturing screenshot\u2026" }),
+              (state.state === "processing" || state.state === "processing-structure") && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "capture-processing-enter flex flex-col gap-1 py-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm font-medium text-slate-700", children: "Understanding your feedback..." }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs text-slate-500", children: "Extracting key insights" })
+              ] }),
+              state.state === "listening" && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "capture-listening-enter border border-slate-200 rounded-lg p-4 bg-slate-50", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between mb-4", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm font-medium text-slate-800", children: "Listening..." }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "capture-timer text-sm text-slate-500", children: derivedValues.formatTime() })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "capture-listening-waveform-wrap mb-4 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(AudioWaveform, { isActive: state.state === "listening" }) }),
-                state.liveStructured && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mb-4 rounded-lg border border-slate-200 bg-slate-100/80 px-3 py-2.5 transition-opacity duration-200", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-2 mb-1.5", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "inline-flex h-1.5 w-1.5 rounded-full bg-brand-accent/60 animate-pulse", "aria-hidden": true }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-xs font-medium text-slate-500 uppercase tracking-wide", children: "Understanding\u2026" })
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "capture-listening-waveform-wrap mb-4 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(AudioWaveform, { isActive: state.state === "listening" }) }),
+                state.liveStructured && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-4 rounded-lg border border-slate-200 bg-slate-100/80 px-3 py-2.5 transition-opacity duration-200", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2 mb-1.5", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "inline-flex h-1.5 w-1.5 rounded-full bg-brand-accent/60 animate-pulse", "aria-hidden": true }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs font-medium text-slate-500 uppercase tracking-wide", children: "Understanding\u2026" })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm font-medium text-slate-800 truncate pr-2", children: state.liveStructured.title }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-wrap gap-1.5 mt-1.5", children: [
-                    state.liveStructured.tags.slice(0, 4).map((tag) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm font-medium text-slate-800 truncate pr-2", children: state.liveStructured.title }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-wrap gap-1.5 mt-1.5", children: [
+                    state.liveStructured.tags.slice(0, 4).map((tag) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                       "span",
                       {
                         className: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/80 text-slate-600 border border-slate-200/80",
@@ -49214,7 +49273,7 @@ This typically indicates that your device does not have a healthy Internet conne
                       },
                       tag
                     )),
-                    state.liveStructured.priority && state.liveStructured.priority !== "medium" && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                    state.liveStructured.priority && state.liveStructured.priority !== "medium" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                       "span",
                       {
                         className: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/80 text-slate-600 border border-slate-200/80 capitalize",
@@ -49223,12 +49282,12 @@ This typically indicates that your device does not have a healthy Internet conne
                     )
                   ] })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "button", onClick: handlers.discardListening, className: "text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-neutral-100 transition-colors duration-120 cursor-pointer px-3 py-2 rounded-md", children: "Cancel" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "button", onClick: handlers.finishListening, className: "bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-colors duration-150 cursor-pointer", children: "Done" })
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", onClick: handlers.discardListening, className: "text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-neutral-100 transition-colors duration-120 cursor-pointer px-3 py-2 rounded-md", children: "Cancel" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", onClick: handlers.finishListening, className: "bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-colors duration-150 cursor-pointer", children: "Done" })
                 ] })
               ] }),
-              state.state === "idle" && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+              state.state === "idle" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                 WidgetFooter,
                 {
                   isIdle: state.state === "idle",
@@ -49244,7 +49303,7 @@ This typically indicates that your device does not have a healthy Internet conne
   }
 
   // echly-extension/src/content.tsx
-  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
   var ROOT_ID = "echly-root";
   var SHADOW_HOST_ID = "echly-shadow-host";
   function normalizePriority(s) {
@@ -49487,7 +49546,7 @@ This typically indicates that your device does not have a healthy Internet conne
       return null;
     }
     if (!user) {
-      return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { pointerEvents: "auto" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+      return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { pointerEvents: "auto" }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
         "button",
         {
           type: "button",
@@ -49508,13 +49567,13 @@ This typically indicates that your device does not have a healthy Internet conne
             boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
           },
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("img", { src: logoUrl, alt: "", width: 22, height: 22, style: { display: "block" } }),
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("img", { src: logoUrl, alt: "", width: 22, height: 22, style: { display: "block" } }),
             "Sign in from extension"
           ]
         }
       ) });
     }
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
       CaptureWidget,
       {
         sessionId: effectiveSessionId ?? "",
@@ -49561,7 +49620,7 @@ This typically indicates that your device does not have a healthy Internet conne
     container.style.height = "auto";
     shadowRoot.appendChild(container);
     const reactRoot = (0, import_client.createRoot)(container);
-    reactRoot.render(/* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ContentApp, {}));
+    reactRoot.render(/* @__PURE__ */ (0, import_jsx_runtime8.jsx)(ContentApp, {}));
   }
   function syncInitialGlobalState(host) {
     chrome.runtime.sendMessage(

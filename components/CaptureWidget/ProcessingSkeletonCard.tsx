@@ -3,8 +3,8 @@
 import React from "react";
 
 /**
- * Placeholder card that matches real ticket layout during "Publishing to your session..." phase.
- * Title bar + 2–3 action line shimmers, rounded edges, subtle elevation, CSS shimmer.
+ * Placeholder card that matches real ticket layout during processing.
+ * Title bar + line shimmers + integrated status footer (no standalone text).
  */
 export default function ProcessingSkeletonCard({
   exiting = false,
@@ -25,9 +25,7 @@ export default function ProcessingSkeletonCard({
     >
       <div className="flex justify-between gap-4">
         <div className="flex-1 min-w-0 space-y-3">
-          {/* Title bar shimmer */}
           <div className="capture-skeleton-line capture-skeleton-title h-4 w-3/4 rounded" />
-          {/* 2–3 fake action line shimmers */}
           <div className="capture-skeleton-line h-3 w-full rounded" />
           <div className="capture-skeleton-line h-3 w-5/6 rounded" />
           <div className="capture-skeleton-line h-3 w-4/6 rounded" />
@@ -37,6 +35,11 @@ export default function ProcessingSkeletonCard({
           <div className="capture-skeleton-dot h-6 w-6 rounded-md" />
           <div className="capture-skeleton-dot h-6 w-6 rounded-md" />
         </div>
+      </div>
+
+      <div className="capture-skeleton-footer">
+        <span className="capture-processing-dot" aria-hidden />
+        <span className="capture-processing-text">Processing</span>
       </div>
     </div>
   );
