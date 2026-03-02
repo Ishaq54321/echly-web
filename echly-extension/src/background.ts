@@ -4,6 +4,7 @@
  */
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithCredential, GoogleAuthProvider } from "firebase/auth/web-extension";
+import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM",
@@ -17,8 +18,20 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
 let activeSessionId: string | null = null;
+
+async function uploadScreenshotToStorage(
+  imageDataUrl: string,
+  sessionId: string,
+  feedbackId: string
+): Promise<string> {
+  const path = `sessions/${sessionId}/feedback/${feedbackId}/${Date.now()}.png`;
+  const storageRef = ref(storage, path);
+  await uploadString(storageRef, imageDataUrl, "data_url", { contentType: "image/png" });
+  return getDownloadURL(storageRef);
+}
 
 let globalUIState: {
   visible: boolean;
@@ -235,7 +248,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const API_BASE = "https://echly-web.vercel.app";
     const payload = request.payload as {
       transcript: string;
-      screenshotUrl: string | null;
+      screenshot: string | null;
       sessionId: string;
       context?: {
         url?: string;
@@ -260,28 +273,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return "medium";
     }
     (async () => {
-      console.log("[WORKER ALIVE] Starting async block");
-      console.log("SESSION ID USED:", sessionId);
       try {
-        const screenshotUrl: string | null = payload.screenshotUrl ?? null;
-
-        console.log("[Echly BG] Starting feedback processing");
-        console.log("[STEP 1] About to get token");
-        console.log("[DEBUG] Firebase token audience check");
         const token = await getValidToken();
-        console.log("[STEP 2] Token acquired:", token?.slice(0, 20));
+        const screenshot = payload.screenshot ?? null;
+        const feedbackId = crypto.randomUUID();
 
         const structurePayload = context ? { transcript, context } : { transcript };
-        const res = await fetch(`${API_BASE}/api/structure-feedback`, {
+        const structurePromise = fetch(`${API_BASE}/api/structure-feedback`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify(structurePayload),
         });
-        console.log("[STEP 3] Structure response status:", res.status);
+        const screenshotPromise = screenshot
+          ? uploadScreenshotToStorage(screenshot, sessionId, feedbackId)
+          : Promise.resolve<string | null>(null);
 
-        const structureText = await res.text();
-        if (!res.ok) {
-          console.error("[STRUCTURE FAILED RAW]", res.status, structureText);
+        const [structureRes, screenshotUrl] = await Promise.all([structurePromise, screenshotPromise]);
+
+        const structureText = await structureRes.text();
+        if (!structureRes.ok) {
+          console.error("[STRUCTURE FAILED RAW]", structureRes.status, structureText);
           sendResponse({ success: false, error: "Structure fetch failed" });
           return;
         }
@@ -297,7 +308,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }>;
           error?: string;
         };
-        console.log("[STEP 4] Structure JSON:", data);
         if (!data.success) {
           sendResponse({
             success: false,
@@ -334,14 +344,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             screenshotUrl: i === 0 ? screenshotUrl : null,
             metadata: { clientTimestamp: Date.now() },
           };
-          console.log("CREATING TICKET FOR SESSION:", sessionId);
-          console.log("[STEP 5] Creating feedback ticket:", body);
           const feedbackRes = await fetch(`${API_BASE}/api/feedback`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(body),
           });
-          console.log("[STEP 6] Feedback API status:", feedbackRes.status);
           const feedbackText = await feedbackRes.text();
           if (!feedbackRes.ok) {
             console.error("[FEEDBACK FAILED RAW]", feedbackRes.status, feedbackText);
@@ -352,7 +359,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             success?: boolean;
             ticket?: { id: string; title: string; description: string; type?: string };
           };
-          console.log("[STEP 7] Feedback API JSON:", feedbackJson);
           if (feedbackJson.success && feedbackJson.ticket) {
             const tick = feedbackJson.ticket;
             if (!firstCreated)
@@ -364,17 +370,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               };
           }
         }
-        console.log("[STEP 8] First created ticket:", firstCreated);
         if (firstCreated) {
-          console.log("[Echly BG] Feedback processing complete, ticket:", firstCreated.id);
           sendResponse({ success: true, ticket: firstCreated });
+          chrome.tabs.query({}, (tabs) => {
+            tabs.forEach((tab) => {
+              if (tab.id) {
+                chrome.tabs.sendMessage(tab.id, {
+                  type: "ECHLY_FEEDBACK_CREATED",
+                  ticket: firstCreated,
+                  sessionId,
+                }).catch(() => {});
+              }
+            });
+          });
         } else {
-          console.warn("[Echly BG] No ticket created from feedback API");
           sendResponse({ success: false, error: "No ticket created" });
         }
-        console.log("[WORKER ALIVE] Finished async block");
       } catch (err) {
-        console.log("[ERROR BLOCK]", err);
         const message = err instanceof Error ? err.message : "Unknown error";
         console.error("[Echly BG] Processing error:", err);
         sendResponse({ success: false, error: message });

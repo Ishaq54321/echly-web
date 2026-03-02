@@ -5,8 +5,6 @@
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { storage } from "./firebase";
 import { apiFetch } from "./contentAuthFetch";
 import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
 import CaptureWidget from "@/components/CaptureWidget";
@@ -162,61 +160,36 @@ function ContentApp() {
         return undefined;
       }
       if (callbacks) {
-        (async () => {
-          let screenshotUrl: string | null = null;
-          if (screenshot) {
-            try {
-              const tokenResponse = await new Promise<{ token?: string; error?: string }>((resolve) =>
-                chrome.runtime.sendMessage({ type: "ECHLY_GET_TOKEN" }, resolve)
-              );
-              const token = tokenResponse?.token;
-              if (!token) {
-                callbacks.onError();
-                return;
-              }
-              const feedbackId = crypto.randomUUID();
-              const path = `sessions/${effectiveSessionId}/feedback/${feedbackId}/${Date.now()}.png`;
-              const screenshotRef = ref(storage, path);
-              await uploadString(screenshotRef, screenshot, "data_url", {
-                contentType: "image/png",
-              });
-              screenshotUrl = await getDownloadURL(screenshotRef);
-            } catch (err) {
-              console.error("[Echly] Screenshot upload failed:", err);
+        /* Fire immediately — no await. Processing state already shown; background runs structure + upload in parallel. */
+        chrome.runtime.sendMessage(
+          {
+            type: "ECHLY_PROCESS_FEEDBACK",
+            payload: {
+              transcript,
+              screenshot: screenshot ?? null,
+              sessionId: effectiveSessionId,
+              context: context ?? null,
+            },
+          },
+          (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
+            if (chrome.runtime.lastError) {
+              console.error("[Echly] Processing failed (runtime):", chrome.runtime.lastError.message);
               callbacks.onError();
               return;
             }
-          }
-          chrome.runtime.sendMessage(
-            {
-              type: "ECHLY_PROCESS_FEEDBACK",
-              payload: {
-                transcript,
-                screenshotUrl,
-                sessionId: effectiveSessionId,
-                context: context ?? null,
-              },
-            },
-            (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
-              if (chrome.runtime.lastError) {
-                console.error("[Echly] Processing failed (runtime):", chrome.runtime.lastError.message);
-                callbacks.onError();
-                return;
-              }
-              if (!response?.success || !response.ticket) {
-                console.error("[Echly] Processing failed:", response?.error ?? "No success or ticket");
-                callbacks.onError();
-                return;
-              }
-              callbacks.onSuccess({
-                id: response.ticket.id,
-                title: response.ticket.title,
-                description: response.ticket.description,
-                type: response.ticket.type ?? "Feedback",
-              });
+            if (!response?.success || !response.ticket) {
+              console.error("[Echly] Processing failed:", response?.error ?? "No success or ticket");
+              callbacks.onError();
+              return;
             }
-          );
-        })();
+            callbacks.onSuccess({
+              id: response.ticket.id,
+              title: response.ticket.title,
+              description: response.ticket.description,
+              type: response.ticket.type ?? "Feedback",
+            });
+          }
+        );
         return;
       }
       const res = await apiFetch("/api/structure-feedback", {
@@ -435,7 +408,11 @@ function ensureMessageListener(host: HTMLDivElement): void {
   const win = window as Window & { __ECHLY_MESSAGE_LISTENER__?: boolean };
   if (win.__ECHLY_MESSAGE_LISTENER__) return;
   win.__ECHLY_MESSAGE_LISTENER__ = true;
-  chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState }) => {
+  chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; description: string; type?: string }; sessionId?: string }) => {
+    if (msg.type === "ECHLY_FEEDBACK_CREATED" && msg.ticket && msg.sessionId) {
+      window.dispatchEvent(new CustomEvent("ECHLY_FEEDBACK_CREATED", { detail: { ticket: msg.ticket, sessionId: msg.sessionId } }));
+      return;
+    }
     const h = document.getElementById(SHADOW_HOST_ID);
     if (!h) return;
     if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {

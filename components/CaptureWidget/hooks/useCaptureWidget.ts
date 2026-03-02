@@ -25,6 +25,8 @@ function generateRecordingId(): string {
 }
 
 const RECORDING_STATES: CaptureState[] = ["capturing", "listening", "processing", "anticipation"];
+/** Minimum time in processing before transitioning to anticipation (smooth structuring animation). */
+const PROCESSING_MIN_MS = 1200;
 
 const LIVE_STRUCTURE_DEBOUNCE_MS = 1800;
 const LIVE_STRUCTURE_MIN_LENGTH = 12;
@@ -68,6 +70,7 @@ export function useCaptureWidget({
   const editingIdRef = useRef<string | null>(null);
   const trayLockedRef = useRef(false);
   const liveStructureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const processingStartRef = useRef<number | null>(null);
 
   useEffect(() => {
     stateRef.current = state;
@@ -316,16 +319,23 @@ export function useCaptureWidget({
       return;
     }
     setState("processing");
+    processingStartRef.current = Date.now();
     if (extensionMode) {
       onComplete(active.transcript, active.screenshot, {
         onSuccess: (structured) => {
-          setRecordings((prev) =>
-            prev.map((r) =>
-              r.id === activeId ? { ...r, structuredOutput: structured } : r
-            )
-          );
-          setPendingStructured(structured);
-          setState("anticipation");
+          const elapsed = Date.now() - (processingStartRef.current ?? 0);
+          const delay = Math.max(0, PROCESSING_MIN_MS - elapsed);
+          const applySuccess = () => {
+            setRecordings((prev) =>
+              prev.map((r) =>
+                r.id === activeId ? { ...r, structuredOutput: structured } : r
+              )
+            );
+            setPendingStructured(structured);
+            setState("anticipation");
+          };
+          if (delay > 0) setTimeout(applySuccess, delay);
+          else applySuccess();
         },
         onError: () => {
           setErrorMessage("AI processing failed.");

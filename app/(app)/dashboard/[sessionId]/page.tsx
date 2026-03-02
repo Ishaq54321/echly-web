@@ -125,6 +125,34 @@ export default function SessionPage() {
     }
   }, [sessionId]);
 
+  /* Local-first: insert ticket immediately when extension creates feedback (no refetch). */
+  useEffect(() => {
+    if (!sessionId || !session) return;
+    const handler = (e: Event) => {
+      const ev = e as CustomEvent<{ ticket: { id: string; title: string; description: string; type?: string }; sessionId: string }>;
+      const { ticket, sessionId: evSessionId } = ev.detail ?? {};
+      if (evSessionId !== sessionId || !ticket) return;
+      const newItem = {
+        id: ticket.id,
+        sessionId: evSessionId,
+        userId: session.userId,
+        title: ticket.title,
+        description: ticket.description,
+        type: ticket.type ?? "Feedback",
+        isResolved: false,
+        priority: "medium" as const,
+        createdAt: null,
+        clientTimestamp: Date.now(),
+      };
+      setFeedback((prev) => [newItem, ...prev]);
+      setSelectedId(ticket.id);
+      setFeedbackTotal((c) => c + 1);
+      setFeedbackActiveCount((c) => c + 1);
+    };
+    window.addEventListener("ECHLY_FEEDBACK_CREATED", handler);
+    return () => window.removeEventListener("ECHLY_FEEDBACK_CREATED", handler);
+  }, [sessionId, session, setFeedback, setFeedbackTotal, setFeedbackActiveCount]);
+
   /* ================= LOAD SESSION ================= */
 
   useEffect(() => {

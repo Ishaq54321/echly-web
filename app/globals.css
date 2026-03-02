@@ -236,7 +236,7 @@ textarea:focus-visible {
   height: 100%;
   width: 0;
   background: hsl(var(--text-secondary) / 0.25);
-  animation: captureProgressFill 1.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: captureProgressFill 1200ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   position: relative;
 }
 .capture-structuring-progress .capture-structuring-progress-fill::after {

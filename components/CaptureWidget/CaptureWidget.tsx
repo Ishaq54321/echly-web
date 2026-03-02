@@ -22,6 +22,7 @@ export default function CaptureWidget({
   expanded,
   onExpandRequest,
   onCollapseRequest,
+  liveStructureFetch,
   captureDisabled = false,
 }: CaptureWidgetProps) {
   const {
@@ -37,6 +38,7 @@ export default function CaptureWidget({
     onComplete,
     onDelete,
     onRecordingChange,
+    liveStructureFetch,
   });
 
   const isControlled = expanded !== undefined;
