@@ -100,15 +100,15 @@ function FeedbackItem({
             className="echly-widget-action-icon"
             aria-label={isExpanded ? "Collapse" : "Expand"}
           >
-            <Expand size={18} strokeWidth={1.5} />
+            <Expand size={16} strokeWidth={1.5} />
           </button>
           {isEditing ? (
             <button type="button" onClick={handleSave} className="echly-widget-action-icon" aria-label="Save">
-              <Check size={18} strokeWidth={1.5} />
+              <Check size={16} strokeWidth={1.5} />
             </button>
           ) : (
             <button type="button" onClick={handleEdit} className="echly-widget-action-icon" aria-label="Edit">
-              <Pencil size={18} strokeWidth={1.5} />
+              <Pencil size={16} strokeWidth={1.5} />
             </button>
           )}
           <button
@@ -117,7 +117,7 @@ function FeedbackItem({
             className="echly-widget-action-icon echly-widget-action-icon--delete"
             aria-label="Delete"
           >
-            <Trash2 size={18} strokeWidth={1.5} />
+            <Trash2 size={16} strokeWidth={1.5} />
           </button>
         </div>
       </div>

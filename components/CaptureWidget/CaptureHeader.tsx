@@ -25,7 +25,7 @@ export default function CaptureHeader({
         className="echly-sidebar-close"
         aria-label="Close"
       >
-        <X size={18} strokeWidth={1.5} />
+        <X size={16} strokeWidth={1.5} />
       </button>
     </div>
   );

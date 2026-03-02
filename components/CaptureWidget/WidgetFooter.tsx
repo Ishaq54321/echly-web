@@ -21,9 +21,9 @@ export default function WidgetFooter({
         onClick={effectivelyDisabled ? undefined : onAddFeedback}
         disabled={effectivelyDisabled}
         className={`echly-add-insight-btn ${effectivelyDisabled ? "echly-add-insight-btn--disabled" : ""}`}
-        aria-label="Add insight"
+        aria-label="Capture feedback"
       >
-        + Add insight
+        Capture feedback
       </button>
     </div>
   );

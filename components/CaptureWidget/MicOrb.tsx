@@ -29,6 +29,7 @@ export function MicOrb({
   size = 48,
 }: Props) {
   const ringScale = isSpeaking ? 1 + Math.min(0.22, audioLevel * 0.28) : 1;
+  const ringSize = size;
 
   return (
     <div
@@ -50,13 +51,24 @@ export function MicOrb({
           `}
           style={
             isSpeaking
-              ? { transform: `translate(-50%, -50%) scale(${ringScale})` }
-              : undefined
+              ? {
+                  width: ringSize,
+                  height: ringSize,
+                  marginLeft: -(ringSize / 2),
+                  marginTop: -(ringSize / 2),
+                  transform: `scale(${ringScale})`,
+                }
+              : {
+                  width: ringSize,
+                  height: ringSize,
+                  marginLeft: -(ringSize / 2),
+                  marginTop: -(ringSize / 2),
+                }
           }
           aria-hidden
         />
       )}
-      <div className="echly-mic-orb" aria-hidden />
+      <div className="echly-mic-orb" style={{ width: size, height: size }} aria-hidden />
     </div>
   );
 }

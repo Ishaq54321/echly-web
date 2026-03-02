@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackItem from "./FeedbackItem";
 import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
+import { RecordingCapsule } from "./RecordingCapsule";
 import type { CaptureWidgetProps } from "./types";
 
 const CAPTURE_FLOW_STATES = ["focus_mode", "region_selecting", "voice_listening", "processing"] as const;
@@ -51,6 +51,18 @@ export default function CaptureWidget({
   const showFloatingButton = !effectiveIsOpen && showSidebar;
   const showPanel = effectiveIsOpen && showSidebar;
 
+  // Collapse the widget while recording (controlled mode via background)
+  const didCollapseRef = useRef(false);
+  useEffect(() => {
+    if (!isInCaptureFlow) {
+      didCollapseRef.current = false;
+      return;
+    }
+    if (didCollapseRef.current) return;
+    didCollapseRef.current = true;
+    onCollapseRequest?.();
+  }, [isInCaptureFlow, onCollapseRequest]);
+
   const insightCount = state.pointers.length;
   const highPriorityCount = state.pointers.filter((p) =>
     /critical|bug|high|urgent/i.test(p.type || "")
@@ -81,27 +93,29 @@ export default function CaptureWidget({
       {/* Capture layer: portaled into #echly-capture-root. Never inside sidebar. */}
       {captureRootReady &&
         refs.captureRootRef.current &&
-        refs.aiRootRef.current &&
-        createPortal(
+        (
           <CaptureLayer
             captureRoot={refs.captureRootRef.current}
-            aiRoot={refs.aiRootRef.current}
             extensionMode={extensionMode}
             state={state.state}
-            pillExiting={state.pillExiting}
-            listeningAudioLevel={state.listeningAudioLevel ?? 0}
-            listeningSentiment={state.listeningSentiment ?? "neutral"}
-            liveTranscript={state.liveTranscript ?? ""}
-            aiPreviewTitle={state.liveStructured?.title ?? null}
-            orbSuccess={state.orbSuccess ?? false}
             getFullTabImage={handlers.getFullTabImage}
             onRegionCaptured={handlers.handleRegionCaptured}
             onRegionSelectStart={handlers.handleRegionSelectStart}
             onCancelCapture={handlers.handleCancelCapture}
-            onDone={handlers.finishListening}
-          />,
-          refs.captureRootRef.current
+          />
         )}
+
+      <RecordingCapsule
+        visible={isInCaptureFlow}
+        isActive={state.state === "voice_listening"}
+        isProcessing={state.state === "processing" || state.pillExiting}
+        isExiting={state.pillExiting}
+        audioLevel={state.listeningAudioLevel ?? 0}
+        sentiment={state.listeningSentiment ?? "neutral"}
+        liveTranscript={state.liveTranscript ?? ""}
+        onDone={handlers.finishListening}
+        onCancel={handlers.handleCancelCapture}
+      />
 
       {showFloatingButton && (
         <div className="echly-floating-trigger-wrapper">
@@ -110,7 +124,7 @@ export default function CaptureWidget({
             onClick={() => (onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true))}
             className="echly-floating-trigger"
           >
-            Add insight
+            Capture feedback
           </button>
         </div>
       )}

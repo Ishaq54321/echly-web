@@ -90,7 +90,6 @@ export function useCaptureWidget({
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
   const captureRootRef = useRef<HTMLDivElement | null>(null);
-  const aiRootRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const activeRecordingIdRef = useRef<string | null>(null);
@@ -284,20 +283,10 @@ export function useCaptureWidget({
     captureEl.id = "echly-capture-root";
     document.body.appendChild(captureEl);
     captureRootRef.current = captureEl;
-    const aiEl = document.createElement("div");
-    aiEl.id = "echly-ai-root";
-    document.body.appendChild(aiEl);
-    aiRootRef.current = aiEl;
     setCaptureRootReady(true);
   }, []);
 
   const removeCaptureRoot = useCallback(() => {
-    if (aiRootRef.current) {
-      try {
-        document.body.removeChild(aiRootRef.current);
-      } catch (_) {}
-      aiRootRef.current = null;
-    }
     if (captureRootRef.current) {
       try {
         document.body.removeChild(captureRootRef.current);
@@ -750,7 +739,6 @@ export function useCaptureWidget({
       widgetRef,
       menuRef,
       captureRootRef,
-      aiRootRef,
     },
     captureRootReady,
   };
