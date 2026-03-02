@@ -534,9 +534,6 @@
   .min-h-\[40vh\] {
     min-height: 40vh;
   }
-  .min-h-\[52px\] {
-    min-height: 52px;
-  }
   .min-h-\[100px\] {
     min-height: 100px;
   }
@@ -1246,9 +1243,6 @@
   }
   .pr-2 {
     padding-right: calc(var(--spacing) * 2);
-  }
-  .pr-4 {
-    padding-right: calc(var(--spacing) * 4);
   }
   .pr-6 {
     padding-right: calc(var(--spacing) * 6);
@@ -2267,6 +2261,36 @@ textarea:focus-visible {
 }
 .capture-skeleton-dot {
   background-size: 200px 100%;
+}
+.capture-skeleton-footer {
+  margin-top: 16px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.capture-processing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  animation: captureProcessingPulse 1.4s infinite ease-in-out;
+}
+.capture-processing-text {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.5);
+}
+@keyframes captureProcessingPulse {
+  0% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.4;
+  }
 }
 .capture-feedback-list > div:first-child {
   animation: captureFeedbackItemEnter 200ms ease-out forwards,

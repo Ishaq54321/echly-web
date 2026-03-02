@@ -36,7 +36,7 @@ export function getDomPath(el: Element | null): string | null {
       segments.unshift(selector);
       break;
     }
-    const parent = current.parentElement;
+    const parent: HTMLElement | null = current.parentElement;
     if (!parent) break;
     const siblings = parent.children;
     let idx = 0;
@@ -66,7 +66,7 @@ export function getNearbyText(el: Element | null): string | null {
       (el as HTMLButtonElement).textContent?.trim() ||
       "") as string;
   if (own.length > 0) parts.push(own.slice(0, 120));
-  let parent = el.parentElement;
+  let parent: HTMLElement | null = el.parentElement;
   for (let i = 0; i < 3 && parent; i++) {
     const tag = parent.tagName.toLowerCase();
     if (tag === "label" || tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4") {
