@@ -605,6 +605,9 @@
   .max-w-6xl {
     max-width: var(--container-6xl);
   }
+  .max-w-\[750px\] {
+    max-width: 750px;
+  }
   .max-w-\[1800px\] {
     max-width: 1800px;
   }
@@ -1304,10 +1307,6 @@
   .tracking-\[0\.08em\] {
     --tw-tracking: 0.08em;
     letter-spacing: 0.08em;
-  }
-  .tracking-\[0\.12em\] {
-    --tw-tracking: 0.12em;
-    letter-spacing: 0.12em;
   }
   .tracking-\[0\.18em\] {
     --tw-tracking: 0.18em;

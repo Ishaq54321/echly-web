@@ -9,6 +9,7 @@ import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { storage } from "./firebase";
 import { apiFetch } from "./contentAuthFetch";
 import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
+import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
 import { log } from "@/lib/utils/logger";
 
@@ -188,6 +189,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       if (callbacks) {
         (async () => {
+          const visibleTextPromise = getVisibleTextFromScreenshot(screenshot ?? null);
           let screenshotUrl: string | null = null;
           if (screenshot) {
             try {
@@ -204,6 +206,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               return;
             }
           }
+          const visibleTextFromScreenshot = await visibleTextPromise;
+          const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+          const enrichedContext = {
+            ...(context ?? {}),
+            visibleText: visibleTextFromScreenshot,
+            url: context?.url ?? currentUrl,
+          };
           chrome.runtime.sendMessage(
             {
               type: "ECHLY_PROCESS_FEEDBACK",
@@ -211,7 +220,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 transcript,
                 screenshotUrl,
                 sessionId: effectiveSessionId,
-                context: context ?? null,
+                context: enrichedContext,
               },
             },
             (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
@@ -237,10 +246,20 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         })();
         return;
       }
+      const visibleTextFromScreenshot = await getVisibleTextFromScreenshot(screenshot ?? null);
+      const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+      const structureBody = {
+        transcript,
+        context: {
+          ...(context ?? {}),
+          visibleText: visibleTextFromScreenshot,
+          url: context?.url ?? currentUrl,
+        },
+      };
       const res = await apiFetch("/api/structure-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript }),
+        body: JSON.stringify(structureBody),
       });
       const data = (await res.json()) as {
         success?: boolean;
