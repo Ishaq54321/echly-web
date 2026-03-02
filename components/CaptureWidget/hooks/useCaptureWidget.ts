@@ -86,6 +86,14 @@ export function useCaptureWidget({
   const [pendingStructured, setPendingStructured] = useState<StructuredFeedback | null>(null);
   const [liveStructured, setLiveStructured] = useState<{ title: string; tags: string[]; priority: string } | null>(null);
   const [listeningAudioLevel, setListeningAudioLevel] = useState(0);
+  /** Extension: when true, widget is hidden for premium floating capture (overlay + pill only). */
+  const [captureModeMinimized, setCaptureModeMinimized] = useState(false);
+  /** Extension: open state to restore when capture completes or is cancelled. */
+  const [widgetOpenBeforeCapture, setWidgetOpenBeforeCapture] = useState(true);
+  /** New ticket id to highlight for 1.2s after capture success. */
+  const [highlightTicketId, setHighlightTicketId] = useState<string | null>(null);
+  /** When true, pill is fading out before we restore the widget. */
+  const [pillExiting, setPillExiting] = useState(false);
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -413,10 +421,20 @@ export function useCaptureWidget({
           setRecordings((prev) => prev.filter((r) => r.id !== activeId));
           setActiveRecordingId(null);
           setState("idle");
+          setPillExiting(true);
+          setHighlightTicketId(ticket.id);
+          setTimeout(() => setHighlightTicketId(null), 1200);
+          setTimeout(() => {
+            setPillExiting(false);
+            setCaptureModeMinimized(false);
+            setIsOpenState(widgetOpenBeforeCapture);
+          }, 220);
         },
         onError: () => {
           setErrorMessage("AI processing failed.");
           setState("error");
+          setCaptureModeMinimized(false);
+          setIsOpenState(widgetOpenBeforeCapture);
         },
       }, active.context ?? undefined);
       return;
@@ -439,7 +457,7 @@ export function useCaptureWidget({
       setErrorMessage("AI processing failed.");
       setState("error");
     }
-  }, [onComplete, extensionMode]);
+  }, [onComplete, extensionMode, widgetOpenBeforeCapture]);
 
   /* Anticipation: 160ms pause then show result */
   useEffect(() => {
@@ -468,7 +486,24 @@ export function useCaptureWidget({
     setRecordings((prev) => prev.filter((r) => r.id !== activeId));
     setActiveRecordingId(null);
     setState("idle");
-  }, []);
+    if (extensionMode) {
+      setCaptureModeMinimized(false);
+      setIsOpenState(widgetOpenBeforeCapture);
+    }
+  }, [extensionMode, widgetOpenBeforeCapture]);
+
+  /** Extension + floating capture: ESC during listening cancels and restores widget. */
+  useEffect(() => {
+    if (!extensionMode || !captureModeMinimized || state !== "listening") return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        discardListening();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [extensionMode, captureModeMinimized, state, discardListening]);
 
   /* ================= SHARE ================= */
 
@@ -596,20 +631,25 @@ export function useCaptureWidget({
     [startListening]
   );
 
-  /** Extension only: cancel region capture mode (Escape or invalid selection). */
+  /** Extension only: cancel region capture mode (Escape or invalid selection). Restore widget. */
   const handleCancelCapture = useCallback(() => {
     setState("idle");
-  }, []);
+    setCaptureModeMinimized(false);
+    setIsOpenState(widgetOpenBeforeCapture);
+  }, [widgetOpenBeforeCapture]);
 
   const handleAddFeedback = useCallback(async () => {
     if (stateRef.current !== "idle") return;
-    setIsOpen(true);
     setErrorMessage(null);
     recognitionRef.current?.stop();
     if (extensionMode) {
+      setWidgetOpenBeforeCapture(isOpen);
+      setCaptureModeMinimized(true);
+      setIsOpenState(false);
       setState("capturing");
       return;
     }
+    setIsOpen(true);
     setState("capturing");
     try {
       const image = await captureScreenshot();
@@ -634,7 +674,7 @@ export function useCaptureWidget({
       setErrorMessage("Screen capture failed.");
       setState("error");
     }
-  }, [extensionMode, setIsOpen, captureScreenshot, startListening]);
+  }, [extensionMode, isOpen, captureScreenshot, startListening]);
 
   const handlers = useMemo(
     () => ({
@@ -709,6 +749,9 @@ export function useCaptureWidget({
       seconds,
       listeningAudioLevel,
       listeningSentiment,
+      captureModeMinimized,
+      highlightTicketId,
+      pillExiting,
     },
     handlers,
     derivedValues,

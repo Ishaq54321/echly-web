@@ -16,6 +16,7 @@ type FeedbackItemProps = {
   onDelete: (id: string) => void;
   onEditedTitleChange: (value: string) => void;
   onEditedDescriptionChange: (value: string) => void;
+  highlightTicketId?: string | null;
 };
 
 function FeedbackItem({
@@ -30,9 +31,11 @@ function FeedbackItem({
   onDelete,
   onEditedTitleChange,
   onEditedDescriptionChange,
+  highlightTicketId = null,
 }: FeedbackItemProps) {
   const isExpanded = expandedId === item.id;
   const isEditing = editingId === item.id;
+  const isHighlighted = highlightTicketId === item.id;
 
   const handleExpand = useCallback(() => {
     onExpand(isExpanded ? null : item.id);
@@ -52,11 +55,12 @@ function FeedbackItem({
 
   return (
     <div
-      className="bg-white px-6 py-4 border-b border-[rgba(0,0,0,0.05)]
+      className={`bg-white px-6 py-4 border-b border-[rgba(0,0,0,0.05)]
                  transition-colors duration-120 ease-[cubic-bezier(0.2,0.8,0.2,1)]
                  hover:bg-neutral-100
                  active:scale-[0.99] active:duration-[80ms] active:ease-in
-                 last:border-b-0"
+                 last:border-b-0
+                 ${isHighlighted ? "echly-ticket-highlight" : ""}`}
     >
       <div className="flex justify-between gap-4">
         <div className="flex-1 min-w-0">

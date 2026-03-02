@@ -16,6 +16,7 @@ type FeedbackListProps = {
   onDelete: (id: string) => void;
   onEditedTitleChange: (value: string) => void;
   onEditedDescriptionChange: (value: string) => void;
+  highlightTicketId?: string | null;
 };
 
 function FeedbackList({
@@ -30,6 +31,7 @@ function FeedbackList({
   onDelete,
   onEditedTitleChange,
   onEditedDescriptionChange,
+  highlightTicketId = null,
 }: FeedbackListProps) {
   return (
     <div className="capture-feedback-list flex flex-col space-y-2">
@@ -47,6 +49,7 @@ function FeedbackList({
           onDelete={onDelete}
           onEditedTitleChange={onEditedTitleChange}
           onEditedDescriptionChange={onEditedDescriptionChange}
+          highlightTicketId={highlightTicketId}
         />
       ))}
     </div>

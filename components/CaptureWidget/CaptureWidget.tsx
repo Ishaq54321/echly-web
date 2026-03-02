@@ -10,6 +10,7 @@ import FeedbackItem from "./FeedbackItem";
 import WidgetFooter from "./WidgetFooter";
 import ProcessingSkeletonCard from "./ProcessingSkeletonCard";
 import { RegionCaptureOverlay } from "./RegionCaptureOverlay";
+import { FloatingVoicePill } from "./FloatingVoicePill";
 import type { CaptureWidgetProps } from "./types";
 
 export default function CaptureWidget({
@@ -45,12 +46,20 @@ export default function CaptureWidget({
 
   const isControlled = expanded !== undefined;
   const effectiveIsOpen = isControlled ? expanded : state.isOpen;
+  const listScrollRef = useRef<HTMLDivElement>(null);
 
   /** When transitioning from saving-feedback/anticipation to idle, keep skeleton visible and fade it out (200ms). */
   const [processingExiting, setProcessingExiting] = useState(false);
   /** When transitioning from listening to processing-structure, play orb shrink then hide (200ms). */
   const [listeningExiting, setListeningExiting] = useState(false);
   const prevStateRef = useRef(state.state);
+
+  /** On new ticket highlight (e.g. after floating capture success), scroll list to top. */
+  useEffect(() => {
+    if (state.highlightTicketId && listScrollRef.current) {
+      listScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [state.highlightTicketId]);
   useEffect(() => {
     const prev = prevStateRef.current;
     const wasProcessing = prev === "saving-feedback" || prev === "anticipation";
@@ -77,7 +86,10 @@ export default function CaptureWidget({
     };
   }, [handlers, widgetToggleRef]);
 
-  if (!effectiveIsOpen) {
+  const showFloatingButton =
+    !effectiveIsOpen && !(extensionMode && state.captureModeMinimized);
+
+  if (showFloatingButton) {
     return (
       <div className="fixed bottom-10 right-10 z-50 capture-floating-wrapper">
         <button
@@ -97,6 +109,61 @@ export default function CaptureWidget({
           Capture Feedback
         </button>
       </div>
+    );
+  }
+
+  /* Extension: premium floating capture — overlay + region selection or voice pill only. */
+  if (extensionMode && state.captureModeMinimized) {
+    const showPill =
+      state.state === "listening" ||
+      state.state === "processing-structure" ||
+      state.state === "saving-feedback";
+    const showFocusOverlay =
+      state.state === "listening" ||
+      state.state === "processing-structure" ||
+      state.state === "saving-feedback" ||
+      state.pillExiting;
+    return (
+      <>
+        {/* Subtle focus overlay when voice pill is shown (no double overlay during region select) */}
+        {showFocusOverlay && (
+          <div
+            className="echly-capture-focus-overlay"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.08)",
+              pointerEvents: "auto",
+              zIndex: 2147483646,
+            }}
+            aria-hidden
+          />
+        )}
+        {state.state === "capturing" && (
+          <RegionCaptureOverlay
+            getFullTabImage={handlers.getFullTabImage}
+            onCapture={handlers.handleRegionCaptured}
+            onCancel={handlers.handleCancelCapture}
+            getWidgetOrigin={undefined}
+          />
+        )}
+        {showPill && (
+          <div className={state.pillExiting ? "echly-voice-pill-wrapper echly-voice-pill--exiting" : "echly-voice-pill-wrapper"}>
+            <FloatingVoicePill
+              isListening={state.state === "listening"}
+              isProcessing={
+                state.state === "processing-structure" ||
+                state.state === "saving-feedback" ||
+                state.pillExiting
+              }
+              isExiting={state.state === "processing-structure" && listeningExiting}
+              audioLevel={state.listeningAudioLevel ?? 0}
+              sentiment={state.listeningSentiment ?? "neutral"}
+              onDone={handlers.finishListening}
+            />
+          </div>
+        )}
+      </>
     );
   }
 
@@ -156,7 +223,10 @@ export default function CaptureWidget({
           isProcessingStructure={state.state === "processing-structure"}
         />
 
-        <div className="px-6 py-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
+        <div
+          ref={listScrollRef}
+          className="px-6 py-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto"
+        >
           <div className="capture-feedback-list flex flex-col space-y-2">
             {/* First slot: skeleton (when publishing) or first ticket (when idle) — no layout shift */}
             {state.state === "saving-feedback" || state.state === "anticipation" || processingExiting ? (
@@ -174,6 +244,7 @@ export default function CaptureWidget({
                 onDelete={handlers.deletePointer}
                 onEditedTitleChange={handlers.setEditedTitle}
                 onEditedDescriptionChange={handlers.setEditedDescription}
+                highlightTicketId={state.highlightTicketId}
               />
             ) : null}
             <FeedbackList
@@ -192,6 +263,7 @@ export default function CaptureWidget({
               onDelete={handlers.deletePointer}
               onEditedTitleChange={handlers.setEditedTitle}
               onEditedDescriptionChange={handlers.setEditedDescription}
+              highlightTicketId={state.highlightTicketId}
             />
           </div>
 

@@ -227,7 +227,7 @@ export function RegionCaptureOverlay({
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(0, 0, 0, 0.12)",
+          background: "rgba(0, 0, 0, 0.08)",
           pointerEvents: isExiting ? "none" : "auto",
           cursor: "crosshair",
           zIndex: 2147483646,
