@@ -309,7 +309,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_PROCESS_FEEDBACK") {
     const payload = request.payload as {
       transcript: string;
-      screenshot: string | null;
+      screenshotUrl: string | null;
       sessionId: string;
       context?: {
         url?: string;
@@ -339,20 +339,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       try {
         const token = await getValidToken();
-        const screenshot = payload.screenshot ?? null;
-        if (screenshot) {
-          // Screenshot upload is intentionally disabled in the service worker to avoid SDK/XHR usage.
-          console.warn("[ECHLY_PROCESS_FEEDBACK] screenshot provided but upload is disabled in background");
-        }
+        const screenshotUrl: string | null = payload.screenshotUrl ?? null;
 
         const structurePayload = context ? { transcript, context } : { transcript };
-        const structurePromise = fetch(`${API_BASE}/api/structure-feedback`, {
+        const structureRes = await fetch(`${API_BASE}/api/structure-feedback`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify(structurePayload),
         });
-        const [structureRes] = await Promise.all([structurePromise]);
-        const screenshotUrl: string | null = null;
 
         const structureText = await structureRes.text();
         if (!structureRes.ok) {

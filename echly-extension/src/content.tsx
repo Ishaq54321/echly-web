@@ -5,6 +5,8 @@
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { storage } from "./firebase";
 import { apiFetch } from "./contentAuthFetch";
 import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
 import CaptureWidget from "@/components/CaptureWidget";
@@ -160,37 +162,54 @@ function ContentApp() {
         return undefined;
       }
       if (callbacks) {
-        /* Fire immediately — no await. Processing state already shown; background runs structure + upload in parallel. */
-        chrome.runtime.sendMessage(
-          {
-            type: "ECHLY_PROCESS_FEEDBACK",
-            payload: {
-              transcript,
-              screenshot: screenshot ?? null,
-              sessionId: effectiveSessionId,
-              context: context ?? null,
-            },
-          },
-          (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
-            if (chrome.runtime.lastError) {
-              console.error("Runtime error", chrome.runtime.lastError);
-              callbacks?.onError();
+        (async () => {
+          let screenshotUrl: string | null = null;
+          if (screenshot) {
+            try {
+              const feedbackId = crypto.randomUUID();
+              const path = `sessions/${effectiveSessionId}/feedback/${feedbackId}/${Date.now()}.png`;
+              const screenshotRef = ref(storage, path);
+              await uploadString(screenshotRef, screenshot, "data_url", {
+                contentType: "image/png",
+              });
+              screenshotUrl = await getDownloadURL(screenshotRef);
+            } catch (err) {
+              console.error("[Echly] Screenshot upload failed:", err);
+              callbacks.onError();
               return;
             }
-            if (!response?.success || !response.ticket) {
-              console.error("No success in response", response);
-              callbacks?.onError();
-              return;
-            }
-            console.log("[CONTENT] Ticket received:", response.ticket);
-            callbacks?.onSuccess({
-              id: response.ticket.id,
-              title: response.ticket.title,
-              description: response.ticket.description,
-              type: response.ticket.type ?? "Feedback",
-            });
           }
-        );
+          chrome.runtime.sendMessage(
+            {
+              type: "ECHLY_PROCESS_FEEDBACK",
+              payload: {
+                transcript,
+                screenshotUrl,
+                sessionId: effectiveSessionId,
+                context: context ?? null,
+              },
+            },
+            (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
+              if (chrome.runtime.lastError) {
+                console.error("Runtime error", chrome.runtime.lastError);
+                callbacks?.onError();
+                return;
+              }
+              if (!response?.success || !response.ticket) {
+                console.error("No success in response", response);
+                callbacks?.onError();
+                return;
+              }
+              console.log("[CONTENT] Ticket received:", response.ticket);
+              callbacks?.onSuccess({
+                id: response.ticket.id,
+                title: response.ticket.title,
+                description: response.ticket.description,
+                type: response.ticket.type ?? "Feedback",
+              });
+            }
+          );
+        })();
         return;
       }
       const res = await apiFetch("/api/structure-feedback", {
