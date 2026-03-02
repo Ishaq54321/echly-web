@@ -536,29 +536,34 @@ export function useCaptureWidget({
   }, []);
 
   const saveEdit = useCallback(async (id: string) => {
+    const title = editedTitle.trim() || editedTitle;
+    const description = editedDescription;
+
+    /* Optimistic update: persist to local state and exit edit mode immediately so the UI updates on click. */
+    setPointers((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, title: title || p.title, description } : p
+      )
+    );
+    setEditingId(null);
+
     try {
       const res = await authFetch(`/api/tickets/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: editedTitle,
-          description: editedDescription,
-        }),
+        body: JSON.stringify({ title: title || editedTitle, description }),
       });
       const data = (await res.json()) as { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string } };
-      if (!res.ok || !data.success || !data.ticket) {
-        console.error("PATCH ticket failed", data);
-        return;
+      if (res.ok && data.success && data.ticket) {
+        const t = data.ticket;
+        setPointers((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? { ...p, title: t.title, description: t.description, type: t.type ?? p.type }
+              : p
+          )
+        );
       }
-      const t = data.ticket;
-      setPointers((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? { ...p, title: t.title, description: t.description, type: t.type ?? p.type }
-            : p
-        )
-      );
-      setEditingId(null);
     } catch (err) {
       console.error("Save edit failed:", err);
     }

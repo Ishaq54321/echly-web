@@ -54,6 +54,7 @@ export function RecordingCapsule({
           expanded ? "echly-recording-capsule--expanded" : "",
           isProcessing ? "echly-recording-capsule--processing" : "",
           isExiting ? "echly-recording-capsule--exiting" : "",
+          isActive && !isProcessing ? "echly-recording-capsule--recording" : "",
         ]
           .filter(Boolean)
           .join(" ")}

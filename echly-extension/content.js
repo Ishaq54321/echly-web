@@ -48216,27 +48216,29 @@ This typically indicates that your device does not have a healthy Internet conne
       setEditedDescription(p.description);
     }, []);
     const saveEdit = (0, import_react.useCallback)(async (id) => {
+      const title = editedTitle.trim() || editedTitle;
+      const description = editedDescription;
+      setPointers(
+        (prev) => prev.map(
+          (p) => p.id === id ? { ...p, title: title || p.title, description } : p
+        )
+      );
+      setEditingId(null);
       try {
         const res = await authFetch2(`/api/tickets/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: editedTitle,
-            description: editedDescription
-          })
+          body: JSON.stringify({ title: title || editedTitle, description })
         });
         const data = await res.json();
-        if (!res.ok || !data.success || !data.ticket) {
-          console.error("PATCH ticket failed", data);
-          return;
+        if (res.ok && data.success && data.ticket) {
+          const t = data.ticket;
+          setPointers(
+            (prev) => prev.map(
+              (p) => p.id === id ? { ...p, title: t.title, description: t.description, type: t.type ?? p.type } : p
+            )
+          );
         }
-        const t = data.ticket;
-        setPointers(
-          (prev) => prev.map(
-            (p) => p.id === id ? { ...p, title: t.title, description: t.description, type: t.type ?? p.type } : p
-          )
-        );
-        setEditingId(null);
       } catch (err) {
         console.error("Save edit failed:", err);
       }
@@ -48625,6 +48627,7 @@ This typically indicates that your device does not have a healthy Internet conne
     const isEditing = editingId === item.id;
     const isHighlighted = highlightTicketId === item.id;
     const priority = priorityFromType(item.type);
+    const [showSaveSuccess, setShowSaveSuccess] = (0, import_react4.useState)(false);
     const handleExpand = (0, import_react4.useCallback)(() => {
       onExpand(isExpanded ? null : item.id);
     }, [isExpanded, item.id, onExpand]);
@@ -48633,6 +48636,8 @@ This typically indicates that your device does not have a healthy Internet conne
     }, [item, onStartEdit]);
     const handleSave = (0, import_react4.useCallback)(() => {
       onSaveEdit(item.id);
+      setShowSaveSuccess(true);
+      setTimeout(() => setShowSaveSuccess(false), 220);
     }, [item.id, onSaveEdit]);
     const handleDelete = (0, import_react4.useCallback)(() => {
       onDelete(item.id);
@@ -48678,7 +48683,16 @@ This typically indicates that your device does not have a healthy Internet conne
                   children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Expand, { size: 16, strokeWidth: 1.5 })
                 }
               ),
-              isEditing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", onClick: handleSave, className: "echly-widget-action-icon", "aria-label": "Save", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Check, { size: 16, strokeWidth: 1.5 }) }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", onClick: handleEdit, className: "echly-widget-action-icon", "aria-label": "Edit", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Pencil, { size: 16, strokeWidth: 1.5 }) }),
+              isEditing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+                "button",
+                {
+                  type: "button",
+                  onClick: handleSave,
+                  className: `echly-widget-action-icon echly-widget-action-icon--confirm ${showSaveSuccess ? "echly-widget-action-icon--confirm-success" : ""}`,
+                  "aria-label": "Save",
+                  children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Check, { size: 16, strokeWidth: 1.5 })
+                }
+              ) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", onClick: handleEdit, className: "echly-widget-action-icon", "aria-label": "Edit", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Pencil, { size: 16, strokeWidth: 1.5 }) }),
               /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
                 "button",
                 {
