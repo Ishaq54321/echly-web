@@ -49272,7 +49272,8 @@ This typically indicates that your device does not have a healthy Internet conne
           "echly-recording-capsule",
           expanded ? "echly-recording-capsule--expanded" : "",
           isProcessing ? "echly-recording-capsule--processing" : "",
-          isExiting ? "echly-recording-capsule--exiting" : ""
+          isExiting ? "echly-recording-capsule--exiting" : "",
+          isActive && !isProcessing ? "echly-recording-capsule--recording" : ""
         ].filter(Boolean).join(" "),
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "echly-recording-orb", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
