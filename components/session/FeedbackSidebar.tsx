@@ -20,7 +20,6 @@ interface Props {
   onSelect: (id: string) => void;
   selectedIndex?: number;
   total?: number;
-  aiInsightSummary?: string | null;
   /** Server metadata: active (open) count; do not derive from feedback array. */
   activeCount?: number;
   /** Server metadata: resolved count; do not derive from feedback array. */
@@ -40,7 +39,6 @@ function FeedbackSidebarInner({
   selectedId,
   onSelect,
   total: totalProp,
-  aiInsightSummary,
   activeCount: activeCountProp,
   resolvedCount: resolvedCountProp,
   loadingMore = false,
@@ -192,17 +190,6 @@ function FeedbackSidebarInner({
             aria-label="Search feedback"
           />
         </div>
-
-        {typeof aiInsightSummary === "string" && aiInsightSummary.trim() !== "" && (
-          <div className="shrink-0 mt-1.5 pl-3 border-l-2 border-neutral-200">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-400">
-              Session Insight
-            </div>
-            <div className="text-[12px] leading-[1.45] text-neutral-500 mt-1">
-              {aiInsightSummary.trim()}
-            </div>
-          </div>
-        )}
 
         {/* Ticket list (content flows; scroll is on parent panel) */}
         <div className="flex flex-col">

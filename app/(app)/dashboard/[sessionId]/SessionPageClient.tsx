@@ -144,6 +144,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [sessionTitleDraft, setSessionTitleDraft] = useState("");
   const [isSavingSessionTitle, setIsSavingSessionTitle] = useState(false);
   const [saveSessionTitleSuccess, setSaveSessionTitleSuccess] = useState(false);
+  const [insightRevealed, setInsightRevealed] = useState(false);
 
   /* Sync active session to extension when user opens this session page. */
   useEffect(() => {
@@ -714,7 +715,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               onSelect={setSelectedId}
               selectedIndex={selectedIndex}
               total={feedbackTotal}
-              aiInsightSummary={session?.aiInsightSummary ?? null}
               activeCount={feedbackActiveCount}
               resolvedCount={feedbackResolvedCount}
               loadingMore={feedbackLoadingMore}
@@ -852,10 +852,23 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                         Saved
                       </p>
                     )}
+                    {typeof session?.aiInsightSummary === "string" &&
+                      session.aiInsightSummary.trim() !== "" && (
+                      <button
+                        type="button"
+                        onClick={() => setInsightRevealed((r) => !r)}
+                        className={`mt-1 text-[12px] cursor-pointer ${
+                          insightRevealed ? "text-neutral-600" : "text-neutral-500"
+                        }`}
+                        aria-label="Toggle session summary"
+                      >
+                        {insightRevealed ? "Hide session summary" : "View session summary"}
+                      </button>
+                    )}
                   </>
                 )}
               </div>
-              <div className="text-[13px] text-neutral-500 flex-shrink-0 flex items-center">
+              <div className="text-[13px] text-neutral-500 flex-shrink-0 flex items-center gap-3">
                 {(() => {
                   const { dateStr, timeStr } = formatSessionCreatedMeta(
                     session?.createdAt
@@ -885,6 +898,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 })()}
               </div>
             </div>
+            {insightRevealed &&
+              typeof session?.aiInsightSummary === "string" &&
+              session.aiInsightSummary.trim() !== "" && (
+                <div className="mt-4 pl-3 border-l-2 border-neutral-200 max-w-[750px] text-[12px] leading-[1.45] text-neutral-500">
+                  {session.aiInsightSummary.trim()}
+                </div>
+              )}
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="max-w-4xl mx-auto w-full px-10 py-8">
