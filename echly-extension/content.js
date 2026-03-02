@@ -48910,8 +48910,8 @@ This typically indicates that your device does not have a healthy Internet conne
           cancel();
         }
       };
-      window.addEventListener("keydown", onKeyDown);
-      return () => window.removeEventListener("keydown", onKeyDown);
+      document.addEventListener("keydown", onKeyDown);
+      return () => document.removeEventListener("keydown", onKeyDown);
     }, [cancel]);
     (0, import_react8.useEffect)(() => {
       const onVisibilityChange = () => {
@@ -48920,13 +48920,29 @@ This typically indicates that your device does not have a healthy Internet conne
       document.addEventListener("visibilitychange", onVisibilityChange);
       return () => document.removeEventListener("visibilitychange", onVisibilityChange);
     }, [cancel]);
-    const root = overlayRef.current?.getRootNode?.() ?? null;
-    const onMouseMove = (0, import_react8.useCallback)(
-      (e) => {
+    (0, import_react8.useEffect)(() => {
+      const getRoot = () => overlayRef.current?.getRootNode?.() ?? null;
+      const onMouseDown = (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+        isDragModeRef.current = false;
+        setDragRect(null);
+      };
+      const onMouseMove = (e) => {
         const clientX = e.clientX;
         const clientY = e.clientY;
         setTooltipPos({ x: clientX + 16, y: clientY + 16 });
-        if (!tooltipVisible) setTooltipVisible(true);
+        setTooltipVisible(true);
+        if (dragStartRef.current && !isDragModeRef.current) {
+          const dx = clientX - dragStartRef.current.x;
+          const dy = clientY - dragStartRef.current.y;
+          if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_PX) {
+            isDragModeRef.current = true;
+            setHighlightRect(null);
+          }
+        }
         if (isDragModeRef.current && dragStartRef.current) {
           const sx = dragStartRef.current.x;
           const sy = dragStartRef.current.y;
@@ -48940,6 +48956,7 @@ This typically indicates that your device does not have a healthy Internet conne
           setHighlightRect(null);
           return;
         }
+        const root = getRoot();
         const el = getPageElementAt(clientX, clientY, root);
         hoveredElementRef.current = el;
         if (el) {
@@ -48952,48 +48969,14 @@ This typically indicates that your device does not have a healthy Internet conne
         } else {
           setHighlightRect(null);
         }
-      },
-      [root, tooltipVisible]
-    );
-    const onMouseDown = (0, import_react8.useCallback)((e) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      dragStartRef.current = { x: e.clientX, y: e.clientY };
-      isDragModeRef.current = false;
-      setDragRect(null);
-    }, []);
-    const onMouseUp = (0, import_react8.useCallback)(
-      async (e) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        const start2 = dragStartRef.current;
-        if (!start2) return;
-        const dx = e.clientX - start2.x;
-        const dy = e.clientY - start2.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        let targetRect = null;
-        let targetElement = null;
-        const currentDragRect = dragRectRef.current;
-        if (isDragModeRef.current && currentDragRect && currentDragRect.w >= MIN_SIZE && currentDragRect.h >= MIN_SIZE) {
-          targetRect = currentDragRect;
-        } else if (!isDragModeRef.current && distance <= DRAG_THRESHOLD_PX) {
-          targetElement = hoveredElementRef.current;
-          if (targetElement) {
-            try {
-              const r = targetElement.getBoundingClientRect();
-              if (r.width >= MIN_SIZE && r.height >= MIN_SIZE) {
-                targetRect = { x: r.left, y: r.top, w: r.width, h: r.height };
-              }
-            } catch (_) {
-            }
-          }
-        }
-        dragStartRef.current = null;
-        isDragModeRef.current = false;
-        setDragRect(null);
-        if (!targetRect) return;
+      };
+      const performCapture = async (targetRect, targetElement) => {
         setOverlayVisible(false);
         setHighlightRect(null);
+        setDragRect(null);
+        dragStartRef.current = null;
+        isDragModeRef.current = false;
+        dragRectRef.current = null;
         await new Promise((r) => setTimeout(r, 80));
         let fullImage = null;
         try {
@@ -49019,24 +49002,57 @@ This typically indicates that your device does not have a healthy Internet conne
         }
         const context = typeof window !== "undefined" ? buildCaptureContext(window, targetElement ?? null) : null;
         onCapture(cropped, context);
-      },
-      [getFullTabImage, onCapture, onCancel]
-    );
-    (0, import_react8.useEffect)(() => {
-      if (!dragStartRef.current) return;
-      const onMove = (e) => {
-        if (!dragStartRef.current || isDragModeRef.current) return;
-        const dx = e.clientX - dragStartRef.current.x;
-        const dy = e.clientY - dragStartRef.current.y;
-        if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_PX) {
-          isDragModeRef.current = true;
-          setHighlightRect(null);
-        }
       };
-      window.addEventListener("mousemove", onMove);
-      return () => window.removeEventListener("mousemove", onMove);
-    }, []);
-    const showHighlight = !!highlightRect && !dragRect && !isDragModeRef.current;
+      const onMouseUp = (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const start2 = dragStartRef.current;
+        if (!start2) return;
+        const dx = e.clientX - start2.x;
+        const dy = e.clientY - start2.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        let targetRect = null;
+        let targetElement = null;
+        const currentDragRect = dragRectRef.current;
+        if (isDragModeRef.current && currentDragRect && currentDragRect.w >= MIN_SIZE && currentDragRect.h >= MIN_SIZE) {
+          targetRect = currentDragRect;
+        } else if (!isDragModeRef.current && distance <= DRAG_THRESHOLD_PX) {
+          targetElement = hoveredElementRef.current;
+          if (targetElement) {
+            try {
+              const r = targetElement.getBoundingClientRect();
+              if (r.width >= MIN_SIZE && r.height >= MIN_SIZE) {
+                targetRect = { x: r.left, y: r.top, w: r.width, h: r.height };
+              }
+            } catch (_) {
+            }
+          }
+        }
+        if (!targetRect) {
+          dragStartRef.current = null;
+          isDragModeRef.current = false;
+          setDragRect(null);
+          return;
+        }
+        performCapture(targetRect, targetElement);
+      };
+      const onClick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      document.addEventListener("mousedown", onMouseDown, true);
+      document.addEventListener("mousemove", onMouseMove, true);
+      document.addEventListener("mouseup", onMouseUp, true);
+      document.addEventListener("click", onClick, true);
+      return () => {
+        document.removeEventListener("mousedown", onMouseDown, true);
+        document.removeEventListener("mousemove", onMouseMove, true);
+        document.removeEventListener("mouseup", onMouseUp, true);
+        document.removeEventListener("click", onClick, true);
+      };
+    }, [cancel, getFullTabImage, onCapture, onCancel]);
+    const showHighlight = !!highlightRect && !dragRect;
     const showDragRect = !!dragRect && dragRect.w >= MIN_SIZE && dragRect.h >= MIN_SIZE;
     return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
       "div",
@@ -49048,18 +49064,8 @@ This typically indicates that your device does not have a healthy Internet conne
           position: "fixed",
           inset: 0,
           zIndex: 2147483647,
-          cursor: "crosshair",
-          pointerEvents: "auto",
+          pointerEvents: "none",
           userSelect: "none"
-        },
-        onMouseDown,
-        onMouseMove,
-        onMouseUp,
-        onMouseLeave: () => {
-          if (!isDragModeRef.current) {
-            setHighlightRect(null);
-            hoveredElementRef.current = null;
-          }
         },
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
@@ -49069,8 +49075,8 @@ This typically indicates that your device does not have a healthy Internet conne
               style: {
                 position: "fixed",
                 inset: 0,
-                background: "rgba(0,0,0,0.25)",
-                backdropFilter: "blur(4px)",
+                background: "rgba(0,0,0,0.12)",
+                backdropFilter: "blur(1.5px)",
                 pointerEvents: "none",
                 zIndex: 2147483646,
                 opacity: overlayVisible ? 1 : 0,
