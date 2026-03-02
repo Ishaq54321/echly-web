@@ -151,10 +151,17 @@ export default function CaptureWidget({
             </div>
           )}
 
-          {(state.state === "processing" || state.state === "anticipation") && (
+          {(state.state === "processing" ||
+            state.state === "processing-structure" ||
+            state.state === "saving-feedback" ||
+            state.state === "anticipation") && (
             <div className="capture-processing-enter relative flex items-center gap-4 text-sm text-slate-600 py-3 pr-4 min-h-[52px]">
               <div className="capture-structuring-text flex items-center gap-2 flex-1">
-                <span className="text-slate-600">Structuring your feedback</span>
+                <span className="text-slate-600">
+                  {state.state === "saving-feedback"
+                    ? "Adding to your session…"
+                    : "Structuring your feedback…"}
+                </span>
                 <span className="capture-ellipsis inline-flex gap-0.5" aria-hidden>
                   <span>.</span><span>.</span><span>.</span>
                 </span>

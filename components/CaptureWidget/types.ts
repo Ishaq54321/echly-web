@@ -35,6 +35,8 @@ export type CaptureState =
   | "capturing"
   | "listening"
   | "processing"
+  | "processing-structure"
+  | "saving-feedback"
   | "anticipation"
   | "error";
 

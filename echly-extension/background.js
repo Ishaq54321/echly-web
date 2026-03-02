@@ -267,18 +267,13 @@
       (async () => {
         try {
           const token = await getValidToken();
-          const screenshot = payload.screenshot ?? null;
-          if (screenshot) {
-            console.warn("[ECHLY_PROCESS_FEEDBACK] screenshot provided but upload is disabled in background");
-          }
+          const screenshotUrl = payload.screenshotUrl ?? null;
           const structurePayload = context ? { transcript, context } : { transcript };
-          const structurePromise = fetch(`${API_BASE}/api/structure-feedback`, {
+          const structureRes = await fetch(`${API_BASE}/api/structure-feedback`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(structurePayload)
           });
-          const [structureRes] = await Promise.all([structurePromise]);
-          const screenshotUrl = null;
           const structureText = await structureRes.text();
           if (!structureRes.ok) {
             console.error("[STRUCTURE FAILED RAW]", structureRes.status, structureText);

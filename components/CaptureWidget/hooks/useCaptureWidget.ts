@@ -24,9 +24,18 @@ function generateRecordingId(): string {
   return `rec-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-const RECORDING_STATES: CaptureState[] = ["capturing", "listening", "processing", "anticipation"];
+const RECORDING_STATES: CaptureState[] = [
+  "capturing",
+  "listening",
+  "processing",
+  "processing-structure",
+  "saving-feedback",
+  "anticipation",
+];
 
 const LIVE_STRUCTURE_DEBOUNCE_MS = 1800;
+/** Minimum time to show "Structuring" before transitioning to "Saving" (avoids flicker). */
+const MIN_PROCESSING_PHASE_MS = 1200;
 const LIVE_STRUCTURE_MIN_LENGTH = 12;
 
 export function useCaptureWidget({
@@ -68,9 +77,17 @@ export function useCaptureWidget({
   const editingIdRef = useRef<string | null>(null);
   const trayLockedRef = useRef(false);
   const liveStructureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
     stateRef.current = state;
+  }, [state]);
+
+  /** After MIN_PROCESSING_PHASE_MS in processing-structure, transition to saving-feedback (avoids flicker). */
+  useEffect(() => {
+    if (state !== "processing-structure") return;
+    const t = setTimeout(() => {
+      if (stateRef.current === "processing-structure") setState("saving-feedback");
+    }, MIN_PROCESSING_PHASE_MS);
+    return () => clearTimeout(t);
   }, [state]);
 
   useEffect(() => {
@@ -79,7 +96,7 @@ export function useCaptureWidget({
 
   /** Keep tray locked during capture → listen → process so it never collapses. */
   useEffect(() => {
-    if (state === "capturing" || state === "listening" || state === "processing" || state === "anticipation") {
+    if (RECORDING_STATES.includes(state)) {
       trayLockedRef.current = true;
     } else {
       trayLockedRef.current = false;
@@ -142,13 +159,7 @@ export function useCaptureWidget({
       if (trayLockedRef.current) return;
       if (extensionMode) return;
       const s = stateRef.current;
-      if (
-        s === "capturing" ||
-        s === "listening" ||
-        s === "processing" ||
-        s === "anticipation"
-      )
-        return;
+      if (RECORDING_STATES.includes(s)) return;
       if (editingIdRef.current) return;
     }
     setIsOpenState(next);
@@ -259,6 +270,8 @@ export function useCaptureWidget({
       }
     };
     recognition.onend = () => {
+      const s = stateRef.current;
+      if (s === "processing-structure" || s === "saving-feedback") return;
       setState("idle");
     };
     recognitionRef.current = recognition;
@@ -315,7 +328,7 @@ export function useCaptureWidget({
       setState("idle");
       return;
     }
-    setState("processing");
+    setState("processing-structure");
     if (extensionMode) {
       onComplete(active.transcript, active.screenshot, {
         onSuccess: (ticket) => {
