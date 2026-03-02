@@ -48831,20 +48831,21 @@ This typically indicates that your device does not have a healthy Internet conne
   // components/CaptureWidget/RegionCaptureOverlay.tsx
   var import_jsx_runtime6 = __toESM(require_jsx_runtime());
   var MIN_SIZE = 24;
-  var EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
-  var BRAND_COLOR = "#2563EB";
-  var HIGHLIGHT_COLOR = "rgba(37, 99, 235, 0.2)";
+  var DRAG_THRESHOLD_PX = 5;
+  var OVERLAY_ID = "echly-capture-overlay";
+  var HIGHLIGHT_BOX_ID = "echly-highlight-box";
+  var TOOLTIP_ID = "echly-capture-tooltip";
   function getPageElementAt(clientX, clientY, overlayRoot) {
-    if (typeof document === "undefined" || !document.elementsFromPoint) return null;
+    if (typeof document === "undefined" || !document.elementFromPoint) return null;
     const host = overlayRoot && "host" in overlayRoot ? overlayRoot.host : null;
-    const elements = document.elementsFromPoint(clientX, clientY);
-    for (const el of elements) {
-      const root = el.getRootNode?.();
-      if (root === overlayRoot) continue;
-      if (host && (el === host || host.contains(el))) continue;
-      return el;
-    }
-    return null;
+    const el = document.elementFromPoint(clientX, clientY);
+    if (!el || el === document.body) return null;
+    const root = el.getRootNode?.();
+    if (root === overlayRoot) return null;
+    if (host && (el === host || host.contains(el))) return null;
+    if (el.id === OVERLAY_ID || el.id === HIGHLIGHT_BOX_ID || el.id === TOOLTIP_ID) return null;
+    if (host?.id === "echly-shadow-host") return null;
+    return el;
   }
   async function cropImageToRegion(fullImageDataUrl, region, dpr) {
     return new Promise((resolve, reject) => {
@@ -48880,54 +48881,33 @@ This typically indicates that your device does not have a healthy Internet conne
     onCancel
   }) {
     const overlayRef = (0, import_react8.useRef)(null);
-    const [phase, setPhase] = (0, import_react8.useState)("selecting");
-    const [rect, setRect] = (0, import_react8.useState)(null);
-    const [hoverRect, setHoverRect] = (0, import_react8.useState)(null);
+    const [highlightRect, setHighlightRect] = (0, import_react8.useState)(null);
+    const [dragRect, setDragRect] = (0, import_react8.useState)(null);
     const [overlayVisible, setOverlayVisible] = (0, import_react8.useState)(true);
-    const [confirmScaleOne, setConfirmScaleOne] = (0, import_react8.useState)(false);
-    const startRef = (0, import_react8.useRef)(null);
-    const isDraggingRef = (0, import_react8.useRef)(false);
+    const [tooltipVisible, setTooltipVisible] = (0, import_react8.useState)(false);
+    const [tooltipPos, setTooltipPos] = (0, import_react8.useState)({ x: 0, y: 0 });
     const hoveredElementRef = (0, import_react8.useRef)(null);
-    const snappedElementRef = (0, import_react8.useRef)(null);
-    const clearSelection = (0, import_react8.useCallback)(() => {
-      startRef.current = null;
-      isDraggingRef.current = false;
-      snappedElementRef.current = null;
-      setRect(null);
-      setHoverRect(null);
+    const dragStartRef = (0, import_react8.useRef)(null);
+    const isDragModeRef = (0, import_react8.useRef)(false);
+    const dragRectRef = (0, import_react8.useRef)(null);
+    const clearHighlight = (0, import_react8.useCallback)(() => {
+      setHighlightRect(null);
+      setDragRect(null);
       hoveredElementRef.current = null;
+      dragStartRef.current = null;
+      isDragModeRef.current = false;
+      dragRectRef.current = null;
     }, []);
     const cancel = (0, import_react8.useCallback)(() => {
       setOverlayVisible(false);
-      clearSelection();
+      clearHighlight();
       setTimeout(() => onCancel(), 120);
-    }, [onCancel, clearSelection]);
+    }, [onCancel, clearHighlight]);
     (0, import_react8.useEffect)(() => {
       const onKeyDown = (e) => {
         if (e.key === "Escape") {
           e.preventDefault();
           cancel();
-          return;
-        }
-        if (e.key === " ") {
-          e.preventDefault();
-          const el = hoveredElementRef.current;
-          if (!el || isDraggingRef.current) return;
-          try {
-            const r = el.getBoundingClientRect();
-            if (r.width >= MIN_SIZE && r.height >= MIN_SIZE) {
-              setRect({
-                x: r.left,
-                y: r.top,
-                w: r.width,
-                h: r.height
-              });
-              snappedElementRef.current = el;
-              setHoverRect(null);
-              hoveredElementRef.current = null;
-            }
-          } catch (_) {
-          }
         }
       };
       window.addEventListener("keydown", onKeyDown);
@@ -48940,164 +48920,225 @@ This typically indicates that your device does not have a healthy Internet conne
       document.addEventListener("visibilitychange", onVisibilityChange);
       return () => document.removeEventListener("visibilitychange", onVisibilityChange);
     }, [cancel]);
+    const root = overlayRef.current?.getRootNode?.() ?? null;
+    const onMouseMove = (0, import_react8.useCallback)(
+      (e) => {
+        const clientX = e.clientX;
+        const clientY = e.clientY;
+        setTooltipPos({ x: clientX + 16, y: clientY + 16 });
+        if (!tooltipVisible) setTooltipVisible(true);
+        if (isDragModeRef.current && dragStartRef.current) {
+          const sx = dragStartRef.current.x;
+          const sy = dragStartRef.current.y;
+          const x2 = Math.min(sx, clientX);
+          const y = Math.min(sy, clientY);
+          const w = Math.abs(clientX - sx);
+          const h = Math.abs(clientY - sy);
+          const next = { x: x2, y, w, h };
+          dragRectRef.current = next;
+          setDragRect(next);
+          setHighlightRect(null);
+          return;
+        }
+        const el = getPageElementAt(clientX, clientY, root);
+        hoveredElementRef.current = el;
+        if (el) {
+          try {
+            const r = el.getBoundingClientRect();
+            setHighlightRect({ x: r.left, y: r.top, w: r.width, h: r.height });
+          } catch {
+            setHighlightRect(null);
+          }
+        } else {
+          setHighlightRect(null);
+        }
+      },
+      [root, tooltipVisible]
+    );
     const onMouseDown = (0, import_react8.useCallback)((e) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      setHoverRect(null);
-      hoveredElementRef.current = null;
-      startRef.current = { x: e.clientX, y: e.clientY };
-      isDraggingRef.current = true;
-      setRect({ x: e.clientX, y: e.clientY, w: 0, h: 0 });
-      setPhase("selecting");
-    }, []);
-    const onMouseMove = (0, import_react8.useCallback)((e) => {
-      if (isDraggingRef.current && startRef.current) {
-        const sx = startRef.current.x;
-        const sy = startRef.current.y;
-        const x2 = Math.min(sx, e.clientX);
-        const y = Math.min(sy, e.clientY);
-        const w = Math.abs(e.clientX - sx);
-        const h = Math.abs(e.clientY - sy);
-        setRect({ x: x2, y, w, h });
-        return;
-      }
-      const root = overlayRef.current?.getRootNode?.() ?? null;
-      const el = getPageElementAt(e.clientX, e.clientY, root);
-      hoveredElementRef.current = el;
-      if (el) {
-        try {
-          const r = el.getBoundingClientRect();
-          setHoverRect({ x: r.left, y: r.top, w: r.width, h: r.height });
-        } catch {
-          setHoverRect(null);
-        }
-      } else {
-        setHoverRect(null);
-      }
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
+      isDragModeRef.current = false;
+      setDragRect(null);
     }, []);
     const onMouseUp = (0, import_react8.useCallback)(
       async (e) => {
-        if (e.button !== 0 || !isDraggingRef.current || !startRef.current) return;
+        if (e.button !== 0) return;
         e.preventDefault();
-        isDraggingRef.current = false;
-        const current = rect;
-        startRef.current = null;
-        if (!current || current.w < MIN_SIZE || current.h < MIN_SIZE) {
-          clearSelection();
-          cancel();
-          return;
+        const start2 = dragStartRef.current;
+        if (!start2) return;
+        const dx = e.clientX - start2.x;
+        const dy = e.clientY - start2.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        let targetRect = null;
+        let targetElement = null;
+        const currentDragRect = dragRectRef.current;
+        if (isDragModeRef.current && currentDragRect && currentDragRect.w >= MIN_SIZE && currentDragRect.h >= MIN_SIZE) {
+          targetRect = currentDragRect;
+        } else if (!isDragModeRef.current && distance <= DRAG_THRESHOLD_PX) {
+          targetElement = hoveredElementRef.current;
+          if (targetElement) {
+            try {
+              const r = targetElement.getBoundingClientRect();
+              if (r.width >= MIN_SIZE && r.height >= MIN_SIZE) {
+                targetRect = { x: r.left, y: r.top, w: r.width, h: r.height };
+              }
+            } catch (_) {
+            }
+          }
         }
-        setPhase("frozen");
-        await new Promise((r) => setTimeout(r, 100));
+        dragStartRef.current = null;
+        isDragModeRef.current = false;
+        setDragRect(null);
+        if (!targetRect) return;
+        setOverlayVisible(false);
+        setHighlightRect(null);
+        await new Promise((r) => setTimeout(r, 80));
         let fullImage = null;
         try {
           fullImage = await getFullTabImage();
         } catch {
-          setPhase("selecting");
-          setRect(current);
-          cancel();
+          setOverlayVisible(true);
+          onCancel();
           return;
         }
         if (!fullImage) {
-          setPhase("selecting");
-          setRect(current);
-          cancel();
+          setOverlayVisible(true);
+          onCancel();
           return;
         }
         const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
         let cropped;
         try {
-          cropped = await cropImageToRegion(fullImage, current, dpr);
+          cropped = await cropImageToRegion(fullImage, targetRect, dpr);
         } catch {
-          cancel();
+          setOverlayVisible(true);
+          onCancel();
           return;
         }
-        const context = typeof window !== "undefined" ? buildCaptureContext(window, snappedElementRef.current ?? null) : null;
-        setPhase("confirming");
-        setRect(current);
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            setTimeout(() => {
-              setConfirmScaleOne(true);
-              setTimeout(() => {
-                setOverlayVisible(false);
-                setTimeout(() => onCapture(cropped, context), 120);
-              }, 150);
-            }, 0);
-          });
-        });
+        const context = typeof window !== "undefined" ? buildCaptureContext(window, targetElement ?? null) : null;
+        onCapture(cropped, context);
       },
-      [rect, getFullTabImage, onCapture, cancel, clearSelection]
+      [getFullTabImage, onCapture, onCancel]
     );
-    const showRect = !!rect;
-    const isConfirming = phase === "confirming" || phase === "confirmingDone";
-    const rectScale = isConfirming && !confirmScaleOne ? 0.98 : 1;
-    const showHover = !!hoverRect && !rect && phase === "selecting";
+    (0, import_react8.useEffect)(() => {
+      if (!dragStartRef.current) return;
+      const onMove = (e) => {
+        if (!dragStartRef.current || isDragModeRef.current) return;
+        const dx = e.clientX - dragStartRef.current.x;
+        const dy = e.clientY - dragStartRef.current.y;
+        if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_PX) {
+          isDragModeRef.current = true;
+          setHighlightRect(null);
+        }
+      };
+      window.addEventListener("mousemove", onMove);
+      return () => window.removeEventListener("mousemove", onMove);
+    }, []);
+    const showHighlight = !!highlightRect && !dragRect && !isDragModeRef.current;
+    const showDragRect = !!dragRect && dragRect.w >= MIN_SIZE && dragRect.h >= MIN_SIZE;
     return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
       "div",
       {
         ref: overlayRef,
         role: "presentation",
         "aria-hidden": true,
-        className: "region-capture-overlay",
         style: {
           position: "fixed",
           inset: 0,
           zIndex: 2147483647,
           cursor: "crosshair",
-          background: "rgba(0, 0, 0, 0.08)",
-          backdropFilter: "blur(1px)",
-          opacity: overlayVisible ? 1 : 0,
-          transition: `opacity 120ms ${EASING}`,
-          pointerEvents: overlayVisible ? "auto" : "none",
+          pointerEvents: "auto",
           userSelect: "none"
         },
         onMouseDown,
         onMouseMove,
         onMouseUp,
-        onMouseLeave: (e) => {
-          if (isDraggingRef.current && e.buttons === 0) isDraggingRef.current = false;
-          setHoverRect(null);
-          hoveredElementRef.current = null;
+        onMouseLeave: () => {
+          if (!isDragModeRef.current) {
+            setHighlightRect(null);
+            hoveredElementRef.current = null;
+          }
         },
         children: [
-          showHover && hoverRect && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
             "div",
             {
-              className: "region-capture-hover",
+              id: OVERLAY_ID,
               style: {
                 position: "fixed",
-                left: hoverRect.x,
-                top: hoverRect.y,
-                width: hoverRect.w,
-                height: hoverRect.h,
-                border: `2px dashed ${BRAND_COLOR}`,
-                borderRadius: 6,
-                backgroundColor: HIGHLIGHT_COLOR,
+                inset: 0,
+                background: "rgba(0,0,0,0.25)",
+                backdropFilter: "blur(4px)",
                 pointerEvents: "none",
-                transition: `opacity 80ms ${EASING}, border-color 80ms ${EASING}`
+                zIndex: 2147483646,
+                opacity: overlayVisible ? 1 : 0,
+                transition: "opacity 120ms ease"
               }
             }
           ),
-          showRect && rect && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+          showHighlight && highlightRect && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
             "div",
             {
-              className: "region-capture-rect",
+              id: HIGHLIGHT_BOX_ID,
               style: {
                 position: "fixed",
-                left: rect.x,
-                top: rect.y,
-                width: rect.w,
-                height: rect.h,
-                border: "2px solid white",
-                borderRadius: 6,
-                boxShadow: isConfirming ? `0 0 0 1px ${BRAND_COLOR}, 0 0 20px rgba(37, 99, 235, 0.4)` : "0 0 0 1px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.15)",
-                transform: `scale(${rectScale})`,
-                transformOrigin: "center center",
-                transition: `transform 150ms ${EASING}, box-shadow 150ms ${EASING}, border-color 150ms ${EASING}`,
-                borderColor: isConfirming ? BRAND_COLOR : "white",
-                pointerEvents: "none"
+                left: highlightRect.x,
+                top: highlightRect.y,
+                width: highlightRect.w,
+                height: highlightRect.h,
+                border: "2px solid #3B82F6",
+                borderRadius: 8,
+                boxShadow: "0 0 0 9999px rgba(0,0,0,0.25)",
+                pointerEvents: "none",
+                transition: "all 120ms ease",
+                zIndex: 2147483646,
+                opacity: overlayVisible ? 1 : 0
               }
+            }
+          ),
+          showDragRect && dragRect && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            "div",
+            {
+              style: {
+                position: "fixed",
+                left: dragRect.x,
+                top: dragRect.y,
+                width: dragRect.w,
+                height: dragRect.h,
+                border: "2px solid #3B82F6",
+                borderRadius: 8,
+                boxShadow: "0 0 0 9999px rgba(0,0,0,0.25)",
+                pointerEvents: "none",
+                transition: "border-color 120ms ease",
+                zIndex: 2147483646,
+                opacity: overlayVisible ? 1 : 0
+              }
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            "div",
+            {
+              id: TOOLTIP_ID,
+              style: {
+                position: "fixed",
+                left: tooltipPos.x,
+                top: tooltipPos.y,
+                padding: "8px 14px",
+                borderRadius: 9999,
+                background: "rgba(0,0,0,0.75)",
+                color: "#fff",
+                fontSize: "13px",
+                fontFamily: "system-ui, -apple-system, sans-serif",
+                whiteSpace: "nowrap",
+                pointerEvents: "none",
+                zIndex: 2147483647,
+                opacity: tooltipVisible ? 1 : 0,
+                transition: "opacity 150ms ease",
+                transform: "translateY(-50%)"
+              },
+              children: "Click to capture \u2022 Drag to select \u2022 ESC to cancel"
             }
           )
         ]
