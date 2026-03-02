@@ -1,9 +1,11 @@
 "use client";
 
+import React from "react";
+import { Plus } from "lucide-react";
+
 type WidgetFooterProps = {
   isIdle: boolean;
   onAddFeedback: () => void;
-  /** When true, button is disabled and no click handler runs. No message shown. */
   captureDisabled?: boolean;
 };
 
@@ -18,9 +20,10 @@ export default function WidgetFooter({
       type="button"
       onClick={effectivelyDisabled ? undefined : onAddFeedback}
       disabled={effectivelyDisabled}
-      className={`echly-widget-font echly-sidebar-add-btn ${effectivelyDisabled ? "echly-sidebar-add-btn--disabled" : ""}`}
+      className={`echly-add-feedback-btn ${effectivelyDisabled ? "echly-add-feedback-btn--disabled" : ""}`}
+      aria-label="Add feedback"
     >
-      + Add Feedback
+      <Plus size={18} strokeWidth={2} className="echly-add-feedback-icon" />
     </button>
   );
 }

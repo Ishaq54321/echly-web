@@ -585,18 +585,21 @@ textarea:focus-visible {
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* ---- Sidebar (session view) ---- */
+/* ---- Sidebar: translucent OS panel ---- */
 .echly-sidebar-container {
   width: 480px;
   transition: opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
     transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .echly-sidebar-surface {
-  border-radius: 14px;
-  background: rgba(20, 20, 20, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  border-radius: 18px;
+  background: rgba(15, 15, 18, 0.72);
+  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
 }
@@ -613,14 +616,14 @@ textarea:focus-visible {
 .echly-sidebar-title {
   display: block;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.2px;
   color: rgba(255, 255, 255, 0.95);
 }
 .echly-sidebar-summary {
   display: block;
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 12px;
   opacity: 0.6;
   color: rgba(255, 255, 255, 0.9);
 }
@@ -646,14 +649,14 @@ textarea:focus-visible {
   padding: 0 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   max-height: 60vh;
   overflow-y: auto;
 }
 .echly-feedback-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 .echly-sidebar-error {
   font-size: 13px;
@@ -661,33 +664,37 @@ textarea:focus-visible {
   color: rgba(255, 255, 255, 0.8);
   padding: 12px 0;
 }
-.echly-sidebar-add-btn {
+/* Add Feedback: floating glass capsule + plus icon */
+.echly-add-feedback-btn {
   margin-top: 12px;
   width: 100%;
-  padding: 12px 20px;
-  border-radius: 12px;
+  height: 42px;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.2px;
-  transition: opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  border: none;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.95);
-}
-.echly-sidebar-add-btn:not(.echly-sidebar-add-btn--disabled):hover {
-  opacity: 0.9;
-}
-.echly-sidebar-add-btn:not(.echly-sidebar-add-btn--disabled):active {
-  transform: scale(0.98);
-}
-.echly-sidebar-add-btn--disabled {
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: background 120ms ease, transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  color: rgba(255, 255, 255, 0.9);
+}
+.echly-add-feedback-btn:not(.echly-add-feedback-btn--disabled):hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.02);
+}
+.echly-add-feedback-btn:not(.echly-add-feedback-btn--disabled):active {
+  transform: scale(0.97);
+}
+.echly-add-feedback-btn--disabled {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.35);
   cursor: not-allowed;
+}
+.echly-add-feedback-icon {
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.15));
 }
 
 .echly-floating-trigger-wrapper {
@@ -736,6 +743,53 @@ textarea:focus-visible {
 .echly-feedback-item .echly-widget-action-icon:focus-visible {
   opacity: 1;
 }
+/* Feedback item: no dividers, hover lift, priority dot */
+.echly-feedback-item {
+  padding: 14px 16px;
+  border-radius: 10px;
+  transition: background 120ms ease, transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.echly-feedback-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-1px);
+}
+.echly-feedback-item:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+.echly-priority-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 6px;
+  background: rgba(255, 255, 255, 0.35);
+}
+.echly-feedback-item[data-priority="critical"] .echly-priority-dot {
+  background: #dc2626;
+}
+.echly-feedback-item[data-priority="high"] .echly-priority-dot {
+  background: #ea580c;
+}
+.echly-feedback-item[data-priority="medium"] .echly-priority-dot {
+  background: rgba(255, 255, 255, 0.4);
+}
+.echly-feedback-item[data-priority="low"] .echly-priority-dot {
+  background: rgba(255, 255, 255, 0.25);
+}
+.echly-feedback-item-inner {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.echly-feedback-item-content {
+  flex: 1;
+  min-width: 0;
+}
 .echly-widget-item-title {
   font-weight: 500;
   font-size: 15px;
@@ -746,9 +800,35 @@ textarea:focus-visible {
   font-size: 13px;
   opacity: 0.6;
   color: rgba(255, 255, 255, 0.85);
+  margin-top: 6px;
 }
-.echly-sidebar-body .echly-feedback-item {
-  padding: 16px 0;
+.echly-feedback-item .echly-widget-action-icon--delete:hover {
+  color: #f87171 !important;
+  opacity: 1;
+}
+.echly-feedback-item-input,
+.echly-feedback-item-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 15px;
+  font-weight: 500;
+  transition: border-color 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  outline: none;
+}
+.echly-feedback-item-input:focus,
+.echly-feedback-item-textarea:focus {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.echly-feedback-item-textarea {
+  font-size: 13px;
+  font-weight: 400;
+  margin-top: 8px;
+  resize: none;
+  min-height: 72px;
 }
 
 /* ---- Voice capsule (capture root only) ---- */
@@ -766,16 +846,16 @@ textarea:focus-visible {
   pointer-events: none;
 }
 .echly-capsule {
-  height: 46px;
+  height: 54px;
   border-radius: 999px;
-  background: rgba(20, 20, 20, 0.92);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  padding: 0 20px;
+  background: rgba(20, 20, 24, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 0 22px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  gap: 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
 }
 .echly-capsule-orb {
@@ -784,19 +864,22 @@ textarea:focus-visible {
   align-items: center;
   justify-content: center;
 }
-.echly-capsule-text-block {
+.echly-capsule-transcript-block {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
   min-width: 0;
+  flex: 1;
 }
+.echly-capsule-transcript,
 .echly-capsule-text {
   color: rgba(255, 255, 255, 0.92);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.1px;
   position: relative;
+  font-family: inherit;
 }
 .echly-capsule-underline {
   position: absolute;
@@ -804,7 +887,7 @@ textarea:focus-visible {
   right: 0;
   bottom: -2px;
   height: 2px;
-  background: linear-gradient(90deg, #E5484D, #C43E42, #E5484D);
+  background: linear-gradient(90deg, #FF4D4F, #D9363E, #FF4D4F);
   background-size: 200% 100%;
   animation: echly-gradient-shift 1.2s infinite linear;
   border-radius: 1px;
@@ -842,10 +925,10 @@ textarea:focus-visible {
   transform: scale(0.96);
 }
 
-/* ---- Mic orb (52px, gradient, breathe, no icon) ---- */
+/* ---- Mic orb: 48px, #FF4D4F → #D9363E, breathe 2.5s, success green ---- */
 .echly-mic-orb-wrapper {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
   position: relative;
   display: flex;
@@ -860,53 +943,61 @@ textarea:focus-visible {
   display: none;
 }
 .echly-mic-orb {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #E5484D, #C43E42);
-  box-shadow: 0 0 24px rgba(229, 72, 77, 0.2);
-  animation: echly-breathe 2.2s infinite ease-in-out;
+  background: linear-gradient(135deg, #FF4D4F, #D9363E);
+  box-shadow: 0 0 24px rgba(255, 77, 79, 0.25);
+  animation: echly-breathe 2.5s infinite ease-in-out;
 }
 .echly-mic-orb-wrapper.echly-mic-orb--exiting .echly-mic-orb,
-.echly-mic-orb-wrapper.echly-mic-orb--processing ~ .echly-mic-orb {
+.echly-mic-orb-wrapper.echly-mic-orb--processing .echly-mic-orb {
   animation: none;
+}
+.echly-mic-orb-wrapper.echly-mic-orb--success .echly-mic-orb {
+  animation: echly-orb-success-pulse 200ms ease-out;
 }
 @keyframes echly-breathe {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.04); }
 }
+@keyframes echly-orb-success-pulse {
+  0% { box-shadow: 0 0 24px rgba(255, 77, 79, 0.25); background: linear-gradient(135deg, #FF4D4F, #D9363E); }
+  50% { box-shadow: 0 0 32px rgba(34, 197, 94, 0.5); background: linear-gradient(135deg, #22c55e, #16a34a); }
+  100% { box-shadow: 0 0 24px rgba(255, 77, 79, 0.25); background: linear-gradient(135deg, #FF4D4F, #D9363E); }
+}
 .echly-mic-orb-ring {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 52px;
-  height: 52px;
-  margin-left: -26px;
-  margin-top: -26px;
+  width: 48px;
+  height: 48px;
+  margin-left: -24px;
+  margin-top: -24px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 0 20px rgba(229, 72, 77, 0.15);
+  box-shadow: 0 0 20px rgba(255, 77, 79, 0.15);
   pointer-events: none;
   transition: box-shadow 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .echly-mic-orb-ring--active {
   border-color: rgba(255, 255, 255, 0.4);
-  box-shadow: 0 0 28px rgba(229, 72, 77, 0.25);
+  box-shadow: 0 0 28px rgba(255, 77, 79, 0.35);
 }
 .echly-mic-orb-processing-line {
   position: absolute;
-  width: 80px;
+  width: 72px;
   height: 4px;
   border-radius: 2px;
-  background: linear-gradient(90deg, #E5484D, #C43E42, #E5484D);
+  background: linear-gradient(90deg, #FF4D4F, #D9363E, #FF4D4F);
   background-size: 200% 100%;
   animation: echly-gradient-shift 1.2s infinite linear;
 }
 .echly-ticket-highlight {
-  animation: echly-ticket-pulse 1.2s ease-out;
+  animation: echly-ticket-pulse 1.5s ease-out;
 }
 @keyframes echly-ticket-pulse {
-  0% { background-color: rgba(229, 72, 77, 0.12); }
+  0% { background-color: rgba(255, 255, 255, 0.08); }
   100% { background-color: transparent; }
 }
 

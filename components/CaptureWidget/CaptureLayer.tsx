@@ -18,12 +18,15 @@ export type CaptureLayerState =
 
 export type CaptureLayerProps = {
   captureRoot: HTMLDivElement;
+  aiRoot: HTMLDivElement;
   extensionMode: boolean;
   state: CaptureLayerState;
   pillExiting: boolean;
   listeningAudioLevel: number;
   listeningSentiment: "negative" | "neutral" | "positive";
+  liveTranscript: string;
   aiPreviewTitle: string | null;
+  orbSuccess: boolean;
   getFullTabImage: () => Promise<string | null>;
   onRegionCaptured: (croppedDataUrl: string, context?: CaptureContext | null) => void;
   onRegionSelectStart: () => void;
@@ -32,17 +35,20 @@ export type CaptureLayerProps = {
 };
 
 /**
- * Renders the capture UI (overlay, region selection, voice capsule) into #echly-capture-root.
- * Completely separate from the sidebar DOM tree.
+ * Overlay + region → #echly-capture-root.
+ * Voice capsule only → #echly-ai-root (always outside sidebar).
  */
 export function CaptureLayer({
   captureRoot,
+  aiRoot,
   extensionMode,
   state,
   pillExiting,
   listeningAudioLevel,
   listeningSentiment,
+  liveTranscript,
   aiPreviewTitle,
+  orbSuccess,
   getFullTabImage,
   onRegionCaptured,
   onRegionSelectStart,
@@ -58,7 +64,7 @@ export function CaptureLayer({
     state === "processing" ||
     pillExiting;
 
-  const content = (
+  const captureContent = (
     <>
       {showDimOverlay && (
         <div
@@ -66,7 +72,7 @@ export function CaptureLayer({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.06)",
+            background: "rgba(0,0,0,0.05)",
             pointerEvents: "auto",
             zIndex: 2147483645,
           }}
@@ -81,27 +87,35 @@ export function CaptureLayer({
           onSelectionStart={onRegionSelectStart}
         />
       )}
-      {showCapsule && (
-        <div
-          className={
-            pillExiting
-              ? "echly-capsule-wrapper echly-capsule-wrapper--exiting"
-              : "echly-capsule-wrapper"
-          }
-        >
-          <VoiceBubble
-            isListening={state === "voice_listening"}
-            isProcessing={state === "processing" || pillExiting}
-            isExiting={state === "processing" && pillExiting}
-            audioLevel={listeningAudioLevel}
-            sentiment={listeningSentiment}
-            aiPreviewTitle={aiPreviewTitle}
-            onDone={onDone}
-          />
-        </div>
-      )}
     </>
   );
 
-  return createPortal(content, captureRoot);
+  const capsuleContent = showCapsule ? (
+    <div
+      className={
+        pillExiting
+          ? "echly-capsule-wrapper echly-capsule-wrapper--exiting"
+          : "echly-capsule-wrapper"
+      }
+    >
+      <VoiceBubble
+        isListening={state === "voice_listening"}
+        isProcessing={state === "processing" || pillExiting}
+        isExiting={state === "processing" && pillExiting}
+        audioLevel={listeningAudioLevel}
+        sentiment={listeningSentiment}
+        liveTranscript={liveTranscript}
+        aiPreviewTitle={aiPreviewTitle}
+        orbSuccess={orbSuccess}
+        onDone={onDone}
+      />
+    </div>
+  ) : null;
+
+  return (
+    <>
+      {createPortal(captureContent, captureRoot)}
+      {capsuleContent && createPortal(capsuleContent, aiRoot)}
+    </>
+  );
 }

@@ -4,7 +4,6 @@ import { X } from "lucide-react";
 
 type CaptureHeaderProps = {
   onClose: () => void;
-  /** Dynamic summary e.g. "12 insights · 2 high priority" */
   summary?: string | null;
 };
 

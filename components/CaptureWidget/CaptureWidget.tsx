@@ -58,7 +58,7 @@ export default function CaptureWidget({
   const summary =
     insightCount > 0
       ? highPriorityCount > 0
-        ? `${insightCount} insights · ${highPriorityCount} high priority`
+        ? `${insightCount} insights • ${highPriorityCount} high priority`
         : `${insightCount} insights`
       : null;
 
@@ -79,16 +79,21 @@ export default function CaptureWidget({
   return (
     <>
       {/* Capture layer: portaled into #echly-capture-root. Never inside sidebar. */}
-      {captureRootReady && refs.captureRootRef.current && (
+      {captureRootReady &&
+        refs.captureRootRef.current &&
+        refs.aiRootRef.current &&
         createPortal(
           <CaptureLayer
             captureRoot={refs.captureRootRef.current}
+            aiRoot={refs.aiRootRef.current}
             extensionMode={extensionMode}
             state={state.state}
             pillExiting={state.pillExiting}
             listeningAudioLevel={state.listeningAudioLevel ?? 0}
             listeningSentiment={state.listeningSentiment ?? "neutral"}
+            liveTranscript={state.liveTranscript ?? ""}
             aiPreviewTitle={state.liveStructured?.title ?? null}
+            orbSuccess={state.orbSuccess ?? false}
             getFullTabImage={handlers.getFullTabImage}
             onRegionCaptured={handlers.handleRegionCaptured}
             onRegionSelectStart={handlers.handleRegionSelectStart}
@@ -96,8 +101,7 @@ export default function CaptureWidget({
             onDone={handlers.finishListening}
           />,
           refs.captureRootRef.current
-        )
-      )}
+        )}
 
       {showFloatingButton && (
         <div className="echly-floating-trigger-wrapper">

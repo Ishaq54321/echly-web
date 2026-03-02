@@ -85,10 +85,12 @@ export function useCaptureWidget({
   const [highlightTicketId, setHighlightTicketId] = useState<string | null>(null);
   const [pillExiting, setPillExiting] = useState(false);
   const [captureRootReady, setCaptureRootReady] = useState(false);
+  const [orbSuccess, setOrbSuccess] = useState(false);
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
   const captureRootRef = useRef<HTMLDivElement | null>(null);
+  const aiRootRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const activeRecordingIdRef = useRef<string | null>(null);
@@ -278,19 +280,30 @@ export function useCaptureWidget({
 
   const createCaptureRoot = useCallback(() => {
     if (captureRootRef.current) return;
-    const el = document.createElement("div");
-    el.id = "echly-capture-root";
-    document.body.appendChild(el);
-    captureRootRef.current = el;
+    const captureEl = document.createElement("div");
+    captureEl.id = "echly-capture-root";
+    document.body.appendChild(captureEl);
+    captureRootRef.current = captureEl;
+    const aiEl = document.createElement("div");
+    aiEl.id = "echly-ai-root";
+    document.body.appendChild(aiEl);
+    aiRootRef.current = aiEl;
     setCaptureRootReady(true);
   }, []);
 
   const removeCaptureRoot = useCallback(() => {
-    if (!captureRootRef.current) return;
-    try {
-      document.body.removeChild(captureRootRef.current);
-    } catch (_) {}
-    captureRootRef.current = null;
+    if (aiRootRef.current) {
+      try {
+        document.body.removeChild(aiRootRef.current);
+      } catch (_) {}
+      aiRootRef.current = null;
+    }
+    if (captureRootRef.current) {
+      try {
+        document.body.removeChild(captureRootRef.current);
+      } catch (_) {}
+      captureRootRef.current = null;
+    }
     setCaptureRootReady(false);
   }, []);
 
@@ -413,7 +426,9 @@ export function useCaptureWidget({
           setRecordings((prev) => prev.filter((r) => r.id !== activeId));
           setActiveRecordingId(null);
           setHighlightTicketId(ticket.id);
-          setTimeout(() => setHighlightTicketId(null), 1200);
+          setTimeout(() => setHighlightTicketId(null), 1500);
+          setOrbSuccess(true);
+          setTimeout(() => setOrbSuccess(false), 200);
           setPillExiting(true);
           setTimeout(() => {
             removeCaptureRoot();
@@ -443,7 +458,9 @@ export function useCaptureWidget({
       setRecordings((prev) => prev.filter((r) => r.id !== activeId));
       setActiveRecordingId(null);
       setHighlightTicketId(structured.id);
-      setTimeout(() => setHighlightTicketId(null), 1200);
+      setTimeout(() => setHighlightTicketId(null), 1500);
+      setOrbSuccess(true);
+      setTimeout(() => setOrbSuccess(false), 200);
       setPillExiting(true);
       setTimeout(() => {
         removeCaptureRoot();
@@ -706,6 +723,8 @@ export function useCaptureWidget({
     return getSentimentFromTranscript(activeRecording?.transcript ?? "");
   }, [state, activeRecording?.transcript]);
 
+  const liveTranscript = activeRecording?.transcript?.trim() ?? "";
+
   return {
     state: {
       isOpen,
@@ -719,16 +738,19 @@ export function useCaptureWidget({
       showMenu,
       position,
       liveStructured,
+      liveTranscript,
       listeningAudioLevel,
       listeningSentiment,
       highlightTicketId,
       pillExiting,
+      orbSuccess,
     },
     handlers,
     refs: {
       widgetRef,
       menuRef,
       captureRootRef,
+      aiRootRef,
     },
     captureRootReady,
   };
