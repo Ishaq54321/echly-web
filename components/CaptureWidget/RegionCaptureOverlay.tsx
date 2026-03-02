@@ -11,10 +11,15 @@ export type Region = { x: number; y: number; w: number; h: number };
 const OVERLAY_ID = "echly-capture-overlay";
 const TOOLTIP_ID = "echly-capture-tooltip";
 
+const CAPTURE_TRANSITION_MS = 300;
+const CAPTURE_EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+
 export type RegionCaptureOverlayProps = {
   getFullTabImage: () => Promise<string | null>;
   onCapture: (croppedDataUrl: string, context: CaptureContext | null) => void;
   onCancel: () => void;
+  /** Widget origin (viewport coords) for selection → mic orb transition. */
+  getWidgetOrigin?: () => { x: number; y: number } | null;
 };
 
 async function cropImageToRegion(
@@ -54,11 +59,16 @@ export function RegionCaptureOverlay({
   getFullTabImage,
   onCapture,
   onCancel,
+  getWidgetOrigin,
 }: RegionCaptureOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [selectionRect, setSelectionRect] = useState<Region | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  /** After mouse up: animate selection toward widget then capture. */
+  const [exitingRect, setExitingRect] = useState<Region | null>(null);
+  const [exitTarget, setExitTarget] = useState<{ x: number; y: number } | null>(null);
+  const [exitPhase, setExitPhase] = useState<0 | 1>(0);
 
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const selectionRectRef = useRef<Region | null>(null);
@@ -161,9 +171,26 @@ export function RegionCaptureOverlay({
         setSelectionRect(null);
         return;
       }
-      performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
+      const target = getWidgetOrigin?.() ?? null;
+      if (target) {
+        setExitPhase(0);
+        setExitingRect({ x: current.x, y: current.y, w: current.w, h: current.h });
+        setExitTarget(target);
+        setSelectionRect(null);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setExitPhase(1));
+        });
+        setTimeout(() => {
+          performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
+          setExitingRect(null);
+          setExitTarget(null);
+          setExitPhase(0);
+        }, CAPTURE_TRANSITION_MS);
+      } else {
+        performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
+      }
     },
-    [performCapture]
+    [performCapture, getWidgetOrigin]
   );
 
   const onMouseUp = useCallback(
@@ -185,6 +212,7 @@ export function RegionCaptureOverlay({
   }, [finalizeSelection]);
 
   const showSelection = !!selectionRect && (selectionRect.w >= MIN_SIZE || selectionRect.h >= MIN_SIZE);
+  const isExiting = !!exitingRect && !!exitTarget;
 
   return (
     <div
@@ -193,18 +221,18 @@ export function RegionCaptureOverlay({
       aria-hidden
       style={{ position: "fixed", inset: 0, zIndex: 2147483647, userSelect: "none" }}
     >
-      {/* Overlay: dim only, no blur. Blocks page clicks. */}
+      {/* Overlay: dim only, no blur. Blocks page clicks. Fade out during exit. */}
       <div
         id={OVERLAY_ID}
         style={{
           position: "fixed",
           inset: 0,
           background: "rgba(0, 0, 0, 0.12)",
-          pointerEvents: "auto",
+          pointerEvents: isExiting ? "none" : "auto",
           cursor: "crosshair",
           zIndex: 2147483646,
-          opacity: overlayVisible ? 1 : 0,
-          transition: "opacity 120ms ease",
+          opacity: isExiting ? 0 : overlayVisible ? 1 : 0,
+          transition: isExiting ? `opacity ${CAPTURE_TRANSITION_MS}ms ${CAPTURE_EASE}` : "opacity 120ms ease",
         }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
@@ -232,6 +260,32 @@ export function RegionCaptureOverlay({
             pointerEvents: "none",
             zIndex: 2147483646,
             opacity: overlayVisible ? 1 : 0,
+          }}
+        />
+      )}
+
+      {/* Exiting: selection → widget transition (white pulse, scale 0.95, move to origin, fade) */}
+      {isExiting && exitingRect && exitTarget && (
+        <div
+          className="echly-capture-exit-selection"
+          style={{
+            position: "fixed",
+            left: exitingRect.x,
+            top: exitingRect.y,
+            width: exitingRect.w,
+            height: exitingRect.h,
+            transformOrigin: "50% 50%",
+            border: "2px solid rgba(255,255,255,0.9)",
+            borderRadius: 8,
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.08), 0 0 24px rgba(255,255,255,0.25)",
+            pointerEvents: "none",
+            zIndex: 2147483647,
+            transition: `transform ${CAPTURE_TRANSITION_MS}ms ${CAPTURE_EASE}, opacity ${CAPTURE_TRANSITION_MS}ms ${CAPTURE_EASE}`,
+            transform:
+              exitPhase === 1
+                ? `translate(${exitTarget.x - (exitingRect.x + exitingRect.w / 2)}px, ${exitTarget.y - (exitingRect.y + exitingRect.h / 2)}px) scale(0.95)`
+                : "scale(0.95)",
+            opacity: exitPhase === 1 ? 0 : 1,
           }}
         />
       )}

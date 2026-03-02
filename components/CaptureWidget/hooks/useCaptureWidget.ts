@@ -1,6 +1,7 @@
 "use client";
 
 import { authFetch } from "@/lib/authFetch";
+import { playDoneClick } from "@/lib/playDoneClick";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSessionFeedback } from "@/lib/feedback";
 import type {
@@ -13,6 +14,25 @@ import type {
 } from "../types";
 
 const SAFE_MARGIN = 24;
+
+export type SentimentGlow = "negative" | "neutral" | "positive";
+
+function getSentimentFromTranscript(transcript: string): SentimentGlow {
+  const t = transcript.toLowerCase().trim();
+  if (!t) return "neutral";
+  const negative =
+    /\b(bug|broken|fail|error|issue|problem|doesn't work|don't work|terrible|frustrated|annoying|wrong|bad|hate|broken)\b/.exec(t);
+  const positive =
+    /\b(great|love|nice|good|works|thank|happy|easy|perfect|awesome|helpful)\b/.exec(t);
+  if (negative && !positive) return "negative";
+  if (positive && !negative) return "positive";
+  if (negative && positive) {
+    const negCount = (t.match(/\b(bug|broken|fail|error|issue|problem|doesn't work|don't work|terrible|frustrated|annoying|wrong|bad|hate)\b/g) ?? []).length;
+    const posCount = (t.match(/\b(great|love|nice|good|works|thank|happy|easy|perfect|awesome|helpful)\b/g) ?? []).length;
+    return negCount > posCount ? "negative" : posCount > negCount ? "positive" : "neutral";
+  }
+  return "neutral";
+}
 
 /** Web Speech API recognition instance (not in DOM lib types). */
 type SpeechRecognitionInstance = { start(): void; stop(): void };
@@ -65,6 +85,7 @@ export function useCaptureWidget({
   const [isDragging, setIsDragging] = useState(false);
   const [pendingStructured, setPendingStructured] = useState<StructuredFeedback | null>(null);
   const [liveStructured, setLiveStructured] = useState<{ title: string; tags: string[]; priority: string } | null>(null);
+  const [listeningAudioLevel, setListeningAudioLevel] = useState(0);
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -77,6 +98,10 @@ export function useCaptureWidget({
   const editingIdRef = useRef<string | null>(null);
   const trayLockedRef = useRef(false);
   const liveStructureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const rafRef = useRef<number | null>(null);
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
@@ -88,6 +113,41 @@ export function useCaptureWidget({
       if (stateRef.current === "processing-structure") setState("saving-feedback");
     }, MIN_PROCESSING_PHASE_MS);
     return () => clearTimeout(t);
+  }, [state]);
+
+  /** While listening, run analyser loop for mic orb ring (speaking vs silent). Clean up on exit. */
+  useEffect(() => {
+    if (state !== "listening") {
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+      audioContextRef.current?.close().catch(() => {});
+      audioContextRef.current = null;
+      analyserRef.current = null;
+      setListeningAudioLevel(0);
+      return;
+    }
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    let rafId: number;
+    const tick = () => {
+      analyser.getByteFrequencyData(data);
+      const sum = data.reduce((a, b) => a + b, 0);
+      const avg = data.length ? sum / data.length : 0;
+      const normalized = Math.min(1, avg / 128);
+      setListeningAudioLevel(normalized);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    rafRef.current = rafId;
+    return () => {
+      cancelAnimationFrame(rafId);
+      rafRef.current = null;
+    };
   }, [state]);
 
   useEffect(() => {
@@ -303,9 +363,19 @@ export function useCaptureWidget({
 
   const startListening = useCallback(async () => {
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      const ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.7;
+      const src = ctx.createMediaStreamSource(stream);
+      src.connect(analyser);
+      audioContextRef.current = ctx;
+      analyserRef.current = analyser;
       recognitionRef.current?.start();
       setState("listening");
+      setListeningAudioLevel(0);
       startTimer();
     } catch (err) {
       console.error("Microphone permission denied:", err);
@@ -315,6 +385,10 @@ export function useCaptureWidget({
   }, [startTimer]);
 
   const finishListening = useCallback(async () => {
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(8);
+    }
+    playDoneClick();
     recognitionRef.current?.stop();
     stopTimer();
     const activeId = activeRecordingIdRef.current;
@@ -610,6 +684,15 @@ export function useCaptureWidget({
     [formatTime]
   );
 
+  const activeRecording = useMemo(
+    () => (activeRecordingId ? recordings.find((r) => r.id === activeRecordingId) : null),
+    [activeRecordingId, recordings]
+  );
+  const listeningSentiment = useMemo((): SentimentGlow => {
+    if (state !== "listening") return "neutral";
+    return getSentimentFromTranscript(activeRecording?.transcript ?? "");
+  }, [state, activeRecording?.transcript]);
+
   return {
     state: {
       isOpen,
@@ -623,6 +706,9 @@ export function useCaptureWidget({
       showMenu,
       position,
       liveStructured,
+      seconds,
+      listeningAudioLevel,
+      listeningSentiment,
     },
     handlers,
     derivedValues,

@@ -657,6 +657,9 @@
   .flex-shrink-0 {
     flex-shrink: 0;
   }
+  .shrink {
+    flex-shrink: 1;
+  }
   .shrink-0 {
     flex-shrink: 0;
   }
@@ -1483,6 +1486,10 @@
   .uppercase {
     text-transform: uppercase;
   }
+  .tabular-nums {
+    --tw-numeric-spacing: tabular-nums;
+    font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,) var(--tw-numeric-figure,) var(--tw-numeric-spacing,) var(--tw-numeric-fraction,);
+  }
   .line-through {
     text-decoration-line: line-through;
   }
@@ -1563,6 +1570,10 @@
   }
   .shadow-xl {
     --tw-shadow: 0 20px 25px -5px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 8px 10px -6px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .ring {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
   .ring-2 {
@@ -2186,18 +2197,71 @@ textarea:focus-visible {
     transform: translateY(0);
   }
 }
-.capture-listening-waveform-wrap {
-  background: rgba(37, 99, 235, 0.04);
-  border-radius: 8px;
-  position: relative;
+.echly-mic-orb-wrapper {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.capture-listening-waveform-wrap::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  background: rgba(37, 99, 235, 0.02);
-  pointer-events: none;
+.echly-mic-orb-wrapper.echly-mic-orb--exiting {
+  transform: scale(0.95);
+}
+.echly-mic-orb-ring {
+  width: 64px;
+  height: 64px;
+  left: 50%;
+  top: 50%;
+  margin-left: -32px;
+  margin-top: -32px;
+  border: 2px solid rgba(255, 77, 79, 0.25);
+  box-shadow: 0 0 20px rgba(255, 77, 79, 0.15);
+}
+.echly-mic-orb-ring--glow {
+  border-color: rgba(255, 77, 79, 0.2);
+  box-shadow: 0 0 24px rgba(255, 77, 79, 0.12);
+}
+.echly-mic-orb-ring--active {
+  border-color: rgba(255, 77, 79, 0.45);
+  box-shadow: 0 0 28px rgba(255, 77, 79, 0.25);
+  animation: echly-mic-orb-ring-pulse 1.6s ease-in-out infinite;
+}
+@keyframes echly-mic-orb-ring-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+.echly-mic-orb {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff4d4f, #ff6b6b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(255, 77, 79, 0.35);
+  animation: echly-mic-orb-breathing 2s infinite ease-in-out;
+}
+.echly-mic-orb--exiting .echly-mic-orb {
+  animation: none;
+}
+@keyframes echly-mic-orb-breathing {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.echly-mic-orb-icon {
+  color: rgba(255, 255, 255, 0.95);
 }
 .capture-timer {
   opacity: 0;
@@ -2443,6 +2507,26 @@ textarea:focus-visible {
   syntax: "*";
   inherits: false;
 }
+@property --tw-ordinal {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-slashed-zero {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-numeric-figure {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-numeric-spacing {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-numeric-fraction {
+  syntax: "*";
+  inherits: false;
+}
 @property --tw-shadow {
   syntax: "*";
   inherits: false;
@@ -2635,6 +2719,11 @@ textarea:focus-visible {
       --tw-leading: initial;
       --tw-font-weight: initial;
       --tw-tracking: initial;
+      --tw-ordinal: initial;
+      --tw-slashed-zero: initial;
+      --tw-numeric-figure: initial;
+      --tw-numeric-spacing: initial;
+      --tw-numeric-fraction: initial;
       --tw-shadow: 0 0 #0000;
       --tw-shadow-color: initial;
       --tw-shadow-alpha: 100%;

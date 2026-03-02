@@ -189,19 +189,106 @@ textarea:focus-visible {
   }
 }
 
-/* Listening — subtle background tint behind waveform (intelligent blue) */
-.capture-listening-waveform-wrap {
-  background: rgba(37, 99, 235, 0.04);
-  border-radius: 8px;
-  position: relative;
+/* Capture → voice: selection exit (white outline pulse) */
+.echly-capture-exit-selection {
+  animation: echly-capture-exit-pulse 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.capture-listening-waveform-wrap::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  background: rgba(37, 99, 235, 0.02);
-  pointer-events: none;
+@keyframes echly-capture-exit-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.08), 0 0 24px rgba(255,255,255,0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.06), 0 0 32px rgba(255,255,255,0.4);
+  }
+}
+
+/* Mic orb — premium minimal AI-futuristic (56px, #111, soft glow) */
+.echly-mic-orb-wrapper {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.echly-mic-orb-wrapper.echly-mic-orb--exiting {
+  transform: scale(0.96);
+}
+.echly-mic-orb-wrapper.echly-mic-orb--exiting .echly-mic-orb {
+  animation: none;
+}
+.echly-mic-orb-ring {
+  width: 56px;
+  height: 56px;
+  left: 50%;
+  top: 50%;
+  margin-left: -28px;
+  margin-top: -28px;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  transition: box-shadow 200ms ease;
+}
+.echly-mic-orb-ring--glow {
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.15);
+}
+.echly-mic-orb-ring--active {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.08);
+}
+.echly-mic-orb-sentiment--negative .echly-mic-orb-ring {
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2), 0 0 24px rgba(220, 38, 38, 0.12);
+}
+.echly-mic-orb-sentiment--negative .echly-mic-orb-ring.echly-mic-orb-ring--active {
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.06), 0 0 32px rgba(220, 38, 38, 0.15);
+}
+.echly-mic-orb-sentiment--positive .echly-mic-orb-ring {
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2), 0 0 24px rgba(37, 99, 235, 0.12);
+}
+.echly-mic-orb-sentiment--positive .echly-mic-orb-ring.echly-mic-orb-ring--active {
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.06), 0 0 32px rgba(37, 99, 235, 0.15);
+}
+.echly-mic-orb {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  animation: echly-mic-orb-breathing 2.2s infinite ease-in-out;
+}
+@keyframes echly-mic-orb-breathing {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+.echly-mic-orb-icon {
+  color: rgba(255, 255, 255, 0.95);
+}
+/* Processing: thin animated gradient ring only */
+.echly-mic-orb--processing .echly-mic-orb {
+  display: none;
+}
+.echly-mic-orb-processing-ring {
+  width: 56px;
+  height: 56px;
+  left: 50%;
+  top: 50%;
+  margin-left: -28px;
+  margin-top: -28px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(255,255,255,0.25), rgba(255,255,255,0.05), rgba(255,255,255,0.2), rgba(255,255,255,0.05));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #fff calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #fff calc(100% - 2px));
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+  animation: echly-mic-orb-gradient-spin 2.5s linear infinite;
+}
+@keyframes echly-mic-orb-gradient-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+.echly-mic-orb-processing-ring {
+  transform: translate(-50%, -50%);
 }
 
 /* Timer fade-in (slight opacity transition) */
@@ -210,6 +297,12 @@ textarea:focus-visible {
   animation: captureTimerFadeIn 160ms cubic-bezier(0.2, 0.8, 0.2, 1) 40ms forwards;
 }
 @keyframes captureTimerFadeIn {
+  to { opacity: 1; }
+}
+
+/* Live AI title under "Describe the issue…" */
+@keyframes echly-title-fade-in {
+  from { opacity: 0; }
   to { opacity: 1; }
 }
 

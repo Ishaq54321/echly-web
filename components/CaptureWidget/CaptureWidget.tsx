@@ -2,8 +2,8 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import AudioWaveform from "@/components/AudioWaveform";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
+import { MicOrb } from "./MicOrb";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackList from "./FeedbackList";
 import FeedbackItem from "./FeedbackItem";
@@ -48,12 +48,22 @@ export default function CaptureWidget({
 
   /** When transitioning from saving-feedback/anticipation to idle, keep skeleton visible and fade it out (200ms). */
   const [processingExiting, setProcessingExiting] = useState(false);
+  /** When transitioning from listening to processing-structure, play orb shrink then hide (200ms). */
+  const [listeningExiting, setListeningExiting] = useState(false);
   const prevStateRef = useRef(state.state);
   useEffect(() => {
-    const wasProcessing = prevStateRef.current === "saving-feedback" || prevStateRef.current === "anticipation";
+    const prev = prevStateRef.current;
+    const wasProcessing = prev === "saving-feedback" || prev === "anticipation";
     if (state.state === "idle" && wasProcessing) {
       setProcessingExiting(true);
       const t = setTimeout(() => setProcessingExiting(false), 200);
+      prevStateRef.current = state.state;
+      return () => clearTimeout(t);
+    }
+    if (state.state === "processing-structure" && prev === "listening") {
+      setListeningExiting(true);
+      const t = setTimeout(() => setListeningExiting(false), 200);
+      prevStateRef.current = state.state;
       return () => clearTimeout(t);
     }
     prevStateRef.current = state.state;
@@ -103,6 +113,12 @@ export default function CaptureWidget({
           getFullTabImage={handlers.getFullTabImage}
           onCapture={handlers.handleRegionCaptured}
           onCancel={handlers.handleCancelCapture}
+          getWidgetOrigin={() => {
+            const el = refs.widgetRef.current;
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top + 140 };
+          }}
         />
       )}
       <div
@@ -191,45 +207,74 @@ export default function CaptureWidget({
             </div>
           )}
 
-          {state.state === "listening" && (
+          {(state.state === "listening" ||
+            listeningExiting ||
+            state.state === "processing-structure" ||
+            state.state === "saving-feedback") && (
             <div className="capture-listening-enter border border-slate-200 rounded-lg p-4 bg-slate-50">
-              <div className="flex justify-between mb-4">
-                <span className="text-sm font-medium text-slate-800">Listening...</span>
-                <span className="capture-timer text-sm text-slate-500">{derivedValues.formatTime()}</span>
-              </div>
-              <div className="capture-listening-waveform-wrap mb-4 flex items-center justify-center">
-                <AudioWaveform isActive={state.state === "listening"} />
-              </div>
-              {state.liveStructured && (
-                <div className="mb-4 rounded-lg border border-slate-200 bg-slate-100/80 px-3 py-2.5 transition-opacity duration-200">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-brand-accent/60 animate-pulse" aria-hidden />
-                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Understanding…</span>
-                  </div>
-                  <p className="text-sm font-medium text-slate-800 truncate pr-2">{state.liveStructured.title}</p>
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {state.liveStructured.tags.slice(0, 4).map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/80 text-slate-600 border border-slate-200/80"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    {state.liveStructured.priority && state.liveStructured.priority !== "medium" && (
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/80 text-slate-600 border border-slate-200/80 capitalize"
-                      >
-                        {state.liveStructured.priority}
-                      </span>
-                    )}
-                  </div>
+              {state.state !== "processing-structure" && state.state !== "saving-feedback" && (
+                <div className="flex justify-between items-center mb-3">
+                  <span className="capture-timer text-sm text-slate-500 tabular-nums">{derivedValues.formatTime()}</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <button type="button" onClick={handlers.discardListening} className="text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-neutral-100 transition-colors duration-120 cursor-pointer px-3 py-2 rounded-md">Cancel</button>
-                <button type="button" onClick={handlers.finishListening} className="bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-colors duration-150 cursor-pointer">Done</button>
+              <div className="flex flex-col items-center justify-center mb-4">
+                {(state.state === "listening" || listeningExiting) && (
+                  <MicOrb
+                    isSpeaking={state.listeningAudioLevel != null && state.listeningAudioLevel > 0.12}
+                    audioLevel={state.listeningAudioLevel ?? 0}
+                    isExiting={listeningExiting}
+                    sentiment={state.listeningSentiment ?? "neutral"}
+                  />
+                )}
+                {(state.state === "processing-structure" || state.state === "saving-feedback") && (
+                  <MicOrb isProcessing />
+                )}
+                {state.state === "listening" && (
+                  <>
+                    <p className="mt-4 text-[15px] text-slate-600 font-normal tracking-tight text-center">
+                      Describe the issue…
+                    </p>
+                    {state.liveStructured?.title && (
+                      <p
+                        className="mt-2 text-sm font-medium text-slate-700 text-center max-w-full truncate px-2 transition-opacity duration-300 ease-out opacity-0 animate-[echly-title-fade-in_300ms_ease-out_forwards]"
+                        style={{ animationDelay: "40ms" }}
+                      >
+                        {state.liveStructured.title}
+                      </p>
+                    )}
+                  </>
+                )}
+                {(state.state === "processing-structure" || state.state === "saving-feedback") && (
+                  <p className="mt-4 text-[15px] text-slate-500 font-normal tracking-tight text-center">
+                    Processing…
+                  </p>
+                )}
               </div>
+              {state.state === "listening" && state.liveStructured && state.liveStructured.tags.length > 0 && (
+                <div className="mb-4 flex flex-wrap gap-1.5 justify-center">
+                  {state.liveStructured.tags.slice(0, 4).map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/80 text-slate-600 border border-slate-200/80"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {state.liveStructured.priority && state.liveStructured.priority !== "medium" && (
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/80 text-slate-600 border border-slate-200/80 capitalize"
+                    >
+                      {state.liveStructured.priority}
+                    </span>
+                  )}
+                </div>
+              )}
+              {state.state === "listening" && !listeningExiting && (
+                <div className="flex justify-between">
+                  <button type="button" onClick={handlers.discardListening} className="text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-neutral-100 transition-colors duration-120 cursor-pointer px-3 py-2 rounded-md">Cancel</button>
+                  <button type="button" onClick={handlers.finishListening} className="bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-colors duration-150 cursor-pointer">Done</button>
+                </div>
+              )}
             </div>
           )}
 
