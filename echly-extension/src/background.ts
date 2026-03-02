@@ -35,17 +35,40 @@ let globalUIState: {
   sessionId: null,
 };
 
-chrome.storage.local.get(["activeSessionId"], (result) => {
-  activeSessionId = result.activeSessionId ?? null;
-  globalUIState.sessionId = activeSessionId;
-});
+chrome.storage.local.get(
+  ["activeSessionId"],
+  (result: { activeSessionId?: string }) => {
+    const stored = result.activeSessionId;
+    activeSessionId = typeof stored === "string" ? stored : null;
+    globalUIState.sessionId = activeSessionId;
+  }
+);
 
-chrome.storage.local.get(["auth_idToken", "auth_refreshToken", "auth_expiresAtMs", "auth_user"], (result) => {
-  tokenState.idToken = typeof result.auth_idToken === "string" ? result.auth_idToken : null;
-  tokenState.refreshToken = typeof result.auth_refreshToken === "string" ? result.auth_refreshToken : null;
-  tokenState.expiresAtMs = typeof result.auth_expiresAtMs === "number" ? result.auth_expiresAtMs : 0;
-  tokenState.user = (result.auth_user as StoredUser | undefined) ?? null;
-});
+type StoredAuthResult = {
+  auth_idToken?: string;
+  auth_refreshToken?: string;
+  auth_expiresAtMs?: number;
+  auth_user?: unknown;
+};
+function isStoredUser(v: unknown): v is StoredUser {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.uid === "string" &&
+    (o.name === null || typeof o.name === "string") &&
+    (o.email === null || typeof o.email === "string") &&
+    (o.photoURL === null || typeof o.photoURL === "string")
+  );
+}
+chrome.storage.local.get(
+  ["auth_idToken", "auth_refreshToken", "auth_expiresAtMs", "auth_user"],
+  (result: StoredAuthResult) => {
+    tokenState.idToken = typeof result.auth_idToken === "string" ? result.auth_idToken : null;
+    tokenState.refreshToken = typeof result.auth_refreshToken === "string" ? result.auth_refreshToken : null;
+    tokenState.expiresAtMs = typeof result.auth_expiresAtMs === "number" ? result.auth_expiresAtMs : 0;
+    tokenState.user = isStoredUser(result.auth_user) ? result.auth_user : null;
+  }
+);
 
 function setTokenState(next: Partial<TokenState>): void {
   tokenState = { ...tokenState, ...next };
