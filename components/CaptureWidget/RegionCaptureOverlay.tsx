@@ -5,37 +5,36 @@ import { buildCaptureContext } from "@/lib/captureContext";
 import type { CaptureContext } from "./types";
 
 const MIN_SIZE = 24;
+const DRAG_THRESHOLD_PX = 5;
 const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
-const BRAND_COLOR = "#2563EB";
-const HIGHLIGHT_COLOR = "rgba(37, 99, 235, 0.2)";
+const HIGHLIGHT_BLUE = "#3B82F6";
 
 export type Region = { x: number; y: number; w: number; h: number };
 
-/** Get topmost page element at (x,y), excluding our overlay and its shadow host. */
+const OVERLAY_ID = "echly-capture-overlay";
+const HIGHLIGHT_BOX_ID = "echly-highlight-box";
+const TOOLTIP_ID = "echly-capture-tooltip";
+
+/** Get nearest meaningful page element at (x,y). Ignores body, overlay, echly-shadow-host. */
 function getPageElementAt(clientX: number, clientY: number, overlayRoot: Node | null): Element | null {
-  if (typeof document === "undefined" || !document.elementsFromPoint) return null;
+  if (typeof document === "undefined" || !document.elementFromPoint) return null;
   const host = overlayRoot && "host" in overlayRoot ? (overlayRoot as ShadowRoot).host : null;
-  const elements = document.elementsFromPoint(clientX, clientY);
-  for (const el of elements) {
-    const root = el.getRootNode?.();
-    if (root === overlayRoot) continue;
-    if (host && (el === host || host.contains(el))) continue;
-    return el;
-  }
-  return null;
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el || el === document.body) return null;
+  const root = el.getRootNode?.();
+  if (root === overlayRoot) return null;
+  if (host && (el === host || host.contains(el))) return null;
+  if ((el as Element).id === OVERLAY_ID || (el as Element).id === HIGHLIGHT_BOX_ID || (el as Element).id === TOOLTIP_ID) return null;
+  if ((host as Element)?.id === "echly-shadow-host") return null;
+  return el;
 }
 
 export type RegionCaptureOverlayProps = {
   getFullTabImage: () => Promise<string | null>;
-  /** Called with cropped data URL and capture context (URL, scroll, viewport, domPath, nearbyText). */
   onCapture: (croppedDataUrl: string, context: CaptureContext | null) => void;
   onCancel: () => void;
 };
 
-/**
- * Crops full tab image to viewport region. Uses devicePixelRatio for HiDPI.
- * Runs off main thread via requestAnimationFrame + async canvas.
- */
 async function cropImageToRegion(
   fullImageDataUrl: string,
   region: Region,
@@ -75,56 +74,38 @@ export function RegionCaptureOverlay({
   onCancel,
 }: RegionCaptureOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [phase, setPhase] = useState<"selecting" | "frozen" | "confirming" | "confirmingDone">("selecting");
-  const [rect, setRect] = useState<Region | null>(null);
-  const [hoverRect, setHoverRect] = useState<Region | null>(null);
+  const [highlightRect, setHighlightRect] = useState<Region | null>(null);
+  const [dragRect, setDragRect] = useState<Region | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(true);
-  const [confirmScaleOne, setConfirmScaleOne] = useState(false);
-  const startRef = useRef<{ x: number; y: number } | null>(null);
-  const isDraggingRef = useRef(false);
-  const hoveredElementRef = useRef<Element | null>(null);
-  const snappedElementRef = useRef<Element | null>(null);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
-  const clearSelection = useCallback(() => {
-    startRef.current = null;
-    isDraggingRef.current = false;
-    snappedElementRef.current = null;
-    setRect(null);
-    setHoverRect(null);
+  const hoveredElementRef = useRef<Element | null>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isDragModeRef = useRef(false);
+  const dragRectRef = useRef<Region | null>(null);
+
+  const clearHighlight = useCallback(() => {
+    setHighlightRect(null);
+    setDragRect(null);
     hoveredElementRef.current = null;
+    dragStartRef.current = null;
+    isDragModeRef.current = false;
+    dragRectRef.current = null;
   }, []);
 
   const cancel = useCallback(() => {
     setOverlayVisible(false);
-    clearSelection();
+    clearHighlight();
     setTimeout(() => onCancel(), 120);
-  }, [onCancel, clearSelection]);
+  }, [onCancel, clearHighlight]);
 
+  // ESC to cancel
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
         cancel();
-        return;
-      }
-      if (e.key === " ") {
-        e.preventDefault();
-        const el = hoveredElementRef.current;
-        if (!el || isDraggingRef.current) return;
-        try {
-          const r = el.getBoundingClientRect();
-          if (r.width >= MIN_SIZE && r.height >= MIN_SIZE) {
-            setRect({
-              x: r.left,
-              y: r.top,
-              w: r.width,
-              h: r.height,
-            });
-            snappedElementRef.current = el;
-            setHoverRect(null);
-            hoveredElementRef.current = null;
-          }
-        } catch (_) {}
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -139,177 +120,252 @@ export function RegionCaptureOverlay({
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [cancel]);
 
+  const root = overlayRef.current?.getRootNode?.() ?? null;
+
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const clientX = e.clientX;
+      const clientY = e.clientY;
+
+      // Tooltip: show after short delay, follow cursor with offset
+      setTooltipPos({ x: clientX + 16, y: clientY + 16 });
+      if (!tooltipVisible) setTooltipVisible(true);
+
+      if (isDragModeRef.current && dragStartRef.current) {
+        const sx = dragStartRef.current.x;
+        const sy = dragStartRef.current.y;
+        const x = Math.min(sx, clientX);
+        const y = Math.min(sy, clientY);
+        const w = Math.abs(clientX - sx);
+        const h = Math.abs(clientY - sy);
+        const next = { x, y, w, h };
+        dragRectRef.current = next;
+        setDragRect(next);
+        setHighlightRect(null);
+        return;
+      }
+
+      const el = getPageElementAt(clientX, clientY, root);
+      hoveredElementRef.current = el;
+      if (el) {
+        try {
+          const r = el.getBoundingClientRect();
+          setHighlightRect({ x: r.left, y: r.top, w: r.width, h: r.height });
+        } catch {
+          setHighlightRect(null);
+        }
+      } else {
+        setHighlightRect(null);
+      }
+    },
+    [root, tooltipVisible]
+  );
+
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    setHoverRect(null);
-    hoveredElementRef.current = null;
-    startRef.current = { x: e.clientX, y: e.clientY };
-    isDraggingRef.current = true;
-    setRect({ x: e.clientX, y: e.clientY, w: 0, h: 0 });
-    setPhase("selecting");
-  }, []);
-
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    if (isDraggingRef.current && startRef.current) {
-      const sx = startRef.current.x;
-      const sy = startRef.current.y;
-      const x = Math.min(sx, e.clientX);
-      const y = Math.min(sy, e.clientY);
-      const w = Math.abs(e.clientX - sx);
-      const h = Math.abs(e.clientY - sy);
-      setRect({ x, y, w, h });
-      return;
-    }
-    const root = overlayRef.current?.getRootNode?.() ?? null;
-    const el = getPageElementAt(e.clientX, e.clientY, root);
-    hoveredElementRef.current = el;
-    if (el) {
-      try {
-        const r = el.getBoundingClientRect();
-        setHoverRect({ x: r.left, y: r.top, w: r.width, h: r.height });
-      } catch {
-        setHoverRect(null);
-      }
-    } else {
-      setHoverRect(null);
-    }
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    isDragModeRef.current = false;
+    setDragRect(null);
   }, []);
 
   const onMouseUp = useCallback(
     async (e: React.MouseEvent) => {
-      if (e.button !== 0 || !isDraggingRef.current || !startRef.current) return;
+      if (e.button !== 0) return;
       e.preventDefault();
-      isDraggingRef.current = false;
-      const current = rect;
-      startRef.current = null;
-      if (!current || current.w < MIN_SIZE || current.h < MIN_SIZE) {
-        clearSelection();
-        cancel();
-        return;
+
+      const start = dragStartRef.current;
+      if (!start) return;
+
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      let targetRect: Region | null = null;
+      let targetElement: Element | null = null;
+
+      const currentDragRect = dragRectRef.current;
+      if (isDragModeRef.current && currentDragRect && currentDragRect.w >= MIN_SIZE && currentDragRect.h >= MIN_SIZE) {
+        targetRect = currentDragRect;
+      } else if (!isDragModeRef.current && distance <= DRAG_THRESHOLD_PX) {
+        targetElement = hoveredElementRef.current;
+        if (targetElement) {
+          try {
+            const r = targetElement.getBoundingClientRect();
+            if (r.width >= MIN_SIZE && r.height >= MIN_SIZE) {
+              targetRect = { x: r.left, y: r.top, w: r.width, h: r.height };
+            }
+          } catch (_) {}
+        }
       }
-      setPhase("frozen");
-      await new Promise((r) => setTimeout(r, 100));
+
+      dragStartRef.current = null;
+      isDragModeRef.current = false;
+      setDragRect(null);
+
+      if (!targetRect) return;
+
+      // Temporarily hide overlay and highlight so screenshot is crisp
+      setOverlayVisible(false);
+      setHighlightRect(null);
+
+      await new Promise((r) => setTimeout(r, 80));
 
       let fullImage: string | null = null;
       try {
         fullImage = await getFullTabImage();
       } catch {
-        setPhase("selecting");
-        setRect(current);
-        cancel();
+        setOverlayVisible(true);
+        onCancel();
         return;
       }
       if (!fullImage) {
-        setPhase("selecting");
-        setRect(current);
-        cancel();
+        setOverlayVisible(true);
+        onCancel();
         return;
       }
 
       const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
       let cropped: string;
       try {
-        cropped = await cropImageToRegion(fullImage, current, dpr);
+        cropped = await cropImageToRegion(fullImage, targetRect, dpr);
       } catch {
-        cancel();
+        setOverlayVisible(true);
+        onCancel();
         return;
       }
 
       const context: CaptureContext | null =
         typeof window !== "undefined"
-          ? buildCaptureContext(window, snappedElementRef.current ?? null)
+          ? buildCaptureContext(window, targetElement ?? null)
           : null;
 
-      setPhase("confirming");
-      setRect(current);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            setConfirmScaleOne(true);
-            setTimeout(() => {
-              setOverlayVisible(false);
-              setTimeout(() => onCapture(cropped, context), 120);
-            }, 150);
-          }, 0);
-        });
-      });
+      onCapture(cropped, context);
     },
-    [rect, getFullTabImage, onCapture, cancel, clearSelection]
+    [getFullTabImage, onCapture, onCancel]
   );
 
-  const showRect = !!rect;
-  const isConfirming = phase === "confirming" || phase === "confirmingDone";
-  const rectScale = isConfirming && !confirmScaleOne ? 0.98 : 1;
+  // Switch to drag mode when move distance exceeds threshold
+  useEffect(() => {
+    if (!dragStartRef.current) return;
+    const onMove = (e: MouseEvent) => {
+      if (!dragStartRef.current || isDragModeRef.current) return;
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_PX) {
+        isDragModeRef.current = true;
+        setHighlightRect(null);
+      }
+    };
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
 
-  const showHover = !!hoverRect && !rect && phase === "selecting";
+  const showHighlight = !!highlightRect && !dragRect && !isDragModeRef.current;
+  const showDragRect = !!dragRect && dragRect.w >= MIN_SIZE && dragRect.h >= MIN_SIZE;
 
   return (
     <div
       ref={overlayRef}
       role="presentation"
       aria-hidden
-      className="region-capture-overlay"
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 2147483647,
         cursor: "crosshair",
-        background: "rgba(0, 0, 0, 0.08)",
-        backdropFilter: "blur(1px)",
-        opacity: overlayVisible ? 1 : 0,
-        transition: `opacity 120ms ${EASING}`,
-        pointerEvents: overlayVisible ? "auto" : "none",
+        pointerEvents: "auto",
         userSelect: "none",
       }}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
-      onMouseLeave={(e) => {
-        if (isDraggingRef.current && e.buttons === 0) isDraggingRef.current = false;
-        setHoverRect(null);
-        hoveredElementRef.current = null;
+      onMouseLeave={() => {
+        if (!isDragModeRef.current) {
+          setHighlightRect(null);
+          hoveredElementRef.current = null;
+        }
       }}
     >
-      {showHover && hoverRect && (
+      {/* Step 1: Visual overlay — dimmed/blurred, pointer-events: none. Hidden before capture. */}
+      <div
+        id={OVERLAY_ID}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.25)",
+          backdropFilter: "blur(4px)",
+          pointerEvents: "none",
+          zIndex: 2147483646,
+          opacity: overlayVisible ? 1 : 0,
+          transition: "opacity 120ms ease",
+        }}
+      />
+
+      {/* Step 2: Smart highlight box — follows hover, crisp blue border. Hidden before capture. */}
+      {showHighlight && highlightRect && (
         <div
-          className="region-capture-hover"
+          id={HIGHLIGHT_BOX_ID}
           style={{
             position: "fixed",
-            left: hoverRect.x,
-            top: hoverRect.y,
-            width: hoverRect.w,
-            height: hoverRect.h,
-            border: `2px dashed ${BRAND_COLOR}`,
-            borderRadius: 6,
-            backgroundColor: HIGHLIGHT_COLOR,
+            left: highlightRect.x,
+            top: highlightRect.y,
+            width: highlightRect.w,
+            height: highlightRect.h,
+            border: "2px solid #3B82F6",
+            borderRadius: 8,
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.25)",
             pointerEvents: "none",
-            transition: `opacity 80ms ${EASING}, border-color 80ms ${EASING}`,
+            transition: "all 120ms ease",
+            zIndex: 2147483646,
+            opacity: overlayVisible ? 1 : 0,
           }}
         />
       )}
-      {showRect && rect && (
+
+      {/* Optional drag selection rectangle */}
+      {showDragRect && dragRect && (
         <div
-          className="region-capture-rect"
           style={{
             position: "fixed",
-            left: rect.x,
-            top: rect.y,
-            width: rect.w,
-            height: rect.h,
-            border: "2px solid white",
-            borderRadius: 6,
-            boxShadow: isConfirming
-              ? `0 0 0 1px ${BRAND_COLOR}, 0 0 20px rgba(37, 99, 235, 0.4)`
-              : "0 0 0 1px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.15)",
-            transform: `scale(${rectScale})`,
-            transformOrigin: "center center",
-            transition: `transform 150ms ${EASING}, box-shadow 150ms ${EASING}, border-color 150ms ${EASING}`,
-            borderColor: isConfirming ? BRAND_COLOR : "white",
+            left: dragRect.x,
+            top: dragRect.y,
+            width: dragRect.w,
+            height: dragRect.h,
+            border: "2px solid #3B82F6",
+            borderRadius: 8,
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.25)",
             pointerEvents: "none",
+            transition: "border-color 120ms ease",
+            zIndex: 2147483646,
+            opacity: overlayVisible ? 1 : 0,
           }}
         />
       )}
+
+      {/* Step 7: Floating tooltip */}
+      <div
+        id={TOOLTIP_ID}
+        style={{
+          position: "fixed",
+          left: tooltipPos.x,
+          top: tooltipPos.y,
+          padding: "8px 14px",
+          borderRadius: 9999,
+          background: "rgba(0,0,0,0.75)",
+          color: "#fff",
+          fontSize: "13px",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          whiteSpace: "nowrap",
+          pointerEvents: "none",
+          zIndex: 2147483647,
+          opacity: tooltipVisible ? 1 : 0,
+          transition: "opacity 150ms ease",
+          transform: "translateY(-50%)",
+        }}
+      >
+        Click to capture • Drag to select • ESC to cancel
+      </div>
     </div>
   );
 }
