@@ -250,7 +250,7 @@ export async function POST(req: Request): Promise<Response> {
   try {
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.2,
+      temperature: 0,
       max_tokens: 160,
       messages: [
         { role: "system", content: SESSION_INSIGHT_SYSTEM_PROMPT },

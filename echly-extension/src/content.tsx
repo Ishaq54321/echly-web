@@ -61,6 +61,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   });
   const effectiveSessionId = globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
+  const submissionLock = React.useRef(false);
   const logoUrl =
     typeof chrome !== "undefined" && chrome.runtime?.getURL
       ? chrome.runtime.getURL("assets/Echly_logo.svg")
@@ -183,8 +184,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         capturedAt?: number;
       } | null
     ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
+      if (submissionLock.current) return undefined;
+      submissionLock.current = true;
+
       if (!effectiveSessionId || !user) {
         callbacks?.onError();
+        submissionLock.current = false;
         return undefined;
       }
       if (callbacks) {
@@ -203,6 +208,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             } catch (err) {
               console.error("[Echly] Screenshot upload failed:", err);
               callbacks.onError();
+              submissionLock.current = false;
               return;
             }
           }
@@ -224,6 +230,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               },
             },
             (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
+              submissionLock.current = false;
               if (chrome.runtime.lastError) {
                 console.error("Runtime error", chrome.runtime.lastError);
                 callbacks?.onError();
@@ -246,6 +253,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         })();
         return;
       }
+      try {
       const visibleTextFromScreenshot = await getVisibleTextFromScreenshot(screenshot ?? null);
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
       const structureBody = {
@@ -316,6 +324,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
       }
       return firstCreated;
+      } finally {
+        submissionLock.current = false;
+      }
     },
     [effectiveSessionId, user]
   );
