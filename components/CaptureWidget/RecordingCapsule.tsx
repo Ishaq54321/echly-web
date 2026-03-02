@@ -33,7 +33,8 @@ export function RecordingCapsule({
       });
       return () => cancelAnimationFrame(id);
     }
-    setExpanded(false);
+    const id = requestAnimationFrame(() => setExpanded(false));
+    return () => cancelAnimationFrame(id);
   }, [isActive, isProcessing]);
 
   const statusText = isProcessing

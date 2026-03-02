@@ -37,7 +37,7 @@ export async function addCommentRepo(
     createdAt: serverTimestamp(),
   };
 
-  const docRef = await addDoc(collectionRef, payload);
+  await addDoc(collectionRef, payload);
   await incrementSessionCommentCountRepo(sessionId);
 }
 

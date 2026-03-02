@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 /**
  * Deterministic background color from a string (e.g. user id).
  * Same input always yields the same hue. Returns HSL string for background.
@@ -46,13 +48,15 @@ export function Avatar({
   const sizeClass = sizeClasses[size];
 
   if (avatarUrl?.trim()) {
+    const w = size === "sm" ? 24 : size === "md" ? 32 : 40;
     return (
-      <img
+      <Image
         src={avatarUrl}
         alt=""
+        width={w}
+        height={w}
         className={`rounded-full object-cover ${sizeClass} ${className}`}
-        width={size === "sm" ? 24 : size === "md" ? 32 : 40}
-        height={size === "sm" ? 24 : size === "md" ? 32 : 40}
+        unoptimized
       />
     );
   }

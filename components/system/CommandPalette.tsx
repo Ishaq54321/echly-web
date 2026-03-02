@@ -33,8 +33,8 @@ export default function CommandPalette({
 
   useEffect(() => {
     if (!isOpen) {
-      setEntered(false);
-      return;
+      const id = requestAnimationFrame(() => setEntered(false));
+      return () => cancelAnimationFrame(id);
     }
     const id = requestAnimationFrame(() => setEntered(true));
     return () => cancelAnimationFrame(id);
@@ -100,7 +100,8 @@ export default function CommandPalette({
   }, [isOpen, setOpen, filtered, clampedIndex, onSelect]);
 
   useEffect(() => {
-    setActiveIndex(0);
+    const id = requestAnimationFrame(() => setActiveIndex(0));
+    return () => cancelAnimationFrame(id);
   }, [query]);
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {

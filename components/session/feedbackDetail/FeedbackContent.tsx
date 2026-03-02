@@ -59,7 +59,8 @@ export function FeedbackContent({
       const t = requestAnimationFrame(() => setDropdownAnimate(true));
       return () => cancelAnimationFrame(t);
     }
-    setDropdownAnimate(false);
+    const t = requestAnimationFrame(() => setDropdownAnimate(false));
+    return () => cancelAnimationFrame(t);
   }, [tagPopoverOpen]);
 
   const handleRemoveTag = (tagToRemove: string) => {

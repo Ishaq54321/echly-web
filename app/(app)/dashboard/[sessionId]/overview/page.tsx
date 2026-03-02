@@ -4,43 +4,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Share2, Settings, LayoutPanelLeft } from "lucide-react";
-import { auth } from "@/lib/firebase";
-import { clearAuthTokenCache } from "@/lib/authFetch";
-import { onAuthStateChanged } from "firebase/auth";
+import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { useSessionOverview } from "./hooks/useSessionOverview";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { OverviewActivityItem } from "./hooks/useSessionOverview";
-
-function formatOverviewDate(
-  ts: { toDate?: () => Date; seconds?: number } | null | undefined
-): string {
-  if (!ts) return "—";
-  try {
-    const date =
-      typeof (ts as { toDate?: () => Date }).toDate === "function"
-        ? (ts as { toDate: () => Date }).toDate()
-        : (ts as { seconds?: number }).seconds != null
-          ? new Date((ts as { seconds: number }).seconds * 1000)
-          : null;
-    return date
-      ? date.toLocaleDateString(undefined, { dateStyle: "medium" })
-      : "—";
-  } catch {
-    return "—";
-  }
-}
-
-function formatActivityTime(date: Date | null): string {
-  if (!date) return "—";
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffM = Math.floor(diffMs / 60000);
-  if (diffM < 1) return "Just now";
-  if (diffM < 60) return `${diffM}m ago`;
-  const diffH = Math.floor(diffM / 60);
-  if (diffH < 24) return `${diffH}h ago`;
-  return date.toLocaleDateString(undefined, { dateStyle: "short" });
-}
+import { formatOverviewDate, formatActivityTime } from "@/lib/utils/date";
 
 function resolutionLabel(isResolved: boolean): string {
   return isResolved ? "Done" : "Open";
@@ -265,29 +233,19 @@ function RecentActivity({ items }: { items: OverviewActivityItem[] }) {
 export default function SessionOverviewPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const router = useRouter();
+  const { user: authUser, loading: authLoading } = useAuthGuard({
+    router,
+    useReplace: true,
+  });
   const { data, loading, error } = useSessionOverview(sessionId);
   const [copied, setCopied] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        clearAuthTokenCache();
-        router.replace("/login");
-        return;
-      }
-      setAuthChecked(true);
-    });
-    return () => unsubscribe();
-  }, [router]);
-
-  useEffect(() => {
-    if (!authChecked || loading || !data.session) return;
-    const user = auth.currentUser;
-    if (user && data.session.userId !== user.uid) {
+    if (authLoading || loading || !data.session || !authUser) return;
+    if (data.session.userId !== authUser.uid) {
       router.replace("/dashboard");
     }
-  }, [authChecked, loading, data.session, router]);
+  }, [authLoading, authUser, loading, data.session, router]);
 
   const handleCopy = useCallback(() => {
     if (!sessionId) return;
@@ -297,7 +255,7 @@ export default function SessionOverviewPage() {
     setTimeout(() => setCopied(false), 2000);
   }, [sessionId]);
 
-  if (!authChecked || (loading && !data.session)) {
+  if (authLoading || (loading && !data.session)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--background))]">
         <p className="text-sm text-[hsl(var(--text-muted))]">Loading…</p>

@@ -3,14 +3,12 @@
 import { authFetch } from "@/lib/authFetch";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase";
-import { clearAuthTokenCache } from "@/lib/authFetch";
-import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { addFeedback, deleteFeedback } from "@/lib/feedback";
 import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
+import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import FeedbackSidebar from "@/components/session/FeedbackSidebar";
 import FeedbackDetail from "@/components/session/feedbackDetail/FeedbackDetail";
@@ -20,6 +18,19 @@ import { ActivityPanel } from "@/components/session/feedbackDetail/ActivityPanel
 import { Pencil, Check } from "lucide-react";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
 import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
+import type { Feedback } from "@/lib/domain/feedback";
+import type { Session } from "@/lib/domain/session";
+import { formatSessionCreatedMeta } from "@/lib/utils/date";
+import { log, warn } from "@/lib/utils/logger";
+import Image from "next/image";
+
+/** Ticket shape returned by structure-feedback API. */
+type StructureFeedbackTicket = {
+  title: string;
+  description?: string;
+  actionSteps?: string[];
+  suggestedTags?: string[];
+};
 
 /** Ticket shape returned by GET/PATCH /api/tickets/:id (DB source of truth). */
 type TicketFromApi = {
@@ -34,48 +45,11 @@ type TicketFromApi = {
   [key: string]: unknown;
 };
 
-const sessionDateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "2-digit",
-  year: "numeric",
-});
-const sessionTimeFormatter = new Intl.DateTimeFormat("en-US", {
-  hour: "numeric",
-  minute: "2-digit",
-});
-
-function formatSessionCreatedMeta(
-  createdAt:
-    | { toDate?: () => Date; seconds?: number }
-    | string
-    | null
-    | undefined
-): { dateStr: string; timeStr: string } {
-  if (!createdAt) return { dateStr: "—", timeStr: "" };
-  try {
-    const date =
-      typeof createdAt === "string"
-        ? new Date(createdAt)
-        : typeof (createdAt as { toDate?: () => Date }).toDate === "function"
-          ? (createdAt as { toDate: () => Date }).toDate()
-          : (createdAt as { seconds?: number }).seconds != null
-            ? new Date((createdAt as { seconds: number }).seconds * 1000)
-            : null;
-    if (!date) return { dateStr: "—", timeStr: "" };
-    return {
-      dateStr: sessionDateFormatter.format(date),
-      timeStr: sessionTimeFormatter.format(date),
-    };
-  } catch {
-    return { dateStr: "—", timeStr: "" };
-  }
-}
-
 export default function SessionPage() {
   const { sessionId } = useParams();
   const router = useRouter();
 
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -125,8 +99,8 @@ export default function SessionPage() {
         type: "ECHLY_SET_ACTIVE_SESSION",
         sessionId,
       });
-    } catch (err) {
-      console.warn("Extension not available");
+    } catch {
+      // Extension not available — silent fail
     }
   }, [sessionId]);
 
@@ -157,53 +131,48 @@ export default function SessionPage() {
     return () => window.removeEventListener("ECHLY_FEEDBACK_CREATED", handler);
   }, [sessionId, session, setFeedback, setFeedbackTotal, setFeedbackActiveCount]);
 
-  /* ================= LOAD SESSION ================= */
+  /* ================= AUTH + LOAD SESSION ================= */
+  const { user: authUser } = useAuthGuard({ router });
 
   useEffect(() => {
+    if (!authUser || !sessionId) {
+      setSessionReady(false);
+      if (!authUser) return;
+      setSessionLoading(true);
+      return;
+    }
     setSessionReady(false);
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      console.log("🔥 AUTH STATE (LOCAL CHECK):", {
-        uid: currentUser?.uid ?? null,
-        email: currentUser?.email ?? null,
-      });
-      if (currentUser === undefined) return;
-      if (!currentUser) {
-        clearAuthTokenCache();
-        router.push("/login");
-        return;
-      }
-
-      const sessionRef = doc(db, "sessions", sessionId as string);
-      const sessionSnap = await getDoc(sessionRef);
-
+    setSessionLoading(true);
+    let cancelled = false;
+    const sid = sessionId as string;
+    const sessionRef = doc(db, "sessions", sid);
+    getDoc(sessionRef).then((sessionSnap) => {
+      if (cancelled) return;
       if (!sessionSnap.exists()) {
         router.push("/dashboard");
+        setSessionLoading(false);
         return;
       }
-
       const data = sessionSnap.data();
-
-      if (data.userId !== currentUser.uid) {
+      if (data.userId !== authUser.uid) {
         router.push("/dashboard");
+        setSessionLoading(false);
         return;
       }
-
-      setSession({ id: sessionSnap.id, ...data });
-      setUserName(
-        currentUser.displayName || currentUser.email || "You"
-      );
-      setUserPhotoURL(currentUser.photoURL ?? null);
+      setSession({ id: sessionSnap.id, ...data } as Session);
+      setUserName(authUser.displayName || authUser.email || "You");
+      setUserPhotoURL(authUser.photoURL ?? null);
       setSessionLoading(false);
       setSessionReady(true);
-
-      const viewerId = getViewerId(currentUser.uid);
+      const viewerId = getViewerId(authUser.uid);
       if (viewerId) {
         recordSessionViewIfNew(sessionSnap.id, viewerId).catch(() => {});
       }
     });
-
-    return () => unsubscribe();
-  }, [sessionId, router]);
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, authUser, router]);
 
   // Select first feedback when first page loads and none selected.
   useEffect(() => {
@@ -389,8 +358,6 @@ export default function SessionPage() {
 
   const saveResolved = async (isResolved: boolean) => {
     if (!selectedId) return;
-    const start = performance.now();
-    console.log("Resolve clicked at", start);
     const previousResolved = Boolean(detailTicket?.isResolved);
     setDetailTicket((t) => (t ? { ...t, isResolved } : null));
     setFeedback((prev) =>
@@ -406,16 +373,13 @@ export default function SessionPage() {
       }
     }
     try {
-      console.log("Sending PATCH...");
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isResolved }),
       });
       const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
-      console.log("PATCH finished in", performance.now() - start);
       if (data.success && data.ticket) setDetailTicket(data.ticket);
-      console.log("Total resolve flow time:", performance.now() - start);
     } catch {
       setDetailTicket((t) => (t ? { ...t, isResolved: previousResolved } : null));
       setFeedback((prev) =>
@@ -467,31 +431,33 @@ export default function SessionPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transcript }),
-    }).then((res) => res.json() as Promise<{ success?: boolean; tickets?: any[]; error?: string }>);
+    }).then((res) => res.json() as Promise<{ success?: boolean; tickets?: StructureFeedbackTicket[]; error?: string }>);
     const uploadCall =
       screenshot ?
         uploadScreenshot(screenshot, sessionId as string, firstFeedbackId)
       : Promise.resolve(null);
 
     const [data, screenshotUrl] = await Promise.all([structureCall, uploadCall]);
-    console.log("STRUCTURING RESPONSE:", data);
+    log("STRUCTURING RESPONSE:", data);
 
     const tickets = Array.isArray(data.tickets) ? data.tickets : [];
     if (!data.success || tickets.length === 0) {
-      console.warn("No structured tickets returned", data);
+      warn("No structured tickets returned", data);
       return;
     }
 
+    if (!session) return;
+
     const effectiveFirstId = tickets.length > 0 && screenshotUrl !== null ? firstFeedbackId : null;
 
-    const created: any[] = [];
+    const created: Feedback[] = [];
     for (let i = 0; i < tickets.length; i++) {
-      const t = tickets[i];
+      const t = tickets[i] as StructureFeedbackTicket;
       const payload = {
         title: t.title,
         description: typeof t.description === "string" ? t.description : (t.title ?? ""),
         type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-        contextSummary: typeof t.description === "string" ? t.description : null,
+        contextSummary: typeof t.description === "string" ? t.description : undefined,
         actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
         suggestedTags: t.suggestedTags ?? undefined,
         screenshotUrl: i === 0 ? screenshotUrl ?? null : null,
@@ -504,10 +470,19 @@ export default function SessionPage() {
         payload,
         i === 0 && effectiveFirstId ? effectiveFirstId : undefined
       );
-      const newItem = {
+      const newItem: Feedback = {
         id: docRef.id,
-        ...payload,
+        sessionId: sessionId as string,
+        userId: session.userId,
+        title: payload.title,
+        description: payload.description,
+        type: payload.type,
         isResolved: false,
+        createdAt: null,
+        contextSummary: payload.contextSummary ?? null,
+        actionSteps: payload.actionSteps?.length ? payload.actionSteps : null,
+        suggestedTags: payload.suggestedTags ?? null,
+        screenshotUrl: payload.screenshotUrl ?? null,
         clientTimestamp: Date.now(),
       };
       created.push(newItem);
@@ -598,7 +573,7 @@ export default function SessionPage() {
                             ? trimmed
                             : session.title || "Untitled Session";
                         const previousTitle = session.title ?? "";
-                        setSession((prev: any) => (prev ? { ...prev, title: safeTitle } : prev));
+                        setSession((prev: Session | null) => (prev ? { ...prev, title: safeTitle } : prev));
                         setSessionTitleDraft(safeTitle);
                         setIsSavingSessionTitle(true);
                         setIsEditingSessionTitle(false);
@@ -612,11 +587,11 @@ export default function SessionPage() {
                           });
                           const data = (await res.json()) as { success?: boolean; session?: Record<string, unknown> };
                           if (data.success && data.session) {
-                            setSession((prev: any) => (prev ? { ...prev, ...data.session } : prev));
+                            setSession((prev: Session | null) => (prev ? { ...prev, ...data.session } as Session : prev));
                             setSessionTitleDraft((data.session!.title as string) ?? safeTitle);
                           }
                         } catch {
-                          setSession((prev: any) => (prev ? { ...prev, title: previousTitle } : prev));
+                          setSession((prev: Session | null) => (prev ? { ...prev, title: previousTitle } : prev));
                           setSessionTitleDraft(previousTitle);
                         } finally {
                           setIsSavingSessionTitle(false);
@@ -698,12 +673,13 @@ export default function SessionPage() {
                       <span aria-hidden className="mx-1">·</span>
                       <span>{userName}</span>
                       {userPhotoURL && (
-                        <img
+                        <Image
                           src={userPhotoURL}
                           alt=""
-                          className="w-6 h-6 rounded-full border border-neutral-200 ml-2 flex-shrink-0"
                           width={24}
                           height={24}
+                          className="w-6 h-6 rounded-full border border-neutral-200 ml-2 flex-shrink-0"
+                          unoptimized
                         />
                       )}
                     </>
@@ -792,11 +768,15 @@ export default function SessionPage() {
             className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-10 cursor-pointer"
             onClick={() => setIsImageExpanded(false)}
           >
-            <img
-              src={selectedItem.screenshotUrl}
-              alt="Expanded Screenshot"
-              className="max-h-full max-w-full rounded-xl"
-            />
+            <div className="relative w-full h-full max-w-5xl max-h-[90vh]">
+              <Image
+                src={selectedItem.screenshotUrl}
+                alt="Expanded Screenshot"
+                fill
+                className="object-contain rounded-xl"
+                unoptimized
+              />
+            </div>
           </div>
         )}
 

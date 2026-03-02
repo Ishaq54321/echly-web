@@ -5,11 +5,12 @@ import {
   getUserSessionsRepo,
   createSessionRepo,
 } from "@/lib/repositories/sessionsRepository";
+import { log } from "@/lib/utils/logger";
 
 /** GET /api/sessions — list sessions for the authenticated user. */
 export async function GET(req: Request) {
   const start = Date.now();
-  console.log("[API] GET /api/sessions start");
+  log("[API] GET /api/sessions start");
   let user;
   try {
     user = await requireAuth(req);
@@ -19,14 +20,14 @@ export async function GET(req: Request) {
 
   try {
     const sessions = await getUserSessionsRepo(user.uid, 100);
-    console.log("[API] GET /api/sessions duration:", Date.now() - start);
+    log("[API] GET /api/sessions duration:", Date.now() - start);
     return NextResponse.json({
       success: true,
       sessions: sessions.map((s) => serializeSession(s)),
     });
   } catch (err) {
     console.error("GET /api/sessions:", err);
-    console.log("[API] GET /api/sessions duration (error):", Date.now() - start);
+    log("[API] GET /api/sessions duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Failed to load sessions" },
       { status: 500 }

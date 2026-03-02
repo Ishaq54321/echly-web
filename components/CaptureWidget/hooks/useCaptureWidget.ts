@@ -37,6 +37,37 @@ function getSentimentFromTranscript(transcript: string): SentimentGlow {
 
 type SpeechRecognitionInstance = { start(): void; stop(): void };
 
+/** One result item: first alternative at index 0 has transcript. */
+interface SpeechRecognitionResultItem {
+  0: { transcript: string };
+  length: number;
+}
+
+/** Web Speech API result event (for recognition.onresult). */
+interface SpeechRecognitionResultEvent {
+  resultIndex: number;
+  results: Array<SpeechRecognitionResultItem>;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionInstance & {
+      continuous: boolean;
+      interimResults: boolean;
+      lang: string;
+      onresult: ((e: SpeechRecognitionResultEvent) => void) | null;
+      onend: (() => void) | null;
+    };
+    webkitSpeechRecognition?: new () => SpeechRecognitionInstance & {
+      continuous: boolean;
+      interimResults: boolean;
+      lang: string;
+      onresult: ((e: SpeechRecognitionResultEvent) => void) | null;
+      onend: (() => void) | null;
+    };
+  }
+}
+
 function generateRecordingId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -85,6 +116,7 @@ export function useCaptureWidget({
   const [highlightTicketId, setHighlightTicketId] = useState<string | null>(null);
   const [pillExiting, setPillExiting] = useState(false);
   const [captureRootReady, setCaptureRootReady] = useState(false);
+  const [captureRootEl, setCaptureRootEl] = useState<HTMLDivElement | null>(null);
   const [orbSuccess, setOrbSuccess] = useState(false);
 
   const dragOffset = useRef({ x: 0, y: 0 });
@@ -283,6 +315,7 @@ export function useCaptureWidget({
     captureEl.id = "echly-capture-root";
     document.body.appendChild(captureEl);
     captureRootRef.current = captureEl;
+    setCaptureRootEl(captureEl);
     setCaptureRootReady(true);
   }, []);
 
@@ -290,9 +323,12 @@ export function useCaptureWidget({
     if (captureRootRef.current) {
       try {
         document.body.removeChild(captureRootRef.current);
-      } catch (_) {}
+      } catch (err) {
+        console.error("CaptureWidget error:", err);
+      }
       captureRootRef.current = null;
     }
+    setCaptureRootEl(null);
     setCaptureRootReady(false);
   }, []);
 
@@ -327,17 +363,17 @@ export function useCaptureWidget({
 
   useEffect(() => {
     const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+      window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionResultEvent) => {
       let text = "";
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-        text += event.results[i][0].transcript;
+        const item: SpeechRecognitionResultItem = event.results[i];
+        if (item && item[0]) text += item[0].transcript;
       }
       const activeId = activeRecordingIdRef.current;
       if (activeId) {
@@ -357,7 +393,9 @@ export function useCaptureWidget({
     return () => {
       try {
         recognition.stop();
-      } catch (_) {}
+      } catch (err) {
+        console.error("CaptureWidget error:", err);
+      }
     };
   }, []);
 
@@ -508,8 +546,9 @@ export function useCaptureWidget({
 
   useEffect(() => {
     if (extensionMode) return;
-    const handleClickOutside = (event: any) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (menuRef.current && target && !menuRef.current.contains(target)) {
         setShowMenu(false);
       }
     };
@@ -746,5 +785,6 @@ export function useCaptureWidget({
       captureRootRef,
     },
     captureRootReady,
+    captureRootEl,
   };
 }

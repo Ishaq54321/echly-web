@@ -2,8 +2,11 @@
  * Extension background (service worker). Centralizes auth + token handling.
  * Content scripts request tokens and auth state via messages.
  */
+import { firebaseConfig } from "../../lib/firebase/config";
+import { warn } from "../../lib/utils/logger";
+
 const API_BASE = "https://echly-web.vercel.app";
-const IDP_API_KEY = "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM";
+const IDP_API_KEY = firebaseConfig.apiKey;
 
 let activeSessionId: string | null = null;
 
@@ -347,7 +350,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       console.error("[ECHLY_PROCESS_FEEDBACK] sessionId is null/empty:", sessionId);
     }
     if (!transcript?.trim() || !sessionId) {
-      console.warn("[Echly BG] Invalid payload: missing transcript or sessionId", {
+      warn("[Echly BG] Invalid payload: missing transcript or sessionId", {
         hasTranscript: !!transcript?.trim(),
         hasSessionId: !!sessionId,
       });
@@ -416,16 +419,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             metadata: { clientTimestamp: Date.now() },
           };
 
-          console.log("[CREATE] Using sessionId:", sessionId);
-          console.log("[CREATE] Sending body:", body);
           const feedbackRes = await fetch(`${API_BASE}/api/feedback`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(body),
           });
-          console.log("[CREATE] Status:", feedbackRes.status);
           const raw = await feedbackRes.text();
-          console.log("[CREATE] Raw response:", raw);
 
           if (!feedbackRes.ok) {
             console.error("[CREATE] FAILED:", feedbackRes.status, raw);
@@ -465,7 +464,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         }
         if (firstCreated) {
-          console.log("[SUCCESS] Sending response to content");
           sendResponse({ success: true, ticket: firstCreated });
           chrome.tabs.query({}, (tabs) => {
             tabs.forEach((tab) => {

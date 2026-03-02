@@ -7,10 +7,10 @@ import FeedbackItem from "./FeedbackItem";
 import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
 import { RecordingCapsule } from "./RecordingCapsule";
-import type { CaptureWidgetProps } from "./types";
+import type { CaptureWidgetProps, CaptureState } from "./types";
 
-const CAPTURE_FLOW_STATES = ["focus_mode", "region_selecting", "voice_listening", "processing"] as const;
-const RECORDING_UI_STATES = ["voice_listening", "processing"] as const;
+const CAPTURE_FLOW_STATES: CaptureState[] = ["focus_mode", "region_selecting", "voice_listening", "processing"];
+const RECORDING_UI_STATES: CaptureState[] = ["voice_listening", "processing"];
 
 export default function CaptureWidget({
   sessionId,
@@ -33,7 +33,7 @@ export default function CaptureWidget({
     state,
     handlers,
     refs,
-    captureRootReady,
+    captureRootEl,
   } = useCaptureWidget({
     sessionId,
     userId,
@@ -49,9 +49,9 @@ export default function CaptureWidget({
   const effectiveIsOpen = isControlled ? expanded : state.isOpen;
   const listScrollRef = useRef<HTMLDivElement>(null);
 
-  const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state as any) || state.pillExiting;
+  const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state) || state.pillExiting;
   const showRecordingCapsule =
-    RECORDING_UI_STATES.includes(state.state as any) || state.pillExiting;
+    RECORDING_UI_STATES.includes(state.state) || state.pillExiting;
   const showSidebar = !isInCaptureFlow;
   const showFloatingButton = !effectiveIsOpen && showSidebar;
   const showPanel = effectiveIsOpen && showSidebar;
@@ -96,11 +96,9 @@ export default function CaptureWidget({
   return (
     <>
       {/* Capture layer: portaled into #echly-capture-root. Never inside sidebar. */}
-      {captureRootReady &&
-        refs.captureRootRef.current &&
-        (
+      {captureRootEl && (
           <CaptureLayer
-            captureRoot={refs.captureRootRef.current}
+            captureRoot={captureRootEl}
             extensionMode={extensionMode}
             state={state.state}
             getFullTabImage={handlers.getFullTabImage}

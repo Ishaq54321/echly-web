@@ -13,7 +13,7 @@ export interface RenameSessionModalProps {
 export function RenameSessionModal({
   open,
   onClose,
-  sessionId,
+  sessionId: _sessionId,
   currentTitle,
   onSave,
 }: RenameSessionModalProps) {

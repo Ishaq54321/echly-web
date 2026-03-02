@@ -10,7 +10,6 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   updateDoc,
   where,
   increment,

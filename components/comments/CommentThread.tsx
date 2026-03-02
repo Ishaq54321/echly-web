@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import Image from "next/image";
 
 export interface CommentDisplay {
   id: string;
@@ -78,10 +79,13 @@ export default function CommentThread({ comments }: Props) {
             )}
             <div className="flex gap-4">
               {comment.avatar ? (
-                <img
+                <Image
                   src={comment.avatar}
                   alt={comment.name}
+                  width={36}
+                  height={36}
                   className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                  unoptimized
                 />
               ) : (
                 <div

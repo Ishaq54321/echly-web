@@ -46,7 +46,8 @@ export function VoiceBubble({
       });
       return () => cancelAnimationFrame(id);
     }
-    setExpanded(false);
+    const id = requestAnimationFrame(() => setExpanded(false));
+    return () => cancelAnimationFrame(id);
   }, [shouldExpand]);
 
   const wordCount = liveTranscript.trim() ? liveTranscript.trim().split(/\s+/).length : 0;
@@ -55,7 +56,8 @@ export function VoiceBubble({
       const t = setTimeout(() => setShowTranscript(true), 80);
       return () => clearTimeout(t);
     }
-    setShowTranscript(false);
+    const t = requestAnimationFrame(() => setShowTranscript(false));
+    return () => cancelAnimationFrame(t);
   }, [wordCount]);
 
   useEffect(() => {
@@ -63,7 +65,8 @@ export function VoiceBubble({
       const t = setTimeout(() => setShowAiPreview(true), 80);
       return () => clearTimeout(t);
     }
-    setShowAiPreview(false);
+    const t = requestAnimationFrame(() => setShowAiPreview(false));
+    return () => cancelAnimationFrame(t);
   }, [aiPreviewTitle]);
 
   return (

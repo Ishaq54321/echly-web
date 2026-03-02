@@ -63,10 +63,13 @@ export function useFeedback({
 
   useEffect(() => {
     const idx = feedback.findIndex((f) => f.id === selectedId);
-    if (idx !== -1) {
-      setDescriptionDraft(feedback[idx].description);
+    if (idx === -1) return;
+    const desc = feedback[idx].description;
+    const t = requestAnimationFrame(() => {
+      setDescriptionDraft(desc);
       setIsEditingDescription(false);
-    }
+    });
+    return () => cancelAnimationFrame(t);
   }, [selectedId, feedback]);
 
   const saveDescription = () => {
@@ -91,13 +94,9 @@ export function useFeedback({
     });
 
     const data = (await res.json()) as { success?: boolean; tickets?: StructuredTicket[]; error?: string };
-    console.log("STRUCTURING RESPONSE:", data);
 
     const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-    if (!data.success || tickets.length === 0) {
-      console.warn("No structured tickets returned", data);
-      return;
-    }
+    if (!data.success || tickets.length === 0) return;
 
     let screenshotUrl: string | null = null;
     let firstFeedbackId: string | null = null;

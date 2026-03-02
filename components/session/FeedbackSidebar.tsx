@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { MoreHorizontal } from "lucide-react";
 
 interface FeedbackItem {
@@ -34,7 +34,7 @@ interface Props {
   onMarkAllResolved?: () => Promise<void>;
 }
 
-export default function FeedbackSidebar({
+function FeedbackSidebarInner({
   feedback,
   selectedId,
   onSelect,
@@ -273,3 +273,5 @@ export default function FeedbackSidebar({
     </div>
   );
 }
+
+export default React.memo(FeedbackSidebarInner);

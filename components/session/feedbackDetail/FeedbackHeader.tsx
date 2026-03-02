@@ -40,7 +40,9 @@ export function FeedbackHeader({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setTitleDraft(item.title);
+    const title = item.title;
+    const t = requestAnimationFrame(() => setTitleDraft(title));
+    return () => cancelAnimationFrame(t);
   }, [item.title]);
 
   useEffect(() => {

@@ -55,18 +55,13 @@ export default function DashboardPage() {
 
   return (
     <div className="surface-main flex flex-col w-full min-h-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-      <div className="mx-auto w-full max-w-[1800px] px-10 py-8">
-        {/* Temporary: semantic color test — remove after verification */}
-        <div className="text-semantic-system text-sm mb-2" aria-hidden>
-          COLOR TEST
-        </div>
-        {/* Header */}
-        <header className="flex items-start justify-between">
-          <div>
-            <h1 className="text-[22px] font-medium text-neutral-900">
+      <div className="mx-auto w-full max-w-[1800px] px-10 pt-6 pb-8">
+        <div className="flex items-start justify-between">
+          <div className="mb-8">
+            <h1 className="text-[28px] font-semibold text-neutral-900">
               Workspaces
             </h1>
-            <p className="mt-2 text-[15px] text-neutral-500">
+            <p className="mt-1 text-[14px] text-neutral-500">
               Sessions and feedback in one place.
             </p>
           </div>
@@ -87,7 +82,7 @@ export default function DashboardPage() {
               aria-label="Search sessions"
             />
           </div>
-        </header>
+        </div>
 
         <main className="flex-1 mt-6">
           {/* TODO: Future: Archived view to list archived sessions. */}

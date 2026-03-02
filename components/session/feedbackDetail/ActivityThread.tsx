@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Comment } from "@/lib/comments";
 
@@ -55,10 +56,13 @@ export function ActivityThread({ comments, loading }: ActivityThreadProps) {
             >
               <div className="h-8 w-8 shrink-0 rounded-full overflow-hidden bg-neutral-200">
                 {comment.userAvatar ? (
-                  <img
+                  <Image
                     src={comment.userAvatar}
-                    alt={comment.userName}
+                    alt={comment.userName ?? ""}
+                    width={32}
+                    height={32}
                     className="w-full h-full object-cover"
+                    unoptimized
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-xs font-medium text-neutral-600">

@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyIdToken } from "../../lib/server/auth";
+import type { RequestWithUser } from "../../lib/types";
+import { log } from "../../lib/utils/logger";
 
 export async function verifyFirebaseToken(
   req: Request,
@@ -17,14 +19,12 @@ export async function verifyFirebaseToken(
   try {
     const decoded = await verifyIdToken(idToken);
 
-    console.log("✅ Token verified. UID:", decoded.uid);
+    log("Token verified. UID:", decoded.uid);
 
-    (req as any).user = decoded;
+    (req as RequestWithUser).user = decoded;
     next();
   } catch (error) {
-    console.log("❌ Token verification failed.");
-    console.log("Error:", error);
-
+    log("Token verification failed.", error);
     return res.status(401).json({ error: "Unauthorized - Invalid token" });
   }
 }

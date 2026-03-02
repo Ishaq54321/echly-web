@@ -14,7 +14,7 @@ export interface ShareSessionModalProps {
 export function ShareSessionModal({
   open,
   onClose,
-  sessionId,
+  sessionId: _sessionId,
   sessionTitle,
 }: ShareSessionModalProps) {
   if (!open) return null;

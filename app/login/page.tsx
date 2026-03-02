@@ -2,7 +2,6 @@
 
 import { auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { saveUserToFirestore } from "@/lib/firestore";
 
 export default function Login() {
   const handleLogin = async () => {

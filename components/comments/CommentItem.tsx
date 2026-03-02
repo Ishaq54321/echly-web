@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 interface Props {
   name: string;
   avatar: string;
@@ -15,10 +17,13 @@ export default function CommentItem({
 }: Props) {
   return (
     <div className="flex items-start gap-4 group">
-      <img
+      <Image
         src={avatar}
         alt={name}
+        width={32}
+        height={32}
         className="w-8 h-8 rounded-full object-cover ring-2 ring-white shadow-sm"
+        unoptimized
       />
 
       <div className="flex-1 min-w-0">

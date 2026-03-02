@@ -22,9 +22,11 @@ export function useFeedbackDetailController(args: {
 
   useEffect(() => {
     if (!feedbackId) {
-      setComments([]);
-      setLoadingComments(false);
-      return;
+      const t = requestAnimationFrame(() => {
+        setComments([]);
+        setLoadingComments(false);
+      });
+      return () => cancelAnimationFrame(t);
     }
 
     // Prevent multiple listeners: tear down previous before subscribing.
@@ -34,7 +36,7 @@ export function useFeedbackDetailController(args: {
     }
 
     let cancelled = false;
-    setLoadingComments(true);
+    const t = requestAnimationFrame(() => setLoadingComments(true));
 
     const unsubscribe = listenToCommentsRepo(
       sessionId,
@@ -48,6 +50,7 @@ export function useFeedbackDetailController(args: {
     unsubscribeRef.current = unsubscribe;
 
     return () => {
+      cancelAnimationFrame(t);
       cancelled = true;
       unsubscribe();
       unsubscribeRef.current = null;

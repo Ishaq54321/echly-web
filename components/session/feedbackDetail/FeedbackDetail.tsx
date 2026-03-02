@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { FeedbackHeader } from "./FeedbackHeader";
 import { FeedbackContent } from "./FeedbackContent";
 import type { FeedbackItemShape } from "./types";
@@ -24,7 +25,7 @@ export interface FeedbackDetailProps {
   onToggleActivity: () => void;
 }
 
-export default function FeedbackDetail({
+function FeedbackDetailInner({
   selectedItem,
   isEditingDescription,
   descriptionDraft,
@@ -78,3 +79,5 @@ export default function FeedbackDetail({
     </div>
   );
 }
+
+export default React.memo(FeedbackDetailInner);

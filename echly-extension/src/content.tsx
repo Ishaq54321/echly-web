@@ -10,6 +10,7 @@ import { storage } from "./firebase";
 import { apiFetch } from "./contentAuthFetch";
 import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
 import CaptureWidget from "@/components/CaptureWidget";
+import { log } from "@/lib/utils/logger";
 
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
@@ -224,7 +225,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 callbacks?.onError();
                 return;
               }
-              console.log("[CONTENT] Ticket received:", response.ticket);
+              log("[CONTENT] Ticket received:", response.ticket);
               callbacks?.onSuccess({
                 id: response.ticket.id,
                 title: response.ticket.title,

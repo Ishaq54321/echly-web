@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { Feedback } from "@/lib/domain/feedback";
 import { requireAuth } from "@/lib/server/auth";
 import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
@@ -7,6 +6,7 @@ import {
   updateFeedbackRepo,
 } from "@/lib/repositories/feedbackRepository";
 import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
+import { log } from "@/lib/utils/logger";
 
 /** GET /api/tickets/:id — return single ticket (feedback) from DB. */
 export async function GET(
@@ -14,7 +14,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const start = Date.now();
-  console.log("[API] GET /api/tickets/[id] start");
+  log("[API] GET /api/tickets/[id] start");
   let user;
   try {
     user = await requireAuth(req);
@@ -42,14 +42,14 @@ export async function GET(
         { status: 403 }
       );
     }
-    console.log("[API] GET /api/tickets/[id] duration:", Date.now() - start);
+    log("[API] GET /api/tickets/[id] duration:", Date.now() - start);
     return NextResponse.json({
       success: true,
       ticket: serializeTicket(ticket),
     });
   } catch (err) {
     console.error("GET /api/tickets/[id]:", err);
-    console.log("[API] GET /api/tickets/[id] duration (error):", Date.now() - start);
+    log("[API] GET /api/tickets/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Server error" },
       { status: 500 }
@@ -63,7 +63,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const start = Date.now();
-  console.log("[API] PATCH /api/tickets/[id] start");
+  log("[API] PATCH /api/tickets/[id] start");
   let user;
   try {
     user = await requireAuth(req);
@@ -122,14 +122,14 @@ export async function PATCH(
       );
     }
     await updateSessionUpdatedAtRepo(updated.sessionId);
-    console.log("[API] PATCH /api/tickets/[id] duration:", Date.now() - start);
+    log("[API] PATCH /api/tickets/[id] duration:", Date.now() - start);
     return NextResponse.json({
       success: true,
       ticket: serializeTicket(updated),
     });
   } catch (err) {
     console.error("PATCH /api/tickets/[id]:", err);
-    console.log("[API] PATCH /api/tickets/[id] duration (error):", Date.now() - start);
+    log("[API] PATCH /api/tickets/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Server error" },
       { status: 500 }

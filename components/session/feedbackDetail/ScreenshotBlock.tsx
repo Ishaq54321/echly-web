@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Expand } from "lucide-react";
 
 interface ScreenshotBlockProps {
@@ -15,10 +16,13 @@ export function ScreenshotBlock({ screenshotUrl, onExpand }: ScreenshotBlockProp
         <span>Screenshot</span>
       </div>
       <div className="relative overflow-hidden rounded-md max-h-[317px] bg-neutral-50">
-        <img
+        <Image
           src={screenshotUrl}
           alt="Screenshot"
+          width={800}
+          height={317}
           className="w-full h-auto max-h-[317px] object-contain"
+          unoptimized
         />
         <button
           type="button"

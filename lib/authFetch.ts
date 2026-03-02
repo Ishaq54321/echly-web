@@ -43,9 +43,16 @@ function resolveInput(input: RequestInfo | URL): RequestInfo | URL {
   return path.startsWith("http") ? input : base + path;
 }
 
+const DEFAULT_TIMEOUT_MS = 15000;
+
+export type AuthFetchInit = RequestInit & {
+  /** Abort request after this many ms. Default 15s when set. */
+  timeout?: number;
+};
+
 export async function authFetch(
   input: RequestInfo | URL,
-  init: RequestInit = {}
+  init: AuthFetchInit = {}
 ): Promise<Response> {
   const user = auth.currentUser;
 
@@ -58,8 +65,41 @@ export async function authFetch(
   const headers = new Headers(init.headers || {});
   headers.set("Authorization", `Bearer ${token}`);
 
-  return fetch(resolveInput(input), {
-    ...init,
-    headers,
-  });
+  const timeoutMs = init.timeout !== undefined ? init.timeout : DEFAULT_TIMEOUT_MS;
+  const { timeout: _t, ...restInit } = init;
+  let signal = restInit.signal;
+  let controller: AbortController | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  if (timeoutMs > 0) {
+    controller = new AbortController();
+    timeoutId = setTimeout(() => controller!.abort(), timeoutMs);
+    signal = restInit.signal
+      ? (() => {
+          const combined = new AbortController();
+          restInit.signal?.addEventListener("abort", () => {
+            clearTimeout(timeoutId!);
+            combined.abort();
+          });
+          controller!.signal.addEventListener("abort", () => combined.abort());
+          return combined.signal;
+        })()
+      : controller.signal;
+  }
+
+  try {
+    const res = await fetch(resolveInput(input), {
+      ...restInit,
+      headers,
+      signal: signal ?? restInit.signal,
+    });
+    if (timeoutId) clearTimeout(timeoutId);
+    return res;
+  } catch (err) {
+    if (timeoutId) clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === "AbortError" && controller?.signal.aborted) {
+      throw new Error("Request timed out");
+    }
+    throw err;
+  }
 }
