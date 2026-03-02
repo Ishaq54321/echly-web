@@ -14,6 +14,8 @@ import { getViewerId } from "@/lib/viewerId";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import FeedbackSidebar from "@/components/session/FeedbackSidebar";
 import FeedbackDetail from "@/components/session/feedbackDetail/FeedbackDetail";
+import { SessionPremiumLoader } from "@/components/session/SessionPremiumLoader";
+import { FeedbackPremiumLoader } from "@/components/session/FeedbackPremiumLoader";
 import { ActivityPanel } from "@/components/session/feedbackDetail/ActivityPanel";
 import { Pencil, Check } from "lucide-react";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
@@ -157,6 +159,7 @@ export default function SessionPage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser === undefined) return;
       if (!currentUser) {
         clearAuthTokenCache();
         router.push("/login");
@@ -550,7 +553,7 @@ export default function SessionPage() {
     }
   };
 
-  if (sessionLoading) return null;
+  if (sessionLoading) return <SessionPremiumLoader />;
 
   return (
     <>
@@ -711,7 +714,9 @@ export default function SessionPage() {
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="max-w-4xl mx-auto w-full px-10 py-8">
-              {detailLoading && selectedId ? (
+              {feedbackLoading ? (
+                <FeedbackPremiumLoader />
+              ) : detailLoading && selectedId ? (
                 <div className="flex items-center justify-center py-16">
                   <p className="text-[13px] text-neutral-500">Loading…</p>
                 </div>

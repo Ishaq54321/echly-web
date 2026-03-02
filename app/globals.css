@@ -138,6 +138,24 @@ body {
   to { opacity: 1; }
 }
 
+/* Session page premium loader: subtle bar pulse */
+@keyframes session-loader-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.75; }
+}
+.animate-session-loader-pulse {
+  animation: session-loader-pulse 1.4s ease-in-out infinite;
+}
+
+/* Feedback list placeholder: very soft opacity fade */
+@keyframes feedback-placeholder-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+.animate-feedback-placeholder-pulse {
+  animation: feedback-placeholder-pulse 1.6s ease-in-out infinite;
+}
+
 /* ======================================
    GLOBAL TYPOGRAPHY SCALE (Echly)
    Linear density · ChatGPT readability · Apple hierarchy · Claude restraint

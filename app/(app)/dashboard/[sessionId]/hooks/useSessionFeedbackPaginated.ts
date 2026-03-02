@@ -46,7 +46,7 @@ export function useSessionFeedbackPaginated(
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -118,6 +118,7 @@ export function useSessionFeedbackPaginated(
       setCursor(null);
       setHasMore(true);
       setInitialLoadDone(false);
+      setInitialLoading(false);
       return;
     }
 
