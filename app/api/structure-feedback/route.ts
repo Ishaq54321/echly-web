@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { requireAuth } from "@/lib/server/auth";
+import {
+  detectHighConfidencePatterns,
+  type DetectedPattern,
+} from "@/lib/server/patternDetection";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -120,6 +124,36 @@ CORE RULES
 10. Do not add explanations unless explicitly stated by user.
 
 ------------------------------------------------------------
+CHANGE INSTRUCTION HANDLING
+------------------------------------------------------------
+
+When the transcript contains a clear "change X to Y" pattern:
+
+1. Always preserve BOTH:
+   - The original value (X)
+   - The new value (Y)
+
+2. Do NOT compress into only the new value.
+
+3. Action step must be formatted as:
+   "Change [element] from 'X' to 'Y'."
+
+4. If original value exists in visible text, prefer that exact spelling.
+
+5. Do not drop the original phrase unless it is completely unintelligible.
+
+Examples:
+
+Transcript:
+"Change Schedule & Begin Treatment to Meet with our care team"
+
+Correct action step:
+"Change title text from 'Schedule & Begin Treatment' to 'Meet with our care team'."
+
+Never output only:
+"Meet with our care team."
+
+------------------------------------------------------------
 TITLE RULES
 ------------------------------------------------------------
 
@@ -237,6 +271,48 @@ function parseStructuredTickets(
   }
 }
 
+function buildStructuralHintsBlock(patterns: DetectedPattern[]): string {
+  if (patterns.length === 0) return "";
+  const lines: string[] = [
+    "------------------------------------------------------------",
+    "DETECTED STRUCTURAL HINTS",
+    "------------------------------------------------------------",
+    "",
+  ];
+  for (const p of patterns) {
+    if (p.type === "change") {
+      lines.push("Detected explicit change:", `From: "${p.from}"`, `To: "${p.to}"`, "");
+    } else if (p.type === "replace") {
+      lines.push("Detected explicit replacement:", `From: "${p.from}"`, `To: "${p.to}"`, "");
+    } else if (p.type === "remove") {
+      lines.push("Detected explicit removal target:", `Target: "${p.target}"`, "");
+    } else if (p.type === "colorChange") {
+      lines.push("Detected explicit color change:", `From: "${p.from}"`, `To: "${p.to}"`, "");
+    }
+  }
+  return lines.join("\n");
+}
+
+function actionStepsContainBoth(
+  tickets: Array<Record<string, unknown>>,
+  from: string,
+  to: string
+): boolean {
+  const steps = tickets.flatMap((t) =>
+    Array.isArray(t.actionSteps) ? (t.actionSteps as string[]) : []
+  );
+  return steps.some(
+    (s) => typeof s === "string" && s.includes(from) && s.includes(to)
+  );
+}
+
+const RETRY_SYSTEM_APPEND = `
+
+IMPORTANT:
+The transcript contains an explicit change instruction.
+The action step MUST preserve both original and new values exactly.
+Do not compress. Do not omit the original phrase.`;
+
 export async function POST(req: Request): Promise<Response> {
   const stableFailure = (error: string): NextResponse<StructureResponse> =>
     NextResponse.json({ success: false, tickets: [], error }, { status: 200 });
@@ -304,22 +380,87 @@ export async function POST(req: Request): Promise<Response> {
           .join("\n")
       : "";
 
-  const userContent = contextBlock
-    ? `${contextBlock}\n\nRaw feedback:\n"${transcript.trim()}"`
-    : `Raw feedback:\n"${transcript.trim()}"`;
+  const patternData = detectHighConfidencePatterns(transcript);
+  const hintsBlock =
+    patternData.detectedPatterns.length > 0
+      ? buildStructuralHintsBlock(patternData.detectedPatterns)
+      : "";
+  const rawFeedbackLine = `Raw feedback:\n"${transcript.trim()}"`;
+  const userContent = [contextBlock, hintsBlock, rawFeedbackLine]
+    .filter(Boolean)
+    .join("\n\n");
+
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[structure-feedback] transcript:", transcript);
+    console.info("[structure-feedback] detectedPatterns:", patternData.detectedPatterns);
+  }
 
   try {
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: STRUCTURE_ENGINE_V2 },
-        { role: "user", content: userContent },
-      ],
-    });
+    const systemContent = STRUCTURE_ENGINE_V2;
+    let parsedTickets: Array<Record<string, unknown>> = [];
 
-    const content = completion.choices[0]?.message?.content;
-    const parsedTickets = parseStructuredTickets(content);
+    const runCompletion = async (system: string) => {
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userContent },
+        ],
+      });
+      return completion.choices[0]?.message?.content ?? null;
+    };
+
+    const content = await runCompletion(systemContent);
+    parsedTickets = parseStructuredTickets(content);
+
+    const changeOrReplace = patternData.detectedPatterns.find(
+      (p): p is DetectedPattern & { from: string; to: string } =>
+        p.type === "change" || p.type === "replace"
+    );
+
+    if (
+      changeOrReplace &&
+      !actionStepsContainBoth(
+        parsedTickets,
+        changeOrReplace.from,
+        changeOrReplace.to
+      )
+    ) {
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[structure-feedback] retry triggered (change/replace validation failed)");
+      }
+      const retryContent = await runCompletion(
+        systemContent + RETRY_SYSTEM_APPEND
+      );
+      parsedTickets = parseStructuredTickets(retryContent);
+
+      if (
+        !actionStepsContainBoth(
+          parsedTickets,
+          changeOrReplace.from,
+          changeOrReplace.to
+        )
+      ) {
+        const reconstructedStep = `Change [element] from '${changeOrReplace.from}' to '${changeOrReplace.to}'.`;
+        const firstWithSteps = parsedTickets.find(
+          (t) => Array.isArray(t.actionSteps) && (t.actionSteps as string[]).length > 0
+        );
+        const targetTicket = firstWithSteps ?? parsedTickets[0];
+        if (targetTicket && typeof targetTicket === "object") {
+          targetTicket.actionSteps = [reconstructedStep];
+        } else {
+          parsedTickets = [
+            {
+              title: "Update content",
+              description: transcript.trim().slice(0, 80),
+              actionSteps: [reconstructedStep],
+              suggestedTags: ["Content"],
+            },
+          ];
+        }
+      }
+    }
 
     const valid = parsedTickets
       .filter((t: Record<string, unknown>) => t && typeof t.title === "string")
