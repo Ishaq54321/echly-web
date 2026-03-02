@@ -2716,8 +2716,8 @@ textarea:focus-visible {
 .echly-recording-capsule--expanded {
   width: 420px;
   min-width: 420px;
-  min-height: 110px;
-  padding: 34px 28px;
+  min-height: 130px;
+  padding: 42px 32px;
   gap: 24px;
   justify-content: flex-start;
 }
@@ -2738,9 +2738,13 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 220ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    box-shadow 220ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    transform 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition: background 220ms ease-out,
+    box-shadow 180ms ease-out,
+    transform 120ms ease-out;
+}
+.echly-recording-orb-inner--listening {
+  box-shadow: 0 0 0 8px rgba(255, 0, 0, 0.08),
+    0 0 20px rgba(255, 0, 0, 0.18);
 }
 .echly-recording-orb-inner--processing {
   background: radial-gradient(circle at 30% 30%, #6b6b6b, #4a4a4a);
@@ -2768,10 +2772,15 @@ textarea:focus-visible {
   flex: 1;
   width: auto;
   opacity: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
 }
 .echly-recording-status {
   font-size: 14px;
   font-weight: 500;
+  line-height: 1.4;
   color: rgba(255, 255, 255, 0.92);
   flex-shrink: 0;
   margin-bottom: 6px;
@@ -2792,11 +2801,15 @@ textarea:focus-visible {
   margin-top: 14px;
 }
 .echly-recording-cancel-pill {
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
-  padding: 6px 12px;
+  height: 38px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
   border: none;
-  color: rgba(255, 255, 255, 0.75);
+  border-radius: 999px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -2808,11 +2821,14 @@ textarea:focus-visible {
   color: rgba(255, 255, 255, 0.95);
 }
 .echly-recording-done {
-  height: 36px;
+  height: 38px;
   padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  background: #FFFFFF;
-  color: #000000;
+  background: #ffffff;
+  color: #111;
   font-size: 14px;
   font-weight: 600;
   border: none;

@@ -30,7 +30,7 @@ export type RecordingMicOrbProps = {
 };
 
 /**
- * 72px mic orb. Radial gradient, soft glow. Scale 1–1.06 on audio. Processing: desaturate.
+ * 72px mic orb. Radial gradient, soft glow. Scale 1–1.1 on audio when listening. Processing: desaturate.
  */
 export function RecordingMicOrb({
   isRecording,
@@ -38,14 +38,16 @@ export function RecordingMicOrb({
   audioLevel,
 }: RecordingMicOrbProps) {
   const scale = isRecording && !isProcessing
-    ? 1 + Math.min(0.06, audioLevel * 0.08)
+    ? 1 + Math.min(0.1, audioLevel * 0.1)
     : 1;
+  const isListening = isRecording && !isProcessing;
 
   return (
     <div
       className={[
         "echly-recording-orb-inner",
         isProcessing ? "echly-recording-orb-inner--processing" : "",
+        isListening ? "echly-recording-orb-inner--listening" : "",
       ]
         .filter(Boolean)
         .join(" ")}
