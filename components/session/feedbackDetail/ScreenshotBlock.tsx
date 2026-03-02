@@ -21,8 +21,9 @@ export function ScreenshotBlock({ screenshotUrl, onExpand }: ScreenshotBlockProp
           alt="Screenshot"
           width={800}
           height={317}
+          sizes="(max-width: 1024px) 100vw, 768px"
           className="w-full h-auto max-h-[317px] object-contain"
-          unoptimized
+          loading="lazy"
         />
         <button
           type="button"
