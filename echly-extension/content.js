@@ -47813,9 +47813,11 @@ This typically indicates that your device does not have a healthy Internet conne
     const [highlightTicketId, setHighlightTicketId] = (0, import_react.useState)(null);
     const [pillExiting, setPillExiting] = (0, import_react.useState)(false);
     const [captureRootReady, setCaptureRootReady] = (0, import_react.useState)(false);
+    const [orbSuccess, setOrbSuccess] = (0, import_react.useState)(false);
     const dragOffset = (0, import_react.useRef)({ x: 0, y: 0 });
     const widgetRef = (0, import_react.useRef)(null);
     const captureRootRef = (0, import_react.useRef)(null);
+    const aiRootRef = (0, import_react.useRef)(null);
     const recognitionRef = (0, import_react.useRef)(null);
     const menuRef = (0, import_react.useRef)(null);
     const activeRecordingIdRef = (0, import_react.useRef)(null);
@@ -47984,19 +47986,31 @@ This typically indicates that your device does not have a healthy Internet conne
     }, []);
     const createCaptureRoot = (0, import_react.useCallback)(() => {
       if (captureRootRef.current) return;
-      const el = document.createElement("div");
-      el.id = "echly-capture-root";
-      document.body.appendChild(el);
-      captureRootRef.current = el;
+      const captureEl = document.createElement("div");
+      captureEl.id = "echly-capture-root";
+      document.body.appendChild(captureEl);
+      captureRootRef.current = captureEl;
+      const aiEl = document.createElement("div");
+      aiEl.id = "echly-ai-root";
+      document.body.appendChild(aiEl);
+      aiRootRef.current = aiEl;
       setCaptureRootReady(true);
     }, []);
     const removeCaptureRoot = (0, import_react.useCallback)(() => {
-      if (!captureRootRef.current) return;
-      try {
-        document.body.removeChild(captureRootRef.current);
-      } catch (_) {
+      if (aiRootRef.current) {
+        try {
+          document.body.removeChild(aiRootRef.current);
+        } catch (_) {
+        }
+        aiRootRef.current = null;
       }
-      captureRootRef.current = null;
+      if (captureRootRef.current) {
+        try {
+          document.body.removeChild(captureRootRef.current);
+        } catch (_) {
+        }
+        captureRootRef.current = null;
+      }
       setCaptureRootReady(false);
     }, []);
     const restoreWidget = (0, import_react.useCallback)(() => {
@@ -48107,7 +48121,9 @@ This typically indicates that your device does not have a healthy Internet conne
             setRecordings((prev) => prev.filter((r) => r.id !== activeId));
             setActiveRecordingId(null);
             setHighlightTicketId(ticket.id);
-            setTimeout(() => setHighlightTicketId(null), 1200);
+            setTimeout(() => setHighlightTicketId(null), 1500);
+            setOrbSuccess(true);
+            setTimeout(() => setOrbSuccess(false), 200);
             setPillExiting(true);
             setTimeout(() => {
               removeCaptureRoot();
@@ -48137,7 +48153,9 @@ This typically indicates that your device does not have a healthy Internet conne
         setRecordings((prev) => prev.filter((r) => r.id !== activeId));
         setActiveRecordingId(null);
         setHighlightTicketId(structured.id);
-        setTimeout(() => setHighlightTicketId(null), 1200);
+        setTimeout(() => setHighlightTicketId(null), 1500);
+        setOrbSuccess(true);
+        setTimeout(() => setOrbSuccess(false), 200);
         setPillExiting(true);
         setTimeout(() => {
           removeCaptureRoot();
@@ -48374,6 +48392,7 @@ This typically indicates that your device does not have a healthy Internet conne
       if (state !== "voice_listening") return "neutral";
       return getSentimentFromTranscript(activeRecording?.transcript ?? "");
     }, [state, activeRecording?.transcript]);
+    const liveTranscript = activeRecording?.transcript?.trim() ?? "";
     return {
       state: {
         isOpen,
@@ -48387,16 +48406,19 @@ This typically indicates that your device does not have a healthy Internet conne
         showMenu,
         position,
         liveStructured,
+        liveTranscript,
         listeningAudioLevel,
         listeningSentiment,
         highlightTicketId,
-        pillExiting
+        pillExiting,
+        orbSuccess
       },
       handlers,
       refs: {
         widgetRef,
         menuRef,
-        captureRootRef
+        captureRootRef,
+        aiRootRef
       },
       captureRootReady
     };
@@ -48530,22 +48552,29 @@ This typically indicates that your device does not have a healthy Internet conne
   ];
   var Pencil = createLucideIcon("pencil", __iconNode3);
 
-  // node_modules/lucide-react/dist/esm/icons/trash-2.js
+  // node_modules/lucide-react/dist/esm/icons/plus.js
   var __iconNode4 = [
+    ["path", { d: "M5 12h14", key: "1ays0h" }],
+    ["path", { d: "M12 5v14", key: "s699le" }]
+  ];
+  var Plus = createLucideIcon("plus", __iconNode4);
+
+  // node_modules/lucide-react/dist/esm/icons/trash-2.js
+  var __iconNode5 = [
     ["path", { d: "M10 11v6", key: "nco0om" }],
     ["path", { d: "M14 11v6", key: "outv1u" }],
     ["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", key: "miytrc" }],
     ["path", { d: "M3 6h18", key: "d0wm0j" }],
     ["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", key: "e791ji" }]
   ];
-  var Trash2 = createLucideIcon("trash-2", __iconNode4);
+  var Trash2 = createLucideIcon("trash-2", __iconNode5);
 
   // node_modules/lucide-react/dist/esm/icons/x.js
-  var __iconNode5 = [
+  var __iconNode6 = [
     ["path", { d: "M18 6 6 18", key: "1bl5f8" }],
     ["path", { d: "m6 6 12 12", key: "d8bk6v" }]
   ];
-  var X = createLucideIcon("x", __iconNode5);
+  var X = createLucideIcon("x", __iconNode6);
 
   // components/CaptureWidget/CaptureHeader.tsx
   var import_jsx_runtime = __toESM(require_jsx_runtime());
@@ -48574,6 +48603,13 @@ This typically indicates that your device does not have a healthy Internet conne
   // components/CaptureWidget/FeedbackItem.tsx
   var import_react4 = __toESM(require_react());
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  function priorityFromType(type) {
+    const t = (type ?? "").toLowerCase();
+    if (/critical|blocking/.test(t)) return "critical";
+    if (/high|urgent|bug/.test(t)) return "high";
+    if (/low/.test(t)) return "low";
+    return "medium";
+  }
   function FeedbackItem({
     item,
     expandedId,
@@ -48591,6 +48627,7 @@ This typically indicates that your device does not have a healthy Internet conne
     const isExpanded = expandedId === item.id;
     const isEditing = editingId === item.id;
     const isHighlighted = highlightTicketId === item.id;
+    const priority = priorityFromType(item.type);
     const handleExpand = (0, import_react4.useCallback)(() => {
       onExpand(isExpanded ? null : item.id);
     }, [isExpanded, item.id, onExpand]);
@@ -48603,80 +48640,66 @@ This typically indicates that your device does not have a healthy Internet conne
     const handleDelete = (0, import_react4.useCallback)(() => {
       onDelete(item.id);
     }, [item.id, onDelete]);
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
       "div",
       {
-        className: `echly-feedback-item py-4 px-5 transition-colors duration-120 ease-[cubic-bezier(0.2,0.8,0.2,1)] active:scale-[0.995] active:duration-[80ms] active:ease-in ${isHighlighted ? "echly-ticket-highlight" : ""}`,
-        children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex justify-between gap-4", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "flex-1 min-w-0", children: isEditing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "input",
-              {
-                value: editedTitle,
-                onChange: (e) => onEditedTitleChange(e.target.value),
-                className: "echly-widget-input focus-ring-brand w-full mb-2 px-3 py-2 bg-transparent text-slate-900 dark:text-slate-100 rounded-md text-[15px] font-medium outline-none focus:ring-1 focus:ring-brand-accent transition-all duration-150 border border-transparent focus:border-slate-300 dark:focus:border-slate-600"
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "textarea",
-              {
-                value: editedDescription,
-                onChange: (e) => onEditedDescriptionChange(e.target.value),
-                rows: 3,
-                className: "echly-widget-input focus-ring-brand w-full px-3 py-2 bg-transparent text-slate-700 dark:text-slate-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-brand-accent transition-all duration-150 resize-none border border-transparent focus:border-slate-300 dark:focus:border-slate-600"
-              }
-            )
-          ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h3", { className: "echly-widget-item-title text-slate-900 dark:text-slate-100", children: item.title }),
-            isExpanded && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "echly-widget-item-desc text-slate-600 dark:text-slate-400 mt-1.5", children: item.description })
-          ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-feedback-item-actions flex items-center gap-1 shrink-0", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "button",
-              {
-                type: "button",
-                onClick: handleExpand,
-                className: "echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 cursor-pointer transition-opacity duration-150",
-                "aria-label": isExpanded ? "Collapse" : "Expand",
-                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Expand, { size: 18, strokeWidth: 1.5 })
-              }
-            ),
-            isEditing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "button",
-              {
-                type: "button",
-                onClick: handleSave,
-                className: "echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 cursor-pointer transition-opacity duration-150",
-                "aria-label": "Save",
-                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Check, { size: 18, strokeWidth: 1.5 })
-              }
-            ) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "button",
-              {
-                type: "button",
-                onClick: handleEdit,
-                className: "echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 cursor-pointer transition-opacity duration-150",
-                "aria-label": "Edit",
-                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Pencil, { size: 18, strokeWidth: 1.5 })
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "button",
-              {
-                type: "button",
-                onClick: handleDelete,
-                className: "echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 hover:!opacity-100 hover:!text-red-500 cursor-pointer transition-opacity duration-150",
-                "aria-label": "Delete",
-                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Trash2, { size: 18, strokeWidth: 1.5 })
-              }
-            )
+        className: `echly-feedback-item ${isHighlighted ? "echly-ticket-highlight" : ""}`,
+        "data-priority": priority,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "echly-priority-dot", "aria-hidden": true }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-feedback-item-inner", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "echly-feedback-item-content", children: isEditing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+                "input",
+                {
+                  value: editedTitle,
+                  onChange: (e) => onEditedTitleChange(e.target.value),
+                  className: "echly-widget-input echly-feedback-item-input"
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+                "textarea",
+                {
+                  value: editedDescription,
+                  onChange: (e) => onEditedDescriptionChange(e.target.value),
+                  rows: 3,
+                  className: "echly-widget-input echly-feedback-item-textarea"
+                }
+              )
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h3", { className: "echly-widget-item-title", children: item.title }),
+              isExpanded && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "echly-widget-item-desc", children: item.description })
+            ] }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-feedback-item-actions", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+                "button",
+                {
+                  type: "button",
+                  onClick: handleExpand,
+                  className: "echly-widget-action-icon",
+                  "aria-label": isExpanded ? "Collapse" : "Expand",
+                  children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Expand, { size: 18, strokeWidth: 1.5 })
+                }
+              ),
+              isEditing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", onClick: handleSave, className: "echly-widget-action-icon", "aria-label": "Save", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Check, { size: 18, strokeWidth: 1.5 }) }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", onClick: handleEdit, className: "echly-widget-action-icon", "aria-label": "Edit", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Pencil, { size: 18, strokeWidth: 1.5 }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+                "button",
+                {
+                  type: "button",
+                  onClick: handleDelete,
+                  className: "echly-widget-action-icon echly-widget-action-icon--delete",
+                  "aria-label": "Delete",
+                  children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Trash2, { size: 18, strokeWidth: 1.5 })
+                }
+              )
+            ] })
           ] })
-        ] })
+        ]
       }
     );
   }
   var FeedbackItem_default = import_react4.default.memo(FeedbackItem, (prev, next) => {
-    return prev.item === next.item && prev.expandedId === next.expandedId && prev.editingId === next.editingId && prev.editedTitle === next.editedTitle && prev.editedDescription === next.editedDescription;
+    return prev.item === next.item && prev.expandedId === next.expandedId && prev.editingId === next.editingId && prev.editedTitle === next.editedTitle && prev.editedDescription === next.editedDescription && prev.highlightTicketId === next.highlightTicketId;
   });
 
   // components/CaptureWidget/WidgetFooter.tsx
@@ -48693,8 +48716,9 @@ This typically indicates that your device does not have a healthy Internet conne
         type: "button",
         onClick: effectivelyDisabled ? void 0 : onAddFeedback,
         disabled: effectivelyDisabled,
-        className: `echly-widget-font echly-sidebar-add-btn ${effectivelyDisabled ? "echly-sidebar-add-btn--disabled" : ""}`,
-        children: "+ Add Feedback"
+        className: `echly-add-feedback-btn ${effectivelyDisabled ? "echly-add-feedback-btn--disabled" : ""}`,
+        "aria-label": "Add feedback",
+        children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Plus, { size: 18, strokeWidth: 2, className: "echly-add-feedback-icon" })
       }
     );
   }
@@ -48962,7 +48986,7 @@ This typically indicates that your device does not have a healthy Internet conne
               style: {
                 position: "fixed",
                 inset: 0,
-                background: "rgba(0,0,0,0.06)",
+                background: "rgba(0,0,0,0.05)",
                 pointerEvents: overlayVisible ? "auto" : "none",
                 cursor: "crosshair",
                 zIndex: 2147483646,
@@ -48990,9 +49014,10 @@ This typically indicates that your device does not have a healthy Internet conne
                 top: selectionRect.y,
                 width: Math.max(selectionRect.w, 1),
                 height: Math.max(selectionRect.h, 1),
-                border: "1px solid rgba(255,255,255,0.9)",
+                border: "1px solid white",
                 borderRadius: 4,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                boxShadow: "0 0 0 1px rgba(255,255,255,0.2)",
+                background: "rgba(255,255,255,0.02)",
                 pointerEvents: "none",
                 zIndex: 2147483646,
                 opacity: overlayVisible ? 1 : 0,
@@ -49010,13 +49035,15 @@ This typically indicates that your device does not have a healthy Internet conne
                 top: releasedRect.y,
                 width: releasedRect.w,
                 height: releasedRect.h,
-                border: "1px solid rgba(255,255,255,0.95)",
+                border: "1px solid white",
                 borderRadius: 4,
-                boxShadow: "0 0 0 1px rgba(255,255,255,0.2), 0 4px 24px rgba(0,0,0,0.12)",
+                boxShadow: "0 0 0 1px rgba(255,255,255,0.2)",
+                background: "rgba(255,255,255,0.02)",
                 pointerEvents: "none",
                 zIndex: 2147483647,
-                transition: `transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1)`,
-                transform: pulseDone ? "scale(1)" : "scale(0.98)"
+                transition: "transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+                transform: pulseDone ? "scale(1)" : "scale(0.98)",
+                opacity: pulseDone ? 1 : 0.8
               }
             }
           )
@@ -49035,9 +49062,10 @@ This typically indicates that your device does not have a healthy Internet conne
     audioLevel = 0,
     isExiting = false,
     isProcessing = false,
+    isSuccess = false,
     sentiment = "neutral"
   }) {
-    const ringScale = isSpeaking ? 1 + Math.min(0.2, audioLevel * 0.25) : 1;
+    const ringScale = isSpeaking ? 1 + Math.min(0.22, audioLevel * 0.28) : 1;
     return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "div",
       {
@@ -49045,6 +49073,7 @@ This typically indicates that your device does not have a healthy Internet conne
         echly-mic-orb-wrapper
         ${isExiting ? "echly-mic-orb--exiting" : ""}
         ${isProcessing ? "echly-mic-orb--processing" : ""}
+        ${isSuccess ? "echly-mic-orb--success" : ""}
         echly-mic-orb-sentiment--${sentiment}
       `,
         children: [
@@ -49068,20 +49097,33 @@ This typically indicates that your device does not have a healthy Internet conne
 
   // components/CaptureWidget/VoiceBubble.tsx
   var import_jsx_runtime6 = __toESM(require_jsx_runtime());
+  var MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
   function VoiceBubble({
     isListening,
     isProcessing,
     isExiting = false,
     audioLevel,
     sentiment,
+    liveTranscript = "",
     aiPreviewTitle = null,
+    orbSuccess = false,
     onDone
   }) {
     const isSpeaking = isListening && audioLevel > 0.12;
+    const [showTranscript, setShowTranscript] = (0, import_react6.useState)(false);
     const [showAiPreview, setShowAiPreview] = (0, import_react6.useState)(false);
+    const wordCount = liveTranscript.trim() ? liveTranscript.trim().split(/\s+/).length : 0;
     (0, import_react6.useEffect)(() => {
-      if (aiPreviewTitle && aiPreviewTitle.length > 10) {
-        const t = setTimeout(() => setShowAiPreview(true), 50);
+      if (wordCount > 5) {
+        const t = setTimeout(() => setShowTranscript(true), 80);
+        return () => clearTimeout(t);
+      } else {
+        setShowTranscript(false);
+      }
+    }, [wordCount]);
+    (0, import_react6.useEffect)(() => {
+      if (aiPreviewTitle && aiPreviewTitle.length > 5) {
+        const t = setTimeout(() => setShowAiPreview(true), 80);
         return () => clearTimeout(t);
       } else {
         setShowAiPreview(false);
@@ -49102,26 +49144,37 @@ This typically indicates that your device does not have a healthy Internet conne
               audioLevel,
               isExiting,
               isProcessing,
+              isSuccess: orbSuccess,
               sentiment
             }
           ) }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "echly-capsule-text-block", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "echly-capsule-text", children: isProcessing ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
-              "Structuring insight\u2026",
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "echly-capsule-underline", "aria-hidden": true })
-            ] }) : "Describe the issue\u2026" }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "echly-capsule-transcript-block", children: isProcessing ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "echly-capsule-text", children: [
+            "Structuring insight\u2026",
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "echly-capsule-underline", "aria-hidden": true })
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+              "span",
+              {
+                className: "echly-capsule-transcript",
+                style: {
+                  opacity: showTranscript ? 1 : 0,
+                  transition: `opacity ${MOTION}`
+                },
+                children: liveTranscript || "Describe the issue\u2026"
+              }
+            ),
             aiPreviewTitle && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
               "span",
               {
                 className: "echly-ai-preview",
                 style: {
                   opacity: showAiPreview ? 1 : 0,
-                  transition: "opacity 200ms ease-out"
+                  transition: `opacity 200ms ease-out`
                 },
                 children: aiPreviewTitle
               }
             )
-          ] }),
+          ] }) }),
           isListening && !isProcessing && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
             "button",
             {
@@ -49141,12 +49194,15 @@ This typically indicates that your device does not have a healthy Internet conne
   var import_jsx_runtime7 = __toESM(require_jsx_runtime());
   function CaptureLayer({
     captureRoot,
+    aiRoot,
     extensionMode,
     state,
     pillExiting,
     listeningAudioLevel,
     listeningSentiment,
+    liveTranscript,
     aiPreviewTitle,
+    orbSuccess,
     getFullTabImage,
     onRegionCaptured,
     onRegionSelectStart,
@@ -49156,7 +49212,7 @@ This typically indicates that your device does not have a healthy Internet conne
     const showDimOverlay = state === "focus_mode" || state === "region_selecting";
     const showRegionOverlay = extensionMode && (state === "focus_mode" || state === "region_selecting");
     const showCapsule = state === "voice_listening" || state === "processing" || pillExiting;
-    const content = /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+    const captureContent = /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
       showDimOverlay && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
         "div",
         {
@@ -49164,7 +49220,7 @@ This typically indicates that your device does not have a healthy Internet conne
           style: {
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.06)",
+            background: "rgba(0,0,0,0.05)",
             pointerEvents: "auto",
             zIndex: 2147483645
           },
@@ -49179,27 +49235,32 @@ This typically indicates that your device does not have a healthy Internet conne
           onCancel: onCancelCapture,
           onSelectionStart: onRegionSelectStart
         }
-      ),
-      showCapsule && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-        "div",
-        {
-          className: pillExiting ? "echly-capsule-wrapper echly-capsule-wrapper--exiting" : "echly-capsule-wrapper",
-          children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-            VoiceBubble,
-            {
-              isListening: state === "voice_listening",
-              isProcessing: state === "processing" || pillExiting,
-              isExiting: state === "processing" && pillExiting,
-              audioLevel: listeningAudioLevel,
-              sentiment: listeningSentiment,
-              aiPreviewTitle,
-              onDone
-            }
-          )
-        }
       )
     ] });
-    return (0, import_react_dom.createPortal)(content, captureRoot);
+    const capsuleContent = showCapsule ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      "div",
+      {
+        className: pillExiting ? "echly-capsule-wrapper echly-capsule-wrapper--exiting" : "echly-capsule-wrapper",
+        children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          VoiceBubble,
+          {
+            isListening: state === "voice_listening",
+            isProcessing: state === "processing" || pillExiting,
+            isExiting: state === "processing" && pillExiting,
+            audioLevel: listeningAudioLevel,
+            sentiment: listeningSentiment,
+            liveTranscript,
+            aiPreviewTitle,
+            orbSuccess,
+            onDone
+          }
+        )
+      }
+    ) : null;
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+      (0, import_react_dom.createPortal)(captureContent, captureRoot),
+      capsuleContent && (0, import_react_dom.createPortal)(capsuleContent, aiRoot)
+    ] });
   }
 
   // components/CaptureWidget/CaptureWidget.tsx
@@ -49246,7 +49307,7 @@ This typically indicates that your device does not have a healthy Internet conne
     const highPriorityCount = state.pointers.filter(
       (p) => /critical|bug|high|urgent/i.test(p.type || "")
     ).length;
-    const summary = insightCount > 0 ? highPriorityCount > 0 ? `${insightCount} insights \xB7 ${highPriorityCount} high priority` : `${insightCount} insights` : null;
+    const summary = insightCount > 0 ? highPriorityCount > 0 ? `${insightCount} insights \u2022 ${highPriorityCount} high priority` : `${insightCount} insights` : null;
     (0, import_react7.useEffect)(() => {
       if (state.highlightTicketId && listScrollRef.current) {
         listScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
@@ -49260,17 +49321,20 @@ This typically indicates that your device does not have a healthy Internet conne
       };
     }, [handlers, widgetToggleRef]);
     return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
-      captureRootReady && refs.captureRootRef.current && (0, import_react_dom2.createPortal)(
+      captureRootReady && refs.captureRootRef.current && refs.aiRootRef.current && (0, import_react_dom2.createPortal)(
         /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
           CaptureLayer,
           {
             captureRoot: refs.captureRootRef.current,
+            aiRoot: refs.aiRootRef.current,
             extensionMode,
             state: state.state,
             pillExiting: state.pillExiting,
             listeningAudioLevel: state.listeningAudioLevel ?? 0,
             listeningSentiment: state.listeningSentiment ?? "neutral",
+            liveTranscript: state.liveTranscript ?? "",
             aiPreviewTitle: state.liveStructured?.title ?? null,
+            orbSuccess: state.orbSuccess ?? false,
             getFullTabImage: handlers.getFullTabImage,
             onRegionCaptured: handlers.handleRegionCaptured,
             onRegionSelectStart: handlers.handleRegionSelectStart,
@@ -54510,6 +54574,14 @@ lucide-react/dist/esm/icons/expand.js:
    *)
 
 lucide-react/dist/esm/icons/pencil.js:
+  (**
+   * @license lucide-react v0.575.0 - ISC
+   *
+   * This source code is licensed under the ISC license.
+   * See the LICENSE file in the root directory of this source tree.
+   *)
+
+lucide-react/dist/esm/icons/plus.js:
   (**
    * @license lucide-react v0.575.0 - ISC
    *

@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { Plus } from "lucide-react";
 
 type WidgetFooterProps = {
   isIdle: boolean;
@@ -16,14 +15,16 @@ export default function WidgetFooter({
 }: WidgetFooterProps) {
   const effectivelyDisabled = !isIdle || captureDisabled;
   return (
-    <button
-      type="button"
-      onClick={effectivelyDisabled ? undefined : onAddFeedback}
-      disabled={effectivelyDisabled}
-      className={`echly-add-feedback-btn ${effectivelyDisabled ? "echly-add-feedback-btn--disabled" : ""}`}
-      aria-label="Add feedback"
-    >
-      <Plus size={18} strokeWidth={2} className="echly-add-feedback-icon" />
-    </button>
+    <div className="echly-add-insight-wrap">
+      <button
+        type="button"
+        onClick={effectivelyDisabled ? undefined : onAddFeedback}
+        disabled={effectivelyDisabled}
+        className={`echly-add-insight-btn ${effectivelyDisabled ? "echly-add-insight-btn--disabled" : ""}`}
+        aria-label="Add insight"
+      >
+        + Add insight
+      </button>
+    </div>
   );
 }

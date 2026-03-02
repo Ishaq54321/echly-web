@@ -59,6 +59,7 @@ export function RegionCaptureOverlay({
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [releasedRect, setReleasedRect] = useState<Region | null>(null);
   const [pulseDone, setPulseDone] = useState(false);
+  const [releasedFaded, setReleasedFaded] = useState(false);
 
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const selectionRectRef = useRef<Region | null>(null);
@@ -155,12 +156,15 @@ export function RegionCaptureOverlay({
       selectionRectRef.current = null;
       setReleasedRect({ x: current.x, y: current.y, w: current.w, h: current.h });
       setPulseDone(false);
+      setReleasedFaded(false);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => setPulseDone(true));
       });
+      setTimeout(() => setReleasedFaded(true), 80);
       setTimeout(() => {
         performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
         setReleasedRect(null);
+        setReleasedFaded(false);
       }, 120);
     },
     [performCapture]
@@ -194,12 +198,15 @@ export function RegionCaptureOverlay({
       selectionRectRef.current = null;
       setReleasedRect({ x: current.x, y: current.y, w: current.w, h: current.h });
       setPulseDone(false);
+      setReleasedFaded(false);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => setPulseDone(true));
       });
+      setTimeout(() => setReleasedFaded(true), 80);
       setTimeout(() => {
         performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
         setReleasedRect(null);
+        setReleasedFaded(false);
       }, 120);
     };
     window.addEventListener("mouseup", onWindowMouseUp);
@@ -221,7 +228,7 @@ export function RegionCaptureOverlay({
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(0,0,0,0.05)",
+          background: "rgba(0,0,0,0.04)",
           pointerEvents: overlayVisible ? "auto" : "none",
           cursor: "crosshair",
           zIndex: 2147483646,
@@ -248,10 +255,9 @@ export function RegionCaptureOverlay({
             top: selectionRect.y,
             width: Math.max(selectionRect.w, 1),
             height: Math.max(selectionRect.h, 1),
-            border: "1px solid white",
+            border: "1px solid rgba(255,255,255,0.9)",
             borderRadius: 4,
-            boxShadow: "0 0 0 1px rgba(255,255,255,0.2)",
-            background: "rgba(255,255,255,0.02)",
+            background: "rgba(255,255,255,0.04)",
             pointerEvents: "none",
             zIndex: 2147483646,
             opacity: overlayVisible ? 1 : 0,
@@ -269,15 +275,14 @@ export function RegionCaptureOverlay({
             top: releasedRect.y,
             width: releasedRect.w,
             height: releasedRect.h,
-            border: "1px solid white",
+            border: "1px solid rgba(255,255,255,0.9)",
             borderRadius: 4,
-            boxShadow: "0 0 0 1px rgba(255,255,255,0.2)",
-            background: "rgba(255,255,255,0.02)",
+            background: "rgba(255,255,255,0.04)",
             pointerEvents: "none",
             zIndex: 2147483647,
             transition: "transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1)",
             transform: pulseDone ? "scale(1)" : "scale(0.98)",
-            opacity: pulseDone ? 1 : 0.8,
+            opacity: releasedFaded ? 0.7 : pulseDone ? 1 : 0.8,
           }}
         />
       )}

@@ -575,17 +575,29 @@ textarea:focus-visible {
 }
 
 /* ======================================
-   ECHLY — Calm collaborative intelligence layer
-   Sidebar (session view) + Capture (system overlay)
+   ECHLY — Confident AI layer
+   Deep graphite, no black. Intentional color hierarchy.
    Motion: 140ms cubic-bezier(0.2, 0.8, 0.2, 1)
 ====================================== */
+
+:root {
+  --echly-surface: #181A1F;
+  --echly-elevated: #20232A;
+  --echly-accent-neutral: #2B2F36;
+  --echly-text-primary: rgba(255, 255, 255, 0.92);
+  --echly-text-secondary: rgba(255, 255, 255, 0.55);
+  --echly-divider: rgba(255, 255, 255, 0.04);
+  --echly-accent: #466EFF;
+  --echly-alert: #FF4D4F;
+  --echly-resolved: #22c55e;
+}
 
 .echly-motion {
   transition-duration: 140ms;
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* ---- Sidebar: translucent OS panel ---- */
+/* ---- Sidebar: deep graphite + layered translucency (no black) ---- */
 .echly-sidebar-container {
   width: 480px;
   transition: opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -593,19 +605,16 @@ textarea:focus-visible {
 }
 .echly-sidebar-surface {
   border-radius: 18px;
-  background: rgba(15, 15, 18, 0.72);
-  backdrop-filter: blur(18px) saturate(120%);
-  -webkit-backdrop-filter: blur(18px) saturate(120%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: rgba(24, 26, 31, 0.82);
+  backdrop-filter: blur(22px) saturate(130%);
+  -webkit-backdrop-filter: blur(22px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
 }
 .echly-sidebar-header {
-  padding: 20px 20px 0;
-  padding-bottom: 16px;
+  padding: 24px 20px 0;
+  padding-bottom: 18px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -618,14 +627,13 @@ textarea:focus-visible {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.2px;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--echly-text-primary);
 }
 .echly-sidebar-summary {
   display: block;
   margin-top: 4px;
   font-size: 12px;
-  opacity: 0.6;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--echly-text-secondary);
 }
 .echly-sidebar-close {
   opacity: 0;
@@ -633,14 +641,14 @@ textarea:focus-visible {
   padding: 6px;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--echly-text-secondary);
   cursor: pointer;
   border-radius: 8px;
 }
 .echly-sidebar-header:hover .echly-sidebar-close,
 .echly-sidebar-close:hover,
 .echly-sidebar-close:focus {
-  opacity: 0.6;
+  opacity: 0.8;
 }
 .echly-sidebar-close:focus-visible {
   opacity: 1;
@@ -649,52 +657,56 @@ textarea:focus-visible {
   padding: 0 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 18px;
   max-height: 60vh;
   overflow-y: auto;
 }
 .echly-feedback-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 18px;
 }
 .echly-sidebar-error {
   font-size: 13px;
-  opacity: 0.8;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--echly-text-secondary);
   padding: 12px 0;
 }
-/* Add Feedback: floating glass capsule + plus icon */
-.echly-add-feedback-btn {
-  margin-top: 12px;
+/* Add insight: primary action, sticky bottom */
+.echly-add-insight-wrap {
+  position: sticky;
+  bottom: 16px;
+  margin-top: 18px;
+}
+.echly-add-insight-btn {
   width: 100%;
-  height: 42px;
+  height: 48px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border: none;
+  background: linear-gradient(135deg, #466EFF, #5B8CFF);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
   cursor: pointer;
-  transition: background 120ms ease, transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  color: rgba(255, 255, 255, 0.9);
+  transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(70, 110, 255, 0.35);
 }
-.echly-add-feedback-btn:not(.echly-add-feedback-btn--disabled):hover {
-  background: rgba(255, 255, 255, 0.12);
+.echly-add-insight-btn:not(.echly-add-insight-btn--disabled):hover {
   transform: scale(1.02);
+  box-shadow: 0 6px 24px rgba(70, 110, 255, 0.4);
 }
-.echly-add-feedback-btn:not(.echly-add-feedback-btn--disabled):active {
-  transform: scale(0.97);
+.echly-add-insight-btn:not(.echly-add-insight-btn--disabled):active {
+  transform: scale(0.96);
 }
-.echly-add-feedback-btn--disabled {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.35);
+.echly-add-insight-btn--disabled {
+  background: var(--echly-accent-neutral);
+  color: var(--echly-text-secondary);
   cursor: not-allowed;
-}
-.echly-add-feedback-icon {
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.15));
+  box-shadow: none;
 }
 
 .echly-floating-trigger-wrapper {
@@ -730,34 +742,32 @@ textarea:focus-visible {
   transform: scale(0.98);
 }
 
-/* Feedback item (reuse existing action icon opacity rules) */
-.echly-feedback-item-actions .echly-widget-action-icon {
-  opacity: 0;
-  transition: opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.echly-feedback-item:hover .echly-feedback-item-actions .echly-widget-action-icon,
-.echly-feedback-item .echly-widget-action-icon:hover,
-.echly-feedback-item .echly-widget-action-icon:focus {
-  opacity: 0.6;
-}
-.echly-feedback-item .echly-widget-action-icon:focus-visible {
-  opacity: 1;
-}
-/* Feedback item: no dividers, hover lift, priority dot */
+/* Feedback item: transparent, space-only separation, icons on hover */
 .echly-feedback-item {
-  padding: 14px 16px;
-  border-radius: 10px;
-  transition: background 120ms ease, transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: transparent;
+  transition: all 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
   display: flex;
   align-items: flex-start;
   gap: 12px;
 }
 .echly-feedback-item:hover {
   background: rgba(255, 255, 255, 0.05);
-  transform: translateY(-1px);
 }
-.echly-feedback-item:active {
-  background: rgba(255, 255, 255, 0.06);
+.echly-feedback-item.echly-ticket-highlight {
+  background: rgba(70, 110, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(70, 110, 255, 0.25) inset;
+}
+.echly-feedback-item-actions .echly-widget-action-icon {
+  opacity: 0;
+  transition: opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.echly-feedback-item:hover .echly-feedback-item-actions .echly-widget-action-icon,
+.echly-feedback-item .echly-widget-action-icon:hover,
+.echly-feedback-item .echly-widget-action-icon:focus,
+.echly-feedback-item .echly-widget-action-icon:focus-visible {
+  opacity: 0.7;
 }
 .echly-priority-dot {
   width: 6px;
@@ -768,7 +778,7 @@ textarea:focus-visible {
   background: rgba(255, 255, 255, 0.35);
 }
 .echly-feedback-item[data-priority="critical"] .echly-priority-dot {
-  background: #dc2626;
+  background: var(--echly-alert);
 }
 .echly-feedback-item[data-priority="high"] .echly-priority-dot {
   background: #ea580c;
@@ -792,18 +802,19 @@ textarea:focus-visible {
 }
 .echly-widget-item-title {
   font-weight: 500;
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.4;
   letter-spacing: -0.2px;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--echly-text-primary);
 }
 .echly-widget-item-desc {
   font-size: 13px;
-  opacity: 0.6;
-  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.4;
+  color: var(--echly-text-secondary);
   margin-top: 6px;
 }
 .echly-feedback-item .echly-widget-action-icon--delete:hover {
-  color: #f87171 !important;
+  color: var(--echly-alert);
   opacity: 1;
 }
 .echly-feedback-item-input,
@@ -832,30 +843,49 @@ textarea:focus-visible {
 }
 
 /* ---- Voice capsule (capture root only) ---- */
-.echly-capsule-wrapper {
+.echly-voice-row {
   position: fixed;
   left: 50%;
-  bottom: 32px;
+  bottom: 40px;
   transform: translateX(-50%);
   z-index: 2147483647;
-  transition: opacity 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 20px;
   pointer-events: auto;
+}
+.echly-capsule-cancel {
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--echly-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 120ms ease;
+  flex-shrink: 0;
+}
+.echly-capsule-cancel:hover {
+  color: var(--echly-text-primary);
+}
+.echly-capsule-wrapper {
+  transition: opacity 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .echly-capsule-wrapper--exiting {
   opacity: 0;
   pointer-events: none;
 }
 .echly-capsule {
-  height: 54px;
+  height: 56px;
   border-radius: 999px;
-  background: rgba(20, 20, 24, 0.92);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(30, 32, 38, 0.95);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   padding: 0 22px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
 }
 .echly-capsule-orb {
@@ -906,23 +936,25 @@ textarea:focus-visible {
   max-width: 280px;
 }
 .echly-capsule-done {
-  margin-left: 4px;
-  padding: 8px 18px;
+  height: 36px;
+  padding: 0 18px;
+  margin-left: 8px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #E5484D, #C43E42);
-  color: white;
+  background: #fff;
+  color: #181A1F;
   font-size: 14px;
   font-weight: 600;
   border: none;
   cursor: pointer;
   transition: transform 100ms cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  flex-shrink: 0;
 }
 .echly-capsule-done:hover {
   opacity: 0.95;
 }
 .echly-capsule-done:active {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 /* ---- Mic orb: 48px, #FF4D4F → #D9363E, breathe 2.5s, success green ---- */
@@ -947,8 +979,8 @@ textarea:focus-visible {
   height: 48px;
   border-radius: 50%;
   background: linear-gradient(135deg, #FF4D4F, #D9363E);
-  box-shadow: 0 0 24px rgba(255, 77, 79, 0.25);
-  animation: echly-breathe 2.5s infinite ease-in-out;
+  box-shadow: 0 0 24px rgba(255, 77, 79, 0.2);
+  animation: echly-breathe 3s infinite ease-in-out;
 }
 .echly-mic-orb-wrapper.echly-mic-orb--exiting .echly-mic-orb,
 .echly-mic-orb-wrapper.echly-mic-orb--processing .echly-mic-orb {
@@ -994,11 +1026,11 @@ textarea:focus-visible {
   animation: echly-gradient-shift 1.2s infinite linear;
 }
 .echly-ticket-highlight {
-  animation: echly-ticket-pulse 1.5s ease-out;
+  animation: echly-ticket-pulse 1.2s ease-out;
 }
 @keyframes echly-ticket-pulse {
-  0% { background-color: rgba(255, 255, 255, 0.08); }
-  100% { background-color: transparent; }
+  0% { background-color: rgba(70, 110, 255, 0.18); box-shadow: 0 0 0 1px rgba(70, 110, 255, 0.35) inset; }
+  100% { background-color: rgba(70, 110, 255, 0.12); box-shadow: 0 0 0 1px rgba(70, 110, 255, 0.25) inset; }
 }
 
 @keyframes echly-selection-fade-in {

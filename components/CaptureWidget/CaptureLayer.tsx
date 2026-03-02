@@ -36,7 +36,7 @@ export type CaptureLayerProps = {
 
 /**
  * Overlay + region → #echly-capture-root.
- * Voice capsule only → #echly-ai-root (always outside sidebar).
+ * Voice capsule + Cancel → #echly-ai-root.
  */
 export function CaptureLayer({
   captureRoot,
@@ -63,6 +63,7 @@ export function CaptureLayer({
     state === "voice_listening" ||
     state === "processing" ||
     pillExiting;
+  const showCancel = state === "voice_listening" && !pillExiting;
 
   const captureContent = (
     <>
@@ -72,8 +73,9 @@ export function CaptureLayer({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.05)",
+            background: "rgba(0,0,0,0.04)",
             pointerEvents: "auto",
+            cursor: "crosshair",
             zIndex: 2147483645,
           }}
           aria-hidden
@@ -91,24 +93,36 @@ export function CaptureLayer({
   );
 
   const capsuleContent = showCapsule ? (
-    <div
-      className={
-        pillExiting
-          ? "echly-capsule-wrapper echly-capsule-wrapper--exiting"
-          : "echly-capsule-wrapper"
-      }
-    >
-      <VoiceBubble
-        isListening={state === "voice_listening"}
-        isProcessing={state === "processing" || pillExiting}
-        isExiting={state === "processing" && pillExiting}
-        audioLevel={listeningAudioLevel}
-        sentiment={listeningSentiment}
-        liveTranscript={liveTranscript}
-        aiPreviewTitle={aiPreviewTitle}
-        orbSuccess={orbSuccess}
-        onDone={onDone}
-      />
+    <div className="echly-voice-row">
+      {showCancel && (
+        <button
+          type="button"
+          onClick={onCancelCapture}
+          className="echly-capsule-cancel"
+          aria-label="Cancel"
+        >
+          Cancel
+        </button>
+      )}
+      <div
+        className={
+          pillExiting
+            ? "echly-capsule-wrapper echly-capsule-wrapper--exiting"
+            : "echly-capsule-wrapper"
+        }
+      >
+        <VoiceBubble
+          isListening={state === "voice_listening"}
+          isProcessing={state === "processing" || pillExiting}
+          isExiting={state === "processing" && pillExiting}
+          audioLevel={listeningAudioLevel}
+          sentiment={listeningSentiment}
+          liveTranscript={liveTranscript}
+          aiPreviewTitle={aiPreviewTitle}
+          orbSuccess={orbSuccess}
+          onDone={onDone}
+        />
+      </div>
     </div>
   ) : null;
 

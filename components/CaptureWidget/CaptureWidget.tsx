@@ -58,7 +58,7 @@ export default function CaptureWidget({
   const summary =
     insightCount > 0
       ? highPriorityCount > 0
-        ? `${insightCount} insights • ${highPriorityCount} high priority`
+        ? `${insightCount} insights • ${highPriorityCount} need attention`
         : `${insightCount} insights`
       : null;
 
@@ -110,7 +110,7 @@ export default function CaptureWidget({
             onClick={() => (onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true))}
             className="echly-floating-trigger"
           >
-            Add Feedback
+            Add insight
           </button>
         </div>
       )}

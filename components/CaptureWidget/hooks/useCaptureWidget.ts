@@ -426,7 +426,7 @@ export function useCaptureWidget({
           setRecordings((prev) => prev.filter((r) => r.id !== activeId));
           setActiveRecordingId(null);
           setHighlightTicketId(ticket.id);
-          setTimeout(() => setHighlightTicketId(null), 1500);
+          setTimeout(() => setHighlightTicketId(null), 1200);
           setOrbSuccess(true);
           setTimeout(() => setOrbSuccess(false), 200);
           setPillExiting(true);
@@ -458,7 +458,7 @@ export function useCaptureWidget({
       setRecordings((prev) => prev.filter((r) => r.id !== activeId));
       setActiveRecordingId(null);
       setHighlightTicketId(structured.id);
-      setTimeout(() => setHighlightTicketId(null), 1500);
+      setTimeout(() => setHighlightTicketId(null), 1200);
       setOrbSuccess(true);
       setTimeout(() => setOrbSuccess(false), 200);
       setPillExiting(true);
