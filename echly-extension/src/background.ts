@@ -1,37 +1,27 @@
 /**
- * Extension background (service worker). Centralizes Firebase Auth and token handling.
- * Content scripts do not use Firebase; they request tokens and auth state via messages.
+ * Extension background (service worker). Centralizes auth + token handling.
+ * Content scripts request tokens and auth state via messages.
  */
-import { initializeApp } from "firebase/app";
-import { getAuth, signInWithCredential, GoogleAuthProvider } from "firebase/auth/web-extension";
-import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM",
-  authDomain: "echly-b74cc.firebaseapp.com",
-  projectId: "echly-b74cc",
-  storageBucket: "echly-b74cc.firebasestorage.app",
-  messagingSenderId: "609478020649",
-  appId: "1:609478020649:web:54cd1ab0dc2b8277131638",
-  measurementId: "G-Q0C7DP8QVR",
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const storage = getStorage(app);
+const API_BASE = "https://echly-web.vercel.app";
+const IDP_API_KEY = "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM";
 
 let activeSessionId: string | null = null;
 
-async function uploadScreenshotToStorage(
-  imageDataUrl: string,
-  sessionId: string,
-  feedbackId: string
-): Promise<string> {
-  const path = `sessions/${sessionId}/feedback/${feedbackId}/${Date.now()}.png`;
-  const storageRef = ref(storage, path);
-  await uploadString(storageRef, imageDataUrl, "data_url", { contentType: "image/png" });
-  return getDownloadURL(storageRef);
-}
+type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
+type TokenState = {
+  idToken: string | null;
+  refreshToken: string | null;
+  /** Epoch ms when token expires (best-effort). */
+  expiresAtMs: number;
+  user: StoredUser | null;
+};
+
+let tokenState: TokenState = {
+  idToken: null,
+  refreshToken: null,
+  expiresAtMs: 0,
+  user: null,
+};
 
 let globalUIState: {
   visible: boolean;
@@ -45,27 +35,115 @@ let globalUIState: {
   sessionId: null,
 };
 
-let cachedToken: string | null = null;
-
 chrome.storage.local.get(["activeSessionId"], (result) => {
   activeSessionId = result.activeSessionId ?? null;
   globalUIState.sessionId = activeSessionId;
 });
-let tokenExpiry = 0;
+
+chrome.storage.local.get(["auth_idToken", "auth_refreshToken", "auth_expiresAtMs", "auth_user"], (result) => {
+  tokenState.idToken = typeof result.auth_idToken === "string" ? result.auth_idToken : null;
+  tokenState.refreshToken = typeof result.auth_refreshToken === "string" ? result.auth_refreshToken : null;
+  tokenState.expiresAtMs = typeof result.auth_expiresAtMs === "number" ? result.auth_expiresAtMs : 0;
+  tokenState.user = (result.auth_user as StoredUser | undefined) ?? null;
+});
+
+function setTokenState(next: Partial<TokenState>): void {
+  tokenState = { ...tokenState, ...next };
+  chrome.storage.local.set({
+    auth_idToken: tokenState.idToken,
+    auth_refreshToken: tokenState.refreshToken,
+    auth_expiresAtMs: tokenState.expiresAtMs,
+    auth_user: tokenState.user,
+  });
+}
+
+function parseHashParam(urlStr: string, key: string): string | null {
+  try {
+    const u = new URL(urlStr);
+    const hash = u.hash.startsWith("#") ? u.hash.slice(1) : u.hash;
+    const params = new URLSearchParams(hash);
+    return params.get(key);
+  } catch {
+    return null;
+  }
+}
+
+async function exchangeGoogleIdToken(googleIdToken: string): Promise<{
+  idToken: string;
+  refreshToken: string;
+  expiresInSec: number;
+  user: StoredUser;
+}> {
+  const body = {
+    postBody: `id_token=${encodeURIComponent(googleIdToken)}&providerId=google.com`,
+    requestUri: "http://localhost",
+    returnIdpCredential: true,
+    returnSecureToken: true,
+  };
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${IDP_API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`Token exchange failed: ${res.status} ${raw}`);
+  const data = JSON.parse(raw) as {
+    idToken?: string;
+    refreshToken?: string;
+    expiresIn?: string;
+    localId?: string;
+    displayName?: string;
+    email?: string;
+    photoUrl?: string;
+  };
+  if (!data.idToken || !data.refreshToken || !data.localId) throw new Error(`Token exchange missing fields: ${raw}`);
+  const expiresInSec = Number.parseInt(data.expiresIn ?? "3600", 10);
+  return {
+    idToken: data.idToken,
+    refreshToken: data.refreshToken,
+    expiresInSec: Number.isFinite(expiresInSec) ? expiresInSec : 3600,
+    user: {
+      uid: data.localId,
+      name: data.displayName ?? null,
+      email: data.email ?? null,
+      photoURL: data.photoUrl ?? null,
+    },
+  };
+}
+
+async function refreshIdToken(refreshToken: string): Promise<{ idToken: string; refreshToken: string; expiresInSec: number }> {
+  const body = new URLSearchParams();
+  body.set("grant_type", "refresh_token");
+  body.set("refresh_token", refreshToken);
+  const res = await fetch(`https://securetoken.googleapis.com/v1/token?key=${IDP_API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`Token refresh failed: ${res.status} ${raw}`);
+  const data = JSON.parse(raw) as { id_token?: string; refresh_token?: string; expires_in?: string };
+  if (!data.id_token || !data.refresh_token) throw new Error(`Token refresh missing fields: ${raw}`);
+  const expiresInSec = Number.parseInt(data.expires_in ?? "3600", 10);
+  return {
+    idToken: data.id_token,
+    refreshToken: data.refresh_token,
+    expiresInSec: Number.isFinite(expiresInSec) ? expiresInSec : 3600,
+  };
+}
 
 async function getValidToken(): Promise<string> {
   const now = Date.now();
-  if (cachedToken && now < tokenExpiry) {
-    return cachedToken;
-  }
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error("User not signed in");
-  }
-  const token = await user.getIdToken();
-  cachedToken = token;
-  tokenExpiry = now + 50 * 60 * 1000; // 50 minutes
-  return token;
+  // Small skew so we don't race expiry.
+  if (tokenState.idToken && now < tokenState.expiresAtMs - 30_000) return tokenState.idToken;
+  if (!tokenState.refreshToken) throw new Error("NOT_AUTHENTICATED");
+  const refreshed = await refreshIdToken(tokenState.refreshToken);
+  setTokenState({
+    idToken: refreshed.idToken,
+    refreshToken: refreshed.refreshToken,
+    expiresAtMs: Date.now() + refreshed.expiresInSec * 1000,
+  });
+  return refreshed.idToken;
 }
 
 function broadcastUIState(): void {
@@ -136,17 +214,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_GET_AUTH_STATE") {
-    const user = auth.currentUser;
     sendResponse({
-      authenticated: !!user,
-      user: user
-        ? {
-            uid: user.uid,
-            name: user.displayName ?? null,
-            email: user.email ?? null,
-            photoURL: user.photoURL ?? null,
-          }
-        : null,
+      authenticated: !!tokenState.refreshToken,
+      user: tokenState.user,
     });
     return true;
   }
@@ -179,29 +249,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
         try {
-          const url = new URL(responseUrl);
-          const idToken =
-            url.hash
-              .substring(1)
-              .split("&")
-              .find((p) => p.startsWith("id_token="))
-              ?.split("=")[1] ?? null;
-          if (!idToken) {
+          const googleIdToken = parseHashParam(responseUrl, "id_token");
+          if (!googleIdToken) {
             sendResponse({ success: false, error: "No ID token in response" });
             return;
           }
-          const credential = GoogleAuthProvider.credential(idToken);
-          const result = await signInWithCredential(auth, credential);
-          cachedToken = null;
-          tokenExpiry = 0;
+          const exchanged = await exchangeGoogleIdToken(googleIdToken);
+          setTokenState({
+            idToken: exchanged.idToken,
+            refreshToken: exchanged.refreshToken,
+            expiresAtMs: Date.now() + exchanged.expiresInSec * 1000,
+            user: exchanged.user,
+          });
           sendResponse({
             success: true,
-            user: {
-              uid: result.user.uid,
-              name: result.user.displayName ?? null,
-              email: result.user.email ?? null,
-              photoURL: result.user.photoURL ?? null,
-            },
+            user: exchanged.user,
           });
         } catch (err) {
           sendResponse({ success: false, error: String(err) });
@@ -245,7 +307,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_PROCESS_FEEDBACK") {
-    const API_BASE = "https://echly-web.vercel.app";
     const payload = request.payload as {
       transcript: string;
       screenshot: string | null;
@@ -259,6 +320,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } | null;
     };
     const { transcript, sessionId, context } = payload;
+    if (!sessionId) {
+      console.error("[ECHLY_PROCESS_FEEDBACK] sessionId is null/empty:", sessionId);
+    }
     if (!transcript?.trim() || !sessionId) {
       console.warn("[Echly BG] Invalid payload: missing transcript or sessionId", {
         hasTranscript: !!transcript?.trim(),
@@ -276,7 +340,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         const token = await getValidToken();
         const screenshot = payload.screenshot ?? null;
-        const feedbackId = crypto.randomUUID();
+        if (screenshot) {
+          // Screenshot upload is intentionally disabled in the service worker to avoid SDK/XHR usage.
+          console.warn("[ECHLY_PROCESS_FEEDBACK] screenshot provided but upload is disabled in background");
+        }
 
         const structurePayload = context ? { transcript, context } : { transcript };
         const structurePromise = fetch(`${API_BASE}/api/structure-feedback`, {
@@ -284,11 +351,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify(structurePayload),
         });
-        const screenshotPromise = screenshot
-          ? uploadScreenshotToStorage(screenshot, sessionId, feedbackId)
-          : Promise.resolve<string | null>(null);
-
-        const [structureRes, screenshotUrl] = await Promise.all([structurePromise, screenshotPromise]);
+        const [structureRes] = await Promise.all([structurePromise]);
+        const screenshotUrl: string | null = null;
 
         const structureText = await structureRes.text();
         if (!structureRes.ok) {
@@ -344,23 +408,46 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             screenshotUrl: i === 0 ? screenshotUrl : null,
             metadata: { clientTimestamp: Date.now() },
           };
+
+          console.log("[CREATE] Using sessionId:", sessionId);
+          console.log("[CREATE] Sending body:", body);
           const feedbackRes = await fetch(`${API_BASE}/api/feedback`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(body),
           });
-          const feedbackText = await feedbackRes.text();
+          console.log("[CREATE] Status:", feedbackRes.status);
+          const raw = await feedbackRes.text();
+          console.log("[CREATE] Raw response:", raw);
+
           if (!feedbackRes.ok) {
-            console.error("[FEEDBACK FAILED RAW]", feedbackRes.status, feedbackText);
-            sendResponse({ success: false, error: "Feedback fetch failed" });
+            console.error("[CREATE] FAILED:", feedbackRes.status, raw);
+            sendResponse({ success: false, error: "Feedback API failed" });
             return;
           }
-          const feedbackJson = JSON.parse(feedbackText) as {
+
+          let feedbackJson: {
             success?: boolean;
             ticket?: { id: string; title: string; description: string; type?: string };
           };
-          if (feedbackJson.success && feedbackJson.ticket) {
-            const tick = feedbackJson.ticket;
+          try {
+            feedbackJson = JSON.parse(raw) as {
+              success?: boolean;
+              ticket?: { id: string; title: string; description: string; type?: string };
+            };
+          } catch (err) {
+            console.error("[CREATE] JSON parse failed:", err, raw);
+            sendResponse({ success: false, error: "Feedback API failed" });
+            return;
+          }
+
+          // parsed JSON only after ok + parse success
+          const typedFeedbackJson = feedbackJson as {
+            success?: boolean;
+            ticket?: { id: string; title: string; description: string; type?: string };
+          };
+          if (typedFeedbackJson.success && typedFeedbackJson.ticket) {
+            const tick = typedFeedbackJson.ticket;
             if (!firstCreated)
               firstCreated = {
                 id: tick.id,
