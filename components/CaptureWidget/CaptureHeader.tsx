@@ -11,6 +11,8 @@ type CaptureHeaderProps = {
   showMenu: boolean;
   onResetSession: () => void;
   menuRef: React.RefObject<HTMLDivElement | null>;
+  /** When true, shows soft animated pulse around Echly header (processing-structure phase). */
+  isProcessingStructure?: boolean;
 };
 
 export default function CaptureHeader({
@@ -21,6 +23,7 @@ export default function CaptureHeader({
   showMenu,
   onResetSession,
   menuRef,
+  isProcessingStructure = false,
 }: CaptureHeaderProps) {
   return (
     <div
@@ -29,7 +32,9 @@ export default function CaptureHeader({
                  bg-[rgba(0,0,0,0.03)] border-b border-[rgba(0,0,0,0.06)]
                  cursor-move"
     >
-      <div className="flex items-center gap-2 min-h-8">
+      <div
+        className={`flex items-center gap-2 min-h-8 ${isProcessingStructure ? "capture-header-pulse" : ""}`}
+      >
         <Image src="/Echly_logo.svg" alt="Echly" width={24} height={24} className="shrink-0" />
         <span className="text-base font-semibold text-slate-900 leading-none">Echly</span>
       </div>

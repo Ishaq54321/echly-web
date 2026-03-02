@@ -1,12 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import AudioWaveform from "@/components/AudioWaveform";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackList from "./FeedbackList";
+import FeedbackItem from "./FeedbackItem";
 import WidgetFooter from "./WidgetFooter";
+import ProcessingSkeletonCard from "./ProcessingSkeletonCard";
 import { RegionCaptureOverlay } from "./RegionCaptureOverlay";
 import type { CaptureWidgetProps } from "./types";
 
@@ -43,6 +45,19 @@ export default function CaptureWidget({
 
   const isControlled = expanded !== undefined;
   const effectiveIsOpen = isControlled ? expanded : state.isOpen;
+
+  /** When transitioning from saving-feedback/anticipation to idle, keep skeleton visible and fade it out (200ms). */
+  const [processingExiting, setProcessingExiting] = useState(false);
+  const prevStateRef = useRef(state.state);
+  useEffect(() => {
+    const wasProcessing = prevStateRef.current === "saving-feedback" || prevStateRef.current === "anticipation";
+    if (state.state === "idle" && wasProcessing) {
+      setProcessingExiting(true);
+      const t = setTimeout(() => setProcessingExiting(false), 200);
+      return () => clearTimeout(t);
+    }
+    prevStateRef.current = state.state;
+  }, [state.state]);
 
   React.useEffect(() => {
     if (!widgetToggleRef) return;
@@ -122,22 +137,52 @@ export default function CaptureWidget({
           showMenu={state.showMenu}
           onResetSession={handlers.resetSession}
           menuRef={refs.menuRef}
+          isProcessingStructure={state.state === "processing-structure"}
         />
 
         <div className="px-6 py-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
-          <FeedbackList
-            items={state.pointers}
-            expandedId={state.expandedId}
-            editingId={state.editingId}
-            editedTitle={state.editedTitle}
-            editedDescription={state.editedDescription}
-            onExpand={handlers.setExpandedId}
-            onStartEdit={handlers.startEditing}
-            onSaveEdit={handlers.saveEdit}
-            onDelete={handlers.deletePointer}
-            onEditedTitleChange={handlers.setEditedTitle}
-            onEditedDescriptionChange={handlers.setEditedDescription}
-          />
+          <div className="capture-feedback-list flex flex-col space-y-2">
+            {/* First slot: skeleton (when publishing) or first ticket (when idle) — no layout shift */}
+            {state.state === "saving-feedback" || state.state === "anticipation" || processingExiting ? (
+              <>
+                <ProcessingSkeletonCard exiting={processingExiting} />
+                <div className="capture-processing-enter flex flex-col gap-0.5 py-1">
+                  <p className="text-sm font-medium text-slate-700">Publishing to your session...</p>
+                </div>
+              </>
+            ) : state.pointers[0] ? (
+              <FeedbackItem
+                item={state.pointers[0]}
+                expandedId={state.expandedId}
+                editingId={state.editingId}
+                editedTitle={state.editedTitle}
+                editedDescription={state.editedDescription}
+                onExpand={handlers.setExpandedId}
+                onStartEdit={handlers.startEditing}
+                onSaveEdit={handlers.saveEdit}
+                onDelete={handlers.deletePointer}
+                onEditedTitleChange={handlers.setEditedTitle}
+                onEditedDescriptionChange={handlers.setEditedDescription}
+              />
+            ) : null}
+            <FeedbackList
+              items={
+                state.state === "saving-feedback" || state.state === "anticipation" || processingExiting
+                  ? state.pointers
+                  : state.pointers.slice(1)
+              }
+              expandedId={state.expandedId}
+              editingId={state.editingId}
+              editedTitle={state.editedTitle}
+              editedDescription={state.editedDescription}
+              onExpand={handlers.setExpandedId}
+              onStartEdit={handlers.startEditing}
+              onSaveEdit={handlers.saveEdit}
+              onDelete={handlers.deletePointer}
+              onEditedTitleChange={handlers.setEditedTitle}
+              onEditedDescriptionChange={handlers.setEditedDescription}
+            />
+          </div>
 
           {state.errorMessage && (
             <div className="text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3">
@@ -151,27 +196,11 @@ export default function CaptureWidget({
             </div>
           )}
 
-          {(state.state === "processing" ||
-            state.state === "processing-structure" ||
-            state.state === "saving-feedback" ||
-            state.state === "anticipation") && (
-            <div className="capture-processing-enter relative flex items-center gap-4 text-sm text-slate-600 py-3 pr-4 min-h-[52px]">
-              <div className="capture-structuring-text flex items-center gap-2 flex-1">
-                <span className="text-slate-600">
-                  {state.state === "saving-feedback"
-                    ? "Adding to your session…"
-                    : "Structuring your feedback…"}
-                </span>
-                <span className="capture-ellipsis inline-flex gap-0.5" aria-hidden>
-                  <span>.</span><span>.</span><span>.</span>
-                </span>
-              </div>
-              <div
-                className={`capture-structuring-progress ${state.state === "anticipation" ? "capture-structuring-progress--complete" : ""}`}
-                aria-hidden
-              >
-                <div className="capture-structuring-progress-fill" />
-              </div>
+          {/* processing-structure: header pulse + "Understanding your feedback..." */}
+          {(state.state === "processing" || state.state === "processing-structure") && (
+            <div className="capture-processing-enter flex flex-col gap-1 py-3">
+              <p className="text-sm font-medium text-slate-700">Understanding your feedback...</p>
+              <p className="text-xs text-slate-500">Extracting key insights</p>
             </div>
           )}
 

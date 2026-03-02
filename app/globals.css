@@ -213,7 +213,7 @@ textarea:focus-visible {
   to { opacity: 1; }
 }
 
-/* 2. Transition to Structuring — 150ms crossfade */
+/* 2. Processing phase — 150ms crossfade */
 .capture-processing-enter {
   animation: captureProcessingEnter 150ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
@@ -222,79 +222,50 @@ textarea:focus-visible {
   to { opacity: 1; }
 }
 
-/* 3. Structuring — 2px progress bar 0% → 85%, calm ease, 1.5s */
-.capture-structuring-progress {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: hsl(var(--border));
-  overflow: hidden;
+/* Soft animated pulse around Echly header (processing-structure phase) */
+.capture-header-pulse {
+  animation: captureHeaderPulse 2.2s ease-in-out infinite;
 }
-.capture-structuring-progress .capture-structuring-progress-fill {
-  height: 100%;
-  width: 0;
-  background: hsl(var(--text-secondary) / 0.25);
-  animation: captureProgressFill 1200ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-  position: relative;
-}
-.capture-structuring-progress .capture-structuring-progress-fill::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.12) 50%, transparent 100%);
-  animation: captureShimmer 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
-  pointer-events: none;
-}
-@keyframes captureProgressFill {
-  to { width: 85%; }
-}
-@keyframes captureShimmer {
-  0% { opacity: 0.4; transform: translateX(-100%); }
-  100% { opacity: 0.4; transform: translateX(200%); }
+@keyframes captureHeaderPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.08);
+    border-radius: 6px;
+    padding: 2px;
+    margin: -2px;
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.04);
+    border-radius: 8px;
+    padding: 2px;
+    margin: -2px;
+  }
 }
 
-/* Anticipation: bar to 92% then fade out in 80ms */
-.capture-structuring-progress.capture-structuring-progress--complete .capture-structuring-progress-fill {
-  animation: captureProgressComplete 80ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+/* Skeleton card — linear-gradient shimmer (Publishing phase) */
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
 }
-.capture-structuring-progress.capture-structuring-progress--complete {
-  animation: captureProgressFadeOut 80ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+.capture-skeleton-line,
+.capture-skeleton-title,
+.capture-skeleton-dot {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 0%,
+    rgba(0, 0, 0, 0.12) 50%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
+  background-size: 400px 100%;
+  animation: shimmer 1.8s linear infinite;
 }
-@keyframes captureProgressComplete {
-  to { width: 92%; }
-}
-@keyframes captureProgressFadeOut {
-  to { opacity: 0; }
-}
-
-/* Structuring text — fade in 120ms */
-.capture-structuring-text {
-  animation: captureStructuringTextIn 120ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-  opacity: 0;
-}
-@keyframes captureStructuringTextIn {
-  to { opacity: 1; }
+.capture-skeleton-dot {
+  background-size: 200px 100%;
 }
 
-/* Ellipsis — opacity pulse only, no bounce */
-.capture-ellipsis span {
-  animation: captureEllipsisPulse 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
-  opacity: 0.6;
-}
-.capture-ellipsis span:nth-child(1) { animation-delay: 0ms; }
-.capture-ellipsis span:nth-child(2) { animation-delay: 180ms; }
-.capture-ellipsis span:nth-child(3) { animation-delay: 360ms; }
-@keyframes captureEllipsisPulse {
-  0%, 55%, 100% { opacity: 0.6; }
-  28% { opacity: 1; }
-}
-
-/* 4 & 5. Result arrival — fade in + translateY(6px→0), 180ms ease-out; 2% tint flash 100ms */
+/* 3 & 4. Result arrival — fade in 200ms; 2% tint flash 100ms */
 .capture-feedback-list > div:first-child {
-  animation: captureFeedbackItemEnter 180ms ease-out forwards,
-             captureCompletionTint 100ms ease-out 180ms forwards;
+  animation: captureFeedbackItemEnter 200ms ease-out forwards,
+             captureCompletionTint 100ms ease-out 200ms forwards;
   opacity: 0;
   transform: translateY(6px);
 }
