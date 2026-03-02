@@ -49192,13 +49192,15 @@ This typically indicates that your device does not have a healthy Internet conne
     isProcessing,
     audioLevel
   }) {
-    const scale = isRecording && !isProcessing ? 1 + Math.min(0.06, audioLevel * 0.08) : 1;
+    const scale = isRecording && !isProcessing ? 1 + Math.min(0.1, audioLevel * 0.1) : 1;
+    const isListening = isRecording && !isProcessing;
     return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       "div",
       {
         className: [
           "echly-recording-orb-inner",
-          isProcessing ? "echly-recording-orb-inner--processing" : ""
+          isProcessing ? "echly-recording-orb-inner--processing" : "",
+          isListening ? "echly-recording-orb-inner--listening" : ""
         ].filter(Boolean).join(" "),
         style: isRecording && !isProcessing ? { transform: `scale(${scale})` } : void 0,
         "aria-hidden": true,

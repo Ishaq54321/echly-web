@@ -2716,9 +2716,12 @@ textarea:focus-visible {
 .echly-recording-capsule--expanded {
   width: 420px;
   min-width: 420px;
-  min-height: 130px;
-  padding: 42px 32px;
-  gap: 24px;
+  height: auto;
+  min-height: auto;
+  padding: 30px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
   justify-content: flex-start;
 }
 .echly-recording-orb {
@@ -2771,23 +2774,26 @@ textarea:focus-visible {
 .echly-recording-capsule--expanded .echly-recording-center {
   flex: 1;
   width: auto;
+  min-height: 0;
+  overflow: visible;
   opacity: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 10px;
+  gap: 4px;
 }
 .echly-recording-status {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.4;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
   color: rgba(255, 255, 255, 0.92);
   flex-shrink: 0;
-  margin-bottom: 6px;
 }
 .echly-recording-esc-hint {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.55);
+  opacity: 0.6;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.85);
   flex-shrink: 0;
 }
 .echly-recording-action-row {
@@ -2795,13 +2801,13 @@ textarea:focus-visible {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
   flex-shrink: 0;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 .echly-recording-cancel-pill {
-  height: 38px;
+  height: 36px;
   padding: 0 16px;
   display: inline-flex;
   align-items: center;
@@ -2821,8 +2827,8 @@ textarea:focus-visible {
   color: rgba(255, 255, 255, 0.95);
 }
 .echly-recording-done {
-  height: 38px;
-  padding: 0 18px;
+  height: 36px;
+  padding: 0 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
