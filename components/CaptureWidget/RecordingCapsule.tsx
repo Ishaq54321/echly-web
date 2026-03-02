@@ -15,18 +15,6 @@ export type RecordingCapsuleProps = {
   onCancel: () => void;
 };
 
-const LINE_HEIGHT = 1.4;
-const FONT_SIZE = 14;
-const MAX_LINES_MASK = 3;
-
-function estimateLineCount(text: string, maxWidth: number = 320): number {
-  if (!text.trim()) return 1;
-  const chars = text.length;
-  const pxPerChar = FONT_SIZE * 0.6;
-  const charsPerLine = Math.floor(maxWidth / pxPerChar);
-  return Math.max(1, Math.ceil(chars / charsPerLine));
-}
-
 export function RecordingCapsule({
   visible,
   isActive,
@@ -61,17 +49,6 @@ export function RecordingCapsule({
     return "Listening — we'll structure this.";
   }, [isProcessing]);
 
-  const lineCount = useMemo(
-    () => (expanded ? estimateLineCount(transcriptText, 320) : 1),
-    [expanded, transcriptText]
-  );
-  const linesClass =
-    lineCount >= MAX_LINES_MASK
-      ? "echly-recording-capsule--lines-3"
-      : lineCount >= 2
-        ? "echly-recording-capsule--lines-2"
-        : "";
-
   if (!visible) return null;
 
   return (
@@ -82,7 +59,6 @@ export function RecordingCapsule({
           expanded ? "echly-recording-capsule--expanded" : "",
           isProcessing ? "echly-recording-capsule--processing" : "",
           isExiting ? "echly-recording-capsule--exiting" : "",
-          linesClass,
         ]
           .filter(Boolean)
           .join(" ")}
@@ -101,7 +77,7 @@ export function RecordingCapsule({
               )}
             </span>
           </div>
-          {!isProcessing && (
+          <div className="echly-recording-action-row">
             <button
               type="button"
               onClick={onCancel}
@@ -110,19 +86,18 @@ export function RecordingCapsule({
             >
               Cancel
             </button>
-          )}
+            {isActive && !isProcessing && (
+              <button
+                type="button"
+                className="echly-recording-done"
+                onClick={onDone}
+                aria-label="Done recording"
+              >
+                Done
+              </button>
+            )}
+          </div>
         </div>
-
-        {isActive && !isProcessing && (
-          <button
-            type="button"
-            className="echly-recording-done"
-            onClick={onDone}
-            aria-label="Done recording"
-          >
-            Done
-          </button>
-        )}
       </div>
     </div>
   );

@@ -2,16 +2,18 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { buildCaptureContext } from "@/lib/captureContext";
+import { playShutterSound } from "@/lib/playShutterSound";
 import type { CaptureContext } from "./types";
 
 const MIN_SIZE = 24;
-const ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
+const ECHLY_EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)";
 
 export type Region = { x: number; y: number; w: number; h: number };
 
 export type RegionCaptureOverlayProps = {
   getFullTabImage: () => Promise<string | null>;
-  onCapture: (croppedDataUrl: string, context: CaptureContext | null) => void;
+  onAddVoice: (croppedDataUrl: string, context: CaptureContext | null) => void;
+  onConfirmOnly: (croppedDataUrl: string, context: CaptureContext | null) => void;
   onCancel: () => void;
   onSelectionStart?: () => void;
 };
@@ -51,22 +53,22 @@ async function cropImageToRegion(
 
 export function RegionCaptureOverlay({
   getFullTabImage,
-  onCapture,
+  onAddVoice,
+  onConfirmOnly,
   onCancel,
   onSelectionStart,
 }: RegionCaptureOverlayProps) {
   const [selectionRect, setSelectionRect] = useState<Region | null>(null);
-  const [overlayVisible, setOverlayVisible] = useState(true);
   const [releasedRect, setReleasedRect] = useState<Region | null>(null);
-  const [pulseDone, setPulseDone] = useState(false);
-  const [releasedFaded, setReleasedFaded] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [flashBorder, setFlashBorder] = useState(false);
 
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const selectionRectRef = useRef<Region | null>(null);
 
   const cancel = useCallback(() => {
-    setOverlayVisible(false);
     setSelectionRect(null);
+    setReleasedRect(null);
     startRef.current = null;
     selectionRectRef.current = null;
     setTimeout(() => onCancel(), 120);
@@ -76,12 +78,19 @@ export function RegionCaptureOverlay({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        cancel();
+        if (releasedRect) {
+          setReleasedRect(null);
+          setSelectionRect(null);
+          selectionRectRef.current = null;
+          startRef.current = null;
+        } else {
+          cancel();
+        }
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [cancel]);
+  }, [cancel, releasedRect]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -91,35 +100,26 @@ export function RegionCaptureOverlay({
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [cancel]);
 
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    onSelectionStart?.();
-    const x = e.clientX;
-    const y = e.clientY;
-    startRef.current = { x, y };
-    setSelectionRect({ x, y, w: 0, h: 0 });
-  }, [onSelectionStart]);
-
   const performCapture = useCallback(
-    async (targetRect: Region) => {
-      setOverlayVisible(false);
-      setSelectionRect(null);
-      setReleasedRect(null);
-      setPulseDone(false);
+    async (targetRect: Region, withVoice: boolean) => {
+      if (confirming) return;
+      setConfirming(true);
+      playShutterSound();
+      setFlashBorder(true);
+      setTimeout(() => setFlashBorder(false), 150);
 
-      await new Promise((r) => setTimeout(r, 80));
+      await new Promise((r) => setTimeout(r, 200));
 
       let fullImage: string | null = null;
       try {
         fullImage = await getFullTabImage();
       } catch {
-        setOverlayVisible(true);
+        setConfirming(false);
         onCancel();
         return;
       }
       if (!fullImage) {
-        setOverlayVisible(true);
+        setConfirming(false);
         onCancel();
         return;
       }
@@ -129,17 +129,41 @@ export function RegionCaptureOverlay({
       try {
         cropped = await cropImageToRegion(fullImage, targetRect, dpr);
       } catch {
-        setOverlayVisible(true);
+        setConfirming(false);
         onCancel();
         return;
       }
 
       const context: CaptureContext | null =
         typeof window !== "undefined" ? buildCaptureContext(window, null) : null;
-      onCapture(cropped, context);
+
+      if (withVoice) {
+        onAddVoice(cropped, context);
+      } else {
+        onConfirmOnly(cropped, context);
+      }
+      setConfirming(false);
+      setReleasedRect(null);
     },
-    [getFullTabImage, onCapture, onCancel]
+    [getFullTabImage, onAddVoice, onConfirmOnly, onCancel, confirming]
   );
+
+  const handleRetake = useCallback(() => {
+    setReleasedRect(null);
+    setSelectionRect(null);
+    selectionRectRef.current = null;
+    startRef.current = null;
+  }, []);
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0 || releasedRect) return;
+    e.preventDefault();
+    onSelectionStart?.();
+    const x = e.clientX;
+    const y = e.clientY;
+    startRef.current = { x, y };
+    setSelectionRect({ x, y, w: 0, h: 0 });
+  }, [onSelectionStart, releasedRect]);
 
   const onMouseUp = useCallback(
     (e: React.MouseEvent) => {
@@ -155,23 +179,12 @@ export function RegionCaptureOverlay({
       setSelectionRect(null);
       selectionRectRef.current = null;
       setReleasedRect({ x: current.x, y: current.y, w: current.w, h: current.h });
-      setPulseDone(false);
-      setReleasedFaded(false);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setPulseDone(true));
-      });
-      setTimeout(() => setReleasedFaded(true), 80);
-      setTimeout(() => {
-        performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
-        setReleasedRect(null);
-        setReleasedFaded(false);
-      }, 120);
     },
-    [performCapture]
+    []
   );
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!startRef.current) return;
+    if (!startRef.current || releasedRect) return;
     const sx = startRef.current.x;
     const sy = startRef.current.y;
     const x = Math.min(sx, e.clientX);
@@ -181,11 +194,11 @@ export function RegionCaptureOverlay({
     const next = { x, y, w, h };
     selectionRectRef.current = next;
     setSelectionRect(next);
-  }, []);
+  }, [releasedRect]);
 
   useEffect(() => {
     const onWindowMouseUp = (e: MouseEvent) => {
-      if (e.button !== 0 || !startRef.current) return;
+      if (e.button !== 0 || !startRef.current || releasedRect) return;
       const current = selectionRectRef.current;
       const start = startRef.current;
       startRef.current = null;
@@ -197,24 +210,16 @@ export function RegionCaptureOverlay({
       setSelectionRect(null);
       selectionRectRef.current = null;
       setReleasedRect({ x: current.x, y: current.y, w: current.w, h: current.h });
-      setPulseDone(false);
-      setReleasedFaded(false);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setPulseDone(true));
-      });
-      setTimeout(() => setReleasedFaded(true), 80);
-      setTimeout(() => {
-        performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
-        setReleasedRect(null);
-        setReleasedFaded(false);
-      }, 120);
     };
     window.addEventListener("mouseup", onWindowMouseUp);
     return () => window.removeEventListener("mouseup", onWindowMouseUp);
-  }, [performCapture]);
+  }, [releasedRect]);
 
   const showSelection = !!selectionRect && (selectionRect.w >= MIN_SIZE || selectionRect.h >= MIN_SIZE);
   const showReleased = releasedRect !== null;
+
+  const hasSelection = (showSelection && selectionRect) || (showReleased && releasedRect);
+  const rect = showReleased ? releasedRect! : selectionRect!;
 
   return (
     <div
@@ -223,68 +228,142 @@ export function RegionCaptureOverlay({
       className="echly-region-overlay"
       style={{ position: "fixed", inset: 0, zIndex: 2147483647, userSelect: "none" }}
     >
+      {/* Full-screen dim when no selection; transparent when selection exists (cutout provides dim) */}
       <div
         className="echly-region-overlay-dim"
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(0,0,0,0.04)",
-          pointerEvents: overlayVisible ? "auto" : "none",
+          background: hasSelection ? "transparent" : "rgba(0,0,0,0.35)",
+          pointerEvents: releasedRect ? "none" : "auto",
           cursor: "crosshair",
           zIndex: 2147483646,
-          opacity: overlayVisible ? 1 : 0,
-          transition: `opacity ${ECHLY_MOTION}`,
+          transition: `background 180ms ${ECHLY_EASE}`,
         }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={() => {
-          if (!startRef.current) return;
+          if (!startRef.current || releasedRect) return;
           setSelectionRect(null);
           startRef.current = null;
           selectionRectRef.current = null;
         }}
       />
 
-      {showSelection && selectionRect && (
+      {/* Top-center hint */}
+      <div
+        className="echly-region-hint"
+        style={{
+          position: "fixed",
+          left: "50%",
+          top: 24,
+          transform: "translateX(-50%)",
+          fontSize: 13,
+          color: "rgba(255,255,255,0.8)",
+          zIndex: 2147483647,
+          pointerEvents: "none",
+          opacity: releasedRect ? 0 : 1,
+          transition: `opacity 180ms ${ECHLY_EASE}`,
+        }}
+      >
+        Drag to capture area — ESC to cancel
+      </div>
+
+      {/* Cutout: selected area clear, outside dimmed via box-shadow */}
+      {hasSelection && rect && (
         <div
-          className="echly-region-selection-box"
+          className="echly-region-cutout"
           style={{
             position: "fixed",
-            left: selectionRect.x,
-            top: selectionRect.y,
-            width: Math.max(selectionRect.w, 1),
-            height: Math.max(selectionRect.h, 1),
-            border: "1px solid rgba(255,255,255,0.9)",
-            borderRadius: 4,
-            background: "rgba(255,255,255,0.04)",
+            left: rect.x,
+            top: rect.y,
+            width: Math.max(rect.w, 1),
+            height: Math.max(rect.h, 1),
+            borderRadius: 6,
+            border: `2px solid ${flashBorder ? "#FFFFFF" : "#5B8CFF"}`,
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
             pointerEvents: "none",
             zIndex: 2147483646,
-            opacity: overlayVisible ? 1 : 0,
-            animation: "echly-selection-fade-in 100ms ease-out",
+            transition: flashBorder ? "none" : `border-color 150ms ${ECHLY_EASE}`,
           }}
         />
       )}
 
+      {/* Confirmation bar near selection */}
       {showReleased && releasedRect && (
         <div
-          className="echly-region-released-pulse"
+          className="echly-region-confirm-bar"
           style={{
             position: "fixed",
-            left: releasedRect.x,
-            top: releasedRect.y,
-            width: releasedRect.w,
-            height: releasedRect.h,
-            border: "1px solid rgba(255,255,255,0.9)",
-            borderRadius: 4,
-            background: "rgba(255,255,255,0.04)",
-            pointerEvents: "none",
+            left: releasedRect.x + releasedRect.w / 2,
+            bottom: Math.max(12, releasedRect.y + releasedRect.h - 48),
+            transform: "translate(-50%, 100%)",
+            display: "flex",
+            gap: 8,
+            padding: "8px 12px",
+            borderRadius: 12,
+            background: "rgba(20,22,28,0.95)",
+            backdropFilter: "blur(12px)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
             zIndex: 2147483647,
-            transition: "transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-            transform: pulseDone ? "scale(1)" : "scale(0.98)",
-            opacity: releasedFaded ? 0.7 : pulseDone ? 1 : 0.8,
+            animation: `echly-confirm-bar-in 220ms ${ECHLY_EASE} forwards`,
           }}
-        />
+        >
+          <button
+            type="button"
+            onClick={handleRetake}
+            className="echly-region-confirm-btn"
+            style={{
+              padding: "8px 14px",
+              borderRadius: 999,
+              border: "none",
+              background: "rgba(255,255,255,0.08)",
+              color: "rgba(255,255,255,0.9)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            Retake
+          </button>
+          <button
+            type="button"
+            onClick={() => performCapture(releasedRect!, true)}
+            disabled={confirming}
+            className="echly-region-confirm-btn"
+            style={{
+              padding: "8px 14px",
+              borderRadius: 999,
+              border: "none",
+              background: "linear-gradient(135deg, #5B8CFF, #466EFF)",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: confirming ? "not-allowed" : "pointer",
+            }}
+          >
+            Add voice
+          </button>
+          <button
+            type="button"
+            onClick={() => performCapture(releasedRect!, false)}
+            disabled={confirming}
+            className="echly-region-confirm-btn"
+            style={{
+              padding: "8px 14px",
+              borderRadius: 999,
+              border: "none",
+              background: "#fff",
+              color: "#000",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: confirming ? "not-allowed" : "pointer",
+            }}
+          >
+            Confirm
+          </button>
+        </div>
       )}
     </div>
   );

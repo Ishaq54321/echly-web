@@ -10,6 +10,7 @@ import { RecordingCapsule } from "./RecordingCapsule";
 import type { CaptureWidgetProps } from "./types";
 
 const CAPTURE_FLOW_STATES = ["focus_mode", "region_selecting", "voice_listening", "processing"] as const;
+const RECORDING_UI_STATES = ["voice_listening", "processing"] as const;
 
 export default function CaptureWidget({
   sessionId,
@@ -47,6 +48,8 @@ export default function CaptureWidget({
   const listScrollRef = useRef<HTMLDivElement>(null);
 
   const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state as any) || state.pillExiting;
+  const showRecordingCapsule =
+    RECORDING_UI_STATES.includes(state.state as any) || state.pillExiting;
   const showSidebar = !isInCaptureFlow;
   const showFloatingButton = !effectiveIsOpen && showSidebar;
   const showPanel = effectiveIsOpen && showSidebar;
@@ -100,13 +103,14 @@ export default function CaptureWidget({
             state={state.state}
             getFullTabImage={handlers.getFullTabImage}
             onRegionCaptured={handlers.handleRegionCaptured}
+            onRegionConfirmOnly={handlers.handleRegionConfirmOnly}
             onRegionSelectStart={handlers.handleRegionSelectStart}
             onCancelCapture={handlers.handleCancelCapture}
           />
         )}
 
       <RecordingCapsule
-        visible={isInCaptureFlow}
+        visible={showRecordingCapsule}
         isActive={state.state === "voice_listening"}
         isProcessing={state.state === "processing" || state.pillExiting}
         isExiting={state.pillExiting}

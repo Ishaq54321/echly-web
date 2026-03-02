@@ -21,6 +21,7 @@ export type CaptureLayerProps = {
   state: CaptureLayerState;
   getFullTabImage: () => Promise<string | null>;
   onRegionCaptured: (croppedDataUrl: string, context?: CaptureContext | null) => void;
+  onRegionConfirmOnly: (croppedDataUrl: string, context?: CaptureContext | null) => void;
   onRegionSelectStart: () => void;
   onCancelCapture: () => void;
 };
@@ -34,6 +35,7 @@ export function CaptureLayer({
   state,
   getFullTabImage,
   onRegionCaptured,
+  onRegionConfirmOnly,
   onRegionSelectStart,
   onCancelCapture,
 }: CaptureLayerProps) {
@@ -61,7 +63,8 @@ export function CaptureLayer({
       {showRegionOverlay && (
         <RegionCaptureOverlay
           getFullTabImage={getFullTabImage}
-          onCapture={onRegionCaptured}
+          onAddVoice={onRegionCaptured}
+          onConfirmOnly={onRegionConfirmOnly}
           onCancel={onCancelCapture}
           onSelectionStart={onRegionSelectStart}
         />
