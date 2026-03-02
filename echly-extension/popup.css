@@ -2676,24 +2676,9 @@ textarea:focus-visible {
   z-index: 999999;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
   pointer-events: auto;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
-}
-.echly-recording-cancel {
-  padding: 8px 10px;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 160ms ease;
-  flex-shrink: 0;
-}
-.echly-recording-cancel:hover,
-.echly-recording-cancel:focus-visible {
-  color: rgba(255, 255, 255, 0.92);
 }
 .echly-recording-capsule {
   height: 56px;
@@ -2716,19 +2701,23 @@ textarea:focus-visible {
     padding 220ms cubic-bezier(0.22, 0.61, 0.36, 1),
     gap 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
+.echly-recording-capsule:not(.echly-recording-capsule--expanded) {
+  justify-content: center;
+}
 .echly-recording-capsule--expanded {
   width: 520px;
   min-width: 520px;
-  padding: 0 16px 0 12px;
-  gap: 14px;
+  padding: 16px 20px;
+  gap: 24px;
+  justify-content: flex-start;
 }
 .echly-recording-capsule--lines-2 {
-  height: 84px;
+  height: 96px;
   border-radius: 999px;
 }
 .echly-recording-capsule--lines-3 {
-  height: 140px;
-  max-height: 140px;
+  height: 160px;
+  max-height: 160px;
   border-radius: 18px;
 }
 .echly-recording-orb {
@@ -2737,28 +2726,33 @@ textarea:focus-visible {
   align-items: center;
   justify-content: center;
 }
-.echly-recording-orb-inner {
-  width: 48px;
-  height: 48px;
-  min-width: 48px;
-  min-height: 48px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #FF6B6B, #E10600);
-  box-shadow: inset 0 -4px 8px rgba(0, 0, 0, 0.25),
-    0 0 20px rgba(255, 80, 80, 0.4);
+.echly-recording-mic-wrapper {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 999px;
+  padding: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: filter 220ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    box-shadow 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-.echly-recording-orb-inner--pulse {
-  animation: echly-recording-orb-pulse 1.2s ease-in-out infinite;
+.echly-recording-orb-inner {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #FF6B6B, #D90429);
+  box-shadow: 0 0 16px rgba(255, 77, 77, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 220ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .echly-recording-orb-inner--processing {
   background: radial-gradient(circle at 30% 30%, #6b6b6b, #4a4a4a);
-  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.2);
-  animation: none;
+  box-shadow: none;
 }
 .echly-recording-orb-icon {
   display: flex;
@@ -2766,13 +2760,28 @@ textarea:focus-visible {
   justify-content: center;
   line-height: 0;
 }
-@keyframes echly-recording-orb-pulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.06);
-  }
+.echly-recording-center {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  transition: opacity 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.echly-recording-capsule--expanded .echly-recording-center {
+  flex: 1;
+  width: auto;
+  opacity: 1;
+}
+.echly-recording-status {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 4px;
+  flex-shrink: 0;
 }
 .echly-recording-transcript {
   min-width: 0;
@@ -2781,14 +2790,15 @@ textarea:focus-visible {
   opacity: 0;
   transition: opacity 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 .echly-recording-capsule--expanded .echly-recording-transcript {
   opacity: 1;
 }
+.echly-recording-capsule--processing .echly-recording-transcript {
+  opacity: 0.7;
+}
 .echly-recording-capsule--lines-3 .echly-recording-transcript {
-  align-items: flex-start;
-  padding-top: 4px;
   -webkit-mask-image: linear-gradient(to bottom, black 0%, black 75%, transparent 100%);
   mask-image: linear-gradient(to bottom, black 0%, black 75%, transparent 100%);
   -webkit-mask-size: 100% 100%;
@@ -2805,6 +2815,23 @@ textarea:focus-visible {
   overflow: hidden;
   display: block;
   max-width: 320px;
+}
+.echly-recording-cancel-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  padding: 6px 12px;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+  align-self: flex-start;
+}
+.echly-recording-cancel-pill:hover,
+.echly-recording-cancel-pill:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.95);
 }
 .echly-recording-done {
   height: 36px;

@@ -18,7 +18,6 @@ export type RecordingCapsuleProps = {
 const LINE_HEIGHT = 1.4;
 const FONT_SIZE = 14;
 const MAX_LINES_MASK = 3;
-const APPROX_CHARS_PER_LINE = 36;
 
 function estimateLineCount(text: string, maxWidth: number = 320): number {
   if (!text.trim()) return 1;
@@ -57,6 +56,11 @@ export function RecordingCapsule({
     return "Listening…";
   }, [isProcessing, liveTranscript]);
 
+  const statusText = useMemo(() => {
+    if (isProcessing) return "Optimizing your insight…";
+    return "Listening — we'll structure this.";
+  }, [isProcessing]);
+
   const lineCount = useMemo(
     () => (expanded ? estimateLineCount(transcriptText, 320) : 1),
     [expanded, transcriptText]
@@ -72,17 +76,6 @@ export function RecordingCapsule({
 
   return (
     <div className="echly-recording-row" aria-live="polite" role="status">
-      {!isProcessing && (
-        <button
-          type="button"
-          onClick={onCancel}
-          className="echly-recording-cancel"
-          aria-label="Cancel recording"
-        >
-          Cancel
-        </button>
-      )}
-
       <div
         className={[
           "echly-recording-capsule",
@@ -98,13 +91,26 @@ export function RecordingCapsule({
           <RecordingMicOrb isRecording={isActive} isProcessing={isProcessing} />
         </div>
 
-        <div className="echly-recording-transcript" ref={transcriptRef}>
-          <span className="echly-recording-text">
-            {transcriptText}
-            {isProcessing && (
-              <span className="echly-recording-underline" aria-hidden />
-            )}
-          </span>
+        <div className="echly-recording-center">
+          <span className="echly-recording-status">{statusText}</span>
+          <div className="echly-recording-transcript" ref={transcriptRef}>
+            <span className="echly-recording-text">
+              {transcriptText}
+              {isProcessing && (
+                <span className="echly-recording-underline" aria-hidden />
+              )}
+            </span>
+          </div>
+          {!isProcessing && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="echly-recording-cancel-pill"
+              aria-label="Cancel recording"
+            >
+              Cancel
+            </button>
+          )}
         </div>
 
         {isActive && !isProcessing && (

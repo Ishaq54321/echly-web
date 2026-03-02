@@ -2,12 +2,12 @@
 
 import React from "react";
 
-/** Solid white microphone icon, 18px. */
-function MicIcon18() {
+/** Solid white microphone icon, 16px. */
+function MicIcon16() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -29,25 +29,24 @@ export type RecordingMicOrbProps = {
 };
 
 /**
- * Recording capsule mic: 48px, radial gradient, inset + glow shadow,
- * white mic SVG 18px. Pulse 1 → 1.06 every 1.2s when recording.
- * Processing: desaturate, no glow.
+ * Contained mic capsule: glass wrapper, 32px red orb inside, 16px white mic.
+ * Subtle outer glow. Processing: desaturate to neutral gray.
  */
-export function RecordingMicOrb({ isRecording, isProcessing }: RecordingMicOrbProps) {
+export function RecordingMicOrb({ isProcessing }: RecordingMicOrbProps) {
   return (
-    <div
-      className={[
-        "echly-recording-orb-inner",
-        isRecording && !isProcessing ? "echly-recording-orb-inner--pulse" : "",
-        isProcessing ? "echly-recording-orb-inner--processing" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      aria-hidden
-    >
-      <span className="echly-recording-orb-icon" style={{ color: "#FFFFFF" }}>
-        <MicIcon18 />
-      </span>
+    <div className="echly-recording-mic-wrapper" aria-hidden>
+      <div
+        className={[
+          "echly-recording-orb-inner",
+          isProcessing ? "echly-recording-orb-inner--processing" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <span className="echly-recording-orb-icon" style={{ color: "#FFFFFF" }}>
+          <MicIcon16 />
+        </span>
+      </div>
     </div>
   );
 }

@@ -49081,74 +49081,66 @@ This typically indicates that your device does not have a healthy Internet conne
   // components/CaptureWidget/RecordingCapsule.tsx
   var import_react6 = __toESM(require_react());
 
-  // components/CaptureWidget/MicOrb.tsx
+  // components/CaptureWidget/RecordingMicOrb.tsx
   var import_jsx_runtime6 = __toESM(require_jsx_runtime());
-  function MicOrb({
-    isSpeaking = false,
-    audioLevel = 0,
-    isExiting = false,
-    isProcessing = false,
-    isSuccess = false,
-    sentiment = "neutral",
-    size = 48
-  }) {
-    const ringScale = isSpeaking ? 1 + Math.min(0.22, audioLevel * 0.28) : 1;
-    const ringSize = size;
+  function MicIcon18() {
     return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+      "svg",
+      {
+        width: "18",
+        height: "18",
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: "2",
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        "aria-hidden": true,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("line", { x1: "12", x2: "12", y1: "19", y2: "22" })
+        ]
+      }
+    );
+  }
+  function RecordingMicOrb({ isRecording, isProcessing }) {
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       "div",
       {
-        className: `
-        echly-mic-orb-wrapper
-        ${size === 44 ? "echly-mic-orb-wrapper--44" : ""}
-        ${isExiting ? "echly-mic-orb--exiting" : ""}
-        ${isProcessing ? "echly-mic-orb--processing" : ""}
-        ${isSuccess ? "echly-mic-orb--success" : ""}
-        echly-mic-orb-sentiment--${sentiment}
-      `,
-        style: size !== 48 ? { width: size, height: size, minWidth: size, minHeight: size } : void 0,
-        children: [
-          !isProcessing && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-            "div",
-            {
-              className: `
-            echly-mic-orb-ring
-            ${isSpeaking ? "echly-mic-orb-ring--active" : "echly-mic-orb-ring--glow"}
-          `,
-              style: isSpeaking ? {
-                width: ringSize,
-                height: ringSize,
-                marginLeft: -(ringSize / 2),
-                marginTop: -(ringSize / 2),
-                transform: `scale(${ringScale})`
-              } : {
-                width: ringSize,
-                height: ringSize,
-                marginLeft: -(ringSize / 2),
-                marginTop: -(ringSize / 2)
-              },
-              "aria-hidden": true
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "echly-mic-orb", style: { width: size, height: size }, "aria-hidden": true })
-        ]
+        className: [
+          "echly-recording-orb-inner",
+          isRecording && !isProcessing ? "echly-recording-orb-inner--pulse" : "",
+          isProcessing ? "echly-recording-orb-inner--processing" : ""
+        ].filter(Boolean).join(" "),
+        "aria-hidden": true,
+        children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "echly-recording-orb-icon", style: { color: "#FFFFFF" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(MicIcon18, {}) })
       }
     );
   }
 
   // components/CaptureWidget/RecordingCapsule.tsx
   var import_jsx_runtime7 = __toESM(require_jsx_runtime());
+  var FONT_SIZE = 14;
+  var MAX_LINES_MASK = 3;
+  function estimateLineCount(text, maxWidth = 320) {
+    if (!text.trim()) return 1;
+    const chars = text.length;
+    const pxPerChar = FONT_SIZE * 0.6;
+    const charsPerLine = Math.floor(maxWidth / pxPerChar);
+    return Math.max(1, Math.ceil(chars / charsPerLine));
+  }
   function RecordingCapsule({
     visible,
     isActive,
     isProcessing,
     isExiting = false,
-    audioLevel,
-    sentiment,
     liveTranscript = "",
     onDone,
     onCancel
   }) {
     const [expanded, setExpanded] = (0, import_react6.useState)(false);
+    const transcriptRef = (0, import_react6.useRef)(null);
     (0, import_react6.useEffect)(() => {
       if (isActive || isProcessing) {
         const id = requestAnimationFrame(() => {
@@ -49164,6 +49156,11 @@ This typically indicates that your device does not have a healthy Internet conne
       if (t) return t;
       return "Listening\u2026";
     }, [isProcessing, liveTranscript]);
+    const lineCount = (0, import_react6.useMemo)(
+      () => expanded ? estimateLineCount(transcriptText, 320) : 1,
+      [expanded, transcriptText]
+    );
+    const linesClass = lineCount >= MAX_LINES_MASK ? "echly-recording-capsule--lines-3" : lineCount >= 2 ? "echly-recording-capsule--lines-2" : "";
     if (!visible) return null;
     return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "echly-recording-row", "aria-live": "polite", role: "status", children: [
       !isProcessing && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
@@ -49183,23 +49180,14 @@ This typically indicates that your device does not have a healthy Internet conne
             "echly-recording-capsule",
             expanded ? "echly-recording-capsule--expanded" : "",
             isProcessing ? "echly-recording-capsule--processing" : "",
-            isExiting ? "echly-recording-capsule--exiting" : ""
+            isExiting ? "echly-recording-capsule--exiting" : "",
+            linesClass
           ].filter(Boolean).join(" "),
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "echly-recording-orb", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-              MicOrb,
-              {
-                isSpeaking: isActive && audioLevel > 0.12,
-                audioLevel,
-                isProcessing,
-                isExiting,
-                sentiment,
-                size: expanded ? 56 : 56
-              }
-            ) }),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "echly-recording-transcript", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "echly-recording-text", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "echly-recording-orb", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(RecordingMicOrb, { isRecording: isActive, isProcessing }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "echly-recording-transcript", ref: transcriptRef, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "echly-recording-text", children: [
               transcriptText,
-              isProcessing && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "echly-capsule-underline", "aria-hidden": true })
+              isProcessing && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "echly-recording-underline", "aria-hidden": true })
             ] }) }),
             isActive && !isProcessing && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
               "button",
