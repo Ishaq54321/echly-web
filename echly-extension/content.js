@@ -1337,7 +1337,7 @@
           return dispatcher;
         }
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-        var React7 = require_react(), Internals = {
+        var React6 = require_react(), Internals = {
           d: {
             f: noop2,
             r: function() {
@@ -1355,7 +1355,7 @@
           },
           p: 0,
           findDOMNode: null
-        }, REACT_PORTAL_TYPE = Symbol.for("react.portal"), ReactSharedInternals = React7.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+        }, REACT_PORTAL_TYPE = Symbol.for("react.portal"), ReactSharedInternals = React6.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
         "function" === typeof Map && null != Map.prototype && "function" === typeof Map.prototype.forEach && "function" === typeof Set && null != Set.prototype && "function" === typeof Set.prototype.clear && "function" === typeof Set.prototype.forEach || console.error(
           "React depends on Map and Set built-in types. Make sure that you load a polyfill in older browsers. https://reactjs.org/link/react-polyfills"
         );
@@ -2890,7 +2890,7 @@
           "number" === type && getActiveElement(node.ownerDocument) === node || node.defaultValue === "" + value || (node.defaultValue = "" + value);
         }
         function validateOptionProps(element, props) {
-          null == props.value && ("object" === typeof props.children && null !== props.children ? React7.Children.forEach(props.children, function(child2) {
+          null == props.value && ("object" === typeof props.children && null !== props.children ? React6.Children.forEach(props.children, function(child2) {
             null == child2 || "string" === typeof child2 || "number" === typeof child2 || "bigint" === typeof child2 || didWarnInvalidChild || (didWarnInvalidChild = true, console.error(
               "Cannot infer the option value of complex children. Pass a `value` prop or use a plain string as children to <option>."
             ));
@@ -18522,14 +18522,14 @@
           ));
         }
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-        var Scheduler = require_scheduler(), React7 = require_react(), ReactDOM = require_react_dom(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = Symbol.for("react.element"), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy");
+        var Scheduler = require_scheduler(), React6 = require_react(), ReactDOM = require_react_dom(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = Symbol.for("react.element"), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy");
         Symbol.for("react.scope");
         var REACT_ACTIVITY_TYPE = Symbol.for("react.activity");
         Symbol.for("react.legacy_hidden");
         Symbol.for("react.tracing_marker");
         var REACT_MEMO_CACHE_SENTINEL = Symbol.for("react.memo_cache_sentinel");
         Symbol.for("react.view_transition");
-        var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React7.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
+        var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React6.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
           pending: false,
           data: null,
           method: null,
@@ -21317,7 +21317,7 @@
           }
         };
         (function() {
-          var isomorphicReactPackageVersion = React7.version;
+          var isomorphicReactPackageVersion = React6.version;
           if ("19.2.3" !== isomorphicReactPackageVersion)
             throw Error(
               'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.2.3\nLearn more: https://react.dev/warnings/version-mismatch")
@@ -21685,18 +21685,18 @@
         function isValidElement(object) {
           return "object" === typeof object && null !== object && object.$$typeof === REACT_ELEMENT_TYPE;
         }
-        var React7 = require_react(), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy"), REACT_ACTIVITY_TYPE = Symbol.for("react.activity"), REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), ReactSharedInternals = React7.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, hasOwnProperty = Object.prototype.hasOwnProperty, isArrayImpl = Array.isArray, createTask = console.createTask ? console.createTask : function() {
+        var React6 = require_react(), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy"), REACT_ACTIVITY_TYPE = Symbol.for("react.activity"), REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), ReactSharedInternals = React6.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, hasOwnProperty = Object.prototype.hasOwnProperty, isArrayImpl = Array.isArray, createTask = console.createTask ? console.createTask : function() {
           return null;
         };
-        React7 = {
+        React6 = {
           react_stack_bottom_frame: function(callStackForError) {
             return callStackForError();
           }
         };
         var specialPropKeyWarningShown;
         var didWarnAboutElementRef = {};
-        var unknownOwnerDebugStack = React7.react_stack_bottom_frame.bind(
-          React7,
+        var unknownOwnerDebugStack = React6.react_stack_bottom_frame.bind(
+          React6,
           UnknownOwner
         )();
         var unknownOwnerDebugTask = createTask(getTaskName(UnknownOwner));
@@ -21741,7 +21741,7 @@
   });
 
   // echly-extension/src/content.tsx
-  var import_react9 = __toESM(require_react());
+  var import_react8 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // node_modules/@firebase/util/dist/postinstall.mjs
@@ -41623,28 +41623,8 @@ This typically indicates that your device does not have a healthy Internet conne
   }
 
   // components/CaptureWidget/CaptureWidget.tsx
-  var import_react8 = __toESM(require_react());
-
-  // echly-extension/stubs/next-image.tsx
-  var import_react = __toESM(require_react());
-  function resolveSrc(src) {
-    if (typeof chrome !== "undefined" && chrome.runtime?.getURL && (src === "/Echly_logo.svg" || src.endsWith("Echly_logo.svg"))) {
-      return chrome.runtime.getURL("assets/Echly_logo.svg");
-    }
-    return src;
-  }
-  function Image2({ src, alt, width, height, className }) {
-    return /* @__PURE__ */ import_react.default.createElement(
-      "img",
-      {
-        src: resolveSrc(src),
-        alt,
-        width,
-        height,
-        className
-      }
-    );
-  }
+  var import_react7 = __toESM(require_react());
+  var import_react_dom2 = __toESM(require_react_dom());
 
   // node_modules/@firebase/auth/dist/esm/index-3398f4bb.js
   function _prodErrorMap2() {
@@ -47701,7 +47681,7 @@ This typically indicates that your device does not have a healthy Internet conne
   }
 
   // components/CaptureWidget/hooks/useCaptureWidget.ts
-  var import_react2 = __toESM(require_react());
+  var import_react = __toESM(require_react());
 
   // lib/querySafety.ts
   var isDev = typeof process !== "undefined" && true;
@@ -47814,55 +47794,57 @@ This typically indicates that your device does not have a healthy Internet conne
     onRecordingChange,
     liveStructureFetch
   }) {
-    const [recordings, setRecordings] = (0, import_react2.useState)([]);
-    const [activeRecordingId, setActiveRecordingId] = (0, import_react2.useState)(null);
-    const [isOpen, setIsOpenState] = (0, import_react2.useState)(false);
-    const [state, setState] = (0, import_react2.useState)("idle");
-    const [errorMessage, setErrorMessage] = (0, import_react2.useState)(null);
-    const [pointers, setPointers] = (0, import_react2.useState)(
+    const [recordings, setRecordings] = (0, import_react.useState)([]);
+    const [activeRecordingId, setActiveRecordingId] = (0, import_react.useState)(null);
+    const [isOpen, setIsOpenState] = (0, import_react.useState)(false);
+    const [state, setState] = (0, import_react.useState)("idle");
+    const [errorMessage, setErrorMessage] = (0, import_react.useState)(null);
+    const [pointers, setPointers] = (0, import_react.useState)(
       initialPointers ?? []
     );
-    const [expandedId, setExpandedId] = (0, import_react2.useState)(null);
-    const [editingId, setEditingId] = (0, import_react2.useState)(null);
-    const [editedTitle, setEditedTitle] = (0, import_react2.useState)("");
-    const [editedDescription, setEditedDescription] = (0, import_react2.useState)("");
-    const [seconds, setSeconds] = (0, import_react2.useState)(0);
-    const [showMenu, setShowMenu] = (0, import_react2.useState)(false);
-    const [position, setPosition] = (0, import_react2.useState)(null);
-    const [isDragging, setIsDragging] = (0, import_react2.useState)(false);
-    const [pendingStructured, setPendingStructured] = (0, import_react2.useState)(null);
-    const [liveStructured, setLiveStructured] = (0, import_react2.useState)(null);
-    const [listeningAudioLevel, setListeningAudioLevel] = (0, import_react2.useState)(0);
-    const [captureModeMinimized, setCaptureModeMinimized] = (0, import_react2.useState)(false);
-    const [widgetOpenBeforeCapture, setWidgetOpenBeforeCapture] = (0, import_react2.useState)(true);
-    const [highlightTicketId, setHighlightTicketId] = (0, import_react2.useState)(null);
-    const [pillExiting, setPillExiting] = (0, import_react2.useState)(false);
-    const dragOffset = (0, import_react2.useRef)({ x: 0, y: 0 });
-    const widgetRef = (0, import_react2.useRef)(null);
-    const recognitionRef = (0, import_react2.useRef)(null);
-    const timerRef = (0, import_react2.useRef)(null);
-    const menuRef = (0, import_react2.useRef)(null);
-    const activeRecordingIdRef = (0, import_react2.useRef)(null);
-    const recordingsRef = (0, import_react2.useRef)(recordings);
-    const stateRef = (0, import_react2.useRef)(state);
-    const editingIdRef = (0, import_react2.useRef)(null);
-    const trayLockedRef = (0, import_react2.useRef)(false);
-    const liveStructureTimeoutRef = (0, import_react2.useRef)(null);
-    const mediaStreamRef = (0, import_react2.useRef)(null);
-    const audioContextRef = (0, import_react2.useRef)(null);
-    const analyserRef = (0, import_react2.useRef)(null);
-    const rafRef = (0, import_react2.useRef)(null);
-    (0, import_react2.useEffect)(() => {
+    const [expandedId, setExpandedId] = (0, import_react.useState)(null);
+    const [editingId, setEditingId] = (0, import_react.useState)(null);
+    const [editedTitle, setEditedTitle] = (0, import_react.useState)("");
+    const [editedDescription, setEditedDescription] = (0, import_react.useState)("");
+    const [seconds, setSeconds] = (0, import_react.useState)(0);
+    const [showMenu, setShowMenu] = (0, import_react.useState)(false);
+    const [position, setPosition] = (0, import_react.useState)(null);
+    const [isDragging, setIsDragging] = (0, import_react.useState)(false);
+    const [pendingStructured, setPendingStructured] = (0, import_react.useState)(null);
+    const [liveStructured, setLiveStructured] = (0, import_react.useState)(null);
+    const [listeningAudioLevel, setListeningAudioLevel] = (0, import_react.useState)(0);
+    const [captureModeMinimized, setCaptureModeMinimized] = (0, import_react.useState)(false);
+    const [widgetOpenBeforeCapture, setWidgetOpenBeforeCapture] = (0, import_react.useState)(true);
+    const [highlightTicketId, setHighlightTicketId] = (0, import_react.useState)(null);
+    const [pillExiting, setPillExiting] = (0, import_react.useState)(false);
+    const [captureRootReady, setCaptureRootReady] = (0, import_react.useState)(false);
+    const dragOffset = (0, import_react.useRef)({ x: 0, y: 0 });
+    const widgetRef = (0, import_react.useRef)(null);
+    const captureRootRef = (0, import_react.useRef)(null);
+    const recognitionRef = (0, import_react.useRef)(null);
+    const timerRef = (0, import_react.useRef)(null);
+    const menuRef = (0, import_react.useRef)(null);
+    const activeRecordingIdRef = (0, import_react.useRef)(null);
+    const recordingsRef = (0, import_react.useRef)(recordings);
+    const stateRef = (0, import_react.useRef)(state);
+    const editingIdRef = (0, import_react.useRef)(null);
+    const trayLockedRef = (0, import_react.useRef)(false);
+    const liveStructureTimeoutRef = (0, import_react.useRef)(null);
+    const mediaStreamRef = (0, import_react.useRef)(null);
+    const audioContextRef = (0, import_react.useRef)(null);
+    const analyserRef = (0, import_react.useRef)(null);
+    const rafRef = (0, import_react.useRef)(null);
+    (0, import_react.useEffect)(() => {
       stateRef.current = state;
     }, [state]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react.useEffect)(() => {
       if (state !== "processing-structure") return;
       const t = setTimeout(() => {
         if (stateRef.current === "processing-structure") setState("saving-feedback");
       }, MIN_PROCESSING_PHASE_MS);
       return () => clearTimeout(t);
     }, [state]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react.useEffect)(() => {
       if (state !== "listening") {
         if (rafRef.current != null) {
           cancelAnimationFrame(rafRef.current);
@@ -47896,18 +47878,18 @@ This typically indicates that your device does not have a healthy Internet conne
         rafRef.current = null;
       };
     }, [state]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react.useEffect)(() => {
       editingIdRef.current = editingId;
     }, [editingId]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react.useEffect)(() => {
       if (RECORDING_STATES.includes(state)) {
         trayLockedRef.current = true;
       } else {
         trayLockedRef.current = false;
       }
     }, [state]);
-    const wasRecordingRef = (0, import_react2.useRef)(false);
-    (0, import_react2.useEffect)(() => {
+    const wasRecordingRef = (0, import_react.useRef)(false);
+    (0, import_react.useEffect)(() => {
       if (!onRecordingChange) return;
       const recording = RECORDING_STATES.includes(state);
       if (recording) {
@@ -47918,7 +47900,7 @@ This typically indicates that your device does not have a healthy Internet conne
         onRecordingChange(false);
       }
     }, [state, onRecordingChange]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react.useEffect)(() => {
       if (state !== "listening" || !liveStructureFetch || !activeRecordingId) {
         setLiveStructured(null);
         if (liveStructureTimeoutRef.current) {
@@ -47951,7 +47933,7 @@ This typically indicates that your device does not have a healthy Internet conne
         }
       };
     }, [state, activeRecordingId, recordings, liveStructureFetch]);
-    const setIsOpen = (0, import_react2.useCallback)((next) => {
+    const setIsOpen = (0, import_react.useCallback)((next) => {
       if (next === false) {
         if (trayLockedRef.current) return;
         if (extensionMode) return;
@@ -47961,16 +47943,16 @@ This typically indicates that your device does not have a healthy Internet conne
       }
       setIsOpenState(next);
     }, [extensionMode]);
-    const toggleOpen = (0, import_react2.useCallback)(() => {
+    const toggleOpen = (0, import_react.useCallback)(() => {
       setIsOpenState((prev) => !prev);
     }, []);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react.useEffect)(() => {
       activeRecordingIdRef.current = activeRecordingId;
     }, [activeRecordingId]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react.useEffect)(() => {
       recordingsRef.current = recordings;
     }, [recordings]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react.useEffect)(() => {
       const handleMouseMove = (e) => {
         if (!isDragging || !widgetRef.current) return;
         e.preventDefault();
@@ -47997,7 +47979,7 @@ This typically indicates that your device does not have a healthy Internet conne
         window.removeEventListener("mouseup", handleMouseUp);
       };
     }, [isDragging]);
-    const startDrag = (0, import_react2.useCallback)((e) => {
+    const startDrag = (0, import_react.useCallback)((e) => {
       if (e.button !== 0 || !widgetRef.current) return;
       const rect = widgetRef.current.getBoundingClientRect();
       setIsDragging(true);
@@ -48008,7 +47990,28 @@ This typically indicates that your device does not have a healthy Internet conne
       };
       setPosition({ x: rect.left, y: rect.top });
     }, []);
-    (0, import_react2.useEffect)(() => {
+    const createCaptureRoot = (0, import_react.useCallback)(() => {
+      if (captureRootRef.current) return;
+      const el = document.createElement("div");
+      el.id = "echly-capture-root";
+      document.body.appendChild(el);
+      captureRootRef.current = el;
+      setCaptureRootReady(true);
+    }, []);
+    const removeCaptureRoot = (0, import_react.useCallback)(() => {
+      if (!captureRootRef.current) return;
+      try {
+        document.body.removeChild(captureRootRef.current);
+      } catch (_) {
+      }
+      captureRootRef.current = null;
+      setCaptureRootReady(false);
+    }, []);
+    const restoreWidget = (0, import_react.useCallback)(() => {
+      setCaptureModeMinimized(false);
+      setIsOpenState(widgetOpenBeforeCapture);
+    }, [widgetOpenBeforeCapture]);
+    (0, import_react.useEffect)(() => {
       if (initialPointers != null) {
         setPointers(initialPointers);
         return;
@@ -48027,7 +48030,7 @@ This typically indicates that your device does not have a healthy Internet conne
       };
       loadFeedback();
     }, [sessionId, initialPointers]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react.useEffect)(() => {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) return;
       const recognition = new SpeechRecognition();
@@ -48061,19 +48064,19 @@ This typically indicates that your device does not have a healthy Internet conne
         }
       };
     }, []);
-    const startTimer = (0, import_react2.useCallback)(() => {
+    const startTimer = (0, import_react.useCallback)(() => {
       setSeconds(0);
       timerRef.current = setInterval(() => {
         setSeconds((prev) => prev + 1);
       }, 1e3);
     }, []);
     const stopTimer = () => clearInterval(timerRef.current);
-    const formatTime = (0, import_react2.useCallback)(() => {
+    const formatTime = (0, import_react.useCallback)(() => {
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
       return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
     }, [seconds]);
-    const startListening = (0, import_react2.useCallback)(async () => {
+    const startListening = (0, import_react.useCallback)(async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaStreamRef.current = stream;
@@ -48095,7 +48098,7 @@ This typically indicates that your device does not have a healthy Internet conne
         setState("error");
       }
     }, [startTimer]);
-    const finishListening = (0, import_react2.useCallback)(async () => {
+    const finishListening = (0, import_react.useCallback)(async () => {
       if (typeof navigator !== "undefined" && navigator.vibrate) {
         navigator.vibrate(8);
       }
@@ -48129,15 +48132,15 @@ This typically indicates that your device does not have a healthy Internet conne
             setTimeout(() => setHighlightTicketId(null), 1200);
             setTimeout(() => {
               setPillExiting(false);
-              setCaptureModeMinimized(false);
-              setIsOpenState(widgetOpenBeforeCapture);
+              removeCaptureRoot();
+              restoreWidget();
             }, 220);
           },
           onError: () => {
             setErrorMessage("AI processing failed.");
             setState("error");
-            setCaptureModeMinimized(false);
-            setIsOpenState(widgetOpenBeforeCapture);
+            removeCaptureRoot();
+            restoreWidget();
           }
         }, active.context ?? void 0);
         return;
@@ -48146,6 +48149,8 @@ This typically indicates that your device does not have a healthy Internet conne
         const structured = await onComplete(active.transcript, active.screenshot);
         if (!structured) {
           setState("idle");
+          removeCaptureRoot();
+          restoreWidget();
           return;
         }
         setRecordings(
@@ -48159,9 +48164,11 @@ This typically indicates that your device does not have a healthy Internet conne
         console.error(err);
         setErrorMessage("AI processing failed.");
         setState("error");
+        removeCaptureRoot();
+        restoreWidget();
       }
-    }, [onComplete, extensionMode, widgetOpenBeforeCapture]);
-    (0, import_react2.useEffect)(() => {
+    }, [onComplete, extensionMode, widgetOpenBeforeCapture, removeCaptureRoot, restoreWidget]);
+    (0, import_react.useEffect)(() => {
       if (state !== "anticipation" || !pendingStructured) return;
       const t = setTimeout(() => {
         setPointers((prev) => [
@@ -48176,23 +48183,23 @@ This typically indicates that your device does not have a healthy Internet conne
         setPendingStructured(null);
         setActiveRecordingId(null);
         setState("idle");
+        removeCaptureRoot();
+        restoreWidget();
       }, 160);
       return () => clearTimeout(t);
-    }, [state, pendingStructured]);
-    const discardListening = (0, import_react2.useCallback)(() => {
+    }, [state, pendingStructured, removeCaptureRoot, restoreWidget]);
+    const discardListening = (0, import_react.useCallback)(() => {
       recognitionRef.current?.stop();
       stopTimer();
       const activeId = activeRecordingIdRef.current;
       setRecordings((prev) => prev.filter((r) => r.id !== activeId));
       setActiveRecordingId(null);
       setState("idle");
-      if (extensionMode) {
-        setCaptureModeMinimized(false);
-        setIsOpenState(widgetOpenBeforeCapture);
-      }
-    }, [extensionMode, widgetOpenBeforeCapture]);
-    (0, import_react2.useEffect)(() => {
-      if (!extensionMode || !captureModeMinimized || state !== "listening") return;
+      removeCaptureRoot();
+      restoreWidget();
+    }, [removeCaptureRoot, restoreWidget]);
+    (0, import_react.useEffect)(() => {
+      if (!captureModeMinimized || state !== "listening") return;
       const onKeyDown = (e) => {
         if (e.key === "Escape") {
           e.preventDefault();
@@ -48201,14 +48208,14 @@ This typically indicates that your device does not have a healthy Internet conne
       };
       document.addEventListener("keydown", onKeyDown);
       return () => document.removeEventListener("keydown", onKeyDown);
-    }, [extensionMode, captureModeMinimized, state, discardListening]);
-    const handleShare = (0, import_react2.useCallback)(async () => {
+    }, [captureModeMinimized, state, discardListening]);
+    const handleShare = (0, import_react.useCallback)(async () => {
       try {
         await navigator.clipboard.writeText(window.location.href);
       } catch {
       }
     }, []);
-    const resetSession = (0, import_react2.useCallback)(() => {
+    const resetSession = (0, import_react.useCallback)(() => {
       setPointers([]);
       setRecordings([]);
       setActiveRecordingId(null);
@@ -48217,7 +48224,7 @@ This typically indicates that your device does not have a healthy Internet conne
       setEditingId(null);
       setShowMenu(false);
     }, []);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react.useEffect)(() => {
       if (extensionMode) return;
       const handleClickOutside = (event) => {
         if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -48227,7 +48234,7 @@ This typically indicates that your device does not have a healthy Internet conne
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [extensionMode]);
-    const deletePointer = (0, import_react2.useCallback)(async (id) => {
+    const deletePointer = (0, import_react.useCallback)(async (id) => {
       try {
         await onDelete(id);
         setPointers((prev) => prev.filter((p) => p.id !== id));
@@ -48235,12 +48242,12 @@ This typically indicates that your device does not have a healthy Internet conne
         console.error("Delete failed:", err);
       }
     }, [onDelete]);
-    const startEditing = (0, import_react2.useCallback)((p) => {
+    const startEditing = (0, import_react.useCallback)((p) => {
       setEditingId(p.id);
       setEditedTitle(p.title);
       setEditedDescription(p.description);
     }, []);
-    const saveEdit = (0, import_react2.useCallback)(async (id) => {
+    const saveEdit = (0, import_react.useCallback)(async (id) => {
       try {
         const res = await authFetch2(`/api/tickets/${id}`, {
           method: "PATCH",
@@ -48266,7 +48273,7 @@ This typically indicates that your device does not have a healthy Internet conne
         console.error("Save edit failed:", err);
       }
     }, [editedTitle, editedDescription]);
-    const getFullTabImage = (0, import_react2.useCallback)(() => {
+    const getFullTabImage = (0, import_react.useCallback)(() => {
       if (typeof chrome !== "undefined" && chrome.runtime?.id) {
         return new Promise((resolve, reject) => {
           chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response) => {
@@ -48280,14 +48287,14 @@ This typically indicates that your device does not have a healthy Internet conne
       }
       return Promise.resolve(null);
     }, []);
-    const captureScreenshot2 = (0, import_react2.useCallback)(async () => {
+    const captureScreenshot2 = (0, import_react.useCallback)(async () => {
       if (typeof chrome !== "undefined" && chrome.runtime?.id) {
         return getFullTabImage();
       }
       const { captureScreenshot: webCapture } = await Promise.resolve().then(() => (init_capture(), capture_exports));
       return webCapture();
     }, [getFullTabImage]);
-    const handleRegionCaptured = (0, import_react2.useCallback)(
+    const handleRegionCaptured = (0, import_react.useCallback)(
       (croppedDataUrl, context) => {
         const id = generateRecordingId();
         const newRecording = {
@@ -48304,29 +48311,31 @@ This typically indicates that your device does not have a healthy Internet conne
       },
       [startListening]
     );
-    const handleCancelCapture = (0, import_react2.useCallback)(() => {
+    const handleCancelCapture = (0, import_react.useCallback)(() => {
+      removeCaptureRoot();
       setState("idle");
-      setCaptureModeMinimized(false);
-      setIsOpenState(widgetOpenBeforeCapture);
-    }, [widgetOpenBeforeCapture]);
-    const handleAddFeedback = (0, import_react2.useCallback)(async () => {
+      restoreWidget();
+    }, [removeCaptureRoot, restoreWidget]);
+    const handleAddFeedback = (0, import_react.useCallback)(async () => {
       if (stateRef.current !== "idle") return;
       setErrorMessage(null);
       recognitionRef.current?.stop();
+      setWidgetOpenBeforeCapture(isOpen);
+      setCaptureModeMinimized(true);
+      setIsOpenState(false);
+      createCaptureRoot();
       if (extensionMode) {
-        setWidgetOpenBeforeCapture(isOpen);
-        setCaptureModeMinimized(true);
-        setIsOpenState(false);
         setState("capturing");
         return;
       }
-      setIsOpen(true);
       setState("capturing");
       try {
         const image = await captureScreenshot2();
         if (!image) {
+          removeCaptureRoot();
           setState("idle");
           setErrorMessage("Capture cancelled.");
+          restoreWidget();
           return;
         }
         const id = generateRecordingId();
@@ -48344,9 +48353,19 @@ This typically indicates that your device does not have a healthy Internet conne
         console.error(err);
         setErrorMessage("Screen capture failed.");
         setState("error");
+        removeCaptureRoot();
+        restoreWidget();
       }
-    }, [extensionMode, isOpen, captureScreenshot2, startListening]);
-    const handlers = (0, import_react2.useMemo)(
+    }, [
+      extensionMode,
+      isOpen,
+      captureScreenshot2,
+      startListening,
+      createCaptureRoot,
+      removeCaptureRoot,
+      restoreWidget
+    ]);
+    const handlers = (0, import_react.useMemo)(
       () => ({
         setIsOpen,
         toggleOpen,
@@ -48386,17 +48405,17 @@ This typically indicates that your device does not have a healthy Internet conne
         getFullTabImage
       ]
     );
-    const derivedValues = (0, import_react2.useMemo)(
+    const derivedValues = (0, import_react.useMemo)(
       () => ({
         formatTime
       }),
       [formatTime]
     );
-    const activeRecording = (0, import_react2.useMemo)(
+    const activeRecording = (0, import_react.useMemo)(
       () => activeRecordingId ? recordings.find((r) => r.id === activeRecordingId) : null,
       [activeRecordingId, recordings]
     );
-    const listeningSentiment = (0, import_react2.useMemo)(() => {
+    const listeningSentiment = (0, import_react.useMemo)(() => {
       if (state !== "listening") return "neutral";
       return getSentimentFromTranscript(activeRecording?.transcript ?? "");
     }, [state, activeRecording?.transcript]);
@@ -48424,13 +48443,15 @@ This typically indicates that your device does not have a healthy Internet conne
       derivedValues,
       refs: {
         widgetRef,
-        menuRef
-      }
+        menuRef,
+        captureRootRef
+      },
+      captureRootReady
     };
   }
 
   // node_modules/lucide-react/dist/esm/createLucideIcon.js
-  var import_react4 = __toESM(require_react());
+  var import_react3 = __toESM(require_react());
 
   // node_modules/lucide-react/dist/esm/shared/src/utils/mergeClasses.js
   var mergeClasses = (...classes) => classes.filter((className, index, array) => {
@@ -48453,7 +48474,7 @@ This typically indicates that your device does not have a healthy Internet conne
   };
 
   // node_modules/lucide-react/dist/esm/Icon.js
-  var import_react3 = __toESM(require_react());
+  var import_react2 = __toESM(require_react());
 
   // node_modules/lucide-react/dist/esm/defaultAttributes.js
   var defaultAttributes = {
@@ -48479,7 +48500,7 @@ This typically indicates that your device does not have a healthy Internet conne
   };
 
   // node_modules/lucide-react/dist/esm/Icon.js
-  var Icon = (0, import_react3.forwardRef)(
+  var Icon = (0, import_react2.forwardRef)(
     ({
       color = "currentColor",
       size = 24,
@@ -48489,7 +48510,7 @@ This typically indicates that your device does not have a healthy Internet conne
       children,
       iconNode,
       ...rest
-    }, ref2) => (0, import_react3.createElement)(
+    }, ref2) => (0, import_react2.createElement)(
       "svg",
       {
         ref: ref2,
@@ -48503,7 +48524,7 @@ This typically indicates that your device does not have a healthy Internet conne
         ...rest
       },
       [
-        ...iconNode.map(([tag, attrs]) => (0, import_react3.createElement)(tag, attrs)),
+        ...iconNode.map(([tag, attrs]) => (0, import_react2.createElement)(tag, attrs)),
         ...Array.isArray(children) ? children : [children]
       ]
     )
@@ -48511,8 +48532,8 @@ This typically indicates that your device does not have a healthy Internet conne
 
   // node_modules/lucide-react/dist/esm/createLucideIcon.js
   var createLucideIcon = (iconName, iconNode) => {
-    const Component2 = (0, import_react4.forwardRef)(
-      ({ className, ...props }, ref2) => (0, import_react4.createElement)(Icon, {
+    const Component2 = (0, import_react3.forwardRef)(
+      ({ className, ...props }, ref2) => (0, import_react3.createElement)(Icon, {
         ref: ref2,
         iconNode,
         className: mergeClasses(
@@ -48600,51 +48621,8 @@ This typically indicates that your device does not have a healthy Internet conne
   ];
   var X = createLucideIcon("x", __iconNode8);
 
-  // components/CaptureWidget/MicOrb.tsx
-  var import_jsx_runtime = __toESM(require_jsx_runtime());
-  function MicOrb({
-    isSpeaking = false,
-    audioLevel = 0,
-    isExiting = false,
-    isProcessing = false,
-    sentiment = "neutral"
-  }) {
-    const ringScale = isSpeaking ? 1 + Math.min(0.2, audioLevel * 0.25) : 1;
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-      "div",
-      {
-        className: `
-        echly-mic-orb-wrapper
-        inline-flex items-center justify-center
-        relative
-        ${isExiting ? "echly-mic-orb--exiting" : ""}
-        ${isProcessing ? "echly-mic-orb--processing" : ""}
-        echly-mic-orb-sentiment--${sentiment}
-      `,
-        children: [
-          !isProcessing && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "div",
-            {
-              className: `
-            echly-mic-orb-ring
-            absolute rounded-full pointer-events-none
-            ${isSpeaking ? "echly-mic-orb-ring--active" : "echly-mic-orb-ring--glow"}
-          `,
-              style: isSpeaking ? {
-                transform: `translate(-50%, -50%) scale(${ringScale})`
-              } : void 0,
-              "aria-hidden": true
-            }
-          ),
-          isProcessing && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "echly-mic-orb-processing-ring absolute rounded-full pointer-events-none", "aria-hidden": true }),
-          !isProcessing && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "echly-mic-orb relative z-10 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { className: "echly-mic-orb-icon", size: 24, strokeWidth: 2, "aria-hidden": true }) })
-        ]
-      }
-    );
-  }
-
   // components/CaptureWidget/CaptureHeader.tsx
-  var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime = __toESM(require_jsx_runtime());
   function CaptureHeader({
     onStartDrag,
     onShare,
@@ -48653,76 +48631,87 @@ This typically indicates that your device does not have a healthy Internet conne
     showMenu,
     onResetSession,
     menuRef,
-    isProcessingStructure = false
+    isProcessingStructure = false,
+    summary = null
   }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
       "div",
       {
         onMouseDown: onStartDrag,
-        className: "px-6 py-4 flex justify-between items-center\r\n                 bg-[rgba(0,0,0,0.03)] border-b border-[rgba(0,0,0,0.06)]\r\n                 cursor-move",
+        className: "echly-widget-header px-5 pt-4 pb-3 flex justify-between items-start cursor-move",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "min-w-0", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "span",
+              {
+                className: `echly-widget-title block ${isProcessingStructure ? "capture-header-pulse" : ""}`,
+                children: "Echly"
+              }
+            ),
+            summary && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "echly-widget-summary mt-0.5 block", children: summary })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
             "div",
             {
-              className: `flex items-center gap-2 min-h-8 ${isProcessingStructure ? "capture-header-pulse" : ""}`,
+              className: "echly-widget-header-actions flex items-center gap-1 relative shrink-0",
+              ref: menuRef,
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Image2, { src: "/Echly_logo.svg", alt: "Echly", width: 24, height: 24, className: "shrink-0" }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "text-base font-semibold text-slate-900 leading-none", children: "Echly" })
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: onShare,
+                    className: "echly-widget-icon-btn flex items-center gap-2 h-8 px-2 rounded-md text-sm font-medium text-slate-600 cursor-pointer",
+                    "aria-label": "Share",
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Share2, { size: 16, strokeWidth: 1.5, className: "shrink-0" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "hidden sm:inline", children: "Share" })
+                    ]
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: onMoreClick,
+                    className: "echly-widget-icon-btn flex items-center justify-center w-8 h-8 rounded-md text-slate-600 cursor-pointer",
+                    "aria-label": "More options",
+                    children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EllipsisVertical, { size: 18, strokeWidth: 1.5 })
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: onClose,
+                    className: "echly-widget-icon-btn flex items-center justify-center w-8 h-8 rounded-md text-slate-600 cursor-pointer",
+                    "aria-label": "Close",
+                    children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { size: 18, strokeWidth: 1.5 })
+                  }
+                ),
+                showMenu && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dropdown-enter absolute right-0 top-12 bg-white dark:bg-[rgba(28,28,28,0.95)] border border-slate-200/80 dark:border-white/10 rounded-xl shadow-lg w-56 py-2 backdrop-blur-xl", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: onResetSession,
+                    className: "w-full text-left px-4 py-2.5 text-sm hover:bg-black/5 dark:hover:bg-white/10 text-brand-accent transition-colors duration-120 cursor-pointer",
+                    children: "Reset Feedback Session"
+                  }
+                ) })
               ]
             }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex items-center gap-2 relative", ref: menuRef, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
-              "button",
-              {
-                type: "button",
-                onClick: onShare,
-                className: "flex items-center gap-2 h-8 px-2 rounded-md text-sm font-medium text-slate-600 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer",
-                children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Share2, { size: 16, strokeWidth: 1.5, className: "shrink-0 text-neutral-500" }),
-                  "Share"
-                ]
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "button",
-              {
-                type: "button",
-                onClick: onMoreClick,
-                className: "flex items-center justify-center w-8 h-8 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer",
-                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(EllipsisVertical, { size: 18, strokeWidth: 1.5 })
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "button",
-              {
-                type: "button",
-                onClick: onClose,
-                className: "flex items-center justify-center w-8 h-8 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer",
-                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(X, { size: 18, strokeWidth: 1.5 })
-              }
-            ),
-            showMenu && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "dropdown-enter absolute right-0 top-12\r\n                              bg-white border border-slate-200\r\n                              rounded-lg shadow-md w-56 py-2", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "button",
-              {
-                type: "button",
-                onClick: onResetSession,
-                className: "w-full text-left px-4 py-2 text-sm hover:bg-neutral-100 text-brand-accent transition-colors duration-120 cursor-pointer",
-                children: "Reset Feedback Session"
-              }
-            ) })
-          ] })
+          )
         ]
       }
     );
   }
 
   // components/CaptureWidget/FeedbackList.tsx
-  var import_react6 = __toESM(require_react());
+  var import_react5 = __toESM(require_react());
 
   // components/CaptureWidget/FeedbackItem.tsx
-  var import_react5 = __toESM(require_react());
-  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
+  var import_react4 = __toESM(require_react());
+  var import_jsx_runtime2 = __toESM(require_jsx_runtime());
   function FeedbackItem({
     item,
     expandedId,
@@ -48740,84 +48729,83 @@ This typically indicates that your device does not have a healthy Internet conne
     const isExpanded = expandedId === item.id;
     const isEditing = editingId === item.id;
     const isHighlighted = highlightTicketId === item.id;
-    const handleExpand = (0, import_react5.useCallback)(() => {
+    const handleExpand = (0, import_react4.useCallback)(() => {
       onExpand(isExpanded ? null : item.id);
     }, [isExpanded, item.id, onExpand]);
-    const handleEdit = (0, import_react5.useCallback)(() => {
+    const handleEdit = (0, import_react4.useCallback)(() => {
       onStartEdit(item);
     }, [item, onStartEdit]);
-    const handleSave = (0, import_react5.useCallback)(() => {
+    const handleSave = (0, import_react4.useCallback)(() => {
       onSaveEdit(item.id);
     }, [item.id, onSaveEdit]);
-    const handleDelete = (0, import_react5.useCallback)(() => {
+    const handleDelete = (0, import_react4.useCallback)(() => {
       onDelete(item.id);
     }, [item.id, onDelete]);
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
       "div",
       {
-        className: `bg-white px-6 py-4 border-b border-[rgba(0,0,0,0.05)]
-                 transition-colors duration-120 ease-[cubic-bezier(0.2,0.8,0.2,1)]
-                 hover:bg-neutral-100
-                 active:scale-[0.99] active:duration-[80ms] active:ease-in
-                 last:border-b-0
-                 ${isHighlighted ? "echly-ticket-highlight" : ""}`,
-        children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between gap-4", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "flex-1 min-w-0", children: isEditing ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+        className: `echly-feedback-item py-4 px-5 transition-colors duration-120 ease-[cubic-bezier(0.2,0.8,0.2,1)] active:scale-[0.995] active:duration-[80ms] active:ease-in ${isHighlighted ? "echly-ticket-highlight" : ""}`,
+        children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex justify-between gap-4", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "flex-1 min-w-0", children: isEditing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
               "input",
               {
                 value: editedTitle,
                 onChange: (e) => onEditedTitleChange(e.target.value),
-                className: "focus-ring-brand w-full mb-2 px-3 py-2\r\n                                     bg-white text-slate-900\r\n                                     border border-slate-300\r\n                                     rounded-sm text-sm font-medium\r\n                                     outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
+                className: "echly-widget-input focus-ring-brand w-full mb-2 px-3 py-2 bg-transparent text-slate-900 dark:text-slate-100 rounded-md text-[15px] font-medium outline-none focus:ring-1 focus:ring-brand-accent transition-all duration-150 border border-transparent focus:border-slate-300 dark:focus:border-slate-600"
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
               "textarea",
               {
                 value: editedDescription,
                 onChange: (e) => onEditedDescriptionChange(e.target.value),
                 rows: 3,
-                className: "focus-ring-brand w-full px-3 py-2\r\n                                     bg-white text-slate-800\r\n                                     border border-slate-300\r\n                                     rounded-sm text-sm\r\n                                     outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 resize-none"
+                className: "echly-widget-input focus-ring-brand w-full px-3 py-2 bg-transparent text-slate-700 dark:text-slate-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-brand-accent transition-all duration-150 resize-none border border-transparent focus:border-slate-300 dark:focus:border-slate-600"
               }
             )
-          ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h3", { className: "text-sm font-semibold text-slate-900 leading-snug", children: item.title }),
-            isExpanded && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-xs text-slate-600 mt-1.5", children: item.description })
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h3", { className: "echly-widget-item-title text-slate-900 dark:text-slate-100", children: item.title }),
+            isExpanded && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "echly-widget-item-desc text-slate-600 dark:text-slate-400 mt-1.5", children: item.description })
           ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2 shrink-0 text-slate-400", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-feedback-item-actions flex items-center gap-1 shrink-0", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
               "button",
               {
                 type: "button",
                 onClick: handleExpand,
-                className: "flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer",
-                children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Expand, { size: 18, strokeWidth: 1.5 })
+                className: "echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 cursor-pointer transition-opacity duration-150",
+                "aria-label": isExpanded ? "Collapse" : "Expand",
+                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Expand, { size: 18, strokeWidth: 1.5 })
               }
             ),
-            isEditing ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            isEditing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
               "button",
               {
                 type: "button",
                 onClick: handleSave,
-                className: "flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer",
-                children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Check, { size: 18, strokeWidth: 1.5 })
+                className: "echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 cursor-pointer transition-opacity duration-150",
+                "aria-label": "Save",
+                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Check, { size: 18, strokeWidth: 1.5 })
               }
-            ) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            ) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
               "button",
               {
                 type: "button",
                 onClick: handleEdit,
-                className: "flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer",
-                children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Pencil, { size: 18, strokeWidth: 1.5 })
+                className: "echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 cursor-pointer transition-opacity duration-150",
+                "aria-label": "Edit",
+                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Pencil, { size: 18, strokeWidth: 1.5 })
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
               "button",
               {
                 type: "button",
                 onClick: handleDelete,
-                className: "flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-semantic-danger/10 hover:text-semantic-danger transition-colors duration-120 cursor-pointer",
-                children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Trash2, { size: 18, strokeWidth: 1.5 })
+                className: "echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 hover:!opacity-100 hover:!text-red-500 cursor-pointer transition-opacity duration-150",
+                "aria-label": "Delete",
+                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Trash2, { size: 18, strokeWidth: 1.5 })
               }
             )
           ] })
@@ -48825,12 +48813,12 @@ This typically indicates that your device does not have a healthy Internet conne
       }
     );
   }
-  var FeedbackItem_default = import_react5.default.memo(FeedbackItem, (prev, next) => {
+  var FeedbackItem_default = import_react4.default.memo(FeedbackItem, (prev, next) => {
     return prev.item === next.item && prev.expandedId === next.expandedId && prev.editingId === next.editingId && prev.editedTitle === next.editedTitle && prev.editedDescription === next.editedDescription;
   });
 
   // components/CaptureWidget/FeedbackList.tsx
-  var import_jsx_runtime4 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   function FeedbackList({
     items,
     expandedId,
@@ -48845,7 +48833,7 @@ This typically indicates that your device does not have a healthy Internet conne
     onEditedDescriptionChange,
     highlightTicketId = null
   }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "capture-feedback-list flex flex-col space-y-2", children: items.map((p) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "capture-feedback-list echly-feedback-list flex flex-col gap-3", children: items.map((p) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       FeedbackItem_default,
       {
         item: p,
@@ -48864,69 +48852,33 @@ This typically indicates that your device does not have a healthy Internet conne
       p.id
     )) });
   }
-  var FeedbackList_default = import_react6.default.memo(FeedbackList);
+  var FeedbackList_default = import_react5.default.memo(FeedbackList);
 
   // components/CaptureWidget/WidgetFooter.tsx
-  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime4 = __toESM(require_jsx_runtime());
   function WidgetFooter({
     isIdle,
     onAddFeedback,
     captureDisabled = false
   }) {
     const effectivelyDisabled = !isIdle || captureDisabled;
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
       "button",
       {
         type: "button",
         onClick: effectivelyDisabled ? void 0 : onAddFeedback,
         disabled: effectivelyDisabled,
-        className: `mt-3 w-full px-6 py-2.5 rounded-lg flex items-center justify-center text-sm font-medium tracking-tight transition-colors duration-150 ${effectivelyDisabled ? "bg-neutral-200 text-neutral-500 cursor-not-allowed" : "cursor-pointer focus-ring-brand bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] focus-visible:outline-none"}`,
+        className: `echly-widget-font mt-3 w-full px-5 py-2.5 rounded-xl flex items-center justify-center text-[15px] font-medium tracking-tight transition-colors duration-150 ${effectivelyDisabled ? "bg-black/5 dark:bg-white/10 text-slate-400 cursor-not-allowed" : "cursor-pointer focus-ring-brand bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] focus-visible:outline-none"}`,
         children: "+ Add Feedback"
       }
     );
   }
 
-  // components/CaptureWidget/ProcessingSkeletonCard.tsx
-  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
-  function ProcessingSkeletonCard({
-    exiting = false
-  }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
-      "div",
-      {
-        className: `
-        capture-processing-skeleton
-        bg-white px-6 py-4 border-b border-[rgba(0,0,0,0.05)]
-        shadow-[0_2px_6px_rgba(0,0,0,0.03)]
-        transition-opacity duration-200 ease-out
-        ${exiting ? "opacity-0" : "opacity-100"}
-      `,
-        "aria-hidden": true,
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between gap-4", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 min-w-0 space-y-3", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "capture-skeleton-line capture-skeleton-title h-4 w-3/4 rounded" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "capture-skeleton-line h-3 w-full rounded" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "capture-skeleton-line h-3 w-5/6 rounded" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "capture-skeleton-line h-3 w-4/6 rounded" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-2 shrink-0", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "capture-skeleton-dot h-6 w-6 rounded-md" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "capture-skeleton-dot h-6 w-6 rounded-md" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "capture-skeleton-dot h-6 w-6 rounded-md" })
-            ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "capture-skeleton-footer", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "capture-processing-dot", "aria-hidden": true }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "capture-processing-text", children: "Processing" })
-          ] })
-        ]
-      }
-    );
-  }
+  // components/CaptureWidget/CaptureLayer.tsx
+  var import_react_dom = __toESM(require_react_dom());
 
   // components/CaptureWidget/RegionCaptureOverlay.tsx
-  var import_react7 = __toESM(require_react());
+  var import_react6 = __toESM(require_react());
 
   // lib/captureContext.ts
   var MAX_PATH_DEPTH = 12;
@@ -48995,7 +48947,7 @@ This typically indicates that your device does not have a healthy Internet conne
   }
 
   // components/CaptureWidget/RegionCaptureOverlay.tsx
-  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
   var MIN_SIZE = 24;
   var OVERLAY_ID = "echly-capture-overlay";
   var TOOLTIP_ID = "echly-capture-tooltip";
@@ -49035,23 +48987,23 @@ This typically indicates that your device does not have a healthy Internet conne
     onCancel,
     getWidgetOrigin
   }) {
-    const overlayRef = (0, import_react7.useRef)(null);
-    const [selectionRect, setSelectionRect] = (0, import_react7.useState)(null);
-    const [overlayVisible, setOverlayVisible] = (0, import_react7.useState)(true);
-    const [tooltipPos, setTooltipPos] = (0, import_react7.useState)({ x: 0, y: 0 });
-    const [exitingRect, setExitingRect] = (0, import_react7.useState)(null);
-    const [exitTarget, setExitTarget] = (0, import_react7.useState)(null);
-    const [exitPhase, setExitPhase] = (0, import_react7.useState)(0);
-    const startRef = (0, import_react7.useRef)(null);
-    const selectionRectRef = (0, import_react7.useRef)(null);
-    const cancel = (0, import_react7.useCallback)(() => {
+    const overlayRef = (0, import_react6.useRef)(null);
+    const [selectionRect, setSelectionRect] = (0, import_react6.useState)(null);
+    const [overlayVisible, setOverlayVisible] = (0, import_react6.useState)(true);
+    const [tooltipPos, setTooltipPos] = (0, import_react6.useState)({ x: 0, y: 0 });
+    const [exitingRect, setExitingRect] = (0, import_react6.useState)(null);
+    const [exitTarget, setExitTarget] = (0, import_react6.useState)(null);
+    const [exitPhase, setExitPhase] = (0, import_react6.useState)(0);
+    const startRef = (0, import_react6.useRef)(null);
+    const selectionRectRef = (0, import_react6.useRef)(null);
+    const cancel = (0, import_react6.useCallback)(() => {
       setOverlayVisible(false);
       setSelectionRect(null);
       startRef.current = null;
       selectionRectRef.current = null;
       setTimeout(() => onCancel(), 120);
     }, [onCancel]);
-    (0, import_react7.useEffect)(() => {
+    (0, import_react6.useEffect)(() => {
       const onKeyDown = (e) => {
         if (e.key === "Escape") {
           e.preventDefault();
@@ -49061,14 +49013,14 @@ This typically indicates that your device does not have a healthy Internet conne
       document.addEventListener("keydown", onKeyDown);
       return () => document.removeEventListener("keydown", onKeyDown);
     }, [cancel]);
-    (0, import_react7.useEffect)(() => {
+    (0, import_react6.useEffect)(() => {
       const onVisibilityChange = () => {
         if (document.visibilityState === "hidden") cancel();
       };
       document.addEventListener("visibilitychange", onVisibilityChange);
       return () => document.removeEventListener("visibilitychange", onVisibilityChange);
     }, [cancel]);
-    const onMouseDown = (0, import_react7.useCallback)((e) => {
+    const onMouseDown = (0, import_react6.useCallback)((e) => {
       if (e.button !== 0) return;
       e.preventDefault();
       const x2 = e.clientX;
@@ -49076,7 +49028,7 @@ This typically indicates that your device does not have a healthy Internet conne
       startRef.current = { x: x2, y };
       setSelectionRect({ x: x2, y, w: 0, h: 0 });
     }, []);
-    const onMouseMove = (0, import_react7.useCallback)((e) => {
+    const onMouseMove = (0, import_react6.useCallback)((e) => {
       setTooltipPos({ x: e.clientX + 16, y: e.clientY + 16 });
       if (!startRef.current) return;
       const sx = startRef.current.x;
@@ -49089,7 +49041,7 @@ This typically indicates that your device does not have a healthy Internet conne
       selectionRectRef.current = next;
       setSelectionRect(next);
     }, []);
-    const performCapture = (0, import_react7.useCallback)(
+    const performCapture = (0, import_react6.useCallback)(
       async (targetRect) => {
         setOverlayVisible(false);
         setSelectionRect(null);
@@ -49121,7 +49073,7 @@ This typically indicates that your device does not have a healthy Internet conne
       },
       [getFullTabImage, onCapture, onCancel]
     );
-    const finalizeSelection = (0, import_react7.useCallback)(
+    const finalizeSelection = (0, import_react6.useCallback)(
       (current) => {
         const start2 = startRef.current;
         startRef.current = null;
@@ -49151,7 +49103,7 @@ This typically indicates that your device does not have a healthy Internet conne
       },
       [performCapture, getWidgetOrigin]
     );
-    const onMouseUp = (0, import_react7.useCallback)(
+    const onMouseUp = (0, import_react6.useCallback)(
       (e) => {
         if (e.button !== 0) return;
         e.preventDefault();
@@ -49159,7 +49111,7 @@ This typically indicates that your device does not have a healthy Internet conne
       },
       [finalizeSelection]
     );
-    (0, import_react7.useEffect)(() => {
+    (0, import_react6.useEffect)(() => {
       const onWindowMouseUp = (e) => {
         if (e.button !== 0 || !startRef.current) return;
         finalizeSelection(selectionRectRef.current);
@@ -49169,7 +49121,7 @@ This typically indicates that your device does not have a healthy Internet conne
     }, [finalizeSelection]);
     const showSelection = !!selectionRect && (selectionRect.w >= MIN_SIZE || selectionRect.h >= MIN_SIZE);
     const isExiting = !!exitingRect && !!exitTarget;
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "div",
       {
         ref: overlayRef,
@@ -49177,7 +49129,7 @@ This typically indicates that your device does not have a healthy Internet conne
         "aria-hidden": true,
         style: { position: "fixed", inset: 0, zIndex: 2147483647, userSelect: "none" },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
             "div",
             {
               id: OVERLAY_ID,
@@ -49202,7 +49154,7 @@ This typically indicates that your device does not have a healthy Internet conne
               }
             }
           ),
-          showSelection && selectionRect && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          showSelection && selectionRect && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
             "div",
             {
               style: {
@@ -49220,7 +49172,7 @@ This typically indicates that your device does not have a healthy Internet conne
               }
             }
           ),
-          isExiting && exitingRect && exitTarget && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          isExiting && exitingRect && exitTarget && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
             "div",
             {
               className: "echly-capture-exit-selection",
@@ -49242,7 +49194,7 @@ This typically indicates that your device does not have a healthy Internet conne
               }
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
             "div",
             {
               id: TOOLTIP_ID,
@@ -49270,9 +49222,52 @@ This typically indicates that your device does not have a healthy Internet conne
     );
   }
 
-  // components/CaptureWidget/FloatingVoicePill.tsx
-  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
-  function FloatingVoicePill({
+  // components/CaptureWidget/MicOrb.tsx
+  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
+  function MicOrb({
+    isSpeaking = false,
+    audioLevel = 0,
+    isExiting = false,
+    isProcessing = false,
+    sentiment = "neutral"
+  }) {
+    const ringScale = isSpeaking ? 1 + Math.min(0.2, audioLevel * 0.25) : 1;
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+      "div",
+      {
+        className: `
+        echly-mic-orb-wrapper
+        inline-flex items-center justify-center
+        relative
+        ${isExiting ? "echly-mic-orb--exiting" : ""}
+        ${isProcessing ? "echly-mic-orb--processing" : ""}
+        echly-mic-orb-sentiment--${sentiment}
+      `,
+        children: [
+          !isProcessing && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            "div",
+            {
+              className: `
+            echly-mic-orb-ring
+            absolute rounded-full pointer-events-none
+            ${isSpeaking ? "echly-mic-orb-ring--active" : "echly-mic-orb-ring--glow"}
+          `,
+              style: isSpeaking ? {
+                transform: `translate(-50%, -50%) scale(${ringScale})`
+              } : void 0,
+              "aria-hidden": true
+            }
+          ),
+          isProcessing && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "echly-mic-orb-processing-ring absolute rounded-full pointer-events-none", "aria-hidden": true }),
+          !isProcessing && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "echly-mic-orb relative z-10 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Mic, { className: "echly-mic-orb-icon", size: 24, strokeWidth: 2, "aria-hidden": true }) })
+        ]
+      }
+    );
+  }
+
+  // components/CaptureWidget/VoiceBubble.tsx
+  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
+  function VoiceBubble({
     isListening,
     isProcessing,
     isExiting = false,
@@ -49281,15 +49276,22 @@ This typically indicates that your device does not have a healthy Internet conne
     onDone
   }) {
     const isSpeaking = isListening && audioLevel > 0.12;
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
       "div",
       {
         className: "echly-voice-pill",
+        style: {
+          position: "fixed",
+          bottom: "32px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 2147483647
+        },
         role: "status",
         "aria-live": "polite",
         "aria-label": isProcessing ? "Structuring insight" : "Describe the issue",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "echly-voice-pill-orb", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "echly-voice-pill-orb", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
             MicOrb,
             {
               isSpeaking,
@@ -49299,15 +49301,15 @@ This typically indicates that your device does not have a healthy Internet conne
               sentiment
             }
           ) }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "echly-voice-pill-text", children: isProcessing ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "echly-voice-pill-text", children: isProcessing ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
             "Structuring insight",
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "echly-voice-pill-dots", "aria-hidden": true, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "." }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "." }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "." })
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "echly-voice-pill-dots", "aria-hidden": true, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: "." }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: "." }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: "." })
             ] })
           ] }) : "Describe the issue\u2026" }),
-          isListening && !isProcessing && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+          isListening && !isProcessing && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
             "button",
             {
               type: "button",
@@ -49320,6 +49322,67 @@ This typically indicates that your device does not have a healthy Internet conne
         ]
       }
     );
+  }
+
+  // components/CaptureWidget/CaptureLayer.tsx
+  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
+  function CaptureLayer({
+    captureRoot,
+    extensionMode,
+    state,
+    pillExiting,
+    listeningExiting,
+    listeningAudioLevel,
+    listeningSentiment,
+    getFullTabImage,
+    onRegionCaptured,
+    onCancelCapture,
+    onDone
+  }) {
+    const showOverlay = state === "listening" || state === "processing-structure" || state === "saving-feedback" || pillExiting;
+    const showBubble = state === "listening" || state === "processing-structure" || state === "saving-feedback" || pillExiting;
+    const content = /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
+      showOverlay && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        "div",
+        {
+          style: {
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.08)",
+            pointerEvents: "auto",
+            zIndex: 2147483646
+          },
+          "aria-hidden": true
+        }
+      ),
+      extensionMode && state === "capturing" && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        RegionCaptureOverlay,
+        {
+          getFullTabImage,
+          onCapture: onRegionCaptured,
+          onCancel: onCancelCapture,
+          getWidgetOrigin: void 0
+        }
+      ),
+      showBubble && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        "div",
+        {
+          className: pillExiting ? "echly-voice-pill-wrapper echly-voice-pill--exiting" : "echly-voice-pill-wrapper",
+          children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+            VoiceBubble,
+            {
+              isListening: state === "listening",
+              isProcessing: state === "processing-structure" || state === "saving-feedback" || pillExiting,
+              isExiting: state === "processing-structure" && listeningExiting,
+              audioLevel: listeningAudioLevel,
+              sentiment: listeningSentiment,
+              onDone
+            }
+          )
+        }
+      )
+    ] });
+    return (0, import_react_dom.createPortal)(content, captureRoot);
   }
 
   // components/CaptureWidget/CaptureWidget.tsx
@@ -49342,8 +49405,8 @@ This typically indicates that your device does not have a healthy Internet conne
     const {
       state,
       handlers,
-      derivedValues,
-      refs
+      refs,
+      captureRootReady
     } = useCaptureWidget({
       sessionId,
       userId,
@@ -49356,24 +49419,16 @@ This typically indicates that your device does not have a healthy Internet conne
     });
     const isControlled = expanded !== void 0;
     const effectiveIsOpen = isControlled ? expanded : state.isOpen;
-    const listScrollRef = (0, import_react8.useRef)(null);
-    const [processingExiting, setProcessingExiting] = (0, import_react8.useState)(false);
-    const [listeningExiting, setListeningExiting] = (0, import_react8.useState)(false);
-    const prevStateRef = (0, import_react8.useRef)(state.state);
-    (0, import_react8.useEffect)(() => {
+    const listScrollRef = (0, import_react7.useRef)(null);
+    const [listeningExiting, setListeningExiting] = (0, import_react7.useState)(false);
+    const prevStateRef = (0, import_react7.useRef)(state.state);
+    (0, import_react7.useEffect)(() => {
       if (state.highlightTicketId && listScrollRef.current) {
         listScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
       }
     }, [state.highlightTicketId]);
-    (0, import_react8.useEffect)(() => {
+    (0, import_react7.useEffect)(() => {
       const prev = prevStateRef.current;
-      const wasProcessing = prev === "saving-feedback" || prev === "anticipation";
-      if (state.state === "idle" && wasProcessing) {
-        setProcessingExiting(true);
-        const t = setTimeout(() => setProcessingExiting(false), 200);
-        prevStateRef.current = state.state;
-        return () => clearTimeout(t);
-      }
       if (state.state === "processing-structure" && prev === "listening") {
         setListeningExiting(true);
         const t = setTimeout(() => setListeningExiting(false), 200);
@@ -49382,223 +49437,143 @@ This typically indicates that your device does not have a healthy Internet conne
       }
       prevStateRef.current = state.state;
     }, [state.state]);
-    import_react8.default.useEffect(() => {
+    import_react7.default.useEffect(() => {
       if (!widgetToggleRef) return;
       widgetToggleRef.current = handlers.toggleOpen;
       return () => {
         widgetToggleRef.current = null;
       };
     }, [handlers, widgetToggleRef]);
-    const showFloatingButton = !effectiveIsOpen && !(extensionMode && state.captureModeMinimized);
-    if (showFloatingButton) {
-      return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "fixed bottom-10 right-10 z-50 capture-floating-wrapper", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+    const isCaptureActive = state.state === "capturing" || state.state === "listening" || state.state === "processing-structure" || state.state === "saving-feedback";
+    const showFloatingButton = !effectiveIsOpen && !state.captureModeMinimized && !isCaptureActive;
+    const showWidgetPanel = !state.captureModeMinimized && !isCaptureActive;
+    const insightCount = state.pointers.length;
+    const highPriorityCount = state.pointers.filter(
+      (p) => /critical|bug|high|urgent/i.test(p.type || "")
+    ).length;
+    const summary = insightCount > 0 ? highPriorityCount > 0 ? `${insightCount} insight${insightCount !== 1 ? "s" : ""} \xB7 ${highPriorityCount} high priority` : `${insightCount} insight${insightCount !== 1 ? "s" : ""}` : null;
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(import_jsx_runtime9.Fragment, { children: [
+      captureRootReady && refs.captureRootRef.current && (0, import_react_dom2.createPortal)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+          CaptureLayer,
+          {
+            captureRoot: refs.captureRootRef.current,
+            extensionMode,
+            state: state.state === "capturing" || state.state === "listening" || state.state === "processing-structure" || state.state === "saving-feedback" ? state.state : "idle",
+            pillExiting: state.pillExiting,
+            listeningExiting,
+            listeningAudioLevel: state.listeningAudioLevel ?? 0,
+            listeningSentiment: state.listeningSentiment ?? "neutral",
+            getFullTabImage: handlers.getFullTabImage,
+            onRegionCaptured: handlers.handleRegionCaptured,
+            onCancelCapture: handlers.handleCancelCapture,
+            onDone: handlers.finishListening
+          }
+        ),
+        refs.captureRootRef.current
+      ),
+      showFloatingButton ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "fixed bottom-10 right-10 z-50 capture-floating-wrapper", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
         "button",
         {
           type: "button",
           onClick: () => onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true),
-          className: "capture-floating-trigger\r\n                     flex items-center gap-3\r\n                     bg-white border border-[rgba(0,0,0,0.08)]\r\n                     px-5 py-2.5 rounded-[20px]\r\n                     text-[#111827] font-semibold\r\n                     shadow-[0_10px_30px_rgba(0,0,0,0.12),0_4px_10px_rgba(0,0,0,0.06)]\r\n                     transition-[transform_80ms_ease-in,box-shadow_150ms_ease-out]\r\n                     hover:-translate-y-px hover:shadow-[0_12px_34px_rgba(0,0,0,0.14),0_5px_12px_rgba(0,0,0,0.08)]\r\n                     active:scale-[0.98] cursor-pointer",
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(Image2, { src: "/Echly_logo.svg", alt: "Echly", width: 26, height: 26, className: "shrink-0" }),
-            "Capture Feedback"
-          ]
+          className: "capture-floating-trigger echly-widget-font\r\n                       flex items-center gap-3\r\n                       bg-white/90 dark:bg-[rgba(20,20,20,0.9)] backdrop-blur-md\r\n                       border border-[rgba(0,0,0,0.06)] dark:border-white/10\r\n                       px-5 py-2.5 rounded-[14px]\r\n                       text-[#111827] dark:text-slate-100 font-medium text-[15px]\r\n                       shadow-[0_10px_30px_rgba(0,0,0,0.08),0_4px_10px_rgba(0,0,0,0.04)]\r\n                       transition-[transform_80ms_ease-in,box-shadow_150ms_ease-out]\r\n                       hover:-translate-y-px hover:shadow-[0_12px_34px_rgba(0,0,0,0.1),0_5px_12px_rgba(0,0,0,0.06)]\r\n                       active:scale-[0.98] cursor-pointer",
+          children: "Capture Feedback"
         }
-      ) });
-    }
-    if (extensionMode && state.captureModeMinimized) {
-      const showPill = state.state === "listening" || state.state === "processing-structure" || state.state === "saving-feedback";
-      const showFocusOverlay = state.state === "listening" || state.state === "processing-structure" || state.state === "saving-feedback" || state.pillExiting;
-      return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(import_jsx_runtime9.Fragment, { children: [
-        showFocusOverlay && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+      ) }) : showWidgetPanel ? /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(import_jsx_runtime9.Fragment, { children: [
+        !extensionMode && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "div",
           {
-            className: "echly-capture-focus-overlay",
-            style: {
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.08)",
-              pointerEvents: "auto",
-              zIndex: 2147483646
-            },
+            className: "fixed inset-0 z-40 backdrop-blur-[4px] bg-black/8",
             "aria-hidden": true
           }
         ),
-        state.state === "capturing" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-          RegionCaptureOverlay,
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+          "div",
           {
-            getFullTabImage: handlers.getFullTabImage,
-            onCapture: handlers.handleRegionCaptured,
-            onCancel: handlers.handleCancelCapture,
-            getWidgetOrigin: void 0
-          }
-        ),
-        showPill && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: state.pillExiting ? "echly-voice-pill-wrapper echly-voice-pill--exiting" : "echly-voice-pill-wrapper", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-          FloatingVoicePill,
-          {
-            isListening: state.state === "listening",
-            isProcessing: state.state === "processing-structure" || state.state === "saving-feedback" || state.pillExiting,
-            isExiting: state.state === "processing-structure" && listeningExiting,
-            audioLevel: state.listeningAudioLevel ?? 0,
-            sentiment: state.listeningSentiment ?? "neutral",
-            onDone: handlers.finishListening
-          }
-        ) })
-      ] });
-    }
-    return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(import_jsx_runtime9.Fragment, { children: [
-      !extensionMode && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-        "div",
-        {
-          className: "fixed inset-0 z-40 backdrop-blur-[4px] bg-black/8",
-          "aria-hidden": true
-        }
-      ),
-      extensionMode && state.state === "capturing" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-        RegionCaptureOverlay,
-        {
-          getFullTabImage: handlers.getFullTabImage,
-          onCapture: handlers.handleRegionCaptured,
-          onCancel: handlers.handleCancelCapture,
-          getWidgetOrigin: () => {
-            const el = refs.widgetRef.current;
-            if (!el) return null;
-            const r = el.getBoundingClientRect();
-            return { x: r.left + r.width / 2, y: r.top + 140 };
-          }
-        }
-      ),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-        "div",
-        {
-          ref: refs.widgetRef,
-          className: `fixed w-[480px] transition-all duration-200 ${!extensionMode && state.position ? "" : !extensionMode ? "bottom-10 right-10" : ""} ${extensionMode ? "" : "z-50"}`,
-          style: extensionMode ? {
-            position: "fixed",
-            ...state.position ? { left: state.position.x, top: state.position.y } : { bottom: "24px", right: "24px" },
-            zIndex: 2147483647,
-            pointerEvents: "auto"
-          } : {
-            ...state.position ? { left: state.position.x, top: state.position.y } : {}
-          },
-          children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "bg-white rounded-lg\r\n                        border border-slate-200/80\r\n                        shadow-[0_16px_40px_rgba(0,0,0,0.12),0_6px_16px_rgba(0,0,0,0.08)]\r\n                        overflow-hidden font-sans", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-              CaptureHeader,
-              {
-                onStartDrag: handlers.startDrag,
-                onShare: handlers.handleShare,
-                onMoreClick: () => handlers.setShowMenu((p) => !p),
-                onClose: () => onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false),
-                showMenu: state.showMenu,
-                onResetSession: handlers.resetSession,
-                menuRef: refs.menuRef,
-                isProcessingStructure: state.state === "processing-structure"
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
-              "div",
-              {
-                ref: listScrollRef,
-                className: "px-6 py-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto",
-                children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "capture-feedback-list flex flex-col space-y-2", children: [
-                    state.state === "saving-feedback" || state.state === "anticipation" || processingExiting ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ProcessingSkeletonCard, { exiting: processingExiting }) : state.pointers[0] ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-                      FeedbackItem_default,
-                      {
-                        item: state.pointers[0],
-                        expandedId: state.expandedId,
-                        editingId: state.editingId,
-                        editedTitle: state.editedTitle,
-                        editedDescription: state.editedDescription,
-                        onExpand: handlers.setExpandedId,
-                        onStartEdit: handlers.startEditing,
-                        onSaveEdit: handlers.saveEdit,
-                        onDelete: handlers.deletePointer,
-                        onEditedTitleChange: handlers.setEditedTitle,
-                        onEditedDescriptionChange: handlers.setEditedDescription,
-                        highlightTicketId: state.highlightTicketId
-                      }
-                    ) : null,
-                    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-                      FeedbackList_default,
-                      {
-                        items: state.state === "saving-feedback" || state.state === "anticipation" || processingExiting ? state.pointers : state.pointers.slice(1),
-                        expandedId: state.expandedId,
-                        editingId: state.editingId,
-                        editedTitle: state.editedTitle,
-                        editedDescription: state.editedDescription,
-                        onExpand: handlers.setExpandedId,
-                        onStartEdit: handlers.startEditing,
-                        onSaveEdit: handlers.saveEdit,
-                        onDelete: handlers.deletePointer,
-                        onEditedTitleChange: handlers.setEditedTitle,
-                        onEditedDescriptionChange: handlers.setEditedDescription,
-                        highlightTicketId: state.highlightTicketId
-                      }
-                    )
-                  ] }),
-                  state.errorMessage && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3", children: state.errorMessage }),
-                  state.state === "capturing" && !extensionMode && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "border border-slate-200 rounded-lg p-4 bg-slate-50 text-sm text-slate-600", children: "Capturing screenshot\u2026" }),
-                  (state.state === "listening" || listeningExiting || state.state === "processing-structure" || state.state === "saving-feedback") && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "capture-listening-enter border border-slate-200 rounded-lg p-4 bg-slate-50", children: [
-                    state.state !== "processing-structure" && state.state !== "saving-feedback" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "flex justify-between items-center mb-3", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "capture-timer text-sm text-slate-500 tabular-nums", children: derivedValues.formatTime() }) }),
-                    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-col items-center justify-center mb-4", children: [
-                      (state.state === "listening" || listeningExiting) && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-                        MicOrb,
+            ref: refs.widgetRef,
+            className: `echly-widget-container fixed w-[480px] transition-all duration-200 ${!extensionMode && state.position ? "" : !extensionMode ? "bottom-10 right-10" : ""} ${extensionMode ? "" : "z-50"}`,
+            style: extensionMode ? {
+              position: "fixed",
+              ...state.position ? { left: state.position.x, top: state.position.y } : { bottom: "24px", right: "24px" },
+              zIndex: 2147483647,
+              pointerEvents: "auto"
+            } : {
+              ...state.position ? { left: state.position.x, top: state.position.y } : {}
+            },
+            children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "echly-widget-surface overflow-hidden", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+                CaptureHeader,
+                {
+                  onStartDrag: handlers.startDrag,
+                  onShare: handlers.handleShare,
+                  onMoreClick: () => handlers.setShowMenu((p) => !p),
+                  onClose: () => onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false),
+                  showMenu: state.showMenu,
+                  onResetSession: handlers.resetSession,
+                  menuRef: refs.menuRef,
+                  isProcessingStructure: state.state === "processing-structure",
+                  summary
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+                "div",
+                {
+                  ref: listScrollRef,
+                  className: "echly-widget-body px-5 py-4 flex flex-col gap-3 max-h-[60vh] overflow-y-auto",
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "capture-feedback-list echly-feedback-list flex flex-col gap-3", children: [
+                      state.pointers[0] ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+                        FeedbackItem_default,
                         {
-                          isSpeaking: state.listeningAudioLevel != null && state.listeningAudioLevel > 0.12,
-                          audioLevel: state.listeningAudioLevel ?? 0,
-                          isExiting: listeningExiting,
-                          sentiment: state.listeningSentiment ?? "neutral"
+                          item: state.pointers[0],
+                          expandedId: state.expandedId,
+                          editingId: state.editingId,
+                          editedTitle: state.editedTitle,
+                          editedDescription: state.editedDescription,
+                          onExpand: handlers.setExpandedId,
+                          onStartEdit: handlers.startEditing,
+                          onSaveEdit: handlers.saveEdit,
+                          onDelete: handlers.deletePointer,
+                          onEditedTitleChange: handlers.setEditedTitle,
+                          onEditedDescriptionChange: handlers.setEditedDescription,
+                          highlightTicketId: state.highlightTicketId
                         }
-                      ),
-                      (state.state === "processing-structure" || state.state === "saving-feedback") && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(MicOrb, { isProcessing: true }),
-                      state.state === "listening" && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(import_jsx_runtime9.Fragment, { children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "mt-4 text-[15px] text-slate-600 font-normal tracking-tight text-center", children: "Describe the issue\u2026" }),
-                        state.liveStructured?.title && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-                          "p",
-                          {
-                            className: "mt-2 text-sm font-medium text-slate-700 text-center max-w-full truncate px-2 transition-opacity duration-300 ease-out opacity-0 animate-[echly-title-fade-in_300ms_ease-out_forwards]",
-                            style: { animationDelay: "40ms" },
-                            children: state.liveStructured.title
-                          }
-                        )
-                      ] }),
-                      (state.state === "processing-structure" || state.state === "saving-feedback") && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "mt-4 text-[15px] text-slate-500 font-normal tracking-tight text-center", children: "Processing\u2026" })
-                    ] }),
-                    state.state === "listening" && state.liveStructured && state.liveStructured.tags.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "mb-4 flex flex-wrap gap-1.5 justify-center", children: [
-                      state.liveStructured.tags.slice(0, 4).map((tag) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-                        "span",
+                      ) : null,
+                      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+                        FeedbackList_default,
                         {
-                          className: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/80 text-slate-600 border border-slate-200/80",
-                          children: tag
-                        },
-                        tag
-                      )),
-                      state.liveStructured.priority && state.liveStructured.priority !== "medium" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-                        "span",
-                        {
-                          className: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/80 text-slate-600 border border-slate-200/80 capitalize",
-                          children: state.liveStructured.priority
+                          items: state.pointers.slice(1),
+                          expandedId: state.expandedId,
+                          editingId: state.editingId,
+                          editedTitle: state.editedTitle,
+                          editedDescription: state.editedDescription,
+                          onExpand: handlers.setExpandedId,
+                          onStartEdit: handlers.startEditing,
+                          onSaveEdit: handlers.saveEdit,
+                          onDelete: handlers.deletePointer,
+                          onEditedTitleChange: handlers.setEditedTitle,
+                          onEditedDescriptionChange: handlers.setEditedDescription,
+                          highlightTicketId: state.highlightTicketId
                         }
                       )
                     ] }),
-                    state.state === "listening" && !listeningExiting && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex justify-between", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", onClick: handlers.discardListening, className: "text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-neutral-100 transition-colors duration-120 cursor-pointer px-3 py-2 rounded-md", children: "Cancel" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", onClick: handlers.finishListening, className: "bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] px-5 py-2 rounded-lg text-[14px] font-medium transition-colors duration-150 cursor-pointer", children: "Done" })
-                    ] })
-                  ] }),
-                  state.state === "idle" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-                    WidgetFooter,
-                    {
-                      isIdle: state.state === "idle",
-                      onAddFeedback: handlers.handleAddFeedback,
-                      captureDisabled
-                    }
-                  )
-                ]
-              }
-            )
-          ] })
-        }
-      )
+                    state.errorMessage && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "text-sm text-slate-600 dark:text-slate-400 opacity-90 rounded-lg px-4 py-3", children: state.errorMessage }),
+                    state.state === "idle" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+                      WidgetFooter,
+                      {
+                        isIdle: state.state === "idle",
+                        onAddFeedback: handlers.handleAddFeedback,
+                        captureDisabled
+                      }
+                    )
+                  ]
+                }
+              )
+            ] })
+          }
+        )
+      ] }) : null
     ] });
   }
 
@@ -49616,19 +49591,19 @@ This typically indicates that your device does not have a healthy Internet conne
     });
   }
   function ContentApp() {
-    const [user, setUser] = import_react9.default.useState(null);
-    const [sessionMessage, setSessionMessage] = import_react9.default.useState(null);
-    const [authChecked, setAuthChecked] = import_react9.default.useState(false);
-    const [globalState, setGlobalState] = import_react9.default.useState({
+    const [user, setUser] = import_react8.default.useState(null);
+    const [sessionMessage, setSessionMessage] = import_react8.default.useState(null);
+    const [authChecked, setAuthChecked] = import_react8.default.useState(false);
+    const [globalState, setGlobalState] = import_react8.default.useState({
       visible: false,
       expanded: false,
       isRecording: false,
       sessionId: null
     });
     const effectiveSessionId = globalState.sessionId;
-    const widgetToggleRef = import_react9.default.useRef(null);
+    const widgetToggleRef = import_react8.default.useRef(null);
     const logoUrl = typeof chrome !== "undefined" && chrome.runtime?.getURL ? chrome.runtime.getURL("assets/Echly_logo.svg") : "/Echly_logo.svg";
-    import_react9.default.useEffect(() => {
+    import_react8.default.useEffect(() => {
       const toggleHandler = () => {
         widgetToggleRef.current?.();
       };
@@ -49637,7 +49612,7 @@ This typically indicates that your device does not have a healthy Internet conne
         window.removeEventListener("ECHLY_TOGGLE_WIDGET", toggleHandler);
       };
     }, []);
-    import_react9.default.useEffect(() => {
+    import_react8.default.useEffect(() => {
       const handler = (e) => {
         const s = e.detail?.state;
         if (s) setGlobalState(s);
@@ -49645,7 +49620,7 @@ This typically indicates that your device does not have a healthy Internet conne
       window.addEventListener("ECHLY_GLOBAL_STATE", handler);
       return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler);
     }, []);
-    import_react9.default.useEffect(() => {
+    import_react8.default.useEffect(() => {
       const sendActiveSessionIfDashboard = () => {
         const origin = window.location.origin;
         const isAppOrigin = origin === "https://echly-web.vercel.app" || origin === "http://localhost:3000";
@@ -49667,7 +49642,7 @@ This typically indicates that your device does not have a healthy Internet conne
         clearInterval(interval);
       };
     }, []);
-    const onRecordingChange = import_react9.default.useCallback((recording) => {
+    const onRecordingChange = import_react8.default.useCallback((recording) => {
       if (recording) {
         chrome.runtime.sendMessage(
           { type: "START_RECORDING" },
@@ -49686,15 +49661,15 @@ This typically indicates that your device does not have a healthy Internet conne
         });
       }
     }, []);
-    const onExpandRequest = import_react9.default.useCallback(() => {
+    const onExpandRequest = import_react8.default.useCallback(() => {
       chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {
       });
     }, []);
-    const onCollapseRequest = import_react9.default.useCallback(() => {
+    const onCollapseRequest = import_react8.default.useCallback(() => {
       chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {
       });
     }, []);
-    import_react9.default.useEffect(() => {
+    import_react8.default.useEffect(() => {
       chrome.runtime.sendMessage(
         { type: "ECHLY_GET_AUTH_STATE" },
         (response) => {
@@ -49712,7 +49687,7 @@ This typically indicates that your device does not have a healthy Internet conne
         }
       );
     }, []);
-    const handleComplete = import_react9.default.useCallback(
+    const handleComplete = import_react8.default.useCallback(
       async (transcript, screenshot, callbacks, context) => {
         if (!effectiveSessionId || !user) {
           callbacks?.onError();
@@ -49819,9 +49794,9 @@ This typically indicates that your device does not have a healthy Internet conne
       },
       [effectiveSessionId, user]
     );
-    const handleDelete = import_react9.default.useCallback(async (_id) => {
+    const handleDelete = import_react8.default.useCallback(async (_id) => {
     }, []);
-    const liveStructureFetch = import_react9.default.useCallback(
+    const liveStructureFetch = import_react8.default.useCallback(
       async (transcript) => {
         try {
           const res = await apiFetch("/api/structure-feedback", {

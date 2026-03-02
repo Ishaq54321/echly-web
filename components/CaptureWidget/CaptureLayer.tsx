@@ -7,93 +7,95 @@ import { VoiceBubble } from "./VoiceBubble";
 import type { CaptureContext } from "./types";
 
 export type CaptureLayerState =
-  | "capturing"
-  | "listening"
-  | "processing-structure"
-  | "saving-feedback"
-  | "idle";
+  | "focus_mode"
+  | "region_selecting"
+  | "voice_listening"
+  | "processing"
+  | "idle"
+  | "success"
+  | "cancelled"
+  | "error";
 
 export type CaptureLayerProps = {
-  /** Portal target: #echly-capture-root */
   captureRoot: HTMLDivElement;
   extensionMode: boolean;
   state: CaptureLayerState;
   pillExiting: boolean;
-  listeningExiting: boolean;
   listeningAudioLevel: number;
   listeningSentiment: "negative" | "neutral" | "positive";
+  aiPreviewTitle: string | null;
   getFullTabImage: () => Promise<string | null>;
   onRegionCaptured: (croppedDataUrl: string, context?: CaptureContext | null) => void;
+  onRegionSelectStart: () => void;
   onCancelCapture: () => void;
   onDone: () => void;
 };
 
 /**
- * Renders the capture UI (overlay, region selection, voice bubble) into #echly-capture-root.
- * Completely separate from the widget DOM tree.
+ * Renders the capture UI (overlay, region selection, voice capsule) into #echly-capture-root.
+ * Completely separate from the sidebar DOM tree.
  */
 export function CaptureLayer({
   captureRoot,
   extensionMode,
   state,
   pillExiting,
-  listeningExiting,
   listeningAudioLevel,
   listeningSentiment,
+  aiPreviewTitle,
   getFullTabImage,
   onRegionCaptured,
+  onRegionSelectStart,
   onCancelCapture,
   onDone,
 }: CaptureLayerProps) {
-  const showOverlay =
-    state === "listening" ||
-    state === "processing-structure" ||
-    state === "saving-feedback" ||
-    pillExiting;
-  const showBubble =
-    state === "listening" ||
-    state === "processing-structure" ||
-    state === "saving-feedback" ||
+  const showDimOverlay =
+    state === "focus_mode" || state === "region_selecting";
+  const showRegionOverlay =
+    extensionMode && (state === "focus_mode" || state === "region_selecting");
+  const showCapsule =
+    state === "voice_listening" ||
+    state === "processing" ||
     pillExiting;
 
   const content = (
     <>
-      {showOverlay && (
+      {showDimOverlay && (
         <div
+          className="echly-focus-overlay"
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.08)",
+            background: "rgba(0,0,0,0.06)",
             pointerEvents: "auto",
-            zIndex: 2147483646,
+            zIndex: 2147483645,
           }}
           aria-hidden
         />
       )}
-      {extensionMode && state === "capturing" && (
+      {showRegionOverlay && (
         <RegionCaptureOverlay
           getFullTabImage={getFullTabImage}
           onCapture={onRegionCaptured}
           onCancel={onCancelCapture}
-          getWidgetOrigin={undefined}
+          onSelectionStart={onRegionSelectStart}
         />
       )}
-      {showBubble && (
+      {showCapsule && (
         <div
           className={
             pillExiting
-              ? "echly-voice-pill-wrapper echly-voice-pill--exiting"
-              : "echly-voice-pill-wrapper"
+              ? "echly-capsule-wrapper echly-capsule-wrapper--exiting"
+              : "echly-capsule-wrapper"
           }
         >
           <VoiceBubble
-            isListening={state === "listening"}
-            isProcessing={
-              state === "processing-structure" || state === "saving-feedback" || pillExiting
-            }
-            isExiting={state === "processing-structure" && listeningExiting}
+            isListening={state === "voice_listening"}
+            isProcessing={state === "processing" || pillExiting}
+            isExiting={state === "processing" && pillExiting}
             audioLevel={listeningAudioLevel}
             sentiment={listeningSentiment}
+            aiPreviewTitle={aiPreviewTitle}
             onDone={onDone}
           />
         </div>

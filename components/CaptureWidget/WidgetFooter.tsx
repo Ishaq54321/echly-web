@@ -18,11 +18,7 @@ export default function WidgetFooter({
       type="button"
       onClick={effectivelyDisabled ? undefined : onAddFeedback}
       disabled={effectivelyDisabled}
-      className={`mt-3 w-full px-6 py-2.5 rounded-lg flex items-center justify-center text-sm font-medium tracking-tight transition-colors duration-150 ${
-        effectivelyDisabled
-          ? "bg-neutral-200 text-neutral-500 cursor-not-allowed"
-          : "cursor-pointer focus-ring-brand bg-brand-primary text-white hover:opacity-90 active:scale-[0.98] focus-visible:outline-none"
-      }`}
+      className={`echly-widget-font echly-sidebar-add-btn ${effectivelyDisabled ? "echly-sidebar-add-btn--disabled" : ""}`}
     >
       + Add Feedback
     </button>

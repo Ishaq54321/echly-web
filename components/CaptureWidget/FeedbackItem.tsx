@@ -55,12 +55,7 @@ function FeedbackItem({
 
   return (
     <div
-      className={`bg-white px-6 py-4 border-b border-[rgba(0,0,0,0.05)]
-                 transition-colors duration-120 ease-[cubic-bezier(0.2,0.8,0.2,1)]
-                 hover:bg-neutral-100
-                 active:scale-[0.99] active:duration-[80ms] active:ease-in
-                 last:border-b-0
-                 ${isHighlighted ? "echly-ticket-highlight" : ""}`}
+      className={`echly-feedback-item py-4 px-5 transition-colors duration-120 ease-[cubic-bezier(0.2,0.8,0.2,1)] active:scale-[0.995] active:duration-[80ms] active:ease-in ${isHighlighted ? "echly-ticket-highlight" : ""}`}
     >
       <div className="flex justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -69,30 +64,22 @@ function FeedbackItem({
               <input
                 value={editedTitle}
                 onChange={(e) => onEditedTitleChange(e.target.value)}
-                className="focus-ring-brand w-full mb-2 px-3 py-2
-                                     bg-white text-slate-900
-                                     border border-slate-300
-                                     rounded-sm text-sm font-medium
-                                     outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150"
+                className="echly-widget-input focus-ring-brand w-full mb-2 px-3 py-2 bg-transparent text-slate-900 dark:text-slate-100 rounded-md text-[15px] font-medium outline-none focus:ring-1 focus:ring-brand-accent transition-all duration-150 border border-transparent focus:border-slate-300 dark:focus:border-slate-600"
               />
               <textarea
                 value={editedDescription}
                 onChange={(e) => onEditedDescriptionChange(e.target.value)}
                 rows={3}
-                className="focus-ring-brand w-full px-3 py-2
-                                     bg-white text-slate-800
-                                     border border-slate-300
-                                     rounded-sm text-sm
-                                     outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 resize-none"
+                className="echly-widget-input focus-ring-brand w-full px-3 py-2 bg-transparent text-slate-700 dark:text-slate-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-brand-accent transition-all duration-150 resize-none border border-transparent focus:border-slate-300 dark:focus:border-slate-600"
               />
             </>
           ) : (
             <>
-              <h3 className="text-sm font-semibold text-slate-900 leading-snug">
+              <h3 className="echly-widget-item-title text-slate-900 dark:text-slate-100">
                 {item.title}
               </h3>
               {isExpanded && (
-                <p className="text-xs text-slate-600 mt-1.5">
+                <p className="echly-widget-item-desc text-slate-600 dark:text-slate-400 mt-1.5">
                   {item.description}
                 </p>
               )}
@@ -100,11 +87,12 @@ function FeedbackItem({
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 text-slate-400">
+        <div className="echly-feedback-item-actions flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={handleExpand}
-            className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
+            className="echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 cursor-pointer transition-opacity duration-150"
+            aria-label={isExpanded ? "Collapse" : "Expand"}
           >
             <Expand size={18} strokeWidth={1.5} />
           </button>
@@ -113,7 +101,8 @@ function FeedbackItem({
             <button
               type="button"
               onClick={handleSave}
-              className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
+              className="echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 cursor-pointer transition-opacity duration-150"
+              aria-label="Save"
             >
               <Check size={18} strokeWidth={1.5} />
             </button>
@@ -121,7 +110,8 @@ function FeedbackItem({
             <button
               type="button"
               onClick={handleEdit}
-              className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-brand-accent transition-colors duration-120 cursor-pointer"
+              className="echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 cursor-pointer transition-opacity duration-150"
+              aria-label="Edit"
             >
               <Pencil size={18} strokeWidth={1.5} />
             </button>
@@ -130,7 +120,8 @@ function FeedbackItem({
           <button
             type="button"
             onClick={handleDelete}
-            className="flex items-center justify-center w-6 h-6 rounded-md text-neutral-500 hover:bg-semantic-danger/10 hover:text-semantic-danger transition-colors duration-120 cursor-pointer"
+            className="echly-widget-action-icon flex items-center justify-center w-8 h-8 rounded-md text-slate-500 hover:!opacity-100 hover:!text-red-500 cursor-pointer transition-opacity duration-150"
+            aria-label="Delete"
           >
             <Trash2 size={18} strokeWidth={1.5} />
           </button>

@@ -14,6 +14,7 @@ import type {
 } from "../types";
 
 const SAFE_MARGIN = 24;
+const ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
 
 export type SentimentGlow = "negative" | "neutral" | "positive";
 
@@ -34,7 +35,6 @@ function getSentimentFromTranscript(transcript: string): SentimentGlow {
   return "neutral";
 }
 
-/** Web Speech API recognition instance (not in DOM lib types). */
 type SpeechRecognitionInstance = { start(): void; stop(): void };
 
 function generateRecordingId(): string {
@@ -44,18 +44,14 @@ function generateRecordingId(): string {
   return `rec-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-const RECORDING_STATES: CaptureState[] = [
-  "capturing",
-  "listening",
+const CAPTURE_FLOW_STATES: CaptureState[] = [
+  "focus_mode",
+  "region_selecting",
+  "voice_listening",
   "processing",
-  "processing-structure",
-  "saving-feedback",
-  "anticipation",
 ];
 
 const LIVE_STRUCTURE_DEBOUNCE_MS = 1800;
-/** Minimum time to show "Structuring" before transitioning to "Saving" (avoids flicker). */
-const MIN_PROCESSING_PHASE_MS = 1200;
 const LIVE_STRUCTURE_MIN_LENGTH = 12;
 
 export function useCaptureWidget({
@@ -79,29 +75,21 @@ export function useCaptureWidget({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
   const [editedDescription, setEditedDescription] = useState("");
-  const [seconds, setSeconds] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [pendingStructured, setPendingStructured] = useState<StructuredFeedback | null>(null);
   const [liveStructured, setLiveStructured] = useState<{ title: string; tags: string[]; priority: string } | null>(null);
   const [listeningAudioLevel, setListeningAudioLevel] = useState(0);
-  /** Extension: when true, widget is hidden for premium floating capture (overlay + pill only). */
-  const [captureModeMinimized, setCaptureModeMinimized] = useState(false);
-  /** Extension: open state to restore when capture completes or is cancelled. */
   const [widgetOpenBeforeCapture, setWidgetOpenBeforeCapture] = useState(true);
-  /** New ticket id to highlight for 1.2s after capture success. */
   const [highlightTicketId, setHighlightTicketId] = useState<string | null>(null);
-  /** When true, pill is fading out before we restore the widget. */
   const [pillExiting, setPillExiting] = useState(false);
-  /** When true, #echly-capture-root exists and capture UI is portaled into it. */
   const [captureRootReady, setCaptureRootReady] = useState(false);
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
   const captureRootRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-  const timerRef = useRef<any>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const activeRecordingIdRef = useRef<string | null>(null);
   const recordingsRef = useRef<Recording[]>(recordings);
@@ -113,22 +101,26 @@ export function useCaptureWidget({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
+
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
-  /** After MIN_PROCESSING_PHASE_MS in processing-structure, transition to saving-feedback (avoids flicker). */
+  /** Focus mode: dim overlay + desaturation when in focus_mode or region_selecting */
   useEffect(() => {
-    if (state !== "processing-structure") return;
-    const t = setTimeout(() => {
-      if (stateRef.current === "processing-structure") setState("saving-feedback");
-    }, MIN_PROCESSING_PHASE_MS);
-    return () => clearTimeout(t);
+    if (state === "focus_mode" || state === "region_selecting") {
+      document.documentElement.style.filter = "saturate(0.98)";
+    } else {
+      document.documentElement.style.filter = "";
+    }
+    return () => {
+      document.documentElement.style.filter = "";
+    };
   }, [state]);
 
-  /** While listening, run analyser loop for mic orb ring (speaking vs silent). Clean up on exit. */
+  /** Audio level loop while voice_listening */
   useEffect(() => {
-    if (state !== "listening") {
+    if (state !== "voice_listening") {
       if (rafRef.current != null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
@@ -165,20 +157,14 @@ export function useCaptureWidget({
     editingIdRef.current = editingId;
   }, [editingId]);
 
-  /** Keep tray locked during capture → listen → process so it never collapses. */
   useEffect(() => {
-    if (RECORDING_STATES.includes(state)) {
-      trayLockedRef.current = true;
-    } else {
-      trayLockedRef.current = false;
-    }
+    trayLockedRef.current = CAPTURE_FLOW_STATES.includes(state);
   }, [state]);
 
-  /** Notify extension when recording starts or stops (global sticky state). Only on actual transition, not on mount. */
   const wasRecordingRef = useRef(false);
   useEffect(() => {
     if (!onRecordingChange) return;
-    const recording = RECORDING_STATES.includes(state);
+    const recording = CAPTURE_FLOW_STATES.includes(state);
     if (recording) {
       wasRecordingRef.current = true;
       onRecordingChange(true);
@@ -188,9 +174,9 @@ export function useCaptureWidget({
     }
   }, [state, onRecordingChange]);
 
-  /** Instant structured insight: debounced live title/tags/priority while user is speaking. */
+  /** Live structured title while user is speaking */
   useEffect(() => {
-    if (state !== "listening" || !liveStructureFetch || !activeRecordingId) {
+    if (state !== "voice_listening" || !liveStructureFetch || !activeRecordingId) {
       setLiveStructured(null);
       if (liveStructureTimeoutRef.current) {
         clearTimeout(liveStructureTimeoutRef.current);
@@ -212,7 +198,7 @@ export function useCaptureWidget({
       liveStructureTimeoutRef.current = null;
       liveStructureFetch(transcript)
         .then((result) => {
-          if (result && stateRef.current === "listening") setLiveStructured(result);
+          if (result && stateRef.current === "voice_listening") setLiveStructured(result);
         })
         .catch(() => {});
     }, LIVE_STRUCTURE_DEBOUNCE_MS);
@@ -224,19 +210,16 @@ export function useCaptureWidget({
     };
   }, [state, activeRecordingId, recordings, liveStructureFetch]);
 
-  /** Guarded setter: in extension mode or during capturing/listening/structuring/edit, do not close. */
   const setIsOpen = useCallback((next: boolean) => {
     if (next === false) {
       if (trayLockedRef.current) return;
       if (extensionMode) return;
-      const s = stateRef.current;
-      if (RECORDING_STATES.includes(s)) return;
+      if (CAPTURE_FLOW_STATES.includes(stateRef.current)) return;
       if (editingIdRef.current) return;
     }
     setIsOpenState(next);
   }, [extensionMode]);
 
-  /** For extension message toggle: flip open state without going through close guard. */
   const toggleOpen = useCallback(() => {
     setIsOpenState((prev) => !prev);
   }, []);
@@ -293,7 +276,6 @@ export function useCaptureWidget({
     setPosition({ x: rect.left, y: rect.top });
   }, []);
 
-  /** Create #echly-capture-root and append to body. Call on Add Feedback. */
   const createCaptureRoot = useCallback(() => {
     if (captureRootRef.current) return;
     const el = document.createElement("div");
@@ -303,7 +285,6 @@ export function useCaptureWidget({
     setCaptureRootReady(true);
   }, []);
 
-  /** Remove #echly-capture-root from body. Call on ESC, success, or error. */
   const removeCaptureRoot = useCallback(() => {
     if (!captureRootRef.current) return;
     try {
@@ -313,9 +294,8 @@ export function useCaptureWidget({
     setCaptureRootReady(false);
   }, []);
 
-  /** Restore widget visibility and open state (call after removeCaptureRoot). */
   const restoreWidget = useCallback(() => {
-    setCaptureModeMinimized(false);
+    setState("idle");
     setIsOpenState(widgetOpenBeforeCapture);
   }, [widgetOpenBeforeCapture]);
 
@@ -368,7 +348,7 @@ export function useCaptureWidget({
     };
     recognition.onend = () => {
       const s = stateRef.current;
-      if (s === "processing-structure" || s === "saving-feedback") return;
+      if (s === "processing" || s === "success") return;
       setState("idle");
     };
     recognitionRef.current = recognition;
@@ -378,23 +358,6 @@ export function useCaptureWidget({
       } catch (_) {}
     };
   }, []);
-
-  /* ================= TIMER ================= */
-
-  const startTimer = useCallback(() => {
-    setSeconds(0);
-    timerRef.current = setInterval(() => {
-      setSeconds((prev) => prev + 1);
-    }, 1000);
-  }, []);
-
-  const stopTimer = () => clearInterval(timerRef.current);
-
-  const formatTime = useCallback(() => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-  }, [seconds]);
 
   /* ================= LISTEN ================= */
 
@@ -411,15 +374,16 @@ export function useCaptureWidget({
       audioContextRef.current = ctx;
       analyserRef.current = analyser;
       recognitionRef.current?.start();
-      setState("listening");
+      setState("voice_listening");
       setListeningAudioLevel(0);
-      startTimer();
     } catch (err) {
       console.error("Microphone permission denied:", err);
       setErrorMessage("Microphone permission denied.");
       setState("error");
+      removeCaptureRoot();
+      restoreWidget();
     }
-  }, [startTimer]);
+  }, []);
 
   const finishListening = useCallback(async () => {
     if (typeof navigator !== "undefined" && navigator.vibrate) {
@@ -427,7 +391,6 @@ export function useCaptureWidget({
     }
     playDoneClick();
     recognitionRef.current?.stop();
-    stopTimer();
     const activeId = activeRecordingIdRef.current;
     if (!activeId) {
       setState("idle");
@@ -439,7 +402,7 @@ export function useCaptureWidget({
       setState("idle");
       return;
     }
-    setState("processing-structure");
+    setState("processing");
     if (extensionMode) {
       onComplete(active.transcript, active.screenshot, {
         onSuccess: (ticket) => {
@@ -449,21 +412,18 @@ export function useCaptureWidget({
           ]);
           setRecordings((prev) => prev.filter((r) => r.id !== activeId));
           setActiveRecordingId(null);
-          setState("idle");
-          setPillExiting(true);
           setHighlightTicketId(ticket.id);
           setTimeout(() => setHighlightTicketId(null), 1200);
+          setPillExiting(true);
           setTimeout(() => {
-            setPillExiting(false);
             removeCaptureRoot();
             restoreWidget();
-          }, 220);
+            setPillExiting(false);
+          }, 120);
         },
         onError: () => {
           setErrorMessage("AI processing failed.");
-          setState("error");
-          removeCaptureRoot();
-          restoreWidget();
+          setState("voice_listening");
         },
       }, active.context ?? undefined);
       return;
@@ -476,77 +436,59 @@ export function useCaptureWidget({
         restoreWidget();
         return;
       }
-      setRecordings((prev) =>
-        prev.map((r) =>
-          r.id === activeId ? { ...r, structuredOutput: structured } : r
-        )
-      );
-      setPendingStructured(structured);
-      setState("anticipation");
+      setPointers((prev) => [
+        { id: structured.id, title: structured.title, description: structured.description, type: structured.type },
+        ...prev,
+      ]);
+      setRecordings((prev) => prev.filter((r) => r.id !== activeId));
+      setActiveRecordingId(null);
+      setHighlightTicketId(structured.id);
+      setTimeout(() => setHighlightTicketId(null), 1200);
+      setPillExiting(true);
+      setTimeout(() => {
+        removeCaptureRoot();
+        restoreWidget();
+        setPillExiting(false);
+      }, 120);
     } catch (err) {
       console.error(err);
       setErrorMessage("AI processing failed.");
-      setState("error");
-      removeCaptureRoot();
-      restoreWidget();
+      setState("voice_listening");
     }
-  }, [onComplete, extensionMode, widgetOpenBeforeCapture, removeCaptureRoot, restoreWidget]);
-
-  /* Anticipation (web): 160ms pause then show result, remove capture root, restore widget */
-  useEffect(() => {
-    if (state !== "anticipation" || !pendingStructured) return;
-    const t = setTimeout(() => {
-      setPointers((prev) => [
-        {
-          id: pendingStructured.id,
-          title: pendingStructured.title,
-          description: pendingStructured.description,
-          type: pendingStructured.type,
-        },
-        ...prev,
-      ]);
-      setPendingStructured(null);
-      setActiveRecordingId(null);
-      setState("idle");
-      removeCaptureRoot();
-      restoreWidget();
-    }, 160);
-    return () => clearTimeout(t);
-  }, [state, pendingStructured, removeCaptureRoot, restoreWidget]);
+  }, [onComplete, extensionMode, removeCaptureRoot, restoreWidget]);
 
   const discardListening = useCallback(() => {
     recognitionRef.current?.stop();
-    stopTimer();
     const activeId = activeRecordingIdRef.current;
     setRecordings((prev) => prev.filter((r) => r.id !== activeId));
     setActiveRecordingId(null);
-    setState("idle");
+    setState("cancelled");
     removeCaptureRoot();
     restoreWidget();
   }, [removeCaptureRoot, restoreWidget]);
 
-  /** ESC during listening (any mode) cancels capture and restores widget. */
+  /** ESC: any capture flow → cancelled */
   useEffect(() => {
-    if (!captureModeMinimized || state !== "listening") return;
+    if (!captureRootReady) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        discardListening();
+        if (CAPTURE_FLOW_STATES.includes(stateRef.current)) {
+          discardListening();
+        }
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [captureModeMinimized, state, discardListening]);
+  }, [captureRootReady, discardListening]);
 
-  /* ================= SHARE ================= */
+  /* ================= SHARE / RESET ================= */
 
   const handleShare = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
     } catch {}
   }, []);
-
-  /* ================= RESET ================= */
 
   const resetSession = useCallback(() => {
     setPointers([]);
@@ -557,8 +499,6 @@ export function useCaptureWidget({
     setEditingId(null);
     setShowMenu(false);
   }, []);
-
-  /* ================= CLICK OUTSIDE (menu only; no widget collapse in extension mode) ================= */
 
   useEffect(() => {
     if (extensionMode) return;
@@ -618,9 +558,8 @@ export function useCaptureWidget({
     }
   }, [editedTitle, editedDescription]);
 
-  /* ================= ADD FEEDBACK (CAPTURE) ================= */
+  /* ================= CAPTURE ================= */
 
-  /** Extension: full tab image via background chrome.tabs.captureVisibleTab. Used by region overlay to crop. */
   const getFullTabImage = useCallback((): Promise<string | null> => {
     if (typeof chrome !== "undefined" && chrome.runtime?.id) {
       return new Promise((resolve, reject) => {
@@ -636,7 +575,6 @@ export function useCaptureWidget({
     return Promise.resolve(null);
   }, []);
 
-  /** Web (non-extension): full-page capture. Extension uses region overlay + getFullTabImage instead. */
   const captureScreenshot = useCallback(async (): Promise<string | null> => {
     if (typeof chrome !== "undefined" && chrome.runtime?.id) {
       return getFullTabImage();
@@ -645,7 +583,10 @@ export function useCaptureWidget({
     return webCapture();
   }, [getFullTabImage]);
 
-  /** Extension only: called by RegionCaptureOverlay with cropped data URL and optional context. */
+  const handleRegionSelectStart = useCallback(() => {
+    setState("region_selecting");
+  }, []);
+
   const handleRegionCaptured = useCallback(
     (croppedDataUrl: string, context?: CaptureContext | null) => {
       const id = generateRecordingId();
@@ -664,10 +605,9 @@ export function useCaptureWidget({
     [startListening]
   );
 
-  /** Extension only: cancel region capture mode (Escape or invalid selection). Remove root, restore widget. */
   const handleCancelCapture = useCallback(() => {
+    setState("cancelled");
     removeCaptureRoot();
-    setState("idle");
     restoreWidget();
   }, [removeCaptureRoot, restoreWidget]);
 
@@ -676,21 +616,16 @@ export function useCaptureWidget({
     setErrorMessage(null);
     recognitionRef.current?.stop();
     setWidgetOpenBeforeCapture(isOpen);
-    setCaptureModeMinimized(true);
     setIsOpenState(false);
     createCaptureRoot();
+    setState("focus_mode");
     if (extensionMode) {
-      setState("capturing");
       return;
     }
-    setState("capturing");
     try {
       const image = await captureScreenshot();
       if (!image) {
-        removeCaptureRoot();
-        setState("idle");
-        setErrorMessage("Capture cancelled.");
-        restoreWidget();
+        handleCancelCapture();
         return;
       }
       const id = generateRecordingId();
@@ -708,8 +643,7 @@ export function useCaptureWidget({
       console.error(err);
       setErrorMessage("Screen capture failed.");
       setState("error");
-      removeCaptureRoot();
-      restoreWidget();
+      handleCancelCapture();
     }
   }, [
     extensionMode,
@@ -717,8 +651,7 @@ export function useCaptureWidget({
     captureScreenshot,
     startListening,
     createCaptureRoot,
-    removeCaptureRoot,
-    restoreWidget,
+    handleCancelCapture,
   ]);
 
   const handlers = useMemo(
@@ -740,6 +673,7 @@ export function useCaptureWidget({
       setEditedDescription,
       handleAddFeedback,
       handleRegionCaptured,
+      handleRegionSelectStart,
       handleCancelCapture,
       getFullTabImage,
     }),
@@ -757,16 +691,10 @@ export function useCaptureWidget({
       saveEdit,
       handleAddFeedback,
       handleRegionCaptured,
+      handleRegionSelectStart,
       handleCancelCapture,
       getFullTabImage,
     ]
-  );
-
-  const derivedValues = useMemo(
-    () => ({
-      formatTime,
-    }),
-    [formatTime]
   );
 
   const activeRecording = useMemo(
@@ -774,7 +702,7 @@ export function useCaptureWidget({
     [activeRecordingId, recordings]
   );
   const listeningSentiment = useMemo((): SentimentGlow => {
-    if (state !== "listening") return "neutral";
+    if (state !== "voice_listening") return "neutral";
     return getSentimentFromTranscript(activeRecording?.transcript ?? "");
   }, [state, activeRecording?.transcript]);
 
@@ -791,15 +719,12 @@ export function useCaptureWidget({
       showMenu,
       position,
       liveStructured,
-      seconds,
       listeningAudioLevel,
       listeningSentiment,
-      captureModeMinimized,
       highlightTicketId,
       pillExiting,
     },
     handlers,
-    derivedValues,
     refs: {
       widgetRef,
       menuRef,

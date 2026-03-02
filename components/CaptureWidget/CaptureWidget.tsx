@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
-import FeedbackList from "./FeedbackList";
 import FeedbackItem from "./FeedbackItem";
 import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
 import type { CaptureWidgetProps } from "./types";
+
+const CAPTURE_FLOW_STATES = ["focus_mode", "region_selecting", "voice_listening", "processing"] as const;
 
 export default function CaptureWidget({
   sessionId,
@@ -46,26 +46,27 @@ export default function CaptureWidget({
   const effectiveIsOpen = isControlled ? expanded : state.isOpen;
   const listScrollRef = useRef<HTMLDivElement>(null);
 
-  /** When transitioning from listening to processing-structure, play orb shrink in bubble (200ms). */
-  const [listeningExiting, setListeningExiting] = useState(false);
-  const prevStateRef = useRef(state.state);
+  const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state as any) || state.pillExiting;
+  const showSidebar = !isInCaptureFlow;
+  const showFloatingButton = !effectiveIsOpen && showSidebar;
+  const showPanel = effectiveIsOpen && showSidebar;
 
-  /** On new ticket highlight (e.g. after floating capture success), scroll list to top. */
+  const insightCount = state.pointers.length;
+  const highPriorityCount = state.pointers.filter((p) =>
+    /critical|bug|high|urgent/i.test(p.type || "")
+  ).length;
+  const summary =
+    insightCount > 0
+      ? highPriorityCount > 0
+        ? `${insightCount} insights · ${highPriorityCount} high priority`
+        : `${insightCount} insights`
+      : null;
+
   useEffect(() => {
     if (state.highlightTicketId && listScrollRef.current) {
       listScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [state.highlightTicketId]);
-  useEffect(() => {
-    const prev = prevStateRef.current;
-    if (state.state === "processing-structure" && prev === "listening") {
-      setListeningExiting(true);
-      const t = setTimeout(() => setListeningExiting(false), 200);
-      prevStateRef.current = state.state;
-      return () => clearTimeout(t);
-    }
-    prevStateRef.current = state.state;
-  }, [state.state]);
 
   React.useEffect(() => {
     if (!widgetToggleRef) return;
@@ -75,154 +76,114 @@ export default function CaptureWidget({
     };
   }, [handlers, widgetToggleRef]);
 
-  const showFloatingButton =
-    !effectiveIsOpen && !state.captureModeMinimized;
-
   return (
     <>
-      {/* Capture UI: portaled into #echly-capture-root, never inside widget */}
-      {captureRootReady && refs.captureRootRef.current &&
+      {/* Capture layer: portaled into #echly-capture-root. Never inside sidebar. */}
+      {captureRootReady && refs.captureRootRef.current && (
         createPortal(
           <CaptureLayer
             captureRoot={refs.captureRootRef.current}
             extensionMode={extensionMode}
-            state={
-              state.state === "capturing" ||
-              state.state === "listening" ||
-              state.state === "processing-structure" ||
-              state.state === "saving-feedback"
-                ? state.state
-                : "idle"
-            }
+            state={state.state}
             pillExiting={state.pillExiting}
-            listeningExiting={listeningExiting}
             listeningAudioLevel={state.listeningAudioLevel ?? 0}
             listeningSentiment={state.listeningSentiment ?? "neutral"}
+            aiPreviewTitle={state.liveStructured?.title ?? null}
             getFullTabImage={handlers.getFullTabImage}
             onRegionCaptured={handlers.handleRegionCaptured}
+            onRegionSelectStart={handlers.handleRegionSelectStart}
             onCancelCapture={handlers.handleCancelCapture}
             onDone={handlers.finishListening}
           />,
           refs.captureRootRef.current
-        )}
+        )
+      )}
 
-      {showFloatingButton ? (
-        <div className="fixed bottom-10 right-10 z-50 capture-floating-wrapper">
+      {showFloatingButton && (
+        <div className="echly-floating-trigger-wrapper">
           <button
             type="button"
             onClick={() => (onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true))}
-            className="capture-floating-trigger
-                       flex items-center gap-3
-                       bg-white border border-[rgba(0,0,0,0.08)]
-                       px-5 py-2.5 rounded-[20px]
-                       text-[#111827] font-semibold
-                       shadow-[0_10px_30px_rgba(0,0,0,0.12),0_4px_10px_rgba(0,0,0,0.06)]
-                       transition-[transform_80ms_ease-in,box-shadow_150ms_ease-out]
-                       hover:-translate-y-px hover:shadow-[0_12px_34px_rgba(0,0,0,0.14),0_5px_12px_rgba(0,0,0,0.08)]
-                       active:scale-[0.98] cursor-pointer"
+            className="echly-floating-trigger"
           >
-            <Image src="/Echly_logo.svg" alt="Echly" width={26} height={26} className="shrink-0" />
-            Capture Feedback
+            Add Feedback
           </button>
         </div>
-      ) : !state.captureModeMinimized ? (
+      )}
+
+      {showPanel && (
         <>
           {!extensionMode && (
             <div
-              className="fixed inset-0 z-40 backdrop-blur-[4px] bg-black/8"
+              className="echly-backdrop"
+              style={{ position: "fixed", inset: 0, zIndex: 2147483646, background: "rgba(0,0,0,0.06)", pointerEvents: "auto" }}
               aria-hidden
             />
           )}
-      <div
-        ref={refs.widgetRef}
-        className={`fixed w-[480px] transition-all duration-200 ${
-          !extensionMode && state.position ? "" : !extensionMode ? "bottom-10 right-10" : ""
-        } ${extensionMode ? "" : "z-50"}`}
-        style={
-          extensionMode
-            ? {
-                position: "fixed",
-                ...(state.position
-                  ? { left: state.position.x, top: state.position.y }
-                  : { bottom: "24px", right: "24px" }),
-                zIndex: 2147483647,
-                pointerEvents: "auto",
-              }
-            : {
-                ...(state.position ? { left: state.position.x, top: state.position.y } : {}),
-              }
-        }
-      >
-        <div className="bg-white rounded-lg
-                        border border-slate-200/80
-                        shadow-[0_16px_40px_rgba(0,0,0,0.12),0_6px_16px_rgba(0,0,0,0.08)]
-                        overflow-hidden font-sans">
-        <CaptureHeader
-          onStartDrag={handlers.startDrag}
-          onShare={handlers.handleShare}
-          onMoreClick={() => handlers.setShowMenu((p) => !p)}
-          onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
-          showMenu={state.showMenu}
-          onResetSession={handlers.resetSession}
-          menuRef={refs.menuRef}
-          isProcessingStructure={state.state === "processing-structure"}
-        />
-
-        <div
-          ref={listScrollRef}
-          className="px-6 py-6 flex flex-col gap-4 max-h-[60vh] overflow-y-auto"
-        >
-          <div className="capture-feedback-list flex flex-col space-y-2">
-            {state.pointers[0] ? (
-              <FeedbackItem
-                item={state.pointers[0]}
-                expandedId={state.expandedId}
-                editingId={state.editingId}
-                editedTitle={state.editedTitle}
-                editedDescription={state.editedDescription}
-                onExpand={handlers.setExpandedId}
-                onStartEdit={handlers.startEditing}
-                onSaveEdit={handlers.saveEdit}
-                onDelete={handlers.deletePointer}
-                onEditedTitleChange={handlers.setEditedTitle}
-                onEditedDescriptionChange={handlers.setEditedDescription}
-                highlightTicketId={state.highlightTicketId}
+          <div
+            ref={refs.widgetRef}
+            className="echly-sidebar-container"
+            style={
+              extensionMode
+                ? {
+                    position: "fixed",
+                    ...(state.position
+                      ? { left: state.position.x, top: state.position.y }
+                      : { bottom: "24px", right: "24px" }),
+                    zIndex: 2147483647,
+                    pointerEvents: "auto",
+                  }
+                : undefined
+            }
+          >
+            <div className="echly-sidebar-surface">
+              <CaptureHeader
+                onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
+                summary={summary}
               />
-            ) : null}
-            <FeedbackList
-              items={state.pointers.slice(1)}
-              expandedId={state.expandedId}
-              editingId={state.editingId}
-              editedTitle={state.editedTitle}
-              editedDescription={state.editedDescription}
-              onExpand={handlers.setExpandedId}
-              onStartEdit={handlers.startEditing}
-              onSaveEdit={handlers.saveEdit}
-              onDelete={handlers.deletePointer}
-              onEditedTitleChange={handlers.setEditedTitle}
-              onEditedDescriptionChange={handlers.setEditedDescription}
-              highlightTicketId={state.highlightTicketId}
-            />
-          </div>
 
-          {state.errorMessage && (
-            <div className="text-sm text-neutral-600 bg-neutral-100/70 border border-neutral-200 rounded-md px-4 py-3">
-              {state.errorMessage}
+              <div
+                ref={listScrollRef}
+                className="echly-sidebar-body"
+              >
+                <div className="echly-feedback-list">
+                  {state.pointers.map((p) => (
+                    <FeedbackItem
+                      key={p.id}
+                      item={p}
+                      expandedId={state.expandedId}
+                      editingId={state.editingId}
+                      editedTitle={state.editedTitle}
+                      editedDescription={state.editedDescription}
+                      onExpand={handlers.setExpandedId}
+                      onStartEdit={handlers.startEditing}
+                      onSaveEdit={handlers.saveEdit}
+                      onDelete={handlers.deletePointer}
+                      onEditedTitleChange={handlers.setEditedTitle}
+                      onEditedDescriptionChange={handlers.setEditedDescription}
+                      highlightTicketId={state.highlightTicketId}
+                    />
+                  ))}
+                </div>
+
+                {state.errorMessage && (
+                  <div className="echly-sidebar-error">
+                    {state.errorMessage}
+                  </div>
+                )}
+
+                {state.state === "idle" && (
+                  <WidgetFooter
+                    isIdle={true}
+                    onAddFeedback={handlers.handleAddFeedback}
+                    captureDisabled={captureDisabled}
+                  />
+                )}
+              </div>
             </div>
-          )}
-
-          {state.state === "idle" && (
-            <WidgetFooter
-              isIdle={state.state === "idle"}
-              onAddFeedback={handlers.handleAddFeedback}
-              captureDisabled={captureDisabled}
-            />
-          )}
-        </div>
-      </div>
-    </div>
-    </>
-      ) : null}
+          </div>
+        </>
+      )}
     </>
   );
 }

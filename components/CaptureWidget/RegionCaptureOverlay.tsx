@@ -5,21 +5,15 @@ import { buildCaptureContext } from "@/lib/captureContext";
 import type { CaptureContext } from "./types";
 
 const MIN_SIZE = 24;
+const ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
 
 export type Region = { x: number; y: number; w: number; h: number };
-
-const OVERLAY_ID = "echly-capture-overlay";
-const TOOLTIP_ID = "echly-capture-tooltip";
-
-const CAPTURE_TRANSITION_MS = 300;
-const CAPTURE_EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
 
 export type RegionCaptureOverlayProps = {
   getFullTabImage: () => Promise<string | null>;
   onCapture: (croppedDataUrl: string, context: CaptureContext | null) => void;
   onCancel: () => void;
-  /** Widget origin (viewport coords) for selection → mic orb transition. */
-  getWidgetOrigin?: () => { x: number; y: number } | null;
+  onSelectionStart?: () => void;
 };
 
 async function cropImageToRegion(
@@ -59,16 +53,12 @@ export function RegionCaptureOverlay({
   getFullTabImage,
   onCapture,
   onCancel,
-  getWidgetOrigin,
+  onSelectionStart,
 }: RegionCaptureOverlayProps) {
-  const overlayRef = useRef<HTMLDivElement>(null);
   const [selectionRect, setSelectionRect] = useState<Region | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(true);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  /** After mouse up: animate selection toward widget then capture. */
-  const [exitingRect, setExitingRect] = useState<Region | null>(null);
-  const [exitTarget, setExitTarget] = useState<{ x: number; y: number } | null>(null);
-  const [exitPhase, setExitPhase] = useState<0 | 1>(0);
+  const [releasedRect, setReleasedRect] = useState<Region | null>(null);
+  const [pulseDone, setPulseDone] = useState(false);
 
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const selectionRectRef = useRef<Region | null>(null);
@@ -81,7 +71,6 @@ export function RegionCaptureOverlay({
     setTimeout(() => onCancel(), 120);
   }, [onCancel]);
 
-  // ESC to cancel
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -104,30 +93,19 @@ export function RegionCaptureOverlay({
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
+    onSelectionStart?.();
     const x = e.clientX;
     const y = e.clientY;
     startRef.current = { x, y };
     setSelectionRect({ x, y, w: 0, h: 0 });
-  }, []);
-
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    setTooltipPos({ x: e.clientX + 16, y: e.clientY + 16 });
-    if (!startRef.current) return;
-    const sx = startRef.current.x;
-    const sy = startRef.current.y;
-    const x = Math.min(sx, e.clientX);
-    const y = Math.min(sy, e.clientY);
-    const w = Math.abs(e.clientX - sx);
-    const h = Math.abs(e.clientY - sy);
-    const next = { x, y, w, h };
-    selectionRectRef.current = next;
-    setSelectionRect(next);
-  }, []);
+  }, [onSelectionStart]);
 
   const performCapture = useCallback(
     async (targetRect: Region) => {
       setOverlayVisible(false);
       setSelectionRect(null);
+      setReleasedRect(null);
+      setPulseDone(false);
 
       await new Promise((r) => setTimeout(r, 80));
 
@@ -162,77 +140,93 @@ export function RegionCaptureOverlay({
     [getFullTabImage, onCapture, onCancel]
   );
 
-  const finalizeSelection = useCallback(
-    (current: Region | null) => {
-      const start = startRef.current;
-      startRef.current = null;
-      selectionRectRef.current = null;
-      if (!start || !current || current.w < MIN_SIZE || current.h < MIN_SIZE) {
-        setSelectionRect(null);
-        return;
-      }
-      const target = getWidgetOrigin?.() ?? null;
-      if (target) {
-        setExitPhase(0);
-        setExitingRect({ x: current.x, y: current.y, w: current.w, h: current.h });
-        setExitTarget(target);
-        setSelectionRect(null);
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => setExitPhase(1));
-        });
-        setTimeout(() => {
-          performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
-          setExitingRect(null);
-          setExitTarget(null);
-          setExitPhase(0);
-        }, CAPTURE_TRANSITION_MS);
-      } else {
-        performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
-      }
-    },
-    [performCapture, getWidgetOrigin]
-  );
-
   const onMouseUp = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      finalizeSelection(selectionRectRef.current);
+      const current = selectionRectRef.current;
+      const start = startRef.current;
+      startRef.current = null;
+      if (!start || !current || current.w < MIN_SIZE || current.h < MIN_SIZE) {
+        setSelectionRect(null);
+        return;
+      }
+      setSelectionRect(null);
+      selectionRectRef.current = null;
+      setReleasedRect({ x: current.x, y: current.y, w: current.w, h: current.h });
+      setPulseDone(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setPulseDone(true));
+      });
+      setTimeout(() => {
+        performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
+        setReleasedRect(null);
+      }, 120);
     },
-    [finalizeSelection]
+    [performCapture]
   );
+
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!startRef.current) return;
+    const sx = startRef.current.x;
+    const sy = startRef.current.y;
+    const x = Math.min(sx, e.clientX);
+    const y = Math.min(sy, e.clientY);
+    const w = Math.abs(e.clientX - sx);
+    const h = Math.abs(e.clientY - sy);
+    const next = { x, y, w, h };
+    selectionRectRef.current = next;
+    setSelectionRect(next);
+  }, []);
 
   useEffect(() => {
     const onWindowMouseUp = (e: MouseEvent) => {
       if (e.button !== 0 || !startRef.current) return;
-      finalizeSelection(selectionRectRef.current);
+      const current = selectionRectRef.current;
+      const start = startRef.current;
+      startRef.current = null;
+      if (!start || !current || current.w < MIN_SIZE || current.h < MIN_SIZE) {
+        setSelectionRect(null);
+        selectionRectRef.current = null;
+        return;
+      }
+      setSelectionRect(null);
+      selectionRectRef.current = null;
+      setReleasedRect({ x: current.x, y: current.y, w: current.w, h: current.h });
+      setPulseDone(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setPulseDone(true));
+      });
+      setTimeout(() => {
+        performCapture({ x: current.x, y: current.y, w: current.w, h: current.h });
+        setReleasedRect(null);
+      }, 120);
     };
     window.addEventListener("mouseup", onWindowMouseUp);
     return () => window.removeEventListener("mouseup", onWindowMouseUp);
-  }, [finalizeSelection]);
+  }, [performCapture]);
 
   const showSelection = !!selectionRect && (selectionRect.w >= MIN_SIZE || selectionRect.h >= MIN_SIZE);
-  const isExiting = !!exitingRect && !!exitTarget;
+  const showReleased = releasedRect !== null;
 
   return (
     <div
-      ref={overlayRef}
       role="presentation"
       aria-hidden
+      className="echly-region-overlay"
       style={{ position: "fixed", inset: 0, zIndex: 2147483647, userSelect: "none" }}
     >
-      {/* Overlay: dim only, no blur. Blocks page clicks. Fade out during exit. */}
       <div
-        id={OVERLAY_ID}
+        className="echly-region-overlay-dim"
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(0, 0, 0, 0.08)",
-          pointerEvents: isExiting ? "none" : "auto",
+          background: "rgba(0,0,0,0.06)",
+          pointerEvents: overlayVisible ? "auto" : "none",
           cursor: "crosshair",
           zIndex: 2147483646,
-          opacity: isExiting ? 0 : overlayVisible ? 1 : 0,
-          transition: isExiting ? `opacity ${CAPTURE_TRANSITION_MS}ms ${CAPTURE_EASE}` : "opacity 120ms ease",
+          opacity: overlayVisible ? 1 : 0,
+          transition: `opacity ${ECHLY_MOTION}`,
         }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
@@ -245,73 +239,45 @@ export function RegionCaptureOverlay({
         }}
       />
 
-      {/* Drag selection rectangle */}
       {showSelection && selectionRect && (
         <div
+          className="echly-region-selection-box"
           style={{
             position: "fixed",
             left: selectionRect.x,
             top: selectionRect.y,
             width: Math.max(selectionRect.w, 1),
             height: Math.max(selectionRect.h, 1),
-            border: "2px solid #3B82F6",
-            borderRadius: 8,
-            boxShadow: "0 0 0 9999px rgba(0,0,0,0.08)",
+            border: "1px solid rgba(255,255,255,0.9)",
+            borderRadius: 4,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
             pointerEvents: "none",
             zIndex: 2147483646,
             opacity: overlayVisible ? 1 : 0,
+            animation: "echly-selection-fade-in 100ms ease-out",
           }}
         />
       )}
 
-      {/* Exiting: selection → widget transition (white pulse, scale 0.95, move to origin, fade) */}
-      {isExiting && exitingRect && exitTarget && (
+      {showReleased && releasedRect && (
         <div
-          className="echly-capture-exit-selection"
+          className="echly-region-released-pulse"
           style={{
             position: "fixed",
-            left: exitingRect.x,
-            top: exitingRect.y,
-            width: exitingRect.w,
-            height: exitingRect.h,
-            transformOrigin: "50% 50%",
-            border: "2px solid rgba(255,255,255,0.9)",
-            borderRadius: 8,
-            boxShadow: "0 0 0 9999px rgba(0,0,0,0.08), 0 0 24px rgba(255,255,255,0.25)",
+            left: releasedRect.x,
+            top: releasedRect.y,
+            width: releasedRect.w,
+            height: releasedRect.h,
+            border: "1px solid rgba(255,255,255,0.95)",
+            borderRadius: 4,
+            boxShadow: "0 0 0 1px rgba(255,255,255,0.2), 0 4px 24px rgba(0,0,0,0.12)",
             pointerEvents: "none",
             zIndex: 2147483647,
-            transition: `transform ${CAPTURE_TRANSITION_MS}ms ${CAPTURE_EASE}, opacity ${CAPTURE_TRANSITION_MS}ms ${CAPTURE_EASE}`,
-            transform:
-              exitPhase === 1
-                ? `translate(${exitTarget.x - (exitingRect.x + exitingRect.w / 2)}px, ${exitTarget.y - (exitingRect.y + exitingRect.h / 2)}px) scale(0.95)`
-                : "scale(0.95)",
-            opacity: exitPhase === 1 ? 0 : 1,
+            transition: `transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1)`,
+            transform: pulseDone ? "scale(1)" : "scale(0.98)",
           }}
         />
       )}
-
-      {/* Tooltip */}
-      <div
-        id={TOOLTIP_ID}
-        style={{
-          position: "fixed",
-          left: tooltipPos.x,
-          top: tooltipPos.y,
-          padding: "8px 14px",
-          borderRadius: 9999,
-          background: "rgba(0,0,0,0.75)",
-          color: "#fff",
-          fontSize: "13px",
-          fontFamily: "system-ui, -apple-system, sans-serif",
-          whiteSpace: "nowrap",
-          pointerEvents: "none",
-          zIndex: 2147483647,
-          transition: "opacity 150ms ease",
-          transform: "translateY(-50%)",
-        }}
-      >
-        Drag to select • ESC to cancel
-      </div>
     </div>
   );
 }

@@ -30,14 +30,15 @@ export interface Recording {
   createdAt: number;
 }
 
+/** Explicit capture flow state machine. */
 export type CaptureState =
   | "idle"
-  | "capturing"
-  | "listening"
+  | "focus_mode"
+  | "region_selecting"
+  | "voice_listening"
   | "processing"
-  | "processing-structure"
-  | "saving-feedback"
-  | "anticipation"
+  | "success"
+  | "cancelled"
   | "error";
 
 export type CaptureWidgetProps = {
