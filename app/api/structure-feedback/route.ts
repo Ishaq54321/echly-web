@@ -107,22 +107,22 @@ type StructureResponse = {
 
 function parseStructuredTickets(
   content: string | null | undefined
-): { tickets: Array<Record<string, unknown>> } {
-  const empty = { tickets: [] as Array<Record<string, unknown>> };
-  if (content == null || typeof content !== "string") return empty;
-  const trimmed = content.replace(/```json/g, "").replace(/```/g, "").trim();
-  if (!trimmed) return empty;
+): Array<Record<string, unknown>> {
+  if (!content || typeof content !== "string") return [];
+
+  const cleaned = content.replace(/```json/g, "").replace(/```/g, "").trim();
+  if (!cleaned) return [];
+
   try {
-    const parsed = JSON.parse(trimmed);
-    if (!parsed || typeof parsed !== "object") return empty;
-    if (!Array.isArray(parsed.tickets)) {
-      console.error("STRUCTURING: parsed.tickets is not an array", parsed);
-      return empty;
-    }
-    return { tickets: parsed.tickets };
+    const parsed = JSON.parse(cleaned);
+    if (!parsed || typeof parsed !== "object") return [];
+
+    if (!Array.isArray(parsed.tickets)) return [];
+
+    return parsed.tickets;
   } catch (e) {
-    console.error("STRUCTURING: JSON parse failed", e);
-    return empty;
+    console.error("STRUCTURE PARSE ERROR:", e);
+    return [];
   }
 }
 
@@ -198,16 +198,10 @@ export async function POST(req: Request): Promise<Response> {
     });
 
     const content = completion.choices[0]?.message?.content;
-    const { tickets: parsedTickets } = parseStructuredTickets(content);
-    if (!Array.isArray(parsedTickets)) {
-      console.error("STRUCTURING: parsedTickets is not an array", parsedTickets);
-      return NextResponse.json({ success: true, tickets: [] });
-    }
+    const parsedTickets = parseStructuredTickets(content);
 
     const valid = parsedTickets
-      .filter(
-        (t: Record<string, unknown>) => t && typeof t.title === "string"
-      )
+      .filter((t: Record<string, unknown>) => t && typeof t.title === "string")
       .map((t: Record<string, unknown>) => {
         return {
           title: t.title as string,
