@@ -458,6 +458,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         }
         if (firstCreated) {
+          console.log("[SUCCESS] Sending response to content");
           sendResponse({ success: true, ticket: firstCreated });
           chrome.tabs.query({}, (tabs) => {
             tabs.forEach((tab) => {

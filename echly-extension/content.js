@@ -42837,7 +42837,6 @@ ${this.customData.serverResponse}`;
     return `rec-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   }
   var RECORDING_STATES = ["capturing", "listening", "processing", "anticipation"];
-  var PROCESSING_MIN_MS = 1200;
   var LIVE_STRUCTURE_DEBOUNCE_MS = 1800;
   var LIVE_STRUCTURE_MIN_LENGTH = 12;
   function useCaptureWidget({
@@ -42878,7 +42877,6 @@ ${this.customData.serverResponse}`;
     const editingIdRef = (0, import_react3.useRef)(null);
     const trayLockedRef = (0, import_react3.useRef)(false);
     const liveStructureTimeoutRef = (0, import_react3.useRef)(null);
-    const processingStartRef = (0, import_react3.useRef)(null);
     (0, import_react3.useEffect)(() => {
       stateRef.current = state;
     }, [state]);
@@ -43085,23 +43083,16 @@ ${this.customData.serverResponse}`;
         return;
       }
       setState("processing");
-      processingStartRef.current = Date.now();
       if (extensionMode) {
         onComplete(active.transcript, active.screenshot, {
-          onSuccess: (structured) => {
-            const elapsed = Date.now() - (processingStartRef.current ?? 0);
-            const delay = Math.max(0, PROCESSING_MIN_MS - elapsed);
-            const applySuccess = () => {
-              setRecordings(
-                (prev) => prev.map(
-                  (r) => r.id === activeId ? { ...r, structuredOutput: structured } : r
-                )
-              );
-              setPendingStructured(structured);
-              setState("anticipation");
-            };
-            if (delay > 0) setTimeout(applySuccess, delay);
-            else applySuccess();
+          onSuccess: (ticket) => {
+            setPointers((prev) => [
+              { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
+              ...prev
+            ]);
+            setRecordings((prev) => prev.filter((r) => r.id !== activeId));
+            setActiveRecordingId(null);
+            setState("idle");
           },
           onError: () => {
             setErrorMessage("AI processing failed.");
@@ -44412,16 +44403,17 @@ ${this.customData.serverResponse}`;
             },
             (response) => {
               if (chrome.runtime.lastError) {
-                console.error("[Echly] Processing failed (runtime):", chrome.runtime.lastError.message);
-                callbacks.onError();
+                console.error("Runtime error", chrome.runtime.lastError);
+                callbacks?.onError();
                 return;
               }
               if (!response?.success || !response.ticket) {
-                console.error("[Echly] Processing failed:", response?.error ?? "No success or ticket");
-                callbacks.onError();
+                console.error("No success in response", response);
+                callbacks?.onError();
                 return;
               }
-              callbacks.onSuccess({
+              console.log("[CONTENT] Ticket received:", response.ticket);
+              callbacks?.onSuccess({
                 id: response.ticket.id,
                 title: response.ticket.title,
                 description: response.ticket.description,

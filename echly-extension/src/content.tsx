@@ -173,16 +173,17 @@ function ContentApp() {
           },
           (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
             if (chrome.runtime.lastError) {
-              console.error("[Echly] Processing failed (runtime):", chrome.runtime.lastError.message);
-              callbacks.onError();
+              console.error("Runtime error", chrome.runtime.lastError);
+              callbacks?.onError();
               return;
             }
             if (!response?.success || !response.ticket) {
-              console.error("[Echly] Processing failed:", response?.error ?? "No success or ticket");
-              callbacks.onError();
+              console.error("No success in response", response);
+              callbacks?.onError();
               return;
             }
-            callbacks.onSuccess({
+            console.log("[CONTENT] Ticket received:", response.ticket);
+            callbacks?.onSuccess({
               id: response.ticket.id,
               title: response.ticket.title,
               description: response.ticket.description,
