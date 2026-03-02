@@ -15,6 +15,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+// STEP 4 — Verify Firestore project (remove after diagnosis)
+if (typeof window !== "undefined") {
+  console.log("Firebase projectId (local/vercel):", app.options.projectId);
+}
+
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);

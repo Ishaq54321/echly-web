@@ -159,6 +159,10 @@ export default function SessionPage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      console.log("🔥 AUTH STATE (LOCAL CHECK):", {
+        uid: currentUser?.uid ?? null,
+        email: currentUser?.email ?? null,
+      });
       if (currentUser === undefined) return;
       if (!currentUser) {
         clearAuthTokenCache();
