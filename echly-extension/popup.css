@@ -688,9 +688,6 @@
   .animate-\[echly-title-fade-in_300ms_ease-out_forwards\] {
     animation: echly-title-fade-in 300ms ease-out forwards;
   }
-  .animate-pulse {
-    animation: var(--animate-pulse);
-  }
   .cursor-default {
     cursor: default;
   }
@@ -998,12 +995,6 @@
   .bg-brand-accent {
     background-color: var(--color-brand-accent);
   }
-  .bg-brand-accent\/60 {
-    background-color: color-mix(in srgb, #2563EB 60%, transparent);
-    @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in oklab, var(--color-brand-accent) 60%, transparent);
-    }
-  }
   .bg-brand-primary {
     background-color: var(--color-brand-primary);
   }
@@ -1098,12 +1089,6 @@
     background-color: color-mix(in srgb, oklch(98.4% 0.003 247.858) 80%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--color-slate-50) 80%, transparent);
-    }
-  }
-  .bg-slate-100\/80 {
-    background-color: color-mix(in srgb, oklch(96.8% 0.007 247.896) 80%, transparent);
-    @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in oklab, var(--color-slate-100) 80%, transparent);
     }
   }
   .bg-transparent {
@@ -2228,7 +2213,6 @@ textarea:focus-visible {
   opacity: 0;
   pointer-events: none;
 }
-/* Floating voice pill — bottom center */
 .echly-voice-pill {
   position: fixed;
   left: 50%;
@@ -2314,7 +2298,6 @@ textarea:focus-visible {
 .echly-voice-pill-done:active {
   transform: scale(0.98);
 }
-
 .echly-mic-orb-wrapper {
   width: 80px;
   height: 80px;

@@ -94,9 +94,12 @@ export function useCaptureWidget({
   const [highlightTicketId, setHighlightTicketId] = useState<string | null>(null);
   /** When true, pill is fading out before we restore the widget. */
   const [pillExiting, setPillExiting] = useState(false);
+  /** When true, #echly-capture-root exists and capture UI is portaled into it. */
+  const [captureRootReady, setCaptureRootReady] = useState(false);
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
+  const captureRootRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const timerRef = useRef<any>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -290,6 +293,32 @@ export function useCaptureWidget({
     setPosition({ x: rect.left, y: rect.top });
   }, []);
 
+  /** Create #echly-capture-root and append to body. Call on Add Feedback. */
+  const createCaptureRoot = useCallback(() => {
+    if (captureRootRef.current) return;
+    const el = document.createElement("div");
+    el.id = "echly-capture-root";
+    document.body.appendChild(el);
+    captureRootRef.current = el;
+    setCaptureRootReady(true);
+  }, []);
+
+  /** Remove #echly-capture-root from body. Call on ESC, success, or error. */
+  const removeCaptureRoot = useCallback(() => {
+    if (!captureRootRef.current) return;
+    try {
+      document.body.removeChild(captureRootRef.current);
+    } catch (_) {}
+    captureRootRef.current = null;
+    setCaptureRootReady(false);
+  }, []);
+
+  /** Restore widget visibility and open state (call after removeCaptureRoot). */
+  const restoreWidget = useCallback(() => {
+    setCaptureModeMinimized(false);
+    setIsOpenState(widgetOpenBeforeCapture);
+  }, [widgetOpenBeforeCapture]);
+
   /* ================= SYNC / LOAD SESSION FEEDBACK ================= */
 
   useEffect(() => {
@@ -426,15 +455,15 @@ export function useCaptureWidget({
           setTimeout(() => setHighlightTicketId(null), 1200);
           setTimeout(() => {
             setPillExiting(false);
-            setCaptureModeMinimized(false);
-            setIsOpenState(widgetOpenBeforeCapture);
+            removeCaptureRoot();
+            restoreWidget();
           }, 220);
         },
         onError: () => {
           setErrorMessage("AI processing failed.");
           setState("error");
-          setCaptureModeMinimized(false);
-          setIsOpenState(widgetOpenBeforeCapture);
+          removeCaptureRoot();
+          restoreWidget();
         },
       }, active.context ?? undefined);
       return;
@@ -443,6 +472,8 @@ export function useCaptureWidget({
       const structured = await onComplete(active.transcript, active.screenshot);
       if (!structured) {
         setState("idle");
+        removeCaptureRoot();
+        restoreWidget();
         return;
       }
       setRecordings((prev) =>
@@ -456,10 +487,12 @@ export function useCaptureWidget({
       console.error(err);
       setErrorMessage("AI processing failed.");
       setState("error");
+      removeCaptureRoot();
+      restoreWidget();
     }
-  }, [onComplete, extensionMode, widgetOpenBeforeCapture]);
+  }, [onComplete, extensionMode, widgetOpenBeforeCapture, removeCaptureRoot, restoreWidget]);
 
-  /* Anticipation: 160ms pause then show result */
+  /* Anticipation (web): 160ms pause then show result, remove capture root, restore widget */
   useEffect(() => {
     if (state !== "anticipation" || !pendingStructured) return;
     const t = setTimeout(() => {
@@ -475,9 +508,11 @@ export function useCaptureWidget({
       setPendingStructured(null);
       setActiveRecordingId(null);
       setState("idle");
+      removeCaptureRoot();
+      restoreWidget();
     }, 160);
     return () => clearTimeout(t);
-  }, [state, pendingStructured]);
+  }, [state, pendingStructured, removeCaptureRoot, restoreWidget]);
 
   const discardListening = useCallback(() => {
     recognitionRef.current?.stop();
@@ -486,15 +521,13 @@ export function useCaptureWidget({
     setRecordings((prev) => prev.filter((r) => r.id !== activeId));
     setActiveRecordingId(null);
     setState("idle");
-    if (extensionMode) {
-      setCaptureModeMinimized(false);
-      setIsOpenState(widgetOpenBeforeCapture);
-    }
-  }, [extensionMode, widgetOpenBeforeCapture]);
+    removeCaptureRoot();
+    restoreWidget();
+  }, [removeCaptureRoot, restoreWidget]);
 
-  /** Extension + floating capture: ESC during listening cancels and restores widget. */
+  /** ESC during listening (any mode) cancels capture and restores widget. */
   useEffect(() => {
-    if (!extensionMode || !captureModeMinimized || state !== "listening") return;
+    if (!captureModeMinimized || state !== "listening") return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -503,7 +536,7 @@ export function useCaptureWidget({
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [extensionMode, captureModeMinimized, state, discardListening]);
+  }, [captureModeMinimized, state, discardListening]);
 
   /* ================= SHARE ================= */
 
@@ -631,31 +664,33 @@ export function useCaptureWidget({
     [startListening]
   );
 
-  /** Extension only: cancel region capture mode (Escape or invalid selection). Restore widget. */
+  /** Extension only: cancel region capture mode (Escape or invalid selection). Remove root, restore widget. */
   const handleCancelCapture = useCallback(() => {
+    removeCaptureRoot();
     setState("idle");
-    setCaptureModeMinimized(false);
-    setIsOpenState(widgetOpenBeforeCapture);
-  }, [widgetOpenBeforeCapture]);
+    restoreWidget();
+  }, [removeCaptureRoot, restoreWidget]);
 
   const handleAddFeedback = useCallback(async () => {
     if (stateRef.current !== "idle") return;
     setErrorMessage(null);
     recognitionRef.current?.stop();
+    setWidgetOpenBeforeCapture(isOpen);
+    setCaptureModeMinimized(true);
+    setIsOpenState(false);
+    createCaptureRoot();
     if (extensionMode) {
-      setWidgetOpenBeforeCapture(isOpen);
-      setCaptureModeMinimized(true);
-      setIsOpenState(false);
       setState("capturing");
       return;
     }
-    setIsOpen(true);
     setState("capturing");
     try {
       const image = await captureScreenshot();
       if (!image) {
+        removeCaptureRoot();
         setState("idle");
         setErrorMessage("Capture cancelled.");
+        restoreWidget();
         return;
       }
       const id = generateRecordingId();
@@ -673,8 +708,18 @@ export function useCaptureWidget({
       console.error(err);
       setErrorMessage("Screen capture failed.");
       setState("error");
+      removeCaptureRoot();
+      restoreWidget();
     }
-  }, [extensionMode, isOpen, captureScreenshot, startListening]);
+  }, [
+    extensionMode,
+    isOpen,
+    captureScreenshot,
+    startListening,
+    createCaptureRoot,
+    removeCaptureRoot,
+    restoreWidget,
+  ]);
 
   const handlers = useMemo(
     () => ({
@@ -758,6 +803,8 @@ export function useCaptureWidget({
     refs: {
       widgetRef,
       menuRef,
+      captureRootRef,
     },
+    captureRootReady,
   };
 }
