@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { MicOrb } from "./MicOrb";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { RecordingMicOrb } from "./RecordingMicOrb";
 
 export type RecordingCapsuleProps = {
   visible: boolean;
@@ -15,18 +15,30 @@ export type RecordingCapsuleProps = {
   onCancel: () => void;
 };
 
+const LINE_HEIGHT = 1.4;
+const FONT_SIZE = 14;
+const MAX_LINES_MASK = 3;
+const APPROX_CHARS_PER_LINE = 36;
+
+function estimateLineCount(text: string, maxWidth: number = 320): number {
+  if (!text.trim()) return 1;
+  const chars = text.length;
+  const pxPerChar = FONT_SIZE * 0.6;
+  const charsPerLine = Math.floor(maxWidth / pxPerChar);
+  return Math.max(1, Math.ceil(chars / charsPerLine));
+}
+
 export function RecordingCapsule({
   visible,
   isActive,
   isProcessing,
   isExiting = false,
-  audioLevel,
-  sentiment,
   liveTranscript = "",
   onDone,
   onCancel,
 }: RecordingCapsuleProps) {
   const [expanded, setExpanded] = useState(false);
+  const transcriptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isActive || isProcessing) {
@@ -44,6 +56,17 @@ export function RecordingCapsule({
     if (t) return t;
     return "Listening…";
   }, [isProcessing, liveTranscript]);
+
+  const lineCount = useMemo(
+    () => (expanded ? estimateLineCount(transcriptText, 320) : 1),
+    [expanded, transcriptText]
+  );
+  const linesClass =
+    lineCount >= MAX_LINES_MASK
+      ? "echly-recording-capsule--lines-3"
+      : lineCount >= 2
+        ? "echly-recording-capsule--lines-2"
+        : "";
 
   if (!visible) return null;
 
@@ -66,25 +89,21 @@ export function RecordingCapsule({
           expanded ? "echly-recording-capsule--expanded" : "",
           isProcessing ? "echly-recording-capsule--processing" : "",
           isExiting ? "echly-recording-capsule--exiting" : "",
+          linesClass,
         ]
           .filter(Boolean)
           .join(" ")}
       >
         <div className="echly-recording-orb">
-          <MicOrb
-            isSpeaking={isActive && audioLevel > 0.12}
-            audioLevel={audioLevel}
-            isProcessing={isProcessing}
-            isExiting={isExiting}
-            sentiment={sentiment}
-            size={expanded ? 56 : 56}
-          />
+          <RecordingMicOrb isRecording={isActive} isProcessing={isProcessing} />
         </div>
 
-        <div className="echly-recording-transcript">
+        <div className="echly-recording-transcript" ref={transcriptRef}>
           <span className="echly-recording-text">
             {transcriptText}
-            {isProcessing && <span className="echly-capsule-underline" aria-hidden />}
+            {isProcessing && (
+              <span className="echly-recording-underline" aria-hidden />
+            )}
           </span>
         </div>
 
@@ -102,4 +121,3 @@ export function RecordingCapsule({
     </div>
   );
 }
-
