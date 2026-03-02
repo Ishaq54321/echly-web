@@ -32,12 +32,6 @@ function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
   } catch {}
 }
 
-function normalizePriority(s: string | undefined): "low" | "medium" | "high" | "critical" {
-  const v = (s ?? "medium").toLowerCase();
-  if (v === "low" || v === "medium" || v === "high" || v === "critical") return v;
-  return "medium";
-}
-
 type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
 
 type GlobalUIState = { visible: boolean; expanded: boolean; isRecording: boolean; sessionId: string | null };
@@ -251,11 +245,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         success?: boolean;
         tickets?: Array<{
           title?: string;
-          contextSummary?: string;
+          description?: string;
           suggestedTags?: string[];
-          actionItems?: string[];
-          impact?: string | null;
-          suggestedPriority?: string;
+          actionSteps?: string[];
         }>;
         error?: string;
       };
@@ -271,16 +263,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
       for (let i = 0; i < tickets.length; i++) {
         const t = tickets[i];
+        const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
         const body = {
           sessionId: effectiveSessionId,
           title: t.title ?? "",
-          description: t.contextSummary ?? t.title ?? "",
+          description: desc,
           type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-          contextSummary: t.contextSummary ?? null,
-          actionItems: t.actionItems ?? [],
-          impact: t.impact ?? null,
+          contextSummary: desc,
+          actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
           suggestedTags: t.suggestedTags,
-          priority: normalizePriority(t.suggestedPriority),
           screenshotUrl: i === 0 ? screenshotUrl : null,
           metadata: { clientTimestamp: Date.now() },
         };
@@ -324,15 +315,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           tickets?: Array<{
             title?: string;
             suggestedTags?: string[];
-            suggestedPriority?: string;
           }>;
         };
         if (!data.success || !Array.isArray(data.tickets) || data.tickets.length === 0) return null;
         const t = data.tickets[0];
         const title = typeof t.title === "string" ? t.title : "";
         const tags = Array.isArray(t.suggestedTags) ? t.suggestedTags : [];
-        const priority = typeof t.suggestedPriority === "string" ? t.suggestedPriority.toLowerCase() : "medium";
-        return { title, tags, priority };
+        return { title, tags, priority: "medium" };
       } catch {
         return null;
       }

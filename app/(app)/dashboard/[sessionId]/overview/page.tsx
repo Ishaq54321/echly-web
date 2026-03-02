@@ -42,14 +42,6 @@ function formatActivityTime(date: Date | null): string {
   return date.toLocaleDateString(undefined, { dateStyle: "short" });
 }
 
-function impactColor(impact: string | null | undefined): string {
-  if (!impact) return "bg-neutral-200";
-  const v = impact.toLowerCase();
-  if (v === "high" || v === "critical") return "bg-amber-500/30";
-  if (v === "medium") return "bg-sky-500/20";
-  return "bg-neutral-200";
-}
-
 function resolutionLabel(isResolved: boolean): string {
   return isResolved ? "Done" : "Open";
 }
@@ -147,10 +139,6 @@ function FeedbackPreviewRow({
 }) {
   return (
     <div className="flex items-center gap-3 py-2 border-b border-neutral-100 last:border-0">
-      <div
-        className={`w-0.5 h-8 shrink-0 rounded-sm ${impactColor(item.impact)}`}
-        aria-hidden
-      />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-[hsl(var(--text-primary))] truncate">
           {item.title}
@@ -203,40 +191,6 @@ function StatusSection({
       </div>
       <Link
         href={viewAllHref}
-        className="text-xs font-medium text-[hsl(var(--text-active))] mt-1.5 inline-block cursor-pointer hover:underline"
-      >
-        View all →
-      </Link>
-    </section>
-  );
-}
-
-// ----- High impact -----
-function HighImpactSection({
-  items,
-  sessionId,
-}: {
-  items: Feedback[];
-  sessionId: string;
-}) {
-  return (
-    <section>
-      <h3 className="text-xs uppercase tracking-wide text-[hsl(var(--text-muted))] mb-2">
-        High Priority Issues
-      </h3>
-      <div className="rounded-md border border-neutral-200 bg-white divide-y divide-neutral-100">
-        {items.length === 0 ? (
-          <p className="text-sm text-[hsl(var(--text-muted))] py-3 px-3">
-            No high-impact items
-          </p>
-        ) : (
-          items.map((item) => (
-            <FeedbackPreviewRow key={item.id} item={item} showStatus />
-          ))
-        )}
-      </div>
-      <Link
-        href={`/dashboard/${sessionId}`}
         className="text-xs font-medium text-[hsl(var(--text-active))] mt-1.5 inline-block cursor-pointer hover:underline"
       >
         View all →
@@ -365,7 +319,7 @@ export default function SessionOverviewPage() {
     return null;
   }
 
-  const { countsByStatus, totalCount, statusPreview, highImpact, recentActivity, tagCounts } = data;
+  const { countsByStatus, totalCount, statusPreview, recentActivity, tagCounts } = data;
   const doneCount = countsByStatus.resolved;
   const completionPercent = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
@@ -407,7 +361,6 @@ export default function SessionOverviewPage() {
                 viewAllHref={`/dashboard/${sessionId}`}
               />
             </div>
-            <HighImpactSection items={highImpact} sessionId={sessionId} />
           </div>
 
           <div className="space-y-6">

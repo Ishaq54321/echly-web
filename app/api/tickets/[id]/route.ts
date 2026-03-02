@@ -57,7 +57,7 @@ export async function GET(
   }
 }
 
-/** PATCH /api/tickets/:id — update ticket; body: { title?, description?, actionItems? }. */
+/** PATCH /api/tickets/:id — update ticket; body: { title?, description?, actionSteps?, suggestedTags?, isResolved? }. */
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -77,7 +77,7 @@ export async function PATCH(
       { status: 400 }
     );
   }
-  let body: { title?: string; description?: string; actionItems?: string[]; suggestedTags?: string[]; isResolved?: boolean };
+  let body: { title?: string; description?: string; actionSteps?: string[]; suggestedTags?: string[]; isResolved?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -102,7 +102,7 @@ export async function PATCH(
   const updates: Parameters<typeof updateFeedbackRepo>[1] = {};
   if (typeof body.title === "string") updates.title = body.title;
   if (typeof body.description === "string") updates.description = body.description;
-  if (Array.isArray(body.actionItems)) updates.actionItems = body.actionItems;
+  if (Array.isArray(body.actionSteps)) updates.actionSteps = body.actionSteps;
   if (Array.isArray(body.suggestedTags)) updates.suggestedTags = body.suggestedTags;
   if (typeof body.isResolved === "boolean") updates.isResolved = body.isResolved;
 

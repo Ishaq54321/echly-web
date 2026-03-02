@@ -19,7 +19,7 @@ interface FeedbackContentProps {
   saveDescription: () => void | Promise<void>;
   isSavingDescription?: boolean;
   saveDescriptionSuccess?: boolean;
-  onSaveActionItems?: (actionItems: string[]) => Promise<void>;
+  onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
   onSaveTags?: (suggestedTags: string[]) => Promise<void>;
   onExpandImage: () => void;
 }
@@ -33,11 +33,11 @@ export function FeedbackContent({
   saveDescription,
   isSavingDescription,
   saveDescriptionSuccess,
-  onSaveActionItems,
+  onSaveActionSteps,
   onSaveTags,
   onExpandImage,
 }: FeedbackContentProps) {
-  const actionItems = Array.isArray(item.actionItems) ? item.actionItems : [];
+  const actionSteps = Array.isArray(item.actionSteps) ? item.actionSteps : [];
   const tags = Array.isArray(item.suggestedTags) ? item.suggestedTags : [];
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [dropdownAnimate, setDropdownAnimate] = useState(false);
@@ -103,17 +103,17 @@ export function FeedbackContent({
       {item.suggestion != null && item.suggestion !== "" && (
         <SuggestionSection suggestion={item.suggestion} />
       )}
-      {onSaveActionItems ? (
+      {onSaveActionSteps ? (
         <ActionItemsSection
-          actionItems={actionItems}
-          onSave={onSaveActionItems}
+          actionSteps={actionSteps}
+          onSave={onSaveActionSteps}
           isResolved={item.isResolved ?? false}
         />
       ) : (
-        actionItems.length > 0 && (
-          <Section title="Decisions" titleSemantic="attention">
+        actionSteps.length > 0 && (
+          <Section title="ACTION STEPS" titleSemantic="attention">
             <ul className="list-none space-y-2 p-0 m-0">
-              {actionItems.map((action, i) => (
+              {actionSteps.map((action, i) => (
                 <li key={i} className="font-mono text-[13px] text-neutral-900 bg-neutral-100 px-2 py-1 rounded-md inline-block">
                   {action}
                 </li>
@@ -121,11 +121,6 @@ export function FeedbackContent({
             </ul>
           </Section>
         )
-      )}
-      {item.impact && (
-        <Section title="Impact">
-          <p>{item.impact}</p>
-        </Section>
       )}
       {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (
         <Section title="Tags" titleMuted>

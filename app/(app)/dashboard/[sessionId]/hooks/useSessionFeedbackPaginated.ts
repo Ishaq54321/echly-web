@@ -110,17 +110,7 @@ export function useSessionFeedbackPaginated(
 
   // Initial load: first page when sessionId becomes available.
   useEffect(() => {
-    if (!sessionId) {
-      setItems([]);
-      setTotal(0);
-      setActiveCount(0);
-      setResolvedCount(0);
-      setCursor(null);
-      setHasMore(true);
-      setInitialLoadDone(false);
-      setInitialLoading(false);
-      return;
-    }
+    if (!sessionId) return;
 
     const sessionLoadStart = performance.now();
     console.log("[Session load] Session feedback fetch started", { sessionId });

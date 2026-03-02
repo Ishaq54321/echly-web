@@ -32,77 +32,71 @@ function checkRateLimit(uid: string): boolean {
   return true;
 }
 
-const ADAPTIVE_STRUCTURE_SYSTEM = `You are Echly's Adaptive Structuring Engine. Your job is to intelligently adjust output depth based on feedback complexity.
+const STRUCTURE_ENGINE_V2 = `
+You are Echly's Feedback Structuring Engine.
 
-MODE SELECTION (choose one for the entire response)
+Your job is to transform raw spoken feedback into structured, minimal, professional tickets.
 
-LIGHT MODE (default): Use for short, simple, single-issue feedback.
-FULL MODE: Use when ANY of the following apply:
-- Mentions errors, crashes, failures, blocking issues.
-- Includes words like "not working", "can't", "broken", "error", "fails", "blocking".
-- Contains multiple distinct issues.
-- Is longer than ~25 words.
-- Mentions checkout, login, onboarding, payment, conversion.
-- Mentions performance problems.
-- Expresses urgency.
+CORE PRINCIPLES
+- Do NOT assume anything not explicitly stated.
+- Do NOT add improvements, suggestions, or UX advice.
+- Do NOT infer intent beyond the provided text.
+- Do NOT exaggerate severity.
+- Do NOT generate impact, priority, or explanations.
+- Only structure what the user clearly said.
 
-RULES
-- Split multiple issues into separate tickets. Never merge unrelated problems.
-- No filler. No conversational tone. Output structured content only.
-- Do not mention which mode you used in the output.
+If input is empty or unclear, return empty tickets.
 
-LIGHT MODE output (per ticket):
-- Title: Clear professional rewrite.
-- Actions: Concise bullet points (actionItems array).
-- Tag: 1–2 relevant tags (suggestedTags). No impact. No priority.
+TITLE RULES
+- 4–8 words maximum.
+- Extremely clear and scannable.
+- Must describe the core change or issue.
+- No filler words.
+- No repetition of full description.
+- No generic phrases like "Improve UX".
 
-FULL MODE output (per ticket):
-- Title: Clear and scoped.
-- Context Summary: 1–2 sentences.
-- Action Items: Specific bullets.
-- Impact: Why this matters.
-- Suggested Priority: Exactly one of: Low, Medium, High, Critical.
-- Suggested Tags: 2–5 relevant tags.
+DESCRIPTION RULES
+- Exactly 1 short sentence.
+- Slightly clearer than title.
+- No invented context.
+- No assumptions.
+- Keep under 20 words if possible.
 
-PRIORITY (FULL MODE ONLY)
-- CRITICAL: Core functionality broken; users cannot proceed; errors; data loss or security risk; blocking.
-- HIGH: Major feature impaired; strong negative UX; conversion-impacting; affects many users.
-- MEDIUM: Noticeable UX flaw; design inconsistency; performance degradation but not blocking.
-- LOW: Minor cosmetic; microcopy; non-urgent enhancement.
-Do not default to Medium. Do not inflate severity. If ambiguous, choose the lower reasonable severity.
+ACTION STEPS RULES
+- Based ONLY on explicit instructions.
+- One action per distinct instruction.
+- If user mentions 3 changes → return 3 actionSteps.
+- If user mentions 1 change → return 1 actionStep.
+- Keep each action step to 1 concise sentence.
+- No "investigate" unless user clearly says something is unclear.
 
-Allowed suggestedTags: UX, Bug, Performance, Accessibility, Copy, Visual Hierarchy, Interaction, Responsive, Backend, Data, Blocking.
+SPLITTING RULE
+If the user describes clearly separate unrelated issues, split into multiple tickets.
+Otherwise keep as one ticket.
 
-Return ONLY valid JSON. No markdown, no code fence.
+ALLOWED TAGS
+UX, Bug, Performance, Accessibility, Copy, Visual Hierarchy, Interaction, Responsive, Backend, Data
 
-LIGHT MODE response shape:
+Use only 1–3 relevant tags.
+If unsure, choose fewer.
+
+RESPONSE FORMAT (JSON only)
+
 {
-  "mode": "light",
   "tickets": [
     {
-      "title": "Clear professional title",
-      "actionItems": ["Action one", "Action two"],
-      "suggestedTags": ["Tag1", "Tag2"]
+      "title": "Short clear title",
+      "description": "One sentence summary.",
+      "actionSteps": ["Step one.", "Step two."],
+      "suggestedTags": ["UX"]
     }
   ]
 }
 
-FULL MODE response shape:
-{
-  "mode": "full",
-  "tickets": [
-    {
-      "title": "Clear, scoped title",
-      "contextSummary": "1-2 sentences.",
-      "actionItems": ["Specific action"],
-      "impact": "Why this matters.",
-      "suggestedPriority": "Low|Medium|High|Critical",
-      "suggestedTags": ["Tag1", "Tag2"]
-    }
-  ]
-}
-
-If the input is empty or unintelligible, return: { "mode": "light", "tickets": [] }`;
+Return ONLY valid JSON.
+No markdown.
+No explanation.
+`;
 
 /** Stable response shape. Never return {} or raw AI output. */
 type StructureResponse = {
@@ -113,8 +107,8 @@ type StructureResponse = {
 
 function parseStructuredTickets(
   content: string | null | undefined
-): { mode: "light" | "full"; tickets: Array<Record<string, unknown>> } {
-  const empty = { mode: "light" as const, tickets: [] as Array<Record<string, unknown>> };
+): { tickets: Array<Record<string, unknown>> } {
+  const empty = { tickets: [] as Array<Record<string, unknown>> };
   if (content == null || typeof content !== "string") return empty;
   const trimmed = content.replace(/```json/g, "").replace(/```/g, "").trim();
   if (!trimmed) return empty;
@@ -125,8 +119,7 @@ function parseStructuredTickets(
       console.error("STRUCTURING: parsed.tickets is not an array", parsed);
       return empty;
     }
-    const mode = parsed.mode === "full" ? "full" : "light";
-    return { mode, tickets: parsed.tickets };
+    return { tickets: parsed.tickets };
   } catch (e) {
     console.error("STRUCTURING: JSON parse failed", e);
     return empty;
@@ -199,13 +192,13 @@ export async function POST(req: Request): Promise<Response> {
       model: "gpt-4o-mini",
       temperature: 0.2,
       messages: [
-        { role: "system", content: ADAPTIVE_STRUCTURE_SYSTEM },
+        { role: "system", content: STRUCTURE_ENGINE_V2 },
         { role: "user", content: userContent },
       ],
     });
 
     const content = completion.choices[0]?.message?.content;
-    const { mode, tickets: parsedTickets } = parseStructuredTickets(content);
+    const { tickets: parsedTickets } = parseStructuredTickets(content);
     if (!Array.isArray(parsedTickets)) {
       console.error("STRUCTURING: parsedTickets is not an array", parsedTickets);
       return NextResponse.json({ success: true, tickets: [] });
@@ -216,40 +209,18 @@ export async function POST(req: Request): Promise<Response> {
         (t: Record<string, unknown>) => t && typeof t.title === "string"
       )
       .map((t: Record<string, unknown>) => {
-        const title = t.title as string;
-        const actionItems = Array.isArray(t.actionItems)
-          ? (t.actionItems as string[])
-          : [];
-        const suggestedTags = Array.isArray(t.suggestedTags)
-          ? (t.suggestedTags as string[])
-          : [];
-
-        if (mode === "light") {
-          return {
-            title,
-            contextSummary: title,
-            actionItems,
-            impact: null as string | null,
-            suggestedPriority: "medium" as const,
-            suggestedTags,
-          };
-        }
-
         return {
-          title,
-          contextSummary:
-            typeof t.contextSummary === "string" ? t.contextSummary : title,
-          actionItems,
-          impact:
-            typeof t.impact === "string" ? (t.impact as string) : (null as string | null),
-          suggestedPriority:
-            typeof t.suggestedPriority === "string" &&
-            ["low", "medium", "high", "critical"].includes(
-              (t.suggestedPriority as string).toLowerCase()
-            )
-              ? (t.suggestedPriority as string).toLowerCase()
-              : "medium",
-          suggestedTags,
+          title: t.title as string,
+          description:
+            typeof t.description === "string"
+              ? (t.description as string)
+              : (t.title as string),
+          actionSteps: Array.isArray(t.actionSteps)
+            ? (t.actionSteps as string[])
+            : [],
+          suggestedTags: Array.isArray(t.suggestedTags)
+            ? (t.suggestedTags as string[])
+            : [],
         };
       });
 

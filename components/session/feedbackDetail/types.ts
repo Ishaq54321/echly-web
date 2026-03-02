@@ -5,13 +5,11 @@ export interface FeedbackItemShape {
   type: string;
   timestamp?: number;
   isResolved?: boolean;
-  priority?: string;
   screenshotUrl?: string | null;
   description: string;
   suggestion?: string | null;
   contextSummary?: string | null;
-  actionItems?: string[] | null;
-  impact?: string | null;
+  actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
   /** ISO date string from API (audit trail). */
   createdAt?: string | null;

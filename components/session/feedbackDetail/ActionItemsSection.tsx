@@ -6,25 +6,25 @@ import { Plus, Trash2 } from "lucide-react";
 
 const MAX_VISIBLE = 3;
 
-interface ActionItemsSectionProps {
-  actionItems: string[];
-  onSave: (items: string[]) => Promise<void>;
+interface ActionStepsSectionProps {
+  actionSteps: string[];
+  onSave: (steps: string[]) => Promise<void>;
   /** When true, show items as resolved (line-through, muted). */
   isResolved?: boolean;
 }
 
 export function ActionItemsSection({
-  actionItems,
+  actionSteps,
   onSave,
   isResolved = false,
-}: ActionItemsSectionProps) {
+}: ActionStepsSectionProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [newItemDraft, setNewItemDraft] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
-  const items = actionItems.length > 0 ? actionItems : [];
+  const items = actionSteps.length > 0 ? actionSteps : [];
   const visibleItems = items.length > MAX_VISIBLE && !showAll ? items.slice(0, MAX_VISIBLE) : items;
   const hasCollapsed = items.length > MAX_VISIBLE;
 
@@ -90,7 +90,7 @@ export function ActionItemsSection({
             className="flex items-center gap-2 px-3 py-2 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors duration-150 cursor-pointer"
           >
             <Plus size={14} />
-            Add action item
+            Add action step
           </button>
         ) : (
           <div className="flex items-center gap-2">
@@ -103,10 +103,10 @@ export function ActionItemsSection({
                 if (e.key === "Enter") void saveNew();
                 if (e.key === "Escape") cancelAdd();
               }}
-              placeholder="New action item…"
+              placeholder="New action step…"
               className="flex-1 font-mono text-[13px] px-3 py-2 rounded-md border border-neutral-200 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
               autoFocus
-              aria-label="New action item"
+              aria-label="New action step"
             />
           </div>
         )}
@@ -115,7 +115,7 @@ export function ActionItemsSection({
   }
 
   return (
-    <Section title="Decisions" titleSemantic="attention">
+    <Section title="ACTION STEPS" titleSemantic="attention">
       <ul className="list-none space-y-2 p-0 m-0">
         {visibleItems.map((text, i) => (
           <li key={i}>
@@ -136,7 +136,7 @@ export function ActionItemsSection({
                     }}
                     className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
                     autoFocus
-                    aria-label={`Edit action item ${i + 1}`}
+                    aria-label={`Edit action step ${i + 1}`}
                   />
                   <button
                     type="button"
@@ -163,7 +163,7 @@ export function ActionItemsSection({
                     type="button"
                     onClick={() => void removeItem(i)}
                     className="flex-shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 opacity-0 group-hover:opacity-100 transition-colors duration-120 cursor-pointer"
-                    aria-label={`Remove action item ${i + 1}`}
+                    aria-label={`Remove action step ${i + 1}`}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -186,10 +186,10 @@ export function ActionItemsSection({
                 if (e.key === "Enter") void saveNew();
                 if (e.key === "Escape") cancelAdd();
               }}
-              placeholder="New action item…"
+              placeholder="New action step…"
               className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
               autoFocus
-              aria-label="New action item"
+              aria-label="New action step"
             />
           </li>
         )}
@@ -210,7 +210,7 @@ export function ActionItemsSection({
           className="mt-2 flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-neutral-600 hover:text-neutral-900 transition-colors duration-120 cursor-pointer"
         >
           <Plus size={14} />
-          Add action item
+          Add action step
         </button>
       )}
     </Section>

@@ -354,11 +354,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: false, error: "Missing transcript or sessionId" });
       return true;
     }
-    function normalizePriority(s: string | undefined): "low" | "medium" | "high" | "critical" {
-      const v = (s ?? "medium").toLowerCase();
-      if (v === "low" || v === "medium" || v === "high" || v === "critical") return v;
-      return "medium";
-    }
     (async () => {
       try {
         const token = await getValidToken();
@@ -381,11 +376,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           success?: boolean;
           tickets?: Array<{
             title?: string;
-            contextSummary?: string;
+            description?: string;
             suggestedTags?: string[];
-            actionItems?: string[];
-            impact?: string | null;
-            suggestedPriority?: string;
+            actionSteps?: string[];
           }>;
           error?: string;
         };
@@ -401,10 +394,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (tickets.length === 0) {
           tickets.push({
             title: transcript.slice(0, 80),
-            contextSummary: transcript,
-            actionItems: [],
-            impact: null,
-            suggestedPriority: "medium",
+            description: transcript,
+            actionSteps: [],
             suggestedTags: ["Feedback"],
           });
         }
@@ -412,16 +403,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
         for (let i = 0; i < tickets.length; i++) {
           const t = tickets[i];
+          const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
           const body = {
             sessionId,
             title: t.title ?? "",
-            description: t.contextSummary ?? t.title ?? "",
+            description: desc,
             type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-            contextSummary: t.contextSummary ?? null,
-            actionItems: t.actionItems ?? [],
-            impact: t.impact ?? null,
+            contextSummary: desc,
+            actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
             suggestedTags: t.suggestedTags,
-            priority: normalizePriority(t.suggestedPriority),
             screenshotUrl: i === 0 ? screenshotUrl : null,
             metadata: { clientTimestamp: Date.now() },
           };

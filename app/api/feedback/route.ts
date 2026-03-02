@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
-import type { FeedbackPriority } from "@/lib/domain/feedback";
 import { requireAuth } from "@/lib/server/auth";
 import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
@@ -104,8 +103,6 @@ export async function GET(req: Request) {
 }
 
 /** POST /api/feedback — create feedback (ticket) for a session. Returns same shape as GET /api/tickets/:id. */
-const POST_BODY_PRIORITY: FeedbackPriority[] = ["low", "medium", "high", "critical"];
-
 export async function POST(req: Request) {
   const start = Date.now();
   console.log("[API] POST /api/feedback start");
@@ -123,10 +120,8 @@ export async function POST(req: Request) {
     suggestion?: string;
     screenshotUrl?: string;
     contextSummary?: string;
-    actionItems?: string[];
-    impact?: string;
+    actionSteps?: string[];
     suggestedTags?: string[];
-    priority?: string;
     metadata?: {
       url?: string;
       viewportWidth?: number;
@@ -177,11 +172,6 @@ export async function POST(req: Request) {
   }
 
   const meta = body.metadata;
-  const priority =
-    typeof body.priority === "string" &&
-    POST_BODY_PRIORITY.includes(body.priority as FeedbackPriority)
-      ? (body.priority as FeedbackPriority)
-      : "medium";
 
   const structuredData = {
     title,
@@ -190,12 +180,10 @@ export async function POST(req: Request) {
     type: "general" as const,
     contextSummary:
       typeof body.contextSummary === "string" ? body.contextSummary : undefined,
-    actionItems: Array.isArray(body.actionItems) ? body.actionItems : undefined,
-    impact: typeof body.impact === "string" ? body.impact : undefined,
+    actionSteps: Array.isArray(body.actionSteps) ? body.actionSteps : undefined,
     suggestedTags: Array.isArray(body.suggestedTags)
       ? body.suggestedTags
       : undefined,
-    priority,
     screenshotUrl:
       typeof body.screenshotUrl === "string" ? body.screenshotUrl : undefined,
     url: meta?.url,

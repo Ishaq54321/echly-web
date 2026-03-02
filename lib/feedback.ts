@@ -1,21 +1,12 @@
 import type { DocumentReference } from "firebase/firestore";
-export type {
-  Feedback,
-  FeedbackPriority,
-  StructuredFeedback,
-} from "@/lib/domain/feedback";
-import type {
-  FeedbackPriority,
-  StructuredFeedback,
-  Feedback,
-} from "@/lib/domain/feedback";
+export type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
+import type { StructuredFeedback, Feedback } from "@/lib/domain/feedback";
 import {
   addFeedbackRepo,
   deleteFeedbackRepo,
   getFeedbackByIdsRepo,
   getSessionFeedbackByResolvedRepo,
   getSessionFeedbackCountsRepo,
-  getSessionFeedbackHighImpactRepo,
   getSessionFeedbackPageRepo,
   getSessionFeedbackTotalCountRepo,
   updateFeedbackRepo,
@@ -64,9 +55,8 @@ export async function updateFeedback(
     description: string;
     type: string;
     isResolved: boolean;
-    priority: FeedbackPriority;
     screenshotUrl: string | null;
-    actionItems: string[] | null;
+    actionSteps: string[] | null;
   }>,
   sessionId?: string
 ) {
@@ -117,14 +107,6 @@ export async function getSessionFeedbackTotalCount(
   sessionId: string
 ): Promise<number> {
   return getSessionFeedbackTotalCountRepo(sessionId);
-}
-
-/** Up to N high-impact items for session, newest first. */
-export async function getSessionFeedbackHighImpact(
-  sessionId: string,
-  max: number = 5
-): Promise<Feedback[]> {
-  return getSessionFeedbackHighImpactRepo(sessionId, max);
 }
 
 /** Fetch feedback by IDs (e.g. for activity titles). Limited. */

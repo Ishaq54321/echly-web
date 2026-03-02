@@ -20,11 +20,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
-import type {
-  Feedback,
-  FeedbackPriority,
-  StructuredFeedback,
-} from "@/lib/domain/feedback";
+import type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
 
 const feedbackPayload = (
   sessionId: string,
@@ -38,12 +34,10 @@ const feedbackPayload = (
   suggestion: data.suggestion ?? "",
   type: data.type,
   status: "open" as const,
-  priority: data.priority ?? "medium",
   createdAt: serverTimestamp(),
 
   contextSummary: data.contextSummary ?? null,
-  actionItems: data.actionItems ?? null,
-  impact: data.impact ?? null,
+  actionSteps: data.actionSteps ?? null,
   suggestedTags: data.suggestedTags ?? null,
 
   url: data.url ?? null,
@@ -78,9 +72,8 @@ type FeedbackUpdate = Partial<{
   description: string;
   type: string;
   status: "open" | "resolved";
-  priority: FeedbackPriority;
   screenshotUrl: string | null;
-  actionItems: string[] | null;
+  actionSteps: string[] | null;
   suggestedTags: string[] | null;
 }>;
 
@@ -91,9 +84,8 @@ export async function updateFeedbackRepo(
     description: string;
     type: string;
     isResolved: boolean;
-    priority: FeedbackPriority;
     screenshotUrl: string | null;
-    actionItems: string[] | null;
+    actionSteps: string[] | null;
     suggestedTags: string[] | null;
   }>
 ): Promise<void> {
@@ -101,9 +93,8 @@ export async function updateFeedbackRepo(
   if (typeof data.title === "string") updates.title = data.title;
   if (typeof data.description === "string") updates.description = data.description;
   if (typeof data.type === "string") updates.type = data.type;
-  if (typeof data.priority === "string") updates.priority = data.priority;
   if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
-  if (data.actionItems !== undefined) updates.actionItems = data.actionItems;
+  if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
   if (typeof (data as { isResolved?: boolean }).isResolved === "boolean") {
     updates.status = (data as { isResolved: boolean }).isResolved ? "resolved" : "open";
@@ -124,7 +115,7 @@ export interface FeedbackPageResult {
 
 const FEEDBACK_PAGE_SIZE_DEFAULT = 20;
 
-/** Maps a Firestore doc snapshot to domain Feedback. */
+/** Maps a Firestore doc snapshot to domain Feedback. Backward compat: actionItems → actionSteps. */
 function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
   const data = docSnap.data();
   const status = data.status ?? "open";
@@ -141,11 +132,9 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     suggestion: data.suggestion ?? "",
     type: data.type,
     isResolved,
-    priority: data.priority ?? "medium",
     createdAt: (data.createdAt ?? null) as Timestamp | null,
     contextSummary: data.contextSummary ?? null,
-    actionItems: data.actionItems ?? null,
-    impact: data.impact ?? null,
+    actionSteps: data.actionSteps ?? data.actionItems ?? null,
     suggestedTags: data.suggestedTags ?? null,
     url: data.url ?? null,
     viewportWidth: data.viewportWidth ?? null,
@@ -297,8 +286,6 @@ export async function deleteAllFeedbackForSessionRepo(
   await Promise.all(snapshot.docs.map((d) => deleteDoc(d.ref)));
 }
 
-const OVERVIEW_HIGH_IMPACT_LIMIT = 5;
-
 const OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT = 3;
 
 /**
@@ -316,26 +303,6 @@ export async function getSessionFeedbackByResolvedRepo(
     collection(db, "feedback"),
     where("sessionId", "==", sessionId),
     where("status", "==", status),
-    orderBy("createdAt", "desc"),
-    limit(max)
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(docToFeedback);
-}
-
-/**
- * Fetches up to N feedback items with impact === "high" for a session, newest first.
- * Composite index required: feedback (sessionId ASC, impact ASC, createdAt DESC).
- */
-export async function getSessionFeedbackHighImpactRepo(
-  sessionId: string,
-  max: number = OVERVIEW_HIGH_IMPACT_LIMIT
-): Promise<Feedback[]> {
-  assertQueryLimit(max, "getSessionFeedbackHighImpactRepo");
-  const q = query(
-    collection(db, "feedback"),
-    where("sessionId", "==", sessionId),
-    where("impact", "==", "high"),
     orderBy("createdAt", "desc"),
     limit(max)
   );

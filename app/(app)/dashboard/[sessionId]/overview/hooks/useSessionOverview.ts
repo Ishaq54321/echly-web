@@ -8,7 +8,6 @@ import {
   getSessionFeedback,
   getSessionFeedbackByResolved,
   getSessionFeedbackCounts,
-  getSessionFeedbackHighImpact,
   getSessionFeedbackTotalCount,
 } from "@/lib/feedback";
 import type { Feedback } from "@/lib/domain/feedback";
@@ -16,7 +15,6 @@ import { getSessionById } from "@/lib/sessions";
 import type { Session } from "@/lib/domain/session";
 
 const RECENT_FEEDBACK_LIMIT = 5;
-const HIGH_IMPACT_LIMIT = 5;
 const RECENT_ACTIVITY_LIMIT = 10;
 
 export interface OverviewActivityItem {
@@ -37,7 +35,6 @@ export interface SessionOverviewData {
   totalCount: number;
   recentFeedback: Feedback[];
   statusPreview: StatusPreview;
-  highImpact: Feedback[];
   recentActivity: OverviewActivityItem[];
   tagCounts: { tag: string; count: number }[];
 }
@@ -86,7 +83,6 @@ export function useSessionOverview(sessionId: string | undefined) {
     totalCount: 0,
     recentFeedback: [],
     statusPreview: { open: [], resolved: [] },
-    highImpact: [],
     recentActivity: [],
     tagCounts: [],
   });
@@ -113,7 +109,6 @@ export function useSessionOverview(sessionId: string | undefined) {
           recentFeedback,
           openPreview,
           resolvedPreview,
-          highImpact,
           recentComments,
         ] = await Promise.all([
           getSessionById(sid),
@@ -122,7 +117,6 @@ export function useSessionOverview(sessionId: string | undefined) {
           getSessionFeedback(sid, RECENT_FEEDBACK_LIMIT),
           getSessionFeedbackByResolved(sid, false, 3),
           getSessionFeedbackByResolved(sid, true, 3),
-          getSessionFeedbackHighImpact(sid, HIGH_IMPACT_LIMIT),
           getSessionRecentComments(sid, RECENT_ACTIVITY_LIMIT),
         ]);
 
@@ -147,7 +141,6 @@ export function useSessionOverview(sessionId: string | undefined) {
           ...recentFeedback,
           ...openPreview,
           ...resolvedPreview,
-          ...highImpact,
         ];
         const tagCounts = extractTagCounts(allForTags);
 
@@ -160,7 +153,6 @@ export function useSessionOverview(sessionId: string | undefined) {
             open: openPreview,
             resolved: resolvedPreview,
           },
-          highImpact,
           recentActivity,
           tagCounts,
         });

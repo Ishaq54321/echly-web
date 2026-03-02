@@ -28,7 +28,7 @@ type TicketFromApi = {
   description: string;
   type: string;
   isResolved?: boolean;
-  actionItems?: string[] | null;
+  actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
   screenshotUrl?: string | null;
   [key: string]: unknown;
@@ -80,6 +80,7 @@ export default function SessionPage() {
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
+  const [sessionReady, setSessionReady] = useState(false);
   /** Detail panel: always from DB (GET /api/tickets/:id). Do not use memory state. */
   const [detailTicket, setDetailTicket] = useState<TicketFromApi | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -99,7 +100,9 @@ export default function SessionPage() {
     loadingMore: feedbackLoadingMore,
     refetchFirstPage: refetchFeedbackFirstPage,
     loadMoreRef: feedbackLoadMoreRef,
-  } = useSessionFeedbackPaginated(sessionId as string | undefined);
+  } = useSessionFeedbackPaginated(
+    sessionReady ? (sessionId as string | undefined) : undefined
+  );
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
@@ -142,7 +145,6 @@ export default function SessionPage() {
         description: ticket.description,
         type: ticket.type ?? "Feedback",
         isResolved: false,
-        priority: "medium" as const,
         createdAt: null,
         clientTimestamp: Date.now(),
       };
@@ -158,6 +160,7 @@ export default function SessionPage() {
   /* ================= LOAD SESSION ================= */
 
   useEffect(() => {
+    setSessionReady(false);
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       console.log("🔥 AUTH STATE (LOCAL CHECK):", {
         uid: currentUser?.uid ?? null,
@@ -191,6 +194,7 @@ export default function SessionPage() {
       );
       setUserPhotoURL(currentUser.photoURL ?? null);
       setSessionLoading(false);
+      setSessionReady(true);
 
       const viewerId = getViewerId(currentUser.uid);
       if (viewerId) {
@@ -334,27 +338,27 @@ export default function SessionPage() {
     }
   };
 
-  /* ================= SAVE ACTION ITEMS (optimistic update, then PATCH) ================= */
+  /* ================= SAVE ACTION STEPS (optimistic update, then PATCH) ================= */
 
-  const saveActionItems = async (actionItems: string[]) => {
+  const saveActionSteps = async (actionSteps: string[]) => {
     if (!selectedId) return;
-    const previous = detailTicket?.actionItems ?? null;
-    setDetailTicket((t) => (t ? { ...t, actionItems } : null));
+    const previous = detailTicket?.actionSteps ?? null;
+    setDetailTicket((t) => (t ? { ...t, actionSteps } : null));
     setFeedback((prev) =>
-      prev.map((item) => (item.id === selectedId ? { ...item, actionItems } : item))
+      prev.map((item) => (item.id === selectedId ? { ...item, actionSteps } : item))
     );
     try {
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionItems }),
+        body: JSON.stringify({ actionSteps }),
       });
       const data = (await res.json()) as { success?: boolean; ticket?: TicketFromApi };
       if (data.success && data.ticket) setDetailTicket(data.ticket);
     } catch {
-      setDetailTicket((t) => (t ? { ...t, actionItems: previous } : null));
+      setDetailTicket((t) => (t ? { ...t, actionSteps: previous } : null));
       setFeedback((prev) =>
-        prev.map((item) => (item.id === selectedId ? { ...item, actionItems: previous } : item))
+        prev.map((item) => (item.id === selectedId ? { ...item, actionSteps: previous } : item))
       );
     }
   };
@@ -452,13 +456,7 @@ export default function SessionPage() {
     setFeedbackResolvedCount((c) => c + activeCountBefore);
   }, [feedback, detailTicket, selectedId, setFeedback, setFeedbackActiveCount, setFeedbackResolvedCount]);
 
-  /* ================= AI SAVE (Elite Structuring) ================= */
-
-  const normalizePriority = (s: string | undefined): "low" | "medium" | "high" | "critical" => {
-    const v = (s ?? "medium").toLowerCase();
-    if (v === "low" || v === "medium" || v === "high" || v === "critical") return v;
-    return "medium";
-  };
+  /* ================= AI SAVE (Structure Engine V2) ================= */
 
   const handleTranscript = async (
     transcript: string,
@@ -491,13 +489,11 @@ export default function SessionPage() {
       const t = tickets[i];
       const payload = {
         title: t.title,
-        description: t.contextSummary ?? t.title,
+        description: typeof t.description === "string" ? t.description : (t.title ?? ""),
         type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-        contextSummary: t.contextSummary ?? null,
-        actionItems: t.actionItems ?? [],
-        impact: t.impact ?? null,
-        suggestedTags: t.suggestedTags,
-        priority: normalizePriority(t.suggestedPriority),
+        contextSummary: typeof t.description === "string" ? t.description : null,
+        actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
+        suggestedTags: t.suggestedTags ?? undefined,
         screenshotUrl: i === 0 ? screenshotUrl ?? null : null,
         timestamp: Date.now(),
       };
@@ -746,7 +742,7 @@ export default function SessionPage() {
                   saveDescriptionSuccess={saveDescriptionSuccess}
                   onSaveTitle={saveTitle}
                   onRequestDelete={() => setShowDeleteModal(true)}
-                  onSaveActionItems={saveActionItems}
+                  onSaveActionSteps={saveActionSteps}
                   onSaveTags={saveTags}
                   onResolvedChange={saveResolved}
                   setIsImageExpanded={setIsImageExpanded}

@@ -1,19 +1,15 @@
 import type { Timestamp } from "firebase/firestore";
 
-export type FeedbackPriority = "low" | "medium" | "high" | "critical";
-
 export interface StructuredFeedback {
   title: string;
   description: string;
   suggestion?: string;
   type: string;
 
-  // Elite structuring (action-ready ticket fields)
+  // Structuring (V2)
   contextSummary?: string;
-  actionItems?: string[];
-  impact?: string;
+  actionSteps?: string[];
   suggestedTags?: string[];
-  priority?: FeedbackPriority;
 
   // Metadata
   url?: string;
@@ -35,13 +31,11 @@ export interface Feedback {
   suggestion?: string;
   type: string;
   isResolved: boolean;
-  priority: FeedbackPriority;
   createdAt: Timestamp | null;
 
-  // Elite structuring
+  // Structuring (V2)
   contextSummary?: string | null;
-  actionItems?: string[] | null;
-  impact?: string | null;
+  actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
 
   // Metadata

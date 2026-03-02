@@ -7,26 +7,16 @@ import {
   deleteFeedback,
   type Feedback,
   type StructuredFeedback,
-  type FeedbackPriority,
 } from "@/lib/feedback";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
 import type { Session } from "@/lib/sessions";
 
-/** Elite structuring API response. */
-interface EliteTicket {
+/** Structure Engine V2 API response. */
+interface StructuredTicket {
   title: string;
-  contextSummary: string;
-  actionItems?: string[];
-  impact?: string;
-  suggestedPriority?: string;
+  description?: string;
+  actionSteps?: string[];
   suggestedTags?: string[];
-}
-
-function normalizePriority(s: string | undefined): FeedbackPriority {
-  const v = (s ?? "medium").toLowerCase();
-  if (v === "low" || v === "medium" || v === "high" || v === "critical")
-    return v;
-  return "medium";
 }
 
 export type SelectedFeedbackItem = Feedback & {
@@ -100,7 +90,7 @@ export function useFeedback({
       body: JSON.stringify({ transcript }),
     });
 
-    const data = (await res.json()) as { success?: boolean; tickets?: EliteTicket[]; error?: string };
+    const data = (await res.json()) as { success?: boolean; tickets?: StructuredTicket[]; error?: string };
     console.log("STRUCTURING RESPONSE:", data);
 
     const tickets = Array.isArray(data.tickets) ? data.tickets : [];
@@ -125,13 +115,11 @@ export function useFeedback({
     for (const t of tickets) {
       const payload: StructuredFeedback = {
         title: t.title,
-        description: t.contextSummary ?? t.title,
+        description: typeof t.description === "string" ? t.description : t.title,
         type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-        contextSummary: t.contextSummary ?? null,
-        actionItems: t.actionItems ?? [],
-        impact: t.impact ?? undefined,
+        contextSummary: typeof t.description === "string" ? t.description : undefined,
+        actionSteps: t.actionSteps ?? [],
         suggestedTags: t.suggestedTags,
-        priority: normalizePriority(t.suggestedPriority),
         screenshotUrl: ticketIndex === 0 ? screenshotUrl : null,
         timestamp: Date.now(),
       };
@@ -152,11 +140,9 @@ export function useFeedback({
         suggestion: "",
         type: payload.type,
         isResolved: false,
-        priority: payload.priority ?? "medium",
         createdAt: null,
         contextSummary: payload.contextSummary ?? null,
-        actionItems: payload.actionItems ?? null,
-        impact: payload.impact ?? null,
+        actionSteps: payload.actionSteps ?? null,
         suggestedTags: payload.suggestedTags ?? null,
         screenshotUrl: payload.screenshotUrl ?? null,
         clientTimestamp: Date.now(),
