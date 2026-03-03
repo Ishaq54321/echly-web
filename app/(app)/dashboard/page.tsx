@@ -94,8 +94,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-6 flex-shrink-0">
             <div
-              className="flex items-center py-3 px-6 rounded-2xl border border-[var(--glass-1-border)] bg-[var(--glass-1-bg)] backdrop-blur-[10px] shadow-[var(--glass-1-edge)]"
-              style={{ boxShadow: "var(--glass-1-edge), 0 1px 0 rgba(0,0,0,0.02)" }}
+              className="flex items-center py-3 px-6 rounded-2xl border border-[var(--layer-1-border)] bg-white"
             >
               <InsightStrip />
             </div>
@@ -153,7 +152,7 @@ export default function DashboardPage() {
           {viewMode === "all" && (
             <NeedsAttentionSection items={attentionItems} onView={handleView} />
           )}
-          <div className="pt-6 border-t border-[var(--glass-1-border)]">
+          <div className="pt-8">
             <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
             {filteredSessions.map((item, index) => (
               <WorkspaceCard

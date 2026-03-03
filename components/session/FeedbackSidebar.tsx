@@ -105,7 +105,7 @@ function FeedbackSidebarInner({
 
   return (
     <div className="flex flex-col">
-      <div className="flex flex-col gap-3 px-4 pt-5 pb-4">
+      <div className="flex flex-col gap-3 px-5 pt-5 pb-4">
         {/* Header (fixed) */}
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
@@ -209,28 +209,22 @@ function FeedbackSidebarInner({
                       onSelect(item.id);
                     }
                   }}
-                  className={`relative flex items-center gap-3 px-4 py-2.5 rounded-md transition-colors duration-120 outline-none focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 cursor-pointer ${
+                  className={`relative flex items-center gap-3 px-5 py-2.5 rounded-full transition-colors duration-[120ms] outline-none focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer ${
                     isActive
-                      ? "text-neutral-900"
-                      : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
+                      ? "text-[hsl(var(--text-primary-strong))] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                      : "text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.04]"
                   }`}
                 >
-                  {isActive && (
-                    <div
-                      className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-md bg-semantic-system"
-                      aria-hidden
-                    />
-                  )}
                   <span
                     className={`w-6 shrink-0 text-right text-[13px] ${
-                      isActive ? "text-semantic-system font-medium" : "text-neutral-400"
+                      isActive ? "text-[hsl(var(--text-primary-strong))] font-medium" : "text-[hsl(var(--text-tertiary))]"
                     }`}
                   >
                     {index + 1}
                   </span>
                   <span
                     className={`min-w-0 flex-1 truncate text-[15px] ${
-                      isActive ? "font-medium text-neutral-900" : "font-normal text-neutral-600"
+                      isActive ? "font-semibold text-[hsl(var(--text-primary-strong))]" : "font-normal text-[hsl(var(--text-secondary-soft))]"
                     }`}
                   >
                     {item.title}

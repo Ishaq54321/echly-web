@@ -45,8 +45,8 @@ function FeedbackDetailInner({
 }: FeedbackDetailProps) {
   if (!selectedItem) {
     return (
-      <div className="flex flex-1 min-h-0 items-center justify-center py-16">
-        <p className="text-[15px] text-neutral-500">
+      <div className="flex flex-1 min-h-0 items-start py-12">
+        <p className="text-[15px] text-[hsl(var(--text-tertiary))]">
           Select a feedback item
         </p>
       </div>

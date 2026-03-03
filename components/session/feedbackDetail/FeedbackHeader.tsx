@@ -85,8 +85,8 @@ export function FeedbackHeader({
   };
 
   return (
-    <div className="pt-2 pb-6">
-      <div className="text-[13px] text-[hsl(var(--text-tertiary))] mb-3">
+    <div className="pt-0 pb-4">
+      <div className="text-[13px] text-[hsl(var(--text-tertiary))] mb-1.5">
         {item.index} of {item.total}
       </div>
       <div className="flex items-start justify-between gap-4">
@@ -104,11 +104,11 @@ export function FeedbackHeader({
                 className="w-full text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))] bg-white border border-[var(--layer-2-border)] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
                 aria-label="Edit title"
               />
-              <p className="text-[14px] text-[hsl(var(--text-tertiary))] mt-1.5">
+              <p className="text-[14px] text-[hsl(var(--text-tertiary))] mt-1">
                 Enter to save
               </p>
               {isSaving && (
-                <p className="text-[14px] text-neutral-500 mt-0.5 transition-opacity duration-150">
+                <p className="text-[14px] text-[hsl(var(--text-tertiary))] mt-0.5 transition-opacity duration-150">
                   Saving...
                 </p>
               )}
@@ -182,13 +182,13 @@ export function FeedbackHeader({
         </div>
       </div>
       {(item.createdAt != null || item.updatedAt != null) && (
-        <div className="mt-2 text-[13px] text-[hsl(var(--text-tertiary))]">
+        <div className="mt-1 text-[13px] text-[hsl(var(--text-tertiary))]">
           {item.updatedAt != null
             ? `Created ${formatRelative(item.createdAt ?? null)} • Updated ${formatRelative(item.updatedAt)}`
             : `Created ${formatRelative(item.createdAt ?? null)}`}
         </div>
       )}
-      <div className="my-6 border-b border-[var(--layer-1-border)]" />
+      <div className="my-3 border-b border-[var(--layer-1-border)]" />
     </div>
   );
 }

@@ -19,8 +19,8 @@ export function Section({ title, children, titleMuted, titleSemantic }: SectionP
           ? "text-[hsl(var(--text-tertiary))]"
           : "text-[hsl(var(--text-tertiary))]";
   return (
-    <section className="my-8">
-      <h2 className={`text-[12px] font-medium uppercase tracking-[0.06em] mb-3 ${titleClass}`}>
+    <section className="my-5">
+      <h2 className={`text-[12px] font-medium uppercase tracking-[0.06em] mb-1.5 ${titleClass}`}>
         {title}
       </h2>
       <div className="gap-2 flex flex-col text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))]">

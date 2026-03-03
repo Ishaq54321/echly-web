@@ -111,15 +111,15 @@ export function ActionItemsSection({
 
   return (
     <Section title="ACTION STEPS" titleSemantic="attention">
-      <ul className="list-none space-y-2 p-0 m-0">
+      <ul className="list-none space-y-4 p-0 m-0">
         {items.map((text, i) => (
           <li key={i}>
-            <div className="group flex items-center justify-between rounded-xl px-3 py-2.5 transition-[background-color] duration-[120ms] hover:bg-white/60 cursor-pointer border border-transparent hover:border-[var(--layer-2-border)]">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full border border-[var(--layer-2-border)] bg-white flex items-center justify-center text-[10px] font-medium text-semantic-attention">
+            <div className="group flex items-center gap-3 rounded-xl pl-3 pr-3 py-2.5 transition-[background-color] duration-[120ms] hover:bg-white/60 cursor-pointer border border-transparent hover:border-[var(--layer-2-border)]">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-[rgba(0,0,0,0.08)] bg-white flex items-center justify-center text-[11px] font-medium text-semantic-attention leading-none">
                 {i + 1}
               </span>
               {editingIndex === i ? (
-                <div className="flex-1 flex gap-2 items-center">
+                <div className="flex-1 flex gap-2 items-center min-w-0">
                   <input
                     type="text"
                     value={draft}
@@ -146,7 +146,7 @@ export function ActionItemsSection({
                   <button
                     type="button"
                     onClick={() => startEdit(i)}
-                    className={`flex-1 text-left font-mono text-[13px] px-2 py-1 rounded-lg -mx-2 cursor-pointer transition-colors duration-120 ${
+                    className={`flex-1 text-left font-mono text-[13px] px-0 py-1 rounded-lg min-w-0 cursor-pointer transition-colors duration-[120ms] ${
                       isResolved
                         ? "line-through text-[hsl(var(--text-tertiary))]"
                         : "text-[hsl(var(--text-primary-strong))]"
@@ -168,8 +168,8 @@ export function ActionItemsSection({
           </li>
         ))}
         {isAdding && (
-          <li className="flex items-center gap-2">
-            <span className="flex-shrink-0 w-5 h-5 rounded-full border border-[var(--layer-2-border)] bg-white flex items-center justify-center text-[10px] font-medium text-[hsl(var(--text-tertiary))]">
+          <li className="flex items-center gap-3">
+            <span className="flex-shrink-0 w-6 h-6 rounded-full border border-[rgba(0,0,0,0.08)] bg-white flex items-center justify-center text-[11px] font-medium text-[hsl(var(--text-tertiary))] leading-none">
               {items.length + 1}
             </span>
             <input
@@ -193,7 +193,7 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-2 flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[120ms] cursor-pointer"
+          className="mt-1.5 flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[120ms] cursor-pointer"
         >
           <Plus size={14} />
           Add action step

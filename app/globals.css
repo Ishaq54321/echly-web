@@ -49,23 +49,32 @@
   --brand: 217 91% 60%;             /* #2563EB */
   --brand-ring: 217 91% 60% / 0.35;
 
-  /* ---- Spatial AI-native system (3-layer depth) ---- */
-  /* Layer 0 — Ambient canvas: dimensional, nearly invisible gradient */
-  --canvas-base: #F8F8F7;
-  --canvas-base-top: #FAFAF9;
-  --canvas-base-bottom: #F5F5F4;
-  /* Layer 1 — Glass surfaces: translucent, blur, soft edge. No heavy shadows. */
+  /* ---- Surface hierarchy: white canvas, gray structure ---- */
+  /* Primary canvas: clean white, calm and consistent */
+  --canvas-base: #FFFFFF;
+  --canvas-base-top: #FFFFFF;
+  --canvas-base-bottom: #FFFFFF;
+  /* Structural gray: sidebars + cards. Same neutral tone, not heavy. */
+  --structural-gray: #F5F5F4;
+  /* Rail: lightened toward white; distinct from ticket column. No glow. */
+  --structural-gray-rail: #F1F0EF;
+  /* Ticket column: 2–3% tonal shift from white. Lighter than rail. Contained panel, no slab. */
+  --structural-gray-ticket: #FAFAFA;
+  /* Layer 1 — Dividers when needed */
   --glass-1-bg: rgba(255, 255, 255, 0.65);
   --glass-1-border: rgba(0, 0, 0, 0.04);
   --glass-1-edge: 0 1px 0 rgba(255, 255, 255, 0.8);
   --layer-1-bg: #FFFFFF;
   --layer-1-border: rgba(0, 0, 0, 0.04);
-  /* Layer 2 — Object cards: micro elevation, tonal lift, minimal border */
-  --layer-2-bg: #FFFFFF;
-  --layer-2-border: rgba(0, 0, 0, 0.035);
-  --layer-2-hover-bg: #FAFAFA;
-  --layer-2-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --layer-2-shadow-hover: 0 4px 14px rgba(0, 0, 0, 0.06);
+  /* Layer 2 — Cards: structural gray, subtle 3D. Restrained shadow. */
+  --layer-2-bg: #F5F5F4;
+  --layer-2-border: rgba(0, 0, 0, 0.04);
+  --layer-2-hover-bg: #F0F0EF;
+  /* Single light source (top-left): shadow down. Low opacity, no glow. */
+  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --elevation-2: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --layer-2-shadow: var(--elevation-1);
+  --layer-2-shadow-hover: var(--elevation-2);
   /* AI Accent: single token. Muted deep indigo-blue, graphite undertone. Active, focus, indicators, hover only. Never large fills. */
   --ai-accent: #4E5572;
   --ai-accent-ring: rgba(78, 85, 114, 0.28);
@@ -99,21 +108,15 @@ body {
 ====================================== */
 
 .surface-rail {
-  background-color: var(--canvas-base);
+  background-color: var(--structural-gray-rail);
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .surface-sidebar {
-  background-color: #FFFFFF;
+  background-color: var(--structural-gray);
 }
 
 .surface-main {
-  /* Layer 0: subtle luminance shift top to bottom, dimensional but nearly invisible */
-  background: linear-gradient(
-    180deg,
-    var(--canvas-base-top) 0%,
-    var(--canvas-base) 50%,
-    var(--canvas-base-bottom) 100%
-  );
   background-color: var(--canvas-base);
 }
 

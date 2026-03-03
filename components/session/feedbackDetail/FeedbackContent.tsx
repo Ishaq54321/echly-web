@@ -125,7 +125,7 @@ export function FeedbackContent({
       )}
       {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (
         <Section title="Tags" titleMuted>
-          <div className="flex flex-wrap gap-2 mt-4 max-w-full">
+          <div className="flex flex-wrap gap-2 mt-3 max-w-full">
             {tags.map((tag, i) => (
               <Tag key={`${tag}-${i}`} name={tag} variant="default">
                 {onSaveTags && (

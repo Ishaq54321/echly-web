@@ -210,10 +210,11 @@ export function WorkspaceCard({
           outline-none
           shadow-[var(--layer-2-shadow)]
           focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)]
-          transition-[background-color,box-shadow,filter] duration-[120ms] ease-out
+          transition-[background-color,box-shadow,filter,transform] duration-[120ms] ease-out
           hover:bg-[var(--layer-2-hover-bg)]
           hover:shadow-[var(--layer-2-shadow-hover)]
           hover:brightness-[1.01]
+          hover:-translate-y-0.5
         "
         style={{ animationDelay: `${index * 40}ms` } as React.CSSProperties}
         data-session-id={session.id}
@@ -247,7 +248,7 @@ export function WorkspaceCard({
                 aria-label="More actions"
                 aria-expanded={moreOpen}
                 aria-haspopup="menu"
-                className="flex items-center justify-center h-10 w-10 rounded-xl text-[hsl(var(--text-tertiary))] transition-colors duration-[120ms] hover:bg-white/70 hover:text-[hsl(var(--text-secondary-soft))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer"
+                className="flex items-center justify-center h-10 w-10 rounded-xl text-[hsl(var(--text-tertiary))] transition-colors duration-[120ms] hover:bg-white/60 hover:text-[hsl(var(--text-secondary-soft))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer"
               >
                 <MoreHorizontal className="h-[16px] w-[16px] relative top-[1px] pointer-events-none" strokeWidth={1.5} aria-hidden />
               </button>
@@ -368,7 +369,7 @@ export function WorkspaceCard({
                   strokeWidth={1.5}
                   aria-hidden
                 />
-                <h3 className="text-[16px] leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-secondary-soft))] line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
+                <h3 className="text-[16px] leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
                   {session.title}
                 </h3>
                 <span
@@ -388,7 +389,7 @@ export function WorkspaceCard({
 
             {/* Metrics row — disciplined alignment, low emphasis */}
             <div className="mt-4 flex items-center gap-3">
-              <div className="inline-flex items-center rounded-xl bg-white/80 backdrop-blur-[6px] border border-[var(--layer-2-border)] px-2.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+              <div className="inline-flex items-center rounded-xl bg-white/70 border border-[var(--layer-2-border)] px-2.5 py-1.5 shadow-[0_1px_1px_rgba(0,0,0,0.03)]">
                 <span className="text-[13px] text-[hsl(var(--text-secondary-soft))] tabular-nums">
                   {feedbackCount}
                 </span>
@@ -396,7 +397,7 @@ export function WorkspaceCard({
                   feedback
                 </span>
               </div>
-              <div className="inline-flex items-center rounded-xl bg-white/80 backdrop-blur-[6px] border border-[var(--layer-2-border)] px-2.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+              <div className="inline-flex items-center rounded-xl bg-white/70 border border-[var(--layer-2-border)] px-2.5 py-1.5 shadow-[0_1px_1px_rgba(0,0,0,0.03)]">
                 <span className="text-[13px] text-[hsl(var(--text-secondary-soft))] tabular-nums">
                   {openCount}
                 </span>

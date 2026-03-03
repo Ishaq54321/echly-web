@@ -23,13 +23,13 @@ export default function GlobalRail() {
 
   return (
     <aside
-      className="surface-rail w-[72px] min-h-0 flex flex-col items-center py-8 gap-6 border-r border-neutral-200 shrink-0"
+      className="surface-rail w-[72px] min-h-0 flex flex-col items-center py-8 gap-6 shrink-0"
       aria-label="Global navigation"
     >
       <div className="relative group">
         <Link
           href="/dashboard"
-          className="flex items-center justify-center w-10 h-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-white hover:text-neutral-900 cursor-pointer"
+          className="flex items-center justify-center w-10 h-10 rounded-full text-[hsl(var(--text-tertiary))] transition-colors duration-[120ms] hover:bg-black/5 cursor-pointer"
           aria-label="Echly home"
         >
           <Box className="h-[18px] w-[18px]" strokeWidth={1.5} />
@@ -43,8 +43,8 @@ export default function GlobalRail() {
             <div key={label} className="relative group">
               <Link
                 href={href}
-                className={`relative flex items-center justify-center w-10 h-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-white hover:text-neutral-900 cursor-pointer ${
-                  active ? "bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)]" : ""
+                className={`relative flex items-center justify-center w-10 h-10 rounded-full text-[hsl(var(--text-tertiary))] transition-colors duration-[120ms] cursor-pointer ${
+                  active ? "bg-black/[0.06] text-[hsl(var(--text-primary-strong))]" : "hover:bg-black/5 hover:text-[hsl(var(--text-primary-strong))]"
                 }`}
                 aria-label={label}
                 aria-current={active ? "page" : undefined}

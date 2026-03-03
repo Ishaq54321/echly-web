@@ -47,8 +47,7 @@ export function NeedsAttentionSection({
 
   return (
     <section
-      className="mb-6 rounded-2xl border border-[var(--glass-1-border)] bg-[var(--glass-1-bg)] backdrop-blur-[12px] py-4 px-5 shadow-[var(--glass-1-edge)]"
-      style={{ boxShadow: "var(--glass-1-edge), 0 1px 0 rgba(0,0,0,0.03)" }}
+      className="mb-8 rounded-2xl bg-white py-5 px-5"
       aria-label="Needs Attention"
     >
       <h2 className="text-[12px] font-medium uppercase tracking-[0.06em] text-[hsl(var(--text-tertiary))] mb-3">
@@ -65,7 +64,7 @@ export function NeedsAttentionSection({
               <button
                 type="button"
                 onClick={() => onView(session.id)}
-                className="w-full text-left px-3 py-2 rounded-xl bg-transparent hover:bg-white/50 transition-[background-color,filter] duration-[120ms] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] flex items-center justify-between gap-4"
+                className="w-full text-left px-3 py-2 rounded-xl bg-transparent hover:bg-[var(--structural-gray)] transition-colors duration-[120ms] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] flex items-center justify-between gap-4"
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-medium text-[hsl(var(--text-primary-strong))] truncate">

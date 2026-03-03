@@ -68,7 +68,7 @@ type TicketFromApi = {
 function SessionPageSkeleton() {
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden">
-      <aside className="surface-sidebar w-[280px] shrink-0 min-h-0 flex flex-col border-r border-[var(--layer-1-border)]">
+      <aside className="w-[280px] shrink-0 min-h-0 flex flex-col bg-[var(--structural-gray-ticket)] border-r border-[rgba(0,0,0,0.06)]">
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           <div className="space-y-3">
             <div className="h-4 w-40 rounded bg-neutral-200/50 animate-feedback-placeholder-pulse" />
@@ -713,7 +713,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   return (
     <>
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside className="surface-sidebar w-[272px] shrink-0 min-h-0 flex flex-col border-r border-[var(--glass-1-border)] bg-[var(--glass-1-bg)]/50 backdrop-blur-[8px]">
+        <aside className="w-[272px] shrink-0 min-h-0 flex flex-col bg-[var(--structural-gray-ticket)] border-r border-[rgba(0,0,0,0.06)]">
           <div className="flex-1 min-h-0 overflow-y-auto">
             <FeedbackSidebar
               feedback={feedback}
@@ -733,7 +733,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         </aside>
 
         <main className="surface-main flex-1 min-h-0 flex flex-col">
-          <div className="max-w-4xl mx-auto w-full px-12 py-9 border-b border-[var(--glass-1-border)] shrink-0">
+          <div className="max-w-3xl mx-auto w-full px-10 py-8 shrink-0 border-b border-[var(--layer-1-border)]">
             <div className="flex justify-between items-center gap-4">
               <div className="min-w-0 flex-1">
                 {isEditingSessionTitle ? (
@@ -912,20 +912,20 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 </div>
               )}
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--glass-1-bg)]/40 backdrop-blur-[12px] border-t border-[var(--glass-1-border)]">
-            <div className="max-w-3xl mx-auto w-full px-12 py-12">
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="max-w-3xl mx-auto w-full px-10 py-8">
               {feedbackLoading ? (
                 <FeedbackPremiumLoader />
               ) : detailLoading && selectedId ? (
-                <div className="flex items-center justify-center py-16">
-                  <p className="text-[13px] text-neutral-500">Loading…</p>
+                <div className="py-12">
+                  <p className="text-[13px] text-[hsl(var(--text-tertiary))]">Loading…</p>
                 </div>
               ) : feedback.length === 0 ? (
-                <div className="text-center mt-24">
-                  <div className="text-[16px] font-medium text-neutral-800">
+                <div className="mt-16">
+                  <div className="text-[16px] font-medium text-[hsl(var(--text-primary-strong))]">
                     No feedback yet
                   </div>
-                  <div className="mt-2 text-[14px] text-neutral-500">
+                  <div className="mt-2 text-[14px] text-[hsl(var(--text-tertiary))]">
                     Capture feedback to start organizing insights.
                   </div>
                 </div>
@@ -955,7 +955,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         </main>
 
         {isCommentsOpen && (
-          <aside className="w-[320px] shrink-0 min-h-0 flex flex-col hidden lg:block border-l border-[var(--layer-1-border)] bg-[var(--canvas-base)]">
+          <aside className="w-[320px] shrink-0 min-h-0 flex flex-col hidden lg:block bg-[var(--canvas-base)]">
             <div className="flex-1 min-h-0 flex flex-col px-6 py-5">
               <ActivityPanel
                 comments={comments}
