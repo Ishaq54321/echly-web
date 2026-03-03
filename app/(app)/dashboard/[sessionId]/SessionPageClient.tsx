@@ -68,23 +68,23 @@ type TicketFromApi = {
 function SessionPageSkeleton() {
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden">
-      <aside className="surface-sidebar w-[280px] shrink-0 min-h-0 flex flex-col border-r border-neutral-200">
+      <aside className="surface-sidebar w-[280px] shrink-0 min-h-0 flex flex-col border-r border-[var(--layer-1-border)]">
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           <div className="space-y-3">
-            <div className="h-4 w-40 rounded bg-neutral-200/70 animate-feedback-placeholder-pulse" />
-            <div className="h-3 w-56 rounded bg-neutral-100/90 animate-feedback-placeholder-pulse" />
-            <div className="h-3 w-52 rounded bg-neutral-100/90 animate-feedback-placeholder-pulse" />
+            <div className="h-4 w-40 rounded bg-neutral-200/50 animate-feedback-placeholder-pulse" />
+            <div className="h-3 w-56 rounded bg-neutral-100/70 animate-feedback-placeholder-pulse" />
+            <div className="h-3 w-52 rounded bg-neutral-100/70 animate-feedback-placeholder-pulse" />
           </div>
         </div>
       </aside>
-      <main className="surface-main flex-1 min-h-0 flex flex-col shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-        <div className="max-w-4xl mx-auto w-full px-10 py-8 border-b border-neutral-200 shrink-0">
+      <main className="surface-main flex-1 min-h-0 flex flex-col">
+        <div className="max-w-4xl mx-auto w-full px-12 py-9 border-b border-[var(--layer-1-border)] shrink-0">
           <div className="flex justify-between items-center gap-4">
             <div className="min-w-0 flex-1">
-              <h1 className="text-[18px] font-medium text-neutral-900">
+              <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
                 Session
               </h1>
-              <p className="text-[13px] text-neutral-500 mt-1">
+              <p className="text-[13px] text-[hsl(var(--text-tertiary))] mt-2">
                 Loading…
               </p>
             </div>
@@ -713,7 +713,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   return (
     <>
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside className="surface-sidebar w-[280px] shrink-0 min-h-0 flex flex-col border-r border-neutral-200">
+        <aside className="surface-sidebar w-[280px] shrink-0 min-h-0 flex flex-col border-r border-[var(--layer-1-border)]">
           <div className="flex-1 min-h-0 overflow-y-auto">
             <FeedbackSidebar
               feedback={feedback}
@@ -732,8 +732,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           </div>
         </aside>
 
-        <main className="surface-main flex-1 min-h-0 flex flex-col shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-          <div className="max-w-4xl mx-auto w-full px-10 py-8 border-b border-neutral-200 shrink-0">
+        <main className="surface-main flex-1 min-h-0 flex flex-col">
+          <div className="max-w-4xl mx-auto w-full px-12 py-9 border-b border-[var(--layer-1-border)] shrink-0">
             <div className="flex justify-between items-center gap-4">
               <div className="min-w-0 flex-1">
                 {isEditingSessionTitle ? (
@@ -802,7 +802,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                         }
                       }}
                       autoFocus
-                      className="text-[18px] font-medium tracking-[-0.01em] text-neutral-900 w-full bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
+                      className="text-[19px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))] w-full bg-white border border-[var(--layer-2-border)] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
                       aria-label="Session title"
                     />
                     <p className="text-[13px] text-neutral-500 mt-1">Enter to save</p>
@@ -835,7 +835,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                       }}
                       aria-label="Edit session title"
                     >
-                      <h1 className="text-[18px] font-medium text-neutral-900">
+                      <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
                         {session?.title ?? "Session"}
                       </h1>
                       {saveSessionTitleSuccess ? (
@@ -907,13 +907,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             {insightRevealed &&
               typeof session?.aiInsightSummary === "string" &&
               session.aiInsightSummary.trim() !== "" && (
-                <div className="mt-4 pl-3 border-l-2 border-neutral-200 max-w-[750px] text-[12px] leading-[1.45] text-neutral-500">
+                <div className="mt-5 pl-3 border-l border-[var(--layer-1-border)] max-w-[750px] text-[12px] leading-[1.5] text-[hsl(var(--text-tertiary))]">
                   {session.aiInsightSummary.trim()}
                 </div>
               )}
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-4xl mx-auto w-full px-10 py-8">
+            <div className="max-w-3xl mx-auto w-full px-12 py-12">
               {feedbackLoading ? (
                 <FeedbackPremiumLoader />
               ) : detailLoading && selectedId ? (
@@ -955,8 +955,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         </main>
 
         {isCommentsOpen && (
-          <aside className="w-[320px] shrink-0 min-h-0 flex flex-col hidden lg:block border-l border-[hsl(var(--border)/0.8)] bg-[hsl(var(--surface-1))]">
-            <div className="flex-1 min-h-0 flex flex-col px-6">
+          <aside className="w-[320px] shrink-0 min-h-0 flex flex-col hidden lg:block border-l border-[var(--layer-1-border)] bg-[var(--canvas-base)]">
+            <div className="flex-1 min-h-0 flex flex-col px-6 py-5">
               <ActivityPanel
                 comments={comments}
                 loading={loadingComments}
@@ -975,7 +975,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             aria-hidden
           />
           <div
-            className="relative w-full max-w-sm h-full min-h-0 bg-[hsl(var(--surface-1))] flex flex-col transition-opacity duration-200 cursor-default"
+            className="relative w-full max-w-sm h-full min-h-0 bg-[var(--canvas-base)] flex flex-col transition-opacity duration-200 cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <ActivityPanel
@@ -1012,12 +1012,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           aria-labelledby="delete-ticket-title"
         >
           <div
-            className="bg-white rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.06)] max-w-sm w-full p-6 border border-neutral-200 cursor-default"
+            className="bg-white rounded-2xl max-w-sm w-full p-6 border border-[var(--layer-2-border)] cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <h2
               id="delete-ticket-title"
-              className="text-[18px] font-medium leading-[1.35] text-neutral-900"
+              className="text-[18px] font-medium leading-[1.3] text-[hsl(var(--text-primary-strong))]"
             >
               Delete feedback permanently?
             </h2>

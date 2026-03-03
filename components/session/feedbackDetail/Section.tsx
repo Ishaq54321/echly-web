@@ -16,14 +16,14 @@ export function Section({ title, children, titleMuted, titleSemantic }: SectionP
       : titleSemantic === "attention"
         ? "text-semantic-attention"
         : titleMuted
-          ? "text-neutral-500"
-          : "text-neutral-400";
+          ? "text-[hsl(var(--text-tertiary))]"
+          : "text-[hsl(var(--text-tertiary))]";
   return (
-    <section className="my-6">
-      <h2 className={`text-[12px] uppercase tracking-[0.08em] mb-2 ${titleClass}`}>
+    <section className="my-8">
+      <h2 className={`text-[12px] font-medium uppercase tracking-[0.06em] mb-3 ${titleClass}`}>
         {title}
       </h2>
-      <div className="gap-2 flex flex-col text-[15px] leading-[1.7] text-neutral-800">
+      <div className="gap-2 flex flex-col text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))]">
         {children}
       </div>
     </section>

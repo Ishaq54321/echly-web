@@ -30,12 +30,12 @@ function OverviewSessionHeader({
 }) {
   const dateStr = formatOverviewDate(createdAt ?? null);
   return (
-    <header className="flex items-center justify-between px-6 py-4 border-b border-neutral-200">
+    <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--layer-1-border)]">
       <div>
-        <h1 className="text-[18px] font-medium leading-[1.35] text-neutral-900">
+        <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
           {title || "Session"}
         </h1>
-        <p className="text-[13px] text-neutral-500 mt-0.5">
+        <p className="text-[13px] text-[hsl(var(--text-tertiary))] mt-2">
           {dateStr} • Owner • —
         </p>
       </div>
@@ -43,7 +43,7 @@ function OverviewSessionHeader({
         <button
           type="button"
           onClick={onCopy}
-          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-md border border-neutral-200 bg-white hover:bg-neutral-100 transition-colors duration-150 text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
+          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
         >
           <Share2 size={14} />
           {copied ? "Copied" : "Share"}
@@ -58,7 +58,7 @@ function OverviewSessionHeader({
         <button
           type="button"
           aria-label="Settings"
-          className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-neutral-200 bg-white hover:bg-neutral-100 transition-colors duration-150 text-[hsl(var(--text-secondary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-secondary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
         >
           <Settings size={14} />
         </button>
@@ -78,15 +78,15 @@ function MetricCard({
   progressPercent?: number;
 }) {
   return (
-    <div className="rounded-md border border-neutral-200 p-4 bg-white">
-      <p className="text-[11px] uppercase tracking-[0.08em] text-neutral-400">
+    <div className="rounded-lg border border-[var(--layer-2-border)] p-4 bg-white">
+      <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[hsl(var(--text-tertiary))]">
         {label}
       </p>
-      <p className="text-[13px] font-medium text-neutral-900 mt-1">
+      <p className="text-[13px] font-medium text-[hsl(var(--text-primary-strong))] mt-1">
         {value}
       </p>
       {progressPercent !== undefined && (
-        <div className="mt-2 h-1 rounded-sm bg-neutral-100 overflow-hidden">
+        <div className="mt-2 h-1 rounded-sm border border-[var(--layer-2-border)] overflow-hidden bg-white">
           <div
             className="h-full rounded-sm bg-[hsl(var(--text-active))] transition-[width] duration-150"
             style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
@@ -106,7 +106,7 @@ function FeedbackPreviewRow({
   showStatus?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-neutral-100 last:border-0">
+    <div className="flex items-center gap-3 py-2 border-b border-[var(--layer-1-border)] last:border-0">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-[hsl(var(--text-primary))] truncate">
           {item.title}
@@ -116,7 +116,7 @@ function FeedbackPreviewRow({
         </p>
       </div>
       {showStatus && (
-        <span className="text-xs font-medium text-[hsl(var(--text-secondary))] shrink-0 px-2 py-0.5 rounded-md border border-neutral-200 bg-neutral-50">
+        <span className="text-xs font-medium text-[hsl(var(--text-secondary))] shrink-0 px-2 py-0.5 rounded-md border border-[var(--layer-2-border)] bg-white">
           {resolutionLabel(item.isResolved ?? false)}
         </span>
       )}
@@ -142,11 +142,11 @@ function StatusSection({
         <span className="text-xs uppercase tracking-wide text-[hsl(var(--text-muted))]">
           {label}
         </span>
-        <span className="text-xs font-medium text-[hsl(var(--text-secondary))] px-2 py-0.5 rounded-md border border-neutral-200 bg-neutral-50">
+        <span className="text-xs font-medium text-[hsl(var(--text-secondary))] px-2 py-0.5 rounded-md border border-[var(--layer-2-border)] bg-white">
           {count}
         </span>
       </div>
-      <div className="rounded-md border border-neutral-200 bg-white divide-y divide-neutral-100">
+      <div className="rounded-lg border border-[var(--layer-2-border)] bg-white divide-y divide-[var(--layer-1-border)]">
         {items.length === 0 ? (
           <p className="text-sm text-[hsl(var(--text-muted))] py-3 px-3">
             No items
@@ -170,7 +170,7 @@ function StatusSection({
 // ----- Tag distribution -----
 function TagDistribution({ tagCounts }: { tagCounts: { tag: string; count: number }[] }) {
   return (
-    <div className="rounded-md border border-neutral-200 p-4 bg-white">
+    <div className="rounded-lg border border-[var(--layer-2-border)] p-4 bg-white">
       <h3 className="text-xs uppercase tracking-wide text-[hsl(var(--text-muted))] mb-3">
         Tag distribution
       </h3>
@@ -184,7 +184,7 @@ function TagDistribution({ tagCounts }: { tagCounts: { tag: string; count: numbe
               className="flex items-center justify-between text-sm"
             >
               <span className="text-[hsl(var(--text-primary))]">{tag}</span>
-              <span className="text-[hsl(var(--text-muted))] font-medium px-2 py-0.5 rounded-md border border-neutral-200 bg-neutral-50">
+              <span className="text-[hsl(var(--text-muted))] font-medium px-2 py-0.5 rounded-md border border-[var(--layer-2-border)] bg-white">
                 {count}
               </span>
             </li>
@@ -198,8 +198,8 @@ function TagDistribution({ tagCounts }: { tagCounts: { tag: string; count: numbe
 // ----- Recent activity -----
 function RecentActivity({ items }: { items: OverviewActivityItem[] }) {
   return (
-    <div className="rounded-md border border-neutral-200 bg-white">
-      <h3 className="text-xs uppercase tracking-wide text-[hsl(var(--text-muted))] px-4 py-3 border-b border-neutral-100">
+    <div className="rounded-lg border border-[var(--layer-2-border)] bg-white">
+      <h3 className="text-xs font-medium uppercase tracking-[0.06em] text-[hsl(var(--text-tertiary))] px-4 py-3 border-b border-[var(--layer-1-border)]">
         Recent activity
       </h3>
       {items.length === 0 ? (
@@ -207,7 +207,7 @@ function RecentActivity({ items }: { items: OverviewActivityItem[] }) {
           No recent activity
         </p>
       ) : (
-        <ul className="divide-y divide-neutral-100">
+        <ul className="divide-y divide-[var(--layer-1-border)]">
           {items.map((item, i) => (
             <li key={i} className="px-4 py-2.5 flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -257,7 +257,7 @@ export default function SessionOverviewPage() {
 
   if (authLoading || (loading && !data.session)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--background))]">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--canvas-base)]">
         <p className="text-sm text-[hsl(var(--text-muted))]">Loading…</p>
       </div>
     );
@@ -265,7 +265,7 @@ export default function SessionOverviewPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--background))]">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--canvas-base)]">
         <p className="text-sm text-neutral-600">Failed to load overview.</p>
       </div>
     );
@@ -282,7 +282,7 @@ export default function SessionOverviewPage() {
   const completionPercent = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))]">
+    <div className="min-h-screen bg-[var(--canvas-base)]">
       <OverviewSessionHeader
         title={session.title}
         createdAt={session.createdAt ?? null}

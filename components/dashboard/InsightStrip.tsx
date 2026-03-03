@@ -39,30 +39,30 @@ export function InsightStrip() {
 
   return (
     <span
-      className="flex flex-wrap items-center gap-x-4 gap-y-0 text-[12px]"
+      className="flex flex-wrap items-center gap-x-5 gap-y-0 text-[12px]"
       aria-label="Dashboard metrics"
     >
       {loading ? (
         <>
-          <span className="text-neutral-400">Open</span>
+          <span className="text-[hsl(var(--text-tertiary))]">Open</span>
           <SkeletonItem />
-          <span className="text-neutral-400">Resolved</span>
+          <span className="text-[hsl(var(--text-tertiary))]">Resolved</span>
           <SkeletonItem />
-          <span className="text-neutral-400">Sessions</span>
+          <span className="text-[hsl(var(--text-tertiary))]">Sessions</span>
           <SkeletonItem />
-          <span className="text-neutral-400">Active</span>
+          <span className="text-[hsl(var(--text-tertiary))]">Active</span>
           <SkeletonItem />
         </>
       ) : metrics ? (
         <>
-          <span className="text-neutral-400">Open</span>
-          <span className="text-neutral-700 tabular-nums">{metrics.totalOpen}</span>
-          <span className="text-neutral-400">Resolved</span>
-          <span className="text-neutral-700 tabular-nums">{metrics.totalResolved}</span>
-          <span className="text-neutral-400">Sessions</span>
-          <span className="text-neutral-700 tabular-nums">{metrics.totalSessions}</span>
-          <span className="text-neutral-400">Active</span>
-          <span className="text-neutral-700 tabular-nums">{metrics.sessionsWithOpen}</span>
+          <span className="text-[hsl(var(--text-tertiary))]">Open</span>
+          <span className="text-[hsl(var(--text-secondary-soft))] tabular-nums font-medium">{metrics.totalOpen}</span>
+          <span className="text-[hsl(var(--text-tertiary))]">Resolved</span>
+          <span className="text-[hsl(var(--text-secondary-soft))] tabular-nums font-medium">{metrics.totalResolved}</span>
+          <span className="text-[hsl(var(--text-tertiary))]">Sessions</span>
+          <span className="text-[hsl(var(--text-secondary-soft))] tabular-nums font-medium">{metrics.totalSessions}</span>
+          <span className="text-[hsl(var(--text-tertiary))]">Active</span>
+          <span className="text-[hsl(var(--text-secondary-soft))] tabular-nums font-medium">{metrics.sessionsWithOpen}</span>
         </>
       ) : null}
     </span>

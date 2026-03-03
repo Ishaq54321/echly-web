@@ -202,18 +202,15 @@ export function WorkspaceCard({
           group
           relative
           w-full
-          rounded-xl
-          border border-neutral-200
-          bg-white
-          shadow-[0_1px_1px_0_rgba(0,0,0,0.03)]
+          rounded-[18px]
+          border border-[var(--layer-2-border)]
+          bg-[var(--layer-2-bg)]
           p-5
           cursor-pointer
           outline-none
-          focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1
-          transition-all duration-150 ease-out
-          will-change-transform
-          hover:shadow-[0_1px_3px_0_rgba(0,0,0,0.04),0_1px_2px_-1px_rgba(0,0,0,0.04)]
-          hover:-translate-y-[1px]
+          focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)]
+          transition-[border-color,background-color,box-shadow] duration-[140ms] ease-out
+          hover:bg-[var(--layer-2-hover-bg)]
         "
         style={{ animationDelay: `${index * 40}ms` } as React.CSSProperties}
         data-session-id={session.id}
@@ -247,7 +244,7 @@ export function WorkspaceCard({
                 aria-label="More actions"
                 aria-expanded={moreOpen}
                 aria-haspopup="menu"
-                className="flex items-center justify-center h-10 w-10 rounded-lg text-neutral-500 transition-colors duration-150 hover:bg-neutral-100 hover:text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 cursor-pointer"
+                className="flex items-center justify-center h-10 w-10 rounded-lg text-[hsl(var(--text-tertiary))] transition-colors duration-[140ms] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-secondary-soft))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer"
               >
                 <MoreHorizontal className="h-[16px] w-[16px] relative top-[1px] pointer-events-none" strokeWidth={1.5} aria-hidden />
               </button>
@@ -368,15 +365,15 @@ export function WorkspaceCard({
                   strokeWidth={1.5}
                   aria-hidden
                 />
-                <h3 className="text-[16px] leading-[1.4] tracking-[-0.01em] text-neutral-700 line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
+                <h3 className="text-[16px] leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-secondary-soft))] line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
                   {session.title}
                 </h3>
                 <span
-                  className={`ml-2 mt-2 h-2 w-2 shrink-0 rounded-full opacity-80 ${
+                  className={`ml-2 mt-2 h-2 w-2 shrink-0 rounded-full opacity-90 ${
                     feedbackCount === 0
                       ? "bg-neutral-300"
                       : openCount > 0
-                        ? "bg-semantic-attention"
+                        ? "bg-[var(--ai-accent)]"
                         : allCompleted
                           ? "bg-semantic-success"
                           : "bg-neutral-300"
@@ -386,21 +383,21 @@ export function WorkspaceCard({
               </div>
             </div>
 
-            {/* Metrics row — low emphasis */}
-            <div className="mt-3 flex items-center gap-3">
-              <div className="inline-flex items-center rounded-md bg-neutral-100/60 px-2.5 py-[5px] transition-colors duration-150">
-                <span className="text-[14px] font-medium text-neutral-700">
+            {/* Metrics row — disciplined alignment, low emphasis */}
+            <div className="mt-4 flex items-center gap-3">
+              <div className="inline-flex items-center rounded-lg border border-[var(--layer-2-border)] bg-[var(--layer-2-bg)] px-2.5 py-1.5">
+                <span className="text-[13px] text-[hsl(var(--text-secondary-soft))] tabular-nums">
                   {feedbackCount}
                 </span>
-                <span className="ml-1 text-[13px] text-neutral-500">
+                <span className="ml-1.5 text-[12px] text-[hsl(var(--text-tertiary))]">
                   feedback
                 </span>
               </div>
-              <div className="inline-flex items-center rounded-md bg-neutral-100/70 px-2.5 py-[5px] transition-colors duration-150">
-                <span className="text-[14px] font-medium text-neutral-700">
+              <div className="inline-flex items-center rounded-lg border border-[var(--layer-2-border)] bg-[var(--layer-2-bg)] px-2.5 py-1.5">
+                <span className="text-[13px] text-[hsl(var(--text-secondary-soft))] tabular-nums">
                   {openCount}
                 </span>
-                <span className="ml-1 text-[13px] text-neutral-500">
+                <span className="ml-1.5 text-[12px] text-[hsl(var(--text-tertiary))]">
                   open
                 </span>
               </div>
@@ -408,8 +405,8 @@ export function WorkspaceCard({
           </div>
 
           <div className="mt-5 flex flex-col">
-            {/* Activity row (views + comments) — low visual weight */}
-            <div className="flex items-center gap-4 text-[13px] text-neutral-500">
+            {/* Activity row (views + comments) — tertiary */}
+            <div className="flex items-center gap-4 text-[13px] text-[hsl(var(--text-tertiary))]">
               <div className="flex items-center gap-1.5">
                 <Eye className="h-[14px] w-[14px] shrink-0 text-neutral-400" strokeWidth={1.5} aria-hidden />
                 <span>{viewCount}</span>

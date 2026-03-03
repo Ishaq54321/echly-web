@@ -85,10 +85,10 @@ export function FeedbackHeader({
   };
 
   return (
-    <div className="pt-4 pb-4">
-<div className="text-[13px] text-neutral-400 mb-3">
-      {item.index} of {item.total}
-    </div>
+    <div className="pt-2 pb-6">
+      <div className="text-[13px] text-[hsl(var(--text-tertiary))] mb-3">
+        {item.index} of {item.total}
+      </div>
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           {isEditingTitle && onSaveTitle ? (
@@ -101,10 +101,10 @@ export function FeedbackHeader({
                 onBlur={handleTitleBlur}
                 onFocus={(e) => e.currentTarget.select()}
                 onKeyDown={handleTitleKeyDown}
-                className="w-full text-[20px] font-medium leading-[1.35] text-neutral-900 bg-white border border-neutral-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
+                className="w-full text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))] bg-white border border-[var(--layer-2-border)] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
                 aria-label="Edit title"
               />
-              <p className="text-[14px] text-neutral-500 mt-1">
+              <p className="text-[14px] text-[hsl(var(--text-tertiary))] mt-1.5">
                 Enter to save
               </p>
               {isSaving && (
@@ -127,7 +127,7 @@ export function FeedbackHeader({
               }}
               aria-label={onSaveTitle ? "Edit title" : undefined}
             >
-              <h1 className="text-[20px] font-medium leading-[1.35] text-neutral-900 truncate">
+              <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))] truncate">
                 {item.title}
               </h1>
               {onSaveTitle && (
@@ -171,8 +171,8 @@ export function FeedbackHeader({
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors duration-120 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-1 rounded-md cursor-pointer ${
-              isActivityOpen ? "text-neutral-700" : ""
+            className={`flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-120 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ai-accent)] focus-visible:ring-offset-1 rounded-lg cursor-pointer ${
+              isActivityOpen ? "text-[hsl(var(--text-secondary-soft))]" : ""
             }`}
             aria-pressed={isActivityOpen}
           >
@@ -182,13 +182,13 @@ export function FeedbackHeader({
         </div>
       </div>
       {(item.createdAt != null || item.updatedAt != null) && (
-        <div className="mt-1 text-[14px] text-neutral-500">
+        <div className="mt-2 text-[13px] text-[hsl(var(--text-tertiary))]">
           {item.updatedAt != null
             ? `Created ${formatRelative(item.createdAt ?? null)} • Updated ${formatRelative(item.updatedAt)}`
             : `Created ${formatRelative(item.createdAt ?? null)}`}
         </div>
       )}
-      <div className="my-5 border-b border-neutral-200" />
+      <div className="my-6 border-b border-[var(--layer-1-border)]" />
     </div>
   );
 }

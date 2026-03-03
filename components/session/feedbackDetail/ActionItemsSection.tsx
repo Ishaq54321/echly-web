@@ -99,7 +99,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 font-mono text-[13px] px-3 py-2 rounded-md border border-neutral-200 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
+              className="flex-1 font-mono text-[13px] px-3 py-2 rounded-lg border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
               autoFocus
               aria-label="New action step"
             />
@@ -114,8 +114,8 @@ export function ActionItemsSection({
       <ul className="list-none space-y-2 p-0 m-0">
         {items.map((text, i) => (
           <li key={i}>
-            <div className="group flex items-center justify-between rounded-md px-3 py-2 transition-colors duration-120 hover:bg-neutral-100 cursor-pointer">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-semantic-attention">
+            <div className="group flex items-center justify-between rounded-lg px-3 py-2 transition-colors duration-120 hover:bg-[var(--layer-2-hover-bg)] cursor-pointer">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full border border-[var(--layer-2-border)] bg-white flex items-center justify-center text-[10px] font-medium text-semantic-attention">
                 {i + 1}
               </span>
               {editingIndex === i ? (
@@ -129,7 +129,7 @@ export function ActionItemsSection({
                       if (e.key === "Enter") void saveEdit();
                       if (e.key === "Escape") cancelEdit();
                     }}
-                    className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
+                    className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-lg border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
                     autoFocus
                     aria-label={`Edit action step ${i + 1}`}
                   />
@@ -146,10 +146,10 @@ export function ActionItemsSection({
                   <button
                     type="button"
                     onClick={() => startEdit(i)}
-                    className={`flex-1 text-left font-mono text-[13px] px-2 py-1 rounded-md -mx-2 cursor-pointer transition-colors duration-120 ${
+                    className={`flex-1 text-left font-mono text-[13px] px-2 py-1 rounded-lg -mx-2 cursor-pointer transition-colors duration-120 ${
                       isResolved
-                        ? "line-through text-neutral-400"
-                        : "text-neutral-900"
+                        ? "line-through text-[hsl(var(--text-tertiary))]"
+                        : "text-[hsl(var(--text-primary-strong))]"
                     }`}
                   >
                     {text}
@@ -157,7 +157,7 @@ export function ActionItemsSection({
                   <button
                     type="button"
                     onClick={() => void removeItem(i)}
-                    className="flex-shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 opacity-0 group-hover:opacity-100 transition-colors duration-120 cursor-pointer"
+                    className="flex-shrink-0 p-1 rounded-md text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] opacity-0 group-hover:opacity-100 transition-colors duration-120 cursor-pointer"
                     aria-label={`Remove action step ${i + 1}`}
                   >
                     <Trash2 size={14} />
@@ -169,7 +169,7 @@ export function ActionItemsSection({
         ))}
         {isAdding && (
           <li className="flex items-center gap-2">
-            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-neutral-400">
+            <span className="flex-shrink-0 w-5 h-5 rounded-full border border-[var(--layer-2-border)] bg-white flex items-center justify-center text-[10px] font-medium text-[hsl(var(--text-tertiary))]">
               {items.length + 1}
             </span>
             <input
@@ -182,7 +182,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
+              className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-lg border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
               autoFocus
               aria-label="New action step"
             />

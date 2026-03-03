@@ -47,13 +47,14 @@ export function NeedsAttentionSection({
 
   return (
     <section
-      className="mb-6 rounded-md bg-white border-t border-neutral-200 pt-5 pb-5 px-4"
+      className="mb-6 pb-5 pt-1 border-b border-[var(--layer-1-border)]"
+      style={{ borderBottomWidth: "1px" }}
       aria-label="Needs Attention"
     >
-      <h2 className="text-[13px] font-medium text-neutral-600 mb-3">
+      <h2 className="text-[13px] font-medium tracking-[0.02em] text-[hsl(var(--text-tertiary))] mb-3">
         Needs Attention
       </h2>
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-1">
         {items.map(({ session, counts }) => {
           const open = session.openCount ?? counts.open;
           const resolved = session.resolvedCount ?? counts.resolved;
@@ -64,17 +65,17 @@ export function NeedsAttentionSection({
               <button
                 type="button"
                 onClick={() => onView(session.id)}
-                className="w-full text-left px-3 py-2 rounded-md bg-transparent hover:bg-neutral-100 transition-colors duration-120 focus:outline-none focus:ring-1 focus:ring-neutral-300 flex items-center justify-between gap-4"
+                className="w-full text-left px-3 py-2 rounded-lg bg-transparent hover:bg-[var(--layer-2-hover-bg)] transition-[background-color] duration-[140ms] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] flex items-center justify-between gap-4"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-medium text-neutral-900 truncate">
+                  <div className="text-[13px] font-medium text-[hsl(var(--text-primary-strong))] truncate">
                     {session.title || "Untitled Session"}
                   </div>
-                  <div className="text-[12px] text-neutral-500 mt-0.5 tabular-nums">
+                  <div className="text-[12px] text-[hsl(var(--text-tertiary))] mt-0.5 tabular-nums">
                     {open} open · {completionPct}% done
                   </div>
                 </div>
-                <span className="text-[11px] text-neutral-400 shrink-0 tabular-nums">
+                <span className="text-[11px] text-[hsl(var(--text-tertiary))] shrink-0 tabular-nums">
                   {formatLastActivity(session.updatedAt)}
                 </span>
               </button>

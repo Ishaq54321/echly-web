@@ -61,7 +61,7 @@ export function DescriptionSection({
 
   return (
     <Section title="Description" titleSemantic="insight">
-      <div className="flex flex-col gap-2 border-l-2 border-semantic-insight/40 pl-4">
+      <div className="flex flex-col gap-2 border-l border-semantic-insight/30 pl-4">
         {isEditing && hasEdit ? (
           <>
             <textarea
@@ -70,7 +70,7 @@ export function DescriptionSection({
               onChange={(e) => onDraftChange?.(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
-              className="w-full min-h-[100px] rounded-md border border-neutral-200 bg-neutral-50 p-3 text-[15px] leading-[1.7] text-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150 resize-none overflow-hidden"
+              className="w-full min-h-[100px] rounded-lg border border-[var(--layer-2-border)] bg-white p-3 text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] focus:border-[var(--ai-accent)] transition-all duration-150 resize-none overflow-hidden"
               autoFocus
               aria-label="Edit description"
             />
@@ -78,7 +78,7 @@ export function DescriptionSection({
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-[14px] font-medium px-3 py-1.5 rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-100 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 cursor-pointer"
+                className="text-[14px] font-medium px-3 py-1.5 rounded-lg border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer"
               >
                 Cancel
               </button>
@@ -100,7 +100,7 @@ export function DescriptionSection({
             role={hasEdit ? "button" : undefined}
             tabIndex={hasEdit ? 0 : undefined}
           >
-            <p className="text-[15px] leading-[1.7] text-neutral-800 flex-1 pr-6">
+            <p className="text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))] flex-1 pr-6">
               {displayValue || (hasEdit ? "Add description…" : "")}
             </p>
             {hasEdit && (

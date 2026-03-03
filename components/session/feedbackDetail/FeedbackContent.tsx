@@ -115,7 +115,7 @@ export function FeedbackContent({
           <Section title="ACTION STEPS" titleSemantic="attention">
             <ul className="list-none space-y-2 p-0 m-0">
               {actionSteps.map((action, i) => (
-                <li key={i} className="font-mono text-[13px] text-neutral-900 bg-neutral-100 px-2 py-1 rounded-md inline-block">
+                <li key={i} className="font-mono text-[13px] text-[hsl(var(--text-primary-strong))] border border-[var(--layer-2-border)] bg-white px-2 py-1 rounded-lg inline-block">
                   {action}
                 </li>
               ))}
@@ -136,7 +136,7 @@ export function FeedbackContent({
                       e.stopPropagation();
                       handleRemoveTag(tag);
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-colors duration-120 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-colors duration-120 text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] cursor-pointer"
                     aria-label={`Remove ${tag}`}
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -151,7 +151,7 @@ export function FeedbackContent({
                 <button
                   type="button"
                   onClick={() => setTagPopoverOpen((o) => !o)}
-                  className="text-[14px] font-medium px-3 py-1 rounded-full border border-dashed border-neutral-300 text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 transition-colors duration-120 ease-out cursor-pointer"
+                  className="text-[14px] font-medium px-3 py-1 rounded-full border border-dashed border-[var(--layer-2-border)] text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-120 ease-out cursor-pointer"
                 >
                   + Add tag
                 </button>
@@ -166,7 +166,7 @@ export function FeedbackContent({
                         key={tag}
                         type="button"
                         onClick={() => handleAddTag(tag)}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-neutral-100 cursor-pointer transition-colors duration-120 text-left"
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--layer-2-hover-bg)] cursor-pointer transition-colors duration-120 text-left"
                       >
                         <span
                           className={`w-1.5 h-1.5 rounded-full shrink-0 ${getTagDotClass(tag)}`}

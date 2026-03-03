@@ -49,6 +49,25 @@
   --brand: 217 91% 60%;             /* #2563EB */
   --brand-ring: 217 91% 60% / 0.35;
 
+  /* ---- Luminous white spatial system (native-like elevation) ---- */
+  /* Layer 0 — Base canvas: extremely subtle vertical luminance (does not read as gradient) */
+  --canvas-base: #FBFBFA;
+  --canvas-base-top: #FCFCFB;
+  --canvas-base-bottom: #FAFAF9;
+  /* Layer 1 — Command surfaces: separation like air */
+  --layer-1-bg: #FFFFFF;
+  --layer-1-border: rgba(0, 0, 0, 0.04);
+  /* Layer 2 — Objects: cards, ~30% softer border */
+  --layer-2-bg: #FFFFFF;
+  --layer-2-border: rgba(0, 0, 0, 0.038);
+  --layer-2-hover-bg: #FAFAFA;
+  /* AI Accent: surgical use only */
+  --ai-accent: #5B6399;
+  --ai-accent-ring: rgba(91, 99, 153, 0.32);
+  /* Typography: authority + clear contrast ladder */
+  --text-primary-strong: 220 15% 8%;
+  --text-secondary-soft: 220 10% 38%;
+  --text-tertiary: 220 9% 50%;
 }
 
 /* ======================================
@@ -59,8 +78,8 @@ html,
 body {
   height: 100%;
   overflow: hidden;
-  background-color: #F7F7F8;
-  color: #1F2937;
+  background-color: var(--canvas-base);
+  color: #1a1a1a;
   font-size: 15px;
   line-height: 1.65;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
@@ -75,15 +94,23 @@ body {
 ====================================== */
 
 .surface-rail {
-  background-color: #F2F2F3;
+  background-color: var(--canvas-base);
 }
 
 .surface-sidebar {
-  background-color: #F7F7F8;
+  background-color: #FFFFFF;
 }
 
 .surface-main {
-  background-color: #FFFFFF;
+  /* Vertical luminance: restrained, must not look like a gradient */
+  background: linear-gradient(
+    180deg,
+    var(--canvas-base-top) 0%,
+    var(--canvas-base) 45%,
+    var(--canvas-base) 55%,
+    var(--canvas-base-bottom) 100%
+  );
+  background-color: var(--canvas-base);
 }
 
 /* Ensure consistent borders */
@@ -98,11 +125,11 @@ body {
   --tw-ring-color: transparent;
 }
 
-/* Global transition baseline — 160ms, ease-out (no bouncy springs) */
+/* Global transition baseline — fast, calm, engineered. No spring. */
 * {
-  transition-property: background-color, border-color, color, box-shadow, transform, opacity;
-  transition-duration: 160ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-property: background-color, border-color, color, box-shadow, transform, opacity, filter;
+  transition-duration: 140ms;
+  transition-timing-function: cubic-bezier(0.25, 0, 0.2, 1);
 }
 
 /* ======================================
@@ -176,7 +203,7 @@ body {
     0 0 0 4px #2563EB;
 }
 
-/* Enterprise focus ring — all interactive elements */
+/* Focus: AI accent outline, 1px clean. Engineered. */
 button:focus-visible,
 a:focus-visible,
 [role="button"]:focus-visible,
@@ -184,7 +211,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px #fafafa, 0 0 0 2px #a3a3a3;
+  box-shadow: 0 0 0 1px var(--ai-accent);
 }
 
 /* ======================================

@@ -81,21 +81,27 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="surface-main flex flex-col w-full min-h-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+    <div className="surface-main flex flex-col w-full min-h-0">
       <div className="mx-auto w-full max-w-[1800px] px-10 pt-6 pb-8">
         <div className="flex items-start justify-between gap-6">
           <div className="mb-6">
-            <h1 className="text-[28px] font-bold text-neutral-900">
+            <h1 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
               Workspaces
             </h1>
-            <p className="mt-1 text-[14px] text-neutral-500">
+            <p className="mt-2 text-[14px] text-[hsl(var(--text-tertiary))]">
               Sessions and feedback in one place.
             </p>
           </div>
           <div className="flex items-center gap-6 flex-shrink-0">
-            <InsightStrip />
             <div
-              className="flex rounded-lg border border-neutral-100 bg-white p-0.5"
+              className="flex items-center py-2.5 px-4 border-b border-[var(--layer-1-border)]"
+              style={{ borderBottomWidth: "1px" }}
+            >
+              <InsightStrip />
+            </div>
+            <div
+              className="flex rounded-xl border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)] p-0.5"
+              style={{ borderWidth: "1px" }}
               role="tablist"
               aria-label="Filter sessions"
             >
@@ -104,10 +110,10 @@ export default function DashboardPage() {
                 role="tab"
                 aria-selected={viewMode === "all"}
                 onClick={() => setViewMode("all")}
-                className={`h-8 px-3 rounded-md text-[13px] text-neutral-500 transition-colors duration-120 ${
+                className={`h-8 px-3 rounded-lg text-[13px] transition-colors duration-120 ${
                   viewMode === "all"
-                    ? "bg-neutral-50 text-neutral-600"
-                    : "text-neutral-400 hover:text-neutral-500"
+                    ? "bg-[var(--layer-2-hover-bg)] text-[hsl(var(--text-secondary-soft))]"
+                    : "text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))]"
                 }`}
               >
                 All
@@ -117,10 +123,10 @@ export default function DashboardPage() {
                 role="tab"
                 aria-selected={viewMode === "archived"}
                 onClick={() => setViewMode("archived")}
-                className={`h-8 px-3 rounded-md text-[13px] text-neutral-500 transition-colors duration-120 ${
+                className={`h-8 px-3 rounded-lg text-[13px] transition-colors duration-120 ${
                   viewMode === "archived"
-                    ? "bg-neutral-50 text-neutral-600"
-                    : "text-neutral-400 hover:text-neutral-500"
+                    ? "bg-[var(--layer-2-hover-bg)] text-[hsl(var(--text-secondary-soft))]"
+                    : "text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))]"
                 }`}
               >
                 Archived
@@ -148,7 +154,7 @@ export default function DashboardPage() {
           {viewMode === "all" && (
             <NeedsAttentionSection items={attentionItems} onView={handleView} />
           )}
-          <div className="border-t border-neutral-100 pt-4">
+          <div className="border-t border-[var(--layer-1-border)] pt-6" style={{ borderTopWidth: "1px" }}>
             <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
             {filteredSessions.map((item, index) => (
               <WorkspaceCard
