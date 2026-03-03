@@ -29,9 +29,9 @@ export function GlobalNavBar() {
         <Image
           src="/Echly_logo.svg"
           alt="Echly"
-          width={24}
-          height={22}
-          className="h-5 w-auto"
+          width={28}
+          height={26}
+          className="h-[26px] w-auto"
         />
       </Link>
 
