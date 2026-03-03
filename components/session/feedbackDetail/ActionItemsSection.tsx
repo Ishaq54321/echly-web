@@ -114,7 +114,7 @@ export function ActionItemsSection({
       <ul className="list-none space-y-2 p-0 m-0">
         {items.map((text, i) => (
           <li key={i}>
-            <div className="group flex items-center justify-between rounded-lg px-3 py-2 transition-colors duration-120 hover:bg-[var(--layer-2-hover-bg)] cursor-pointer">
+            <div className="group flex items-center justify-between rounded-xl px-3 py-2.5 transition-[background-color] duration-[120ms] hover:bg-white/60 cursor-pointer border border-transparent hover:border-[var(--layer-2-border)]">
               <span className="flex-shrink-0 w-5 h-5 rounded-full border border-[var(--layer-2-border)] bg-white flex items-center justify-center text-[10px] font-medium text-semantic-attention">
                 {i + 1}
               </span>
@@ -136,7 +136,7 @@ export function ActionItemsSection({
                   <button
                     type="button"
                     onClick={() => void saveEdit()}
-                    className="text-[13px] font-medium text-neutral-700 hover:text-neutral-900 hover:underline cursor-pointer transition-colors duration-120"
+                    className="text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] hover:underline cursor-pointer transition-colors duration-[120ms]"
                   >
                     Save
                   </button>
@@ -193,7 +193,7 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-2 flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-neutral-600 hover:text-neutral-900 transition-colors duration-120 cursor-pointer"
+          className="mt-2 flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[120ms] cursor-pointer"
         >
           <Plus size={14} />
           Add action step

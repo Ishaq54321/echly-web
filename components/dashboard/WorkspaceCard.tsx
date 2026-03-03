@@ -189,7 +189,7 @@ export function WorkspaceCard({
   };
 
   const menuItemClass =
-    "w-full px-3 py-2 text-left text-[14px] font-medium rounded-md text-neutral-800 hover:bg-neutral-100 transition-colors duration-120 cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1";
+    "w-full px-3 py-2 text-left text-[14px] font-medium rounded-lg text-[hsl(var(--text-primary-strong))] hover:bg-white/70 transition-colors duration-[120ms] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)]";
 
   return (
     <>
@@ -202,15 +202,18 @@ export function WorkspaceCard({
           group
           relative
           w-full
-          rounded-[18px]
+          rounded-2xl
           border border-[var(--layer-2-border)]
           bg-[var(--layer-2-bg)]
           p-5
           cursor-pointer
           outline-none
+          shadow-[var(--layer-2-shadow)]
           focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)]
-          transition-[border-color,background-color,box-shadow] duration-[140ms] ease-out
+          transition-[background-color,box-shadow,filter] duration-[120ms] ease-out
           hover:bg-[var(--layer-2-hover-bg)]
+          hover:shadow-[var(--layer-2-shadow-hover)]
+          hover:brightness-[1.01]
         "
         style={{ animationDelay: `${index * 40}ms` } as React.CSSProperties}
         data-session-id={session.id}
@@ -244,7 +247,7 @@ export function WorkspaceCard({
                 aria-label="More actions"
                 aria-expanded={moreOpen}
                 aria-haspopup="menu"
-                className="flex items-center justify-center h-10 w-10 rounded-lg text-[hsl(var(--text-tertiary))] transition-colors duration-[140ms] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-secondary-soft))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer"
+                className="flex items-center justify-center h-10 w-10 rounded-xl text-[hsl(var(--text-tertiary))] transition-colors duration-[120ms] hover:bg-white/70 hover:text-[hsl(var(--text-secondary-soft))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer"
               >
                 <MoreHorizontal className="h-[16px] w-[16px] relative top-[1px] pointer-events-none" strokeWidth={1.5} aria-hidden />
               </button>
@@ -273,7 +276,7 @@ export function WorkspaceCard({
                 <div
                   ref={menuRef}
                   data-card-actions
-                  className="dropdown-enter absolute right-0 top-full mt-1 py-1 min-w-[160px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] shadow-lg z-10"
+                  className="dropdown-enter absolute right-0 top-full mt-1 py-1 min-w-[160px] rounded-xl border border-[var(--glass-1-border)] bg-[var(--glass-1-bg)] backdrop-blur-[10px] shadow-[var(--layer-2-shadow-hover)] z-10"
                   role="menu"
                   aria-label="Workspace actions"
                 >
@@ -330,11 +333,11 @@ export function WorkspaceCard({
                     <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     {archiving ? "Archiving…" : "Archive"}
                   </button>
-                  <div className="my-1 border-t border-[hsl(var(--border))]" role="separator" aria-hidden />
+                  <div className="my-1 border-t border-[var(--glass-1-border)]" role="separator" aria-hidden />
                   <button
                     type="button"
                     onClick={handleDeleteClick}
-                    className="w-full px-3 py-2 text-left text-[14px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-semantic-danger/10 transition-colors duration-120 cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1"
+                    className="w-full px-3 py-2 text-left text-[14px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))] hover:bg-semantic-danger/10 transition-colors duration-[120ms] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)]"
                     role="menuitem"
                   >
                     <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -385,7 +388,7 @@ export function WorkspaceCard({
 
             {/* Metrics row — disciplined alignment, low emphasis */}
             <div className="mt-4 flex items-center gap-3">
-              <div className="inline-flex items-center rounded-lg border border-[var(--layer-2-border)] bg-[var(--layer-2-bg)] px-2.5 py-1.5">
+              <div className="inline-flex items-center rounded-xl bg-white/80 backdrop-blur-[6px] border border-[var(--layer-2-border)] px-2.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
                 <span className="text-[13px] text-[hsl(var(--text-secondary-soft))] tabular-nums">
                   {feedbackCount}
                 </span>
@@ -393,7 +396,7 @@ export function WorkspaceCard({
                   feedback
                 </span>
               </div>
-              <div className="inline-flex items-center rounded-lg border border-[var(--layer-2-border)] bg-[var(--layer-2-bg)] px-2.5 py-1.5">
+              <div className="inline-flex items-center rounded-xl bg-white/80 backdrop-blur-[6px] border border-[var(--layer-2-border)] px-2.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
                 <span className="text-[13px] text-[hsl(var(--text-secondary-soft))] tabular-nums">
                   {openCount}
                 </span>

@@ -47,14 +47,14 @@ export function NeedsAttentionSection({
 
   return (
     <section
-      className="mb-6 pb-5 pt-1 border-b border-[var(--layer-1-border)]"
-      style={{ borderBottomWidth: "1px" }}
+      className="mb-6 rounded-2xl border border-[var(--glass-1-border)] bg-[var(--glass-1-bg)] backdrop-blur-[12px] py-4 px-5 shadow-[var(--glass-1-edge)]"
+      style={{ boxShadow: "var(--glass-1-edge), 0 1px 0 rgba(0,0,0,0.03)" }}
       aria-label="Needs Attention"
     >
-      <h2 className="text-[13px] font-medium tracking-[0.02em] text-[hsl(var(--text-tertiary))] mb-3">
+      <h2 className="text-[12px] font-medium uppercase tracking-[0.06em] text-[hsl(var(--text-tertiary))] mb-3">
         Needs Attention
       </h2>
-      <ul className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-0.5">
         {items.map(({ session, counts }) => {
           const open = session.openCount ?? counts.open;
           const resolved = session.resolvedCount ?? counts.resolved;
@@ -65,7 +65,7 @@ export function NeedsAttentionSection({
               <button
                 type="button"
                 onClick={() => onView(session.id)}
-                className="w-full text-left px-3 py-2 rounded-lg bg-transparent hover:bg-[var(--layer-2-hover-bg)] transition-[background-color] duration-[140ms] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] flex items-center justify-between gap-4"
+                className="w-full text-left px-3 py-2 rounded-xl bg-transparent hover:bg-white/50 transition-[background-color,filter] duration-[120ms] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] flex items-center justify-between gap-4"
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-medium text-[hsl(var(--text-primary-strong))] truncate">

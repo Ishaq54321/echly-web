@@ -85,23 +85,22 @@ export default function DashboardPage() {
       <div className="mx-auto w-full max-w-[1800px] px-10 pt-6 pb-8">
         <div className="flex items-start justify-between gap-6">
           <div className="mb-6">
-            <h1 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
+            <h1 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] text-[hsl(var(--text-primary-strong))]">
               Workspaces
             </h1>
-            <p className="mt-2 text-[14px] text-[hsl(var(--text-tertiary))]">
+            <p className="mt-2.5 text-[14px] leading-[1.5] text-[hsl(var(--text-tertiary))]">
               Sessions and feedback in one place.
             </p>
           </div>
           <div className="flex items-center gap-6 flex-shrink-0">
             <div
-              className="flex items-center py-2.5 px-4 border-b border-[var(--layer-1-border)]"
-              style={{ borderBottomWidth: "1px" }}
+              className="flex items-center py-3 px-6 rounded-2xl border border-[var(--glass-1-border)] bg-[var(--glass-1-bg)] backdrop-blur-[10px] shadow-[var(--glass-1-edge)]"
+              style={{ boxShadow: "var(--glass-1-edge), 0 1px 0 rgba(0,0,0,0.02)" }}
             >
               <InsightStrip />
             </div>
             <div
-              className="flex rounded-xl border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)] p-0.5"
-              style={{ borderWidth: "1px" }}
+              className="flex rounded-xl border border-[var(--glass-1-border)] bg-[var(--glass-1-bg)] backdrop-blur-[8px] p-0.5"
               role="tablist"
               aria-label="Filter sessions"
             >
@@ -135,7 +134,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={handleCreateSession}
-              className="h-9 rounded-lg bg-neutral-900 text-white text-[14px] px-4 font-medium hover:opacity-90 active:scale-[0.98] focus:outline-none focus:ring-1 focus:ring-neutral-300 transition-colors duration-150 cursor-pointer"
+              className="h-9 rounded-xl bg-[hsl(var(--text-primary-strong))] text-white text-[14px] px-4 font-medium hover:opacity-92 active:scale-[0.99] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-[120ms] cursor-pointer"
             >
               New Session
             </button>
@@ -144,7 +143,7 @@ export default function DashboardPage() {
               placeholder="Search sessions"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 px-3 min-w-[160px] rounded-lg bg-white border border-neutral-200 text-[14px] text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-300 transition-all duration-150"
+              className="h-9 px-3 min-w-[160px] rounded-xl bg-white/90 border border-[var(--layer-2-border)] text-[14px] text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-[120ms]"
               aria-label="Search sessions"
             />
           </div>
@@ -154,7 +153,7 @@ export default function DashboardPage() {
           {viewMode === "all" && (
             <NeedsAttentionSection items={attentionItems} onView={handleView} />
           )}
-          <div className="border-t border-[var(--layer-1-border)] pt-6" style={{ borderTopWidth: "1px" }}>
+          <div className="pt-6 border-t border-[var(--glass-1-border)]">
             <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
             {filteredSessions.map((item, index) => (
               <WorkspaceCard

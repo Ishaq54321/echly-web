@@ -713,7 +713,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   return (
     <>
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside className="surface-sidebar w-[280px] shrink-0 min-h-0 flex flex-col border-r border-[var(--layer-1-border)]">
+        <aside className="surface-sidebar w-[272px] shrink-0 min-h-0 flex flex-col border-r border-[var(--glass-1-border)] bg-[var(--glass-1-bg)]/50 backdrop-blur-[8px]">
           <div className="flex-1 min-h-0 overflow-y-auto">
             <FeedbackSidebar
               feedback={feedback}
@@ -733,7 +733,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         </aside>
 
         <main className="surface-main flex-1 min-h-0 flex flex-col">
-          <div className="max-w-4xl mx-auto w-full px-12 py-9 border-b border-[var(--layer-1-border)] shrink-0">
+          <div className="max-w-4xl mx-auto w-full px-12 py-9 border-b border-[var(--glass-1-border)] shrink-0">
             <div className="flex justify-between items-center gap-4">
               <div className="min-w-0 flex-1">
                 {isEditingSessionTitle ? (
@@ -896,7 +896,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                           alt=""
                           width={24}
                           height={24}
-                          className="w-6 h-6 rounded-full border border-neutral-200 ml-2 flex-shrink-0"
+                          className="w-6 h-6 rounded-full border border-[var(--layer-2-border)] ml-2 flex-shrink-0"
                         />
                       )}
                     </>
@@ -912,7 +912,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 </div>
               )}
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--glass-1-bg)]/40 backdrop-blur-[12px] border-t border-[var(--glass-1-border)]">
             <div className="max-w-3xl mx-auto w-full px-12 py-12">
               {feedbackLoading ? (
                 <FeedbackPremiumLoader />
@@ -1012,7 +1012,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           aria-labelledby="delete-ticket-title"
         >
           <div
-            className="bg-white rounded-2xl max-w-sm w-full p-6 border border-[var(--layer-2-border)] cursor-default"
+            className="bg-white rounded-2xl max-w-sm w-full p-6 border border-[var(--layer-2-border)] shadow-[var(--layer-2-shadow-hover)] cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <h2
@@ -1036,7 +1036,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               <button
                 type="button"
                 onClick={() => handleDeleteFeedback(selectedId)}
-                className="px-4 py-2 text-[13px] font-medium rounded-lg bg-neutral-900 text-white hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors duration-150 cursor-pointer"
+                className="px-4 py-2 text-[13px] font-medium rounded-xl bg-[hsl(var(--text-primary-strong))] text-white hover:opacity-92 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-colors duration-[120ms] cursor-pointer"
               >
                 Delete permanently
               </button>
