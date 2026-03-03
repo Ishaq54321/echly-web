@@ -2,21 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Folder,
-  Camera,
-  BarChart3,
-  Settings,
-  Box,
-} from "lucide-react";
+import { LayoutDashboard, Folder, Box } from "lucide-react";
 
+/** Dashboard and Sessions only; Capture, Analytics, Settings temporarily removed. */
 const NAV_ITEMS = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/dashboard", icon: Folder, label: "Sessions" },
-  { href: "/capture", icon: Camera, label: "Capture" },
-  { href: "/analytics", icon: BarChart3, label: "Analytics" },
-  { href: "/settings", icon: Settings, label: "Settings" },
 ] as const;
 
 function isActive(href: string, label: string, pathname: string): boolean {

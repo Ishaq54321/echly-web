@@ -4,6 +4,7 @@ import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
   getFeedbackByIdRepo,
   updateFeedbackRepo,
+  updateFeedbackResolveAndSessionCountersRepo,
 } from "@/lib/repositories/feedbackRepository";
 import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
@@ -113,7 +114,12 @@ export async function PATCH(
     });
   }
   try {
-    await updateFeedbackRepo(id, updates);
+    if (typeof body.isResolved === "boolean") {
+      await updateFeedbackResolveAndSessionCountersRepo(id, updates);
+    } else {
+      await updateFeedbackRepo(id, updates);
+      await updateSessionUpdatedAtRepo(existingForOwnership.sessionId);
+    }
     const updated = await getFeedbackByIdRepo(id);
     if (!updated) {
       return NextResponse.json(
@@ -121,7 +127,6 @@ export async function PATCH(
         { status: 404 }
       );
     }
-    await updateSessionUpdatedAtRepo(updated.sessionId);
     log("[API] PATCH /api/tickets/[id] duration:", Date.now() - start);
     return NextResponse.json({
       success: true,

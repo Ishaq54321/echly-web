@@ -42,9 +42,10 @@ export async function recordSessionViewIfNew(
 
 export async function getUserSessions(
   userId: string,
-  max?: number
+  max?: number,
+  options?: { archivedOnly?: boolean }
 ): Promise<Session[]> {
-  return await getUserSessionsRepo(userId, max);
+  return await getUserSessionsRepo(userId, max, options?.archivedOnly);
 }
 
 /* ================================

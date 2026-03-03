@@ -2,7 +2,7 @@
 
 import { authFetch } from "@/lib/authFetch";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle, Folder } from "lucide-react";
+import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle, Folder, Hash } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import { ShareSessionModal } from "./ShareSessionModal";
 import { RenameSessionModal } from "./RenameSessionModal";
@@ -205,14 +205,14 @@ export function WorkspaceCard({
           rounded-xl
           border border-neutral-200
           bg-white
-          shadow-sm
+          shadow-[0_1px_1px_0_rgba(0,0,0,0.03)]
           p-5
           cursor-pointer
           outline-none
           focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1
           transition-all duration-150 ease-out
           will-change-transform
-          hover:shadow-md
+          hover:shadow-[0_1px_3px_0_rgba(0,0,0,0.04),0_1px_2px_-1px_rgba(0,0,0,0.04)]
           hover:-translate-y-[1px]
         "
         style={{ animationDelay: `${index * 40}ms` } as React.CSSProperties}
@@ -292,6 +292,21 @@ export function WorkspaceCard({
                   </button>
                   <button
                     type="button"
+                    onClick={() => {
+                      const id = session.id ? `FB-${session.id.slice(-6).toUpperCase()}` : session.id;
+                      if (id && navigator.clipboard?.writeText) {
+                        navigator.clipboard.writeText(id);
+                      }
+                      setMoreOpen(false);
+                    }}
+                    className={menuItemClass}
+                    role="menuitem"
+                  >
+                    <Hash className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Copy session ID
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleShare}
                     className={menuItemClass}
                     role="menuitem"
@@ -353,7 +368,7 @@ export function WorkspaceCard({
                   strokeWidth={1.5}
                   aria-hidden
                 />
-                <h3 className="text-[16px] font-medium leading-[1.4] tracking-[-0.01em] text-neutral-900 line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
+                <h3 className="text-[16px] leading-[1.4] tracking-[-0.01em] text-neutral-700 line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
                   {session.title}
                 </h3>
                 <span
@@ -403,10 +418,6 @@ export function WorkspaceCard({
                 <MessageCircle className="h-[14px] w-[14px] shrink-0 text-neutral-400" strokeWidth={1.5} aria-hidden />
                 <span>{commentCount}</span>
               </div>
-            </div>
-            {/* System ID — audit / structure signal */}
-            <div className="mt-2 text-[11px] text-neutral-400">
-              ID: {session.id ? `FB-${session.id.slice(-6).toUpperCase()}` : "—"}
             </div>
           </div>
         </div>

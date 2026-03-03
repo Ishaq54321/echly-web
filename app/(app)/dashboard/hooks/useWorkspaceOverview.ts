@@ -12,11 +12,16 @@ import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepositor
 
 const SESSION_LIMIT = 50;
 
-async function loadSessionsAndCounts(uid: string): Promise<{
+async function loadSessionsAndCounts(
+  uid: string,
+  archivedOnly?: boolean
+): Promise<{
   sessions: Session[];
   counts: Record<string, SessionFeedbackCounts>;
 }> {
-  const userSessions = await getUserSessions(uid, SESSION_LIMIT);
+  const userSessions = await getUserSessions(uid, SESSION_LIMIT, {
+    archivedOnly,
+  });
   const counts = await Promise.all(
     userSessions.map((s) =>
       getSessionFeedbackCounts(s.id).then((c) => [s.id, c] as const)
@@ -37,45 +42,55 @@ export interface SessionWithCounts {
   counts: SessionFeedbackCounts;
 }
 
-export function useWorkspaceOverview() {
+export type ViewMode = "all" | "archived";
+
+export function useWorkspaceOverview(viewMode: ViewMode = "all") {
   const router = useRouter();
   const [user, setUser] = useState<{ uid: string } | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionCounts, setSessionCounts] = useState<Record<string, SessionFeedbackCounts>>({});
   const [loading, setLoading] = useState(true);
 
+  const archivedOnly = viewMode === "archived";
+
   const refreshSessions = useCallback(async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
     setLoading(true);
     try {
-      const { sessions: userSessions, counts: newCounts } = await loadSessionsAndCounts(currentUser.uid);
+      const { sessions: userSessions, counts: newCounts } = await loadSessionsAndCounts(
+        currentUser.uid,
+        archivedOnly
+      );
       setSessions(userSessions);
       setSessionCounts(newCounts);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [archivedOnly]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         clearAuthTokenCache();
         router.push("/login");
         return;
       }
       setUser(currentUser);
-      setLoading(true);
-      try {
-        const { sessions: userSessions, counts: newCounts } = await loadSessionsAndCounts(currentUser.uid);
-        setSessions(userSessions);
-        setSessionCounts(newCounts);
-      } finally {
-        setLoading(false);
-      }
     });
     return () => unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    if (!user) return;
+    setLoading(true);
+    loadSessionsAndCounts(user.uid, archivedOnly)
+      .then(({ sessions: userSessions, counts: newCounts }) => {
+        setSessions(userSessions);
+        setSessionCounts(newCounts);
+      })
+      .finally(() => setLoading(false));
+  }, [user?.uid, archivedOnly]);
 
   const stats: WorkspaceStats = {
     totalSessions: sessions.length,

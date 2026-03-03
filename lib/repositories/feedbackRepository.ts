@@ -9,11 +9,14 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   startAfter,
   updateDoc,
   where,
+  increment,
+  writeBatch,
   type DocumentReference,
   type QueryDocumentSnapshot,
   type Timestamp,
@@ -67,6 +70,34 @@ export async function addFeedbackRepo(
   return docRef;
 }
 
+/**
+ * Creates feedback and updates session denormalized counters in one transaction.
+ * Use for feedback create to avoid race conditions. Migration-safe: uses increment(1).
+ */
+export async function addFeedbackWithSessionCountersRepo(
+  sessionId: string,
+  userId: string,
+  data: StructuredFeedback,
+  feedbackId?: string
+): Promise<DocumentReference> {
+  const payload = feedbackPayload(sessionId, userId, data);
+  const sessionRef = doc(db, "sessions", sessionId);
+
+  return await runTransaction(db, async (tx) => {
+    const feedbackRef =
+      feedbackId != null && feedbackId !== ""
+        ? doc(db, "feedback", feedbackId)
+        : doc(collection(db, "feedback"));
+    tx.set(feedbackRef, payload);
+    tx.update(sessionRef, {
+      openCount: increment(1),
+      feedbackCount: increment(1),
+      updatedAt: serverTimestamp(),
+    });
+    return feedbackRef;
+  });
+}
+
 type FeedbackUpdate = Partial<{
   title: string;
   description: string;
@@ -101,6 +132,63 @@ export async function updateFeedbackRepo(
   }
   if (Object.keys(updates).length === 0) return;
   await updateDoc(doc(db, "feedback", feedbackId), updates);
+}
+
+/**
+ * Updates feedback (including resolve toggle) and session denormalized counters in one transaction.
+ * Use when isResolved may change. Migration-safe: floors session counters at 0.
+ */
+export async function updateFeedbackResolveAndSessionCountersRepo(
+  feedbackId: string,
+  data: Partial<{
+    title: string;
+    description: string;
+    type: string;
+    screenshotUrl: string | null;
+    actionSteps: string[] | null;
+    suggestedTags: string[] | null;
+    isResolved: boolean;
+  }>
+): Promise<void> {
+  const feedbackRef = doc(db, "feedback", feedbackId);
+  const updates: FeedbackUpdate = {};
+  if (typeof data.title === "string") updates.title = data.title;
+  if (typeof data.description === "string") updates.description = data.description;
+  if (typeof data.type === "string") updates.type = data.type;
+  if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
+  if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
+  if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
+  if (typeof (data as { isResolved?: boolean }).isResolved === "boolean") {
+    updates.status = (data as { isResolved: boolean }).isResolved ? "resolved" : "open";
+  }
+
+  await runTransaction(db, async (tx) => {
+    const feedbackSnap = await tx.get(feedbackRef);
+    if (!feedbackSnap.exists()) return;
+    const fd = feedbackSnap.data();
+    const sessionId = fd.sessionId as string;
+    const wasResolved = (fd.status as string) === "resolved";
+    const toResolved = (data as { isResolved?: boolean }).isResolved === true;
+
+    if (Object.keys(updates).length > 0) {
+      tx.update(feedbackRef, updates);
+    }
+
+    const sessionRef = doc(db, "sessions", sessionId);
+    const sessionSnap = await tx.get(sessionRef);
+    const s = sessionSnap.data() || {};
+    let openCount = (s.openCount as number) ?? 0;
+    let resolvedCount = (s.resolvedCount as number) ?? 0;
+    if (wasResolved !== toResolved) {
+      openCount = Math.max(0, openCount + (toResolved ? -1 : 1));
+      resolvedCount = Math.max(0, resolvedCount + (toResolved ? 1 : -1));
+    }
+    tx.update(sessionRef, {
+      openCount,
+      resolvedCount,
+      updatedAt: serverTimestamp(),
+    });
+  });
 }
 
 /** Cursor for server-side pagination. Opaque to callers; only repo uses it. */
@@ -228,6 +316,41 @@ export async function getSessionFeedbackCountRepo(sessionId: string): Promise<nu
 
 export async function deleteFeedbackRepo(feedbackId: string): Promise<void> {
   await deleteDoc(doc(db, "feedback", feedbackId));
+}
+
+/**
+ * Deletes feedback and updates session denormalized counters in one transaction.
+ * Migration-safe: reads session and floors counters at 0.
+ */
+export async function deleteFeedbackWithSessionCountersRepo(
+  feedbackId: string
+): Promise<void> {
+  const feedbackRef = doc(db, "feedback", feedbackId);
+
+  await runTransaction(db, async (tx) => {
+    const feedbackSnap = await tx.get(feedbackRef);
+    if (!feedbackSnap.exists()) return;
+    const data = feedbackSnap.data();
+    const sessionId = data.sessionId as string;
+    const status = (data.status as string) ?? "open";
+    const sessionRef = doc(db, "sessions", sessionId);
+    const sessionSnap = await tx.get(sessionRef);
+    const s = sessionSnap.data() || {};
+    const openCount = Math.max(0, ((s.openCount as number) ?? 0) - (status === "open" ? 1 : 0));
+    const resolvedCount = Math.max(
+      0,
+      ((s.resolvedCount as number) ?? 0) - (status === "resolved" ? 1 : 0)
+    );
+    const feedbackCount = Math.max(0, ((s.feedbackCount as number) ?? 0) - 1);
+
+    tx.delete(feedbackRef);
+    tx.update(sessionRef, {
+      openCount,
+      resolvedCount,
+      feedbackCount,
+      updatedAt: serverTimestamp(),
+    });
+  });
 }
 
 export async function resolveFeedbackRepo(feedbackId: string): Promise<void> {

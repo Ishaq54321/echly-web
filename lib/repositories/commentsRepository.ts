@@ -14,7 +14,10 @@ import {
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Comment } from "@/lib/domain/comment";
-import { incrementSessionCommentCountRepo } from "@/lib/repositories/sessionsRepository";
+import {
+  incrementSessionCommentCountRepo,
+  updateSessionUpdatedAtRepo,
+} from "@/lib/repositories/sessionsRepository";
 
 export async function addCommentRepo(
   sessionId: string,
@@ -39,6 +42,7 @@ export async function addCommentRepo(
 
   await addDoc(collectionRef, payload);
   await incrementSessionCommentCountRepo(sessionId);
+  await updateSessionUpdatedAtRepo(sessionId);
 }
 
 /** Max comments per feedback thread (cost protection). */

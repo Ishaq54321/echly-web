@@ -26,5 +26,11 @@ export interface Session {
   aiInsightSummaryFeedbackCount?: number;
   /** Timestamp when aiInsightSummary was last generated. */
   aiInsightSummaryUpdatedAt?: Timestamp | null;
+  /** Denormalized: total open feedback (WAVE 1 structural). */
+  openCount?: number;
+  /** Denormalized: total resolved feedback (WAVE 1 structural). */
+  resolvedCount?: number;
+  /** Denormalized: total feedback count (WAVE 1 structural). */
+  feedbackCount?: number;
 }
 

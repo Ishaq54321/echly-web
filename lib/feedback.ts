@@ -2,14 +2,15 @@ import type { DocumentReference } from "firebase/firestore";
 export type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
 import type { StructuredFeedback, Feedback } from "@/lib/domain/feedback";
 import {
-  addFeedbackRepo,
-  deleteFeedbackRepo,
+  addFeedbackWithSessionCountersRepo,
+  deleteFeedbackWithSessionCountersRepo,
   getFeedbackByIdsRepo,
   getSessionFeedbackByResolvedRepo,
   getSessionFeedbackCountsRepo,
   getSessionFeedbackPageRepo,
   getSessionFeedbackTotalCountRepo,
   updateFeedbackRepo,
+  updateFeedbackResolveAndSessionCountersRepo,
 } from "@/lib/repositories/feedbackRepository";
 import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
 import type {
@@ -39,9 +40,7 @@ export async function addFeedback(
   data: StructuredFeedback,
   feedbackId?: string
 ): Promise<DocumentReference> {
-  const ref = await addFeedbackRepo(sessionId, userId, data, feedbackId);
-  await updateSessionUpdatedAtRepo(sessionId);
-  return ref;
+  return addFeedbackWithSessionCountersRepo(sessionId, userId, data, feedbackId);
 }
 
 /* ================================
@@ -60,8 +59,12 @@ export async function updateFeedback(
   }>,
   sessionId?: string
 ) {
-  await updateFeedbackRepo(feedbackId, data);
-  if (sessionId) await updateSessionUpdatedAtRepo(sessionId);
+  if (typeof (data as { isResolved?: boolean }).isResolved === "boolean") {
+    await updateFeedbackResolveAndSessionCountersRepo(feedbackId, data);
+  } else {
+    await updateFeedbackRepo(feedbackId, data);
+    if (sessionId) await updateSessionUpdatedAtRepo(sessionId);
+  }
 }
 
 /* ================================
@@ -121,7 +124,6 @@ export async function getFeedbackByIds(
    DELETE FEEDBACK
 ================================ */
 
-export async function deleteFeedback(feedbackId: string, sessionId?: string) {
-  await deleteFeedbackRepo(feedbackId);
-  if (sessionId) await updateSessionUpdatedAtRepo(sessionId);
+export async function deleteFeedback(feedbackId: string, _sessionId?: string) {
+  await deleteFeedbackWithSessionCountersRepo(feedbackId);
 }

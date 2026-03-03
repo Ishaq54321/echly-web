@@ -3,16 +3,12 @@ import type { Feedback } from "@/lib/domain/feedback";
 import { requireAuth } from "@/lib/server/auth";
 import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
-  addFeedbackRepo,
+  addFeedbackWithSessionCountersRepo,
   getFeedbackByIdRepo,
   getSessionFeedbackPageWithStringCursorRepo,
-  getSessionFeedbackCountRepo,
   getSessionFeedbackCountsRepo,
 } from "@/lib/repositories/feedbackRepository";
-import {
-  getSessionByIdRepo,
-  updateSessionUpdatedAtRepo,
-} from "@/lib/repositories/sessionsRepository";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
 
 function serializeFeedback(item: Feedback): Record<string, unknown> {
@@ -77,10 +73,19 @@ export async function GET(req: Request) {
     let activeCount: number | undefined;
     let resolvedCount: number | undefined;
     if (isFirstPage) {
-      total = await getSessionFeedbackCountRepo(sessionId);
-      const counts = await getSessionFeedbackCountsRepo(sessionId);
-      activeCount = counts.open;
-      resolvedCount = counts.resolved;
+      const hasCounters =
+        typeof session.openCount === "number" &&
+        typeof session.resolvedCount === "number";
+      if (hasCounters) {
+        activeCount = session.openCount ?? 0;
+        resolvedCount = session.resolvedCount ?? 0;
+        total = activeCount + resolvedCount;
+      } else {
+        const counts = await getSessionFeedbackCountsRepo(sessionId);
+        activeCount = counts.open;
+        resolvedCount = counts.resolved;
+        total = activeCount + resolvedCount;
+      }
     }
     const { feedback, nextCursor, hasMore } = pageResult;
 
@@ -195,7 +200,11 @@ export async function POST(req: Request) {
   };
 
   try {
-    const docRef = await addFeedbackRepo(sessionId, user.uid, structuredData);
+    const docRef = await addFeedbackWithSessionCountersRepo(
+      sessionId,
+      user.uid,
+      structuredData
+    );
     const created = await getFeedbackByIdRepo(docRef.id);
     if (!created) {
       return NextResponse.json(
@@ -203,7 +212,6 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
-    await updateSessionUpdatedAtRepo(sessionId);
 
     log("[API] POST /api/feedback duration:", Date.now() - start);
     return NextResponse.json({

@@ -39,6 +39,9 @@ export async function createSessionRepo(
     createdBy: createdBy ?? null,
     viewCount: 0,
     commentCount: 0,
+    openCount: 0,
+    resolvedCount: 0,
+    feedbackCount: 0,
   });
 
   return docRef.id;
@@ -47,15 +50,20 @@ export async function createSessionRepo(
 /**
  * Lists user sessions. Sorted by most recent activity (updatedAt desc).
  * Composite index required: (userId Ascending, updatedAt Descending).
+ * When archivedOnly is true: (userId Ascending, archived Ascending, updatedAt Descending).
  */
 export async function getUserSessionsRepo(
   userId: string,
-  max: number = 50
+  max: number = 50,
+  archivedOnly?: boolean
 ): Promise<Session[]> {
   assertQueryLimit(max, "getUserSessionsRepo");
   const q = query(
     collection(db, "sessions"),
     where("userId", "==", userId),
+    ...(archivedOnly === true
+      ? [where("archived", "==", true) as ReturnType<typeof where>]
+      : []),
     orderBy("updatedAt", "desc"),
     limit(max)
   );
@@ -63,7 +71,10 @@ export async function getUserSessionsRepo(
   const snapshot = await getDocs(q);
 
   return snapshot.docs
-    .filter((docSnap) => (docSnap.data() as { archived?: boolean }).archived !== true)
+    .filter((docSnap) => {
+      const archived = (docSnap.data() as { archived?: boolean }).archived === true;
+      return archivedOnly ? archived : !archived;
+    })
     .map((docSnap) => ({
       id: docSnap.id,
       ...(docSnap.data() as SessionDoc),
