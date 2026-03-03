@@ -2,7 +2,8 @@
  * authFetch for content script: proxies requests through background (no Firebase in content).
  * Background adds Bearer token via ECHLY_GET_TOKEN / getValidToken().
  */
-const API_BASE = "https://echly-web.vercel.app";
+const API_BASE = "http://localhost:3000";
+console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 export function clearAuthTokenCache(): void {
   // No-op: token cache lives in background.

@@ -5,7 +5,8 @@
 import { firebaseConfig } from "../../lib/firebase/config";
 import { warn } from "../../lib/utils/logger";
 
-const API_BASE = "https://echly-web.vercel.app";
+const API_BASE = "http://localhost:3000";
+console.log("[EXTENSION] Using API_BASE:", API_BASE);
 const IDP_API_KEY = firebaseConfig.apiKey;
 
 let activeSessionId: string | null = null;

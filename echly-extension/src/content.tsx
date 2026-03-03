@@ -213,6 +213,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             }
           }
           const visibleTextFromScreenshot = await visibleTextPromise;
+          console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
           const currentUrl = typeof window !== "undefined" ? window.location.href : "";
           const enrichedContext = {
             ...(context ?? {}),
@@ -255,6 +256,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       try {
       const visibleTextFromScreenshot = await getVisibleTextFromScreenshot(screenshot ?? null);
+      console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
       const structureBody = {
         transcript,

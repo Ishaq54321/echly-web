@@ -43,7 +43,7 @@ function resolveInput(input: RequestInfo | URL): RequestInfo | URL {
   return path.startsWith("http") ? input : base + path;
 }
 
-const DEFAULT_TIMEOUT_MS = 15000;
+const DEFAULT_TIMEOUT_MS = 25000;
 
 export type AuthFetchInit = RequestInit & {
   /** Abort request after this many ms. Default 15s when set. */
@@ -73,7 +73,10 @@ export async function authFetch(
 
   if (timeoutMs > 0) {
     controller = new AbortController();
-    timeoutId = setTimeout(() => controller!.abort(), timeoutMs);
+    timeoutId = setTimeout(() => {
+      console.warn("[authFetch] Request exceeded timeout threshold:", timeoutMs, "ms");
+      controller!.abort();
+    }, timeoutMs);
     signal = restInit.signal
       ? (() => {
           const combined = new AbortController();

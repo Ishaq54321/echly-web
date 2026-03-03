@@ -310,6 +310,19 @@ export async function POST(req: Request): Promise<Response> {
   let body: { transcript?: unknown; context?: unknown };
   try {
     body = await req.json();
+    const ctxDebug = body?.context as {
+      url?: string;
+      viewportWidth?: number;
+      viewportHeight?: number;
+      domPath?: string | null;
+      nearbyText?: string | null;
+      visibleText?: string | null;
+    } | undefined;
+    console.log("====== STRUCTURE API REQUEST ======");
+    console.log("RAW BODY:", body);
+    console.log("BODY.transcript:", body?.transcript);
+    console.log("BODY.context:", ctxDebug);
+    console.log("BODY.context.visibleText:", ctxDebug?.visibleText);
   } catch {
     return stableFailure("Invalid request body");
   }
@@ -350,11 +363,18 @@ export async function POST(req: Request): Promise<Response> {
           .join("\n")
       : "";
 
+  console.log("[STRUCTURE] Received visibleText:", ctx?.visibleText);
+  console.log("[STRUCTURE] Original transcript:", transcript);
   const originalTranscript = transcript;
   const correctedTranscript = anchorProperNouns(
     originalTranscript,
     ctx?.visibleText ?? null
   );
+  console.log("ANCHOR INPUT transcript:", originalTranscript);
+  console.log("ANCHOR INPUT visibleText:", ctx?.visibleText);
+  console.log("ANCHOR OUTPUT correctedTranscript:", correctedTranscript);
+  console.log("===================================");
+  console.log("[STRUCTURE] Corrected transcript:", correctedTranscript);
 
   const patternData = detectHighConfidencePatterns(correctedTranscript);
   const hintsBlock =
@@ -382,6 +402,12 @@ export async function POST(req: Request): Promise<Response> {
   const userContent = [contextBlock, hintsBlock, screenRefBlock, rawFeedbackLine]
     .filter(Boolean)
     .join("\n\n");
+
+  // Verification: confirm which transcript is sent to structure extraction
+  const transcriptSentToExtraction = correctedTranscript.trim();
+  console.log("[VERIFY] Original transcript:", originalTranscript);
+  console.log("[VERIFY] Corrected transcript (anchor output):", correctedTranscript);
+  console.log("[VERIFY] Transcript actually sent into structure extraction (in user message):", transcriptSentToExtraction);
 
   if (process.env.NODE_ENV !== "production") {
     console.log("Original transcript:", originalTranscript);
