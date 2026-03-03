@@ -47,6 +47,11 @@ type StructureFeedbackTicket = {
   suggestedTags?: string[];
 };
 
+/** Response shape from POST /api/session-insight. */
+type SummaryResponse = {
+  summary?: string;
+};
+
 /** Ticket shape returned by GET/PATCH /api/tickets/:id (DB source of truth). */
 type TicketFromApi = {
   id: string;
@@ -674,15 +679,16 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId }),
     })
-      .then((res) => res.json())
-      .then((data: { summary?: unknown }) => {
+      .then(async (res) => (await res.json()) as SummaryResponse)
+      .then((data) => {
         if (cancelled) return;
-        if (typeof data?.summary === "string" && data.summary.trim() !== "") {
+        const summary = data.summary;
+        if (typeof summary === "string" && summary.trim() !== "") {
           setSession((prev) =>
             prev
               ? ({
                   ...prev,
-                  aiInsightSummary: data.summary.trim(),
+                  aiInsightSummary: summary.trim(),
                   aiInsightSummaryFeedbackCount: currentCount,
                 } as Session)
               : prev
