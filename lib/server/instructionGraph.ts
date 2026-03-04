@@ -275,7 +275,8 @@ export interface BuildInstructionGraphResult {
  * Deterministic; no OpenAI calls.
  */
 export function buildInstructionGraph(input: BuildInstructionGraphInput): BuildInstructionGraphResult {
-  const { instructions, context, transcript = "" } = input;
+  const { instructions, context } = input;
+  const transcript = input.transcript ?? "";
   const allowed = getAllowedElementPhrases(context);
 
   const targetMap = new Map<string, ActionNode[]>();
