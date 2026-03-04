@@ -32,9 +32,19 @@ type StructureFeedbackTicket = {
   description?: string;
   actionSteps?: string[];
   suggestedTags?: string[];
+  confidenceScore?: number;
 };
 
-/** Structure-feedback API response (includes Clarity Guard fields). */
+/** Context sent with structure-feedback for consistent AI results (visibleText preferred; fallback nearbyText/domPath). */
+type StructureFeedbackContext = {
+  visibleText?: string | null;
+  nearbyText?: string | null;
+  domPath?: string | null;
+  url?: string;
+  elements?: Array<{ type: string; label?: string | null; text?: string | null }>;
+};
+
+/** Structure-feedback API response (includes Clarity Guard and pipeline fields). */
 type StructureFeedbackResponse = {
   success?: boolean;
   tickets?: StructureFeedbackTicket[];
@@ -43,6 +53,10 @@ type StructureFeedbackResponse = {
   clarityIssues?: string[];
   suggestedRewrite?: string | null;
   confidence?: number;
+  needsClarification?: boolean;
+  verificationIssues?: string[];
+  verificationWarnings?: string[];
+  instructionLimitWarning?: string | null;
 };
 
 /** Pending state when submission is blocked by low clarity. */
@@ -57,6 +71,7 @@ type PendingClaritySubmit = {
   clarityIssues: string[];
   suggestedRewrite: string | null;
   confidence: number;
+  context?: StructureFeedbackContext | null;
 };
 
 /** Response shape from POST /api/session-insight. */
@@ -883,13 +898,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const handleTranscript = async (
     transcript: string,
-    screenshot: string | null
+    screenshot: string | null,
+    context?: StructureFeedbackContext | null
   ) => {
     const firstFeedbackId = generateFeedbackId();
     const structureCall = authFetch("/api/structure-feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript }),
+      body: JSON.stringify({
+        transcript,
+        ...(context != null && Object.keys(context).length > 0 ? { context } : {}),
+      }),
     }).then((res) => res.json() as Promise<StructureFeedbackResponse>);
     const uploadCall = screenshot
       ? uploadScreenshot(screenshot, sessionId, firstFeedbackId)
@@ -920,7 +939,32 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
     if (!session) return;
 
-    /* Raw fallback when AI fails or returns no tickets */
+    /* Pipeline or verification requested clarification: show clarity UI, do not create raw ticket */
+    if (data.needsClarification && tickets.length === 0) {
+      const issues = data.verificationIssues ?? data.clarityIssues ?? ["Feedback needs clarification"];
+      setClarityResult({
+        clarityScore: clarityScore,
+        clarityIssues: issues,
+        suggestedRewrite: suggestedRewrite,
+      });
+      setBlockSubmit(true);
+      setPendingClaritySubmit({
+        data,
+        screenshotUrl,
+        firstFeedbackId,
+        transcript,
+        screenshot,
+        clarityScore,
+        clarityStatus,
+        clarityIssues: issues,
+        suggestedRewrite,
+        confidence,
+        context: context ?? undefined,
+      });
+      return undefined;
+    }
+
+    /* Raw fallback when AI fails or returns no tickets (and not needsClarification) */
     if (!data.success || tickets.length === 0) {
       const rawPayload = {
         title: transcript.slice(0, 80),
@@ -983,6 +1027,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         clarityIssues,
         suggestedRewrite,
         confidence,
+        context: context ?? undefined,
       });
       return undefined;
     }
@@ -1018,7 +1063,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const structureCall = authFetch("/api/structure-feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript: pending.suggestedRewrite!.trim() }),
+      body: JSON.stringify({
+        transcript: pending.suggestedRewrite!.trim(),
+        ...(pending.context != null && Object.keys(pending.context).length > 0 ? { context: pending.context } : {}),
+      }),
     }).then((res) => res.json() as Promise<StructureFeedbackResponse>);
 
     const data = (await structureCall) as StructureFeedbackResponse;

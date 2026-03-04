@@ -1,17 +1,24 @@
 /**
  * Phrase-level and token-level proper-noun anchoring using OCR visible text as authority.
- * Phrase-level runs first (2–4 word sequences, similarity >= 0.82); token-level Levenshtein as fallback.
+ * - Only replace when similarity >= 0.85. Between 0.5 and 0.85 we log potential matches but keep the transcript.
+ * - Phrase-level runs first (multi-word matches preferred); single-word token-level as fallback.
+ * - Common UI words (submit, button, email, phone, name, form, field) are protected and never replaced.
+ * - Anchoring corrects obvious OCR mismatches only; it does not guess replacements that could change meaning.
  */
 
 const MIN_VISIBLE_TOKEN_LEN = 4;
 const MIN_WORD_LEN = 3;
-const MAX_DISTANCE_SINGLE = 2;
-/** For phrases longer than 2 words, allow slightly more STT noise (token-level fallback). */
-const MAX_DISTANCE_PHRASE = 3;
-/** Minimum similarity for phrase-level replacement (normalized Levenshtein). Word-count mismatch allowed. */
-const PHRASE_SIMILARITY_THRESHOLD = 0.74;
+/** Minimum similarity to perform any replacement. Below this we do not auto-replace. */
+const SIMILARITY_THRESHOLD_REPLACE = 0.85;
+/** Below this similarity, do not even log as potential. Between this and REPLACE threshold: log only, no replace. */
+const SIMILARITY_POTENTIAL_MIN = 0.5;
 const MIN_VISIBLE_TEXT_LEN = 10;
 const MAX_PHRASE_WORDS = 6;
+
+/** Common UI words that must never be replaced by OCR matches (e.g. "submit" must not become "Summit"). */
+const PROTECTED_UI_WORDS = new Set(
+  ["submit", "button", "email", "phone", "name", "form", "field"].map((s) => s.toLowerCase())
+);
 
 const EXCLUDED_CANDIDATES = new Set(
   [
@@ -65,6 +72,12 @@ function isDigitsOnly(str: string): boolean {
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Returns true if any token in the phrase (space-separated) is a protected UI word. */
+function containsProtectedWord(phrase: string): boolean {
+  const tokens = normalizeForCompare(phrase).split(/\s+/).filter(Boolean);
+  return tokens.some((t) => PROTECTED_UI_WORDS.has(t));
 }
 
 function replaceWholeToken(
@@ -299,8 +312,18 @@ export function anchorProperNouns(
         console.log("Collapsed Window:", collapsedWindow);
         console.log("Collapsed OCR:", collapsedOCR);
         console.log("Similarity Score:", similarity);
+        if (similarity >= SIMILARITY_POTENTIAL_MIN && similarity < SIMILARITY_THRESHOLD_REPLACE) {
+          if (process.env.NODE_ENV !== "production") {
+            console.log("[Anchoring] Potential phrase match (no replace, similarity 0.5–0.85):", {
+              transcriptWindow,
+              ocrPhrase,
+              similarity,
+            });
+          }
+        }
         if (
-          similarity >= PHRASE_SIMILARITY_THRESHOLD &&
+          similarity >= SIMILARITY_THRESHOLD_REPLACE &&
+          !containsProtectedWord(transcriptWindow) &&
           (!bestMatch || similarity > bestMatch.similarity)
         ) {
           bestMatch = {
@@ -358,20 +381,23 @@ export function anchorProperNouns(
   for (const candidatePhrase of candidatePhrases) {
     const candidateNorm = normalizePunctuation(candidatePhrase);
     const candidateLower = candidateNorm.toLowerCase();
-    const phraseWordCount = candidateNorm.split(/\s+/).length;
-    const maxDist = phraseWordCount > 2 ? MAX_DISTANCE_PHRASE : MAX_DISTANCE_SINGLE;
+    if (containsProtectedWord(candidatePhrase)) continue;
     let bestCasing: string | null = null;
-    let bestDist = Number.POSITIVE_INFINITY;
+    let bestSimilarity = 0;
     for (const { phrase: visibleNorm, casing } of visiblePhrases) {
       const visibleLower = visibleNorm.toLowerCase();
-      if (candidateLower === visibleLower) {
-        bestCasing = casing;
-        bestDist = 0;
-        break;
+      const sim = normalizedSimilarity(candidateLower, visibleLower);
+      if (sim >= SIMILARITY_POTENTIAL_MIN && sim < SIMILARITY_THRESHOLD_REPLACE) {
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[Anchoring] Potential phrase match (no replace, similarity 0.5–0.85):", {
+            candidatePhrase,
+            visiblePhrase: casing,
+            similarity: sim,
+          });
+        }
       }
-      const d = computeLevenshteinDistance(candidateLower, visibleLower);
-      if (d <= maxDist && d < bestDist) {
-        bestDist = d;
+      if (sim >= SIMILARITY_THRESHOLD_REPLACE && sim > bestSimilarity) {
+        bestSimilarity = sim;
         bestCasing = casing;
       }
     }
@@ -383,22 +409,26 @@ export function anchorProperNouns(
   for (const candidate of candidates) {
     const candidateNorm = normalizePunctuation(candidate);
     const candidateLower = candidateNorm.toLowerCase();
+    if (PROTECTED_UI_WORDS.has(candidateLower)) continue;
     let bestToken: string | null = null;
-    let bestDist = Number.POSITIVE_INFINITY;
+    let bestSimilarity = 0;
     for (const token of visibleTokens) {
       if (token.length < MIN_VISIBLE_TOKEN_LEN) continue;
       const visibleNorm = normalizePunctuation(token);
       const visibleLower = visibleNorm.toLowerCase();
-      if (candidateLower === visibleLower) {
-        bestToken = token;
-        bestDist = 0;
-        break;
+      const sim = normalizedSimilarity(candidateLower, visibleLower);
+      if (sim >= SIMILARITY_POTENTIAL_MIN && sim < SIMILARITY_THRESHOLD_REPLACE) {
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[Anchoring] Potential single-word match (no replace, similarity 0.5–0.85):", {
+            transcriptWord: candidate,
+            ocrToken: token,
+            similarity: sim,
+          });
+        }
       }
-      const d = computeLevenshteinDistance(candidateLower, visibleLower);
-      if (d <= MAX_DISTANCE_SINGLE && d < bestDist) {
-        bestDist = d;
+      if (sim >= SIMILARITY_THRESHOLD_REPLACE && sim > bestSimilarity) {
+        bestSimilarity = sim;
         bestToken = token;
-        if (d === 1) break;
       }
     }
     if (!bestToken) continue;

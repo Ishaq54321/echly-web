@@ -283,6 +283,33 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               return;
             }
 
+            /* Pipeline requested clarification (vague feedback or verification failed): show clarity assistant, do not create fallback ticket */
+            const needsClarification = Boolean((data as { needsClarification?: boolean }).needsClarification);
+            const verificationIssues = (data as { verificationIssues?: string[] }).verificationIssues ?? [];
+            if (data.success && needsClarification && tickets.length === 0) {
+              console.log("PIPELINE NEEDS CLARIFICATION", verificationIssues);
+              setExtensionClarityPending({
+                tickets: [],
+                screenshotUrl,
+                transcript,
+                screenshot,
+                firstFeedbackId,
+                clarityScore,
+                clarityIssues: verificationIssues.length > 0 ? verificationIssues : clarityIssues,
+                suggestedRewrite,
+                confidence,
+                callbacks,
+                context: enrichedContext,
+              });
+              setEditedTranscript(transcript);
+              setIsEditingFeedback(false);
+              clarityAssistantSubmitLock.current = false;
+              setClarityAssistantSubmitting(false);
+              setShowClarityAssistant(true);
+              submissionLock.current = false;
+              return;
+            }
+
             if (!data.success || tickets.length === 0) {
               chrome.runtime.sendMessage(
                 {
