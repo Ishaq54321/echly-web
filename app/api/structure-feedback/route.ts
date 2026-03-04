@@ -178,10 +178,30 @@ Each action step must:
 - Not combine two separate modifications.
 
 ------------------------------------------------------------
+CLARITY EVALUATION RULES
+------------------------------------------------------------
+
+Evaluate the feedback transcript for clarity. You must:
+
+- Score clarity from 0–100 (100 = fully clear and actionable).
+- Identify vague language (e.g. "something", "maybe", "better", "fix it").
+- Detect non-actionable phrasing (e.g. pure opinion with no concrete change).
+- Detect emotional or subjective statements that lack a clear UI change.
+- Detect missing expected outcome (user intent unclear).
+- If clarityScore < 75: suggest a short rewrite that preserves intent but is more specific and actionable. Otherwise set suggestedRewrite to null.
+- Provide confidence 0–1 for your clarity assessment.
+
+Rules:
+- clarityScore: integer 0–100.
+- clarityIssues: array of short strings (e.g. "Vague language", "Missing expected outcome"). Empty array [] if none.
+- suggestedRewrite: string or null. Null if clarityScore >= 75.
+- confidence: float 0–1.
+
+------------------------------------------------------------
 STRICT OUTPUT FORMAT
 ------------------------------------------------------------
 
-Return ONLY valid JSON.
+Return ONLY valid JSON in this exact shape:
 
 {
   "tickets": [
@@ -194,8 +214,17 @@ Return ONLY valid JSON.
       ],
       "suggestedTags": ["UX"]
     }
-  ]
+  ],
+  "clarityScore": number,
+  "clarityIssues": string[],
+  "suggestedRewrite": string | null,
+  "confidence": number
 }
+
+- clarityScore: 0–100.
+- clarityIssues: empty array if none.
+- suggestedRewrite: null if clarityScore >= 75.
+- confidence: 0–1 float.
 
 ------------------------------------------------------------
 EMPTY OR INVALID INPUT
@@ -205,7 +234,11 @@ If transcript is empty or unintelligible:
 Return:
 
 {
-  "tickets": []
+  "tickets": [],
+  "clarityScore": 0,
+  "clarityIssues": ["Empty or unintelligible input"],
+  "suggestedRewrite": null,
+  "confidence": 0.5
 }
 
 Do not return markdown.
@@ -218,26 +251,66 @@ type StructureResponse = {
   success: boolean;
   tickets: Array<Record<string, unknown>>;
   error?: string;
+  clarityScore?: number;
+  clarityIssues?: string[];
+  suggestedRewrite?: string | null;
+  confidence?: number;
 };
 
-function parseStructuredTickets(
+export type ParseStructureResult = {
+  tickets: Array<Record<string, unknown>>;
+  clarityScore: number;
+  clarityIssues: string[];
+  suggestedRewrite: string | null;
+  confidence: number;
+};
+
+function parseStructureResponse(
   content: string | null | undefined
-): Array<Record<string, unknown>> {
-  if (!content || typeof content !== "string") return [];
+): ParseStructureResult {
+  const empty: ParseStructureResult = {
+    tickets: [],
+    clarityScore: 100,
+    clarityIssues: [],
+    suggestedRewrite: null,
+    confidence: 0.5,
+  };
+  if (!content || typeof content !== "string") return empty;
 
   const cleaned = content.replace(/```json/g, "").replace(/```/g, "").trim();
-  if (!cleaned) return [];
+  if (!cleaned) return empty;
 
   try {
     const parsed = JSON.parse(cleaned);
-    if (!parsed || typeof parsed !== "object") return [];
+    if (!parsed || typeof parsed !== "object") return empty;
 
-    if (!Array.isArray(parsed.tickets)) return [];
+    const tickets = Array.isArray(parsed.tickets) ? parsed.tickets : [];
+    const clarityScore =
+      typeof parsed.clarityScore === "number" && parsed.clarityScore >= 0 && parsed.clarityScore <= 100
+        ? parsed.clarityScore
+        : 100;
+    const clarityIssues = Array.isArray(parsed.clarityIssues)
+      ? parsed.clarityIssues.filter((x: unknown) => typeof x === "string")
+      : [];
+    const suggestedRewrite =
+      parsed.suggestedRewrite != null && typeof parsed.suggestedRewrite === "string"
+        ? parsed.suggestedRewrite
+        : null;
+    const confidence =
+      typeof parsed.confidence === "number" && parsed.confidence >= 0 && parsed.confidence <= 1
+        ? parsed.confidence
+        : 0.5;
 
-    return parsed.tickets;
+    return {
+      tickets,
+      clarityScore,
+      clarityIssues,
+      suggestedRewrite,
+      confidence,
+    };
   } catch (e) {
     console.error("STRUCTURE PARSE ERROR:", e);
-    return [];
+    return empty;
   }
 }
 
@@ -424,6 +497,7 @@ export async function POST(req: Request): Promise<Response> {
       const completion = await client.chat.completions.create({
         model: "gpt-4o-mini",
         temperature: 0,
+        max_tokens: 600,
         messages: [
           { role: "system", content: system },
           { role: "user", content: userContent },
@@ -432,8 +506,10 @@ export async function POST(req: Request): Promise<Response> {
       return completion.choices[0]?.message?.content ?? null;
     };
 
-    const content = await runCompletion(systemContent);
-    parsedTickets = parseStructuredTickets(content);
+    let content = await runCompletion(systemContent);
+    let lastJsonContent: string | null = content;
+    let parsed = parseStructureResponse(content);
+    parsedTickets = parsed.tickets;
 
     const changeOrReplace = patternData.detectedPatterns.find(
       (p): p is DetectedPattern & { from: string; to: string } =>
@@ -454,7 +530,9 @@ export async function POST(req: Request): Promise<Response> {
       const retryContent = await runCompletion(
         systemContent + RETRY_SYSTEM_APPEND
       );
-      parsedTickets = parseStructuredTickets(retryContent);
+      lastJsonContent = retryContent;
+      parsed = parseStructureResponse(retryContent);
+      parsedTickets = parsed.tickets;
 
       if (
         !actionStepsContainBoth(
@@ -501,7 +579,27 @@ export async function POST(req: Request): Promise<Response> {
         };
       });
 
-    return NextResponse.json({ success: true, tickets: valid });
+    const finalParsed = lastJsonContent ? parseStructureResponse(lastJsonContent) : parsed;
+    const clarityScore = finalParsed.clarityScore;
+    const clarityIssues = finalParsed.clarityIssues;
+    const suggestedRewrite = finalParsed.suggestedRewrite;
+    const confidence = finalParsed.confidence;
+
+    console.log("CLARITY API OUTPUT", {
+      clarityScore,
+      clarityIssues,
+      suggestedRewrite,
+      confidence,
+    });
+
+    return NextResponse.json({
+      success: true,
+      tickets: valid,
+      clarityScore,
+      clarityIssues,
+      suggestedRewrite,
+      confidence,
+    });
   } catch (err) {
     console.error("STRUCTURING ERROR:", err);
     return NextResponse.json(

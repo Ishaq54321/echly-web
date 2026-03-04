@@ -139,6 +139,10 @@ export async function POST(req: Request) {
       userAgent?: string;
       clientTimestamp?: number;
     };
+    clarityScore?: number;
+    clarityStatus?: "clear" | "needs_improvement" | "unclear";
+    clarityIssues?: string[];
+    clarityConfidence?: number;
   };
   try {
     body = await req.json();
@@ -201,6 +205,23 @@ export async function POST(req: Request) {
     viewportHeight: meta?.viewportHeight,
     userAgent: meta?.userAgent,
     timestamp: meta?.clientTimestamp,
+    clarityScore:
+      typeof body.clarityScore === "number" && body.clarityScore >= 0 && body.clarityScore <= 100
+        ? body.clarityScore
+        : undefined,
+    clarityStatus:
+      body.clarityStatus === "clear" ||
+      body.clarityStatus === "needs_improvement" ||
+      body.clarityStatus === "unclear"
+        ? body.clarityStatus
+        : undefined,
+    clarityIssues: Array.isArray(body.clarityIssues) ? body.clarityIssues : undefined,
+    clarityConfidence:
+      typeof body.clarityConfidence === "number" &&
+      body.clarityConfidence >= 0 &&
+      body.clarityConfidence <= 1
+        ? body.clarityConfidence
+        : undefined,
   };
 
   try {

@@ -29,20 +29,13 @@ function TicketItemInner({
     <button
       type="button"
       onClick={handleClick}
-      className={`group relative flex w-full items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-all duration-[var(--motion-duration)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] ${
+      className={`sidebar-row-interactive group relative flex w-full items-center gap-2 px-3 py-2.5 rounded-xl text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] ${
         active
-          ? "bg-[var(--color-primary-soft)] shadow-[0_0_0_1px_rgba(26,86,219,0.15)]"
-          : "hover:bg-[var(--layer-2-hover-bg)]"
+          ? "bg-[var(--layer-2-hover-bg)]"
+          : ""
       }`}
       aria-current={active ? "true" : undefined}
     >
-      {/* Selected: vertical bar on left (not a status dot) */}
-      {active && (
-        <span
-          className="absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-full h-5 bg-[var(--color-primary)]"
-          aria-hidden
-        />
-      )}
       <span className="relative min-w-0 flex-1 truncate text-[13px] leading-[1.4] py-0.5">
         <span
           className={`truncate block ${

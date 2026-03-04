@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { addFeedback, deleteFeedback } from "@/lib/feedback";
+import { addFeedback } from "@/lib/feedback";
 import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
@@ -32,6 +32,31 @@ type StructureFeedbackTicket = {
   description?: string;
   actionSteps?: string[];
   suggestedTags?: string[];
+};
+
+/** Structure-feedback API response (includes Clarity Guard fields). */
+type StructureFeedbackResponse = {
+  success?: boolean;
+  tickets?: StructureFeedbackTicket[];
+  error?: string;
+  clarityScore?: number;
+  clarityIssues?: string[];
+  suggestedRewrite?: string | null;
+  confidence?: number;
+};
+
+/** Pending state when submission is blocked by low clarity. */
+type PendingClaritySubmit = {
+  data: StructureFeedbackResponse;
+  screenshotUrl: string | null;
+  firstFeedbackId: string;
+  transcript: string;
+  screenshot: string | null;
+  clarityScore: number;
+  clarityStatus: "clear" | "needs_improvement" | "unclear";
+  clarityIssues: string[];
+  suggestedRewrite: string | null;
+  confidence: number;
 };
 
 /** Response shape from POST /api/session-insight. */
@@ -153,6 +178,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [isSavingSessionTitle, setIsSavingSessionTitle] = useState(false);
   const [saveSessionTitleSuccess, setSaveSessionTitleSuccess] = useState(false);
   const [insightRevealed, setInsightRevealed] = useState(false);
+
+  /* Clarity Guard (Phase 5.1): block low-clarity submission, show rewrite option */
+  const [clarityResult, setClarityResult] = useState<{
+    clarityScore: number;
+    clarityIssues: string[];
+    suggestedRewrite: string | null;
+  } | null>(null);
+  const [blockSubmit, setBlockSubmit] = useState(false);
+  const [pendingClaritySubmit, setPendingClaritySubmit] = useState<PendingClaritySubmit | null>(null);
 
   /* Escape exits comment mode (canvas-native: no panel open by default). */
   useEffect(() => {
@@ -776,44 +810,31 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   /* ================= AI SAVE (Structure Engine V2) ================= */
 
-  const handleTranscript = async (
-    transcript: string,
-    screenshot: string | null
-  ) => {
-    const firstFeedbackId = generateFeedbackId();
-    const structureCall = authFetch("/api/structure-feedback", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript }),
-    }).then(
-      (res) =>
-        res.json() as Promise<{
-          success?: boolean;
-          tickets?: StructureFeedbackTicket[];
-          error?: string;
-        }>
-    );
-    const uploadCall = screenshot
-      ? uploadScreenshot(screenshot, sessionId, firstFeedbackId)
-      : Promise.resolve(null);
+  const buildClarityStatus = (
+    score: number
+  ): "clear" | "needs_improvement" | "unclear" => {
+    if (score >= 85) return "clear";
+    if (score >= 60) return "needs_improvement";
+    return "unclear";
+  };
 
-    const [data, screenshotUrl] = await Promise.all([structureCall, uploadCall]);
-    log("STRUCTURING RESPONSE:", data);
-
-    const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-    if (!data.success || tickets.length === 0) {
-      warn("No structured tickets returned", data);
-      return;
-    }
-
-    if (!session) return;
-
+  const createFeedbackFromTickets = async (
+    tickets: StructureFeedbackTicket[],
+    screenshotUrl: string | null,
+    firstFeedbackId: string,
+    clarityMeta: {
+      clarityScore: number;
+      clarityStatus: "clear" | "needs_improvement" | "unclear";
+      clarityIssues: string[];
+      clarityConfidence: number;
+    } | null
+  ): Promise<Feedback[]> => {
+    if (!session) return [];
     const effectiveFirstId =
       tickets.length > 0 && screenshotUrl !== null ? firstFeedbackId : null;
-
     const created: Feedback[] = [];
     for (let i = 0; i < tickets.length; i++) {
-      const t = tickets[i] as StructureFeedbackTicket;
+      const t = tickets[i];
       const payload = {
         title: t.title,
         description:
@@ -825,10 +846,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         contextSummary: typeof t.description === "string" ? t.description : undefined,
         actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
         suggestedTags: t.suggestedTags ?? undefined,
-        screenshotUrl: i === 0 ? screenshotUrl ?? null : null,
+        screenshotUrl: i === 0 ? screenshotUrl : null,
         timestamp: Date.now(),
+        ...(clarityMeta && {
+          clarityScore: clarityMeta.clarityScore,
+          clarityStatus: clarityMeta.clarityStatus,
+          clarityIssues: clarityMeta.clarityIssues,
+          clarityConfidence: clarityMeta.clarityConfidence,
+        }),
       };
-
       const docRef = await addFeedback(
         sessionId,
         session.userId,
@@ -852,13 +878,198 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       };
       created.push(newItem);
     }
+    return created;
+  };
+
+  const handleTranscript = async (
+    transcript: string,
+    screenshot: string | null
+  ) => {
+    const firstFeedbackId = generateFeedbackId();
+    const structureCall = authFetch("/api/structure-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript }),
+    }).then((res) => res.json() as Promise<StructureFeedbackResponse>);
+    const uploadCall = screenshot
+      ? uploadScreenshot(screenshot, sessionId, firstFeedbackId)
+      : Promise.resolve(null);
+
+    const [data, screenshotUrl] = await Promise.all([structureCall, uploadCall]);
+    console.log("ECHLY CLARITY DEBUG", {
+      clarityScore: data.clarityScore,
+      clarityIssues: data.clarityIssues,
+      suggestedRewrite: data.suggestedRewrite,
+      confidence: data.confidence,
+      tickets: data.tickets,
+    });
+    log("STRUCTURING RESPONSE:", data);
+
+    const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+    const clarityScore = data.clarityScore ?? 100;
+    const clarityIssues = data.clarityIssues ?? [];
+    const suggestedRewrite = data.suggestedRewrite ?? null;
+    const confidence = data.confidence ?? 0.5;
+    console.log("CLARITY DEBUG", {
+      clarityScore,
+      clarityIssues,
+      suggestedRewrite,
+      confidence,
+    });
+    const clarityStatus = buildClarityStatus(clarityScore);
+
+    if (!session) return;
+
+    /* Raw fallback when AI fails or returns no tickets */
+    if (!data.success || tickets.length === 0) {
+      const rawPayload = {
+        title: transcript.slice(0, 80),
+        description: transcript,
+        type: "general",
+        contextSummary: transcript,
+        actionSteps: [],
+        suggestedTags: undefined,
+        screenshotUrl: screenshotUrl ?? null,
+        timestamp: Date.now(),
+        clarityScore: 0,
+        clarityStatus: "unclear" as const,
+        clarityIssues: ["AI structuring failed"],
+        clarityConfidence: 0,
+      };
+      const docRef = await addFeedback(
+        sessionId,
+        session.userId,
+        rawPayload,
+        firstFeedbackId
+      );
+      const newItem: Feedback = {
+        id: docRef.id,
+        sessionId,
+        userId: session.userId,
+        title: rawPayload.title,
+        description: rawPayload.description,
+        type: rawPayload.type,
+        isResolved: false,
+        createdAt: null,
+        contextSummary: rawPayload.contextSummary ?? null,
+        actionSteps: null,
+        suggestedTags: null,
+        screenshotUrl: rawPayload.screenshotUrl ?? null,
+        clientTimestamp: Date.now(),
+      };
+      setFeedback((prev) => [newItem, ...prev]);
+      setSelectedId(newItem.id);
+      setFeedbackTotal((c) => c + 1);
+      setFeedbackActiveCount((c) => c + 1);
+      return newItem;
+    }
+
+    /* Block submission when clarity is too low */
+    if (clarityScore < 60) {
+      setClarityResult({
+        clarityScore,
+        clarityIssues,
+        suggestedRewrite,
+      });
+      setBlockSubmit(true);
+      setPendingClaritySubmit({
+        data,
+        screenshotUrl,
+        firstFeedbackId,
+        transcript,
+        screenshot,
+        clarityScore,
+        clarityStatus,
+        clarityIssues,
+        suggestedRewrite,
+        confidence,
+      });
+      return undefined;
+    }
+
+    const clarityMeta = {
+      clarityScore,
+      clarityStatus,
+      clarityIssues,
+      clarityConfidence: confidence,
+    };
+    const created = await createFeedbackFromTickets(
+      tickets,
+      screenshotUrl,
+      firstFeedbackId,
+      clarityMeta
+    );
+    if (created.length === 0) return undefined;
 
     setFeedback((prev) => [...created, ...prev]);
     setSelectedId(created[0].id);
     setFeedbackTotal((c) => c + created.length);
     setFeedbackActiveCount((c) => c + created.length);
-
     return created[0];
+  };
+
+  const handleClarityUseSuggestion = async () => {
+    const pending = pendingClaritySubmit;
+    if (!pending?.suggestedRewrite?.trim() || !session) return;
+    setBlockSubmit(false);
+    setPendingClaritySubmit(null);
+    setClarityResult(null);
+
+    const structureCall = authFetch("/api/structure-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript: pending.suggestedRewrite!.trim() }),
+    }).then((res) => res.json() as Promise<StructureFeedbackResponse>);
+
+    const data = (await structureCall) as StructureFeedbackResponse;
+    const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+    const clarityScore = data.clarityScore ?? 100;
+    const clarityStatus = buildClarityStatus(clarityScore);
+    const clarityMeta = {
+      clarityScore,
+      clarityStatus,
+      clarityIssues: data.clarityIssues ?? [],
+      clarityConfidence: data.confidence ?? 0.5,
+    };
+
+    const created = await createFeedbackFromTickets(
+      tickets,
+      pending.screenshotUrl,
+      pending.firstFeedbackId,
+      clarityMeta
+    );
+    if (created.length === 0) return;
+    setFeedback((prev) => [...created, ...prev]);
+    setSelectedId(created[0].id);
+    setFeedbackTotal((c) => c + created.length);
+    setFeedbackActiveCount((c) => c + created.length);
+  };
+
+  const handleClaritySubmitAnyway = async () => {
+    const pending = pendingClaritySubmit;
+    if (!pending || !session) return;
+    setBlockSubmit(false);
+    setPendingClaritySubmit(null);
+    setClarityResult(null);
+
+    const tickets = pending.data.tickets ?? [];
+    const clarityMeta = {
+      clarityScore: pending.clarityScore,
+      clarityStatus: pending.clarityStatus,
+      clarityIssues: pending.clarityIssues,
+      clarityConfidence: pending.confidence,
+    };
+    const created = await createFeedbackFromTickets(
+      tickets,
+      pending.screenshotUrl,
+      pending.firstFeedbackId,
+      clarityMeta
+    );
+    if (created.length === 0) return;
+    setFeedback((prev) => [...created, ...prev]);
+    setSelectedId(created[0].id);
+    setFeedbackTotal((c) => c + created.length);
+    setFeedbackActiveCount((c) => c + created.length);
   };
 
   const handleDeleteFeedback = async (id: string) => {
@@ -877,9 +1088,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     setDetailTicket(null);
     setSelectedId(nextSelected);
     setShowDeleteModal(false);
-    if (nextSelected === null) router.push(`/dashboard/${sessionId}`);
     try {
-      await deleteFeedback(id, sessionId);
+      const res = await authFetch(`/api/tickets/${id}`, { method: "DELETE" });
+      const data = (await res.json()) as { success?: boolean; error?: string };
+      if (!res.ok || !data?.success) throw new Error(data?.error ?? "Delete failed");
+      router.push(`/dashboard/${sessionId}`);
     } catch {
       setFeedback(prevFeedback);
       setFeedbackTotal((c) => c + 1);
@@ -1050,6 +1263,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         sendTextComment={sendTextComment ?? undefined}
         onCommentPlaced={() => setIsCommentMode(false)}
         updatePinPosition={updatePinPosition ?? undefined}
+        onDelete={() => setShowDeleteModal(true)}
       />
     );
   };
@@ -1143,6 +1357,78 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         </div>
       </div>
 
+      {/* Clarity Guard: block panel when feedback is unclear */}
+      {blockSubmit && clarityResult && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          onClick={() => {}}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="clarity-guard-title"
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 border border-[var(--layer-2-border)] shadow-[var(--layer-2-shadow-hover)] cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="clarity-guard-title"
+              className="text-[18px] font-semibold leading-[1.3] text-[hsl(var(--text-primary-strong))]"
+            >
+              Feedback needs clarity
+            </h2>
+            <p className="mt-1 text-[14px] text-[hsl(var(--text-tertiary))]">
+              Score: {clarityResult.clarityScore}/100 — below threshold for submission.
+            </p>
+            {clarityResult.clarityIssues.length > 0 && (
+              <ul className="mt-3 list-disc list-inside text-[13px] text-[hsl(var(--text-secondary-soft))] space-y-1">
+                {clarityResult.clarityIssues.map((issue, i) => (
+                  <li key={i}>{issue}</li>
+                ))}
+              </ul>
+            )}
+            {clarityResult.suggestedRewrite && (
+              <div className="mt-3 p-3 rounded-xl bg-[var(--layer-2-hover-bg)] border border-[var(--layer-2-border)]">
+                <p className="text-[12px] font-medium text-[hsl(var(--text-tertiary))] mb-1">
+                  Suggested rewrite
+                </p>
+                <p className="text-[14px] text-[hsl(var(--text-primary-strong))]">
+                  {clarityResult.suggestedRewrite}
+                </p>
+              </div>
+            )}
+            <div className="mt-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setBlockSubmit(false);
+                  setPendingClaritySubmit(null);
+                  setClarityResult(null);
+                }}
+                className="px-4 py-2 text-[13px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              {clarityResult.suggestedRewrite && (
+                <button
+                  type="button"
+                  onClick={handleClarityUseSuggestion}
+                  className="px-4 py-2 text-[13px] font-medium rounded-xl bg-[var(--color-primary)] text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors cursor-pointer"
+                >
+                  Use Suggestion
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleClaritySubmitAnyway}
+                className="px-4 py-2 text-[13px] font-medium rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors cursor-pointer"
+              >
+                Submit Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isTicketNavigatorOpen && (
         <div className="fixed inset-0 z-40 flex lg:hidden">
           <div
@@ -1225,11 +1511,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               id="delete-ticket-title"
               className="text-[18px] font-medium leading-[1.3] text-[hsl(var(--text-primary-strong))]"
             >
-              Delete feedback permanently?
+              Delete this ticket?
             </h2>
             <p className="mt-2 text-[14px] text-neutral-500">
-              This action cannot be undone. This will permanently remove this
-              feedback and associated activity.
+              This action cannot be undone.
             </p>
             <div className="mt-6 flex gap-3 justify-end">
               <button
@@ -1242,9 +1527,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               <button
                 type="button"
                 onClick={() => handleDeleteFeedback(selectedId)}
-                className="px-4 py-2 text-[13px] font-medium rounded-xl bg-[hsl(var(--text-primary-strong))] text-white hover:opacity-92 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-colors duration-[120ms] cursor-pointer"
+                className="px-4 py-2 text-[13px] font-medium rounded-xl bg-[#ef4444] text-white hover:bg-[#dc2626] focus:outline-none focus:ring-2 focus:ring-[#ef4444]/40 transition-colors duration-[120ms] cursor-pointer"
               >
-                Delete permanently
+                Delete
               </button>
             </div>
           </div>

@@ -235,4 +235,36 @@
 
 ---
 
+## WAVE 1 — STRUCTURAL INTELLIGENCE (IMPLEMENTATION SUMMARY)
+
+**Implemented:** Session denormalized counters, last-activity correction, redundant-count removal, metrics endpoint, bulk-resolve utility. No UI or layout changes.
+
+### Structural assumptions
+
+- **Session counters** (`openCount`, `resolvedCount`, `feedbackCount`): Optional on the session document. When missing (existing sessions), reads treat them as `0`; first write that updates counters uses read-modify-write in a transaction and floors at 0. New sessions get counters set to 0 at creation.
+- **Counter consistency:** All feedback create/delete/resolve-toggle (and future bulk resolve) update session counters inside a **transaction** or **batch** with the feedback write so counts stay consistent and no N+1 feedback reads are needed for aggregation.
+- **GET /api/feedback first page:** If the session document has `openCount` and `resolvedCount`, they are used and **total** is derived as `openCount + resolvedCount`; the separate total count query is skipped. If counters are missing, behavior falls back to existing aggregation (open/resolved counts only; total = open + resolved).
+- **GET /api/dashboard/metrics:** Uses only session documents (query by `userId`), aggregates server-side from session counters. No feedback collection reads. Auth required.
+
+### Modified files and logic
+
+| File | Change |
+|------|--------|
+| `lib/domain/session.ts` | Added optional `openCount`, `resolvedCount`, `feedbackCount`. |
+| `lib/repositories/sessionsRepository.ts` | New sessions get `openCount: 0`, `resolvedCount: 0`, `feedbackCount: 0`. |
+| `lib/repositories/feedbackRepository.ts` | `addFeedbackWithSessionCountersRepo` (create + increment open/feedback in tx). `deleteFeedbackWithSessionCountersRepo` (delete + decrement in tx). `updateFeedbackResolveAndSessionCountersRepo` (resolve toggle + session counter delta in tx). Imports: `runTransaction`, `increment`, `writeBatch`. |
+| `lib/repositories/commentsRepository.ts` | `addCommentRepo` now calls `updateSessionUpdatedAtRepo(sessionId)` so comment create updates session `updatedAt`. |
+| `app/api/feedback/route.ts` | POST uses `addFeedbackWithSessionCountersRepo` (no separate `updateSessionUpdatedAtRepo`). GET first page: if session has counters, use them and set `total = openCount + resolvedCount`; else use `getSessionFeedbackCountsRepo` and derive total (removed `getSessionFeedbackCountRepo`). |
+| `app/api/tickets/[id]/route.ts` | PATCH: when `body.isResolved` is boolean, uses `updateFeedbackResolveAndSessionCountersRepo`; otherwise `updateFeedbackRepo` + `updateSessionUpdatedAtRepo`. |
+| `lib/feedback.ts` | `addFeedback` → `addFeedbackWithSessionCountersRepo`. `updateFeedback`: when `isResolved` set → `updateFeedbackResolveAndSessionCountersRepo`; else unchanged. `deleteFeedback` → `deleteFeedbackWithSessionCountersRepo`. |
+| `app/api/dashboard/metrics/route.ts` | **New.** GET returns `{ totalOpen, totalResolved, totalSessions, sessionsWithOpen }` from session counters only; auth required; queries sessions by `userId`, max 500. |
+| `lib/server/resolveAllOpenFeedbackInSession.ts` | **New.** Internal utility: resolves all open feedback in a session in batches of 499, updates session counters; verifies `userId`; not exposed to UI. |
+
+### Backward compatibility
+
+- Existing sessions without counters: first time counters are written (e.g. on next feedback create/delete/resolve in that session), they are set inside the same transaction from current session doc (or 0) and adjusted; no one-time migration job required.
+- GET /api/feedback response shape unchanged: still returns `total`, `activeCount`, `resolvedCount` on first page; total is now derived from open + resolved when possible, reducing one Firestore read.
+
+---
+
 **END OF REPORT**

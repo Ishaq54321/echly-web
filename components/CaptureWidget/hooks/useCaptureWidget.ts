@@ -613,13 +613,13 @@ export function useCaptureWidget({
   const getFullTabImage = useCallback((): Promise<string | null> => {
     if (typeof chrome !== "undefined" && chrome.runtime?.id) {
       return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boolean; image?: string } | undefined) => {
-          if (!response || !response.success) {
-            reject(new Error("Capture failed"));
-          } else {
-            resolve(response.image ?? null);
-          }
-        });
+chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boolean; screenshot?: string } | undefined) => {
+            if (!response || !response.success) {
+              reject(new Error("Capture failed"));
+            } else {
+              resolve(response.screenshot ?? null);
+            }
+          });
       });
     }
     return Promise.resolve(null);
@@ -660,6 +660,14 @@ export function useCaptureWidget({
     removeCaptureRoot();
     restoreWidget();
   }, [removeCaptureRoot, restoreWidget]);
+
+  const setActiveRecordingTranscript = useCallback((transcript: string) => {
+    const activeId = activeRecordingIdRef.current;
+    if (!activeId) return;
+    setRecordings((prev) =>
+      prev.map((r) => (r.id === activeId ? { ...r, transcript } : r))
+    );
+  }, []);
 
   const handleAddFeedback = useCallback(async () => {
     if (stateRef.current !== "idle") return;
@@ -726,6 +734,7 @@ export function useCaptureWidget({
       handleRegionSelectStart,
       handleCancelCapture,
       getFullTabImage,
+      setActiveRecordingTranscript,
     }),
     [
       setIsOpen,
@@ -744,6 +753,7 @@ export function useCaptureWidget({
       handleRegionSelectStart,
       handleCancelCapture,
       getFullTabImage,
+      setActiveRecordingTranscript,
     ]
   );
 

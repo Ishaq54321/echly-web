@@ -50,6 +50,15 @@ const feedbackPayload = (
   clientTimestamp: data.timestamp ?? null,
 
   screenshotUrl: data.screenshotUrl ?? null,
+
+  clarityScore: data.clarityScore ?? null,
+  clarityStatus: data.clarityStatus ?? null,
+  clarityIssues: data.clarityIssues ?? null,
+  clarityConfidence: data.clarityConfidence ?? null,
+  clarityCheckedAt:
+    data.clarityScore != null || data.clarityStatus != null
+      ? serverTimestamp()
+      : (data.clarityCheckedAt ?? null),
 });
 
 export async function addFeedbackRepo(
@@ -187,16 +196,18 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     const sessionId = fd.sessionId as string;
     const wasStatus = ((s: string): FeedbackStatus => (s === "resolved" || s === "skipped" ? s : "open"))(fd.status as string);
 
-    if (Object.keys(updates).length > 0) {
-      tx.update(feedbackRef, updates);
-    }
-
     const sessionRef = doc(db, "sessions", sessionId);
     const sessionSnap = await tx.get(sessionRef);
     const s = sessionSnap.data() || {};
     let openCount = (s.openCount as number) ?? 0;
     let resolvedCount = (s.resolvedCount as number) ?? 0;
     let skippedCount = (s.skippedCount as number) ?? 0;
+
+    // Important: Firestore transactions require *all reads* to happen before *any writes*.
+    // We read both feedback + session above, then perform writes below.
+    if (Object.keys(updates).length > 0) {
+      tx.update(feedbackRef, updates);
+    }
 
     if (wasStatus !== toStatus) {
       if (wasStatus === "open") openCount = Math.max(0, openCount - 1);
@@ -257,6 +268,11 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     userAgent: data.userAgent ?? null,
     clientTimestamp: data.clientTimestamp ?? null,
     screenshotUrl: data.screenshotUrl ?? null,
+    clarityScore: data.clarityScore ?? null,
+    clarityStatus: data.clarityStatus ?? null,
+    clarityIssues: data.clarityIssues ?? null,
+    clarityConfidence: data.clarityConfidence ?? null,
+    clarityCheckedAt: data.clarityCheckedAt ?? null,
   };
 }
 

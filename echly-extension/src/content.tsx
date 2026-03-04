@@ -62,6 +62,27 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const effectiveSessionId = globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
   const submissionLock = React.useRef(false);
+
+  type ExtensionClarityPending = {
+    tickets: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
+    screenshotUrl: string | null;
+    transcript: string;
+    screenshot: string | null;
+    firstFeedbackId: string;
+    clarityScore: number;
+    clarityIssues: string[];
+    suggestedRewrite: string | null;
+    confidence: number;
+    callbacks: { onSuccess: (ticket: { id: string; title: string; description: string; type: string }) => void; onError: () => void };
+    context?: Record<string, unknown>;
+  };
+  const [extensionClarityPending, setExtensionClarityPending] = React.useState<ExtensionClarityPending | null>(null);
+  const [showClarityAssistant, setShowClarityAssistant] = React.useState(false);
+  const [isEditingFeedback, setIsEditingFeedback] = React.useState(false);
+  const [editedTranscript, setEditedTranscript] = React.useState("");
+  const clarityTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const clarityAssistantSubmitLock = React.useRef(false);
+  const [clarityAssistantSubmitting, setClarityAssistantSubmitting] = React.useState(false);
   const logoUrl =
     typeof chrome !== "undefined" && chrome.runtime?.getURL
       ? chrome.runtime.getURL("assets/Echly_logo.svg")
@@ -195,16 +216,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       if (callbacks) {
         (async () => {
           const visibleTextPromise = getVisibleTextFromScreenshot(screenshot ?? null);
+          const firstFeedbackId = generateFeedbackId();
           let screenshotUrl: string | null = null;
           if (screenshot) {
             try {
-              const feedbackId = crypto.randomUUID();
-              const path = `sessions/${effectiveSessionId}/feedback/${feedbackId}/${Date.now()}.png`;
-              const screenshotRef = ref(storage, path);
-              await uploadString(screenshotRef, screenshot, "data_url", {
-                contentType: "image/png",
-              });
-              screenshotUrl = await getDownloadURL(screenshotRef);
+              screenshotUrl = await uploadScreenshot(screenshot, effectiveSessionId, firstFeedbackId);
             } catch (err) {
               console.error("[Echly] Screenshot upload failed:", err);
               callbacks.onError();
@@ -220,37 +236,122 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             visibleText: visibleTextFromScreenshot,
             url: context?.url ?? currentUrl,
           };
-          chrome.runtime.sendMessage(
-            {
-              type: "ECHLY_PROCESS_FEEDBACK",
-              payload: {
-                transcript,
+          const structureBody = { transcript, context: enrichedContext };
+          try {
+            const res = await apiFetch("/api/structure-feedback", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(structureBody),
+            });
+            const data = (await res.json()) as {
+              success?: boolean;
+              tickets?: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
+              error?: string;
+              clarityScore?: number;
+              clarityIssues?: string[];
+              suggestedRewrite?: string | null;
+              confidence?: number;
+            };
+            const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+            const clarityScore = typeof data.clarityScore === "number" ? data.clarityScore : (data.clarityScore != null ? Number(data.clarityScore) : 100);
+            const clarityIssues = data.clarityIssues ?? [];
+            const suggestedRewrite = data.suggestedRewrite ?? null;
+            const confidence = data.confidence ?? 0.5;
+
+            /* Intercept before any submission: pause and show clarity assistant when score <= 20 (even when tickets is empty). */
+            if (data.success && clarityScore <= 20) {
+              console.log("CLARITY GUARD TRIGGERED", clarityScore);
+              setExtensionClarityPending({
+                tickets,
                 screenshotUrl,
-                sessionId: effectiveSessionId,
+                transcript,
+                screenshot,
+                firstFeedbackId,
+                clarityScore,
+                clarityIssues,
+                suggestedRewrite,
+                confidence,
+                callbacks,
                 context: enrichedContext,
-              },
-            },
-            (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
-              submissionLock.current = false;
-              if (chrome.runtime.lastError) {
-                console.error("Runtime error", chrome.runtime.lastError);
-                callbacks?.onError();
-                return;
-              }
-              if (!response?.success || !response.ticket) {
-                console.error("No success in response", response);
-                callbacks?.onError();
-                return;
-              }
-              log("[CONTENT] Ticket received:", response.ticket);
-              callbacks?.onSuccess({
-                id: response.ticket.id,
-                title: response.ticket.title,
-                description: response.ticket.description,
-                type: response.ticket.type ?? "Feedback",
               });
+              setEditedTranscript(transcript);
+              setIsEditingFeedback(false);
+              clarityAssistantSubmitLock.current = false;
+              setClarityAssistantSubmitting(false);
+              setShowClarityAssistant(true);
+              submissionLock.current = false;
+              return;
             }
-          );
+
+            if (!data.success || tickets.length === 0) {
+              chrome.runtime.sendMessage(
+                {
+                  type: "ECHLY_PROCESS_FEEDBACK",
+                  payload: { transcript, screenshotUrl, sessionId: effectiveSessionId, context: enrichedContext },
+                },
+                (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
+                  submissionLock.current = false;
+                  if (chrome.runtime.lastError) {
+                    callbacks.onError();
+                    return;
+                  }
+                  if (response?.success && response.ticket) {
+                    callbacks.onSuccess({
+                      id: response.ticket.id,
+                      title: response.ticket.title,
+                      description: response.ticket.description,
+                      type: response.ticket.type ?? "Feedback",
+                    });
+                  } else {
+                    callbacks.onError();
+                  }
+                }
+              );
+              return;
+            }
+
+            /* clarityScore > 20: continue with normal submission to /api/feedback */
+            const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
+            const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
+            let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
+            for (let i = 0; i < tickets.length; i++) {
+              const t = tickets[i];
+              const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
+              const body = {
+                sessionId: effectiveSessionId,
+                title: t.title ?? "",
+                description: desc,
+                type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
+                contextSummary: desc,
+                actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
+                suggestedTags: t.suggestedTags,
+                screenshotUrl: i === 0 ? screenshotUrl : null,
+                metadata: { clientTimestamp: Date.now() },
+                ...clarityMeta,
+              };
+              const feedbackRes = await apiFetch("/api/feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+              });
+              const feedbackJson = (await feedbackRes.json()) as {
+                success?: boolean;
+                ticket?: { id: string; title: string; description: string; type?: string };
+              };
+              if (feedbackJson.success && feedbackJson.ticket) {
+                const tick = feedbackJson.ticket;
+                if (!firstCreated)
+                  firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
+              }
+            }
+            submissionLock.current = false;
+            if (firstCreated) callbacks.onSuccess(firstCreated);
+            else callbacks.onError();
+          } catch (err) {
+            console.error("[Echly] Structure or submit failed:", err);
+            submissionLock.current = false;
+            callbacks.onError();
+          }
         })();
         return;
       }
@@ -280,8 +381,17 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           actionSteps?: string[];
         }>;
         error?: string;
+        clarityScore?: number;
+        clarityIssues?: string[];
+        suggestedRewrite?: string | null;
+        confidence?: number;
       };
       const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+      const clarityScore = data.clarityScore ?? 100;
+      const clarityIssues = data.clarityIssues ?? [];
+      const suggestedRewrite = data.suggestedRewrite ?? null;
+      const confidence = data.confidence ?? 0.5;
+
       if (!data.success || tickets.length === 0) return undefined;
 
       let screenshotUrl: string | null = null;
@@ -290,6 +400,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         screenshotUrl = await uploadScreenshot(screenshot, effectiveSessionId, firstFeedbackId);
       }
 
+      const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
+      const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
       let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
       for (let i = 0; i < tickets.length; i++) {
         const t = tickets[i];
@@ -304,6 +416,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           suggestedTags: t.suggestedTags,
           screenshotUrl: i === 0 ? screenshotUrl : null,
           metadata: { clientTimestamp: Date.now() },
+          ...clarityMeta,
         };
         const feedbackRes = await apiFetch("/api/feedback", {
           method: "POST",
@@ -334,6 +447,248 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   );
 
   const handleDelete = React.useCallback(async (_id: string) => {}, []);
+
+  const submitPendingFeedback = React.useCallback(
+    async (pending: ExtensionClarityPending) => {
+      if (!effectiveSessionId) return;
+      if (pending.tickets.length === 0) {
+        chrome.runtime.sendMessage(
+          {
+            type: "ECHLY_PROCESS_FEEDBACK",
+            payload: {
+              transcript: pending.transcript,
+              screenshotUrl: pending.screenshotUrl,
+              sessionId: effectiveSessionId,
+              context: pending.context ?? {},
+            },
+          },
+          (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
+            if (chrome.runtime.lastError) {
+              console.error("[Echly] Submit anyway failed:", chrome.runtime.lastError.message);
+              pending.callbacks.onError();
+              return;
+            }
+            if (response?.success && response.ticket) {
+              pending.callbacks.onSuccess({
+                id: response.ticket.id,
+                title: response.ticket.title,
+                description: response.ticket.description,
+                type: response.ticket.type ?? "Feedback",
+              });
+            } else {
+              pending.callbacks.onError();
+            }
+          }
+        );
+        return;
+      }
+
+      const clarityMeta = {
+        clarityScore: pending.clarityScore,
+        clarityIssues: pending.clarityIssues,
+        clarityConfidence: pending.confidence,
+        clarityStatus: (pending.clarityScore >= 85 ? "clear" : pending.clarityScore >= 60 ? "needs_improvement" : "unclear") as "clear" | "needs_improvement" | "unclear",
+      };
+      let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
+      for (let i = 0; i < pending.tickets.length; i++) {
+        const t = pending.tickets[i];
+        const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
+        const body = {
+          sessionId: effectiveSessionId,
+          title: t.title ?? "",
+          description: desc,
+          type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
+          contextSummary: desc,
+          actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
+          suggestedTags: t.suggestedTags,
+          screenshotUrl: i === 0 ? pending.screenshotUrl : null,
+          metadata: { clientTimestamp: Date.now() },
+          ...clarityMeta,
+        };
+        const feedbackRes = await apiFetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const feedbackJson = (await feedbackRes.json()) as {
+          success?: boolean;
+          ticket?: { id: string; title: string; description: string; type?: string };
+        };
+        if (feedbackJson.success && feedbackJson.ticket) {
+          const tick = feedbackJson.ticket;
+          if (!firstCreated)
+            firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
+        }
+      }
+      if (firstCreated) pending.callbacks.onSuccess(firstCreated);
+      else pending.callbacks.onError();
+    },
+    [effectiveSessionId]
+  );
+
+  const submitEditedFeedback = React.useCallback(
+    async (pending: ExtensionClarityPending, editedText: string) => {
+      if (!effectiveSessionId) return;
+      const trimmed = editedText.trim();
+      try {
+        const structureBody = { transcript: trimmed, context: pending.context ?? {} };
+        const res = await apiFetch("/api/structure-feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(structureBody),
+        });
+        const data = (await res.json()) as {
+          success?: boolean;
+          tickets?: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
+          clarityScore?: number;
+          clarityIssues?: string[];
+          confidence?: number;
+        };
+        const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+        const clarityScore = data.clarityScore ?? 100;
+        const confidence = data.confidence ?? 0.5;
+        const clarityStatus = (clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear") as "clear" | "needs_improvement" | "unclear";
+        const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
+
+        if (tickets.length === 0) {
+          chrome.runtime.sendMessage(
+            {
+              type: "ECHLY_PROCESS_FEEDBACK",
+              payload: {
+                transcript: trimmed,
+                screenshotUrl: pending.screenshotUrl,
+                sessionId: effectiveSessionId,
+                context: pending.context ?? {},
+              },
+            },
+            (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string } } | undefined) => {
+              if (chrome.runtime.lastError) {
+                console.error("[Echly] Submit edited feedback failed:", chrome.runtime.lastError.message);
+                pending.callbacks.onError();
+                return;
+              }
+              if (response?.success && response.ticket) {
+                pending.callbacks.onSuccess({
+                  id: response.ticket.id,
+                  title: response.ticket.title,
+                  description: response.ticket.description,
+                  type: response.ticket.type ?? "Feedback",
+                });
+              } else {
+                pending.callbacks.onError();
+              }
+            }
+          );
+          return;
+        }
+
+        let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
+        for (let i = 0; i < tickets.length; i++) {
+          const t = tickets[i];
+          const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
+          const body = {
+            sessionId: effectiveSessionId,
+            title: t.title ?? "",
+            description: desc,
+            type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
+            contextSummary: desc,
+            actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
+            suggestedTags: t.suggestedTags,
+            screenshotUrl: i === 0 ? pending.screenshotUrl : null,
+            metadata: { clientTimestamp: Date.now() },
+            ...clarityMeta,
+          };
+          const feedbackRes = await apiFetch("/api/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const feedbackJson = (await feedbackRes.json()) as {
+            success?: boolean;
+            ticket?: { id: string; title: string; description: string; type?: string };
+          };
+          if (feedbackJson.success && feedbackJson.ticket) {
+            const tick = feedbackJson.ticket;
+            if (!firstCreated)
+              firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
+          }
+        }
+        if (firstCreated) pending.callbacks.onSuccess(firstCreated);
+        else pending.callbacks.onError();
+      } catch (err) {
+        console.error("[Echly] Submit edited feedback failed:", err);
+        pending.callbacks.onError();
+      }
+    },
+    [effectiveSessionId]
+  );
+
+  const handleExtensionClarityUseSuggestion = React.useCallback(async () => {
+    const pending = extensionClarityPending;
+    if (!pending?.suggestedRewrite?.trim() || !effectiveSessionId) return;
+    setExtensionClarityPending(null);
+    try {
+      const res = await apiFetch("/api/structure-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript: pending.suggestedRewrite!.trim() }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        tickets?: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
+        clarityScore?: number;
+        clarityIssues?: string[];
+        confidence?: number;
+      };
+      const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+      const clarityScore = data.clarityScore ?? 100;
+      const confidence = data.confidence ?? 0.5;
+      const clarityStatus = (clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear") as "clear" | "needs_improvement" | "unclear";
+      const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
+      let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
+      for (let i = 0; i < tickets.length; i++) {
+        const t = tickets[i];
+        const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
+        const body = {
+          sessionId: effectiveSessionId,
+          title: t.title ?? "",
+          description: desc,
+          type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
+          contextSummary: desc,
+          actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
+          suggestedTags: t.suggestedTags,
+          screenshotUrl: i === 0 ? pending.screenshotUrl : null,
+          metadata: { clientTimestamp: Date.now() },
+          ...clarityMeta,
+        };
+        const feedbackRes = await apiFetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const feedbackJson = (await feedbackRes.json()) as {
+          success?: boolean;
+          ticket?: { id: string; title: string; description: string; type?: string };
+        };
+        if (feedbackJson.success && feedbackJson.ticket) {
+          const tick = feedbackJson.ticket;
+          if (!firstCreated)
+            firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
+        }
+      }
+      if (firstCreated) pending.callbacks.onSuccess(firstCreated);
+      else pending.callbacks.onError();
+    } catch (err) {
+      console.error("[Echly] Use suggestion failed:", err);
+      pending.callbacks.onError();
+    }
+  }, [extensionClarityPending, effectiveSessionId]);
+
+  React.useEffect(() => {
+    if (isEditingFeedback && clarityTextareaRef.current) {
+      clarityTextareaRef.current.focus();
+    }
+  }, [isEditingFeedback]);
 
   const liveStructureFetch = React.useCallback(
     async (transcript: string): Promise<{ title: string; tags: string[]; priority: string } | null> => {
@@ -395,23 +750,183 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     );
   }
 
+  const pending = extensionClarityPending;
+
   return (
-    <CaptureWidget
-      sessionId={effectiveSessionId ?? ""}
-      userId={user.uid}
-      extensionMode={true}
-      onComplete={handleComplete}
-      onDelete={handleDelete}
-      widgetToggleRef={widgetToggleRef}
-      onRecordingChange={onRecordingChange}
-      expanded={globalState.expanded}
-      onExpandRequest={onExpandRequest}
-      onCollapseRequest={onCollapseRequest}
-      liveStructureFetch={liveStructureFetch}
-      captureDisabled={!effectiveSessionId}
-      theme={theme}
-      onThemeToggle={onThemeToggle}
-    />
+    <>
+      {showClarityAssistant && pending && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.15)",
+            zIndex: 999999,
+            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 420,
+              width: "90%",
+              background: "#F8FBFF",
+              borderRadius: 12,
+              padding: 20,
+              boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+              border: "1px solid #E6F0FF",
+              animation: "echly-clarity-card-in 150ms ease-out",
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6, color: "#111" }}>Quick suggestion</div>
+            <div style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>
+              Your feedback may be unclear.
+            </div>
+            <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>
+              Try specifying what looks wrong and what change you want.
+            </div>
+            {pending.suggestedRewrite && (
+              <div style={{ fontSize: 13, fontStyle: "italic", color: "#4b5563", marginBottom: 12, opacity: 0.9 }}>
+                Example: &quot;{pending.suggestedRewrite}&quot;
+              </div>
+            )}
+            <textarea
+              ref={clarityTextareaRef}
+              value={editedTranscript}
+              onChange={(e) => setEditedTranscript(e.target.value)}
+              disabled={!isEditingFeedback}
+              rows={3}
+              placeholder="Your feedback"
+              aria-label="Feedback message"
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid #E6F0FF",
+                fontSize: 14,
+                resize: "vertical",
+                minHeight: 72,
+                marginBottom: 16,
+                background: isEditingFeedback ? "#fff" : "#f3f4f6",
+                color: "#111",
+              }}
+            />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              {isEditingFeedback ? (
+                <button
+                  type="button"
+                  disabled={clarityAssistantSubmitting}
+                  onClick={() => {
+                    if (clarityAssistantSubmitLock.current) return;
+                    if (!pending) return;
+                    clarityAssistantSubmitLock.current = true;
+                    setClarityAssistantSubmitting(true);
+                    setShowClarityAssistant(false);
+                    setExtensionClarityPending(null);
+                    setIsEditingFeedback(false);
+                    const snapshot = pending;
+                    const text = editedTranscript;
+                    submitEditedFeedback(snapshot, text)
+                      .catch((err) => console.error("[Echly] Done submission failed:", err))
+                      .finally(() => {
+                        clarityAssistantSubmitLock.current = false;
+                        setClarityAssistantSubmitting(false);
+                      });
+                  }}
+                  style={{
+                    background: "#3B82F6",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    cursor: clarityAssistantSubmitting ? "default" : "pointer",
+                    opacity: clarityAssistantSubmitting ? 0.8 : 1,
+                  }}
+                >
+                  Done
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={clarityAssistantSubmitting}
+                    onClick={() => setIsEditingFeedback(true)}
+                    style={{
+                      background: "transparent",
+                      border: "1px solid #E6F0FF",
+                      borderRadius: 8,
+                      padding: "8px 14px",
+                      fontSize: 14,
+                      color: "#374151",
+                      cursor: clarityAssistantSubmitting ? "default" : "pointer",
+                      opacity: clarityAssistantSubmitting ? 0.7 : 1,
+                    }}
+                  >
+                    Edit feedback
+                  </button>
+                  <button
+                    type="button"
+                    disabled={clarityAssistantSubmitting}
+                    onClick={() => {
+                      if (clarityAssistantSubmitLock.current) return;
+                      if (!pending) return;
+                      clarityAssistantSubmitLock.current = true;
+                      setClarityAssistantSubmitting(true);
+                      setShowClarityAssistant(false);
+                      setExtensionClarityPending(null);
+                      setIsEditingFeedback(false);
+                      const snapshot = pending;
+                      submitPendingFeedback(snapshot)
+                        .catch((err) => console.error("[Echly] Submit anyway failed:", err))
+                        .finally(() => {
+                          clarityAssistantSubmitLock.current = false;
+                          setClarityAssistantSubmitting(false);
+                        });
+                    }}
+                    style={{
+                      background: "#3B82F6",
+                      color: "white",
+                      border: "none",
+                      borderRadius: 8,
+                      padding: "8px 14px",
+                      fontSize: 14,
+                      fontWeight: 500,
+                      cursor: clarityAssistantSubmitting ? "default" : "pointer",
+                      opacity: clarityAssistantSubmitting ? 0.8 : 1,
+                    }}
+                  >
+                    Submit anyway
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      <CaptureWidget
+        sessionId={effectiveSessionId ?? ""}
+        userId={user.uid}
+        extensionMode={true}
+        onComplete={handleComplete}
+        onDelete={handleDelete}
+        widgetToggleRef={widgetToggleRef}
+        onRecordingChange={onRecordingChange}
+        expanded={globalState.expanded}
+        onExpandRequest={onExpandRequest}
+        onCollapseRequest={onCollapseRequest}
+        liveStructureFetch={liveStructureFetch}
+        captureDisabled={!effectiveSessionId}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
+      />
+    </>
   );
 }
 

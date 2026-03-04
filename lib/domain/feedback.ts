@@ -20,6 +20,13 @@ export interface StructuredFeedback {
 
   // Screenshot
   screenshotUrl?: string | null;
+
+  // Clarity Guard (Phase 5.1)
+  clarityScore?: number | null;
+  clarityStatus?: "clear" | "needs_improvement" | "unclear" | null;
+  clarityIssues?: string[] | null;
+  clarityConfidence?: number | null;
+  clarityCheckedAt?: Timestamp | null;
 }
 
 /** Derived status for a ticket. Prefer explicit checks over !isResolved. */
@@ -52,6 +59,13 @@ export interface Feedback {
 
   // Screenshot
   screenshotUrl?: string | null;
+
+  // Clarity Guard (Phase 5.1)
+  clarityScore?: number | null;
+  clarityStatus?: "clear" | "needs_improvement" | "unclear" | null;
+  clarityIssues?: string[] | null;
+  clarityConfidence?: number | null;
+  clarityCheckedAt?: Timestamp | null;
 }
 
 /** Returns explicit status for a feedback item. Use instead of !isResolved. */

@@ -4,7 +4,7 @@ import React from "react";
 import { statusFromResolved, type FeedbackStatus } from "@/lib/domain/feedback-display";
 import type { FeedbackItemShape } from "@/components/session/feedbackDetail/types";
 import { FeedbackContent } from "@/components/session/feedbackDetail/FeedbackContent";
-import { CheckCircle2, UserPlus, Clock, MessageSquare } from "lucide-react";
+import { CheckCircle2, UserPlus, Clock, MessageSquare, Trash2 } from "lucide-react";
 import type { Comment } from "@/lib/domain/comment";
 
 export interface ExecutionViewProps {
@@ -38,6 +38,7 @@ export interface ExecutionViewProps {
   sendTextComment?: (textRange: { startOffset: number; endOffset: number; containerId: string }, message: string) => Promise<string | null>;
   onCommentPlaced?: () => void;
   updatePinPosition?: (commentId: string, position: { xPercent: number; yPercent: number }) => Promise<void>;
+  onDelete?: () => void;
 }
 
 function StatusPill({ status }: { status: FeedbackStatus }) {
@@ -87,6 +88,7 @@ export function ExecutionView({
   sendTextComment,
   onCommentPlaced,
   updatePinPosition,
+  onDelete,
 }: ExecutionViewProps) {
 
   if (!item) {
@@ -130,15 +132,16 @@ export function ExecutionView({
         {onResolvedChange && (
           <button
             type="button"
-            onClick={() => onResolvedChange(!(item.isResolved ?? false))}
-            className={`shrink-0 inline-flex items-center justify-center gap-1.5 h-8 min-w-[4.5rem] px-3 rounded-lg text-[12px] font-medium whitespace-nowrap focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 transition-colors duration-150 cursor-pointer ${
+            onClick={() => onResolvedChange(true)}
+            disabled={item.isResolved === true}
+            className={`shrink-0 inline-flex items-center justify-center gap-1.5 h-8 min-w-[4.5rem] px-3 rounded-lg text-[12px] font-medium whitespace-nowrap focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 transition-colors duration-150 ${
               item.isResolved
-                ? "border border-neutral-200 bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-neutral-50"
-                : "border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                ? "border border-neutral-200 bg-white text-[hsl(var(--text-secondary-soft))] cursor-not-allowed opacity-80"
+                : "border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 cursor-pointer"
             }`}
           >
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" strokeWidth={1.5} aria-hidden />
-            <span className="inline-block">{item.isResolved ? "Reopen" : "Resolve"}</span>
+            <span className="inline-block">{item.isResolved ? "Resolved" : "Resolve"}</span>
           </button>
         )}
         <button
@@ -176,6 +179,18 @@ export function ExecutionView({
           >
             <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
             Comment
+          </button>
+        )}
+
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="ml-auto shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#ef4444] bg-transparent hover:bg-[rgba(239,68,68,0.1)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#ef4444] transition-colors duration-150 cursor-pointer"
+            aria-label="Delete ticket"
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4" strokeWidth={1.75} aria-hidden />
           </button>
         )}
       </div>

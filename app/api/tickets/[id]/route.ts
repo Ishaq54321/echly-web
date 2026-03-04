@@ -5,6 +5,7 @@ import {
   getFeedbackByIdRepo,
   updateFeedbackRepo,
   updateFeedbackResolveAndSessionCountersRepo,
+  deleteFeedbackWithSessionCountersRepo,
 } from "@/lib/repositories/feedbackRepository";
 import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
@@ -78,7 +79,15 @@ export async function PATCH(
       { status: 400 }
     );
   }
-  let body: { title?: string; description?: string; actionSteps?: string[]; suggestedTags?: string[]; isResolved?: boolean; isSkipped?: boolean };
+  let body: {
+    title?: string;
+    description?: string;
+    actionSteps?: string[];
+    suggestedTags?: string[];
+    isResolved?: boolean;
+    isSkipped?: boolean;
+    status?: "open" | "resolved" | "skipped";
+  };
   try {
     body = await req.json();
   } catch {
@@ -105,8 +114,21 @@ export async function PATCH(
   if (typeof body.description === "string") updates.description = body.description;
   if (Array.isArray(body.actionSteps)) updates.actionSteps = body.actionSteps;
   if (Array.isArray(body.suggestedTags)) updates.suggestedTags = body.suggestedTags;
-  if (typeof body.isResolved === "boolean") updates.isResolved = body.isResolved;
-  if (typeof body.isSkipped === "boolean") updates.isSkipped = body.isSkipped;
+  if (typeof body.status === "string") {
+    if (body.status === "resolved") {
+      updates.isResolved = true;
+      updates.isSkipped = false;
+    } else if (body.status === "skipped") {
+      updates.isResolved = false;
+      updates.isSkipped = true;
+    } else if (body.status === "open") {
+      updates.isResolved = false;
+      updates.isSkipped = false;
+    }
+  } else {
+    if (typeof body.isResolved === "boolean") updates.isResolved = body.isResolved;
+    if (typeof body.isSkipped === "boolean") updates.isSkipped = body.isSkipped;
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({
@@ -114,7 +136,8 @@ export async function PATCH(
       ticket: serializeTicket(existingForOwnership),
     });
   }
-  const statusChange = typeof body.isResolved === "boolean" || typeof body.isSkipped === "boolean";
+  const statusChange =
+    typeof updates.isResolved === "boolean" || typeof updates.isSkipped === "boolean";
   try {
     if (statusChange) {
       const targetResolved = updates.isResolved ?? existingForOwnership.isResolved;
@@ -143,6 +166,55 @@ export async function PATCH(
   } catch (err) {
     console.error("PATCH /api/tickets/[id]:", err);
     log("[API] PATCH /api/tickets/[id] duration (error):", Date.now() - start);
+    return NextResponse.json(
+      { success: false, error: "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/** DELETE /api/tickets/:id — permanently delete ticket (feedback) from DB. */
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const start = Date.now();
+  log("[API] DELETE /api/tickets/[id] start");
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (res) {
+    return res as Response;
+  }
+  const { id } = await params;
+  if (!id) {
+    return NextResponse.json(
+      { success: false, error: "Missing ticket id" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const existingForOwnership = await getFeedbackByIdRepo(id);
+    if (!existingForOwnership) {
+      return NextResponse.json(
+        { success: false, error: "Not found" },
+        { status: 404 }
+      );
+    }
+    if (existingForOwnership.userId !== user.uid) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+
+    await deleteFeedbackWithSessionCountersRepo(id);
+    log("[API] DELETE /api/tickets/[id] duration:", Date.now() - start);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("DELETE /api/tickets/[id]:", err);
+    log("[API] DELETE /api/tickets/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Server error" },
       { status: 500 }

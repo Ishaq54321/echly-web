@@ -233,8 +233,7 @@ export function WorkspaceCard({
           cursor-pointer
           outline-none
           focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2
-          transition-duration-[var(--motion-duration)]
-          hover:-translate-y-[2px]
+          transition-[transform,box-shadow] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)]
         "
         style={{ animationDelay: `${index * 50}ms` } as React.CSSProperties}
         data-session-id={session.id}

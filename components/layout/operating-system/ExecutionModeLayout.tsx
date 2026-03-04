@@ -275,7 +275,7 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={onSkip}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-tertiary))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-secondary-soft))] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-tertiary))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-secondary-soft))] transition-colors duration-[var(--motion-fast)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <SkipForward className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Skip
@@ -284,7 +284,7 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={onNeedsClarification}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:-translate-y-px transition-[transform,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <MessageCircleQuestion className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Needs clarification
@@ -293,7 +293,7 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={onAssign}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:-translate-y-px transition-[transform,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <UserPlus className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Assign
@@ -302,7 +302,7 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={handleResolveAndNext}
                 disabled={disabled}
-                className="inline-flex items-center justify-center gap-2 min-w-[180px] h-12 px-8 rounded-xl bg-[var(--color-primary)] text-white text-[15px] font-semibold shadow-[0_4px_14px_rgba(26,86,219,0.35)] hover:bg-[var(--color-primary-hover)] hover:shadow-[0_6px_20px_rgba(26,86,219,0.4)] hover:-translate-y-0.5 active:translate-y-0 active:shadow-[0_2px_8px_rgba(26,86,219,0.3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                className="btn-primary-glow inline-flex items-center justify-center gap-2 min-w-[180px] h-12 px-8 rounded-xl bg-[var(--color-primary)] text-white text-[15px] font-semibold shadow-[0_4px_14px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 transition-[transform,box-shadow,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
                 {isProcessing ? (
                   <>

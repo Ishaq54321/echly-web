@@ -108,17 +108,21 @@ export default function CaptureWidget({
           />
         )}
 
-      <RecordingCapsule
-        visible={showRecordingCapsule}
-        isActive={state.state === "voice_listening"}
-        isProcessing={state.state === "processing" || state.pillExiting}
-        isExiting={state.pillExiting}
-        audioLevel={state.listeningAudioLevel ?? 0}
-        sentiment={state.listeningSentiment ?? "neutral"}
-        liveTranscript={state.liveTranscript ?? ""}
-        onDone={handlers.finishListening}
-        onCancel={handlers.handleCancelCapture}
-      />
+      {showRecordingCapsule && (
+        <>
+          <RecordingCapsule
+            visible={true}
+            isActive={state.state === "voice_listening"}
+            isProcessing={state.state === "processing" || state.pillExiting}
+            isExiting={state.pillExiting}
+            audioLevel={state.listeningAudioLevel ?? 0}
+            sentiment={state.listeningSentiment ?? "neutral"}
+            liveTranscript={state.liveTranscript ?? ""}
+            onDone={handlers.finishListening}
+            onCancel={handlers.handleCancelCapture}
+          />
+        </>
+      )}
 
       {showFloatingButton && (
         <div className="echly-floating-trigger-wrapper">

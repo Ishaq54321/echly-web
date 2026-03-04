@@ -89,7 +89,7 @@ export default function DashboardPage() {
               Workspaces
             </h1>
             <p className="mt-2.5 text-[14px] leading-[1.5] text-[hsl(var(--text-tertiary))]">
-              Sessions and feedback in one place.
+              All your team's sessions in one place.
             </p>
           </div>
           <div className="flex items-center gap-6 flex-shrink-0">
@@ -133,7 +133,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={handleCreateSession}
-              className="h-9 rounded-xl bg-[var(--color-primary)] text-white text-[14px] px-5 font-semibold shadow-[0_2px_8px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] hover:shadow-[0_4px_14px_rgba(26,86,219,0.35)] hover:-translate-y-0.5 active:translate-y-0 active:shadow-[0_2px_6px_rgba(26,86,219,0.25)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2 transition-all duration-[var(--motion-duration)] cursor-pointer"
+              className="btn-primary-glow h-9 rounded-xl bg-[var(--color-primary)] text-white text-[14px] px-5 font-semibold shadow-[0_2px_8px_rgba(26,86,219,0.28)] hover:bg-[var(--color-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2 transition-[transform,box-shadow,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer"
             >
               New Session
             </button>

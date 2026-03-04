@@ -234,9 +234,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_GET_TOKEN") {
-    getValidToken()
-      .then((token) => sendResponse({ token }))
-      .catch(() => sendResponse({ error: "NOT_AUTHENTICATED" }));
+    (async () => {
+      try {
+        const token = await getValidToken();
+        sendResponse({ token });
+      } catch (error) {
+        sendResponse({ error: "NOT_AUTHENTICATED" });
+      }
+    })();
     return true;
   }
 
@@ -319,17 +324,62 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "CAPTURE_TAB") {
-    chrome.tabs.captureVisibleTab(
-      sender.tab!.windowId,
-      { format: "png" },
-      (dataUrl) => {
-        if (chrome.runtime.lastError) {
-          sendResponse({ success: false });
+    (async () => {
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          chrome.tabs.captureVisibleTab(sender.tab!.windowId, { format: "png" }, (result) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError?.message ?? "Capture failed"));
+              return;
+            }
+            resolve(result);
+          });
+        });
+        sendResponse({ success: true, screenshot: dataUrl });
+      } catch (error) {
+        sendResponse({ success: false });
+      }
+    })();
+    return true;
+  }
+
+  if (request.type === "ECHLY_UPLOAD_SCREENSHOT") {
+    (async () => {
+      try {
+        const { imageDataUrl, sessionId, feedbackId } = request as {
+          imageDataUrl: string;
+          sessionId: string;
+          feedbackId: string;
+        };
+
+        const token = await getValidToken();
+
+        const res = await fetch(`${API_BASE}/api/upload-screenshot`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            imageDataUrl,
+            sessionId,
+            feedbackId,
+          }),
+        });
+
+        const data = (await res.json()) as { url?: string; error?: string };
+
+        if (!res.ok) {
+          sendResponse({ error: data.error || "Upload failed" });
           return;
         }
-        sendResponse({ success: true, image: dataUrl });
+
+        sendResponse({ url: data.url });
+      } catch (err) {
+        console.error("ECHLY_UPLOAD_SCREENSHOT error:", err);
+        sendResponse({ error: String(err) });
       }
-    );
+    })();
     return true;
   }
 
@@ -356,7 +406,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         hasSessionId: !!sessionId,
       });
       sendResponse({ success: false, error: "Missing transcript or sessionId" });
-      return true;
+      return false;
     }
     (async () => {
       try {
@@ -480,10 +530,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         } else {
           sendResponse({ success: false, error: "No ticket created" });
         }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        console.error("[Echly BG] Processing error:", err);
-        sendResponse({ success: false, error: message });
+      } catch (error) {
+        console.error("ECHLY_PROCESS_FEEDBACK error:", error);
+        sendResponse({
+          success: false,
+          error: String(error),
+        });
       }
     })();
     return true;
@@ -497,33 +549,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       body?: string | null;
       token?: string;
     };
-    const doFetch = (resolvedToken: string | undefined) => {
-      const h = { ...headers };
-      if (resolvedToken) h["Authorization"] = `Bearer ${resolvedToken}`;
-      fetch(url, {
-        method: method || "GET",
-        headers: h,
-        body: body ?? undefined,
-      })
-        .then(async (res) => {
-          const text = await res.text();
-          const out: Record<string, string> = {};
-          res.headers.forEach((v, k) => {
-            out[k] = v;
-          });
-          sendResponse({ ok: res.ok, status: res.status, headers: out, body: text });
-        })
-        .catch((err) => {
-          sendResponse({ ok: false, status: 0, headers: {}, body: String(err?.message ?? err) });
+    (async () => {
+      try {
+        const resolvedToken = token ?? (await getValidToken());
+        const h = { ...headers };
+        if (resolvedToken) h["Authorization"] = `Bearer ${resolvedToken}`;
+        const res = await fetch(url, {
+          method: method || "GET",
+          headers: h,
+          body: body ?? undefined,
         });
-    };
-    if (token) {
-      doFetch(token);
-    } else {
-      getValidToken()
-        .then(doFetch)
-        .catch(() => sendResponse({ ok: false, status: 401, headers: {}, body: "Not authenticated" }));
-    }
+        const text = await res.text();
+        const out: Record<string, string> = {};
+        res.headers.forEach((v, k) => {
+          out[k] = v;
+        });
+        sendResponse({ ok: res.ok, status: res.status, headers: out, body: text });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const isAuth = message === "NOT_AUTHENTICATED" || message.includes("NOT_AUTHENTICATED");
+        sendResponse({
+          ok: false,
+          status: isAuth ? 401 : 0,
+          headers: {},
+          body: isAuth ? "Not authenticated" : message,
+        });
+      }
+    })();
     return true;
   }
 
