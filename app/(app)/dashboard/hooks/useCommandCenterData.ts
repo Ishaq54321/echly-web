@@ -9,6 +9,7 @@ import type {
   SignalHeatmapBucket,
   PriorityRadarBucket,
   MomentumDirection,
+  RiskLevel,
 } from "@/lib/domain/signal";
 
 /**
@@ -32,7 +33,7 @@ export function useCommandCenterData(sessions: SessionWithCounts[]) {
       id: s.session.id,
       title: s.session.title || "Untitled Session",
       sessionId: s.session.id,
-      riskLevel: (s.session.openCount ?? s.counts.open) > 5 ? "high" : "medium",
+      riskLevel: ((s.session.openCount ?? s.counts.open) > 5 ? "high" : "medium") as RiskLevel,
     }));
 
     const openTotal = sessions.reduce((acc, s) => acc + (s.session.openCount ?? s.counts.open), 0);

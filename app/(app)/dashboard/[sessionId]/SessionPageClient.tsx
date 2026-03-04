@@ -553,12 +553,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (currentIndex === -1) return;
     let nextIndex = currentIndex + 1;
     if (nextIndex >= feedback.length) nextIndex = 0;
-    let next = feedback[nextIndex];
+    let next: Feedback | undefined = feedback[nextIndex];
     while (next && (next.isResolved ?? false) && nextIndex < feedback.length - 1) {
       nextIndex += 1;
       next = feedback[nextIndex];
     }
-    if (next && (next.isResolved ?? false)) next = null;
+    if (next && (next.isResolved ?? false)) next = undefined;
     if (next) {
       if (preloadedNextTicket?.id === next.id) {
         setDetailTicket(preloadedNextTicket);
@@ -576,12 +576,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (currentIndex === -1) return;
     let nextIndex = currentIndex + 1;
     if (nextIndex >= feedback.length) nextIndex = 0;
-    let next = feedback[nextIndex];
+    let next: Feedback | undefined = feedback[nextIndex];
     while (next && (next.isResolved ?? false) && nextIndex < feedback.length - 1) {
       nextIndex += 1;
       next = feedback[nextIndex];
     }
-    if (next && (next.isResolved ?? false)) next = null;
+    if (next && (next.isResolved ?? false)) next = undefined;
     if (next) {
       if (preloadedNextTicket?.id === next.id) {
         setDetailTicket(preloadedNextTicket);

@@ -81,9 +81,9 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
           <div key={group.label} className="flex flex-col items-center w-full">
             {group.items.map((item) => {
               const Icon = item.icon;
-              const isCommand = item.label === "Command Center";
+              const isCommand = item.href === "#";
               const active =
-                !isCommand && item.href !== "#" && isActive(item.href, item.label, pathname);
+                !isCommand && isActive(item.href, item.label, pathname);
 
               const content = (
                 <span
@@ -103,9 +103,10 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
                 </span>
               );
 
-              const title = item.shortcut
-                ? `${item.label} (${item.shortcut})`
-                : item.label;
+              const title =
+                "shortcut" in item && item.shortcut
+                  ? `${item.label} (${item.shortcut})`
+                  : item.label;
 
               if (isCommand && onOpenCommandPalette) {
                 return (
@@ -120,9 +121,11 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
                     {content}
                     <span className="absolute left-full ml-2 px-2 py-1 text-[11px] font-medium rounded-md bg-white border border-[var(--layer-2-border)] shadow-[var(--elevation-1)] opacity-0 pointer-events-none group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-150 whitespace-nowrap z-10">
                       {item.label}
-                      <span className="ml-1.5 text-[10px] text-[hsl(var(--text-tertiary))]">
-                        {item.shortcut}
-                      </span>
+                      {"shortcut" in item && item.shortcut && (
+                        <span className="ml-1.5 text-[10px] text-[hsl(var(--text-tertiary))]">
+                          {item.shortcut}
+                        </span>
+                      )}
                     </span>
                   </button>
                 );
@@ -152,9 +155,9 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
                   {content}
                   <span className="absolute left-full ml-2 px-2 py-1 text-[11px] font-medium rounded-md bg-white border border-[var(--layer-2-border)] shadow-[var(--elevation-1)] opacity-0 pointer-events-none group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-150 whitespace-nowrap z-10">
                     {item.label}
-                    {item.shortcut && (
+                    {"shortcut" in item && (item as { shortcut?: string }).shortcut && (
                       <span className="ml-1.5 text-[10px] text-[hsl(var(--text-tertiary))]">
-                        {item.shortcut}
+                        {(item as { shortcut: string }).shortcut}
                       </span>
                     )}
                   </span>
