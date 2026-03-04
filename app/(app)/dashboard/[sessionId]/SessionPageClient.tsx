@@ -1,7 +1,7 @@
 "use client";
 
 import { authFetch } from "@/lib/authFetch";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -15,6 +15,7 @@ import { FeedbackPremiumLoader } from "@/components/session/FeedbackPremiumLoade
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
 import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
 import type { Feedback } from "@/lib/domain/feedback";
+import { getTicketStatus } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
 import { log, warn } from "@/lib/utils/logger";
 import Image from "next/image";
@@ -45,6 +46,7 @@ type TicketFromApi = {
   description: string;
   type: string;
   isResolved?: boolean;
+  isSkipped?: boolean;
   actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
   screenshotUrl?: string | null;
@@ -117,15 +119,23 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     total: feedbackTotal,
     activeCount: feedbackActiveCount,
     resolvedCount: feedbackResolvedCount,
+    skippedCount: feedbackSkippedCount,
     setTotal: setFeedbackTotal,
     setActiveCount: setFeedbackActiveCount,
     setResolvedCount: setFeedbackResolvedCount,
+    setSkippedCount: setFeedbackSkippedCount,
     loading: feedbackLoading,
     hasMore: hasMoreFeedback,
     hasReachedLimit: feedbackReachedLimit,
     loadingMore: feedbackLoadingMore,
     loadMoreRef: feedbackLoadMoreRef,
   } = useSessionFeedbackPaginated(feedbackSessionId, listScrollRef, listScrollReady);
+
+  /** Open tickets only; used for Execution Mode queue and progress. */
+  const openFeedback = useMemo(
+    () => feedback.filter((f) => getTicketStatus(f) === "open"),
+    [feedback]
+  );
 
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [executionMode, setExecutionMode] = useState(false);
@@ -279,16 +289,31 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     fetchDetailTicket(selectedId);
   }, [selectedId, fetchDetailTicket, detailTicket?.id]);
 
+  /* In Execution Mode, ensure selection is an open ticket (open-only queue). */
+  useEffect(() => {
+    if (!executionMode) return;
+    if (openFeedback.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    const current = selectedId ? feedback.find((f) => f.id === selectedId) : null;
+    if (!current || getTicketStatus(current) !== "open") {
+      setSelectedId(openFeedback[0].id);
+    }
+  }, [executionMode, openFeedback, feedback, selectedId]);
+
   /* Preload next ticket in Execution Mode for instant transition */
   useEffect(() => {
     if (!executionMode || feedback.length === 0) return;
     setPreloadedNextTicket(null);
   }, [selectedId, executionMode, feedback.length]);
 
+  /* Preload next *open* ticket in Execution Mode (open-only queue). */
   useEffect(() => {
-    if (!executionMode || feedback.length === 0) return;
-    const idx = feedback.findIndex((f) => f.id === selectedId);
-    const nextId = idx >= 0 ? feedback[idx + 1]?.id : undefined;
+    if (!executionMode || openFeedback.length === 0) return;
+    const openIdx = openFeedback.findIndex((f) => f.id === selectedId);
+    const nextOpen = openFeedback[openIdx + 1];
+    const nextId = nextOpen?.id;
     if (!nextId) return;
     let cancelled = false;
     authFetch(`/api/tickets/${nextId}`)
@@ -301,18 +326,32 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return () => {
       cancelled = true;
     };
-  }, [executionMode, selectedId, feedback]);
+  }, [executionMode, selectedId, openFeedback]);
 
   /* ================= SELECTED ITEM WITH INDEX (from DB) ================= */
 
   const selectedIndex = feedback.findIndex((f) => f.id === selectedId);
+  const selectedIndexInOpen = openFeedback.findIndex((f) => f.id === selectedId);
+  const executionModeTotal = feedbackActiveCount > 0 ? feedbackActiveCount : openFeedback.length;
 
   const selectedItem =
     detailTicket != null
       ? {
           ...detailTicket,
-          index: selectedIndex !== -1 ? selectedIndex + 1 : 1,
-          total: feedbackTotal > 0 ? feedbackTotal : feedback.length || 1,
+          index:
+            executionMode && openFeedback.length > 0
+              ? selectedIndexInOpen !== -1
+                ? selectedIndexInOpen + 1
+                : 1
+              : selectedIndex !== -1
+                ? selectedIndex + 1
+                : 1,
+          total:
+            executionMode && openFeedback.length > 0
+              ? executionModeTotal
+              : feedbackTotal > 0
+                ? feedbackTotal
+                : feedback.length || 1,
         }
       : null;
 
@@ -549,60 +588,65 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const handleResolveAndNext = async () => {
     if (!selectedId || !selectedItem) return;
     await saveResolved(true);
-    const currentIndex = feedback.findIndex((f) => f.id === selectedId);
-    if (currentIndex === -1) return;
-    let nextIndex = currentIndex + 1;
-    if (nextIndex >= feedback.length) nextIndex = 0;
-    let next: Feedback | undefined = feedback[nextIndex];
-    while (next && (next.isResolved ?? false) && nextIndex < feedback.length - 1) {
-      nextIndex += 1;
-      next = feedback[nextIndex];
-    }
-    if (next && (next.isResolved ?? false)) next = undefined;
-    if (next) {
-      if (preloadedNextTicket?.id === next.id) {
+    const openIdx = openFeedback.findIndex((f) => f.id === selectedId);
+    if (openIdx === -1) return;
+    const nextOpen = openFeedback[openIdx + 1] ?? openFeedback[0];
+    if (nextOpen && nextOpen.id !== selectedId) {
+      if (preloadedNextTicket?.id === nextOpen.id) {
         setDetailTicket(preloadedNextTicket);
         setPreloadedNextTicket(null);
       }
-      setSelectedId(next.id);
+      setSelectedId(nextOpen.id);
       setExecutionStreak((s) => s + 1);
     }
   };
 
-  const handleExecutionDone = async () => {
-    if (!selectedId || !selectedItem) return;
-    await saveResolved(true);
-    const currentIndex = feedback.findIndex((f) => f.id === selectedId);
-    if (currentIndex === -1) return;
-    let nextIndex = currentIndex + 1;
-    if (nextIndex >= feedback.length) nextIndex = 0;
-    let next: Feedback | undefined = feedback[nextIndex];
-    while (next && (next.isResolved ?? false) && nextIndex < feedback.length - 1) {
-      nextIndex += 1;
-      next = feedback[nextIndex];
-    }
-    if (next && (next.isResolved ?? false)) next = undefined;
-    if (next) {
-      if (preloadedNextTicket?.id === next.id) {
-        setDetailTicket(preloadedNextTicket);
-        setPreloadedNextTicket(null);
-      }
-      setSelectedId(next.id);
-      setExecutionStreak((s) => s + 1);
-    }
-  };
-
-  const handleExecutionSkip = () => {
+  const handleExecutionSkip = async () => {
+    if (!selectedId) return;
     setExecutionStreak(0);
-    const currentIndex = feedback.findIndex((f) => f.id === selectedId);
-    if (currentIndex === -1) return;
-    const next = feedback[currentIndex + 1] ?? feedback[0];
-    if (next) {
-      if (preloadedNextTicket?.id === next.id) {
-        setDetailTicket(preloadedNextTicket);
-        setPreloadedNextTicket(null);
+    const openIdx = openFeedback.findIndex((f) => f.id === selectedId);
+    const nextOpen = openIdx >= 0 ? openFeedback[openIdx + 1] ?? openFeedback[0] : undefined;
+    const nextOpenId = nextOpen?.id === selectedId ? undefined : nextOpen?.id ?? null;
+
+    setFeedback((prev) =>
+      prev.map((item) =>
+        item.id === selectedId ? { ...item, isSkipped: true, isResolved: false } : item
+      )
+    );
+    setFeedbackActiveCount((c) => Math.max(0, c - 1));
+    setFeedbackSkippedCount((c) => c + 1);
+    if (detailTicket?.id === selectedId) {
+      setDetailTicket((t) => (t ? { ...t, isSkipped: true, isResolved: false } : null));
+    }
+    setSelectedId(nextOpenId ?? null);
+    if (nextOpenId && preloadedNextTicket?.id === nextOpenId) {
+      setDetailTicket(preloadedNextTicket);
+      setPreloadedNextTicket(null);
+    } else if (nextOpenId) {
+      fetchDetailTicket(nextOpenId);
+    } else {
+      setDetailTicket(null);
+    }
+
+    try {
+      await authFetch(`/api/tickets/${selectedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isSkipped: true }),
+      });
+    } catch {
+      setFeedback((prev) =>
+        prev.map((item) =>
+          item.id === selectedId ? { ...item, isSkipped: false } : item
+        )
+      );
+      setFeedbackActiveCount((c) => c + 1);
+      setFeedbackSkippedCount((c) => Math.max(0, c - 1));
+      setSelectedId(selectedId);
+      if (detailTicket?.id === selectedId) {
+        setDetailTicket((t) => (t ? { ...t, isSkipped: false } : null));
       }
-      setSelectedId(next.id);
+      fetchDetailTicket(selectedId);
     }
   };
 
@@ -653,7 +697,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [sessionId, session, sessionTitleDraft]);
 
   const handleMarkAllResolved = useCallback(async () => {
-    const active = feedback.filter((item) => !(item.isResolved ?? false));
+    const active = feedback.filter((item) => getTicketStatus(item) === "open");
     if (active.length === 0) return;
     await Promise.all(
       active.map((item) =>
@@ -664,12 +708,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         })
       )
     );
-    setFeedback((prev) => prev.map((item) => ({ ...item, isResolved: true })));
+    setFeedback((prev) =>
+      prev.map((item) =>
+        getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
+      )
+    );
     if (detailTicket && selectedId) {
       setDetailTicket((t) => (t ? { ...t, isResolved: true } : null));
     }
-    const activeCountBefore = feedback.filter((f) => !(f.isResolved ?? false))
-      .length;
+    const activeCountBefore = active.length;
     setFeedbackActiveCount((c) => Math.max(0, c - activeCountBefore));
     setFeedbackResolvedCount((c) => c + activeCountBefore);
   }, [
@@ -682,7 +729,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   ]);
 
   const handleMarkAllUnresolved = useCallback(async () => {
-    const resolved = feedback.filter((item) => item.isResolved ?? false);
+    const resolved = feedback.filter((item) => getTicketStatus(item) === "resolved");
     if (resolved.length === 0) return;
     await Promise.all(
       resolved.map((item) =>
@@ -693,11 +740,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         })
       )
     );
-    setFeedback((prev) => prev.map((item) => ({ ...item, isResolved: false })));
+    setFeedback((prev) =>
+      prev.map((item) =>
+        getTicketStatus(item) === "resolved"
+          ? { ...item, isResolved: false }
+          : item
+      )
+    );
     if (detailTicket && selectedId) {
       setDetailTicket((t) => (t ? { ...t, isResolved: false } : null));
     }
-    const resolvedCountBefore = feedback.filter((f) => f.isResolved ?? false).length;
+    const resolvedCountBefore = resolved.length;
     setFeedbackResolvedCount((c) => Math.max(0, c - resolvedCountBefore));
     setFeedbackActiveCount((c) => c + resolvedCountBefore);
   }, [
@@ -891,13 +944,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           <ExecutionModeLayout
             item={selectedItem}
             onExitExecutionMode={() => setExecutionMode(false)}
-            onDone={handleExecutionDone}
+            onSkip={handleExecutionSkip}
             onNeedsClarification={() => {
               setExecutionMode(false);
               setExecutionStreak(0);
             }}
             onAssign={() => {}}
-            onSkip={handleExecutionSkip}
             onResolveAndNext={handleResolveAndNext}
             onSaveActionSteps={saveActionSteps}
             onExpandImage={() => setIsImageExpanded(true)}
@@ -999,6 +1051,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             totalCount={feedbackTotal}
             openCount={feedbackActiveCount}
             resolvedCount={feedbackResolvedCount}
+            skippedCount={feedbackSkippedCount}
             isEditingSessionTitle={isEditingSessionTitle}
             sessionTitleDraft={sessionTitleDraft}
             onSessionTitleChange={setSessionTitleDraft}
@@ -1038,7 +1091,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 Tickets
               </button>
             </div>
-            {feedback.length > 0 && (
+            {openFeedback.length > 0 && (
               <button
                 type="button"
                 onClick={() => setExecutionMode(true)}
@@ -1094,6 +1147,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               totalCount={feedbackTotal}
               openCount={feedbackActiveCount}
               resolvedCount={feedbackResolvedCount}
+              skippedCount={feedbackSkippedCount}
               isEditingSessionTitle={isEditingSessionTitle}
               sessionTitleDraft={sessionTitleDraft}
               onSessionTitleChange={setSessionTitleDraft}

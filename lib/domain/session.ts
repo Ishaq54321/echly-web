@@ -30,6 +30,8 @@ export interface Session {
   openCount?: number;
   /** Denormalized: total resolved feedback (WAVE 1 structural). */
   resolvedCount?: number;
+  /** Denormalized: total skipped feedback (Execution Mode skip). */
+  skippedCount?: number;
   /** Denormalized: total feedback count (WAVE 1 structural). */
   feedbackCount?: number;
 }

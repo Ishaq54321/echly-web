@@ -45,16 +45,19 @@ export async function GET(req: Request) {
       typeof session.resolvedCount === "number";
     let openCount: number;
     let resolvedCount: number;
+    let skippedCount: number;
     if (hasCounters) {
       openCount = session.openCount ?? 0;
       resolvedCount = session.resolvedCount ?? 0;
+      skippedCount = session.skippedCount ?? 0;
     } else {
       const counts = await getSessionFeedbackCountsRepo(sessionId);
       openCount = counts.open;
       resolvedCount = counts.resolved;
+      skippedCount = counts.skipped;
     }
-    const total = openCount + resolvedCount;
-    return NextResponse.json({ total, openCount, resolvedCount });
+    const total = openCount + resolvedCount + skippedCount;
+    return NextResponse.json({ total, openCount, resolvedCount, skippedCount });
   } catch (err) {
     console.error("GET /api/feedback/counts:", err);
     return NextResponse.json(

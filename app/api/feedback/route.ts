@@ -72,6 +72,7 @@ export async function GET(req: Request) {
     let total: number | undefined;
     let activeCount: number | undefined;
     let resolvedCount: number | undefined;
+    let skippedCount: number | undefined;
     if (isFirstPage) {
       const hasCounters =
         typeof session.openCount === "number" &&
@@ -79,12 +80,14 @@ export async function GET(req: Request) {
       if (hasCounters) {
         activeCount = session.openCount ?? 0;
         resolvedCount = session.resolvedCount ?? 0;
-        total = activeCount + resolvedCount;
+        skippedCount = session.skippedCount ?? 0;
+        total = activeCount + resolvedCount + skippedCount;
       } else {
         const counts = await getSessionFeedbackCountsRepo(sessionId);
         activeCount = counts.open;
         resolvedCount = counts.resolved;
-        total = activeCount + resolvedCount;
+        skippedCount = counts.skipped;
+        total = activeCount + resolvedCount + skippedCount;
       }
     }
     const { feedback, nextCursor, hasMore } = pageResult;
@@ -97,6 +100,7 @@ export async function GET(req: Request) {
       ...(typeof total === "number" && { total }),
       ...(typeof activeCount === "number" && { activeCount }),
       ...(typeof resolvedCount === "number" && { resolvedCount }),
+      ...(typeof skippedCount === "number" && { skippedCount }),
     });
   } catch (err) {
     console.error("GET /api/feedback:", err);

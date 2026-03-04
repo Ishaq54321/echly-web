@@ -22,6 +22,9 @@ export interface StructuredFeedback {
   screenshotUrl?: string | null;
 }
 
+/** Derived status for a ticket. Prefer explicit checks over !isResolved. */
+export type TicketStatus = "open" | "resolved" | "skipped";
+
 export interface Feedback {
   id: string;
   sessionId: string;
@@ -31,6 +34,8 @@ export interface Feedback {
   suggestion?: string;
   type: string;
   isResolved: boolean;
+  /** True when ticket was skipped (e.g. in Execution Mode). Excluded from open count. */
+  isSkipped?: boolean;
   createdAt: Timestamp | null;
 
   // Structuring (V2)
@@ -49,3 +54,9 @@ export interface Feedback {
   screenshotUrl?: string | null;
 }
 
+/** Returns explicit status for a feedback item. Use instead of !isResolved. */
+export function getTicketStatus(f: Pick<Feedback, "isResolved" | "isSkipped">): TicketStatus {
+  if (f.isSkipped === true) return "skipped";
+  if (f.isResolved === true) return "resolved";
+  return "open";
+}

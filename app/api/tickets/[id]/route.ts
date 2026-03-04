@@ -78,7 +78,7 @@ export async function PATCH(
       { status: 400 }
     );
   }
-  let body: { title?: string; description?: string; actionSteps?: string[]; suggestedTags?: string[]; isResolved?: boolean };
+  let body: { title?: string; description?: string; actionSteps?: string[]; suggestedTags?: string[]; isResolved?: boolean; isSkipped?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -106,6 +106,7 @@ export async function PATCH(
   if (Array.isArray(body.actionSteps)) updates.actionSteps = body.actionSteps;
   if (Array.isArray(body.suggestedTags)) updates.suggestedTags = body.suggestedTags;
   if (typeof body.isResolved === "boolean") updates.isResolved = body.isResolved;
+  if (typeof body.isSkipped === "boolean") updates.isSkipped = body.isSkipped;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({
@@ -113,9 +114,16 @@ export async function PATCH(
       ticket: serializeTicket(existingForOwnership),
     });
   }
+  const statusChange = typeof body.isResolved === "boolean" || typeof body.isSkipped === "boolean";
   try {
-    if (typeof body.isResolved === "boolean") {
-      await updateFeedbackResolveAndSessionCountersRepo(id, updates);
+    if (statusChange) {
+      const targetResolved = updates.isResolved ?? existingForOwnership.isResolved;
+      const targetSkipped = updates.isSkipped ?? existingForOwnership.isSkipped ?? false;
+      await updateFeedbackResolveAndSessionCountersRepo(id, {
+        ...updates,
+        isResolved: targetSkipped ? false : targetResolved,
+        isSkipped: targetSkipped,
+      });
     } else {
       await updateFeedbackRepo(id, updates);
       await updateSessionUpdatedAtRepo(existingForOwnership.sessionId);

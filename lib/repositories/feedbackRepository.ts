@@ -102,11 +102,17 @@ type FeedbackUpdate = Partial<{
   title: string;
   description: string;
   type: string;
-  status: "open" | "resolved";
+  status: "open" | "resolved" | "skipped";
   screenshotUrl: string | null;
   actionSteps: string[] | null;
   suggestedTags: string[] | null;
 }>;
+
+function statusFromResolveAndSkip(isResolved: boolean, isSkipped: boolean): "open" | "resolved" | "skipped" {
+  if (isSkipped) return "skipped";
+  if (isResolved) return "resolved";
+  return "open";
+}
 
 export async function updateFeedbackRepo(
   feedbackId: string,
@@ -115,6 +121,7 @@ export async function updateFeedbackRepo(
     description: string;
     type: string;
     isResolved: boolean;
+    isSkipped: boolean;
     screenshotUrl: string | null;
     actionSteps: string[] | null;
     suggestedTags: string[] | null;
@@ -127,16 +134,22 @@ export async function updateFeedbackRepo(
   if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
   if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
-  if (typeof (data as { isResolved?: boolean }).isResolved === "boolean") {
-    updates.status = (data as { isResolved: boolean }).isResolved ? "resolved" : "open";
+  const isResolved = (data as { isResolved?: boolean }).isResolved;
+  const isSkipped = (data as { isSkipped?: boolean }).isSkipped;
+  if (typeof isSkipped === "boolean") {
+    updates.status = statusFromResolveAndSkip(isResolved === true, isSkipped);
+  } else if (typeof isResolved === "boolean") {
+    updates.status = statusFromResolveAndSkip(isResolved, false);
   }
   if (Object.keys(updates).length === 0) return;
   await updateDoc(doc(db, "feedback", feedbackId), updates);
 }
 
+type FeedbackStatus = "open" | "resolved" | "skipped";
+
 /**
- * Updates feedback (including resolve toggle) and session denormalized counters in one transaction.
- * Use when isResolved may change. Migration-safe: floors session counters at 0.
+ * Updates feedback (including status: resolve/skip) and session denormalized counters in one transaction.
+ * Use when isResolved or isSkipped may change. Migration-safe: floors session counters at 0.
  */
 export async function updateFeedbackResolveAndSessionCountersRepo(
   feedbackId: string,
@@ -148,9 +161,14 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     actionSteps: string[] | null;
     suggestedTags: string[] | null;
     isResolved: boolean;
+    isSkipped: boolean;
   }>
 ): Promise<void> {
   const feedbackRef = doc(db, "feedback", feedbackId);
+  const isResolved = (data as { isResolved?: boolean }).isResolved === true;
+  const isSkipped = (data as { isSkipped?: boolean }).isSkipped === true;
+  const toStatus: FeedbackStatus = statusFromResolveAndSkip(isResolved, isSkipped);
+
   const updates: FeedbackUpdate = {};
   if (typeof data.title === "string") updates.title = data.title;
   if (typeof data.description === "string") updates.description = data.description;
@@ -158,8 +176,8 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
   if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
   if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
-  if (typeof (data as { isResolved?: boolean }).isResolved === "boolean") {
-    updates.status = (data as { isResolved: boolean }).isResolved ? "resolved" : "open";
+  if (typeof (data as { isResolved?: boolean }).isResolved === "boolean" || typeof (data as { isSkipped?: boolean }).isSkipped === "boolean") {
+    updates.status = toStatus;
   }
 
   await runTransaction(db, async (tx) => {
@@ -167,8 +185,7 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     if (!feedbackSnap.exists()) return;
     const fd = feedbackSnap.data();
     const sessionId = fd.sessionId as string;
-    const wasResolved = (fd.status as string) === "resolved";
-    const toResolved = (data as { isResolved?: boolean }).isResolved === true;
+    const wasStatus = ((s: string): FeedbackStatus => (s === "resolved" || s === "skipped" ? s : "open"))(fd.status as string);
 
     if (Object.keys(updates).length > 0) {
       tx.update(feedbackRef, updates);
@@ -179,13 +196,21 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     const s = sessionSnap.data() || {};
     let openCount = (s.openCount as number) ?? 0;
     let resolvedCount = (s.resolvedCount as number) ?? 0;
-    if (wasResolved !== toResolved) {
-      openCount = Math.max(0, openCount + (toResolved ? -1 : 1));
-      resolvedCount = Math.max(0, resolvedCount + (toResolved ? 1 : -1));
+    let skippedCount = (s.skippedCount as number) ?? 0;
+
+    if (wasStatus !== toStatus) {
+      if (wasStatus === "open") openCount = Math.max(0, openCount - 1);
+      else if (wasStatus === "resolved") resolvedCount = Math.max(0, resolvedCount - 1);
+      else if (wasStatus === "skipped") skippedCount = Math.max(0, skippedCount - 1);
+      if (toStatus === "open") openCount += 1;
+      else if (toStatus === "resolved") resolvedCount += 1;
+      else if (toStatus === "skipped") skippedCount += 1;
     }
+
     tx.update(sessionRef, {
       openCount,
       resolvedCount,
+      skippedCount,
       updatedAt: serverTimestamp(),
     });
   });
@@ -206,11 +231,12 @@ const FEEDBACK_PAGE_SIZE_DEFAULT = 20;
 /** Maps a Firestore doc snapshot to domain Feedback. Backward compat: actionItems → actionSteps. */
 function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
   const data = docSnap.data();
-  const status = data.status ?? "open";
+  const status = (data.status ?? "open") as string;
   const isResolved =
     data.isResolved === true ||
     status === "resolved" ||
     status === "done";
+  const isSkipped = status === "skipped";
   return {
     id: docSnap.id,
     sessionId: data.sessionId,
@@ -220,6 +246,7 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     suggestion: data.suggestion ?? "",
     type: data.type,
     isResolved,
+    isSkipped: isSkipped || undefined,
     createdAt: (data.createdAt ?? null) as Timestamp | null,
     contextSummary: data.contextSummary ?? null,
     actionSteps: data.actionSteps ?? data.actionItems ?? null,
@@ -341,12 +368,17 @@ export async function deleteFeedbackWithSessionCountersRepo(
       0,
       ((s.resolvedCount as number) ?? 0) - (status === "resolved" ? 1 : 0)
     );
+    const skippedCount = Math.max(
+      0,
+      ((s.skippedCount as number) ?? 0) - (status === "skipped" ? 1 : 0)
+    );
     const feedbackCount = Math.max(0, ((s.feedbackCount as number) ?? 0) - 1);
 
     tx.delete(feedbackRef);
     tx.update(sessionRef, {
       openCount,
       resolvedCount,
+      skippedCount,
       feedbackCount,
       updatedAt: serverTimestamp(),
     });
@@ -357,26 +389,33 @@ export async function resolveFeedbackRepo(feedbackId: string): Promise<void> {
   await updateDoc(doc(db, "feedback", feedbackId), { status: "resolved" });
 }
 
-/** Counts by resolution for one session. Each count uses aggregation (no unbounded reads). */
+/** Counts by status for one session. Each count uses aggregation (no unbounded reads). */
 export interface SessionFeedbackCounts {
   open: number;
   resolved: number;
+  skipped: number;
 }
 
 export async function getSessionFeedbackCountsRepo(
   sessionId: string
 ): Promise<SessionFeedbackCounts> {
   const coll = collection(db, "feedback");
-  const [resolvedSnap, totalSnap] = await Promise.all([
+  const [resolvedSnap, skippedSnap, totalSnap] = await Promise.all([
     getCountFromServer(
       query(coll, where("sessionId", "==", sessionId), where("status", "==", "resolved"))
+    ),
+    getCountFromServer(
+      query(coll, where("sessionId", "==", sessionId), where("status", "==", "skipped"))
     ),
     getSessionFeedbackTotalCountRepo(sessionId),
   ]);
   const resolved = resolvedSnap.data().count;
+  const skipped = skippedSnap.data().count;
+  const total = totalSnap;
   return {
+    open: Math.max(0, total - resolved - skipped),
     resolved,
-    open: totalSnap - resolved,
+    skipped,
   };
 }
 

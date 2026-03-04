@@ -20,10 +20,9 @@ const SCROLL_MEMORY_KEY_PREFIX = "echly-exec-scroll-";
 export interface ExecutionModeLayoutProps {
   item: (FeedbackItemShape & { index: number; total: number }) | null;
   onExitExecutionMode: () => void;
-  onDone: () => void;
+  onSkip: () => void;
   onNeedsClarification: () => void;
   onAssign: () => void;
-  onSkip: () => void;
   onResolveAndNext: () => void;
   onSaveActionSteps: (actionSteps: string[]) => Promise<void>;
   onExpandImage: () => void;
@@ -37,10 +36,9 @@ export interface ExecutionModeLayoutProps {
 export function ExecutionModeLayout({
   item,
   onExitExecutionMode,
-  onDone,
+  onSkip,
   onNeedsClarification,
   onAssign,
-  onSkip,
   onResolveAndNext,
   onSaveActionSteps,
   onExpandImage,
@@ -105,13 +103,6 @@ export function ExecutionModeLayout({
     };
   }, [item?.id, sessionId]);
 
-  const handleDone = useCallback(() => {
-    if (!item?.id || processingTriggeredForRef.current === item.id) return;
-    processingTriggeredForRef.current = item.id;
-    setIsProcessing(true);
-    onDone();
-  }, [item?.id, onDone]);
-
   const handleResolveAndNext = useCallback(() => {
     if (!item?.id || processingTriggeredForRef.current === item.id) return;
     processingTriggeredForRef.current = item.id;
@@ -140,7 +131,7 @@ export function ExecutionModeLayout({
         case "d":
           e.preventDefault();
           if (e.shiftKey) handleResolveAndNext();
-          else handleDone();
+          else onSkip();
           break;
         case "n":
         case "s":
@@ -161,7 +152,7 @@ export function ExecutionModeLayout({
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isProcessing, handleDone, handleResolveAndNext, onSkip, onNeedsClarification, onAssign]);
+  }, [isProcessing, handleResolveAndNext, onSkip, onNeedsClarification, onAssign]);
 
   // Normalize: always a real array, render all steps (no truncation)
   const actionSteps = Array.isArray(item?.actionSteps) ? [...item.actionSteps] : [];
@@ -208,24 +199,24 @@ export function ExecutionModeLayout({
         </div>
       </header>
 
-      {/* Content: centered, max-w 920px */}
+      {/* Content: centered, max-w 920px, minimal chrome */}
       <div
         ref={contentScrollRef}
         className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden transition-opacity duration-150 ${disabled ? "opacity-[0.85]" : "opacity-100"}`}
       >
-        <div className="max-w-[920px] mx-auto px-6 py-8 pb-12">
-          <h1 className="text-[24px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] mb-5">
+        <div className="max-w-[920px] mx-auto px-6 py-8 pb-12 flex flex-col items-center">
+          <h1 className="w-full text-center text-[24px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] mb-5">
             {item.title}
           </h1>
 
-          <div className="mb-6">
+          <div className="w-full text-center mb-6">
             {descriptionDraft !== undefined && setDescriptionDraft && saveDescription ? (
               <textarea
                 value={descriptionDraft}
                 onChange={(e) => setDescriptionDraft(e.target.value)}
                 onBlur={() => void saveDescription()}
                 disabled={disabled}
-                className="w-full min-h-[80px] text-[15px] leading-[1.65] text-[hsl(var(--text-primary-strong))] bg-transparent border-0 resize-none focus:outline-none focus-visible:ring-0 placeholder:text-[hsl(var(--text-tertiary))]"
+                className="w-full min-h-[80px] text-[15px] leading-[1.65] text-[hsl(var(--text-primary-strong))] text-center bg-transparent border-0 resize-none focus:outline-none focus-visible:ring-0 placeholder:text-[hsl(var(--text-tertiary))]"
                 placeholder="Description…"
               />
             ) : (
@@ -236,8 +227,8 @@ export function ExecutionModeLayout({
           </div>
 
           {hasScreenshot && (
-            <div className="mb-8 rounded-xl overflow-hidden bg-neutral-100/90 shadow-sm">
-              <div className="relative aspect-video max-h-[400px]">
+            <div className="w-full mb-8 flex justify-center">
+              <div className="relative w-full max-w-[920px] aspect-video max-h-[400px] rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
                 <Image
                   src={item.screenshotUrl!}
                   alt="Screenshot"
@@ -250,7 +241,7 @@ export function ExecutionModeLayout({
                   type="button"
                   onClick={onExpandImage}
                   disabled={disabled}
-                  className="absolute top-3 right-3 p-2 rounded-lg bg-black/40 text-white hover:bg-black/60 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1 disabled:opacity-60"
+                  className="absolute top-[12px] right-[12px] w-9 h-9 flex items-center justify-center rounded-full bg-white/90 text-neutral-700 shadow-sm hover:bg-white hover:shadow transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1 disabled:opacity-60"
                   aria-label="Zoom screenshot (Z)"
                 >
                   <ZoomIn className="h-4 w-4" strokeWidth={1.5} />
@@ -260,47 +251,28 @@ export function ExecutionModeLayout({
           )}
 
           {hasActionSteps ? (
-            <div className="mb-10 rounded-xl bg-neutral-50/80 px-6 py-5 shadow-sm">
+            <div className="w-full max-w-[920px] mb-10 px-0 py-1">
               <ExecutionModeActionSteps actionSteps={actionSteps} />
             </div>
           ) : null}
 
-          {/* Action bar: centered under content, 12–16px gap, clear hierarchy */}
-          <div className="flex flex-col items-center justify-center gap-4">
+          {/* Action bar: Skip | Needs clarification | Assign | Resolve & Next — centered, primary right */}
+          <div className="flex flex-col items-center justify-center gap-4 w-full">
             <div className="flex flex-wrap items-center justify-center gap-4">
-              {!item.isResolved && (
-                <button
-                  type="button"
-                  onClick={handleResolveAndNext}
-                  disabled={disabled}
-                  className="inline-flex items-center justify-center gap-2 min-w-[140px] h-11 px-5 rounded-xl bg-[var(--accent-operational)] text-white text-[14px] font-medium hover:opacity-95 transition-opacity cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-operational)] focus-visible:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} aria-hidden />
-                      Processing…
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-4 w-4" strokeWidth={1.5} aria-hidden />
-                      Resolve & Next
-                    </>
-                  )}
-                </button>
-              )}
               <button
                 type="button"
-                onClick={handleDone}
+                onClick={onSkip}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-white text-[14px] font-medium text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-operational)] focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-gray-300 bg-white text-gray-700 text-[14px] font-medium hover:bg-gray-50 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Done
+                <SkipForward className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+                Skip
               </button>
               <button
                 type="button"
                 onClick={onNeedsClarification}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-neutral-100 text-[14px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-neutral-200/80 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-operational)] focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-[14px] font-medium hover:bg-amber-100 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <MessageCircleQuestion className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Needs clarification
@@ -309,31 +281,40 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={onAssign}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-white text-[14px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-operational)] focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-gray-300 bg-white text-gray-600 text-[14px] font-medium hover:bg-gray-50 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <UserPlus className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Assign
               </button>
               <button
                 type="button"
-                onClick={onSkip}
+                onClick={handleResolveAndNext}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl text-[14px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-neutral-100/80 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-operational)] focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center gap-2 min-w-[160px] h-11 px-6 rounded-xl bg-blue-600 text-white text-[14px] font-medium hover:bg-blue-700 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                <SkipForward className="h-4 w-4" strokeWidth={1.5} aria-hidden />
-                Skip
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} aria-hidden />
+                    Processing…
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+                    Resolve & Next
+                  </>
+                )}
               </button>
             </div>
           </div>
 
           {quickNoteOpen && (
-            <div className="mt-8 p-3 rounded-lg bg-neutral-50/80">
+            <div className="mt-8 w-full max-w-[920px] p-3">
               <input
                 type="text"
                 value={quickNoteValue}
                 onChange={(e) => setQuickNoteValue(e.target.value)}
                 placeholder="Quick note…"
-                className="w-full text-[14px] px-3 py-2 rounded-lg bg-white border-0 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] placeholder:text-[hsl(var(--text-tertiary))]"
+                className="w-full text-[14px] px-3 py-2 rounded-lg border border-[var(--layer-2-border)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] placeholder:text-[hsl(var(--text-tertiary))]"
                 autoFocus
               />
             </div>

@@ -3,6 +3,7 @@
 import React, { useMemo, useState, memo, useRef, useEffect } from "react";
 import { ChevronDown, ChevronRight, Check, Search, MoreVertical } from "lucide-react";
 import type { Feedback } from "@/lib/domain/feedback";
+import { getTicketStatus } from "@/lib/domain/feedback";
 import { TicketItem } from "./TicketItem";
 
 export interface TicketListProps {
@@ -11,6 +12,7 @@ export interface TicketListProps {
   totalCount?: number;
   openCount?: number;
   resolvedCount?: number;
+  skippedCount?: number;
   /** Optional: editable session title */
   isEditingSessionTitle?: boolean;
   sessionTitleDraft?: string;
@@ -43,6 +45,7 @@ function TicketListInner({
   totalCount,
   openCount,
   resolvedCount,
+  skippedCount,
   isEditingSessionTitle = false,
   sessionTitleDraft,
   onSessionTitleChange,
@@ -88,13 +91,27 @@ function TicketListInner({
   }, [searchInput]);
 
   const total = typeof totalCount === "number" ? totalCount : items.length;
-  const open = typeof openCount === "number" ? openCount : items.filter((i) => !(i.isResolved ?? false)).length;
+  const open =
+    typeof openCount === "number"
+      ? openCount
+      : items.filter((i) => getTicketStatus(i) === "open").length;
+  const skipped =
+    typeof skippedCount === "number"
+      ? skippedCount
+      : items.filter((i) => getTicketStatus(i) === "skipped").length;
   const resolved =
-    typeof resolvedCount === "number" ? resolvedCount : items.filter((i) => i.isResolved ?? false).length;
+    typeof resolvedCount === "number"
+      ? resolvedCount
+      : items.filter((i) => getTicketStatus(i) === "resolved").length;
 
   const meta =
     total > 0
-      ? [`${total} total`, `${open} open`, `${resolved} resolved`].join(" · ")
+      ? [
+          `${total} total`,
+          `${open} open`,
+          ...(skipped > 0 ? [`${skipped} skipped`] : []),
+          `${resolved} resolved`,
+        ].join(" · ")
       : "0 total";
 
   const getTime = (f: Feedback): number => {
@@ -107,16 +124,19 @@ function TicketListInner({
 
   const query = searchQuery.trim().toLowerCase();
 
-  const { openItems, resolvedItems } = useMemo(() => {
+  const { openItems, skippedItems, resolvedItems } = useMemo(() => {
     const sorted = [...items].sort((a, b) => getTime(b) - getTime(a));
     const filtered = query
       ? sorted.filter((f) => f.title.toLowerCase().includes(query))
       : sorted;
     return {
-      openItems: filtered.filter((i) => !(i.isResolved ?? false)),
-      resolvedItems: filtered.filter((i) => i.isResolved ?? false),
+      openItems: filtered.filter((i) => getTicketStatus(i) === "open"),
+      skippedItems: filtered.filter((i) => getTicketStatus(i) === "skipped"),
+      resolvedItems: filtered.filter((i) => getTicketStatus(i) === "resolved"),
     };
   }, [items, query]);
+
+  const [skippedExpanded, setSkippedExpanded] = useState(false);
 
   const canEditTitle =
     typeof onSessionTitleChange === "function" &&
@@ -263,7 +283,8 @@ function TicketListInner({
                   key={item.id}
                   id={item.id}
                   title={item.title}
-                  isResolved={item.isResolved}
+                  isResolved={false}
+                  isSkipped={false}
                   index={idx + 1}
                   active={item.id === selectedId}
                   onSelect={onSelect}
@@ -277,6 +298,47 @@ function TicketListInner({
             </div>
           )}
         </section>
+
+        {skipped > 0 && (
+          <section className="border-b border-[var(--layer-2-border)]">
+            <button
+              type="button"
+              onClick={() => setSkippedExpanded((x) => !x)}
+              className="sticky top-0 z-10 flex w-full items-center gap-2 px-3 py-2 text-left bg-amber-100/90 border-b border-amber-200/80 cursor-pointer"
+              aria-expanded={skippedExpanded}
+            >
+              <span className="text-[12px] font-semibold tabular-nums text-amber-900/95">
+                {skipped}
+              </span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-amber-800/90">
+                Skipped
+              </span>
+              <span className="ml-auto shrink-0">
+                {skippedExpanded ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-amber-700/80" aria-hidden />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 text-amber-700/80" aria-hidden />
+                )}
+              </span>
+            </button>
+            {skippedExpanded && (
+              <div className="px-2 py-1.5 space-y-0.5 bg-[var(--canvas-base)]">
+                {skippedItems.map((item, idx) => (
+                  <TicketItem
+                    key={item.id}
+                    id={item.id}
+                    title={item.title}
+                    isResolved={false}
+                    isSkipped={true}
+                    index={openItems.length + idx + 1}
+                    active={item.id === selectedId}
+                    onSelect={onSelect}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         <section>
           <button
@@ -306,8 +368,9 @@ function TicketListInner({
                   key={item.id}
                   id={item.id}
                   title={item.title}
-                  isResolved={item.isResolved}
-                  index={openItems.length + idx + 1}
+                  isResolved={true}
+                  isSkipped={false}
+                  index={openItems.length + skippedItems.length + idx + 1}
                   active={item.id === selectedId}
                   onSelect={onSelect}
                 />

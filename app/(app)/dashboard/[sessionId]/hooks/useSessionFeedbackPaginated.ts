@@ -18,10 +18,13 @@ export interface UseSessionFeedbackPaginatedResult {
   activeCount: number;
   /** Resolved count from server (first page only); do not derive from items. */
   resolvedCount: number;
-  /** Setters for counts so callers can update locally (e.g. after resolve toggle, delete, create without refetch). */
+  /** Skipped count from server (first page only); do not derive from items. */
+  skippedCount: number;
+  /** Setters for counts so callers can update locally (e.g. after resolve/skip, delete, create without refetch). */
   setTotal: React.Dispatch<React.SetStateAction<number>>;
   setActiveCount: React.Dispatch<React.SetStateAction<number>>;
   setResolvedCount: React.Dispatch<React.SetStateAction<number>>;
+  setSkippedCount: React.Dispatch<React.SetStateAction<number>>;
   loading: boolean;
   hasMore: boolean;
   hasReachedLimit: boolean;
@@ -48,6 +51,7 @@ export function useSessionFeedbackPaginated(
   const [total, setTotal] = useState<number>(0);
   const [activeCount, setActiveCount] = useState<number>(0);
   const [resolvedCount, setResolvedCount] = useState<number>(0);
+  const [skippedCount, setSkippedCount] = useState<number>(0);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -167,11 +171,12 @@ export function useSessionFeedbackPaginated(
     let cancelled = false;
     authFetch(`/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`)
       .then((res) => res.json())
-      .then((data: { total?: number; openCount?: number; resolvedCount?: number }) => {
+      .then((data: { total?: number; openCount?: number; resolvedCount?: number; skippedCount?: number }) => {
         if (cancelled) return;
         if (typeof data.total === "number") setTotal(data.total);
         if (typeof data.openCount === "number") setActiveCount(data.openCount);
         if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
+        if (typeof data.skippedCount === "number") setSkippedCount(data.skippedCount);
       })
       .catch(() => {});
     return () => {
@@ -191,11 +196,12 @@ export function useSessionFeedbackPaginated(
       `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
     )
       .then((res) => res.json())
-      .then((data: { feedback?: Feedback[]; nextCursor?: string | null; hasMore?: boolean; total?: number; activeCount?: number; resolvedCount?: number }) => {
+      .then((data: { feedback?: Feedback[]; nextCursor?: string | null; hasMore?: boolean; total?: number; activeCount?: number; resolvedCount?: number; skippedCount?: number }) => {
         if (cancelled) return;
         if (typeof data.total === "number") setTotal(data.total);
         if (typeof data.activeCount === "number") setActiveCount(data.activeCount);
         if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
+        if (typeof data.skippedCount === "number") setSkippedCount(data.skippedCount);
         if (data.feedback?.length) {
           setItems(data.feedback);
           setCursor(data.nextCursor ?? null);
@@ -229,10 +235,12 @@ export function useSessionFeedbackPaginated(
         total?: number;
         activeCount?: number;
         resolvedCount?: number;
+        skippedCount?: number;
       };
       if (typeof data.total === "number") setTotal(data.total);
       if (typeof data.activeCount === "number") setActiveCount(data.activeCount);
       if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
+      if (typeof data.skippedCount === "number") setSkippedCount(data.skippedCount);
       if (data.feedback?.length) {
         setItems(data.feedback);
         setCursor(data.nextCursor ?? null);
@@ -252,10 +260,12 @@ export function useSessionFeedbackPaginated(
     total,
     activeCount,
     resolvedCount,
+    skippedCount,
     setFeedback: setItems,
     setTotal,
     setActiveCount,
     setResolvedCount,
+    setSkippedCount,
     loading: initialLoading,
     hasMore,
     hasReachedLimit,

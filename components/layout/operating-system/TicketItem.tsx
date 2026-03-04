@@ -6,6 +6,8 @@ interface TicketItemProps {
   id: string;
   title: string;
   isResolved?: boolean;
+  /** When true, shows skipped (deferred) styling. Takes precedence over isResolved for display. */
+  isSkipped?: boolean;
   index?: number;
   impactLabel?: string | null;
   active?: boolean;
@@ -16,6 +18,7 @@ function TicketItemInner({
   id,
   title,
   isResolved,
+  isSkipped,
   impactLabel,
   active,
   onSelect,
@@ -26,7 +29,9 @@ function TicketItemInner({
 
   const statusDotClass = isResolved
     ? "bg-emerald-500/70"
-    : "bg-amber-400/90";
+    : isSkipped
+      ? "bg-amber-500/80"
+      : "bg-amber-400/90";
 
   return (
     <button

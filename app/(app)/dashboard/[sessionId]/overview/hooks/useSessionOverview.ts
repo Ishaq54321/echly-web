@@ -42,6 +42,7 @@ export interface SessionOverviewData {
 const defaultCounts: SessionFeedbackCounts = {
   open: 0,
   resolved: 0,
+  skipped: 0,
 };
 
 function extractTagCounts(feedback: Feedback[]): { tag: string; count: number }[] {

@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { CheckSquare, Square, ChevronDown, ChevronRight, Check } from "lucide-react";
 import type { Feedback } from "@/lib/domain/feedback";
+import { getTicketStatus } from "@/lib/domain/feedback";
 
 export interface FeedbackListPanelProps {
   items: Feedback[];
@@ -31,12 +32,17 @@ export function FeedbackListPanel({
   listRef,
 }: FeedbackListPanelProps) {
   const [openExpanded, setOpenExpanded] = useState(true);
+  const [skippedExpanded, setSkippedExpanded] = useState(false);
   const [resolvedExpanded, setResolvedExpanded] = useState(false);
 
-  const openItems = useMemo(() => items.filter((i) => !(i.isResolved ?? false)), [items]);
-  const resolvedItems = useMemo(() => items.filter((i) => i.isResolved ?? false), [items]);
+  const openItems = useMemo(() => items.filter((i) => getTicketStatus(i) === "open"), [items]);
+  const skippedItems = useMemo(() => items.filter((i) => getTicketStatus(i) === "skipped"), [items]);
+  const resolvedItems = useMemo(() => items.filter((i) => getTicketStatus(i) === "resolved"), [items]);
 
-  const flatOrdered = useMemo(() => [...openItems, ...resolvedItems], [openItems, resolvedItems]);
+  const flatOrdered = useMemo(
+    () => [...openItems, ...skippedItems, ...resolvedItems],
+    [openItems, skippedItems, resolvedItems]
+  );
   const selectedIndex = flatOrdered.findIndex((i) => i.id === selectedId);
   const listContainerRef = useRef<HTMLDivElement>(null);
 
@@ -69,7 +75,7 @@ export function FeedbackListPanel({
 
   const renderRow = (item: Feedback) => {
     const isSelected = item.id === selectedId;
-    const isUnread = !(item.isResolved ?? false);
+    const isUnread = getTicketStatus(item) === "open" || getTicketStatus(item) === "skipped";
     const isChecked = selectedIds.has(item.id);
     return (
       <div
@@ -179,6 +185,20 @@ export function FeedbackListPanel({
               Open ({openItems.length})
             </button>
             {openExpanded && openItems.map((item) => renderRow(item))}
+
+            {skippedItems.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSkippedExpanded((x) => !x)}
+                  className="flex items-center gap-2 w-full px-4 py-2 mt-1 text-left text-[11px] font-medium uppercase tracking-wider text-amber-800/90 hover:bg-amber-50/50"
+                >
+                  {skippedExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  Skipped ({skippedItems.length})
+                </button>
+                {skippedExpanded && skippedItems.map((item) => renderRow(item))}
+              </>
+            )}
 
             <button
               type="button"
