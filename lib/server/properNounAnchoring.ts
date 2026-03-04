@@ -6,6 +6,8 @@
  * - Anchoring corrects obvious OCR mismatches only; it does not guess replacements that could change meaning.
  */
 
+import { echlyDebug } from "@/lib/utils/logger";
+
 const MIN_VISIBLE_TOKEN_LEN = 4;
 const MIN_WORD_LEN = 3;
 /** Minimum similarity to perform any replacement. Below this we do not auto-replace. */
@@ -260,10 +262,6 @@ export function anchorProperNouns(
   transcript: string,
   visibleText: string | null
 ): string {
-  console.log("---- ANCHOR START ----");
-  console.log("Transcript INPUT:", transcript);
-  console.log("VisibleText INPUT:", visibleText);
-
   const vt = visibleText?.trim() ?? "";
   if (!vt || vt.length < MIN_VISIBLE_TEXT_LEN) return transcript;
 
@@ -307,20 +305,6 @@ export function anchorProperNouns(
         const collapsedWindow = transcriptNorm.replace(/\s+/g, "");
         const collapsedOCR = ocrNorm.replace(/\s+/g, "");
         const similarity = normalizedSimilarity(collapsedOCR, collapsedWindow);
-        console.log("OCR Phrase:", ocrPhrase);
-        console.log("Window Phrase:", transcriptWindow);
-        console.log("Collapsed Window:", collapsedWindow);
-        console.log("Collapsed OCR:", collapsedOCR);
-        console.log("Similarity Score:", similarity);
-        if (similarity >= SIMILARITY_POTENTIAL_MIN && similarity < SIMILARITY_THRESHOLD_REPLACE) {
-          if (process.env.NODE_ENV !== "production") {
-            console.log("[Anchoring] Potential phrase match (no replace, similarity 0.5–0.85):", {
-              transcriptWindow,
-              ocrPhrase,
-              similarity,
-            });
-          }
-        }
         if (
           similarity >= SIMILARITY_THRESHOLD_REPLACE &&
           !containsProtectedWord(transcriptWindow) &&
@@ -340,9 +324,6 @@ export function anchorProperNouns(
     }
 
     if (bestMatch) {
-      console.log(">>> REPLACEMENT SELECTED <<<");
-      console.log("Replacing:", bestMatch.transcriptWindow);
-      console.log("With:", bestMatch.ocrPhrase);
       replacements.push({
         start: bestMatch.start,
         end: bestMatch.end,
@@ -351,14 +332,13 @@ export function anchorProperNouns(
       for (let k = bestMatch.wordStart; k < bestMatch.wordStart + bestMatch.windowSize; k++) {
         usedStarts.add(k);
       }
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[Anchoring] Phrase match:", {
-          transcriptWindow: bestMatch.transcriptWindow,
-          matchedOCRPhrase: bestMatch.ocrPhrase,
-          similarity: bestMatch.similarity,
-        });
-      }
     }
+  }
+
+  if (replacements.length > 0) {
+    echlyDebug("OCR ANCHOR MATCH FOUND", replacements.length);
+  } else if (ocrPhrases.length > 0) {
+    echlyDebug("OCR ANCHOR NOT FOUND", null);
   }
 
   replacements.sort((a, b) => b.start - a.start);
@@ -369,8 +349,6 @@ export function anchorProperNouns(
   // --- STEP 4: Token-level anchoring (fallback) ---
   const visibleTokens = tokenizeVisibleText(vt);
   if (visibleTokens.length === 0) {
-    console.log("Final Anchored Transcript:", corrected);
-    console.log("---- ANCHOR END ----");
     return corrected;
   }
 
@@ -387,15 +365,6 @@ export function anchorProperNouns(
     for (const { phrase: visibleNorm, casing } of visiblePhrases) {
       const visibleLower = visibleNorm.toLowerCase();
       const sim = normalizedSimilarity(candidateLower, visibleLower);
-      if (sim >= SIMILARITY_POTENTIAL_MIN && sim < SIMILARITY_THRESHOLD_REPLACE) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log("[Anchoring] Potential phrase match (no replace, similarity 0.5–0.85):", {
-            candidatePhrase,
-            visiblePhrase: casing,
-            similarity: sim,
-          });
-        }
-      }
       if (sim >= SIMILARITY_THRESHOLD_REPLACE && sim > bestSimilarity) {
         bestSimilarity = sim;
         bestCasing = casing;
@@ -417,15 +386,6 @@ export function anchorProperNouns(
       const visibleNorm = normalizePunctuation(token);
       const visibleLower = visibleNorm.toLowerCase();
       const sim = normalizedSimilarity(candidateLower, visibleLower);
-      if (sim >= SIMILARITY_POTENTIAL_MIN && sim < SIMILARITY_THRESHOLD_REPLACE) {
-        if (process.env.NODE_ENV !== "production") {
-          console.log("[Anchoring] Potential single-word match (no replace, similarity 0.5–0.85):", {
-            transcriptWord: candidate,
-            ocrToken: token,
-            similarity: sim,
-          });
-        }
-      }
       if (sim >= SIMILARITY_THRESHOLD_REPLACE && sim > bestSimilarity) {
         bestSimilarity = sim;
         bestToken = token;
@@ -436,8 +396,6 @@ export function anchorProperNouns(
     corrected = res.text;
   }
 
-  console.log("Final Anchored Transcript:", corrected);
-  console.log("---- ANCHOR END ----");
   return corrected;
 }
 

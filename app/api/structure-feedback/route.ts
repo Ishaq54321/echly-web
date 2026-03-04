@@ -1,14 +1,28 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { requireAuth } from "@/lib/server/auth";
+import { echlyDebug } from "@/lib/utils/logger";
 import { segmentInstructions } from "@/lib/server/instructionSegmentation";
 import { refineInstructions } from "@/lib/server/instructionRefinement";
+import { buildInstructionGraph, ticketsFromGraph } from "@/lib/server/instructionGraph";
 import { mapInstructionsToOntology } from "@/lib/server/instructionOntology";
 import { batchIntentAndTicketsFromOntology } from "@/lib/server/pipelineStages";
 import { anchorProperNouns } from "@/lib/server/properNounAnchoring";
+import { normalizeUiVocabulary } from "@/lib/server/uiVocabularyNormalization";
 import { normalizeTranscript } from "@/lib/server/transcriptNormalization";
-import { verifyTicketsBatch } from "@/lib/server/ticketVerification";
+import { verifyTicketsBatch, applyVerifierFinalDecision } from "@/lib/server/ticketVerification";
 import type { PipelineContext } from "@/lib/server/pipelineContext";
+
+/** Action verbs in transcript: only trigger clarification when instructionCount=0 AND no these. */
+const TRANSCRIPT_ACTION_VERBS = /\b(reduce|increase|move|change|rename|hide|show|add|remove)\b/i;
+
+function transcriptWordCount(transcript: string): number {
+  return transcript.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function transcriptHasActionVerbs(transcript: string): boolean {
+  return TRANSCRIPT_ACTION_VERBS.test(transcript);
+}
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -17,7 +31,10 @@ const client = new OpenAI({
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
 const MAX_INSTRUCTIONS = 12;
-const CONFIDENCE_GATE_THRESHOLD = 0.6;
+/** Only trigger clarification when confidence is extremely low (after extraction). */
+const CLARITY_EXTREME_LOW_CONFIDENCE = 0.45;
+/** Clarity score above this → skip clarification. Formula: instructionCountNorm * 0.6 + avgConfidence * 0.4 */
+const CLARITY_SCORE_SKIP_THRESHOLD = 0.5;
 
 const rateLimitMap = new Map<
   string,
@@ -146,8 +163,7 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  console.log("ECHLY DEBUG — TRANSCRIPT RECEIVED:", transcript);
-  console.log("ECHLY DEBUG — CONTEXT RECEIVED:", body?.context ?? null);
+  echlyDebug("RAW TRANSCRIPT", transcript);
 
   const ctx = normalizeContext(body?.context);
   const originalTranscript = transcript;
@@ -156,11 +172,13 @@ export async function POST(req: Request): Promise<Response> {
     ctx?.visibleText ?? null
   );
 
-  // ——— Transcript cleanup: fix STT/grammar before segmentation ———
-  const normalizedTranscript = await normalizeTranscript(client, correctedTranscript, { retryOnce: true });
+  echlyDebug("CORRECTED TRANSCRIPT", correctedTranscript);
 
-  console.log("ECHLY DEBUG — CORRECTED TRANSCRIPT:", correctedTranscript);
-  console.log("ECHLY DEBUG — NORMALIZED TRANSCRIPT:", normalizedTranscript);
+  // ——— UI vocabulary normalization: summit→submit, model→modal, etc. (Rule 5) ———
+  const transcriptAfterUiNorm = normalizeUiVocabulary(correctedTranscript);
+
+  // ——— Transcript cleanup: fix STT/grammar before segmentation ———
+  const normalizedTranscript = await normalizeTranscript(client, transcriptAfterUiNorm, { retryOnce: true });
 
   try {
     // ——— Stage 1: Instruction segmentation (with context, gpt-4o, retry) ———
@@ -168,22 +186,44 @@ export async function POST(req: Request): Promise<Response> {
       instructions: segmentedInstructions,
       needsClarification: segmentNeedsClarification,
       confidence: segmentConfidence,
+      intentConfidenceScore: segmentIntentScore,
     } = await segmentInstructions(client, normalizedTranscript, ctx, { retryOnce: true });
 
-    if (segmentNeedsClarification || segmentedInstructions.length === 0) {
+    echlyDebug("SEGMENTATION RESULT", segmentedInstructions);
+
+    // Only trigger clarification when ALL are true: instructionCount === 0, transcript < 12 words, no action verbs.
+    if (segmentedInstructions.length === 0) {
+      const wordCount = transcriptWordCount(normalizedTranscript);
+      const hasActionVerbs = transcriptHasActionVerbs(normalizedTranscript);
+      const shouldTriggerClarification = wordCount < 12 && !hasActionVerbs;
+      const intentScore = segmentIntentScore ?? 0;
+      const clarityLayerInput = {
+        instructionCount: 0,
+        averageConfidence: intentScore / 100,
+        transcript: normalizedTranscript,
+        wordCount,
+        hasActionVerbs,
+        shouldTriggerClarification,
+      };
+      echlyDebug("CLARITY LAYER INPUT", clarityLayerInput);
+      echlyDebug("CLARITY DECISION", shouldTriggerClarification);
       return NextResponse.json({
         success: true,
         tickets: [],
-        needsClarification: true,
-        verificationIssues: ["Vague or unclear feedback. Please specify what to change (e.g. which element and what to change)."],
-        clarityScore: 0,
-        clarityIssues: ["Feedback too vague to create a ticket"],
-        suggestedRewrite: "Please specify what you'd like to change (e.g. which element and what to change).",
+        needsClarification: shouldTriggerClarification,
+        verificationIssues: shouldTriggerClarification
+          ? ["Vague or unclear feedback. Please specify what to change (e.g. which element and what to change)."]
+          : undefined,
+        clarityScore: intentScore,
+        clarityIssues: shouldTriggerClarification ? ["Feedback too vague to create a ticket"] : [],
+        suggestedRewrite: shouldTriggerClarification
+          ? "Please specify what you'd like to change (e.g. which element and what to change)."
+          : null,
         confidence: 0,
       });
     }
 
-    // ——— Stage 2: Instruction refinement ———
+    // ——— Stage 2: Instruction refinement (splits compound; do not merge alternatives — see Instruction Graph) ———
     const { instructions: refinedInstructions } = await refineInstructions(client, segmentedInstructions);
     let instructions = refinedInstructions;
 
@@ -198,38 +238,83 @@ export async function POST(req: Request): Promise<Response> {
       console.log("[STRUCTURE] Refined instructions:", instructions.length, instructionLimitWarning ?? "");
     }
 
-    // ——— Stage 3: Instruction → Ontology Mapping (NEW) ———
-    const ontologyResult = await mapInstructionsToOntology(client, instructions, ctx, { retryOnce: true });
+    // ——— Stage 3: Instruction Graph Builder (deterministic; groups by UI target, preserves alternatives) ———
+    // Use segmented instructions for graph so we preserve multiple actions per element (refinement may merge alternatives).
+    const instructionsForGraph = segmentedInstructions.length > 0 ? segmentedInstructions.slice(0, MAX_INSTRUCTIONS) : instructions;
+    const { graph, needsClarification: graphNeedsClarification } = buildInstructionGraph({
+      instructions: instructionsForGraph,
+      context: ctx,
+      transcript: normalizedTranscript,
+    });
 
-    // ——— Stages 4–5: Intent + single merged ticket from ontology (with context, retry on parse) ———
-    const { intents: _intents, tickets: pipelineTickets } = await batchIntentAndTicketsFromOntology(
-      client,
-      ontologyResult.actions,
-      ctx,
-      { instructions, retryOnce: true }
+    // Structured instructions for debug: flatten graph to { action_type, target_element, confidence }[]
+    let structuredInstructionsForDebug: Array<{ action_type: string; target_element: string | null; confidence: number }> = graph.targets.flatMap((t) =>
+      t.actions.map((a) => ({ action_type: a.action_type, target_element: t.element, confidence: a.confidence }))
     );
 
+    // ——— Stage 4: Ticket generation from graph (one ticket per TargetNode) ———
+    let pipelineTickets = ticketsFromGraph(graph);
+
+    // Fallback: if graph produced no tickets (e.g. target heuristics missed), use ontology path once
+    if (pipelineTickets.length === 0 && instructions.length > 0) {
+      const ontologyResult = await mapInstructionsToOntology(client, instructions, ctx, { retryOnce: true });
+      structuredInstructionsForDebug = ontologyResult.actions.map((a) => ({
+        action_type: a.action_type,
+        target_element: a.target_element,
+        confidence: a.confidence,
+      }));
+      const { tickets: ontologyTickets } = await batchIntentAndTicketsFromOntology(
+        client,
+        ontologyResult.actions,
+        ctx,
+        { instructions, retryOnce: true }
+      );
+      pipelineTickets = ontologyTickets;
+    }
+
+    echlyDebug("STRUCTURED INSTRUCTIONS", structuredInstructionsForDebug);
+    echlyDebug("INSTRUCTION CONFIDENCE SCORES", structuredInstructionsForDebug.map((s) => s.confidence));
+    echlyDebug("INSTRUCTION COUNT", instructions.length);
+
     if (pipelineTickets.length === 0) {
+      const avgConf = structuredInstructionsForDebug.length > 0
+        ? structuredInstructionsForDebug.reduce((s, a) => s + a.confidence, 0) / structuredInstructionsForDebug.length
+        : 0;
+      const clarityLayerInput = { instructionCount: instructions.length, averageConfidence: avgConf, transcript: normalizedTranscript };
+      echlyDebug("CLARITY LAYER INPUT", clarityLayerInput);
+      echlyDebug("CLARITY DECISION", true);
       return NextResponse.json({
         success: true,
         tickets: [],
         needsClarification: true,
-        verificationIssues: ["Could not generate tickets from instructions."],
+        verificationIssues: graphNeedsClarification
+          ? ["No UI target could be inferred or no actionable change. Please specify what to change (e.g. which element and what to change)."]
+          : ["Could not generate tickets from instructions."],
         clarityScore: 0,
         clarityIssues: [],
-        suggestedRewrite: null,
+        suggestedRewrite: graphNeedsClarification
+          ? "Please specify what you'd like to change (e.g. which element and what to change)."
+          : null,
         confidence: 0.5,
       });
     }
 
-    // ——— Stage 5: Verification (single ticket; retry once) ———
-    const verifications = await verifyTicketsBatch(
+    // ——— Stage 5: Verification (retry once) ———
+    const rawVerifications = await verifyTicketsBatch(
       client,
       normalizedTranscript,
       instructions,
       pipelineTickets,
       { retryOnce: true }
     );
+
+    // ——— Apply verifier final decision: do not override segmentation when segmentationNeedsClarification === false ———
+    const verifications = applyVerifierFinalDecision(rawVerifications, {
+      instructionCount: instructions.length,
+      instructions,
+      transcript: normalizedTranscript,
+      segmentationNeedsClarification: segmentNeedsClarification,
+    });
 
     // ——— Partial verification: keep only tickets that pass ———
     const validIndices: number[] = [];
@@ -245,6 +330,15 @@ export async function POST(req: Request): Promise<Response> {
 
     // ——— All tickets failed verification → needsClarification ———
     if (validTickets.length === 0 && pipelineTickets.length > 0) {
+      const avgConfVerification =
+        verifications.length > 0 ? verifications.reduce((s, v) => s + v.confidence, 0) / verifications.length : 0;
+      const clarityLayerInput = {
+        instructionCount: instructions.length,
+        averageConfidence: avgConfVerification,
+        transcript: normalizedTranscript,
+      };
+      echlyDebug("CLARITY LAYER INPUT", clarityLayerInput);
+      echlyDebug("CLARITY DECISION", true);
       return NextResponse.json({
         success: true,
         tickets: [],
@@ -258,7 +352,7 @@ export async function POST(req: Request): Promise<Response> {
       });
     }
 
-    // ——— Confidence gate: if overall confidence low, return needsClarification ———
+    // ——— Clarity decision AFTER extraction: only trigger when no actionable instructions OR confidence extremely low ———
     const minTicketConfidence = validTickets.length > 0
       ? Math.min(...validTickets.map((t) => t.confidenceScore))
       : 1;
@@ -270,19 +364,14 @@ export async function POST(req: Request): Promise<Response> {
       minTicketConfidence,
       minVerificationConfidence
     );
+    const averageConfidence =
+      validVerifications.length > 0
+        ? validVerifications.reduce((s, v) => s + v.confidence, 0) / validVerifications.length
+        : overallConfidence;
 
-    if (overallConfidence < CONFIDENCE_GATE_THRESHOLD && validTickets.length > 0) {
-      return NextResponse.json({
-        success: true,
-        tickets: [],
-        needsClarification: true,
-        verificationIssues: ["Confidence too low to return tickets. Please rephrase for clarity."],
-        verificationWarnings: verificationWarnings.length > 0 ? verificationWarnings : undefined,
-        clarityScore: Math.round(overallConfidence * 100),
-        clarityIssues: ["Low confidence in interpretation"],
-        suggestedRewrite: "Please rephrase your feedback so we can create an actionable ticket.",
-        confidence: overallConfidence,
-      });
+    // If instructions exist, allow tickets to proceed even when confidence < 0.5 (do not trigger clarification for low confidence).
+    if (validTickets.length > 0 && averageConfidence < CLARITY_EXTREME_LOW_CONFIDENCE) {
+      // Instructions exist: proceed anyway per spec; do not return needsClarification for low confidence.
     }
 
     // Return only valid tickets; include warnings for any that failed
@@ -298,19 +387,34 @@ export async function POST(req: Request): Promise<Response> {
       validVerifications.length > 0
         ? Math.min(...validVerifications.map((v) => v.confidence))
         : overallConfidence;
+    const avgConfidenceForClarity =
+      validVerifications.length > 0
+        ? validVerifications.reduce((s, v) => s + v.confidence, 0) / validVerifications.length
+        : minConfidence;
 
-    const ontologyNeedsClarification = ontologyResult.needsClarification === true;
+    // Clarity score: instructionCount * 0.6 + averageConfidence * 0.4 (normalized 0–1). If > 0.5 → skip clarification.
+    const instructionCountNorm = Math.min(1, valid.length);
+    const clarityScoreValue = instructionCountNorm * 0.6 + avgConfidenceForClarity * 0.4;
+    const clarityScore100 = Math.round(clarityScoreValue * 100);
 
-    console.log("ECHLY DEBUG — FINAL TICKETS RETURNED:", valid);
+    // Failsafe: at least one valid instruction → never trigger clarification.
+    const clarityLayerInput = {
+      instructionCount: valid.length,
+      averageConfidence: avgConfidenceForClarity,
+      transcript: normalizedTranscript,
+    };
+    echlyDebug("CLARITY LAYER INPUT", clarityLayerInput);
+    echlyDebug("CLARITY DECISION", false);
+    echlyDebug("FINAL TICKETS", valid);
 
     return NextResponse.json({
       success: true,
       tickets: valid,
-      clarityScore: Math.round((valid.length > 0 ? minConfidence : overallConfidence) * 100),
-      clarityIssues: ontologyNeedsClarification ? ["Some instructions had low mapping confidence"] : [],
+      clarityScore: clarityScore100,
+      clarityIssues: valid.length > 0 ? [] : (graphNeedsClarification ? ["Some instructions had low confidence"] : []),
       suggestedRewrite: null,
       confidence: valid.length > 0 ? minConfidence : overallConfidence,
-      needsClarification: ontologyNeedsClarification ? true : undefined,
+      needsClarification: false,
       verificationWarnings: verificationWarnings.length > 0 ? verificationWarnings : undefined,
       instructionLimitWarning: instructionLimitWarning ?? undefined,
     });

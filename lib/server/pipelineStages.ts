@@ -5,6 +5,7 @@
  */
 
 import type OpenAI from "openai";
+import { echlyDebug } from "@/lib/utils/logger";
 import {
   getElementsForPrompt,
   getTextContextForPrompt,
@@ -39,57 +40,32 @@ export interface PipelineTicket {
   confidenceScore: number;
 }
 
-const INTENT_AND_TICKET_SYSTEM = `You are Echly's pipeline: for a list of instructions you will output (1) one intent per instruction and (2) ONE developer-ready ticket that merges all instructions into a single ticket with multiple action steps. Accuracy over creativity. Use temperature 0 behavior.
+const INTENT_AND_TICKET_SYSTEM = `You are Echly's pipeline: for a list of instructions output (1) one intent per instruction and (2) ONE developer-ready ticket with multiple action steps. Follow the unified interpretation policy: preserve user meaning, do not hallucinate. Accuracy over creativity. Temperature 0.
 
 STAGE A — INTENT (per instruction):
-For each instruction output:
 - intent_type: one of "UI change", "Content change", "Layout change", "Bug fix", "Accessibility improvement", "UX improvement"
-- target_element: short label for the UI element (e.g. "hero CTA button", "Email field") or null. Use page context when provided.
-- change_type: specific type (e.g. "size_increase", "color_change", "text_replace", "layout_width", "redirect_fix")
+- target_element: short label (e.g. "hero CTA button", "Email field") or null. Use page context only to identify targets.
+- change_type: e.g. "size_increase", "color_change", "text_replace", "layout_width", "redirect_fix"
 - confidence: 0–1
 
-STAGE B — SINGLE TICKET (all instructions merged):
-Output exactly ONE ticket that represents the entire group of changes. Each instruction becomes one action step. Action steps must be clear product requirements, faithful to the user's intent — never invent implementation mechanics.
+STAGE B — SINGLE TICKET:
+Output exactly ONE ticket. Each instruction = one action step. Preserve the user's intent; do not add implementation details they did not state. Do not use visible/page text as the content of a change (e.g. "shorten the headline" → step is "Shorten the hero headline", not "Change headline to [page text]").
 
 TICKET RULES:
-1. title: Short summary (4–10 words) describing the group of changes (e.g. "Update contact form fields", "Adjust hero and CTA styling").
-2. description: One concise sentence explaining that multiple UI changes are requested (e.g. "Modify several form fields to improve clarity and usability.").
-3. actionSteps: One step per instruction, in order. Write clear product requirements (see ACTION STEPS QUALITY below). Clarify wording when necessary; never invent how to implement.
-4. tags: 1–3 from ["UI", "Content", "UX", "Layout", "Bug", "Accessibility"]. Combine tags that apply across the instructions.
-5. confidenceScore: Average of the per-instruction confidences (0–1).
+1. title: Short summary (4–10 words).
+2. description: One concise sentence for the changes.
+3. actionSteps: One per instruction, in order. Clear product requirements; never invent how to implement.
+4. tags: 1–3 from ["UI", "Content", "UX", "Layout", "Bug", "Accessibility"].
+5. confidenceScore: Average of per-instruction confidences.
 
-ACTION STEPS QUALITY (strict):
-- Action steps must read like clear product requirements, not engineering instructions. Preserve the exact intent of the user's instruction.
-- Clarify wording when necessary (e.g. spell out which field, which context). Never invent implementation mechanisms.
-- Never assume specific technologies, properties, or code. Never add phrases like: "by adding a conditional rule", "by applying CSS", "by implementing JavaScript", "using a visibility property", "using loading='lazy'", "using WebP".
-- Avoid vague phrases: "implement the change", "improve layout", "update design".
-- Prefer concrete product phrasing: "Show the Company Name field when Business Account is selected", "Rename the Email field label to 'Business Email'".
+ACTION STEPS QUALITY:
+- Clear product requirements. Preserve exact intent; clarify wording only when needed.
+- Never add implementation: no "by applying CSS", "using JavaScript", etc. No invented specifics (e.g. "make bold" only if user said "bold").
+- Prefer concrete: "Increase spacing between pricing cards", "Make testimonial author names more prominent". When user left solution general, keep it general.
 
-Good examples (instruction → action step):
-- "Show company name field when business account is selected" → "Show the Company Name field when Business Account is selected."
-- "Hide personal phone number field for business accounts" → "Hide the Personal Phone Number field when Business Account is selected."
-- "Require work email instead of personal email" → "Require a Work Email instead of a Personal Email for Business Account signups."
+Do not hallucinate. Only what the instructions state or clearly imply.
 
-Bad (disallowed): "Apply a conditional visibility rule", "Use CSS display property", "Implement logic to dynamically show the field" — these invent implementation.
-
-Do not hallucinate. Only include what the instructions state or clearly imply. No invented technical details.
-
-OUTPUT: Return ONLY valid JSON. No markdown.
-{
-  "intents": [
-    { "intent_type": "UI change", "target_element": "Email field", "change_type": "label_change", "confidence": 0.9 },
-    { "intent_type": "UI change", "target_element": "Phone field", "change_type": "label_change", "confidence": 0.88 }
-  ],
-  "ticket": {
-    "title": "Update contact form fields",
-    "description": "Modify several form fields to improve clarity and usability.",
-    "actionSteps": ["Rename Email field to Business Email", "Rename Phone Number field to Mobile Number"],
-    "tags": ["UI", "UX"],
-    "confidenceScore": 0.89
-  }
-}
-
-The number of intents MUST equal the number of instructions. Output exactly one "ticket" object (not "tickets" array).`;
+OUTPUT: Return ONLY valid JSON. No markdown. Number of intents = number of instructions. Exactly one "ticket" object.`;
 
 /** Map ontology action_type to pipeline intent_type and change_type for consistency. */
 const ONTOLOGY_TO_INTENT: Record<
@@ -111,45 +87,25 @@ const ONTOLOGY_TO_INTENT: Record<
   ACCESSIBILITY_FIX: { intent_type: "Accessibility improvement", change_type: "accessibility" },
 };
 
-const TICKET_FROM_ONTOLOGY_SYSTEM = `You are Echly's pipeline: for a list of ONTOLOGY ACTIONS you will output ONE developer-ready ticket that merges all actions. Use the structured actions and instructions as the source of truth. Accuracy over creativity. Temperature 0.
+const TICKET_FROM_ONTOLOGY_SYSTEM = `You are Echly's pipeline: for a list of ONTOLOGY ACTIONS you will output ONE developer-ready ticket that merges all actions. Use the structured actions and instructions as the source of truth. Follow the unified interpretation policy: interpret intent, preserve user meaning, do not hallucinate. Accuracy over creativity. Temperature 0.
 
-INPUT: You receive an array of ontology actions (action_type, target_element, change_details, confidence) and the original instructions (one per action). Generate one action step per instruction. Write clear product requirements (see ACTION STEPS QUALITY below). Clarify wording when necessary; never invent how to implement.
+INPUT: You receive ontology actions and original instructions (one per action). Generate one action step per instruction. Write clear product requirements. Never invent implementation or copy page/OCR content into steps.
 
 TICKET RULES (strict):
-1. Output exactly ONE ticket for the entire group. Each instruction/action becomes one action step.
-2. title: Short summary (4–10 words) describing the group of changes (e.g. "Update contact form fields", "Adjust hero and CTA").
-3. description: One concise sentence explaining that multiple UI changes are requested.
-4. actionSteps: One step per instruction, in order. Write clear product requirements; never invent implementation mechanisms (see ACTION STEPS QUALITY).
-5. tags: 1–3 from ["UI", "Content", "UX", "Layout", "Bug", "Accessibility"]. Combine tags inferred from all actions.
+1. Output exactly ONE ticket. Each instruction becomes one action step.
+2. title: Short summary (4–10 words) for the group of changes.
+3. description: One concise sentence for the requested changes.
+4. actionSteps: One step per instruction, in order. Rule 4 — Never invent specific UI text or values. Only content from transcript or visible UI context for identification. "Shorten the headline" → step is "Shorten the hero headline", NOT "Change headline to [page text]".
+5. tags: 1–3 from ["UI", "Content", "UX", "Layout", "Bug", "Accessibility"].
 6. confidenceScore: Average of the actions' confidence values (0–1).
-7. Do not hallucinate. Only include what the actions state. No invented technical details.
+7. Do not hallucinate. Only what the instructions/actions state. Rule 10: Consistent interpretation; same feedback → same ticket style.
 
-ACTION STEPS QUALITY (strict):
-- Action steps must read like clear product requirements, not engineering instructions. Preserve the exact intent of the user's instruction.
-- Clarify wording when necessary (e.g. spell out which field, which context). Never invent implementation mechanisms.
-- Never assume specific technologies, properties, or code. Never add phrases like: "by adding a conditional rule", "by applying CSS", "by implementing JavaScript", "using a visibility property", "using loading='lazy'", "using WebP".
-- Avoid vague phrases: "implement the change", "improve layout", "update design".
-- Prefer concrete product phrasing: "Show the Company Name field when Business Account is selected", "Rename the Email field label to 'Business Email'".
+ACTION STEPS QUALITY (Rule 9):
+- Clear, developer-actionable, specific to UI element. Good: "Increase spacing between pricing cards." Bad: "Improve layout."
+- Never add implementation mechanisms or invented specifics. No copying page/OCR text as the change content.
+- When the user left solution general, keep it general; do not invent specifics.
 
-Good examples (instruction → action step):
-- "Show company name field when business account is selected" → "Show the Company Name field when Business Account is selected."
-- "Hide personal phone number field for business accounts" → "Hide the Personal Phone Number field when Business Account is selected."
-- "Require work email instead of personal email" → "Require a Work Email instead of a Personal Email for Business Account signups."
-
-Bad (disallowed): "Apply a conditional visibility rule", "Use CSS display property", "Implement logic to dynamically show the field" — these invent implementation.
-
-OUTPUT: Return ONLY valid JSON. No markdown.
-{
-  "ticket": {
-    "title": "Update contact form fields",
-    "description": "Modify several form fields to improve clarity and usability.",
-    "actionSteps": ["Rename Email field to Business Email", "Rename Phone Number field to Mobile Number", "Merge First Name and Last Name into Full Name"],
-    "tags": ["UI", "UX"],
-    "confidenceScore": 0.9
-  }
-}
-
-Output exactly one "ticket" object (not "tickets" array).`;
+OUTPUT: Return ONLY valid JSON. No markdown. One "ticket" object (not "tickets" array).`;
 
 function cleanJson(content: string): string {
   return content
@@ -214,8 +170,8 @@ export async function batchIntentAndTicketsFromOntology(
   options?: { instructions?: string[]; retryOnce?: boolean }
 ): Promise<{ intents: InstructionIntent[]; tickets: PipelineTicket[] }> {
   const instructions = options?.instructions ?? actions.map((a) => ticketTitleFromAction(a));
-  console.log("ECHLY DEBUG — ONTOLOGY ACTIONS RECEIVED BY PIPELINE:", actions.length);
-  console.log("ECHLY DEBUG — VISIBLE TEXT LENGTH:", context?.visibleText ? context.visibleText.length : 0);
+  echlyDebug("ONTOLOGY ACTIONS RECEIVED BY PIPELINE", actions.length);
+  echlyDebug("VISIBLE TEXT LENGTH", context?.visibleText ? context.visibleText.length : 0);
 
   if (actions.length === 0) {
     return { intents: [], tickets: [] };
@@ -242,7 +198,7 @@ export async function batchIntentAndTicketsFromOntology(
     const parsed = JSON.parse(cleanJson(content)) as { ticket?: unknown };
     const tickets = normalizeSingleTicketFromOntology(parsed.ticket, actions, instructions);
     const intents = actions.map((a) => ontologyActionToIntent(a));
-    console.log("ECHLY DEBUG — GENERATED TICKETS (single merged):", tickets);
+    echlyDebug("GENERATED TICKETS (single merged)", tickets);
     return { intents, tickets };
   };
 
@@ -386,8 +342,8 @@ export async function batchIntentAndTickets(
   context: PipelineContext | null,
   options?: { retryOnce?: boolean }
 ): Promise<{ intents: InstructionIntent[]; tickets: PipelineTicket[] }> {
-  console.log("ECHLY DEBUG — INSTRUCTIONS RECEIVED BY PIPELINE:", instructions);
-  console.log("ECHLY DEBUG — VISIBLE TEXT LENGTH:", context?.visibleText ? context.visibleText.length : 0);
+  echlyDebug("INSTRUCTIONS RECEIVED BY PIPELINE", instructions);
+  echlyDebug("VISIBLE TEXT LENGTH", context?.visibleText ? context.visibleText.length : 0);
 
   if (instructions.length === 0) {
     return { intents: [], tickets: [] };
@@ -417,7 +373,7 @@ export async function batchIntentAndTickets(
     };
     const intents = normalizeIntents(parsed.intents, instructions.length);
     const tickets = normalizeSingleTicket(parsed.ticket, instructions);
-    console.log("ECHLY DEBUG — GENERATED TICKETS (single merged):", tickets);
+    echlyDebug("GENERATED TICKETS (single merged)", tickets);
     return { intents, tickets };
   };
 

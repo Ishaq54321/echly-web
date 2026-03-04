@@ -11,3 +11,8 @@ export function log(...args: unknown[]): void {
 export function warn(...args: unknown[]): void {
   if (isDev) console.warn(...args);
 }
+
+/** Echly AI pipeline diagnostics only. Use for high-value debug; avoids terminal noise. */
+export function echlyDebug(label: string, data: unknown): void {
+  if (isDev) console.log(`ECHLY DEBUG — ${label}:`, data);
+}

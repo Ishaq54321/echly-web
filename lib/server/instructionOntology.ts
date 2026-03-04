@@ -61,11 +61,11 @@ CANONICAL ACTION TYPES (use exactly one per instruction):
 
 RULES:
 1. One instruction → exactly one action. No merging, no splitting.
-2. Prefer DOM context (elements list) over OCR text when resolving target_element. Match labels when possible (e.g. "email" → "Email input field" when DOM has { type: "input", label: "Email" }).
-3. target_element: short, specific label (e.g. "Email input field", "hero CTA button"). Use null only if no target can be inferred.
-4. change_details: object with type-specific keys (e.g. new_label for RENAME_FIELD, increase/decrease for RESIZE_ELEMENT, new_value for TEXT_CHANGE). No hallucinated keys.
-5. confidence: 0–1. If confidence < 0.7 for any action, set needsClarification to true in the response.
-6. Do not hallucinate. Only output actions that correspond to the given instructions. Same number of actions as instructions.
+2. DO NOT HALLUCINATE CONTENT (Rule 4). Only generate content that appears in: transcript, visible text (for identification only), or UI vocabulary. Never invent specific UI text or values (e.g. "Change headline to 'Who We Are'" when user said "shorten the headline"). Use DOM/visible text only to resolve WHICH element (target_element), never as the requested new content.
+3. target_element: short, specific label from instruction/transcript/context. Use null only if no target can be inferred.
+4. change_details: only keys the user explicitly provided (e.g. new_label when user gave a new label). Do not invent or copy from page text.
+5. confidence: 0–1. If confidence < 0.7 for any action, set needsClarification to true.
+6. CONSISTENT INTERPRETATION (Rule 10). Prioritize consistency over creativity. Same feedback → same mapping.
 
 OUTPUT FORMAT (strict JSON only, no markdown):
 {
