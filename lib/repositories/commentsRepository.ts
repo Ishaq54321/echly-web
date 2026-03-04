@@ -2,35 +2,43 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  doc,
   getDocs,
   limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
-import type { Comment } from "@/lib/domain/comment";
+import type { Comment, CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import {
   incrementSessionCommentCountRepo,
   updateSessionUpdatedAtRepo,
 } from "@/lib/repositories/sessionsRepository";
 
+export interface AddCommentData {
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  message: string;
+  type?: "pin" | "text" | "general";
+  position?: CommentPosition;
+  textRange?: CommentTextRange;
+  threadId?: string | null;
+}
+
 export async function addCommentRepo(
   sessionId: string,
   feedbackId: string,
-  data: {
-    userId: string;
-    userName: string;
-    userAvatar: string;
-    message: string;
-  }
-): Promise<void> {
+  data: AddCommentData
+): Promise<string> {
   const collectionRef = collection(db, "comments");
-  const payload = {
+  const payload: Record<string, unknown> = {
     sessionId,
     feedbackId,
     userId: data.userId,
@@ -39,10 +47,15 @@ export async function addCommentRepo(
     message: data.message,
     createdAt: serverTimestamp(),
   };
+  if (data.type != null) payload.type = data.type;
+  if (data.position != null) payload.position = data.position;
+  if (data.textRange != null) payload.textRange = data.textRange;
+  if (data.threadId != null) payload.threadId = data.threadId;
 
-  await addDoc(collectionRef, payload);
+  const ref = await addDoc(collectionRef, payload);
   await incrementSessionCommentCountRepo(sessionId);
   await updateSessionUpdatedAtRepo(sessionId);
+  return ref.id;
 }
 
 /** Max comments per feedback thread (cost protection). */
@@ -98,6 +111,42 @@ export async function getSessionRecentCommentsRepo(
     id: docSnap.id,
     ...(docSnap.data() as Omit<Comment, "id">),
   }));
+}
+
+/**
+ * Updates a comment's pin position (for drag-to-move).
+ */
+export async function updateCommentPositionRepo(
+  commentId: string,
+  position: CommentPosition
+): Promise<void> {
+  await updateDoc(doc(db, "comments", commentId), { position });
+}
+
+export interface UpdateCommentData {
+  message?: string;
+  resolved?: boolean;
+}
+
+/**
+ * Updates a comment's message and/or resolved state.
+ */
+export async function updateCommentRepo(
+  commentId: string,
+  data: UpdateCommentData
+): Promise<void> {
+  const payload: Record<string, unknown> = {};
+  if (data.message !== undefined) payload.message = data.message;
+  if (data.resolved !== undefined) payload.resolved = data.resolved;
+  if (Object.keys(payload).length === 0) return;
+  await updateDoc(doc(db, "comments", commentId), payload);
+}
+
+/**
+ * Deletes a single comment by id.
+ */
+export async function deleteCommentRepo(commentId: string): Promise<void> {
+  await deleteDoc(doc(db, "comments", commentId));
 }
 
 const DELETE_SESSION_COMMENTS_LIMIT = 500;

@@ -3,6 +3,8 @@
 import { useRef, useEffect } from "react";
 import { Pencil, Check } from "lucide-react";
 import { Section } from "./Section";
+import { SelectableText } from "./SelectableText";
+import type { CommentTextRange } from "@/lib/domain/comment";
 
 interface DescriptionSectionProps {
   description: string;
@@ -14,6 +16,8 @@ interface DescriptionSectionProps {
   onCancel?: () => void;
   isSaving?: boolean;
   saveSuccess?: boolean;
+  isCommentMode?: boolean;
+  sendTextComment?: (textRange: CommentTextRange, message: string) => Promise<string | null>;
 }
 
 export function DescriptionSection({
@@ -26,6 +30,8 @@ export function DescriptionSection({
   onCancel,
   isSaving = false,
   saveSuccess = false,
+  isCommentMode,
+  sendTextComment,
 }: DescriptionSectionProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const displayValue = isEditing ? draft : description;
@@ -92,6 +98,41 @@ export function DescriptionSection({
               </button>
             </div>
           </>
+        ) : isCommentMode && sendTextComment ? (
+          <SelectableText
+            containerId="description"
+            isCommentMode
+            onAddTextComment={sendTextComment}
+            className="relative"
+          >
+            <div
+              className={`group relative flex items-start justify-between gap-2 ${hasEdit ? "cursor-pointer" : ""}`}
+              onClick={hasEdit ? onEdit : undefined}
+              onKeyDown={hasEdit ? (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onEdit?.()) : undefined}
+              role={hasEdit ? "button" : undefined}
+              tabIndex={hasEdit ? 0 : undefined}
+            >
+              <p className="text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))] flex-1 pr-6">
+                {displayValue || (hasEdit ? "Add description…" : "")}
+              </p>
+              {hasEdit && (
+                <span className="absolute top-0 right-0 flex items-center gap-1.5">
+                  {saveSuccess ? (
+                    <span className="text-xs text-semantic-success flex items-center gap-1.5 transition-opacity duration-150">
+                      <Check size={14} className="shrink-0" aria-hidden />
+                      Saved
+                    </span>
+                  ) : (
+                    <Pencil
+                      size={14}
+                      className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[hsl(var(--text-secondary))] shrink-0"
+                      aria-hidden
+                    />
+                  )}
+                </span>
+              )}
+            </div>
+          </SelectableText>
         ) : (
           <div
             className={`group relative flex items-start justify-between gap-2 ${hasEdit ? "cursor-pointer" : ""}`}

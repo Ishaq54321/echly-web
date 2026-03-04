@@ -4,11 +4,13 @@ import { useState, useRef, useEffect } from "react";
 import { DescriptionSection } from "./DescriptionSection";
 import { Section } from "./Section";
 import { ScreenshotBlock } from "./ScreenshotBlock";
+import { ScreenshotWithPins } from "./ScreenshotWithPins";
 import { SuggestionSection } from "./SuggestionSection";
 import { ActionItemsSection } from "./ActionItemsSection";
 import { Tag } from "@/components/ui/Tag";
 import { AVAILABLE_TAGS, getTagDotClass } from "@/lib/tagConfig";
 import type { FeedbackItemShape } from "./types";
+import type { Comment } from "@/lib/domain/comment";
 
 interface FeedbackContentProps {
   item: FeedbackItemShape & { index?: number; total?: number };
@@ -22,6 +24,19 @@ interface FeedbackContentProps {
   onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
   onSaveTags?: (suggestedTags: string[]) => Promise<void>;
   onExpandImage: () => void;
+  isCommentMode?: boolean;
+  comments?: Comment[];
+  pinComments?: (Comment & { position: { xPercent: number; yPercent: number } })[];
+  activePinId?: string;
+  activeThreadId?: string | null;
+  onPinClick?: (commentId: string) => void;
+  onOpenThreadPanel?: (commentId: string) => void;
+  onCloseInlinePopover?: () => void;
+  sendPinComment?: (position: { xPercent: number; yPercent: number }, message: string) => Promise<string | null>;
+  updateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
+  sendTextComment?: (textRange: { startOffset: number; endOffset: number; containerId: string }, message: string) => Promise<string | null>;
+  onCommentPlaced?: () => void;
+  updatePinPosition?: (commentId: string, position: { xPercent: number; yPercent: number }) => Promise<void>;
 }
 
 export function FeedbackContent({
@@ -36,6 +51,19 @@ export function FeedbackContent({
   onSaveActionSteps,
   onSaveTags,
   onExpandImage,
+  isCommentMode,
+  comments = [],
+  pinComments,
+  activePinId,
+  activeThreadId,
+  onPinClick,
+  onOpenThreadPanel,
+  onCloseInlinePopover,
+  sendPinComment,
+  updateComment,
+  sendTextComment,
+  onCommentPlaced,
+  updatePinPosition,
 }: FeedbackContentProps) {
   const actionSteps = Array.isArray(item.actionSteps) ? item.actionSteps : [];
   const tags = Array.isArray(item.suggestedTags) ? item.suggestedTags : [];
@@ -92,13 +120,34 @@ export function FeedbackContent({
         }}
         isSaving={isSavingDescription}
         saveSuccess={saveDescriptionSuccess}
+        isCommentMode={isCommentMode}
+        sendTextComment={sendTextComment}
       />
       {item.screenshotUrl && (
         <Section title="Attachments">
-          <ScreenshotBlock
-            screenshotUrl={item.screenshotUrl}
-            onExpand={onExpandImage}
-          />
+          {sendPinComment != null ? (
+            <ScreenshotWithPins
+              screenshotUrl={item.screenshotUrl}
+              onExpand={onExpandImage}
+              isCommentMode={isCommentMode}
+              pins={pinComments ?? []}
+              comments={comments}
+              activePinId={activePinId}
+              activeThreadId={activeThreadId}
+              onPinClick={onPinClick}
+              onOpenThreadPanel={onOpenThreadPanel}
+              onCloseInlinePopover={onCloseInlinePopover}
+              onAddPinComment={sendPinComment}
+              updateComment={updateComment}
+              onCommentPlaced={onCommentPlaced}
+              onPinPositionChange={updatePinPosition}
+            />
+          ) : (
+            <ScreenshotBlock
+              screenshotUrl={item.screenshotUrl}
+              onExpand={onExpandImage}
+            />
+          )}
         </Section>
       )}
       {item.suggestion != null && item.suggestion !== "" && (

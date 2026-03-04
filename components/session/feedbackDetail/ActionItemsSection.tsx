@@ -63,11 +63,11 @@ export function ActionItemsSection({
 
   const saveNew = async () => {
     const value = newItemDraft.trim();
+    setNewItemDraft("");
+    setIsAdding(false);
     if (value) {
       await onSave([...items, value]);
-      setNewItemDraft("");
     }
-    setIsAdding(false);
   };
 
   const cancelAdd = () => {
@@ -99,7 +99,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 font-mono text-[13px] px-3 py-2 rounded-lg border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
+              className="flex-1 min-w-0 font-mono text-[13px] px-3 py-2 rounded-lg border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
               autoFocus
               aria-label="New action step"
             />
@@ -109,69 +109,65 @@ export function ActionItemsSection({
     );
   }
 
+  const numberClass =
+    "flex-shrink-0 text-[12px] font-medium tabular-nums text-[hsl(var(--text-tertiary))] leading-[1.4]";
   return (
     <Section title="ACTION STEPS" titleSemantic="attention">
-      <ul className="list-none space-y-4 p-0 m-0">
+      <ul className="list-none space-y-2 p-0 m-0">
         {items.map((text, i) => (
-          <li key={i}>
-            <div className="group flex items-center gap-3 rounded-xl pl-3 pr-3 py-2.5 transition-[background-color] duration-[120ms] hover:bg-white/60 cursor-pointer border border-transparent hover:border-[var(--layer-2-border)]">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-[rgba(0,0,0,0.08)] bg-white flex items-center justify-center text-[11px] font-medium text-semantic-attention leading-none">
-                {i + 1}
-              </span>
-              {editingIndex === i ? (
-                <div className="flex-1 flex gap-2 items-center min-w-0">
-                  <input
-                    type="text"
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onBlur={() => void saveEdit()}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void saveEdit();
-                      if (e.key === "Escape") cancelEdit();
-                    }}
-                    className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-lg border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
-                    autoFocus
-                    aria-label={`Edit action step ${i + 1}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void saveEdit()}
-                    className="text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] hover:underline cursor-pointer transition-colors duration-[120ms]"
-                  >
-                    Save
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => startEdit(i)}
-                    className={`flex-1 text-left font-mono text-[13px] px-0 py-1 rounded-lg min-w-0 cursor-pointer transition-colors duration-[120ms] ${
-                      isResolved
-                        ? "line-through text-[hsl(var(--text-tertiary))]"
-                        : "text-[hsl(var(--text-primary-strong))]"
-                    }`}
-                  >
-                    {text}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void removeItem(i)}
-                    className="flex-shrink-0 p-1 rounded-md text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] opacity-0 group-hover:opacity-100 transition-colors duration-120 cursor-pointer"
-                    aria-label={`Remove action step ${i + 1}`}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </>
-              )}
-            </div>
+          <li key={i} className="group flex items-start gap-2">
+            <span className={numberClass}>{i + 1}</span>
+            {editingIndex === i ? (
+              <div className="flex-1 flex gap-2 items-center min-w-0">
+                <input
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={() => void saveEdit()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void saveEdit();
+                    if (e.key === "Escape") cancelEdit();
+                  }}
+                  className="flex-1 min-w-0 font-mono text-[13px] px-2 py-1 rounded border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
+                  autoFocus
+                  aria-label={`Edit action step ${i + 1}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => void saveEdit()}
+                  className="text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] hover:underline cursor-pointer"
+                >
+                  Save
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => startEdit(i)}
+                  className={`flex-1 text-left font-mono text-[13px] leading-[1.4] px-0 py-0 min-w-0 cursor-pointer ${
+                    isResolved
+                      ? "line-through text-[hsl(var(--text-tertiary))]"
+                      : "text-[hsl(var(--text-primary-strong))]"
+                  }`}
+                >
+                  {text}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void removeItem(i)}
+                  className="flex-shrink-0 p-1 rounded text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] opacity-0 group-hover:opacity-100 cursor-pointer"
+                  aria-label={`Remove action step ${i + 1}`}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
           </li>
         ))}
         {isAdding && (
-          <li className="flex items-center gap-3">
-            <span className="flex-shrink-0 w-6 h-6 rounded-full border border-[rgba(0,0,0,0.08)] bg-white flex items-center justify-center text-[11px] font-medium text-[hsl(var(--text-tertiary))] leading-none">
-              {items.length + 1}
-            </span>
+          <li className="flex items-start gap-2">
+            <span className={numberClass}>{items.length + 1}</span>
             <input
               type="text"
               value={newItemDraft}
@@ -182,7 +178,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 font-mono text-[13px] px-2 py-1.5 rounded-lg border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
+              className="flex-1 min-w-0 font-mono text-[13px] px-2 py-1 rounded border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
               autoFocus
               aria-label="New action step"
             />
@@ -193,7 +189,7 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-1.5 flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[120ms] cursor-pointer"
+          className="mt-2 flex items-center gap-2 px-0 py-1 text-[13px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] cursor-pointer"
         >
           <Plus size={14} />
           Add action step

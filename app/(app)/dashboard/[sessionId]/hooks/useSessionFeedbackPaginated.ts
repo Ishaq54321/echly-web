@@ -32,12 +32,17 @@ export interface UseSessionFeedbackPaginatedResult {
   loadMoreRef: React.RefObject<HTMLDivElement | null>;
 }
 
+const SCROLL_THRESHOLD_PX = 120;
+
 /**
- * Infinite scroll: GET /api/feedback with 150ms debounce, intersection observer.
- * Append-only; no duplicate fetch; no simultaneous requests.
+ * Infinite scroll: first page only on mount; next pages only when user scrolls near bottom.
+ * Uses scroll-container ref to avoid triggering load on initial paint.
+ * scrollReady: increment when scroll container has mounted (so observer can attach).
  */
 export function useSessionFeedbackPaginated(
-  sessionId: string | undefined
+  sessionId: string | undefined,
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>,
+  scrollReady?: number
 ): UseSessionFeedbackPaginatedResult {
   const [items, setItems] = useState<Feedback[]>([]);
   const [total, setTotal] = useState<number>(0);
@@ -48,16 +53,26 @@ export function useSessionFeedbackPaginated(
   const [loadingMore, setLoadingMore] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [userHasScrolledList, setUserHasScrolledList] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const hasReachedLimit = items.length >= FEEDBACK_LOAD_CAP;
 
+  const stateRef = useRef({ items, total, cursor, hasMore, loadingMore, initialLoadDone });
+  stateRef.current = { items, total, cursor, hasMore, loadingMore, initialLoadDone };
+
   const loadMore = useCallback(async () => {
-    if (!sessionId || !initialLoadDone || !hasMore || loadingMore || hasReachedLimit) return;
+    const s = stateRef.current;
+    if (!sessionId || !s.initialLoadDone || s.loadingMore || s.items.length >= FEEDBACK_LOAD_CAP) return;
+    if (s.total > 0 && s.items.length >= s.total) {
+      setHasMore(false);
+      return;
+    }
+    if (!s.hasMore) return;
 
     setLoadingMore(true);
     try {
-      const url = `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=${encodeURIComponent(cursor ?? "")}&limit=${PAGE_SIZE}`;
+      const url = `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=${encodeURIComponent(s.cursor ?? "")}&limit=${PAGE_SIZE}`;
       const res = await authFetch(url);
       const data = (await res.json()) as {
         feedback?: Feedback[];
@@ -68,18 +83,20 @@ export function useSessionFeedbackPaginated(
         resolvedCount?: number;
       };
 
-      if (data.feedback?.length) {
+      const appended = data.feedback?.length ?? 0;
+      const serverTotal = typeof data.total === "number" ? data.total : s.total;
+      if (appended > 0) {
         setItems((prev) => [...prev, ...data.feedback!]);
         setCursor(data.nextCursor ?? null);
-        setHasMore(data.hasMore ?? false);
-        // Do not update total/activeCount/resolvedCount on scroll; keep from initial load
+        const newLen = s.items.length + appended;
+        setHasMore(serverTotal > 0 ? newLen < serverTotal : (data.hasMore ?? false));
       } else {
         setHasMore(false);
       }
     } finally {
       setLoadingMore(false);
     }
-  }, [sessionId, initialLoadDone, cursor, hasMore, loadingMore, hasReachedLimit]);
+  }, [sessionId]);
 
   const debouncedLoadMore = useMemo(() => {
     let timeout: ReturnType<typeof setTimeout>;
@@ -91,22 +108,76 @@ export function useSessionFeedbackPaginated(
     };
   }, [loadMore]);
 
+  // On scroll near bottom: trigger load when !isFetching && loadedCount < totalCount (refs avoid stale closure).
   useEffect(() => {
-    const el = loadMoreRef.current;
+    const el = scrollContainerRef?.current;
     if (!el) return;
+    let scrollTimeout: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      setUserHasScrolledList(true);
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const s = stateRef.current;
+        if (s.loadingMore) return;
+        const loadedCount = s.items.length;
+        const totalCount = s.total;
+        const hasMore = totalCount === 0 ? s.hasMore : loadedCount < totalCount;
+        if (!hasMore || loadedCount >= FEEDBACK_LOAD_CAP) return;
+        const { scrollTop, clientHeight, scrollHeight } = el;
+        if (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD_PX) {
+          debouncedLoadMore();
+        }
+      }, DEBOUNCE_MS);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+    };
+  }, [scrollContainerRef, debouncedLoadMore]);
+
+  // Sentinel at bottom: when in view, if hasMore && !isLoading then fetch next page. Reattach when items.length changes.
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    const scrollEl = scrollContainerRef?.current;
+    if (!sentinel || !scrollEl) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          debouncedLoadMore();
-        }
+        if (!entries[0].isIntersecting) return;
+        const s = stateRef.current;
+        if (s.loadingMore) return;
+        const loadedCount = s.items.length;
+        const totalCount = s.total;
+        const hasMore = totalCount === 0 ? s.hasMore : loadedCount < totalCount;
+        if (!hasMore) return;
+        if (loadedCount >= FEEDBACK_LOAD_CAP) return;
+        debouncedLoadMore();
       },
-      { threshold: 0.1 }
+      { root: scrollEl, rootMargin: `${SCROLL_THRESHOLD_PX}px`, threshold: 0 }
     );
 
-    observer.observe(el);
+    observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [debouncedLoadMore]);
+  }, [scrollContainerRef, scrollReady, items.length, debouncedLoadMore]);
+
+  // Fetch counts immediately so UI never shows 0 while first page loads.
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    authFetch(`/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`)
+      .then((res) => res.json())
+      .then((data: { total?: number; openCount?: number; resolvedCount?: number }) => {
+        if (cancelled) return;
+        if (typeof data.total === "number") setTotal(data.total);
+        if (typeof data.openCount === "number") setActiveCount(data.openCount);
+        if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
 
   // Initial load: first page when sessionId becomes available.
   useEffect(() => {

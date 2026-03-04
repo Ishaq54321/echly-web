@@ -1,7 +1,7 @@
 "use client";
 
 import { authFetch } from "@/lib/authFetch";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -10,34 +10,20 @@ import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { uploadScreenshot, generateFeedbackId } from "@/lib/screenshot";
-import FeedbackSidebar from "@/components/session/FeedbackSidebar";
-import FeedbackDetail from "@/components/session/feedbackDetail/FeedbackDetail";
 import { SessionPremiumLoader } from "@/components/session/SessionPremiumLoader";
 import { FeedbackPremiumLoader } from "@/components/session/FeedbackPremiumLoader";
-import dynamic from "next/dynamic";
-import { Pencil, Check } from "lucide-react";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
 import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
-import { formatSessionCreatedMeta } from "@/lib/utils/date";
 import { log, warn } from "@/lib/utils/logger";
 import Image from "next/image";
-
-const ActivityPanel = dynamic(
-  () =>
-    import("@/components/session/feedbackDetail/ActivityPanel").then(
-      (m) => m.ActivityPanel
-    ),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex-1 min-h-0 flex flex-col px-6 py-6">
-        <p className="text-[13px] text-neutral-500">Loading activity…</p>
-      </div>
-    ),
-  }
-);
+import {
+  TicketList,
+  ExecutionView,
+  ExecutionModeLayout,
+  CommentPanel,
+} from "@/components/layout/operating-system";
 
 /** Ticket shape returned by structure-feedback API. */
 type StructureFeedbackTicket = {
@@ -122,6 +108,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const feedbackSessionId =
     !authLoading && authUser && sessionId ? sessionId : undefined;
 
+  const listScrollRef = useRef<HTMLDivElement | null>(null);
+  const [listScrollReady, setListScrollReady] = useState(0);
+
   const {
     feedback,
     setFeedback,
@@ -136,9 +125,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     hasReachedLimit: feedbackReachedLimit,
     loadingMore: feedbackLoadingMore,
     loadMoreRef: feedbackLoadMoreRef,
-  } = useSessionFeedbackPaginated(feedbackSessionId);
+  } = useSessionFeedbackPaginated(feedbackSessionId, listScrollRef, listScrollReady);
 
-  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
+  const [executionMode, setExecutionMode] = useState(false);
+  const [executionStreak, setExecutionStreak] = useState(0);
+  const [preloadedNextTicket, setPreloadedNextTicket] = useState<TicketFromApi | null>(null);
+  const [isCommentMode, setIsCommentMode] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [isSavingDescription, setIsSavingDescription] = useState(false);
@@ -150,6 +143,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [isSavingSessionTitle, setIsSavingSessionTitle] = useState(false);
   const [saveSessionTitleSuccess, setSaveSessionTitleSuccess] = useState(false);
   const [insightRevealed, setInsightRevealed] = useState(false);
+
+  /* Escape exits comment mode (canvas-native: no panel open by default). */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsCommentMode(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   /* Sync active session to extension when user opens this session page. */
   useEffect(() => {
@@ -273,8 +275,33 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setDetailTicket(null);
       return;
     }
+    if (detailTicket?.id === selectedId) return;
     fetchDetailTicket(selectedId);
-  }, [selectedId, fetchDetailTicket]);
+  }, [selectedId, fetchDetailTicket, detailTicket?.id]);
+
+  /* Preload next ticket in Execution Mode for instant transition */
+  useEffect(() => {
+    if (!executionMode || feedback.length === 0) return;
+    setPreloadedNextTicket(null);
+  }, [selectedId, executionMode, feedback.length]);
+
+  useEffect(() => {
+    if (!executionMode || feedback.length === 0) return;
+    const idx = feedback.findIndex((f) => f.id === selectedId);
+    const nextId = idx >= 0 ? feedback[idx + 1]?.id : undefined;
+    if (!nextId) return;
+    let cancelled = false;
+    authFetch(`/api/tickets/${nextId}`)
+      .then((res) => res.json())
+      .then((data: { success?: boolean; ticket?: TicketFromApi }) => {
+        if (cancelled || !data.success || !data.ticket) return;
+        setPreloadedNextTicket(data.ticket);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [executionMode, selectedId, feedback]);
 
   /* ================= SELECTED ITEM WITH INDEX (from DB) ================= */
 
@@ -289,10 +316,25 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         }
       : null;
 
-  const { comments, loadingComments, sendComment } = useFeedbackDetailController({
+  const {
+    comments,
+    loadingComments,
+    sendComment,
+    sendReply,
+    sendPinComment,
+    sendTextComment,
+    resolve,
+    updatePinPosition,
+    updateComment,
+    deleteComment,
+  } = useFeedbackDetailController({
     sessionId,
     feedbackId: selectedId,
   });
+
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  /** Pin whose inline thread popover is open (does not open right panel). */
+  const [activePinIdForPopover, setActivePinIdForPopover] = useState<string | null>(null);
 
   /* ================= SYNC DESCRIPTION (from DB-backed detail) ================= */
 
@@ -504,6 +546,112 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
   };
 
+  const handleResolveAndNext = async () => {
+    if (!selectedId || !selectedItem) return;
+    await saveResolved(true);
+    const currentIndex = feedback.findIndex((f) => f.id === selectedId);
+    if (currentIndex === -1) return;
+    let nextIndex = currentIndex + 1;
+    if (nextIndex >= feedback.length) nextIndex = 0;
+    let next = feedback[nextIndex];
+    while (next && (next.isResolved ?? false) && nextIndex < feedback.length - 1) {
+      nextIndex += 1;
+      next = feedback[nextIndex];
+    }
+    if (next && (next.isResolved ?? false)) next = null;
+    if (next) {
+      if (preloadedNextTicket?.id === next.id) {
+        setDetailTicket(preloadedNextTicket);
+        setPreloadedNextTicket(null);
+      }
+      setSelectedId(next.id);
+      setExecutionStreak((s) => s + 1);
+    }
+  };
+
+  const handleExecutionDone = async () => {
+    if (!selectedId || !selectedItem) return;
+    await saveResolved(true);
+    const currentIndex = feedback.findIndex((f) => f.id === selectedId);
+    if (currentIndex === -1) return;
+    let nextIndex = currentIndex + 1;
+    if (nextIndex >= feedback.length) nextIndex = 0;
+    let next = feedback[nextIndex];
+    while (next && (next.isResolved ?? false) && nextIndex < feedback.length - 1) {
+      nextIndex += 1;
+      next = feedback[nextIndex];
+    }
+    if (next && (next.isResolved ?? false)) next = null;
+    if (next) {
+      if (preloadedNextTicket?.id === next.id) {
+        setDetailTicket(preloadedNextTicket);
+        setPreloadedNextTicket(null);
+      }
+      setSelectedId(next.id);
+      setExecutionStreak((s) => s + 1);
+    }
+  };
+
+  const handleExecutionSkip = () => {
+    setExecutionStreak(0);
+    const currentIndex = feedback.findIndex((f) => f.id === selectedId);
+    if (currentIndex === -1) return;
+    const next = feedback[currentIndex + 1] ?? feedback[0];
+    if (next) {
+      if (preloadedNextTicket?.id === next.id) {
+        setDetailTicket(preloadedNextTicket);
+        setPreloadedNextTicket(null);
+      }
+      setSelectedId(next.id);
+    }
+  };
+
+  const handleSessionTitleBlur = useCallback(async () => {
+    const trimmed = sessionTitleDraft.trim();
+    if (!sessionId || !session) return;
+    if (trimmed === (session.title ?? "")) {
+      setIsEditingSessionTitle(false);
+      return;
+    }
+    const safeTitle =
+      trimmed && trimmed.length > 0
+        ? trimmed
+        : session.title || "Untitled Session";
+    const previousTitle = session.title ?? "";
+    setSession((prev: Session | null) =>
+      prev ? ({ ...prev, title: safeTitle } as Session) : prev
+    );
+    setSessionTitleDraft(safeTitle);
+    setIsSavingSessionTitle(true);
+    setIsEditingSessionTitle(false);
+    setSaveSessionTitleSuccess(true);
+    setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
+    try {
+      const res = await authFetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: safeTitle }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        session?: Record<string, unknown>;
+      };
+      if (data.success && data.session) {
+        setSession((prev: Session | null) =>
+          prev ? ({ ...prev, ...data.session } as Session) : prev
+        );
+        setSessionTitleDraft((data.session.title as string) ?? safeTitle);
+      }
+    } catch {
+      setSession((prev: Session | null) =>
+        prev ? ({ ...prev, title: previousTitle } as Session) : prev
+      );
+      setSessionTitleDraft(previousTitle);
+    } finally {
+      setIsSavingSessionTitle(false);
+    }
+  }, [sessionId, session, sessionTitleDraft]);
+
   const handleMarkAllResolved = useCallback(async () => {
     const active = feedback.filter((item) => !(item.isResolved ?? false));
     if (active.length === 0) return;
@@ -524,6 +672,34 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       .length;
     setFeedbackActiveCount((c) => Math.max(0, c - activeCountBefore));
     setFeedbackResolvedCount((c) => c + activeCountBefore);
+  }, [
+    feedback,
+    detailTicket,
+    selectedId,
+    setFeedback,
+    setFeedbackActiveCount,
+    setFeedbackResolvedCount,
+  ]);
+
+  const handleMarkAllUnresolved = useCallback(async () => {
+    const resolved = feedback.filter((item) => item.isResolved ?? false);
+    if (resolved.length === 0) return;
+    await Promise.all(
+      resolved.map((item) =>
+        authFetch(`/api/tickets/${item.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isResolved: false }),
+        })
+      )
+    );
+    setFeedback((prev) => prev.map((item) => ({ ...item, isResolved: false })));
+    if (detailTicket && selectedId) {
+      setDetailTicket((t) => (t ? { ...t, isResolved: false } : null));
+    }
+    const resolvedCountBefore = feedback.filter((f) => f.isResolved ?? false).length;
+    setFeedbackResolvedCount((c) => Math.max(0, c - resolvedCountBefore));
+    setFeedbackActiveCount((c) => c + resolvedCountBefore);
   }, [
     feedback,
     detailTicket,
@@ -707,281 +883,245 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   // If auth is still settling, keep the UI stable but show a lightweight skeleton.
   if (authLoading) return <SessionPageSkeleton />;
 
-  // If session is loading, render shell (not a blank screen) to avoid LCP shifts.
-  const headerLoading = sessionLoading || !session;
+  /* Full-screen Execution Mode: no sidebar, no comment panel, minimal UI only */
+  if (executionMode) {
+    return (
+      <>
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <ExecutionModeLayout
+            item={selectedItem}
+            onExitExecutionMode={() => setExecutionMode(false)}
+            onDone={handleExecutionDone}
+            onNeedsClarification={() => {
+              setExecutionMode(false);
+              setExecutionStreak(0);
+            }}
+            onAssign={() => {}}
+            onSkip={handleExecutionSkip}
+            onResolveAndNext={handleResolveAndNext}
+            onSaveActionSteps={saveActionSteps}
+            onExpandImage={() => setIsImageExpanded(true)}
+            descriptionDraft={descriptionDraft}
+            setDescriptionDraft={setDescriptionDraft}
+            saveDescription={saveDescription}
+            sessionId={sessionId}
+          />
+        </div>
+        {isImageExpanded && selectedItem?.screenshotUrl && (
+          <div
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-10 cursor-pointer"
+            onClick={() => setIsImageExpanded(false)}
+          >
+            <div className="relative w-full h-full max-w-5xl max-h-[90vh]">
+              <Image
+                src={selectedItem.screenshotUrl}
+                alt="Expanded Screenshot"
+                fill
+                className="object-contain rounded-xl"
+              />
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  const renderExecutionContent = () => {
+    if (feedbackLoading) {
+      return <FeedbackPremiumLoader />;
+    }
+    if (detailLoading && selectedId) {
+      return (
+        <div className="py-12">
+          <p className="text-[13px] text-[hsl(var(--text-tertiary))]">
+            Loading…
+          </p>
+        </div>
+      );
+    }
+    if (feedback.length === 0) {
+      return (
+        <div className="mt-16">
+          <div className="text-[16px] font-medium text-[hsl(var(--text-primary-strong))]">
+            No feedback yet
+          </div>
+          <div className="mt-2 text-[14px] text-[hsl(var(--text-tertiary))]">
+            Capture feedback to start organizing insights.
+          </div>
+        </div>
+      );
+    }
+    return (
+      <ExecutionView
+        item={selectedItem}
+        isEditingDescription={isEditingDescription}
+        descriptionDraft={descriptionDraft}
+        setIsEditingDescription={setIsEditingDescription}
+        setDescriptionDraft={setDescriptionDraft}
+        saveDescription={saveDescription}
+        isSavingDescription={isSavingDescription}
+        saveDescriptionSuccess={saveDescriptionSuccess}
+        onSaveTitle={saveTitle}
+        onResolvedChange={saveResolved}
+        onSaveActionSteps={saveActionSteps}
+        onSaveTags={saveTags}
+        setIsImageExpanded={setIsImageExpanded}
+        isCommentMode={isCommentMode}
+        onOpenComment={() => setIsCommentMode(true)}
+        onCloseCommentMode={() => setIsCommentMode(false)}
+        onResolveAndNext={handleResolveAndNext}
+        impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
+        comments={comments}
+        sendPinComment={sendPinComment ?? undefined}
+        sendReply={sendReply}
+        activePinIdForPopover={activePinIdForPopover}
+        activeThreadId={activeThreadId}
+        onPinClick={setActivePinIdForPopover}
+        onOpenThreadPanel={(id) => {
+          setActiveThreadId(id);
+          setActivePinIdForPopover(null);
+        }}
+        onCloseInlinePopover={() => setActivePinIdForPopover(null)}
+        updateComment={updateComment}
+        sendTextComment={sendTextComment ?? undefined}
+        onCommentPlaced={() => setIsCommentMode(false)}
+        updatePinPosition={updatePinPosition ?? undefined}
+      />
+    );
+  };
 
   return (
     <>
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside className="w-[272px] shrink-0 min-h-0 flex flex-col bg-[var(--structural-gray-ticket)] border-r border-[rgba(0,0,0,0.06)]">
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <FeedbackSidebar
-              feedback={feedback}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              selectedIndex={selectedIndex}
-              total={feedbackTotal}
-              activeCount={feedbackActiveCount}
-              resolvedCount={feedbackResolvedCount}
-              loadingMore={feedbackLoadingMore}
-              hasMore={hasMoreFeedback}
-              hasReachedLimit={feedbackReachedLimit}
-              loadMoreRef={feedbackLoadMoreRef}
-              onMarkAllResolved={handleMarkAllResolved}
-            />
-          </div>
+        <aside className="hidden lg:flex w-[300px] shrink-0 min-h-0 flex-col bg-[var(--canvas-base)] border-r border-[var(--layer-2-border)]">
+          <TicketList
+            sessionTitle={session?.title ?? "Session"}
+            totalCount={feedbackTotal}
+            openCount={feedbackActiveCount}
+            resolvedCount={feedbackResolvedCount}
+            isEditingSessionTitle={isEditingSessionTitle}
+            sessionTitleDraft={sessionTitleDraft}
+            onSessionTitleChange={setSessionTitleDraft}
+            onSessionTitleSave={handleSessionTitleBlur}
+            onSessionTitleCancel={() => {
+              setIsEditingSessionTitle(false);
+              setSessionTitleDraft(session?.title ?? "Session");
+            }}
+            onSessionTitleEdit={() => {
+              setSessionTitleDraft(session?.title ?? "Session");
+              setIsEditingSessionTitle(true);
+            }}
+            isSavingSessionTitle={isSavingSessionTitle}
+            saveSessionTitleSuccess={saveSessionTitleSuccess}
+            items={feedback}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            loadingMore={feedbackLoadingMore}
+            hasMore={hasMoreFeedback}
+            hasReachedLimit={feedbackReachedLimit}
+            loadMoreRef={feedbackLoadMoreRef}
+            scrollContainerRef={listScrollRef}
+            onScrollContainerReady={() => setListScrollReady((n) => n + 1)}
+            onMarkAllTicketsResolved={handleMarkAllResolved}
+            onMarkAllTicketsUnresolved={handleMarkAllUnresolved}
+          />
         </aside>
 
-        <main className="surface-main flex-1 min-h-0 flex flex-col">
-          <div className="max-w-3xl mx-auto w-full px-10 py-8 shrink-0 border-b border-[var(--layer-1-border)]">
-            <div className="flex justify-between items-center gap-4">
-              <div className="min-w-0 flex-1">
-                {isEditingSessionTitle ? (
-                  <>
-                    <input
-                      value={sessionTitleDraft}
-                      onChange={(e) => setSessionTitleDraft(e.target.value)}
-                      onBlur={async () => {
-                        const trimmed = sessionTitleDraft.trim();
-                        if (!sessionId || !session) return;
-                        if (trimmed === (session.title ?? "")) {
-                          setIsEditingSessionTitle(false);
-                          return;
-                        }
-                        const safeTitle =
-                          trimmed && trimmed.length > 0
-                            ? trimmed
-                            : session.title || "Untitled Session";
-                        const previousTitle = session.title ?? "";
-                        setSession((prev: Session | null) =>
-                          prev ? ({ ...prev, title: safeTitle } as Session) : prev
-                        );
-                        setSessionTitleDraft(safeTitle);
-                        setIsSavingSessionTitle(true);
-                        setIsEditingSessionTitle(false);
-                        setSaveSessionTitleSuccess(true);
-                        setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
-                        try {
-                          const res = await authFetch(`/api/sessions/${sessionId}`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ title: safeTitle }),
-                          });
-                          const data = (await res.json()) as {
-                            success?: boolean;
-                            session?: Record<string, unknown>;
-                          };
-                          if (data.success && data.session) {
-                            setSession((prev: Session | null) =>
-                              prev
-                                ? ({ ...prev, ...data.session } as Session)
-                                : prev
-                            );
-                            setSessionTitleDraft(
-                              (data.session!.title as string) ?? safeTitle
-                            );
-                          }
-                        } catch {
-                          setSession((prev: Session | null) =>
-                            prev ? ({ ...prev, title: previousTitle } as Session) : prev
-                          );
-                          setSessionTitleDraft(previousTitle);
-                        } finally {
-                          setIsSavingSessionTitle(false);
-                        }
-                      }}
-                      onFocus={(e) => e.currentTarget.select()}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          e.currentTarget.blur();
-                        } else if (e.key === "Escape") {
-                          setSessionTitleDraft(session?.title ?? "Session");
-                          setIsEditingSessionTitle(false);
-                          e.currentTarget.blur();
-                        }
-                      }}
-                      autoFocus
-                      className="text-[19px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))] w-full bg-white border border-[var(--layer-2-border)] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
-                      aria-label="Session title"
-                    />
-                    <p className="text-[13px] text-neutral-500 mt-1">Enter to save</p>
-                    {isSavingSessionTitle && (
-                      <p className="text-[13px] text-neutral-500 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
-                        Saving...
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className={`group flex items-center gap-2 cursor-pointer min-h-[2rem] ${
-                        headerLoading ? "opacity-70" : ""
-                      }`}
-                      onClick={() => {
-                        if (!session) return;
-                        setSessionTitleDraft(session?.title ?? "Session");
-                        setIsEditingSessionTitle(true);
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          if (!session) return;
-                          setSessionTitleDraft(session?.title ?? "Session");
-                          setIsEditingSessionTitle(true);
-                        }
-                      }}
-                      aria-label="Edit session title"
-                    >
-                      <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
-                        {session?.title ?? "Session"}
-                      </h1>
-                      {saveSessionTitleSuccess ? (
-                        <Check
-                          size={14}
-                          className="text-neutral-600 shrink-0"
-                          aria-hidden
-                        />
-                      ) : (
-                        <Pencil
-                          size={14}
-                          className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[hsl(var(--text-secondary))] shrink-0"
-                          aria-hidden
-                        />
-                      )}
-                    </div>
-                    {saveSessionTitleSuccess && (
-                      <p className="text-[13px] text-neutral-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
-                        <Check size={12} className="shrink-0" aria-hidden />
-                        Saved
-                      </p>
-                    )}
-                    {typeof session?.aiInsightSummary === "string" &&
-                      session.aiInsightSummary.trim() !== "" && (
-                      <button
-                        type="button"
-                        onClick={() => setInsightRevealed((r) => !r)}
-                        className={`mt-1 text-[12px] cursor-pointer ${
-                          insightRevealed ? "text-neutral-600" : "text-neutral-500"
-                        }`}
-                        aria-label="Toggle session summary"
-                      >
-                        {insightRevealed ? "Hide session summary" : "View session summary"}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-              <div className="text-[13px] text-neutral-500 flex-shrink-0 flex items-center gap-3">
-                {(() => {
-                  const { dateStr, timeStr } = formatSessionCreatedMeta(
-                    session?.createdAt
-                  );
-                  return (
-                    <>
-                      <span>{dateStr}</span>
-                      <span aria-hidden className="mx-1">
-                        ·
-                      </span>
-                      <span>{timeStr}</span>
-                      <span aria-hidden className="mx-1">
-                        ·
-                      </span>
-                      <span>{userName || "—"}</span>
-                      {userPhotoURL && (
-                        <Image
-                          src={userPhotoURL}
-                          alt=""
-                          width={24}
-                          height={24}
-                          className="w-6 h-6 rounded-full border border-[var(--layer-2-border)] ml-2 flex-shrink-0"
-                        />
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
+        <main className="surface-main flex-1 min-h-0 flex flex-col min-w-0">
+          <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-[var(--layer-2-border)]">
+            <div className="lg:hidden">
+              <button
+                type="button"
+                onClick={() => setIsTicketNavigatorOpen(true)}
+                className="h-8 inline-flex items-center px-3 rounded-md border border-[var(--layer-2-border)] bg-white text-[12px] font-medium text-[hsl(var(--text-secondary-soft))]"
+              >
+                Tickets
+              </button>
             </div>
-            {insightRevealed &&
-              typeof session?.aiInsightSummary === "string" &&
-              session.aiInsightSummary.trim() !== "" && (
-                <div className="mt-5 pl-3 border-l border-[var(--layer-1-border)] max-w-[750px] text-[12px] leading-[1.5] text-[hsl(var(--text-tertiary))]">
-                  {session.aiInsightSummary.trim()}
-                </div>
-              )}
+            {feedback.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setExecutionMode(true)}
+                className="h-8 inline-flex items-center px-3 rounded-lg border border-[var(--layer-2-border)] bg-white text-[12px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors cursor-pointer"
+              >
+                Execution Mode
+              </button>
+            )}
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-3xl mx-auto w-full px-10 py-8">
-              {feedbackLoading ? (
-                <FeedbackPremiumLoader />
-              ) : detailLoading && selectedId ? (
-                <div className="py-12">
-                  <p className="text-[13px] text-[hsl(var(--text-tertiary))]">Loading…</p>
-                </div>
-              ) : feedback.length === 0 ? (
-                <div className="mt-16">
-                  <div className="text-[16px] font-medium text-[hsl(var(--text-primary-strong))]">
-                    No feedback yet
-                  </div>
-                  <div className="mt-2 text-[14px] text-[hsl(var(--text-tertiary))]">
-                    Capture feedback to start organizing insights.
-                  </div>
-                </div>
-              ) : (
-                <FeedbackDetail
-                  sessionId={sessionId}
-                  selectedItem={selectedItem}
-                  isEditingDescription={isEditingDescription}
-                  descriptionDraft={descriptionDraft}
-                  setIsEditingDescription={setIsEditingDescription}
-                  setDescriptionDraft={setDescriptionDraft}
-                  saveDescription={saveDescription}
-                  isSavingDescription={isSavingDescription}
-                  saveDescriptionSuccess={saveDescriptionSuccess}
-                  onSaveTitle={saveTitle}
-                  onRequestDelete={() => setShowDeleteModal(true)}
-                  onSaveActionSteps={saveActionSteps}
-                  onSaveTags={saveTags}
-                  onResolvedChange={saveResolved}
-                  setIsImageExpanded={setIsImageExpanded}
-                  isCommentsOpen={isCommentsOpen}
-                  onToggleActivity={() => setIsCommentsOpen((prev) => !prev)}
-                />
-              )}
+            <div className="max-w-3xl mx-auto w-full px-6 py-4">
+              {renderExecutionContent()}
             </div>
           </div>
         </main>
 
-        {isCommentsOpen && (
-          <aside className="w-[320px] shrink-0 min-h-0 flex flex-col hidden lg:block bg-[var(--canvas-base)]">
-            <div className="flex-1 min-h-0 flex flex-col px-6 py-5">
-              <ActivityPanel
-                comments={comments}
-                loading={loadingComments}
-                sendComment={sendComment}
-              />
-            </div>
-          </aside>
-        )}
+        {/* Comment panel: only when a pin/thread is opened (Google Docs style). No permanent sidebar. */}
+        <div
+          className="shrink-0 flex flex-col min-h-0 border-l border-[var(--layer-2-border)] bg-[var(--canvas-base)] transition-[width] duration-200 ease-out overflow-hidden"
+          style={{ width: activeThreadId != null ? 380 : 0 }}
+        >
+          {activeThreadId != null && (
+            <CommentPanel
+              variant="sidebar"
+              isOpen
+              onClose={() => setActiveThreadId(null)}
+              comments={comments}
+              loading={loadingComments}
+              sendReply={sendReply}
+              activeThreadId={activeThreadId}
+              onSelectThread={setActiveThreadId}
+              currentUserId={authUser?.uid ?? null}
+              updateComment={updateComment}
+              deleteComment={deleteComment}
+            />
+          )}
+        </div>
       </div>
 
-      {isCommentsOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 flex justify-end">
+      {isTicketNavigatorOpen && (
+        <div className="fixed inset-0 z-40 flex lg:hidden">
           <div
             className="absolute inset-0 bg-black/50 transition-opacity duration-200 cursor-pointer"
-            onClick={() => setIsCommentsOpen(false)}
+            onClick={() => setIsTicketNavigatorOpen(false)}
             aria-hidden
           />
           <div
-            className="relative w-full max-w-sm h-full min-h-0 bg-[var(--canvas-base)] flex flex-col transition-opacity duration-200 cursor-default"
+            className="relative w-full max-w-[300px] h-full min-h-0 bg-[var(--canvas-base)] flex flex-col border-r border-[var(--layer-2-border)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <ActivityPanel
-              comments={comments}
-              loading={loadingComments}
-              sendComment={sendComment}
+            <TicketList
+              sessionTitle={session?.title ?? "Session"}
+              totalCount={feedbackTotal}
+              openCount={feedbackActiveCount}
+              resolvedCount={feedbackResolvedCount}
+              isEditingSessionTitle={isEditingSessionTitle}
+              sessionTitleDraft={sessionTitleDraft}
+              onSessionTitleChange={setSessionTitleDraft}
+              onSessionTitleSave={handleSessionTitleBlur}
+              onSessionTitleCancel={() => {
+                setIsEditingSessionTitle(false);
+                setSessionTitleDraft(session?.title ?? "Session");
+              }}
+              onSessionTitleEdit={() => {
+                setSessionTitleDraft(session?.title ?? "Session");
+                setIsEditingSessionTitle(true);
+              }}
+              isSavingSessionTitle={isSavingSessionTitle}
+              saveSessionTitleSuccess={saveSessionTitleSuccess}
+              items={feedback}
+              selectedId={selectedId}
+              onSelect={(id) => {
+                setSelectedId(id);
+                setIsTicketNavigatorOpen(false);
+              }}
+              loadingMore={feedbackLoadingMore}
+              hasMore={hasMoreFeedback}
+              hasReachedLimit={feedbackReachedLimit}
+              loadMoreRef={feedbackLoadMoreRef}
+              scrollContainerRef={listScrollRef}
+              onScrollContainerReady={() => setListScrollReady((n) => n + 1)}
+              onMarkAllTicketsResolved={handleMarkAllResolved}
+              onMarkAllTicketsUnresolved={handleMarkAllUnresolved}
             />
           </div>
         </div>

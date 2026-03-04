@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { auth } from "@/lib/firebase";
-import { addComment, resolveFeedback, type Comment } from "@/lib/comments";
+import { addComment, resolveFeedback, updatePinPosition, updateComment, deleteComment, type Comment } from "@/lib/comments";
+import type { CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
 
 /**
@@ -60,18 +61,77 @@ export function useFeedbackDetailController(args: {
   const sendComment = async (message: string): Promise<void> => {
     const user = auth.currentUser;
     if (!user || !feedbackId) return;
-
     const trimmed = message.trim();
     if (!trimmed) return;
-
     const payload = {
       userId: user.uid,
       userName: user.displayName || "User",
       userAvatar: user.photoURL || "",
       message: trimmed,
     };
-
     addComment(sessionId, feedbackId, payload).catch(console.error);
+  };
+
+  const sendReply = async (threadId: string, message: string): Promise<void> => {
+    const user = auth.currentUser;
+    if (!user || !feedbackId) return;
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    addComment(sessionId, feedbackId, {
+      userId: user.uid,
+      userName: user.displayName || "User",
+      userAvatar: user.photoURL || "",
+      message: trimmed,
+      threadId,
+    }).catch(console.error);
+  };
+
+  const sendPinComment = async (
+    position: CommentPosition,
+    message: string
+  ): Promise<string | null> => {
+    const user = auth.currentUser;
+    if (!user || !feedbackId) return null;
+    const trimmed = message.trim();
+    if (!trimmed) return null;
+    try {
+      const id = await addComment(sessionId, feedbackId, {
+        userId: user.uid,
+        userName: user.displayName || "User",
+        userAvatar: user.photoURL || "",
+        message: trimmed,
+        type: "pin",
+        position,
+      });
+      return id;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  };
+
+  const sendTextComment = async (
+    textRange: CommentTextRange,
+    message: string
+  ): Promise<string | null> => {
+    const user = auth.currentUser;
+    if (!user || !feedbackId) return null;
+    const trimmed = message.trim();
+    if (!trimmed) return null;
+    try {
+      const id = await addComment(sessionId, feedbackId, {
+        userId: user.uid,
+        userName: user.displayName || "User",
+        userAvatar: user.photoURL || "",
+        message: trimmed,
+        type: "text",
+        textRange,
+      });
+      return id;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
   };
 
   const resolve = async () => {
@@ -79,11 +139,35 @@ export function useFeedbackDetailController(args: {
     await resolveFeedback(feedbackId, sessionId);
   };
 
+  const updatePinPositionHandler = async (
+    commentId: string,
+    position: { xPercent: number; yPercent: number }
+  ) => {
+    await updatePinPosition(commentId, position);
+  };
+
+  const updateCommentHandler = async (
+    commentId: string,
+    data: { message?: string; resolved?: boolean }
+  ) => {
+    await updateComment(commentId, data);
+  };
+
+  const deleteCommentHandler = async (commentId: string) => {
+    await deleteComment(commentId);
+  };
+
   return {
     comments,
     loadingComments,
     sendComment,
+    sendReply,
+    sendPinComment,
+    sendTextComment,
     resolve,
+    updatePinPosition: updatePinPositionHandler,
+    updateComment: updateCommentHandler,
+    deleteComment: deleteCommentHandler,
   };
 }
 

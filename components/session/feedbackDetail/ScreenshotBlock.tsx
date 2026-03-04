@@ -11,10 +11,6 @@ interface ScreenshotBlockProps {
 export function ScreenshotBlock({ screenshotUrl, onExpand }: ScreenshotBlockProps) {
   return (
     <div className="rounded-xl border border-[var(--layer-2-border)] bg-white/95 backdrop-blur-[6px] p-3 shadow-[var(--layer-2-shadow)]">
-      <div className="flex items-center justify-between mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-[hsl(var(--text-tertiary))]">
-        <span>Attachment</span>
-        <span>Screenshot</span>
-      </div>
       <div className="relative overflow-hidden rounded-lg max-h-[317px] bg-white/90 border border-[var(--layer-2-border)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
         <Image
           src={screenshotUrl}

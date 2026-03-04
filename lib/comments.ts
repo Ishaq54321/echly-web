@@ -1,30 +1,61 @@
 // lib/comments.ts
 
-export type { Comment } from "@/lib/domain/comment";
+export type { Comment, CommentPosition, CommentTextRange, CommentType } from "@/lib/domain/comment";
+import type { CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import {
   addCommentRepo,
   getSessionRecentCommentsRepo,
+  updateCommentPositionRepo,
+  updateCommentRepo,
+  deleteCommentRepo,
+  type AddCommentData,
+  type UpdateCommentData,
 } from "@/lib/repositories/commentsRepository";
 import { resolveFeedbackRepo } from "@/lib/repositories/feedbackRepository";
 import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
 
+export interface AddCommentOptions {
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  message: string;
+  type?: "pin" | "text" | "general";
+  position?: CommentPosition;
+  textRange?: CommentTextRange;
+  threadId?: string | null;
+}
+
 export async function addComment(
   sessionId: string,
   feedbackId: string,
-  data: {
-    userId: string;
-    userName: string;
-    userAvatar: string;
-    message: string;
-  }
-) {
-  await addCommentRepo(sessionId, feedbackId, data);
-  await updateSessionUpdatedAtRepo(sessionId);
+  data: AddCommentOptions
+): Promise<string> {
+  return addCommentRepo(sessionId, feedbackId, data as AddCommentData);
+}
+
+export async function updatePinPosition(
+  commentId: string,
+  position: { xPercent: number; yPercent: number }
+): Promise<void> {
+  await updateCommentPositionRepo(commentId, position);
 }
 
 export async function resolveFeedback(feedbackId: string, sessionId?: string) {
   await resolveFeedbackRepo(feedbackId);
   if (sessionId) await updateSessionUpdatedAtRepo(sessionId);
+}
+
+export type { UpdateCommentData };
+
+export async function updateComment(
+  commentId: string,
+  data: UpdateCommentData
+): Promise<void> {
+  await updateCommentRepo(commentId, data);
+}
+
+export async function deleteComment(commentId: string): Promise<void> {
+  await deleteCommentRepo(commentId);
 }
 
 /** Recent comments for a session (overview activity feed). Limited. */
