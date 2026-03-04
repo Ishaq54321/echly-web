@@ -38,20 +38,20 @@ export function DeleteSessionModal({
       aria-labelledby="delete-session-title"
     >
       <div
-        className="bg-[hsl(var(--surface-1))] rounded-xl shadow-xl max-w-md w-full p-6 border border-[hsl(var(--border))] cursor-default"
+        className="card-depth bg-[var(--layer-1-bg)] rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] max-w-md w-full p-6 cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
           id="delete-session-title"
-          className="text-[20px] font-medium leading-[1.35] text-neutral-900"
+          className="text-[20px] font-semibold leading-[1.35] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))]"
         >
           Delete session permanently?
         </h2>
-        <p className="mt-2 text-[14px] text-neutral-500">
+        <p className="mt-2 text-[14px] leading-[1.5] text-[hsl(var(--text-tertiary))]">
           This action cannot be undone. This will permanently remove this session and all associated feedback.
         </p>
         {sessionTitle && (
-          <p className="mt-2 text-[14px] text-neutral-500 font-medium truncate">
+          <p className="mt-2 text-[14px] text-[hsl(var(--text-secondary-soft))] font-medium truncate">
             &ldquo;{sessionTitle}&rdquo;
           </p>
         )}
@@ -60,7 +60,7 @@ export function DeleteSessionModal({
             type="button"
             onClick={onClose}
             disabled={deleting}
-            className="px-4 py-2 text-[14px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--layer-2-bg)] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -68,7 +68,7 @@ export function DeleteSessionModal({
             type="button"
             onClick={handleConfirm}
             disabled={deleting}
-            className="px-4 py-2 text-[14px] font-medium rounded-lg bg-neutral-900 text-white hover:opacity-90 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(185,28,28,0.25)] hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {deleting ? "Deleting…" : "Delete permanently"}
           </button>

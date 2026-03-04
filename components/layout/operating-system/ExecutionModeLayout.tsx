@@ -161,8 +161,8 @@ export function ExecutionModeLayout({
 
   if (!item) {
     return (
-      <div className="flex-1 min-h-0 flex flex-col items-center justify-center bg-[var(--canvas-base)]">
-        <p className="text-[14px] text-[hsl(var(--text-tertiary))]">
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center bg-[var(--env-base)]">
+        <p className="text-[14px] leading-relaxed text-[hsl(var(--text-tertiary))]">
           Select a ticket to start. Turn on Execution Mode from the session view.
         </p>
       </div>
@@ -173,62 +173,73 @@ export function ExecutionModeLayout({
   const disabled = isProcessing;
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col bg-[var(--canvas-base)] overflow-hidden">
-      {/* Top bar: Exit (left) | Position (right). Progress bar full width below. */}
-      <header className="shrink-0 bg-[var(--canvas-base)]">
-        <div className="flex items-center justify-between gap-4 px-5 py-3">
+    <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden bg-[rgba(0,0,0,0.03)]">
+      {/* Focus chamber: dimmed env + subtle spotlight behind content */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-none">
+        <div className="absolute inset-0 bg-[var(--env-base)] opacity-95" />
+        <div
+          className="absolute left-1/2 top-[30%] -translate-x-1/2 -translate-y-1/2 w-[140%] max-w-[900px] h-[60vh] rounded-[50%] opacity-40"
+          style={{
+            background: "radial-gradient(ellipse 80% 50% at 50% 50%, rgba(255,255,255,0.9) 0%, transparent 70%)",
+          }}
+        />
+      </div>
+
+      {/* Top bar: Exit | Progress prominent */}
+      <header className="relative z-10 shrink-0 px-5 pt-4 pb-3">
+        <div className="flex items-center justify-between gap-4">
           <button
             type="button"
             onClick={onExitExecutionMode}
             disabled={disabled}
-            className="inline-flex items-center gap-2 text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] rounded-lg px-2 py-1.5 transition-colors cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] focus-visible:ring-offset-1 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] rounded-xl px-2.5 py-2 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label="Exit Execution Mode"
           >
             <ArrowLeft className="h-4 w-4" strokeWidth={1.5} aria-hidden />
             Exit Execution Mode
           </button>
-          <span className="text-[22px] font-medium tabular-nums text-[hsl(var(--text-primary-strong))] leading-none">
-            {item.index} / {item.total}
+          <span className="text-[20px] font-semibold tabular-nums text-[hsl(var(--text-primary-strong))] leading-none tracking-[-0.02em]">
+            {item.index} <span className="text-[hsl(var(--text-tertiary))] font-normal">/ {item.total}</span>
           </span>
         </div>
-        <div className="w-full h-[3px] rounded-full bg-[hsl(var(--layer-2-border))] overflow-hidden">
+        <div className="mt-3 w-full h-1.5 rounded-full bg-[var(--layer-2-border)] overflow-hidden">
           <div
-            className="h-full bg-[var(--accent-operational)] rounded-full transition-[width] duration-150 ease-out"
+            className="h-full bg-[var(--color-primary)] rounded-full transition-[width] duration-200 ease-out shadow-[0_0_12px_rgba(26,86,219,0.25)]"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
       </header>
 
-      {/* Content: centered, max-w 920px, minimal chrome */}
+      {/* Content: centered, elevated, max-w 920px */}
       <div
         ref={contentScrollRef}
-        className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden transition-opacity duration-150 ${disabled ? "opacity-[0.85]" : "opacity-100"}`}
+        className={`relative z-10 flex-1 min-h-0 overflow-y-auto overflow-x-hidden transition-opacity duration-200 ${disabled ? "opacity-90" : "opacity-100"}`}
       >
-        <div className="max-w-[920px] mx-auto px-6 py-8 pb-12 flex flex-col items-center">
-          <h1 className="w-full text-center text-[24px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] mb-5">
+        <div className="max-w-[920px] mx-auto px-6 py-6 pb-16 flex flex-col items-center">
+          <h1 className="w-full text-center text-[24px] font-semibold leading-[1.3] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] mb-6">
             {item.title}
           </h1>
 
-          <div className="w-full text-center mb-6">
+          <div className="w-full text-center mb-8">
             {descriptionDraft !== undefined && setDescriptionDraft && saveDescription ? (
               <textarea
                 value={descriptionDraft}
                 onChange={(e) => setDescriptionDraft(e.target.value)}
                 onBlur={() => void saveDescription()}
                 disabled={disabled}
-                className="w-full min-h-[80px] text-[15px] leading-[1.65] text-[hsl(var(--text-primary-strong))] text-center bg-transparent border-0 resize-none focus:outline-none focus-visible:ring-0 placeholder:text-[hsl(var(--text-tertiary))]"
+                className="w-full min-h-[80px] text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))] text-center bg-transparent border-0 resize-none focus:outline-none focus-visible:ring-0 placeholder:text-[hsl(var(--text-tertiary))]"
                 placeholder="Description…"
               />
             ) : (
-              <p className="text-[15px] leading-[1.65] text-[hsl(var(--text-secondary-soft))] whitespace-pre-wrap">
+              <p className="text-[15px] leading-[1.7] text-[hsl(var(--text-secondary-soft))] whitespace-pre-wrap">
                 {item.description || "No description."}
               </p>
             )}
           </div>
 
           {hasScreenshot && (
-            <div className="w-full mb-8 flex justify-center">
-              <div className="relative w-full max-w-[920px] aspect-video max-h-[400px] rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+            <div className="w-full mb-10 flex justify-center">
+              <div className="relative w-full max-w-[920px] aspect-video max-h-[400px] rounded-[var(--radius-xl)] overflow-hidden shadow-[var(--shadow-level-3)] border border-[var(--card-border)] transition-transform duration-200 hover:scale-[1.01] group">
                 <Image
                   src={item.screenshotUrl!}
                   alt="Screenshot"
@@ -237,14 +248,15 @@ export function ExecutionModeLayout({
                   unoptimized={item.screenshotUrl!.startsWith("data:")}
                   sizes="(max-width: 1024px) 100vw, 920px"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent pointer-events-none" />
                 <button
                   type="button"
                   onClick={onExpandImage}
                   disabled={disabled}
-                  className="absolute top-[12px] right-[12px] w-9 h-9 flex items-center justify-center rounded-full bg-white/90 text-neutral-700 shadow-sm hover:bg-white hover:shadow transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1 disabled:opacity-60"
+                  className="absolute top-3 right-3 w-10 h-10 flex items-center justify-center rounded-xl bg-white/95 text-[hsl(var(--text-primary-strong))] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60"
                   aria-label="Zoom screenshot (Z)"
                 >
-                  <ZoomIn className="h-4 w-4" strokeWidth={1.5} />
+                  <ZoomIn className="h-5 w-5" strokeWidth={1.5} />
                 </button>
               </div>
             </div>
@@ -256,14 +268,14 @@ export function ExecutionModeLayout({
             </div>
           ) : null}
 
-          {/* Action bar: Skip | Needs clarification | Assign | Resolve & Next — centered, primary right */}
-          <div className="flex flex-col items-center justify-center gap-4 w-full">
-            <div className="flex flex-wrap items-center justify-center gap-4">
+          {/* Action bar: Resolve & Next dominant, Skip subtle, others secondary. Centered, elevated. */}
+          <div className="flex flex-col items-center justify-center gap-6 w-full mt-4">
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
                 onClick={onSkip}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-gray-300 bg-white text-gray-700 text-[14px] font-medium hover:bg-gray-50 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-tertiary))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-secondary-soft))] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <SkipForward className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Skip
@@ -272,7 +284,7 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={onNeedsClarification}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-[14px] font-medium hover:bg-amber-100 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <MessageCircleQuestion className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Needs clarification
@@ -281,7 +293,7 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={onAssign}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-gray-300 bg-white text-gray-600 text-[14px] font-medium hover:bg-gray-50 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <UserPlus className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Assign
@@ -290,16 +302,16 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={handleResolveAndNext}
                 disabled={disabled}
-                className="inline-flex items-center justify-center gap-2 min-w-[160px] h-11 px-6 rounded-xl bg-blue-600 text-white text-[14px] font-medium hover:bg-blue-700 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center gap-2 min-w-[180px] h-12 px-8 rounded-xl bg-[var(--color-primary)] text-white text-[15px] font-semibold shadow-[0_4px_14px_rgba(26,86,219,0.35)] hover:bg-[var(--color-primary-hover)] hover:shadow-[0_6px_20px_rgba(26,86,219,0.4)] hover:-translate-y-0.5 active:translate-y-0 active:shadow-[0_2px_8px_rgba(26,86,219,0.3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} aria-hidden />
+                    <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} aria-hidden />
                     Processing…
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+                    <CheckCircle2 className="h-5 w-5" strokeWidth={1.5} aria-hidden />
                     Resolve & Next
                   </>
                 )}
@@ -314,7 +326,7 @@ export function ExecutionModeLayout({
                 value={quickNoteValue}
                 onChange={(e) => setQuickNoteValue(e.target.value)}
                 placeholder="Quick note…"
-                className="w-full text-[14px] px-3 py-2 rounded-lg border border-[var(--layer-2-border)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] placeholder:text-[hsl(var(--text-tertiary))]"
+                className="w-full text-[14px] px-4 py-2.5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] placeholder:text-[hsl(var(--text-tertiary))]"
                 autoFocus
               />
             </div>
@@ -325,7 +337,7 @@ export function ExecutionModeLayout({
       {/* Full-screen screenshot zoom */}
       {screenshotZoomed && item.screenshotUrl && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-6 cursor-pointer"
           onClick={() => setScreenshotZoomed(false)}
           role="button"
           tabIndex={0}
@@ -334,12 +346,12 @@ export function ExecutionModeLayout({
           <button
             type="button"
             onClick={() => setScreenshotZoomed(false)}
-            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="absolute top-5 right-5 p-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
             aria-label="Close zoom"
           >
             <X className="h-5 w-5" strokeWidth={1.5} />
           </button>
-          <div className="relative w-full h-full max-w-6xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full h-full max-w-6xl max-h-[90vh] rounded-2xl overflow-hidden shadow-[var(--shadow-level-5)]" onClick={(e) => e.stopPropagation()}>
             <Image
               src={item.screenshotUrl}
               alt="Screenshot zoomed"

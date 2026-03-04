@@ -101,7 +101,7 @@ export function FeedbackHeader({
                 onBlur={handleTitleBlur}
                 onFocus={(e) => e.currentTarget.select()}
                 onKeyDown={handleTitleKeyDown}
-                className="w-full text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))] bg-white border border-[var(--layer-2-border)] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-150"
+                className="w-full text-[20px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)]"
                 aria-label="Edit title"
               />
               <p className="text-[14px] text-[hsl(var(--text-tertiary))] mt-1">
@@ -161,7 +161,7 @@ export function FeedbackHeader({
             <button
               type="button"
               onClick={onRequestDelete}
-              className="flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-neutral-500 hover:text-neutral-700 hover:bg-semantic-danger/10 transition-colors duration-120 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-1 rounded-md cursor-pointer"
+              className="flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] rounded-xl cursor-pointer"
               aria-label="Delete permanently"
             >
               <Trash2 size={14} />
@@ -171,7 +171,7 @@ export function FeedbackHeader({
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-120 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ai-accent)] focus-visible:ring-offset-1 rounded-lg cursor-pointer ${
+            className={`flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] rounded-xl cursor-pointer ${
               isActivityOpen ? "text-[hsl(var(--text-secondary-soft))]" : ""
             }`}
             aria-pressed={isActivityOpen}

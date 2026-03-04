@@ -1,12 +1,17 @@
 "use client";
 
 import { authFetch } from "@/lib/authFetch";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle, Folder, Hash } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import { ShareSessionModal } from "./ShareSessionModal";
 import { RenameSessionModal } from "./RenameSessionModal";
 import { DeleteSessionModal } from "./DeleteSessionModal";
+
+const DROPDOWN_Z_INDEX = 1000;
+const TOOLTIP_HOVER_DELAY_MS = 300;
+const DROPDOWN_ANIMATION_MS = 150;
 
 export interface WorkspaceCardProps {
   item: SessionWithCounts;
@@ -39,11 +44,12 @@ export function WorkspaceCard({
   const [showTooltip, setShowTooltip] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
-  const moreRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement>(null);
 
@@ -53,14 +59,33 @@ export function WorkspaceCard({
     };
   }, []);
 
-  const closeMenu = useCallback(() => setMoreOpen(false), []);
+  const closeMenu = useCallback(() => {
+    setMoreOpen(false);
+    setDropdownPosition(null);
+  }, []);
 
+  // Position dropdown when open (for portal)
+  useLayoutEffect(() => {
+    if (!moreOpen || typeof document === "undefined") return;
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const padding = 8;
+    const dropdownMinWidth = 160;
+    setDropdownPosition({
+      top: rect.bottom + padding,
+      left: Math.max(8, rect.right - dropdownMinWidth),
+    });
+  }, [moreOpen]);
+
+  // Click outside: both trigger (in card) and portaled menu
   useEffect(() => {
     if (!moreOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
-        closeMenu();
-      }
+      const target = e.target as Node;
+      const inTrigger = triggerRef.current?.contains(target);
+      const inMenu = menuRef.current?.contains(target);
+      if (!inTrigger && !inMenu) closeMenu();
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -189,7 +214,7 @@ export function WorkspaceCard({
   };
 
   const menuItemClass =
-    "w-full px-3 py-2 text-left text-[14px] font-medium rounded-lg text-[hsl(var(--text-primary-strong))] hover:bg-white/70 transition-colors duration-[120ms] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)]";
+    "w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)]";
 
   return (
     <>
@@ -199,36 +224,31 @@ export function WorkspaceCard({
         onClick={handleCardClick}
         onKeyDown={handleCardKeyDown}
         className="
+          workspace-card-in
+          card-depth
           group
           relative
           w-full
-          rounded-2xl
-          border border-[var(--layer-2-border)]
-          bg-[var(--layer-2-bg)]
           p-5
           cursor-pointer
           outline-none
-          shadow-[var(--layer-2-shadow)]
-          focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)]
-          transition-[background-color,box-shadow,filter,transform] duration-[120ms] ease-out
-          hover:bg-[var(--layer-2-hover-bg)]
-          hover:shadow-[var(--layer-2-shadow-hover)]
-          hover:brightness-[1.01]
-          hover:-translate-y-0.5
+          focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2
+          transition-duration-[var(--motion-duration)]
+          hover:-translate-y-[2px]
         "
-        style={{ animationDelay: `${index * 40}ms` } as React.CSSProperties}
+        style={{ animationDelay: `${index * 50}ms` } as React.CSSProperties}
         data-session-id={session.id}
       >
-        {/* 3-DOTS — ABSOLUTELY POSITIONED, visible on hover */}
+        {/* 3-DOTS — visible on hover; tooltip only when hover and dropdown closed */}
         <div className="absolute top-4 right-4">
-          <div data-card-actions className="relative z-20 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+          <div data-card-actions className="relative z-10 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
             <div
               className="relative h-10 w-10"
-              ref={moreRef}
               onMouseEnter={() => {
+                if (moreOpen) return;
                 hoverTimeoutRef.current = setTimeout(() => {
                   setShowTooltip(true);
-                }, 300);
+                }, TOOLTIP_HOVER_DELAY_MS);
               }}
               onMouseLeave={() => {
                 if (hoverTimeoutRef.current) {
@@ -239,117 +259,34 @@ export function WorkspaceCard({
               }}
             >
               <button
+                ref={triggerRef}
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  setShowTooltip(false);
                   setMoreOpen((prev) => !prev);
                 }}
                 aria-label="More actions"
                 aria-expanded={moreOpen}
                 aria-haspopup="menu"
-                className="flex items-center justify-center h-10 w-10 rounded-xl text-[hsl(var(--text-tertiary))] transition-colors duration-[120ms] hover:bg-white/60 hover:text-[hsl(var(--text-secondary-soft))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer"
+                className="flex items-center justify-center h-10 w-10 rounded-xl text-[hsl(var(--text-tertiary))] transition-colors duration-[var(--motion-duration)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
               >
                 <MoreHorizontal className="h-[16px] w-[16px] relative top-[1px] pointer-events-none" strokeWidth={1.5} aria-hidden />
               </button>
-              {showTooltip && (
+              {/* Tooltip: only when hover and dropdown is closed */}
+              {showTooltip && !moreOpen && (
                 <span
-                  className="
-                    tooltip-enter
-                    absolute
-                    top-full
-                    right-0
-                    mt-2
-                    px-3 py-1.5
-                    text-xs
-                    rounded-md
-                    bg-black
-                    text-white
-                    shadow-lg
-                    pointer-events-none
-                    whitespace-nowrap
-                  "
+                  className="workspace-card-tooltip absolute top-full right-0 mt-2 px-3 py-1.5 text-xs rounded-xl bg-[hsl(var(--text-primary-strong))] text-white shadow-[var(--shadow-level-4)] pointer-events-none whitespace-nowrap z-[100]"
+                  role="tooltip"
                 >
                   More actions…
                 </span>
               )}
-              {moreOpen && (
-                <div
-                  ref={menuRef}
-                  data-card-actions
-                  className="dropdown-enter absolute right-0 top-full mt-1 py-1 min-w-[160px] rounded-xl border border-[var(--glass-1-border)] bg-[var(--glass-1-bg)] backdrop-blur-[10px] shadow-[var(--layer-2-shadow-hover)] z-10"
-                  role="menu"
-                  aria-label="Workspace actions"
-                >
-                  <button
-                    ref={firstMenuItemRef}
-                    type="button"
-                    onClick={handleCopyLink}
-                    className={menuItemClass}
-                    role="menuitem"
-                  >
-                    <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    Copy link
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const id = session.id ? `FB-${session.id.slice(-6).toUpperCase()}` : session.id;
-                      if (id && navigator.clipboard?.writeText) {
-                        navigator.clipboard.writeText(id);
-                      }
-                      setMoreOpen(false);
-                    }}
-                    className={menuItemClass}
-                    role="menuitem"
-                  >
-                    <Hash className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    Copy session ID
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleShare}
-                    className={menuItemClass}
-                    role="menuitem"
-                  >
-                    <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    Share
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRenameClick}
-                    className={menuItemClass}
-                    role="menuitem"
-                  >
-                    <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    Rename
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleArchiveClick}
-                    disabled={archiving}
-                    className={`${menuItemClass} disabled:opacity-60`}
-                    role="menuitem"
-                  >
-                    <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    {archiving ? "Archiving…" : "Archive"}
-                  </button>
-                  <div className="my-1 border-t border-[var(--glass-1-border)]" role="separator" aria-hidden />
-                  <button
-                    type="button"
-                    onClick={handleDeleteClick}
-                    className="w-full px-3 py-2 text-left text-[14px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))] hover:bg-semantic-danger/10 transition-colors duration-[120ms] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)]"
-                    role="menuitem"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    Delete permanently
-                  </button>
-                </div>
-              )}
             </div>
             {copyTooltip && (
               <span
-                className="tooltip-enter absolute right-12 top-0 mt-2 px-3 py-1.5 text-xs rounded-md bg-black text-white shadow-lg whitespace-nowrap z-20 pointer-events-none"
+                className="workspace-card-tooltip absolute right-12 top-0 mt-2 px-3 py-1.5 text-xs rounded-xl bg-[hsl(var(--text-primary-strong))] text-white shadow-[var(--shadow-level-4)] whitespace-nowrap z-[100] pointer-events-none"
                 role="status"
                 aria-live="polite"
               >
@@ -359,64 +296,139 @@ export function WorkspaceCard({
           </div>
         </div>
 
+        {/* Dropdown: portaled to body, fixed position, no clipping */}
+        {moreOpen &&
+          dropdownPosition &&
+          typeof document !== "undefined" &&
+          createPortal(
+            <div
+              ref={menuRef}
+              data-card-actions
+              role="menu"
+              aria-label="Workspace actions"
+              className="workspace-card-dropdown min-w-[160px] rounded-xl border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-5)] py-1"
+              style={{
+                position: "fixed",
+                top: dropdownPosition.top,
+                left: dropdownPosition.left,
+                zIndex: DROPDOWN_Z_INDEX,
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <button
+                ref={firstMenuItemRef}
+                type="button"
+                onClick={handleCopyLink}
+                className={menuItemClass}
+                role="menuitem"
+              >
+                <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Copy link
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = session.id ? `FB-${session.id.slice(-6).toUpperCase()}` : session.id;
+                  if (id && navigator.clipboard?.writeText) {
+                    navigator.clipboard.writeText(id);
+                  }
+                  closeMenu();
+                }}
+                className={menuItemClass}
+                role="menuitem"
+              >
+                <Hash className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Copy session ID
+              </button>
+              <button
+                type="button"
+                onClick={handleShare}
+                className={menuItemClass}
+                role="menuitem"
+              >
+                <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Share
+              </button>
+              <button
+                type="button"
+                onClick={handleRenameClick}
+                className={menuItemClass}
+                role="menuitem"
+              >
+                <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={handleArchiveClick}
+                disabled={archiving}
+                className={`${menuItemClass} disabled:opacity-60`}
+                role="menuitem"
+              >
+                <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {archiving ? "Archiving…" : "Archive"}
+              </button>
+              <div className="my-1 border-t border-[var(--glass-1-border)]" role="separator" aria-hidden />
+              <button
+                type="button"
+                onClick={handleDeleteClick}
+                className="w-full px-3 py-2 text-left text-[14px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)]"
+                role="menuitem"
+              >
+                <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Delete permanently
+              </button>
+            </div>,
+            document.body
+          )}
+
         <div className="flex h-full flex-col justify-between">
           <div>
-            {/* Title row */}
+            {/* Title row — stronger hierarchy, no decorative dot */}
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2 min-w-0 flex-1 pr-8">
+              <div className="flex items-start gap-2.5 min-w-0 flex-1 pr-10">
                 <Folder
-                  className="h-[16px] w-[16px] relative top-[1px] shrink-0 text-neutral-400 transition-colors duration-150 group-hover:text-neutral-600"
+                  className="h-[18px] w-[18px] relative top-[2px] shrink-0 text-[hsl(var(--text-tertiary))] transition-colors duration-[var(--motion-duration)] group-hover:text-[hsl(var(--text-primary-strong))]"
                   strokeWidth={1.5}
                   aria-hidden
                 />
-                <h3 className="text-[16px] leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
+                <h3 className="text-[17px] font-semibold leading-[1.3] tracking-[-0.015em] text-[hsl(var(--text-primary-strong))] line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
                   {session.title}
                 </h3>
-                <span
-                  className={`ml-2 mt-2 h-2 w-2 shrink-0 rounded-full opacity-90 ${
-                    feedbackCount === 0
-                      ? "bg-neutral-300"
-                      : openCount > 0
-                        ? "bg-[var(--ai-accent)]"
-                        : allCompleted
-                          ? "bg-semantic-success"
-                          : "bg-neutral-300"
-                  }`}
-                  aria-hidden
-                />
               </div>
             </div>
 
-            {/* Metrics row — disciplined alignment, low emphasis */}
-            <div className="mt-4 flex items-center gap-3">
-              <div className="inline-flex items-center rounded-xl bg-white/70 border border-[var(--layer-2-border)] px-2.5 py-1.5 shadow-[0_1px_1px_rgba(0,0,0,0.03)]">
-                <span className="text-[13px] text-[hsl(var(--text-secondary-soft))] tabular-nums">
+            {/* Metrics row — clear separation, token-based */}
+            <div className="mt-5 flex items-center gap-3">
+              <div className="inline-flex items-center rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] px-3 py-2 shadow-[var(--shadow-level-1)]">
+                <span className="text-[14px] font-medium text-[hsl(var(--text-primary-strong))] tabular-nums">
                   {feedbackCount}
                 </span>
-                <span className="ml-1.5 text-[12px] text-[hsl(var(--text-tertiary))]">
+                <span className="ml-2 text-[12px] text-[hsl(var(--text-tertiary))]">
                   feedback
                 </span>
               </div>
-              <div className="inline-flex items-center rounded-xl bg-white/70 border border-[var(--layer-2-border)] px-2.5 py-1.5 shadow-[0_1px_1px_rgba(0,0,0,0.03)]">
-                <span className="text-[13px] text-[hsl(var(--text-secondary-soft))] tabular-nums">
+              <div className="inline-flex items-center rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] px-3 py-2 shadow-[var(--shadow-level-1)]">
+                <span className="text-[14px] font-medium text-[hsl(var(--text-primary-strong))] tabular-nums">
                   {openCount}
                 </span>
-                <span className="ml-1.5 text-[12px] text-[hsl(var(--text-tertiary))]">
+                <span className="ml-2 text-[12px] text-[hsl(var(--text-tertiary))]">
                   open
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="mt-5 flex flex-col">
-            {/* Activity row (views + comments) — tertiary */}
-            <div className="flex items-center gap-4 text-[13px] text-[hsl(var(--text-tertiary))]">
-              <div className="flex items-center gap-1.5">
-                <Eye className="h-[14px] w-[14px] shrink-0 text-neutral-400" strokeWidth={1.5} aria-hidden />
+          <div className="mt-6 flex flex-col border-t border-[var(--layer-2-border)] pt-4">
+            {/* Activity row — tertiary, breathing room */}
+            <div className="flex items-center gap-5 text-[13px] text-[hsl(var(--text-tertiary))]">
+              <div className="flex items-center gap-2">
+                <Eye className="h-[14px] w-[14px] shrink-0 text-[hsl(var(--text-tertiary))]" strokeWidth={1.5} aria-hidden />
                 <span>{viewCount}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <MessageCircle className="h-[14px] w-[14px] shrink-0 text-neutral-400" strokeWidth={1.5} aria-hidden />
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-[14px] w-[14px] shrink-0 text-[hsl(var(--text-tertiary))]" strokeWidth={1.5} aria-hidden />
                 <span>{commentCount}</span>
               </div>
             </div>

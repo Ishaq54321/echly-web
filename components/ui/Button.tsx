@@ -2,15 +2,20 @@
 
 import { forwardRef } from "react";
 
-type ButtonVariant = "primary" | "secondary" | "danger";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const baseClass =
-  "cursor-pointer transition-colors duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-1";
+  "cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 transition-all duration-[var(--motion-duration)] rounded-xl font-medium";
 
-const variantHover: Record<ButtonVariant, string> = {
-  primary: "hover:opacity-90",
-  secondary: "hover:bg-neutral-100",
-  danger: "hover:bg-semantic-danger/10",
+const variantClasses: Record<ButtonVariant, string> = {
+  primary:
+    "bg-[var(--color-primary)] text-white shadow-[0_2px_8px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] hover:shadow-[0_4px_14px_rgba(26,86,219,0.35)] hover:-translate-y-0.5 active:translate-y-0 active:shadow-[0_2px_6px_rgba(26,86,219,0.25)]",
+  secondary:
+    "bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] text-[hsl(var(--text-primary-strong))] shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] hover:bg-[var(--layer-2-hover-bg)] hover:border-[var(--layer-2-border)] hover:-translate-y-0.5 active:translate-y-0",
+  ghost:
+    "bg-transparent text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))]",
+  danger:
+    "bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(185,28,28,0.25)] hover:opacity-95 active:scale-[0.98]",
 };
 
 export interface ButtonProps
@@ -20,11 +25,10 @@ export interface ButtonProps
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = "primary", className = "", ...props }, ref) => {
-    const variantClass = variantHover[variant];
     return (
       <button
         ref={ref}
-        className={`${baseClass} ${variantClass} ${className}`.trim()}
+        className={`${baseClass} ${variantClasses[variant]} ${className}`.trim()}
         {...props}
       />
     );

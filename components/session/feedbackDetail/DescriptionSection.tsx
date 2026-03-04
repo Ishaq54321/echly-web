@@ -76,7 +76,7 @@ export function DescriptionSection({
               onChange={(e) => onDraftChange?.(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
-              className="w-full min-h-[100px] rounded-lg border border-[var(--layer-2-border)] bg-white p-3 text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] focus:border-[var(--ai-accent)] transition-all duration-150 resize-none overflow-hidden"
+              className="w-full min-h-[100px] rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] p-4 text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] resize-none overflow-hidden"
               autoFocus
               aria-label="Edit description"
             />
@@ -84,7 +84,7 @@ export function DescriptionSection({
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-[14px] font-medium px-3 py-1.5 rounded-lg border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer"
+                className="text-[14px] font-medium px-3 py-2 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
               >
                 Cancel
               </button>
@@ -92,7 +92,7 @@ export function DescriptionSection({
                 type="button"
                 onClick={triggerSave}
                 disabled={isSaving || draft === description}
-                className="text-[14px] font-medium px-3 py-1.5 rounded-md bg-neutral-800 text-white hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-neutral-400 cursor-pointer"
+                className="text-[14px] font-semibold px-4 py-2 rounded-xl bg-[var(--color-primary)] text-white shadow-[0_2px_8px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] disabled:opacity-50 disabled:pointer-events-none transition-all duration-[var(--motion-duration)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
               >
                 {isSaving ? "Saving..." : "Save"}
               </button>

@@ -137,13 +137,13 @@ const CommentRow = memo(function CommentRow({
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-1 py-1.5 min-w-[160px] rounded-lg bg-white border border-neutral-200/80 shadow-[0_4px_16px_rgba(0,0,0,0.08)] z-[200]">
+                <div className="absolute right-0 top-full mt-1.5 py-1.5 min-w-[160px] rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-1-border)] shadow-[var(--shadow-level-4)] z-[200]">
                   {isAuthor && (
                     <>
                       <button
                         type="button"
                         onClick={() => { setEditing(true); setEditDraft(comment.message); setMenuOpen(false); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-neutral-50 transition-colors duration-150 cursor-pointer"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] cursor-pointer"
                       >
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </button>
@@ -169,7 +169,7 @@ const CommentRow = memo(function CommentRow({
                     <button
                       type="button"
                       onClick={handleUnresolve}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] text-[hsl(var(--text-secondary-soft))] hover:bg-neutral-50 transition-colors duration-150 cursor-pointer"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] cursor-pointer"
                     >
                       <RotateCcw className="h-3.5 w-3.5" /> Mark as unresolved
                     </button>
@@ -184,7 +184,7 @@ const CommentRow = memo(function CommentRow({
             <textarea
               value={editDraft}
               onChange={(e) => setEditDraft(e.target.value)}
-              className="box-border w-full min-h-[60px] rounded-lg border border-neutral-200/80 px-2.5 py-2 text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms] resize-none"
+              className="box-border w-full min-h-[60px] rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-2-bg)] px-3 py-2.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] resize-none"
               autoFocus
             />
             <div className="flex gap-2">
@@ -197,7 +197,7 @@ const CommentRow = memo(function CommentRow({
         )}
       </div>
       {deleteConfirm && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteConfirm(false)}>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4 cursor-pointer" onClick={() => setDeleteConfirm(false)} aria-hidden>
           <div className="bg-white rounded-xl shadow-xl p-4 max-w-sm w-full border border-[var(--layer-2-border)]" onClick={(e) => e.stopPropagation()}>
             <p className="text-[13px] text-[hsl(var(--text-primary-strong))]">Delete this comment? This cannot be undone.</p>
             <div className="flex justify-end gap-2 mt-4">
@@ -253,7 +253,7 @@ const ThreadBlock = memo(function ThreadBlock({
       tabIndex={0}
       onClick={() => onSelectThread?.(root.id)}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelectThread?.(root.id); } }}
-      className={`relative w-full box-border rounded-lg px-3 py-3 min-w-0 overflow-visible transition-colors duration-[180ms] ease-out cursor-pointer ${isActive ? "bg-neutral-100/90" : "hover:bg-neutral-50/80"} ${root.resolved ? "opacity-90" : ""} ${isHighlighted ? "bg-neutral-100/90" : ""}`}
+      className={`relative w-full box-border rounded-xl px-3 py-3 min-w-0 overflow-visible transition-colors duration-[var(--motion-duration)] cursor-pointer ${isActive ? "bg-[var(--layer-2-hover-bg)]" : "hover:bg-[var(--layer-2-hover-bg)]"} ${root.resolved ? "opacity-90" : ""} ${isHighlighted ? "bg-[var(--color-primary-soft)]" : ""}`}
       style={{ boxSizing: "border-box" }}
     >
       <CommentRow
@@ -301,7 +301,7 @@ const ThreadBlock = memo(function ThreadBlock({
                   value={replyDraft}
                   onChange={(e) => setReplyDraft(e.target.value)}
                   placeholder="Write a reply..."
-                  className="block box-border w-full max-w-full min-h-[44px] rounded-lg bg-[#f5f5f5] border border-neutral-200/80 px-3 py-2.5 text-[13px] leading-relaxed text-[hsl(var(--text-primary-strong))] placeholder:text-neutral-400 focus:outline-none resize-none"
+                  className="block box-border w-full max-w-full min-h-[44px] rounded-xl bg-[var(--layer-2-bg)] border border-[var(--layer-2-border)] px-3 py-2.5 text-[13px] leading-relaxed text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] resize-none transition-all duration-[var(--motion-duration)]"
                   style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
                   autoFocus
                   onKeyDown={(e) => {
@@ -381,18 +381,18 @@ const CommentThreadList = memo(function CommentThreadList({
 
   return (
     <div className="space-y-2 min-w-0">
-      <div className="flex items-center gap-0 border-b border-neutral-200 min-w-0">
+      <div className="flex items-center gap-0 border-b border-[var(--layer-2-border)] min-w-0">
         {tabs.map((tab) => {
           const isActive = filterTab === tab;
           const activeBorder =
             tab === "all"
-              ? "border-neutral-500"
+              ? "border-[hsl(var(--text-primary-strong))]"
               : tab === "unresolved"
                 ? "border-amber-500"
                 : "border-emerald-500";
           const activeBg =
             tab === "all"
-              ? "bg-neutral-100/80"
+              ? "bg-[var(--layer-2-hover-bg)]"
               : tab === "unresolved"
                 ? "bg-amber-50/80"
                 : "bg-emerald-50/80";
@@ -404,7 +404,7 @@ const CommentThreadList = memo(function CommentThreadList({
               className={`px-3 py-2.5 text-[12px] font-medium capitalize transition-colors duration-150 ease-out border-b-2 -mb-px shrink-0 cursor-pointer ${
                 isActive
                   ? `text-[hsl(var(--text-primary-strong))] ${activeBorder} ${activeBg}`
-                  : "text-neutral-600 hover:text-neutral-800 border-transparent hover:bg-neutral-50/60"
+                  : "text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] border-transparent hover:bg-[var(--layer-2-hover-bg)]"
               }`}
             >
               {tab === "all" ? "All" : tab === "unresolved" ? "Unresolved" : "Resolved"}
@@ -526,7 +526,7 @@ export function CommentPanel({
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded-md text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] cursor-pointer"
+          className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
           aria-label="Close comment panel"
         >
           <X className="h-4 w-4" strokeWidth={1.5} />
@@ -567,7 +567,7 @@ export function CommentPanel({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-150" onClick={onClose} aria-hidden />
+      <div className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-150 cursor-pointer" onClick={onClose} aria-hidden />
       <aside
         role="dialog"
         aria-label="Comment"

@@ -73,12 +73,12 @@ export function RenameSessionModal({
       aria-labelledby="rename-session-title"
     >
       <div
-        className="bg-[hsl(var(--surface-1))] rounded-xl shadow-xl max-w-md w-full p-6 border border-[hsl(var(--border))] cursor-default"
+        className="card-depth bg-[var(--layer-1-bg)] rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] max-w-md w-full p-6 cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
           id="rename-session-title"
-          className="text-[20px] font-medium leading-[1.35] text-neutral-900"
+          className="text-[20px] font-semibold leading-[1.35] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))]"
         >
           Rename session
         </h2>
@@ -89,13 +89,13 @@ export function RenameSessionModal({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={saving}
-          className="focus-ring-brand mt-4 w-full h-10 px-3 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] placeholder:text-[hsl(var(--text-secondary))] focus:outline-none focus:ring-1 focus:ring-brand-accent focus:border-brand-accent transition-all duration-150 disabled:opacity-60"
+          className="mt-4 w-full h-11 px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-2-bg)] text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] disabled:opacity-60"
           aria-label="Session title"
           aria-invalid={!!error}
           aria-describedby={error ? "rename-error" : undefined}
         />
         {error && (
-          <p id="rename-error" className="mt-2 text-[14px] text-neutral-600" role="alert">
+          <p id="rename-error" className="mt-2 text-[14px] text-[var(--color-danger)]" role="alert">
             {error}
           </p>
         )}
@@ -104,7 +104,7 @@ export function RenameSessionModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="focus-ring-brand px-4 py-2 text-[14px] font-medium rounded-md bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary))] hover:bg-neutral-100 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--layer-2-bg)] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -112,7 +112,7 @@ export function RenameSessionModal({
             type="button"
             onClick={handleSave}
             disabled={saving || value.trim() === ""}
-            className="focus-ring-brand px-4 py-2 text-[14px] font-medium rounded-md bg-neutral-900 text-white hover:opacity-90 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-primary)] text-white shadow-[0_2px_8px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {saving ? "Saving…" : "Save"}
           </button>

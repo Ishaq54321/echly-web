@@ -56,7 +56,7 @@ type TicketFromApi = {
 function SessionPageSkeleton() {
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden">
-      <aside className="w-[280px] shrink-0 min-h-0 flex flex-col bg-[var(--structural-gray-ticket)] border-r border-[rgba(0,0,0,0.06)]">
+      <aside className="w-[280px] shrink-0 min-h-0 flex flex-col rounded-r-[var(--radius-lg)] bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-1)] border-r border-[var(--layer-1-border)]">
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           <div className="space-y-3">
             <div className="h-4 w-40 rounded bg-neutral-200/50 animate-feedback-placeholder-pulse" />
@@ -699,15 +699,21 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const handleMarkAllResolved = useCallback(async () => {
     const active = feedback.filter((item) => getTicketStatus(item) === "open");
     if (active.length === 0) return;
-    await Promise.all(
-      active.map((item) =>
-        authFetch(`/api/tickets/${item.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isResolved: true }),
-        })
-      )
-    );
+    try {
+      await Promise.all(
+        active.map((item) =>
+          authFetch(`/api/tickets/${item.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isResolved: true }),
+            timeout: 60000,
+          })
+        )
+      );
+    } catch (err) {
+      warn("Mark all resolved failed:", err);
+      return;
+    }
     setFeedback((prev) =>
       prev.map((item) =>
         getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
@@ -731,15 +737,21 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const handleMarkAllUnresolved = useCallback(async () => {
     const resolved = feedback.filter((item) => getTicketStatus(item) === "resolved");
     if (resolved.length === 0) return;
-    await Promise.all(
-      resolved.map((item) =>
-        authFetch(`/api/tickets/${item.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isResolved: false }),
-        })
-      )
-    );
+    try {
+      await Promise.all(
+        resolved.map((item) =>
+          authFetch(`/api/tickets/${item.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isResolved: false }),
+            timeout: 60000,
+          })
+        )
+      );
+    } catch (err) {
+      warn("Mark all unresolved failed:", err);
+      return;
+    }
     setFeedback((prev) =>
       prev.map((item) =>
         getTicketStatus(item) === "resolved"
@@ -1045,7 +1057,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   return (
     <>
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside className="hidden lg:flex w-[300px] shrink-0 min-h-0 flex-col bg-[var(--canvas-base)] border-r border-[var(--layer-2-border)]">
+        <aside className="hidden lg:flex w-[300px] shrink-0 min-h-0 flex-col">
           <TicketList
             sessionTitle={session?.title ?? "Session"}
             totalCount={feedbackTotal}
@@ -1081,12 +1093,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         </aside>
 
         <main className="surface-main flex-1 min-h-0 flex flex-col min-w-0">
-          <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-2 border-b border-[var(--layer-2-border)]">
+          <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--layer-1-border)] bg-[var(--layer-1-bg)]/80">
             <div className="lg:hidden">
               <button
                 type="button"
                 onClick={() => setIsTicketNavigatorOpen(true)}
-                className="h-8 inline-flex items-center px-3 rounded-md border border-[var(--layer-2-border)] bg-white text-[12px] font-medium text-[hsl(var(--text-secondary-soft))]"
+                className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-200"
               >
                 Tickets
               </button>
@@ -1095,7 +1107,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               <button
                 type="button"
                 onClick={() => setExecutionMode(true)}
-                className="h-8 inline-flex items-center px-3 rounded-lg border border-[var(--layer-2-border)] bg-white text-[12px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors cursor-pointer"
+                className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-200 cursor-pointer"
               >
                 Execution Mode
               </button>
@@ -1139,7 +1151,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             aria-hidden
           />
           <div
-            className="relative w-full max-w-[300px] h-full min-h-0 bg-[var(--canvas-base)] flex flex-col border-r border-[var(--layer-2-border)]"
+            className="relative w-full max-w-[300px] h-full min-h-0 flex flex-col shadow-[var(--shadow-level-4)]"
             onClick={(e) => e.stopPropagation()}
           >
             <TicketList
@@ -1223,7 +1235,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 text-[13px] font-medium rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:ring-offset-1 transition-colors duration-150 cursor-pointer"
+                className="px-4 py-2 text-[13px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer"
               >
                 Cancel
               </button>

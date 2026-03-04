@@ -74,7 +74,7 @@ export default function DashboardPage() {
     return (
       <div className="surface-main flex flex-col w-full min-h-[40vh]">
         <div className="mx-auto w-full max-w-[1800px] px-10 py-8 flex items-center justify-center">
-          <p className="text-[14px] text-neutral-500">Loading workspace…</p>
+          <p className="text-[14px] text-[hsl(var(--text-tertiary))]">Loading workspace…</p>
         </div>
       </div>
     );
@@ -94,7 +94,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-6 flex-shrink-0">
             <div
-              className="flex items-center py-3 px-6 rounded-2xl border border-[var(--layer-1-border)] bg-white"
+              className="flex items-center py-3 px-6 rounded-[var(--radius-card)] border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-1)]"
             >
               <InsightStrip />
             </div>
@@ -108,9 +108,9 @@ export default function DashboardPage() {
                 role="tab"
                 aria-selected={viewMode === "all"}
                 onClick={() => setViewMode("all")}
-                className={`h-8 px-3 rounded-lg text-[13px] transition-colors duration-120 ${
+                className={`h-9 px-4 rounded-xl text-[13px] font-medium transition-colors duration-[var(--motion-duration)] ${
                   viewMode === "all"
-                    ? "bg-[var(--layer-2-hover-bg)] text-[hsl(var(--text-secondary-soft))]"
+                    ? "bg-[var(--layer-2-hover-bg)] text-[hsl(var(--text-primary-strong))]"
                     : "text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))]"
                 }`}
               >
@@ -121,9 +121,9 @@ export default function DashboardPage() {
                 role="tab"
                 aria-selected={viewMode === "archived"}
                 onClick={() => setViewMode("archived")}
-                className={`h-8 px-3 rounded-lg text-[13px] transition-colors duration-120 ${
+                className={`h-9 px-4 rounded-xl text-[13px] font-medium transition-colors duration-[var(--motion-duration)] ${
                   viewMode === "archived"
-                    ? "bg-[var(--layer-2-hover-bg)] text-[hsl(var(--text-secondary-soft))]"
+                    ? "bg-[var(--layer-2-hover-bg)] text-[hsl(var(--text-primary-strong))]"
                     : "text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))]"
                 }`}
               >
@@ -133,7 +133,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={handleCreateSession}
-              className="h-9 rounded-xl bg-[hsl(var(--text-primary-strong))] text-white text-[14px] px-4 font-medium hover:opacity-92 active:scale-[0.99] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-[120ms] cursor-pointer"
+              className="h-9 rounded-xl bg-[var(--color-primary)] text-white text-[14px] px-5 font-semibold shadow-[0_2px_8px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] hover:shadow-[0_4px_14px_rgba(26,86,219,0.35)] hover:-translate-y-0.5 active:translate-y-0 active:shadow-[0_2px_6px_rgba(26,86,219,0.25)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2 transition-all duration-[var(--motion-duration)] cursor-pointer"
             >
               New Session
             </button>
@@ -142,7 +142,7 @@ export default function DashboardPage() {
               placeholder="Search sessions"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 px-3 min-w-[160px] rounded-xl bg-white/90 border border-[var(--layer-2-border)] text-[14px] text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] transition-all duration-[120ms]"
+              className="h-9 px-4 min-w-[180px] rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] text-[14px] text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)]"
               aria-label="Search sessions"
             />
           </div>
@@ -170,7 +170,7 @@ export default function DashboardPage() {
             </div>
           </div>
           {filteredSessions.length === 0 && (
-            <p className="text-[14px] text-neutral-500 py-8">
+            <p className="text-[14px] text-[hsl(var(--text-tertiary))] py-8">
               {search.trim()
                 ? "No sessions match your search."
                 : viewMode === "archived"

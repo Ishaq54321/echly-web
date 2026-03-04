@@ -119,12 +119,12 @@ export default function CommandPalette({
       onClick={handleOverlayClick}
     >
       <div
-        className={`w-full max-w-2xl overflow-hidden rounded-3xl border border-[hsl(var(--border))] border-opacity-60 bg-[hsl(var(--surface-1))] shadow-[0_25px_70px_rgba(0,0,0,0.12)] transition-all duration-[120ms] ease-out cursor-default ${
-          entered ? "opacity-100 scale-100" : "opacity-0 scale-95"
+        className={`w-full max-w-2xl overflow-hidden rounded-[var(--radius-card)] border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-5)] transition-all duration-[var(--motion-duration)] cursor-default ${
+          entered ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-[hsl(var(--border))] opacity-50">
+        <div className="border-b border-[var(--layer-2-border)]">
           <input
             ref={inputRef}
             type="text"
@@ -166,10 +166,10 @@ export default function CommandPalette({
                   role="option"
                   aria-selected={index === clampedIndex}
                   type="button"
-                  className={`w-full cursor-pointer rounded-lg px-6 py-3.5 text-left text-sm transition-colors duration-120 focus-visible:outline-none ${
+                  className={`w-full cursor-pointer rounded-xl px-6 py-3.5 text-left text-sm transition-colors duration-[var(--motion-duration)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] ${
                     index === clampedIndex
-                      ? "bg-[hsl(var(--surface-3))]"
-                      : "hover:bg-neutral-100"
+                      ? "bg-[var(--color-primary-soft)]"
+                      : "hover:bg-[var(--layer-2-hover-bg)]"
                   }`}
                   onClick={() => {
                     onSelect(item.id);
