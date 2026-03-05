@@ -87,6 +87,8 @@ export async function PATCH(
     isResolved?: boolean;
     isSkipped?: boolean;
     status?: "open" | "resolved" | "skipped";
+    /** Set when async screenshot upload completes so the ticket shows the image. */
+    screenshotUrl?: string | null;
   };
   try {
     body = await req.json();
@@ -129,6 +131,7 @@ export async function PATCH(
     if (typeof body.isResolved === "boolean") updates.isResolved = body.isResolved;
     if (typeof body.isSkipped === "boolean") updates.isSkipped = body.isSkipped;
   }
+  if (body.screenshotUrl !== undefined) updates.screenshotUrl = body.screenshotUrl === null ? null : (typeof body.screenshotUrl === "string" ? body.screenshotUrl : undefined);
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({

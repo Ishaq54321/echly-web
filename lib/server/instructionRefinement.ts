@@ -6,43 +6,12 @@
 
 import type OpenAI from "openai";
 import { echlyDebug } from "@/lib/utils/logger";
+import { estimateCost } from "@/lib/ai/costEstimator";
 import {
   EXTRACTION_INTENTS,
   isValidExtractionIntent,
   type ExtractedInstruction,
 } from "@/lib/server/instructionExtraction";
-
-const REFINEMENT_SYSTEM = `You are Echly's Instruction Refiner. You work under a unified interpretation policy for messy human feedback. Your job: ensure each instruction is exactly ONE developer-ready action. Be deterministic; preserve the user's meaning.
-
-RULES:
-1. One instruction = exactly one developer action. Split compound instructions when they contain multiple distinct changes.
-2. PRESERVE MULTIPLE SUGGESTED ACTIONS (Rule 3). When the user proposed multiple distinct improvements (e.g. "stack the links better or add more spacing"), keep them as separate instructions. Do NOT merge into one. Only merge when two instructions are alternative phrasings of the SAME single intent (e.g. "make it bigger or highlight it" → one: "Make the middle pricing card stand out visually").
-3. Preserve the user's original meaning. Do not rewrite intent (e.g. "shorten the headline" stays "Shorten the hero headline").
-4. Do NOT hallucinate (Rule 4). Only include specifics the user stated. "Make author names stand out more" → "Make testimonial author names more prominent", NOT "Make author names bold".
-5. If an instruction already describes a single action and is developer-ready, leave it unchanged or lightly rephrase for clarity only.
-6. Output developer-ready instructions: clear, actionable, specific to UI element (Rule 9). Avoid vague: "Improve layout." Prefer: "Increase spacing between pricing cards." When the user left solution general, keep it general.
-7. Output only the refined instructions array. No explanation. No markdown.
-
-EXAMPLE (split compound):
-Input: ["Change first name and last name to fullname and merge their fields"]
-Output: { "instructions": ["Rename the First Name and Last Name fields to Full Name", "Merge the First Name and Last Name fields into one field"] }
-
-EXAMPLE (preserve multiple distinct suggestions):
-Input: ["Stack navigation links vertically", "Increase spacing between navigation links"]
-Output: { "instructions": ["Stack navigation links vertically.", "Increase spacing between navigation links."] }
-
-EXAMPLE (merge same intent only):
-Input: ["Increase size of middle pricing card", "Change color of middle pricing card"]
-Output: { "instructions": ["Make the middle pricing card stand out visually."] }
-
-EXAMPLE (no hallucination):
-Input: ["Make author names stand out more"]
-Output: { "instructions": ["Make testimonial author names more prominent"] }
-
-OUTPUT FORMAT (strict JSON only):
-{ "instructions": ["refined instruction 1", "refined instruction 2", ...] }
-
-Split compound items when they are genuinely multiple changes. Never merge two genuinely separate user requests.`;
 
 const STRUCTURED_REFINEMENT_SYSTEM = `You are Echly's Instruction Refiner. Your job: ensure each instruction is exactly ONE developer-ready action. Input and output are STRUCTURED: each instruction has intent, entity, action, confidence.
 
@@ -84,8 +53,9 @@ function normalizeStructuredInstruction(raw: unknown, fallbackConfidence: number
   };
 }
 
-export interface RefineInstructionsResult {
-  instructions: string[];
+export interface RefinementResult {
+  instructions: ExtractedInstruction[];
+  cost: number;
 }
 
 /**
@@ -96,9 +66,9 @@ export interface RefineInstructionsResult {
 export async function refineStructuredInstructions(
   client: OpenAI,
   instructions: ExtractedInstruction[]
-): Promise<ExtractedInstruction[]> {
+): Promise<RefinementResult> {
   if (instructions.length === 0) {
-    return [];
+    return { instructions: [], cost: 0 };
   }
 
   echlyDebug("STRUCTURED REFINEMENT INPUT", instructions);
@@ -120,10 +90,22 @@ export async function refineStructuredInstructions(
       ],
     });
 
+    const usage = completion.usage;
+    const promptTokens = usage?.prompt_tokens ?? 0;
+    const completionTokens = usage?.completion_tokens ?? 0;
+    const cost = estimateCost("gpt-4o-mini", promptTokens, completionTokens);
+    console.log("[AI COST]", {
+      stage: "refinement",
+      model: "gpt-4o-mini",
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      cost,
+    });
+
     const content = completion.choices[0]?.message?.content?.trim();
     if (!content) {
       echlyDebug("STRUCTURED REFINEMENT OUTPUT", instructions);
-      return instructions;
+      return { instructions, cost };
     }
 
     const parsed = JSON.parse(cleanJson(content)) as { instructions?: unknown[] };
@@ -137,54 +119,10 @@ export async function refineStructuredInstructions(
 
     const out = result.length > 0 ? result : instructions;
     echlyDebug("STRUCTURED REFINEMENT OUTPUT", out);
-    return out;
+    return { instructions: out, cost };
   } catch (err) {
     console.error("[instructionRefinement] Structured refinement failed:", err);
     echlyDebug("STRUCTURED REFINEMENT OUTPUT", instructions);
-    return instructions;
-  }
-}
-
-/**
- * Refines a list of instructions so each is exactly one developer action.
- * Uses gpt-4o-mini. Returns same list if parsing fails (defensive).
- * @deprecated Prefer refineStructuredInstructions for pipeline use so structure is preserved.
- */
-export async function refineInstructions(
-  client: OpenAI,
-  instructions: string[]
-): Promise<RefineInstructionsResult> {
-  if (instructions.length === 0) {
-    return { instructions: [] };
-  }
-
-  const userContent = [
-    "Instructions to refine (one per line):",
-    ...instructions.map((s, i) => `${i + 1}. ${s}`),
-  ].join("\n");
-
-  try {
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0,
-      top_p: 1,
-      max_tokens: 1500,
-      messages: [
-        { role: "system", content: REFINEMENT_SYSTEM },
-        { role: "user", content: userContent },
-      ],
-    });
-
-    const content = completion.choices[0]?.message?.content?.trim();
-    if (!content) return { instructions };
-
-    const parsed = JSON.parse(cleanJson(content)) as { instructions?: unknown };
-    const out = Array.isArray(parsed.instructions)
-      ? (parsed.instructions as string[]).filter((s) => typeof s === "string" && s.trim() !== "")
-      : instructions;
-    return { instructions: out.length > 0 ? out : instructions };
-  } catch (err) {
-    console.error("[instructionRefinement] Failed:", err);
-    return { instructions };
+    return { instructions, cost: 0 };
   }
 }

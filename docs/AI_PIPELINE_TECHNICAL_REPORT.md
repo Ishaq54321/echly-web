@@ -1,586 +1,582 @@
-# Echly AI Pipeline — Full Technical Report
+# Echly AI Pipeline — Technical Documentation for External Audit
 
-This document is a complete technical introspection of the AI pipeline used in Echly, from user feedback to ticket creation. It is intended for product and AI architects to fully understand and improve the system.
-
----
-
-## SECTION 1 — AI PIPELINE OVERVIEW
-
-### End-to-end flow
-
-**INPUT (to API)**
-
-- `transcript` (string) — voice feedback text
-- `context` (optional) — when sent by the extension:
-  - `url`
-  - `viewportWidth`, `viewportHeight`
-  - `domPath`, `nearbyText`
-  - `visibleText` (OCR from screenshot)
-
-The screenshot is **not** sent to the structure-feedback API. It is uploaded separately (e.g. `uploadScreenshot`). The AI pipeline receives only text: transcript and, when provided, `context.visibleText`.
-
-**Pre-pipeline (no AI)**
-
-- **Proper noun anchoring**  
-  **File:** `lib/server/properNounAnchoring.ts`  
-  **Input:** `originalTranscript`, `context?.visibleText`  
-  **Output:** `correctedTranscript` (STT/transcript terms aligned to OCR visible text for proper nouns/phrases).  
-  **Data passed:** The route uses `correctedTranscript` for all subsequent stages.
-
-**Stage 1: Instruction segmentation**
-
-- **File:** `lib/server/instructionSegmentation.ts`  
-- **Function:** `segmentInstructions(client, correctedTranscript)`  
-- **Input:** OpenAI client, corrected transcript only (no visibleText at this stage).  
-- **Output:** `{ instructions: string[], needsClarification: boolean }`.  
-- **Data passed to next stage:** `instructions` array; if `needsClarification === true` or `instructions.length === 0`, the route returns immediately and does not run later stages.
-
-**Stage 2: Instruction refinement**
-
-- **File:** `lib/server/instructionRefinement.ts`  
-- **Function:** `refineInstructions(client, instructions)`  
-- **Input:** OpenAI client, segmented instructions.  
-- **Output:** `{ instructions: string[] }` (each instruction = exactly one developer action).  
-- **Data passed to next stage:** refined `instructions`.
-
-**Stage 3: Instruction → Ontology Mapping (NEW)**
-
-- **File:** `lib/server/instructionOntology.ts`  
-- **Function:** `mapInstructionsToOntology(client, instructions, ctx)`  
-- **Input:** OpenAI client, refined instructions, optional pipeline context (DOM elements preferred over OCR).  
-- **Output:** `{ actions: OntologyAction[], needsClarification?: boolean }`. Each instruction maps to exactly one canonical action type (e.g. RENAME_FIELD, RESIZE_ELEMENT, TEXT_CHANGE).  
-- **Data passed to next stage:** `ontologyResult.actions` (structured UI actions).
-
-**Stage 4–5: Intent + ticket generation from ontology (batched)**
-
-- **File:** `lib/server/pipelineStages.ts`  
-- **Function:** `batchIntentAndTicketsFromOntology(client, ontologyResult.actions, ctx)`  
-- **Input:** OpenAI client, ontology actions, optional pipeline context.  
-- **Output:** `{ intents: InstructionIntent[], tickets: PipelineTicket[] }`. Intents derived from action_type; tickets generated from structured actions for consistency.  
-- **Data passed to next stage:** `pipelineTickets`.
-
-**Stage 6: Verification**
-
-- **File:** `lib/server/ticketVerification.ts`  
-- **Function:** `verifyTicketsBatch(client, correctedTranscript, instructions, pipelineTickets)`  
-- **Input:** OpenAI client, full corrected transcript, refined instructions, pipeline tickets.  
-- **Output:** `VerificationResult[]` (one per ticket: `isAccurate`, `isActionable`, `needsClarification`, `confidence`).  
-- **Data used:** Route aggregates verification results; if any verification has `needsClarification === true`, that ticket is dropped; if all fail, route returns needsClarification.
-
-**Final ticket creation**
-
-- **File:** `app/api/structure-feedback/route.ts`  
-- **Logic:** If all stages succeed and no clarification is required, the route maps `pipelineTickets` to the response shape (`title`, `description`, `actionSteps`, `suggestedTags`, `confidenceScore`) and returns them. Actual persistence (Firestore feedback documents) is done by the client (dashboard or extension) via `/api/feedback` or equivalent, not inside this route.
-
-### Pipeline diagram (data flow)
-
-```
-INPUT
-  transcript (required)
-  context: { url?, viewportWidth?, viewportHeight?, domPath?, nearbyText?, visibleText? }
-
-↓ (in route)
-
-Pre-pipeline: anchorProperNouns(transcript, context?.visibleText)
-  File: lib/server/properNounAnchoring.ts
-  → correctedTranscript
-
-↓
-
-Stage 1: segmentInstructions(client, correctedTranscript)
-  File: lib/server/instructionSegmentation.ts
-  → { instructions, needsClarification }
-  → If needsClarification || instructions.length === 0 → early return (clarity response)
-
-↓
-
-Stage 2: refineInstructions(client, instructions)
-  File: lib/server/instructionRefinement.ts
-  → { instructions } (one action per instruction)
-
-↓
-
-Stage 3: mapInstructionsToOntology(client, instructions, ctx)
-  File: lib/server/instructionOntology.ts
-  → { actions: OntologyAction[], needsClarification? }
-
-↓
-
-Stage 4–5: batchIntentAndTicketsFromOntology(client, actions, ctx)
-  File: lib/server/pipelineStages.ts
-  → { intents, tickets: pipelineTickets }
-  → If pipelineTickets.length === 0 → early return (clarity response)
-
-↓
-
-Stage 6: verifyTicketsBatch(client, correctedTranscript, instructions, pipelineTickets)
-  File: lib/server/ticketVerification.ts
-  → VerificationResult[]
-  → If any v.needsClarification → early return (clarity response)
-
-↓
-
-Final: map pipelineTickets to response tickets; return success + tickets + clarityScore, etc.
-  File: app/api/structure-feedback/route.ts
-```
+**Purpose:** Complete technical documentation of the AI pipeline for external AI architects to audit and improve the system.  
+**Scope:** Pipeline architecture, every LLM call, prompt design, instruction extraction, entity resolution, ticket generation, verification, error handling, metrics, and file map.
 
 ---
 
-## SECTION 2 — FULL PROMPTS USED BY EACH AI STAGE
+## SECTION 1 — Pipeline Overview
 
-### Stage 1: Instruction segmentation
-
-**File:** `lib/server/instructionSegmentation.ts`
-
-**System prompt (exact):**
+The pipeline is organized into five layers. Each stage has a single responsibility; AI is used only where indicated.
 
 ```
-You are Echly's Instruction Segmenter.
-
-Treat this task as parsing a list of instructions, not summarizing text.
-
-Your job: split user feedback into atomic, actionable instructions. One instruction = exactly one concrete change.
-
-STRICT RULES:
-1. Split instructions whenever a new verb or action appears.
-2. Split on conjunctions such as "and", "also", commas, or sentence boundaries.
-3. Each instruction must represent exactly one change. Never merge unrelated instructions into one.
-4. Preserve meaning but simplify wording if needed (e.g. "change X to Y" → "Change the label 'X' to 'Y'").
-5. Do NOT hallucinate additional tasks. Only output instructions that are clearly stated or directly implied.
-6. If the feedback is vague (e.g. "fix this", "make this better", "this looks weird") with no concrete change, output an empty array and set needsClarification to true.
-7. If the transcript is empty or unintelligible, output empty array and needsClarification true.
-8. Always return valid JSON. No markdown, no code fences.
-
-OUTPUT FORMAT:
-{
-  "instructions": ["instruction 1", "instruction 2", ...],
-  "needsClarification": false
-}
-
-Set needsClarification to true when:
-- The user did not specify what to change (e.g. "fix this", "make it better").
-- The feedback is purely subjective with no actionable request (e.g. "this looks weird").
-- The transcript is empty or unintelligible.
-
-EXAMPLES:
-
-Example 1:
-Input: "Change hero image and increase button size"
-Output:
-{
-  "instructions": ["Change the hero image", "Increase the button size"],
-  "needsClarification": false
-}
-
-Example 2:
-Input: "Update the CTA text and make it blue and increase its size"
-Output:
-{
-  "instructions": ["Update the CTA text", "Change the CTA color to blue", "Increase the CTA size"],
-  "needsClarification": false
-}
-
-Example 3:
-Input: "Rename Email to Business Email and Phone Number to Mobile Number"
-Output:
-{
-  "instructions": ["Rename the Email field to Business Email", "Rename the Phone Number field to Mobile Number"],
-  "needsClarification": false
-}
+Capture
+   ↓
+Perception
+   ↓
+Understanding
+   ↓
+Structuring
+   ↓
+Output
 ```
 
-**User prompt (exact):**
+### 1. Capture
 
-```
-Transcript:
-"<trimmed transcript>"
-```
+**What it does:** Collects raw signals from the client: transcript (voice or text), optional screenshot, and context (DOM, viewport, text near capture point). No AI.
 
-**Rules (in code, pre-LLM):**
+**Implementation:**
+- **Entry:** `POST /api/structure-feedback` receives `{ transcript, context }`.
+- **File:** `app/api/structure-feedback/route.ts` — validates body, delegates to `runFeedbackPipeline(client, { transcript, context }, options)`.
+- **Normalization:** `lib/ai/runFeedbackPipeline.ts` — `normalizeInput(raw)` and `normalizeContext(raw)` turn the request into `PipelineCapture`: `{ transcript: string, context: PipelineContext | null }`.
+- **Context shape:** `context` may include `url`, `viewportWidth`, `viewportHeight`, `scrollX`, `scrollY`, `devicePixelRatio`, `domPath`, `nearbyText`, `visibleText`, `screenshotOCRText`, `subtreeText`, and element arrays (`elements`, `visibleElements`, `interactiveElements`, `formFields`, `buttons`, `headings`).
 
-- Empty or whitespace transcript → return `{ instructions: [], needsClarification: true }` without calling the model.
-- **Vague-pattern check:** If transcript matches any of the following regexes, return `{ instructions: [], needsClarification: true }` without calling the model:
-  - `/\b(this looks?|that looks?)\s+(weird|bad|off|wrong)\b/i`
-  - `/\bmake (this|it) better\b/i`
-  - `/\bfix (this|it)\b/i`
-  - `/\bimprove (this|it)\b/i`
-  - `/\bsomething('s)? wrong\b/i`
-  - `/\b(just )?fix (it|things)\b/i`
-- Transcript length &lt; 3 after trim → treated as vague (returns needsClarification).
+### 2. Perception
+
+**What it does:** Cleans and prepares signals. Mostly deterministic; one optional AI call for transcript normalization.
+
+**Steps (in order):**
+1. **Proper noun anchoring** — Align transcript phrases to OCR/visible text (e.g. fix “sign of form” → “signup form” using visible text).  
+   **File:** `lib/server/properNounAnchoring.ts` — `anchorProperNouns(transcript, visibleText)`.
+2. **UI vocabulary normalization** — Map known STT mishearings (summit→submit, model→modal, etc.).  
+   **File:** `lib/server/uiVocabularyNormalization.ts` — `normalizeUiVocabulary(transcript)`.
+3. **Speech normalization** — Deterministic fixes (e.g. “below 8” → “below it”).  
+   **File:** `lib/server/speechNormalization.ts` — `normalizeTranscript(transcript)`.
+4. **Clause splitting** — Split transcript into clauses (no AI).  
+   **File:** `lib/server/clauseSplitter.ts` — `splitTranscriptIntoClauses(transcript)`.
+5. **Grounding** — Pre-detect entities/actions per clause by matching against DOM phrases (no AI, &lt;2ms).  
+   **File:** `lib/server/groundTranscriptClauses.ts` — `groundTranscriptClauses({ clauses, domPhrases })`; `domPhrases` from `lib/server/pipelineContext.ts` — `getDomPhrasesFromContext(context)`.
+6. **Optional AI transcript normalization** — Fix STT/grammar via LLM; preserve intent.  
+   **File:** `lib/server/transcriptNormalization.ts` — `normalizeTranscript(client, transcript)`.  
+   **Controlled by:** `useTranscriptNormalization` (default **false** in structure-feedback).
+7. **Spatial context build** — Build full spatial context from context fields.  
+   **File:** `lib/ai/spatial-context-builder.ts` — `buildSpatialContext(input)` → `SpatialContext` (domScopeText, nearbyScopeText, viewportScopeText, screenshotOCRText).
+8. **Token budget truncation** — Truncate spatial context for the extraction model only.  
+   **File:** `lib/ai/pipelineTokenBudget.ts` — `truncateSpatialContext(fullSpatialContext)`.
+
+**Orchestration:** `lib/ai/runFeedbackPipeline.ts` — `runPerceptionLayer(capture, options)` returns `PerceptionOutput`: `normalizedTranscript`, `spatialContext` (truncated), `fullSpatialContext`, `context`, `groundedClauses`.
+
+### 3. Understanding
+
+**What it does:** Primary AI stage: extract structured instructions (intent, entity, action, confidence). Then deterministic copy correction and entity resolution.
+
+**Steps:**
+1. **Context filtering** — For extraction only, prioritize context lines relevant to the transcript.  
+   **File:** `lib/ai/contextFilter.ts` — `filterRelevantContext(transcript, spatialContext)`.
+2. **Instruction extraction (AI)** — Convert transcript into structured instructions.  
+   **File:** `lib/server/instructionExtraction.ts` — `extractStructuredInstructions(client, transcript, context, { spatialContext, groundedClauses })` → `{ instructions: ExtractedInstruction[], needsClarification }`.  
+   **Model:** gpt-4o, temperature 0, max_tokens 1600.
+3. **Copy correction** — For `COPY_CHANGE` instructions, replace STT-error phrases with best fuzzy match from spatial context (dom → nearby → viewport → ocr).  
+   **File:** `lib/ai/copy-correction.ts` — `correctCopyInInstructions(instructions, fullSpatialContext)`.
+4. **Entity resolution** — Resolve vague entity phrases to concrete text from spatial context (same priority order; fuzzy + spatial + hierarchy scoring).  
+   **File:** `lib/ai/element-resolver.ts` — `resolveInstructionsEntities(instructions, fullSpatialContext, { context, transcript })`.
+5. **Action normalization** — Deterministic rules to normalize vague actions (e.g. “spacing feels tight” → “increase spacing”).  
+   **File:** `lib/server/instructionExtraction.ts` — `normalizeInstructionActions(instructions)`.
+6. **Optional refinement (AI)** — Only when `hasCompoundInstructions(instructions)` is true: split compound instructions so each is one developer action.  
+   **File:** `lib/server/instructionRefinement.ts` — `refineStructuredInstructions(client, instructions)`.  
+   **Model:** gpt-4o-mini, temperature 0, max_tokens 2000.
+
+**Orchestration:** `lib/ai/runFeedbackPipeline.ts` — `runUnderstandingLayer(client, perception, { metrics })` returns `UnderstandingOutput`: `instructions`, `needsClarification`, `segmentConfidence`.
+
+### 4. Structuring
+
+**What it does:** Build an instruction graph from structured instructions and turn it into one pipeline ticket. No AI. No ontology fallback in the current main path (ontology exists but is only used when graph yields no tickets).
+
+**Steps:**
+1. **Cap instructions** — `MAX_INSTRUCTIONS = 12`; slice and set `instructionLimitWarning` if over.
+2. **Build graph** — Group instructions by entity; each instruction becomes one action on a target node.  
+   **File:** `lib/server/instructionGraph.ts` — `buildInstructionGraph({ structuredInstructions, context, transcript })` → `{ graph, needsClarification }`.
+3. **Tickets from graph** — One ticket per entity; titles from single `generateTicketTitlesBatch(client, tickets)` call; action steps from graph actions (confidence ≥ 0.5).  
+   **File:** `lib/server/instructionGraph.ts` — `ticketsFromGraph(graph, instructions)`; **File:** `lib/ai/ticketTitle.ts` — `generateTicketTitlesBatch(client, tickets)`.
+
+**Orchestration:** `lib/ai/runFeedbackPipeline.ts` — `runStructuringLayer(understanding, perception, context)` returns `StructuringOutput`: `graph`, `tickets`, `refinedInstructions`, `instructionLimitWarning`, `graphNeedsClarification`.
+
+### 5. Output
+
+**What it does:** Optional verification (AI), filtering of tickets by verification result, clarity scoring, and stable API response.
+
+**Steps:**
+1. **Early exits** — If no instructions/tickets: return clarity-style response (e.g. suggestedRewrite, needsClarification). If graph produced no tickets but instructions exist: return needsClarification, no ontology in current flow.
+2. **Verification (optional AI)** — When `useVerification` is true: verify the single ticket against transcript and all instruction strings.  
+   **File:** `lib/server/ticketVerification.ts` — `verifyTicketsBatch(client, transcript, instructionStrings, tickets)` → `VerificationResult[]`.  
+   **Model:** gpt-4o-mini, temperature 0, max_tokens 1500.
+3. **Verifier overrides** — Apply business rules so valid instructions don’t incorrectly trigger clarification.  
+   **File:** `lib/server/ticketVerification.ts` — `applyVerifierFinalDecision(rawVerifications, options)` (e.g. if instructionCount &gt; 0: force isActionable=true, needsClarification=false).
+4. **Filter** — Keep only tickets where `isAccurate && isActionable && !needsClarification`.
+5. **Response** — Build final payload: `success`, `tickets` (title, actionSteps, suggestedTags, confidenceScore), `clarityScore`, `clarityIssues`, `suggestedRewrite`, `confidence`, `needsClarification`, `verificationIssues`, `verificationWarnings`, `instructionLimitWarning`, `extractedInstructions`.
+
+**Orchestration:** `lib/ai/runFeedbackPipeline.ts` — `runOutputLayer(client, structuring, understanding, perception, options)`.
+
+### End-to-end entry
+
+**File:** `lib/ai/runFeedbackPipeline.ts` — `runFeedbackPipeline(client, input, options)` runs:  
+`normalizeInput` → `runPerceptionLayer` → `runUnderstandingLayer` → `runStructuringLayer` → `runOutputLayer`, then logs pipeline metrics.
 
 ---
 
-### Stage 2–3: Intent understanding + ticket generation (single batched call)
+## SECTION 2 — AI Calls
 
-**File:** `lib/server/pipelineStages.ts`
+Every OpenAI (LLM) call in the system, with file, function, model, temperature, max tokens, input payload, and output format.
 
-**System prompt (exact):**
+### 2.1 Transcript normalization
 
-```
-You are Echly's pipeline: for each atomic instruction you will output (1) intent and (2) one developer-ready ticket. Accuracy over creativity. Use temperature 0 behavior.
+| Field | Value |
+|-------|--------|
+| **File** | `lib/server/transcriptNormalization.ts` |
+| **Function** | `normalizeTranscript` |
+| **Model** | gpt-4o-mini |
+| **Temperature** | 0 |
+| **Max tokens** | 500 |
+| **Input** | System: NORMALIZATION_SYSTEM. User: `"Normalize this transcript:\n\n\"${trimmed}\""`. |
+| **Output** | Plain normalized transcript string (or original on failure). |
 
-STAGE A — INTENT (per instruction):
-For each instruction output:
-- intent_type: one of "UI change", "Content change", "Layout change", "Bug fix", "Accessibility improvement", "UX improvement"
-- target_element: short label for the UI element (e.g. "hero CTA button", "nav link") or null
-- change_type: specific type (e.g. "size_increase", "color_change", "text_replace", "layout_width", "redirect_fix")
-- confidence: 0–1
+**When used:** Only when `useTranscriptNormalization === true` (default false in structure-feedback).
 
-STAGE B — TICKET (per instruction):
-Each ticket must represent exactly ONE change. Never merge two instructions into one ticket.
+---
 
-Ticket rules:
-1. title: 4–10 words, specific (e.g. "Increase hero button size by 40%"). No vague titles like "Fix design".
-2. description: One concise sentence. What should change and why (if clear).
-3. actionSteps: 1–5 concrete, implementable steps. No vague steps like "Improve layout". Be specific (e.g. "Increase margin between headline and CTA by ~24px").
-4. tags: 1–3 tags from ["UI", "Content", "UX", "Layout", "Bug", "Accessibility"].
-5. confidenceScore: 0–1.
+### 2.2 Instruction extraction
 
-Do not repeat the transcript verbatim. Do not hallucinate steps not implied by the instruction.
+| Field | Value |
+|-------|--------|
+| **File** | `lib/server/instructionExtraction.ts` |
+| **Function** | `extractStructuredInstructions` |
+| **Model** | gpt-4o |
+| **Temperature** | 0 |
+| **top_p** | 1 |
+| **Max tokens** | 1600 |
+| **Input** | System: EXTRACTION_SYSTEM_PROMPT. User: `buildUserContent(transcript, context, spatialContext, groundedClauses)` — transcript, optional grounded-clause hints, spatial context (DOM / nearby / viewport / OCR), text context, known UI elements. |
+| **Output** | JSON `{ "instructions": [ { "intent", "entity", "action", "confidence" }, ... ] }`. Parsed to `ExtractionResult`; fallback `{ instructions: [], needsClarification: true }` on parse failure. |
 
-OUTPUT: Return ONLY valid JSON. No markdown.
+---
+
+### 2.3 Instruction refinement (structured)
+
+| Field | Value |
+|-------|--------|
+| **File** | `lib/server/instructionRefinement.ts` |
+| **Function** | `refineStructuredInstructions` |
+| **Model** | gpt-4o-mini |
+| **Temperature** | 0 |
+| **top_p** | 1 |
+| **Max tokens** | 2000 |
+| **Input** | System: STRUCTURED_REFINEMENT_SYSTEM. User: "Structured instructions to refine (split compounds; output same JSON shape):" + JSON.stringify(instructions, null, 2). |
+| **Output** | JSON `{ "instructions": [ { "intent", "entity", "action", "confidence" }, ... ] }`. On parse failure returns original instructions. |
+
+---
+
+### 2.4 Instruction refinement (string-based, deprecated)
+
+| Field | Value |
+|-------|--------|
+| **File** | `lib/server/instructionRefinement.ts` |
+| **Function** | `refineInstructions` |
+| **Model** | gpt-4o-mini |
+| **Temperature** | 0 |
+| **top_p** | 1 |
+| **Max tokens** | 1500 |
+| **Input** | System: REFINEMENT_SYSTEM. User: "Instructions to refine (one per line):" + numbered list of instruction strings. |
+| **Output** | JSON `{ "instructions": string[] }`. Not used by main pipeline. |
+
+---
+
+### 2.5 Instruction ontology
+
+| Field | Value |
+|-------|--------|
+| **File** | `lib/server/instructionOntology.ts` |
+| **Function** | `mapInstructionsToOntology` |
+| **Model** | gpt-4o-mini |
+| **Temperature** | 0 |
+| **top_p** | 1 |
+| **Max tokens** | 3000 |
+| **Input** | System: ONTOLOGY_SYSTEM. User: DOM elements + visible text + instructions list (from `buildUserContent(instructions, context)`). |
+| **Output** | JSON `{ "actions": [ { "action_type", "target_element", "change_details", "confidence" } ], "needsClarification" }`. Used only when graph yields no tickets (ontology fallback). |
+
+---
+
+### 2.6 Batch intent and tickets from ontology
+
+| Field | Value |
+|-------|--------|
+| **File** | `lib/server/pipelineStages.ts` |
+| **Function** | `batchIntentAndTicketsFromOntology` |
+| **Model** | gpt-4o-mini |
+| **Temperature** | 0 |
+| **top_p** | 1 |
+| **Max tokens** | 2500 |
+| **Input** | System: TICKET_FROM_ONTOLOGY_SYSTEM. User: ontology actions JSON + instructions + UI elements + visible text. |
+| **Output** | JSON with single `ticket` object (title, actionSteps, tags, confidenceScore). Normalized to `PipelineTicket[]`; fallback from ontology actions if parse fails. |
+
+---
+
+### 2.7 Batch intent and tickets (from instruction strings)
+
+| Field | Value |
+|-------|--------|
+| **File** | `lib/server/pipelineStages.ts` |
+| **Function** | `batchIntentAndTickets` |
+| **Model** | gpt-4o-mini |
+| **Temperature** | 0 |
+| **top_p** | 1 |
+| **Max tokens** | 2500 |
+| **Input** | System: INTENT_AND_TICKET_SYSTEM. User: instructions list + UI elements + visible text. |
+| **Output** | JSON with `intents` array and single `ticket` object. Used in ontology fallback path when merging ticket from instructions. |
+
+---
+
+### 2.8 Ticket verification
+
+| Field | Value |
+|-------|--------|
+| **File** | `lib/server/ticketVerification.ts` |
+| **Function** | `verifyTicketsBatch` |
+| **Model** | gpt-4o-mini |
+| **Temperature** | 0 |
+| **top_p** | 1 |
+| **Max tokens** | 1500 |
+| **Input** | System: VERIFICATION_SYSTEM. User: original transcript (trimmed, slice 0–1500) + numbered instructions + ticket title and action steps JSON. |
+| **Output** | JSON `{ "verification": { "isAccurate", "isActionable", "needsClarification", "confidence" } }`. One result per batch (single merged ticket). Conservative fallback on failure: isAccurate/isActionable false, needsClarification true, confidence 0.5. |
+
+---
+
+### 2.9 Session insight
+
+| Field | Value |
+|-------|--------|
+| **File** | `app/api/session-insight/route.ts` |
+| **Function** | Inline `client.chat.completions.create` after loading session feedback. |
+| **Model** | gpt-4o-mini |
+| **Temperature** | 0 |
+| **Max tokens** | 160 |
+| **Input** | System: SESSION_INSIGHT_SYSTEM_PROMPT. User: condensed lines per feedback (title, context, tags, action steps), up to 200 items. |
+| **Output** | Plain text summary (3 sentences, 90–120 words) or null. Cached in session when feedback count unchanged. |
+
+---
+
+### 2.10 Unused by main pipeline
+
+- **`lib/server/intentExtraction.ts`** — `extractIntent`: gpt-4o-mini, 300 tokens. Single-intent extraction. Not called by any route.
+- **`lib/server/instructionSegmentation.ts`** — `segmentInstructions`: gpt-4o, 1200 tokens. String-based segmentation. Not used by structure-feedback (pipeline uses instructionExtraction instead).
+
+---
+
+## SECTION 3 — Prompt Design
+
+Exact prompts for instruction extraction, instruction refinement, and verification.
+
+### 3.1 Instruction extraction
+
+**System prompt** (`EXTRACTION_SYSTEM_PROMPT` in `lib/server/instructionExtraction.ts`):
+
+- Role: Convert spoken UI feedback into structured product tickets. Inputs: transcript, page context (visible text, DOM text, nearby UI labels). Do not summarize.
+- Per instruction: **Intent** (one of COPY_CHANGE | UI_LAYOUT | UI_VISUAL_ADJUSTMENT | COMPONENT_CHANGE | FORM_LOGIC | DATA_VALIDATION | PERFORMANCE_OPTIMIZATION | ANALYTICS_TRACKING | BACKEND_BEHAVIOR | SECURITY_REQUIREMENT | GENERAL_INVESTIGATION), **Entity** (specific UI element), **Action** (clear, developer-actionable), **Confidence** (0.0–1.0).
+- **RULE 1 — Entity:** Prefer transcript entities; infer from page context only when ambiguous. Avoid vague entities (e.g. "page", "design", "element").
+- **RULE 2 — Action:** Precise and actionable (e.g. "change button color from green to blue" not "improve the button").
+- **RULE 3 — Split multiple changes:** One instruction per change; do not merge unrelated changes.
+- **RULE 4 — Spatial context priority:** DOM scope → nearby → viewport → OCR. Resolve UI elements only from provided spatial context.
+- Intent definitions and confidence rules (0.9+ when entity matched in DOM; &lt;0.7 when ambiguous).
+- **Output format:** Valid JSON only, no markdown: `{ "instructions": [ { "intent", "entity", "action", "confidence" }, ... ] }`.
+
+**User prompt:** Built by `buildUserContent(transcript, context, spatialContext, groundedClauses)`:
+- "User feedback transcript:" + quoted transcript.
+- If groundedClauses: "Pre-detected grounding hints" + per-clause entities, action, property, confidence.
+- If spatial context: "Spatial context — resolve UI elements ONLY from these sources" + [DOM scope] (slice 1500) + [Nearby scope] (1000) + [Viewport scope] (2000) + [OCR fallback] if no viewport (1500).
+- Additional visible text / known UI elements (from pipelineContext) when present.
+
+**Expected JSON output:**
+
+```json
 {
-  "intents": [
-    { "intent_type": "UI change", "target_element": "hero button", "change_type": "size_increase", "confidence": 0.88 }
-  ],
-  "tickets": [
+  "instructions": [
     {
-      "title": "Increase hero CTA button size by 40%",
-      "description": "The hero call-to-action button should be larger for better visibility.",
-      "actionSteps": ["Increase hero CTA button size by approximately 40%.", "Ensure button remains responsive across breakpoints."],
-      "tags": ["UI", "Layout"],
-      "confidenceScore": 0.88
+      "intent": "COPY_CHANGE | UI_LAYOUT | ...",
+      "entity": "specific UI element",
+      "action": "clear developer instruction",
+      "confidence": 0.0
     }
   ]
 }
-
-The number of intents and tickets MUST equal the number of instructions. One instruction → one intent → one ticket.
 ```
-
-**User prompt (constructed in code):**
-
-```
-Visible text from page (for disambiguation only):
-<visibleText if provided, else "(none)">
-
-Instructions (one per line):
-1. <instruction 1>
-2. <instruction 2>
-...
-```
-
-**Examples:** The single in-prompt example is the JSON block in the system prompt above.
-
-**Rules:** One instruction → one intent → one ticket; counts must match.
 
 ---
 
-### Stage 4: Verification
+### 3.2 Instruction refinement
 
-**File:** `lib/server/ticketVerification.ts`
+**System prompt** (`STRUCTURED_REFINEMENT_SYSTEM` in `lib/server/instructionRefinement.ts`):
 
-**System prompt (exact):**
+- Role: Echly Instruction Refiner. Ensure each instruction is exactly ONE developer-ready action. Input/output are structured (intent, entity, action, confidence).
+- Rules: One instruction = one developer action; split compound instructions; preserve meaning; do not hallucinate; when splitting, assign intent per sub-instruction and give each entity/action/confidence.
+- **Output format:** Strict JSON only, no markdown: `{ "instructions": [ { "intent", "entity", "action", "confidence" }, ... ] }`.
 
-```
-You are Echly's Ticket Verifier. For each (instruction, ticket) pair, decide if the ticket is accurate and actionable. No creativity; strict evaluation.
+**User prompt:** "Structured instructions to refine (split compounds; output same JSON shape):" + JSON.stringify(instructions, null, 2).
 
-For each pair check:
-1. Does the ticket match the user's intent? (Same change, same target element — no wrong or invented details.)
-2. Is the ticket actionable for developers? (Concrete steps, no vague language.)
-3. Is anything hallucinated? (Nothing added that the user did not say or clearly imply.)
+**Expected JSON output:**
 
-Return:
-- isAccurate: true only if the ticket correctly reflects the instruction.
-- isActionable: true only if a developer could implement it without guessing.
-- needsClarification: true if the ticket is wrong, vague, or hallucinated. When in doubt, set true.
-- confidence: 0–1 for your verification.
-
-If the instruction was vague (e.g. "fix this") or the ticket invents details, set needsClarification true.
-
-OUTPUT: Return ONLY valid JSON. No markdown.
+```json
 {
-  "verifications": [
-    { "isAccurate": true, "isActionable": true, "needsClarification": false, "confidence": 0.9 }
+  "instructions": [
+    {
+      "intent": "UI_VISUAL_ADJUSTMENT",
+      "entity": "hero image",
+      "action": "reduce the hero image size",
+      "confidence": 0.9
+    }
   ]
 }
-
-The number of verifications MUST equal the number of instructions. One verification per (instruction, ticket) pair.
 ```
-
-**User prompt (constructed in code):**
-
-```
-Original transcript (full feedback):
-"<originalTranscript.trim().slice(0, 1500)>"
-
-Instruction and ticket pairs (verify each):
---- Pair 1 ---
-Instruction: <instruction 1>
-Ticket title: <ticket 1 title>
-Description: <ticket 1 description>
-Action steps: <JSON.stringify(ticket 1 actionSteps)>
-
---- Pair 2 ---
-...
-```
-
-**Examples:** The single in-prompt example is the `verifications` array in the system prompt.
-
-**Rules:** One verification per (instruction, ticket) pair; length must match.
 
 ---
 
-## SECTION 3 — MODEL CONFIGURATION
+### 3.3 Verification
 
-All pipeline stages use the same model and similar sampling; no explicit timeout is set on the OpenAI client in server code.
+**System prompt** (`VERIFICATION_SYSTEM` in `lib/server/ticketVerification.ts`):
 
-| Stage                 | Model       | Temperature | top_p | max_tokens | Response format | Timeout (server) |
-|----------------------|------------|-------------|-------|------------|------------------|-------------------|
-| Instruction segmentation | gpt-4o-mini | 0           | 1     | 800        | JSON             | None (OpenAI default) |
-| Intent + ticket (batch)  | gpt-4o-mini | 0           | 1     | 2000       | JSON             | None              |
-| Verification             | gpt-4o-mini | 0           | 1     | 1000       | JSON             | None              |
+- Role: Echly Ticket Verifier. Validate ONE ticket (Title, Description, ActionSteps) against original transcript and instructions.
+- **Check:** (1) Ticket reflects ALL instructions; (2) Action steps are implementable and developer-actionable; (3) No hallucination (no invented UI text, no copying page/OCR as requested change).
+- **Clarity:** Set needsClarification true ONLY when ticket is wrong, hallucinated, or misses an instruction. Do NOT set for: correct UX diagnostic feedback, problem-statement-style instructions inferred into actionable steps, general but correct wording, conversational language ("maybe", "probably").
+- **Verification result:** isAccurate, isActionable, needsClarification, confidence (0–1). Output: only valid JSON, one "verification" object (not array).
 
-- **Segmentation:** `lib/server/instructionSegmentation.ts` — `model: "gpt-4o-mini", temperature: 0, top_p: 1, max_tokens: 800`.
-- **Intent + tickets:** `lib/server/pipelineStages.ts` — `model: "gpt-4o-mini", temperature: 0, top_p: 1, max_tokens: 2000`.
-- **Verification:** `lib/server/ticketVerification.ts` — `model: "gpt-4o-mini", temperature: 0, top_p: 1, max_tokens: 1000`.
+**User prompt:** Original transcript (slice 1500) + "Instructions (all should be reflected in the ticket):" (numbered) + "Ticket to verify (single merged ticket):" + Title + Action steps JSON.
 
-Client-side: `lib/authFetch.ts` uses `DEFAULT_TIMEOUT_MS = 25000` for the whole HTTP request (including structure-feedback). No per-stage timeout is configured in the API route.
+**Expected JSON output:**
 
----
-
-## SECTION 4 — DATA INPUT TO AI
-
-### API request body (structure-feedback)
-
-```ts
+```json
 {
-  transcript: string;           // required
-  context?: {
-    url?: string;
-    viewportWidth?: number;
-    viewportHeight?: number;
-    domPath?: string | null;
-    nearbyText?: string | null;
-    visibleText?: string | null;  // OCR text from page
-  };
+  "verification": {
+    "isAccurate": true,
+    "isActionable": true,
+    "needsClarification": false,
+    "confidence": 0.9
+  }
 }
 ```
 
-- **Dashboard:** Typically sends only `{ transcript }` (no `context`). So `visibleText` is null for dashboard-originated requests unless the client is extended to send context.
-- **Extension:** Sends `{ transcript, context: enrichedContext }` with `visibleText` from OCR when available, plus `url` and any other context fields.
+---
 
-### Per-stage inputs
+## SECTION 4 — Entity Resolution
 
-| Stage              | Receives from code | Actual AI input (user message content) |
-|--------------------|--------------------|----------------------------------------|
-| Segmentation       | `correctedTranscript` only | `Transcript:\n"<trimmed>"` |
-| Intent + tickets   | `instructions`, `ctx?.visibleText ?? null` | Visible text block + numbered instructions list |
-| Verification       | `correctedTranscript` (sliced 0–1500), `instructions`, `pipelineTickets` | Original transcript snippet + per-pair instruction + ticket title, description, action steps |
+Entity resolution maps vague or STT-noisy entity phrases (e.g. "that button", "this title") to concrete text from the page using spatial context and fuzzy matching.
 
-- **Screenshot:** Not sent to any AI stage. Only text (transcript + optional visibleText) is used.
-- **URL, viewport, domPath, nearbyText:** Read from `body.context` in the route but **not** passed into any of the three AI stages; only `visibleText` is passed (to anchoring and to `batchIntentAndTickets`).
+### 4.1 Where it runs
+
+- **Copy correction** (`lib/ai/copy-correction.ts`): For instructions with `intent === "COPY_CHANGE"`, replaces phrases in entity/action with best match from spatial context (e.g. "but tribes us" → "What Drives Us" from DOM).
+- **Entity resolution** (`lib/ai/element-resolver.ts`): `resolveInstructionsEntities(instructions, spatialContext, options)` updates each instruction’s `entity` (and optionally confidence) when a resolution score meets the threshold.
+
+### 4.2 DOM phrase extraction
+
+- **Source:** `lib/server/pipelineContext.ts` — `getDomPhrasesFromContext(ctx)`.
+- **Logic:** Collects labels and text from `getElementsForPrompt(ctx)` (elements, visibleElements, formFields, buttons, headings, interactiveElements). Deduplicates by lowercase; minimum length 2. If no elements, tokenizes `getTextContextForPrompt(ctx)` into words and bigrams (length ≥ 3) as fallback phrases.
+- **Use:** These phrases are used for grounding (`groundTranscriptClauses`) and for entity resolution when context provides interactive labels (see below).
+
+### 4.3 N-gram generation (element-resolver)
+
+- **File:** `lib/ai/element-resolver.ts`.
+- **Input:** Per-scope text (domScopeText, nearbyScopeText, viewportScopeText, screenshotOCRText).
+- **Tokenization:** `getCleanTokens(text)` — split on whitespace/·,; trim.
+- **N-grams:** `getPhraseCandidates(tokens)` — n = 1, 2, 3 up to `MAX_NGRAM` (3), sliding window; deduplicated, order preserved. Rejected: length &gt; `MAX_PHRASE_CHARS` (40), UI overlay words ("capture", "cancel", "retake"), only stopwords, single word &lt; MIN_CANDIDATE_LENGTH (4).
+
+### 4.4 Fuzzy matching algorithm
+
+- **File:** `lib/ai/fuzzy-similarity.ts`.
+- **Levenshtein:** `levenshtein(a, b)` — edit distance.
+- **Similarity:** `fuzzySimilarity(a, b) = max(0, 1 - distance / maxLen)` (0–1, 1 = identical).
+- **Best match in corpus:** `bestMatchInCorpus(phrase, corpus, { minChunkLength, maxChunkLength })` — slides word windows (up to 12 words) and single words; returns `{ similarity, matchedText }` with highest similarity.
+- **Copy correction:** Uses `bestMatchInCorpus` over each spatial scope line in order (dom → nearby → viewport → ocr); first match with similarity ≥ threshold (0.75) wins.
+- **Element resolver:** For each phrase candidate from scope text, `fuzzySimilarity(phrase, candidatePhrase)` is combined with spatial and hierarchy scores (see below).
+
+### 4.5 Similarity thresholds and scoring (element-resolver)
+
+- **MIN_RESOLUTION_SCORE = 0.65** — Below this, resolution is not applied (entity left unchanged).
+- **Scoring (per candidate):**
+  - **Text weight 0.6:** `fuzzySimilarity(entityPhrase, candidatePhrase)`.
+  - **Spatial weight 0.3:** dom=1, nearby=0.75, viewport=0.5, ocr=0.25.
+  - **Hierarchy weight 0.1:** `domHierarchyWeight(candidateText)` by length (e.g. ≤2 chars 0.3, ≤10 0.6, ≤40 0.9, else 1).
+  - **Heading boost +0.2:** When entity phrase is "title"/"heading"/"section title" and source is dom.
+  - **Keyword-in-DOM boost +0.15:** When source is dom and transcript/entity keywords appear in candidate.
+  - **Interactive boost +0.2:** When entity suggests button/link/field/input and candidate is in context’s buttons/interactiveElements/formFields labels.
+- **Confidence after resolution:** If resolved from dom or nearby: at least 0.9; from viewport or ocr: at least 0.75. If entity is vague ("that button", "the thing", "unknown") and unresolved: confidence capped at 0.65.
+
+### 4.6 Examples
+
+- "that button" + DOM "Start Free Trial" → resolved to "Start Free Trial" (if score ≥ 0.65).
+- "hero title" + DOM heading "What Drives Us" → heading boost helps DOM match win.
+- "sign of form" in COPY_CHANGE action → copy correction replaces with "signup form" when match in spatial context ≥ 0.75.
 
 ---
 
-## SECTION 5 — FAILURE HANDLING
+## SECTION 5 — Spatial Context System
 
-### Instruction segmentation (`instructionSegmentation.ts`)
+Spatial context scopes all resolution to four regions in priority order: **DOM subtree → nearby → viewport → OCR fallback**.
 
-- **Empty/missing content:** If `completion.choices[0]?.message?.content?.trim()` is falsy → return `{ instructions: [], needsClarification: false }` (no throw).
-- **JSON parse:** Content is cleaned (strip markdown code fences), then `JSON.parse(cleaned)`. On any exception → `catch` returns `{ instructions: [], needsClarification: true }`.
-- **Instructions array:** If `parsed.instructions` is not an array, `instructions` is `[]`. Strings are filtered to non-empty trimmed only.
-- **Logic:** If after parse `instructions.length === 0` and `!needsClarification`, the function forces `needsClarification: true` so the route treats it as clarification needed.
+### 5.1 Inputs and types
 
-### Intent + ticket generation (`pipelineStages.ts`)
+- **File:** `lib/ai/spatial-context-builder.ts`.
+- **Input:** `SpatialContextInput`: `domPath`, `visibleText`, `nearbyText` (string or array), `viewportWidth`, `viewportHeight`, `scrollX`, `scrollY`, `screenshotOCRText`, `subtreeText`.
+- **Output:** `SpatialContext`: `domScopeText`, `nearbyScopeText`, `viewportScopeText`, `screenshotOCRText` (all strings).
 
-- **Empty content:** If no content from completion → `fallbackIntentAndTickets(instructions)` (default intents and tickets from instruction text; no re-call).
-- **JSON parse:** `cleanJson(content)` then `JSON.parse`. On exception → `fallbackIntentAndTickets(instructions)`.
-- **Normalization:** `normalizeIntents` and `normalizeTickets` tolerate missing/wrong types: wrong/missing `intent_type` → `"UX improvement"`; missing numbers → `clamp` to 0.5; missing strings → instruction slice or defaults. Length is forced to `expectedLen` / `instructions.length` by iterating over indices.
+### 5.2 domPath
 
-### Verification (`ticketVerification.ts`)
+- Client-sent selector/path of the focused or captured element.
+- **Use:** If `subtreeText` is not provided and code runs in a DOM environment, `extractDomSubtreeText(domPath)` gets innerText/textContent of that subtree. Otherwise dom scope falls back to nearby text when dom is empty.
 
-- **Empty content:** Return array of `conservativeVerification()` for each pair: `{ isAccurate: false, isActionable: false, needsClarification: true, confidence: 0.5 }`.
-- **JSON parse:** `cleanJson(content)` then `JSON.parse`. On exception → same conservative result per pair.
-- **Per-item:** If a verification object is missing or not an object, that index gets `conservativeVerification()`.
+### 5.3 nearbyText
 
-### Route (`app/api/structure-feedback/route.ts`)
+- Client-sent text near the capture point (string or array of snippets).
+- **Build:** `buildNearbyScopeText(nearbyText)` — normalize whitespace, split on newlines/commas/semicolons, drop chunks with length ≤ 3, join with newlines → `nearbyScopeText`.
 
-- **Auth/rate limit:** Failure returns 401/429 with JSON; no generic catch for those.
-- **Invalid body / no transcript:** Returns 200 with `success: false, tickets: [], error: "Invalid request body"` or `"No valid transcript provided"`.
-- **Missing OPENAI_API_KEY:** Returns 200 with `success: false, tickets: [], error: "Missing OpenAI API key"`.
-- **Top-level try/catch:** Any thrown error in the pipeline (e.g. OpenAI API errors, timeouts) is caught and returns 200 with `success: false, tickets: [], error: "Structuring failed"`. No retries; no differentiation of error type.
+### 5.4 subtreeText
 
-### OpenAI API errors and timeouts
+- Client-sent text for the DOM subtree at `domPath` (most accurate for the focused element).
+- **Use:** Preferred for `domScopeText`. If present, it is used directly; no server-side DOM query.
 
-- No explicit timeout on `client.chat.completions.create` in server code; reliance on OpenAI SDK/defaults.
-- No retry logic in segmentation, pipeline stages, or verification.
-- Client: `authFetch` aborts after 25s (configurable via `init.timeout`); no custom timeout is set for structure-feedback in the call sites inspected, so 25s default applies.
+### 5.5 visibleText
 
-### Summary table
+- Usually OCR or visible text from the client (e.g. screenshot OCR).
+- **Use:** Fills `viewportScopeText` (currently no per-line scroll filtering; full visible text). Also used for `screenshotOCRText` when `screenshotOCRText` is not set.
 
-| Failure type           | Handling |
-|------------------------|----------|
-| AI response empty      | Segmentation: empty instructions + needsClarification false; Intent+tickets: fallback tickets; Verification: conservative (needsClarification true). |
-| OpenAI API errors      | Propagate to route catch → `success: false, error: "Structuring failed"`. |
-| Timeouts               | No server-side timeout; client 25s abort. |
-| Invalid JSON           | All stages: strip code fences, then parse; on failure use fallback or conservative result. |
-| Empty instructions    | Route returns clarity response (no tickets). |
-| Zero tickets from batch| Route returns clarity response. |
-| Verification needsClarification | Route returns clarity response with verificationIssues. |
+### 5.6 truncateSpatialContext()
+
+- **File:** `lib/ai/pipelineTokenBudget.ts`.
+- **Purpose:** Keep total context under token budget (~2000 tokens target; ~4 chars/token).
+- **Logic:** Per-field character limits: `domScopeText` 1200, `nearbyScopeText` 800, `viewportScopeText` 1200, `screenshotOCRText` 800. `truncateForTokenBudget(s, maxChars)` truncates each field to its limit (slice from start, trim).
+- **Usage:** Truncated context is passed to instruction extraction. Copy-correction and entity resolution use **full** (untruncated) spatial context.
+
+### 5.7 Priority order in consumers
+
+- **getSpatialScopeLines(ctx)** returns `[ { text: domScopeText, source: "dom" }, ... nearby, viewport, ocr ]`.
+- Copy-correction and element-resolver iterate this order (dom → nearby → viewport → ocr) when matching or resolving.
 
 ---
 
-## SECTION 6 — CLARITY SYSTEM
+## SECTION 6 — Instruction Structuring
 
-### clarityScore generation
+How structured instructions become a single pipeline ticket (graph path; no ontology in the default success path).
 
-- **Success path (tickets returned):** `clarityScore = Math.round(minConfidence * 100)` where `minConfidence` is the minimum of `verifications[].confidence`. So clarity score is 0–100 derived from verification confidence.
-- **Clarity return (needsClarification from verification):** `clarityScore = Math.min(...verifications.map((v) => v.confidence * 100))`.
-- **Segmentation clarity return:** `clarityScore: 0`.
-- **Zero tickets from batch:** `clarityScore: 0`.
-- **Default when score missing in client:** Dashboard and extension often use `data.clarityScore ?? 100`.
+### 6.1 buildInstructionGraph()
 
-### Threshold values
+- **File:** `lib/server/instructionGraph.ts`.
+- **Signature:** `buildInstructionGraph(input: BuildInstructionGraphInput): BuildInstructionGraphResult`.
+- **Input:** `structuredInstructions` (ExtractedInstruction[]), `context`, `transcript` (optional; kept for compatibility, not used for entity).
+- **Logic:**
+  - For each instruction: normalize entity to an element key (`normalizeElementKey`, lowercased, trimmed, slice 80). Empty or generic ("unknown", "page", "this") → key `"__ungrouped__"`.
+  - Group by key: same key → same target node; each instruction becomes one `ActionNode`: `action_type = instruction.intent`, `details.summary = instruction.action`, `confidence = instruction.confidence`.
+  - Build `InstructionGraph`: list of `TargetNode` (element key or null for ungrouped, actions list). Set `needsClarification` when no actionable targets or all action confidences &lt; 0.5.
+- **Output:** `{ graph: InstructionGraph, needsClarification: boolean }`.
 
-- **Dashboard (`SessionPageClient.tsx`):**
-  - `buildClarityStatus(score)`: `score >= 85` → `"clear"`, `score >= 60` → `"needs_improvement"`, else `"unclear"`.
-  - **Block submission:** `clarityScore < 60` → set `blockSubmit(true)` and show clarity UI with optional “Submit Anyway”.
-- **Extension (`content.tsx`):**
-  - **Clarity guard (pause and show assistant):** `clarityScore <= 20` → show clarity assistant and do not submit.
-  - **Status:** `score >= 85` → clear, `score >= 60` → needs_improvement, else unclear.
+### 6.2 groupInstructionsIntoTickets / ticketsFromGraph()
 
-So dashboard uses a 60 threshold for blocking; extension uses 20 for the “hard” clarity guard.
+- **File:** `lib/server/instructionGraph.ts`.
+- **Function:** `ticketsFromGraph(graph, instructions?)` — there is no separate `groupInstructionsIntoTickets`; grouping is done inside `buildInstructionGraph`. Ticket generation is `ticketsFromGraph`.
+- **Logic:**
+  - Collect all actions from all targets with confidence ≥ 0.5; action_type !== "UNKNOWN". Each action’s `details.summary` (or action_type) becomes one action step string.
+  - `actionSteps` = list of those strings.
+  - Primary target: first target’s element (or "layout" if null/ungrouped). Title entity: first target’s element or first instruction’s entity or "layout".
+  - **Title:** Assigned in `runStructuringLayer` via `generateTicketTitlesBatch(client, tickets)` (lib/ai/ticketTitle.ts); one LLM call for all titles; fallback per ticket: actionSteps[0].slice(0, 60).
+  - One `PipelineTicket` per graph target: title (slice 120), actionSteps, tags `["Feedback"]`, confidenceScore = average of action confidences.
+- **Output:** `PipelineTicket[]` (one per entity/target).
 
-### How needsClarification is triggered
+### 6.3 generateTicketTitlesBatch()
 
-1. **Stage 1:** Segmentation returns `needsClarification: true` or `instructions.length === 0` (including vague-pattern or empty transcript).
-2. **Stage 2–3:** `pipelineTickets.length === 0` after batch (route treats this as clarification path).
-3. **Stage 4:** Any `VerificationResult.needsClarification === true` → route returns with `needsClarification: true` and no tickets.
+- **File:** `lib/ai/ticketTitle.ts`.
+- **Signature:** `generateTicketTitlesBatch(client: OpenAI, tickets: TicketTitleInput[]): Promise<string[]>`. Each title max 60 chars.
+- **Logic:** Single gpt-4o-mini call; user prompt: "For each set of UI changes generate a concise ticket title (max 60 characters). Return JSON with a \"titles\" array of strings in the same order." Input JSON: array of `{ actions: string[] }`. Fallback per ticket on failure: actionSteps[0].slice(0, 60) or "Requested UI changes".
 
-When the route returns with `needsClarification: true` and zero tickets, the client treats it as “pipeline requested clarification.”
+### 6.4 Example transformations
 
-### UI reaction when clarification is required
-
-- **Dashboard:** If `data.needsClarification && tickets.length === 0`: sets `clarityResult` (score, issues, suggestedRewrite), `blockSubmit(true)`, and `pendingClaritySubmit` (payload + screenshot, transcript, etc.). A modal (“Feedback needs clarity”) shows score, clarityIssues list, suggested rewrite if present, and actions: Cancel, “Use Suggestion” (re-run with suggested rewrite), “Submit Anyway.”
-- **Extension:** If `needsClarification && tickets.length === 0` (or `clarityScore <= 20`): sets `extensionClarityPending` and opens the clarity assistant UI; no ticket is created. User can edit and re-submit or use suggestion.
-
----
-
-## SECTION 7 — TICKET STRUCTURE
-
-### Schema of a generated ticket (pipeline output)
-
-**Source:** `lib/server/pipelineStages.ts` — `PipelineTicket` and normalization in `normalizeTickets`.
-
-```ts
-interface PipelineTicket {
-  title: string;        // max 120 chars in normalization
-  description: string;  // max 500 chars
-  actionSteps: string[]; // 1–5 steps per prompt; no length limit in code
-  tags: string[];        // 1–3 from ["UI","Content","UX","Layout","Bug","Accessibility"] per prompt
-  confidenceScore: number; // 0–1, clamped
-}
-```
-
-### API response ticket shape (route output)
-
-```ts
-{
-  title: string;
-  description: string;
-  actionSteps: string[];
-  suggestedTags: string[];  // mapped from pipeline ticket.tags
-  confidenceScore: number;
-}
-```
-
-### How each field is generated
-
-- **title:** From model’s `ticket.title`; if missing or empty, `instructions[i].slice(0, 80)`. Normalized to `.slice(0, 120)`.
-- **description:** From model’s `ticket.description`; if missing or empty, falls back to title. Normalized to `.slice(0, 500)`.
-- **actionSteps:** From model’s `ticket.actionSteps`; must be array of non-empty strings, trimmed; otherwise `[]` for that ticket (or default ticket uses `[instruction]`).
-- **tags:** From model’s `ticket.tags`; must be string array; otherwise `["Feedback"]`. Exposed as `suggestedTags` in the API.
-- **confidenceScore:** From model’s `ticket.confidenceScore`; clamped to [0, 1] via `clamp()`; default 0.5 if not a number.
+- **Input instructions:**  
+  [ { entity: "hero section", action: "reduce the size of the hero section", intent: "UI_VISUAL_ADJUSTMENT", confidence: 0.9 },  
+    { entity: "signup button", action: "move the signup button below the hero", intent: "UI_LAYOUT", confidence: 0.85 } ]
+- **Graph:** Two targets: "hero section" (one action), "signup button" (one action).
+- **Tickets:** Two tickets (one per entity). Each: actionSteps from that target's actions; title from generateTicketTitlesBatch (e.g. "Reduce hero section size", "Move signup button below hero"); tags ["Feedback"]; confidenceScore = average of that target's action confidences.
 
 ---
 
-## SECTION 8 — VERIFICATION LOGIC
+## SECTION 7 — Error Handling
 
-### Inputs to verification
-
-- **originalTranscript:** Full corrected transcript, trimmed, then sliced to 1500 characters in the user message.
-- **instructions:** Array from Stage 1.
-- **tickets:** `pipelineTickets` from Stage 2–3. Pairs are formed as `instructions.slice(0, min(instructions.length, tickets.length))` with `tickets[i]` so that each pair is (instruction, ticket) by index.
-
-### How needsClarification is determined
-
-- The verifier model returns for each pair: `isAccurate`, `isActionable`, `needsClarification`, `confidence`. The route uses only `needsClarification` and `confidence`.
-- **Route:** `anyNeedsClarification = verifications.some((v) => v.needsClarification)`. If true, the route returns with `needsClarification: true`, no tickets, and `verificationIssues` set (e.g. “Ticket N: may not match intent or is not actionable” for each verification with needsClarification).
-
-### How inaccurate tickets are blocked
-
-- If any verification has `needsClarification === true`, the entire response is treated as “needs clarification”: the route does **not** return the tickets. So any ticket that the verifier flags as wrong, vague, or hallucinated blocks all tickets for that request. There is no per-ticket filtering; it is all-or-nothing.
-
----
-
-## SECTION 9 — PERFORMANCE
-
-### AI calls per feedback submission
-
-- **Per submission:** Exactly **3** OpenAI `chat.completions.create` calls when the pipeline runs to completion:
-  1. Segmentation (1 call).
-  2. Intent + tickets (1 batched call for all instructions).
-  3. Verification (1 batched call for all instruction–ticket pairs).
-
-- If segmentation returns needsClarification or empty instructions: **1** call (segmentation only).  
-- If intent+tickets returns no tickets: **2** calls (segmentation + batch).  
-- No parallelization between these three; they run sequentially in the route.
-
-### Sequencing and batching
-
-- **Sequential:** Stage 1 → Stage 2–3 → Stage 4. Each stage waits for the previous.
-- **Batch:** Stages 2–3 are one call for all instructions; Stage 4 is one call for all pairs. No per-instruction or per-ticket API calls.
-
-### Latency
-
-- No server-side metrics or logging of per-stage or total latency in the codebase.
-- **Approximate:** 3 × gpt-4o-mini latency (segmentation ~800 tokens, intent+tickets ~2000, verification ~1000). Client timeout 25s for the whole request; if exceeded, client aborts and no tickets are shown.
+| Scenario | Handling |
+|----------|----------|
+| **Speech / STT errors** | Perception: proper noun anchoring, UI vocabulary normalization, speech normalization. Optional AI transcript normalization; on failure or when disabled, original (or post–speech-norm) transcript used. Copy correction then fixes COPY_CHANGE phrases via fuzzy match to DOM/nearby/viewport/OCR. |
+| **Entity mismatches** | Entity resolution: if score &lt; MIN_RESOLUTION_SCORE (0.65), entity left unchanged. Vague unresolved entities ("that button", "unknown") get confidence capped at 0.65. No hard failure; pipeline continues with original entity. |
+| **AI extraction failures** | `extractStructuredInstructions`: on parse error or empty content returns `fallbackResult()` (instructions: [], needsClarification: true). Retry once if result empty and transcript length &gt; 20. |
+| **AI refinement failures** | `refineStructuredInstructions`: on parse error or empty content returns original instructions. No retry. |
+| **Ontology failures** | `mapInstructionsToOntology`: on parse/API error returns fallback ontology (one defaultAction() per instruction, needsClarification: true). Retry once. |
+| **Verification failures** | `verifyTicketsBatch`: on parse/API error returns `conservativeVerification()` (isAccurate false, isActionable false, needsClarification true, confidence 0.5). Retry once. |
+| **Empty instructions** | Understanding returns instructions: [], needsClarification. Output layer: early exit with clarity response (e.g. suggestedRewrite when wordCount &lt; 12 and no action verbs). |
+| **Graph yields no tickets** | Output layer: if instructions exist but tickets.length === 0, return needsClarification and message (no ontology fallback in current default path; ontology code exists for optional fallback). |
+| **All tickets fail verification** | Only tickets with isAccurate && isActionable && !needsClarification kept; if none, response with needsClarification, verificationIssues, suggestedRewrite. |
+| **Rate limit** | structure-feedback: 20 requests per 60s per user; 429 when exceeded. |
+| **Missing OPENAI_API_KEY** | structure-feedback returns 200 with success: false, error message. session-insight returns success: false, summary: null. |
 
 ---
 
-## SECTION 10 — KNOWN LIMITATIONS
+## SECTION 8 — Performance Metrics
 
-- **Instruction segmentation reliability:** Vague detection is regex-based before the LLM; the model can still return empty instructions or set needsClarification inconsistently. Long or complex transcripts may be split suboptimally (no explicit length handling).
-- **Context loss in long transcripts:** Verification user message truncates transcript to 1500 characters; very long feedback may lose context for later instructions.
-- **No DOM-level targeting:** Pipeline uses only transcript and visibleText (OCR). No `domPath`, `nearbyText`, or screenshot; targeting is textual only.
-- **Screenshot not in AI path:** Screenshot is uploaded and stored but never sent to any model; no vision-based understanding.
-- **Model hallucination:** Verification is the only guard; if the verifier is permissive, invented details can still reach tickets. No fact-check against DOM or screenshot.
-- **All-or-nothing verification:** One bad ticket causes all tickets to be dropped; no partial success.
-- **No retries:** Transient API or network failures result in a single “Structuring failed” response.
-- **Dashboard without context:** Dashboard sends only transcript to structure-feedback, so anchoring and intent/ticket stage never see visibleText for dashboard-originated feedback.
-- **Dual clarity thresholds:** Extension uses clarityScore ≤ 20 for hard block; dashboard uses &lt; 60. Inconsistent product behavior.
-- **Intent extraction unused in main pipeline:** `lib/server/intentExtraction.ts` defines a different intent schema and is not called from `app/api/structure-feedback/route.ts`; it appears legacy or for another path.
+Metrics are collected in-memory and logged only when `NODE_ENV !== "production"` (no external telemetry).
 
----
+### 8.1 PipelineMetrics (lib/ai/pipelineMetrics.ts)
 
-## SECTION 11 — COMPLETE FILE MAP
+- **pipelineLatencyMs** — Full pipeline duration.
+- **extractionLatencyMs** — Time for `extractStructuredInstructions`.
+- **refinementLatencyMs** — Time for `refineStructuredInstructions` (when called).
+- **contextCharactersSent** — Sum of character lengths of filtered spatial context (domScopeText, nearbyScopeText, viewportScopeText, screenshotOCRText) sent to extraction.
+- **instructionCount** — Number of instructions after understanding.
+- **aiCallCount** — Number of AI calls in the run (extraction + optional refinement + optional verification; transcript norm if enabled).
 
-| File | Responsibility |
-|------|----------------|
-| `app/api/structure-feedback/route.ts` | Entry point: auth, rate limit, body parsing, proper-noun anchoring, orchestration of stages 1–4, response shaping (tickets vs clarity), error handling. |
-| `lib/server/instructionSegmentation.ts` | Stage 1: instruction segmentation and vague detection; single LLM call; returns instructions + needsClarification. |
-| `lib/server/pipelineStages.ts` | Stages 2–3: batched intent + ticket generation; single LLM call; defines PipelineTicket and InstructionIntent; normalization and fallbacks. |
-| `lib/server/ticketVerification.ts` | Stage 4: batch verification of (instruction, ticket) pairs; single LLM call; returns VerificationResult[]. |
-| `lib/server/properNounAnchoring.ts` | Pre-pipeline: corrects transcript using OCR visibleText (phrase- and token-level anchoring); no AI. |
-| `lib/server/intentExtraction.ts` | Legacy/alternate intent extraction (different intent types/categories). Not used by structure-feedback route. |
-| `lib/authFetch.ts` | Client-side authenticated fetch; 25s default timeout; used by dashboard for structure-feedback. |
-| `lib/repositories/feedbackRepository.ts` | Persists feedback including clarityScore, clarityStatus, clarityIssues, clarityConfidence. |
-| `app/(app)/dashboard/[sessionId]/SessionPageClient.tsx` | Dashboard UI: calls structure-feedback (transcript only), handles clarity modal, buildClarityStatus (85/60), block at clarityScore &lt; 60, “Use Suggestion” / “Submit Anyway”. |
-| `app/(app)/dashboard/[sessionId]/hooks/useFeedback.ts` | Can call structure-feedback with transcript only. |
-| `echly-extension/src/content.tsx` | Extension: builds context (visibleText from OCR, url), calls structure-feedback with transcript + context; clarity guard at clarityScore ≤ 20; needsClarification handling; clarity assistant UI. |
-| `echly-extension/src/background.ts` | Can call structure-feedback with `{ transcript, context }` when context exists. |
-| `app/api/session-insight/route.ts` | Separate feature: generates session summary from feedback list using gpt-4o-mini; not part of the feedback→ticket pipeline. |
+### 8.2 Logging
+
+- **Function:** `logPipelineMetrics(metrics)` — `console.debug("ECHLY PIPELINE METRICS", { ... })` in non-production.
+- **Typical values (from design/comments):** No aggregate metrics are persisted; approximate expectations:
+  - **Latency:** Dominated by sequential LLM calls (extraction is slowest; gpt-4o). Refinement and verification add one gpt-4o-mini call each when used.
+  - **AI calls per feedback:** Default (no transcript norm, no verification): 1 (extraction) or 2 (extraction + refinement when compound). With verification: +1. With transcript norm: +1.
+  - **Token usage:** Extraction 1600 max; refinement 2000; verification 1500; session insight 160. Context truncated to ~1200+800+1200+800 chars for extraction.
+  - **Instruction count:** Capped at 12; typically 1–5 from extraction.
 
 ---
 
-*End of technical report. All details above reflect the implementation as of the codebase state analyzed.*
+## SECTION 9 — Known Weaknesses
+
+From code and comments:
+
+- **Verifier:** `applyVerifierFinalDecision` returns raw verification results; ticket is valid only when isAccurate && isActionable && !needsClarification.
+- **Clarity rules:** Multiple ad-hoc rules (word count &lt; 12, action verbs, confidence thresholds, instructionCountNorm * 0.6 + avgConfidence * 0.4) without a single clarity model.
+- **Duplicate/unused code:** Two refinement entry points (refineStructuredInstructions used; refineInstructions deprecated). instructionSegmentation and intentExtraction unused by structure-feedback.
+- **No ontology in default path:** When graph yields no tickets, current flow returns needsClarification; ontology + batchIntentAndTicketsFromOntology exist but are not wired in the main path as described in some docs.
+- **Context truncation:** Extraction sees truncated spatial context; copy-correction and entity resolution use full context — consistent but extraction may miss distant DOM text when context is large.
+- **Multiple tickets:** Pipeline produces one ticket per entity (graph target); titles from single batch LLM call.
+
+---
+
+## SECTION 10 — File Map
+
+Key files implementing the AI pipeline.
+
+| Area | File | Purpose |
+|------|------|---------|
+| **Entry** | `app/api/structure-feedback/route.ts` | POST handler; rate limit; calls runFeedbackPipeline. |
+| **Orchestration** | `lib/ai/runFeedbackPipeline.ts` | normalizeInput, runPerceptionLayer, runUnderstandingLayer, runStructuringLayer, runOutputLayer, runFeedbackPipeline; metrics. |
+| **Context** | `lib/server/pipelineContext.ts` | PipelineContext type; getElementsForPrompt, getTextContextForPrompt, getDomPhrasesFromContext. |
+| **Perception** | `lib/server/properNounAnchoring.ts` | anchorProperNouns. |
+| | `lib/server/uiVocabularyNormalization.ts` | normalizeUiVocabulary. |
+| | `lib/server/speechNormalization.ts` | normalizeTranscript (speech). |
+| | `lib/server/clauseSplitter.ts` | splitTranscriptIntoClauses. |
+| | `lib/server/groundTranscriptClauses.ts` | groundTranscriptClauses. |
+| | `lib/server/transcriptNormalization.ts` | normalizeTranscript (AI). |
+| **Spatial** | `lib/ai/spatial-context-builder.ts` | buildSpatialContext, getSpatialScopeLines, extractDomSubtreeText. |
+| | `lib/ai/pipelineTokenBudget.ts` | truncateSpatialContext, truncateForTokenBudget. |
+| | `lib/ai/contextFilter.ts` | filterRelevantContext. |
+| **Understanding** | `lib/server/instructionExtraction.ts` | extractStructuredInstructions, normalizeInstructionActions, structuredToInstructionStrings; EXTRACTION_SYSTEM_PROMPT. |
+| | `lib/ai/copy-correction.ts` | correctCopyInInstructions. |
+| | `lib/ai/element-resolver.ts` | resolveElement, resolveInstructionsEntities. |
+| | `lib/ai/fuzzy-similarity.ts` | fuzzySimilarity, bestMatchInCorpus. |
+| | `lib/server/instructionRefinement.ts` | refineStructuredInstructions; STRUCTURED_REFINEMENT_SYSTEM. |
+| **Structuring** | `lib/server/instructionGraph.ts` | buildInstructionGraph, ticketsFromGraph. |
+| | `lib/ai/ticketTitle.ts` | generateTicketTitlesBatch. |
+| **Ontology (fallback)** | `lib/server/instructionOntology.ts` | mapInstructionsToOntology; ONTOLOGY_SYSTEM. |
+| | `lib/server/pipelineStages.ts` | batchIntentAndTicketsFromOntology, batchIntentAndTickets; PipelineTicket. |
+| **Output** | `lib/server/ticketVerification.ts` | verifyTicketsBatch, applyVerifierFinalDecision; VERIFICATION_SYSTEM. |
+| **Metrics** | `lib/ai/pipelineMetrics.ts` | createPipelineMetrics, logPipelineMetrics, PipelineMetrics. |
+| **Session insight** | `app/api/session-insight/route.ts` | Session summary AI call; SESSION_INSIGHT_SYSTEM_PROMPT. |
+
+---
+
+*End of technical report. This document is intended for external AI architects to audit and improve the Echly AI pipeline.*

@@ -1,10 +1,11 @@
 /**
  * Stage 4 — Verification pass.
- * Validates the single merged ticket against the original transcript and all instructions.
+ * Validates each ticket against the original transcript and instructions.
  */
 
 import type OpenAI from "openai";
 import { echlyDebug } from "@/lib/utils/logger";
+import { estimateCost } from "@/lib/ai/costEstimator";
 import type { PipelineTicket } from "./pipelineStages";
 
 export interface VerificationResult {
@@ -14,35 +15,29 @@ export interface VerificationResult {
   confidence: number;
 }
 
-const VERIFICATION_SYSTEM = `You are Echly's Ticket Verifier. You validate ONE ticket (Title, Description, ActionSteps) against the original transcript and instructions under the unified interpretation policy for messy human feedback.
+const VERIFICATION_SYSTEM = `You are Echly's Ticket Verifier. You validate multiple tickets (Title, ActionSteps) against the original transcript and instructions under the unified interpretation policy for messy human feedback.
 
-CHECK:
-1. Does the ticket reflect ALL instructions? Every instruction should be clearly represented in an action step. Nothing missing.
-2. Are the action steps implementable (Rule 9)? Each step should be clear, developer-actionable, and specific to a UI element. Product-level requirements are acceptable: "Increase spacing between footer sections", "Improve readability of testimonial quotes", "Simplify the hero section" are actionable. Do NOT treat general wording as vague when it matches the user's intent.
-3. Was anything hallucinated (Rule 4)? The ticket must not add content the user did not say or imply: no invented UI text, no copying page/OCR text as the requested change (e.g. "shorten the headline" → step must be "Shorten the hero headline", NOT "Change headline to [page text]"). General product phrasing that preserves intent is NOT hallucination.
+You receive one JSON input with: transcript, instructions, and tickets (array). Return one verification result per ticket, in the same order as the tickets array.
 
-CLARITY (Rule 8): Set needsClarification true ONLY when the ticket is wrong, hallucinated, or misses an instruction. Do NOT set true for:
-- UX diagnostic feedback correctly interpreted (e.g. user said "footer feels dense" → ticket says "Increase spacing between footer sections").
-- Problem-statement-style instructions that were inferred into actionable steps.
-- General but correct wording (e.g. "Improve dashboard readability").
-- Conversational language in the transcript (e.g. "maybe", "probably", "kind of", "feels like", "should", "might"). These are normal human feedback, not ambiguity.
+For each ticket, CHECK:
+1. Does the ticket reflect the instructions it represents? Every instruction for this ticket should be clearly represented in an action step.
+2. Are the action steps implementable? Each step should be clear, developer-actionable, and specific to a UI element.
+3. Was anything hallucinated? The ticket must not add content the user did not say or imply.
 
-VERIFICATION RESULT:
-- isAccurate: true if the ticket correctly reflects all instructions and preserves user meaning.
+For each ticket, output one object in the results array:
+- isAccurate: true if the ticket correctly reflects the relevant instructions and preserves user meaning.
 - isActionable: true if a developer could implement every step.
 - needsClarification: true only if the ticket invents details, drops an instruction, or distorts intent.
 - confidence: 0–1.
 
 OUTPUT: Return ONLY valid JSON. No markdown.
 {
-  "verification": {
-    "isAccurate": true,
-    "isActionable": true,
-    "needsClarification": false,
-    "confidence": 0.9
-  }
+  "results": [
+    { "isAccurate": true, "isActionable": true, "needsClarification": false, "confidence": 0.9 },
+    { "isAccurate": true, "isActionable": true, "needsClarification": false, "confidence": 0.85 }
+  ]
 }
-Return exactly one "verification" object (not "verifications" array).`;
+Return exactly one "results" array with one object per ticket, in the same order as the input tickets.`;
 
 function cleanJson(content: string): string {
   return content
@@ -57,9 +52,35 @@ function clamp(n: unknown): number {
   return Math.max(0, Math.min(1, n));
 }
 
+function parseOneVerificationResult(r: unknown): VerificationResult {
+  if (!r || typeof r !== "object") return conservativeVerification();
+  const o = r as Record<string, unknown>;
+  return {
+    isAccurate: Boolean(o.isAccurate),
+    isActionable: Boolean(o.isActionable),
+    needsClarification: Boolean(o.needsClarification),
+    confidence: clamp(o.confidence),
+  };
+}
+
+function parseBatchVerification(content: string, ticketCount: number): VerificationResult[] {
+  const parsed = JSON.parse(cleanJson(content)) as { results?: unknown[] };
+  const results = Array.isArray(parsed.results) ? parsed.results : [];
+  const verificationResults: VerificationResult[] = [];
+  for (let i = 0; i < ticketCount; i++) {
+    verificationResults.push(parseOneVerificationResult(results[i]));
+  }
+  return verificationResults;
+}
+
+export interface VerifyTicketsBatchResult {
+  results: VerificationResult[];
+  cost: number;
+}
+
 /**
- * Verifies the single merged ticket against the original transcript and all instructions.
- * Returns one VerificationResult for the entire ticket. Retries once on failure.
+ * Verifies all tickets in one request against the original transcript and instructions.
+ * Returns one VerificationResult per ticket, in the same order as tickets. Retries once on failure.
  */
 export async function verifyTicketsBatch(
   client: OpenAI,
@@ -67,71 +88,75 @@ export async function verifyTicketsBatch(
   instructions: string[],
   tickets: PipelineTicket[],
   options?: { retryOnce?: boolean }
-): Promise<VerificationResult[]> {
+): Promise<VerifyTicketsBatchResult> {
   if (instructions.length === 0 || tickets.length === 0) {
-    return [];
+    return { results: [], cost: 0 };
   }
 
-  const ticket = tickets[0];
   const retryOnce = options?.retryOnce ?? true;
+  const transcriptSlice = originalTranscript.trim().slice(0, 1500);
+  const userPayload = {
+    transcript: transcriptSlice,
+    instructions,
+    tickets: tickets.map((t, i) => ({
+      id: i + 1,
+      title: t.title,
+      actions: t.actionSteps,
+    })),
+  };
+  const userContent = JSON.stringify(userPayload, null, 0);
 
-  const userContent = [
-    "Original transcript (full feedback):",
-    `"${originalTranscript.trim().slice(0, 1500)}"`,
-    "",
-    "Instructions (all should be reflected in the ticket):",
-    ...instructions.map((s, i) => `${i + 1}. ${s}`),
-    "",
-    "Ticket to verify (single merged ticket):",
-    `Title: ${ticket.title}`,
-    `Action steps: ${JSON.stringify(ticket.actionSteps)}`,
-  ].join("\n\n");
-
-  const run = async (): Promise<VerificationResult[]> => {
+  const runBatch = async (): Promise<{ results: VerificationResult[]; cost: number }> => {
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0,
       top_p: 1,
-      max_tokens: 1500,
+      max_tokens: Math.max(500, tickets.length * 150),
       messages: [
         { role: "system", content: VERIFICATION_SYSTEM },
         { role: "user", content: userContent },
       ],
     });
 
-    const content = completion.choices[0]?.message?.content?.trim();
-    if (!content) return [conservativeVerification()];
+    const usage = completion.usage;
+    const promptTokens = usage?.prompt_tokens ?? 0;
+    const completionTokens = usage?.completion_tokens ?? 0;
+    const cost = estimateCost("gpt-4o-mini", promptTokens, completionTokens);
+    console.log("[AI COST]", {
+      stage: "verification",
+      model: "gpt-4o-mini",
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      cost,
+    });
 
-    const parsed = JSON.parse(cleanJson(content)) as { verification?: unknown };
-    const v = parsed.verification;
-    if (!v || typeof v !== "object") return [conservativeVerification()];
-    const r = v as Record<string, unknown>;
-    const result: VerificationResult = {
-      isAccurate: Boolean(r.isAccurate),
-      isActionable: Boolean(r.isActionable),
-      needsClarification: Boolean(r.needsClarification),
-      confidence: clamp(r.confidence),
-    };
-    return [result];
+    const content = completion.choices[0]?.message?.content?.trim();
+    if (!content) return { results: tickets.map(() => conservativeVerification()), cost };
+    try {
+      const results = parseBatchVerification(content, tickets.length);
+      return { results, cost };
+    } catch {
+      return { results: tickets.map(() => conservativeVerification()), cost };
+    }
   };
 
   try {
-    const verifications = await run();
-    echlyDebug("VERIFICATION RESULTS (single ticket)", verifications);
-    return verifications;
+    const { results, cost } = await runBatch();
+    echlyDebug("VERIFICATION RESULTS", results);
+    return { results, cost };
   } catch (err) {
-    console.error("[ticketVerification] Failed:", err);
+    console.error("[ticketVerification] Batch failed", err);
     if (retryOnce) {
       try {
-        const verifications = await run();
-        echlyDebug("VERIFICATION RESULTS (single ticket)", verifications);
-        return verifications;
+        const { results, cost } = await runBatch();
+        echlyDebug("VERIFICATION RESULTS", results);
+        return { results, cost };
       } catch (retryErr) {
-        console.error("[ticketVerification] Retry failed:", retryErr);
-        return [conservativeVerification()];
+        console.error("[ticketVerification] Retry failed", retryErr);
+        return { results: tickets.map(() => conservativeVerification()), cost: 0 };
       }
     }
-    return [conservativeVerification()];
+    return { results: tickets.map(() => conservativeVerification()), cost: 0 };
   }
 }
 
@@ -144,56 +169,14 @@ function conservativeVerification(): VerificationResult {
   };
 }
 
-/** Action verbs that must never be marked non-actionable. */
-const ALWAYS_ACTIONABLE_VERBS = /\b(reduce|increase|move|change|rename|hide|show|add|remove)\b/i;
-
 /**
- * Applies the verification layer rules so valid instructions do not incorrectly trigger clarification.
- * - If instructionCount > 0: force isActionable=true, isAccurate=true, needsClarification=false.
- * - If segmentationNeedsClarification === false: verification cannot set needsClarification=true.
- * - If any instruction contains action verbs (reduce, increase, move, etc.): force isActionable=true.
+ * Returns verification results as-is. No overrides.
+ * A ticket is valid iff: isAccurate === true && isActionable === true && needsClarification === false.
+ * Otherwise the ticket is treated as needing clarification.
  */
 export function applyVerifierFinalDecision(
-  rawVerifications: VerificationResult[],
-  options: {
-    instructionCount: number;
-    instructions: string[];
-    transcript: string;
-    segmentationNeedsClarification: boolean;
-  }
+  rawVerifications: VerificationResult[]
 ): VerificationResult[] {
-  const { instructionCount, instructions, transcript, segmentationNeedsClarification } = options;
-
-  const hasActionVerbInInstructions = instructions.some((inst) => ALWAYS_ACTIONABLE_VERBS.test(inst));
-  const hasInstructionCount = instructionCount > 0;
-
-  const result = rawVerifications.map((v) => {
-    let isActionable = v.isActionable;
-    let isAccurate = v.isAccurate;
-    let needsClarification = v.needsClarification;
-
-    if (hasInstructionCount) {
-      isActionable = true;
-      isAccurate = true;
-      needsClarification = false;
-    } else {
-      if (hasActionVerbInInstructions) isActionable = true;
-      if (!segmentationNeedsClarification) needsClarification = false;
-    }
-
-    return {
-      ...v,
-      isActionable,
-      isAccurate,
-      needsClarification,
-    };
-  });
-
-  echlyDebug("VERIFIER FINAL DECISION", {
-    instructionCount,
-    isActionable: result[0]?.isActionable,
-    isAccurate: result[0]?.isAccurate,
-    needsClarification: result[0]?.needsClarification,
-  });
-  return result;
+  echlyDebug("VERIFIER FINAL DECISION", rawVerifications);
+  return rawVerifications;
 }

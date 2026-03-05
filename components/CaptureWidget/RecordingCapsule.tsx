@@ -38,7 +38,7 @@ export function RecordingCapsule({
   }, [isActive, isProcessing]);
 
   const statusText = isProcessing
-    ? "Structuring your feedback…"
+    ? "Saving feedback…"
     : isActive
       ? "Listening…"
       : "Tell us what's happening — we'll structure it.";
@@ -78,18 +78,18 @@ export function RecordingCapsule({
               type="button"
               onClick={onCancel}
               className="echly-recording-cancel-pill"
-              aria-label="Cancel recording"
+              aria-label="Discard"
             >
-              Cancel
+              Discard
             </button>
             {isActive && !isProcessing && (
               <button
                 type="button"
                 className="echly-recording-done"
                 onClick={onDone}
-                aria-label="Done recording"
+                aria-label="Save feedback"
               >
-                Done
+                Save feedback
               </button>
             )}
           </div>

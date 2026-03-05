@@ -4,6 +4,7 @@
  */
 
 import type OpenAI from "openai";
+import { estimateCost } from "@/lib/ai/costEstimator";
 
 const NORMALIZATION_SYSTEM = `You are Echly's transcript normalizer. Your only job is to fix speech-to-text and grammar errors in user feedback. Preserve the user's exact intent. Output nothing but the normalized sentence(s).
 
@@ -31,6 +32,11 @@ function cleanOutput(content: string): string {
     .trim();
 }
 
+export interface NormalizeTranscriptResult {
+  normalized: string;
+  cost: number;
+}
+
 /**
  * Normalizes a speech-to-text transcript: corrects obvious STT mistakes and simple grammar.
  * Preserves intent. Returns the normalized string, or the original on failure/empty.
@@ -39,13 +45,13 @@ export async function normalizeTranscript(
   client: OpenAI,
   transcript: string,
   options?: { retryOnce?: boolean }
-): Promise<string> {
+): Promise<NormalizeTranscriptResult> {
   const trimmed = typeof transcript === "string" ? transcript.trim() : "";
-  if (!trimmed) return trimmed;
+  if (!trimmed) return { normalized: trimmed, cost: 0 };
 
   const retryOnce = options?.retryOnce ?? true;
 
-  const run = async (): Promise<string> => {
+  const run = async (): Promise<NormalizeTranscriptResult> => {
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0,
@@ -56,11 +62,24 @@ export async function normalizeTranscript(
       ],
     });
 
+    const usage = completion.usage;
+    const promptTokens = usage?.prompt_tokens ?? 0;
+    const completionTokens = usage?.completion_tokens ?? 0;
+    const cost = estimateCost("gpt-4o-mini", promptTokens, completionTokens);
+    console.log("[AI COST]", {
+      stage: "transcript_normalization",
+      model: "gpt-4o-mini",
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      cost,
+    });
+
     const content = completion.choices[0]?.message?.content?.trim();
-    if (!content) return trimmed;
+    if (!content) return { normalized: trimmed, cost };
 
     const normalized = cleanOutput(content).trim();
-    return normalized.length > 0 ? normalized : trimmed;
+    const out = normalized.length > 0 ? normalized : trimmed;
+    return { normalized: out, cost };
   };
 
   try {
@@ -71,9 +90,9 @@ export async function normalizeTranscript(
       try {
         return await run();
       } catch {
-        return trimmed;
+        return { normalized: trimmed, cost: 0 };
       }
     }
-    return trimmed;
+    return { normalized: trimmed, cost: 0 };
   }
 }

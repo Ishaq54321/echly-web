@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { buildCaptureContext } from "@/lib/captureContext";
+import { buildCaptureContext, isEchlyElement } from "@/lib/captureContext";
 import { playShutterSound } from "@/lib/playShutterSound";
 import type { CaptureContext } from "./types";
 
@@ -17,7 +17,7 @@ export type RegionCaptureOverlayProps = {
   onSelectionStart?: () => void;
 };
 
-async function cropImageToRegion(
+export async function cropImageToRegion(
   fullImageDataUrl: string,
   region: Region,
   dpr: number
@@ -132,8 +132,23 @@ export function RegionCaptureOverlay({
         return;
       }
 
+      const centerX = targetRect.x + targetRect.w / 2;
+      const centerY = targetRect.y + targetRect.h / 2;
+      let element: Element | null = null;
+      if (typeof document !== "undefined" && document.elementsFromPoint) {
+        const stack = document.elementsFromPoint(centerX, centerY);
+        element =
+          stack.find((el) => !isEchlyElement(el)) ??
+          document.elementFromPoint(centerX, centerY) ??
+          document.elementFromPoint(targetRect.x + 2, targetRect.y + 2);
+        while (element && isEchlyElement(element)) {
+          element = element.parentElement;
+        }
+      }
       const context: CaptureContext | null =
-        typeof window !== "undefined" ? buildCaptureContext(window, null) : null;
+        typeof window !== "undefined"
+          ? buildCaptureContext(window, element)
+          : null;
       onAddVoice(cropped, context);
       setConfirming(false);
       setReleasedRect(null);
@@ -216,9 +231,11 @@ export function RegionCaptureOverlay({
 
   return (
     <div
+      id="echly-overlay"
       role="presentation"
       aria-hidden
       className="echly-region-overlay"
+      data-echly-ui="true"
       style={{ position: "fixed", inset: 0, zIndex: 2147483647, userSelect: "none" }}
     >
       {/* Full-screen dim when no selection; transparent when selection exists (cutout provides dim) */}

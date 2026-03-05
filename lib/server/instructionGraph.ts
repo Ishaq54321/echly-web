@@ -1,15 +1,17 @@
 /**
  * Instruction Graph Layer — Groups instructions by UI target and preserves
- * multiple actions per element. Sits between Segmentation and Ticket Generation.
- * Builds the graph deterministically from segmentation output (no extra OpenAI calls).
- * Behaves like a senior product manager interpreting messy human feedback.
+ * multiple actions per element. Builds the graph deterministically from extraction output.
+ * Ticket generation: one ticket per entity (target); entities that differ significantly
+ * produce separate tickets (e.g. hero section, signup button, footer → three tickets).
+ * Titles are not set here; runStructuringLayer assigns them via generateTicketTitlesBatch.
  */
 
-import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 import { echlyDebug } from "@/lib/utils/logger";
 import type { PipelineContext } from "./pipelineContext";
 import type { PipelineTicket } from "./pipelineStages";
 import type { ExtractedInstruction } from "./instructionExtraction";
+
+const MAX_TITLE_LENGTH = 60;
 
 // ---------------------------------------------------------------------------
 // Graph data structures
@@ -123,36 +125,22 @@ export function buildInstructionGraph(input: BuildInstructionGraphInput): BuildI
 }
 
 // ---------------------------------------------------------------------------
-// Ticket generation from graph (single ticket with ALL instructions as action steps)
+// Ticket generation from graph (one ticket per entity/target)
 // ---------------------------------------------------------------------------
 
-/** Build a short summary title from targets/elements (e.g. "Hero layout adjustments"). */
-function generateTitleFromTargets(targets: TargetNode[]): string {
-  const elements = targets
-    .map((t) => t.element)
-    .filter((e): e is string => e != null && e !== "__ungrouped__" && e !== "__vague__");
-  if (elements.length === 0) return "Requested UI changes";
-  if (elements.length === 1) {
-    const label = elements[0].replace(/\b\w/g, (c) => c.toUpperCase());
-    return `${label} adjustments`;
-  }
-  const first = elements[0].replace(/\b\w/g, (c) => c.toUpperCase());
-  if (elements.some((e) => /hero|button|cta|image/i.test(e))) return `${first} layout adjustments`;
-  return "Layout and content adjustments";
-}
-
 /**
- * Converts the instruction graph to a single pipeline ticket.
- * ALL instructions from the graph appear as action steps (no discarding).
- * Title is generated via generateTicketTitle(entity, actionSteps) for intent-based, short titles.
+ * Converts the instruction graph to pipeline tickets: one ticket per target (entity).
+ * Returns tickets WITHOUT generated titles (placeholder used); runStructuringLayer
+ * assigns titles in a single batch call via generateTicketTitlesBatch.
  */
 export function ticketsFromGraph(
   graph: InstructionGraph,
-  instructions?: ExtractedInstruction[]
+  _instructions?: ExtractedInstruction[]
 ): PipelineTicket[] {
-  const allActions: Array<{ summary: string; confidence: number }> = [];
+  const tickets: PipelineTicket[] = [];
 
   for (const node of graph.targets) {
+    const actionsForTarget: Array<{ summary: string; confidence: number }> = [];
     for (const a of node.actions) {
       if (a.action_type === "UNKNOWN" || a.confidence < 0.5) continue;
       const summary =
@@ -160,40 +148,29 @@ export function ticketsFromGraph(
           ? (a.details as { summary: string }).summary.trim()
           : "";
       const step = summary.length > 0 ? summary : a.action_type;
-      if (step.length > 0) allActions.push({ summary: step, confidence: a.confidence });
+      if (step.length > 0) actionsForTarget.push({ summary: step, confidence: a.confidence });
     }
+
+    if (actionsForTarget.length === 0) continue;
+
+    const actionSteps = actionsForTarget.map((a) => a.summary);
+    const averageConfidence =
+      actionsForTarget.reduce((s, a) => s + a.confidence, 0) / actionsForTarget.length;
+    const placeholderTitle =
+      actionSteps[0]?.slice(0, MAX_TITLE_LENGTH).trim() ?? "Requested UI changes";
+
+    echlyDebug("TICKET PER ENTITY", {
+      element: node.element,
+      actionStepCount: actionSteps.length,
+    });
+
+    tickets.push({
+      title: placeholderTitle,
+      actionSteps,
+      tags: ["Feedback"],
+      confidenceScore: Math.max(0, Math.min(1, averageConfidence)),
+    });
   }
 
-  if (allActions.length === 0) return [];
-
-  const actionSteps = allActions.map((a) => a.summary);
-  const primaryTarget =
-    graph.targets[0]?.element != null &&
-    graph.targets[0].element !== "__ungrouped__" &&
-    graph.targets[0].element !== "__vague__"
-      ? graph.targets[0].element.replace(/\b\w/g, (c) => c.toUpperCase())
-      : "layout";
-  const titleEntity =
-    graph.targets[0]?.element ?? instructions?.[0]?.entity?.trim() ?? null;
-  const entityStr = (titleEntity ?? primaryTarget).toString().trim() || "layout";
-  console.log("ECHLY DEBUG — TITLE GENERATION INPUT:", {
-    entity: titleEntity,
-    actionSteps,
-  });
-  const title = generateTicketTitle(entityStr, actionSteps);
-  console.log("ECHLY DEBUG — GENERATED TITLE:", title);
-  const averageConfidence =
-    allActions.reduce((s, a) => s + a.confidence, 0) / allActions.length;
-
-  echlyDebug("TICKET ACTION STEP COUNT", actionSteps.length);
-  echlyDebug("ACTION STEPS INCLUDED", actionSteps);
-
-  const ticket: PipelineTicket = {
-    title: title.slice(0, 120),
-    actionSteps,
-    tags: ["Feedback"],
-    confidenceScore: Math.max(0, Math.min(1, averageConfidence)),
-  };
-
-  return [ticket];
+  return tickets;
 }

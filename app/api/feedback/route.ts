@@ -15,6 +15,7 @@ import {
   isValidExtractionIntent,
   type ExtractedInstruction,
 } from "@/lib/server/instructionExtraction";
+import { updateScreenshotAttachedRepo } from "@/lib/repositories/screenshotsRepository";
 
 function serializeFeedback(item: Feedback): Record<string, unknown> {
   const out = { ...item } as Record<string, unknown>;
@@ -155,6 +156,8 @@ export async function POST(req: Request) {
       action?: string;
       confidence?: number;
     }>;
+    /** Optional: screenshotId from async upload; marks screenshot as ATTACHED to this ticket. */
+    screenshotId?: string;
   };
   try {
     body = await req.json();
@@ -242,6 +245,13 @@ export async function POST(req: Request) {
       user.uid,
       structuredData
     );
+    const screenshotId =
+      typeof body.screenshotId === "string" ? body.screenshotId.trim() : "";
+    if (screenshotId) {
+      updateScreenshotAttachedRepo(screenshotId, docRef.id).catch((err) => {
+        console.error("[feedback] updateScreenshotAttachedRepo failed:", err);
+      });
+    }
     const created = await getFeedbackByIdRepo(docRef.id);
     if (!created) {
       return NextResponse.json(

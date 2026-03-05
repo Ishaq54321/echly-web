@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackItem from "./FeedbackItem";
 import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
 import { RecordingCapsule } from "./RecordingCapsule";
+import { ResumeSessionModal } from "./ResumeSessionModal";
 import type { CaptureWidgetProps, CaptureState } from "./types";
 
 const CAPTURE_FLOW_STATES: CaptureState[] = ["focus_mode", "region_selecting", "voice_listening", "processing"];
@@ -28,7 +29,21 @@ export default function CaptureWidget({
   captureDisabled = false,
   theme = "dark",
   onThemeToggle,
+  fetchSessions,
+  onResumeSessionSelect,
+  loadSessionWithPointers,
+  onSessionLoaded,
+  onSessionEnd: onSessionEndCallback,
+  onCreateSession,
+  onActiveSessionChange,
+  globalSessionModeActive,
+  globalSessionPaused,
+  onSessionModeStart,
+  onSessionModePause,
+  onSessionModeResume,
+  onSessionModeEnd,
 }: CaptureWidgetProps) {
+  const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const {
     state,
     handlers,
@@ -43,6 +58,16 @@ export default function CaptureWidget({
     onDelete,
     onRecordingChange,
     liveStructureFetch,
+    loadSessionWithPointers,
+    onSessionLoaded,
+    onCreateSession,
+    onActiveSessionChange,
+    globalSessionModeActive,
+    globalSessionPaused,
+    onSessionModeStart,
+    onSessionModePause,
+    onSessionModeResume,
+    onSessionModeEnd,
   });
 
   const isControlled = expanded !== undefined;
@@ -51,10 +76,12 @@ export default function CaptureWidget({
 
   const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state) || state.pillExiting;
   const showRecordingCapsule =
-    RECORDING_UI_STATES.includes(state.state) || state.pillExiting;
-  const showSidebar = !isInCaptureFlow;
-  const showFloatingButton = !effectiveIsOpen && showSidebar;
-  const showPanel = effectiveIsOpen && showSidebar;
+    (RECORDING_UI_STATES.includes(state.state) || state.pillExiting) &&
+    !state.sessionFeedbackPending;
+  const showSidebar = !isInCaptureFlow && !state.sessionMode;
+  const showPanelWhenPaused = state.sessionMode && state.sessionPaused;
+  const showFloatingButton = !effectiveIsOpen && showSidebar && !showPanelWhenPaused;
+  const showPanel = (effectiveIsOpen && showSidebar) || showPanelWhenPaused;
 
   // Collapse the widget while recording (controlled mode via background)
   const didCollapseRef = useRef(false);
@@ -95,6 +122,17 @@ export default function CaptureWidget({
 
   return (
     <>
+      {extensionMode && fetchSessions && onResumeSessionSelect && (
+        <ResumeSessionModal
+          open={resumeModalOpen}
+          onClose={() => setResumeModalOpen(false)}
+          fetchSessions={fetchSessions}
+          onSelectSession={(sessionId) => {
+            onResumeSessionSelect(sessionId);
+            setResumeModalOpen(false);
+          }}
+        />
+      )}
       {/* Capture layer: portaled into #echly-capture-root. Never inside sidebar. */}
       {captureRootEl && (
           <CaptureLayer
@@ -105,6 +143,26 @@ export default function CaptureWidget({
             onRegionCaptured={handlers.handleRegionCaptured}
             onRegionSelectStart={handlers.handleRegionSelectStart}
             onCancelCapture={handlers.handleCancelCapture}
+            sessionMode={state.sessionMode}
+            sessionPaused={state.sessionPaused}
+            sessionFeedbackPending={state.sessionFeedbackPending}
+            onSessionElementClicked={handlers.handleSessionElementClicked}
+            onSessionPause={() => {
+              handlers.pauseSession();
+              onExpandRequest?.();
+            }}
+            onSessionResume={() => {
+              handlers.resumeSession();
+              onCollapseRequest?.();
+            }}
+            onSessionEnd={() => {
+              handlers.endSession();
+              onSessionEndCallback?.();
+            }}
+            onSessionRecordVoice={handlers.handleSessionStartVoice}
+            onSessionDoneVoice={handlers.finishListening}
+            onSessionSaveText={handlers.handleSessionFeedbackSubmit}
+            onSessionFeedbackCancel={handlers.handleSessionFeedbackCancel}
           />
         )}
 
@@ -131,7 +189,7 @@ export default function CaptureWidget({
             onClick={() => (onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true))}
             className="echly-floating-trigger"
           >
-            Capture feedback
+            {extensionMode ? "Echly" : "Capture feedback"}
           </button>
         </div>
       )}
@@ -203,6 +261,9 @@ export default function CaptureWidget({
                   <WidgetFooter
                     isIdle={true}
                     onAddFeedback={handlers.handleAddFeedback}
+                    extensionMode={extensionMode}
+                    onStartSession={extensionMode ? handlers.startSession : undefined}
+                    onResumeSession={extensionMode && fetchSessions && onResumeSessionSelect ? () => setResumeModalOpen(true) : undefined}
                     captureDisabled={captureDisabled}
                   />
                 )}

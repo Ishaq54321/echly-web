@@ -40,6 +40,7 @@ type StructureFeedbackContext = {
   visibleText?: string | null;
   nearbyText?: string | null;
   domPath?: string | null;
+  subtreeText?: string | null;
   url?: string;
   elements?: Array<{ type: string; label?: string | null; text?: string | null }>;
 };

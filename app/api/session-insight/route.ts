@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { requireAuth } from "@/lib/server/auth";
+import { estimateCost } from "@/lib/ai/costEstimator";
 import { getSessionByIdRepo, updateSessionAiInsightSummaryRepo } from "@/lib/repositories/sessionsRepository";
 import { getSessionFeedbackPageWithStringCursorRepo, getSessionFeedbackTotalCountRepo } from "@/lib/repositories/feedbackRepository";
 
@@ -256,6 +257,18 @@ export async function POST(req: Request): Promise<Response> {
         { role: "system", content: SESSION_INSIGHT_SYSTEM_PROMPT },
         { role: "user", content: userContent },
       ],
+    });
+
+    const usage = completion.usage;
+    const promptTokens = usage?.prompt_tokens ?? 0;
+    const completionTokens = usage?.completion_tokens ?? 0;
+    const cost = estimateCost("gpt-4o-mini", promptTokens, completionTokens);
+    console.log("[AI COST]", {
+      stage: "session_insight",
+      model: "gpt-4o-mini",
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      cost,
     });
 
     const raw = completion.choices[0]?.message?.content ?? "";

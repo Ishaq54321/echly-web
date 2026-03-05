@@ -17,6 +17,10 @@ export type CaptureContext = {
   devicePixelRatio: number;
   domPath: string | null;
   nearbyText: string | null;
+  /** Visible text from the DOM subtree at domPath (for spatial scope). */
+  subtreeText?: string | null;
+  /** Visible viewport text (readable text in viewport). */
+  visibleText?: string | null;
   capturedAt: number;
 };
 
@@ -54,7 +58,8 @@ export type CaptureWidgetProps = {
       onSuccess: (ticket: StructuredFeedback) => void;
       onError: () => void;
     },
-    context?: CaptureContext | null
+    context?: CaptureContext | null,
+    options?: { sessionMode?: boolean }
   ) => void | Promise<StructuredFeedback | undefined>;
   onDelete: (id: string) => Promise<void>;
   /** Optional ref for extension: parent can set a toggle callback to open/close widget via message. */
@@ -75,6 +80,32 @@ export type CaptureWidgetProps = {
   theme?: "dark" | "light";
   /** Called when user clicks theme toggle. */
   onThemeToggle?: () => void;
+  /** Extension: fetch sessions for Resume Session picker. */
+  fetchSessions?: () => Promise<Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number; [key: string]: unknown }>>;
+  /** Extension: when user selects a session from Resume picker. Parent should set active session, fetch feedback, then pass loadSessionWithPointers. */
+  onResumeSessionSelect?: (sessionId: string) => void;
+  /** Extension: when set, widget enters session mode with these pointers (e.g. after resuming a session). */
+  loadSessionWithPointers?: { sessionId: string; pointers: StructuredFeedback[] } | null;
+  /** Called after widget has applied loadSessionWithPointers so parent can clear it. */
+  onSessionLoaded?: () => void;
+  /** Called when user ends the feedback session (e.g. to clear resume override in extension). */
+  onSessionEnd?: () => void;
+  /** Extension: create a new session (POST /api/sessions). Returns { id } so widget can set it as active. */
+  onCreateSession?: () => Promise<{ id: string } | null>;
+  /** Extension: notify parent that active session changed (e.g. after start or resume). Parent sets storage and passes new sessionId. */
+  onActiveSessionChange?: (sessionId: string) => void;
+  /** Extension: global session mode from background (ECHLY_GLOBAL_STATE). When true, overlay activates in this tab. */
+  globalSessionModeActive?: boolean;
+  /** Extension: global session paused from background. Synced to local sessionPaused. */
+  globalSessionPaused?: boolean;
+  /** Extension: notify background that session mode started (after POST /api/sessions succeeds). */
+  onSessionModeStart?: () => void;
+  /** Extension: notify background to set session paused. */
+  onSessionModePause?: () => void;
+  /** Extension: notify background to resume session. */
+  onSessionModeResume?: () => void;
+  /** Extension: notify background that session ended (disable overlay in all tabs). */
+  onSessionModeEnd?: () => void;
 };
 
 export type LiveStructured = { title: string; tags: string[]; priority: string };

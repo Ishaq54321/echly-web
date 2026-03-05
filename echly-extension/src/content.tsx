@@ -5,10 +5,8 @@
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { storage } from "./firebase";
 import { apiFetch } from "./contentAuthFetch";
-import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
+import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
 import { log } from "@/lib/utils/logger";
@@ -36,7 +34,14 @@ function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
 
 type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
 
-type GlobalUIState = { visible: boolean; expanded: boolean; isRecording: boolean; sessionId: string | null };
+type GlobalUIState = {
+  visible: boolean;
+  expanded: boolean;
+  isRecording: boolean;
+  sessionId: string | null;
+  sessionModeActive: boolean;
+  sessionPaused: boolean;
+};
 
 /** Ask background to open popup (e.g. in a new tab) so user can sign in. */
 function requestOpenPopup(): void {
@@ -58,14 +63,23 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     expanded: false,
     isRecording: false,
     sessionId: null,
+    sessionModeActive: false,
+    sessionPaused: false,
   });
-  const effectiveSessionId = globalState.sessionId;
+  const [sessionIdOverride, setSessionIdOverride] = React.useState<string | null>(null);
+  const [loadSessionWithPointers, setLoadSessionWithPointers] = React.useState<{
+    sessionId: string;
+    pointers: Array<{ id: string; title: string; description: string; type: string }>;
+  } | null>(null);
+  const effectiveSessionId = sessionIdOverride ?? globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
   const submissionLock = React.useRef(false);
 
   type ExtensionClarityPending = {
     tickets: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
     screenshotUrl: string | null;
+    screenshotId: string;
+    uploadPromise: Promise<string | null>;
     transcript: string;
     screenshot: string | null;
     firstFeedbackId: string;
@@ -109,6 +123,40 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
   }, []);
+
+  /* When session is active (tab load or ECHLY_GLOBAL_STATE), fetch existing feedback and pass to widget so markers persist across tabs. */
+  React.useEffect(() => {
+    if (!globalState.sessionModeActive || !globalState.sessionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch(
+          `/api/feedback?sessionId=${encodeURIComponent(globalState.sessionId!)}&limit=50`
+        );
+        if (cancelled) return;
+        const json = (await res.json()) as {
+          feedback?: Array<{ id: string; title: string; description: string; type?: string }>;
+        };
+        const list = json.feedback ?? [];
+        const pointers = list.map((f) => ({
+          id: f.id,
+          title: f.title ?? "",
+          description: f.description ?? "",
+          type: f.type ?? "Feedback",
+        }));
+        if (cancelled) return;
+        setLoadSessionWithPointers({ sessionId: globalState.sessionId!, pointers });
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[Echly] Failed to load session feedback for markers:", err);
+          setLoadSessionWithPointers({ sessionId: globalState.sessionId!, pointers: [] });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [globalState.sessionModeActive, globalState.sessionId]);
 
   /* When user is on dashboard session page, set that session as the extension's active session. */
   React.useEffect(() => {
@@ -202,8 +250,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         devicePixelRatio?: number;
         domPath?: string | null;
         nearbyText?: string | null;
+        subtreeText?: string | null;
+        visibleText?: string | null;
         capturedAt?: number;
-      } | null
+      } | null,
+      options?: { sessionMode?: boolean }
     ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
       if (submissionLock.current) return undefined;
       submissionLock.current = true;
@@ -217,23 +268,19 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         (async () => {
           const visibleTextPromise = getVisibleTextFromScreenshot(screenshot ?? null);
           const firstFeedbackId = generateFeedbackId();
-          let screenshotUrl: string | null = null;
-          if (screenshot) {
-            try {
-              screenshotUrl = await uploadScreenshot(screenshot, effectiveSessionId, firstFeedbackId);
-            } catch (err) {
-              console.error("[Echly] Screenshot upload failed:", err);
-              callbacks.onError();
-              submissionLock.current = false;
-              return;
-            }
-          }
+          const screenshotId = generateScreenshotId();
+          const uploadPromise = screenshot
+            ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
+            : Promise.resolve(null as string | null);
           const visibleTextFromScreenshot = await visibleTextPromise;
           console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
           const currentUrl = typeof window !== "undefined" ? window.location.href : "";
           const enrichedContext = {
             ...(context ?? {}),
-            visibleText: visibleTextFromScreenshot,
+            visibleText:
+              (visibleTextFromScreenshot?.trim() && visibleTextFromScreenshot) ||
+              context?.visibleText ||
+              null,
             url: context?.url ?? currentUrl,
           };
           const structureBody = { transcript, context: enrichedContext };
@@ -257,64 +304,72 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             const clarityIssues = data.clarityIssues ?? [];
             const suggestedRewrite = data.suggestedRewrite ?? null;
             const confidence = data.confidence ?? 0.5;
+            const isSessionMode = Boolean(options?.sessionMode);
 
-            /* Intercept before any submission: pause and show clarity assistant when score <= 20 (even when tickets is empty). */
-            if (data.success && clarityScore <= 20) {
-              console.log("CLARITY GUARD TRIGGERED", clarityScore);
-              setExtensionClarityPending({
-                tickets,
-                screenshotUrl,
-                transcript,
-                screenshot,
-                firstFeedbackId,
-                clarityScore,
-                clarityIssues,
-                suggestedRewrite,
-                confidence,
-                callbacks,
-                context: enrichedContext,
-              });
-              setEditedTranscript(transcript);
-              setIsEditingFeedback(false);
-              clarityAssistantSubmitLock.current = false;
-              setClarityAssistantSubmitting(false);
-              setShowClarityAssistant(true);
-              submissionLock.current = false;
-              return;
-            }
+            /* Session mode: never show clarity assistant; process silently. */
+            if (!isSessionMode) {
+              /* Intercept before any submission: pause and show clarity assistant when score <= 20 (even when tickets is empty). */
+              if (data.success && clarityScore <= 20) {
+                console.log("CLARITY GUARD TRIGGERED", clarityScore);
+                setExtensionClarityPending({
+                  tickets,
+                  screenshotUrl: null,
+                  screenshotId,
+                  uploadPromise,
+                  transcript,
+                  screenshot,
+                  firstFeedbackId,
+                  clarityScore,
+                  clarityIssues,
+                  suggestedRewrite,
+                  confidence,
+                  callbacks,
+                  context: enrichedContext,
+                });
+                setEditedTranscript(transcript);
+                setIsEditingFeedback(false);
+                clarityAssistantSubmitLock.current = false;
+                setClarityAssistantSubmitting(false);
+                setShowClarityAssistant(true);
+                submissionLock.current = false;
+                return;
+              }
 
-            /* Pipeline requested clarification (vague feedback or verification failed): show clarity assistant, do not create fallback ticket */
-            const needsClarification = Boolean((data as { needsClarification?: boolean }).needsClarification);
-            const verificationIssues = (data as { verificationIssues?: string[] }).verificationIssues ?? [];
-            if (data.success && needsClarification && tickets.length === 0) {
-              console.log("PIPELINE NEEDS CLARIFICATION", verificationIssues);
-              setExtensionClarityPending({
-                tickets: [],
-                screenshotUrl,
-                transcript,
-                screenshot,
-                firstFeedbackId,
-                clarityScore,
-                clarityIssues: verificationIssues.length > 0 ? verificationIssues : clarityIssues,
-                suggestedRewrite,
-                confidence,
-                callbacks,
-                context: enrichedContext,
-              });
-              setEditedTranscript(transcript);
-              setIsEditingFeedback(false);
-              clarityAssistantSubmitLock.current = false;
-              setClarityAssistantSubmitting(false);
-              setShowClarityAssistant(true);
-              submissionLock.current = false;
-              return;
+              /* Pipeline requested clarification (vague feedback or verification failed): show clarity assistant, do not create fallback ticket */
+              const needsClarification = Boolean((data as { needsClarification?: boolean }).needsClarification);
+              const verificationIssues = (data as { verificationIssues?: string[] }).verificationIssues ?? [];
+              if (data.success && needsClarification && tickets.length === 0) {
+                console.log("PIPELINE NEEDS CLARIFICATION", verificationIssues);
+                setExtensionClarityPending({
+                  tickets: [],
+                  screenshotUrl: null,
+                  screenshotId,
+                  uploadPromise,
+                  transcript,
+                  screenshot,
+                  firstFeedbackId,
+                  clarityScore,
+                  clarityIssues: verificationIssues.length > 0 ? verificationIssues : clarityIssues,
+                  suggestedRewrite,
+                  confidence,
+                  callbacks,
+                  context: enrichedContext,
+                });
+                setEditedTranscript(transcript);
+                setIsEditingFeedback(false);
+                clarityAssistantSubmitLock.current = false;
+                setClarityAssistantSubmitting(false);
+                setShowClarityAssistant(true);
+                submissionLock.current = false;
+                return;
+              }
             }
 
             if (!data.success || tickets.length === 0) {
               chrome.runtime.sendMessage(
                 {
                   type: "ECHLY_PROCESS_FEEDBACK",
-                  payload: { transcript, screenshotUrl, sessionId: effectiveSessionId, context: enrichedContext },
+                  payload: { transcript, screenshotUrl: null, screenshotId, sessionId: effectiveSessionId, context: enrichedContext },
                 },
                 (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
                   submissionLock.current = false;
@@ -323,12 +378,22 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                     return;
                   }
                   if (response?.success && response.ticket) {
+                    const ticketId = response.ticket.id;
                     callbacks.onSuccess({
-                      id: response.ticket.id,
+                      id: ticketId,
                       title: response.ticket.title,
                       description: response.ticket.description,
                       type: response.ticket.type ?? "Feedback",
                     });
+                    uploadPromise.then((url) => {
+                      if (url) {
+                        apiFetch(`/api/tickets/${ticketId}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ screenshotUrl: url }),
+                        }).catch(() => {});
+                      }
+                    }).catch(() => {});
                   } else {
                     callbacks.onError();
                   }
@@ -352,7 +417,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 contextSummary: desc,
                 actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
                 suggestedTags: t.suggestedTags,
-                screenshotUrl: i === 0 ? screenshotUrl : null,
+                screenshotUrl: null,
+                screenshotId: i === 0 ? screenshotId : undefined,
                 metadata: { clientTimestamp: Date.now() },
                 ...clarityMeta,
               };
@@ -372,8 +438,21 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               }
             }
             submissionLock.current = false;
-            if (firstCreated) callbacks.onSuccess(firstCreated);
-            else callbacks.onError();
+            if (firstCreated) {
+              const ticketId = firstCreated.id;
+              uploadPromise.then((url) => {
+                if (url) {
+                  apiFetch(`/api/tickets/${ticketId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ screenshotUrl: url }),
+                  }).catch(() => {});
+                }
+              }).catch(() => {});
+              callbacks.onSuccess(firstCreated);
+            } else {
+              callbacks.onError();
+            }
           } catch (err) {
             console.error("[Echly] Structure or submit failed:", err);
             submissionLock.current = false;
@@ -383,6 +462,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         return;
       }
       try {
+      const screenshotId = generateScreenshotId();
+      const uploadPromise = screenshot
+        ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
+        : Promise.resolve(null as string | null);
       const visibleTextFromScreenshot = await getVisibleTextFromScreenshot(screenshot ?? null);
       console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
@@ -390,7 +473,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         transcript,
         context: {
           ...(context ?? {}),
-          visibleText: visibleTextFromScreenshot,
+          visibleText:
+            (visibleTextFromScreenshot?.trim() && visibleTextFromScreenshot) ||
+            context?.visibleText ||
+            null,
           url: context?.url ?? currentUrl,
         },
       };
@@ -421,12 +507,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
       if (!data.success || tickets.length === 0) return undefined;
 
-      let screenshotUrl: string | null = null;
-      if (tickets.length > 0 && screenshot) {
-        const firstFeedbackId = generateFeedbackId();
-        screenshotUrl = await uploadScreenshot(screenshot, effectiveSessionId, firstFeedbackId);
-      }
-
       const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
       const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
       let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
@@ -441,7 +521,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           contextSummary: desc,
           actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
           suggestedTags: t.suggestedTags,
-          screenshotUrl: i === 0 ? screenshotUrl : null,
+          screenshotUrl: null,
+          screenshotId: i === 0 ? screenshotId : undefined,
           metadata: { clientTimestamp: Date.now() },
           ...clarityMeta,
         };
@@ -465,6 +546,18 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             };
         }
       }
+      if (firstCreated) {
+        const ticketId = firstCreated.id;
+        uploadPromise.then((url) => {
+          if (url) {
+            apiFetch(`/api/tickets/${ticketId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ screenshotUrl: url }),
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
       return firstCreated;
       } finally {
         submissionLock.current = false;
@@ -475,6 +568,55 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   const handleDelete = React.useCallback(async (_id: string) => {}, []);
 
+  const fetchSessions = React.useCallback(async () => {
+    const res = await apiFetch("/api/sessions");
+    const json = (await res.json()) as { success?: boolean; sessions?: Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number }> };
+    if (!res.ok || !json.success) return [];
+    return json.sessions ?? [];
+  }, []);
+
+  const createSession = React.useCallback(async (): Promise<{ id: string } | null> => {
+    try {
+      const res = await apiFetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const json = (await res.json()) as { success?: boolean; session?: { id: string } };
+      if (!res.ok || !json.success || !json.session?.id) return null;
+      return { id: json.session.id };
+    } catch (err) {
+      console.error("[Echly] Failed to create session:", err);
+      return null;
+    }
+  }, []);
+
+  const onActiveSessionChange = React.useCallback((newSessionId: string) => {
+    chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {});
+    setSessionIdOverride(newSessionId);
+  }, []);
+
+  const onResumeSessionSelect = React.useCallback(
+    async (sessionId: string) => {
+      chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {});
+      setSessionIdOverride(sessionId);
+      try {
+        const res = await apiFetch(`/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=50`);
+        const json = (await res.json()) as {
+          feedback?: Array<{ id: string; title: string; description: string; type?: string }>;
+        };
+        const list = json.feedback ?? [];
+        const pointers = list.map((f) => ({
+          id: f.id,
+          title: f.title ?? "",
+          description: f.description ?? "",
+          type: f.type ?? "Feedback",
+        }));
+        setLoadSessionWithPointers({ sessionId, pointers });
+      } catch (err) {
+        console.error("[Echly] Failed to load session feedback:", err);
+        setLoadSessionWithPointers({ sessionId, pointers: [] });
+      }
+    },
+    []
+  );
+
   const submitPendingFeedback = React.useCallback(
     async (pending: ExtensionClarityPending) => {
       if (!effectiveSessionId) return;
@@ -484,7 +626,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             type: "ECHLY_PROCESS_FEEDBACK",
             payload: {
               transcript: pending.transcript,
-              screenshotUrl: pending.screenshotUrl,
+              screenshotUrl: null,
+              screenshotId: pending.screenshotId,
               sessionId: effectiveSessionId,
               context: pending.context ?? {},
             },
@@ -496,12 +639,22 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               return;
             }
             if (response?.success && response.ticket) {
+              const ticketId = response.ticket.id;
               pending.callbacks.onSuccess({
-                id: response.ticket.id,
+                id: ticketId,
                 title: response.ticket.title,
                 description: response.ticket.description,
                 type: response.ticket.type ?? "Feedback",
               });
+              pending.uploadPromise.then((url) => {
+                if (url) {
+                  apiFetch(`/api/tickets/${ticketId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ screenshotUrl: url }),
+                  }).catch(() => {});
+                }
+              }).catch(() => {});
             } else {
               pending.callbacks.onError();
             }
@@ -528,7 +681,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           contextSummary: desc,
           actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
           suggestedTags: t.suggestedTags,
-          screenshotUrl: i === 0 ? pending.screenshotUrl : null,
+          screenshotUrl: null,
+          screenshotId: i === 0 ? pending.screenshotId : undefined,
           metadata: { clientTimestamp: Date.now() },
           ...clarityMeta,
         };
@@ -547,8 +701,21 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
         }
       }
-      if (firstCreated) pending.callbacks.onSuccess(firstCreated);
-      else pending.callbacks.onError();
+      if (firstCreated) {
+        const ticketId = firstCreated.id;
+        pending.uploadPromise.then((url) => {
+          if (url) {
+            apiFetch(`/api/tickets/${ticketId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ screenshotUrl: url }),
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+        pending.callbacks.onSuccess(firstCreated);
+      } else {
+        pending.callbacks.onError();
+      }
     },
     [effectiveSessionId]
   );
@@ -583,7 +750,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               type: "ECHLY_PROCESS_FEEDBACK",
               payload: {
                 transcript: trimmed,
-                screenshotUrl: pending.screenshotUrl,
+                screenshotUrl: null,
+                screenshotId: pending.screenshotId,
                 sessionId: effectiveSessionId,
                 context: pending.context ?? {},
               },
@@ -595,12 +763,22 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 return;
               }
               if (response?.success && response.ticket) {
+                const ticketId = response.ticket.id;
                 pending.callbacks.onSuccess({
-                  id: response.ticket.id,
+                  id: ticketId,
                   title: response.ticket.title,
                   description: response.ticket.description,
                   type: response.ticket.type ?? "Feedback",
                 });
+                pending.uploadPromise.then((url) => {
+                  if (url) {
+                    apiFetch(`/api/tickets/${ticketId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ screenshotUrl: url }),
+                    }).catch(() => {});
+                  }
+                }).catch(() => {});
               } else {
                 pending.callbacks.onError();
               }
@@ -621,7 +799,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             contextSummary: desc,
             actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
             suggestedTags: t.suggestedTags,
-            screenshotUrl: i === 0 ? pending.screenshotUrl : null,
+            screenshotUrl: null,
+            screenshotId: i === 0 ? pending.screenshotId : undefined,
             metadata: { clientTimestamp: Date.now() },
             ...clarityMeta,
           };
@@ -640,8 +819,21 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
           }
         }
-        if (firstCreated) pending.callbacks.onSuccess(firstCreated);
-        else pending.callbacks.onError();
+        if (firstCreated) {
+          const ticketId = firstCreated.id;
+          pending.uploadPromise.then((url) => {
+            if (url) {
+              apiFetch(`/api/tickets/${ticketId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ screenshotUrl: url }),
+              }).catch(() => {});
+            }
+          }).catch(() => {});
+          pending.callbacks.onSuccess(firstCreated);
+        } else {
+          pending.callbacks.onError();
+        }
       } catch (err) {
         console.error("[Echly] Submit edited feedback failed:", err);
         pending.callbacks.onError();
@@ -684,7 +876,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           contextSummary: desc,
           actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
           suggestedTags: t.suggestedTags,
-          screenshotUrl: i === 0 ? pending.screenshotUrl : null,
+          screenshotUrl: null,
+          screenshotId: i === 0 ? pending.screenshotId : undefined,
           metadata: { clientTimestamp: Date.now() },
           ...clarityMeta,
         };
@@ -703,8 +896,21 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
         }
       }
-      if (firstCreated) pending.callbacks.onSuccess(firstCreated);
-      else pending.callbacks.onError();
+      if (firstCreated) {
+        const ticketId = firstCreated.id;
+        pending.uploadPromise.then((url) => {
+          if (url) {
+            apiFetch(`/api/tickets/${ticketId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ screenshotUrl: url }),
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+        pending.callbacks.onSuccess(firstCreated);
+      } else {
+        pending.callbacks.onError();
+      }
     } catch (err) {
       console.error("[Echly] Use suggestion failed:", err);
       pending.callbacks.onError();
@@ -952,6 +1158,19 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         captureDisabled={!effectiveSessionId}
         theme={theme}
         onThemeToggle={onThemeToggle}
+        fetchSessions={fetchSessions}
+        onResumeSessionSelect={onResumeSessionSelect}
+        loadSessionWithPointers={loadSessionWithPointers}
+        onSessionLoaded={() => setLoadSessionWithPointers(null)}
+        onSessionEnd={() => setSessionIdOverride(null)}
+        onCreateSession={createSession}
+        onActiveSessionChange={onActiveSessionChange}
+        globalSessionModeActive={globalState.sessionModeActive ?? false}
+        globalSessionPaused={globalState.sessionPaused ?? false}
+        onSessionModeStart={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {})}
+        onSessionModePause={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {})}
+        onSessionModeResume={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {})}
+        onSessionModeEnd={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }).catch(() => {})}
       />
     </>
   );
@@ -989,6 +1208,7 @@ function mountReactApp(host: HTMLDivElement): void {
 
   const container = document.createElement("div");
   container.id = ROOT_ID;
+  container.setAttribute("data-echly-ui", "true");
   container.style.all = "initial";
   container.style.boxSizing = "border-box";
   container.style.pointerEvents = "auto";
@@ -1002,11 +1222,18 @@ function mountReactApp(host: HTMLDivElement): void {
   reactRoot.render(<ContentApp widgetRoot={container} initialTheme={initialTheme} />);
 }
 
-/** Request initial global state from background. Restores visibility, expanded, recording on load/refresh. */
+/** Request initial global state from background. Restores visibility, expanded, recording, session mode on load/refresh. */
 function syncInitialGlobalState(host: HTMLDivElement): void {
   chrome.runtime.sendMessage(
     { type: "ECHLY_GET_GLOBAL_STATE" },
-    (state: { visible?: boolean; expanded?: boolean; isRecording?: boolean; sessionId?: string | null } | undefined) => {
+    (state: {
+      visible?: boolean;
+      expanded?: boolean;
+      isRecording?: boolean;
+      sessionId?: string | null;
+      sessionModeActive?: boolean;
+      sessionPaused?: boolean;
+    } | undefined) => {
       if (!state) return;
       host.style.display = state.visible ? "block" : "none";
       window.dispatchEvent(
@@ -1017,6 +1244,8 @@ function syncInitialGlobalState(host: HTMLDivElement): void {
               expanded: state.expanded ?? false,
               isRecording: state.isRecording ?? false,
               sessionId: state.sessionId ?? null,
+              sessionModeActive: state.sessionModeActive ?? false,
+              sessionPaused: state.sessionPaused ?? false,
             },
           },
         })
@@ -1056,6 +1285,7 @@ function main(): void {
   if (!host) {
     host = document.createElement("div");
     host.id = SHADOW_HOST_ID;
+    host.setAttribute("data-echly-ui", "true");
     host.style.position = "fixed";
     host.style.bottom = "24px";
     host.style.right = "24px";

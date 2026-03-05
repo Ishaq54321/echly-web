@@ -74,7 +74,7 @@ export function VoiceBubble({
       className={`echly-capsule ${expanded ? "echly-capsule--expanded" : ""} ${isExiting ? "echly-capsule--exiting" : ""}`}
       role="status"
       aria-live="polite"
-      aria-label={isProcessing ? "Structuring insight" : "Describe the issue"}
+      aria-label={isProcessing ? "Saving feedback…" : "Describe the change"}
     >
       <div className="echly-capsule-orb">
         <MicOrb
@@ -90,7 +90,7 @@ export function VoiceBubble({
       <div className="echly-capsule-transcript-block">
         {isProcessing ? (
           <span className="echly-capsule-text">
-            Structuring insight…
+            Saving feedback…
             <span className="echly-capsule-underline" aria-hidden />
           </span>
         ) : (
@@ -102,7 +102,7 @@ export function VoiceBubble({
                 transition: `opacity ${MOTION}`,
               }}
             >
-              {liveTranscript || "Describe the issue…"}
+              {liveTranscript || "Describe the change…"}
             </span>
             {aiPreviewTitle && (
               <span
@@ -123,9 +123,9 @@ export function VoiceBubble({
           type="button"
           className="echly-capsule-done"
           onClick={onDone}
-          aria-label="Done recording"
+          aria-label="Save feedback"
         >
-          Done
+          Save feedback
         </button>
       )}
     </div>

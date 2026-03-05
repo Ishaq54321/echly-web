@@ -12,6 +12,11 @@ import type {
   Position,
   CaptureContext,
 } from "../types";
+import { buildCaptureContext } from "@/lib/captureContext";
+import { playShutterSound } from "@/lib/playShutterSound";
+import { logSession } from "../session/sessionMode";
+import { cropScreenshotAroundElement } from "../session/cropAroundElement";
+import { createMarker, removeAllMarkers, updateMarker, removeMarker } from "../session/feedbackMarkers";
 
 const SAFE_MARGIN = 24;
 const ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
@@ -93,6 +98,16 @@ export function useCaptureWidget({
   onDelete,
   onRecordingChange,
   liveStructureFetch,
+  loadSessionWithPointers,
+  onSessionLoaded,
+  onCreateSession,
+  onActiveSessionChange,
+  globalSessionModeActive,
+  globalSessionPaused,
+  onSessionModeStart,
+  onSessionModePause,
+  onSessionModeResume,
+  onSessionModeEnd,
 }: CaptureWidgetProps) {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
@@ -118,6 +133,22 @@ export function useCaptureWidget({
   const [captureRootReady, setCaptureRootReady] = useState(false);
   const [captureRootEl, setCaptureRootEl] = useState<HTMLDivElement | null>(null);
   const [orbSuccess, setOrbSuccess] = useState(false);
+  const [sessionMode, setSessionMode] = useState(false);
+  const [sessionPaused, setSessionPaused] = useState(false);
+  const [sessionFeedbackPending, setSessionFeedbackPending] = useState<{
+    screenshot: string;
+    context: CaptureContext | null;
+  } | null>(null);
+
+  const sessionModeRef = useRef(false);
+  const sessionPausedRef = useRef(false);
+  const lastSessionClickedElementRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    sessionModeRef.current = sessionMode;
+  }, [sessionMode]);
+  useEffect(() => {
+    sessionPausedRef.current = sessionPaused;
+  }, [sessionPaused]);
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -319,6 +350,24 @@ export function useCaptureWidget({
     setCaptureRootReady(true);
   }, []);
 
+  /* Dedicated marker layer: appended after React portal so reconciliation does not remove markers. */
+  useEffect(() => {
+    const root = document.getElementById("echly-capture-root");
+    if (!root || root.querySelector("#echly-marker-layer")) return;
+    const markerLayer = document.createElement("div");
+    markerLayer.id = "echly-marker-layer";
+    markerLayer.style.cssText = [
+      "position:fixed",
+      "top:0",
+      "left:0",
+      "width:100%",
+      "height:100%",
+      "pointer-events:none",
+      "z-index:2147483646",
+    ].join(";");
+    root.appendChild(markerLayer);
+  }, [captureRootEl]);
+
   const removeCaptureRoot = useCallback(() => {
     if (captureRootRef.current) {
       try {
@@ -438,12 +487,56 @@ export function useCaptureWidget({
     }
     const currentRecordings = recordingsRef.current;
     const active = currentRecordings.find((r) => r.id === activeId);
-    if (!active || !active.transcript.trim()) {
+    const transcript = active?.transcript?.trim() ?? "";
+    if (!active || transcript.length === 0) {
+      setSessionFeedbackPending(null);
+      lastSessionClickedElementRef.current = null;
       setState("idle");
       return;
     }
-    setState("processing");
     if (extensionMode) {
+      const isSessionFeedback = sessionModeRef.current;
+      if (isSessionFeedback) {
+        /* Session mode: create marker immediately, clear state so user can click another element, process async. */
+        const root = captureRootRef.current;
+        const element = lastSessionClickedElementRef.current ?? undefined;
+        const placeholderId = `pending-${Date.now()}`;
+        if (root) {
+          createMarker(
+            root,
+            { id: placeholderId, x: 0, y: 0, element, title: "Saving feedback…" },
+            {
+              getSessionPaused: () => sessionPausedRef.current,
+              onMarkerClick: (marker) => {
+                setHighlightTicketId(marker.id);
+                setExpandedId(marker.id);
+              },
+            }
+          );
+        }
+        setSessionFeedbackPending(null);
+        setRecordings((prev) => prev.filter((r) => r.id !== activeId));
+        setActiveRecordingId(null);
+        setState("idle");
+        lastSessionClickedElementRef.current = null;
+        onComplete(active.transcript, active.screenshot, {
+          onSuccess: (ticket) => {
+            if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
+            setPointers((prev) => [
+              { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
+              ...prev,
+            ]);
+            setHighlightTicketId(ticket.id);
+            setTimeout(() => setHighlightTicketId(null), 1200);
+          },
+          onError: () => {
+            if (root) removeMarker(placeholderId);
+            setErrorMessage("AI processing failed.");
+          },
+        }, active.context ?? undefined, { sessionMode: true });
+        return;
+      }
+      setState("processing");
       onComplete(active.transcript, active.screenshot, {
         onSuccess: (ticket) => {
           setPointers((prev) => [
@@ -470,6 +563,7 @@ export function useCaptureWidget({
       }, active.context ?? undefined);
       return;
     }
+    setState("processing");
     try {
       const structured = await onComplete(active.transcript, active.screenshot);
       if (!structured) {
@@ -669,6 +763,211 @@ chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boole
     );
   }, []);
 
+  const startSession = useCallback(async () => {
+    if (stateRef.current !== "idle" || sessionModeRef.current) return;
+    logSession("start");
+    if (extensionMode && onCreateSession && onActiveSessionChange) {
+      const session = await onCreateSession();
+      if (!session?.id) return;
+      onActiveSessionChange(session.id);
+      setPointers([]);
+      onSessionModeStart?.();
+    }
+    setSessionMode(true);
+    setSessionPaused(false);
+    setSessionFeedbackPending(null);
+    createCaptureRoot();
+  }, [extensionMode, onCreateSession, onActiveSessionChange, onSessionModeStart, createCaptureRoot]);
+
+  const pauseSession = useCallback(() => {
+    if (!sessionModeRef.current) return;
+    logSession("pause");
+    setSessionPaused(true);
+    onSessionModePause?.();
+  }, [onSessionModePause]);
+
+  const resumeSession = useCallback(() => {
+    if (!sessionModeRef.current) return;
+    logSession("resume");
+    setSessionPaused(false);
+    onSessionModeResume?.();
+  }, [onSessionModeResume]);
+
+  const endSession = useCallback(() => {
+    if (!sessionModeRef.current) return;
+    logSession("end");
+    onSessionModeEnd?.();
+    removeAllMarkers();
+    setSessionMode(false);
+    setSessionPaused(false);
+    setSessionFeedbackPending(null);
+    removeCaptureRoot();
+  }, [onSessionModeEnd, removeCaptureRoot]);
+
+  /**
+   * Sync session mode from global state (ECHLY_GLOBAL_STATE).
+   * When sessionModeActive becomes true in this tab, initialize full capture like startSession:
+   * setSessionMode(true), setSessionPaused(false), then createCaptureRoot() so CaptureLayer,
+   * SessionOverlay, highlighter, and click handler mount. Prevents partial activation (cursor
+   * without toolbar). Only create root if it does not already exist.
+   */
+  useEffect(() => {
+    if (!extensionMode || globalSessionModeActive === undefined) return;
+    if (globalSessionModeActive === true) {
+      setSessionMode(true);
+      setSessionPaused(globalSessionPaused ?? false);
+      setSessionFeedbackPending(null);
+      if (!captureRootRef.current) {
+        createCaptureRoot();
+      }
+    }
+    if (globalSessionPaused === true) {
+      setSessionPaused(true);
+    }
+    if (globalSessionModeActive === false) {
+      setSessionMode(false);
+      setSessionPaused(false);
+      removeCaptureRoot();
+    }
+  }, [extensionMode, globalSessionModeActive, globalSessionPaused, createCaptureRoot, removeCaptureRoot]);
+
+  /** When globalSessionPaused changes while session mode is active, sync local paused state. */
+  useEffect(() => {
+    if (extensionMode && globalSessionModeActive && globalSessionPaused !== undefined) {
+      setSessionPaused(globalSessionPaused);
+    }
+  }, [extensionMode, globalSessionModeActive, globalSessionPaused]);
+
+  /** Tab activation recovery: when this tab becomes visible and session is active but capture root is missing, reinitialize. */
+  useEffect(() => {
+    if (!extensionMode || globalSessionModeActive !== true) return;
+    const onVisibilityChange = () => {
+      if (document.hidden) return;
+      if (!globalSessionModeActive || captureRootRef.current) return;
+      setSessionMode(true);
+      setSessionPaused(globalSessionPaused ?? false);
+      createCaptureRoot();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [extensionMode, globalSessionModeActive, globalSessionPaused, createCaptureRoot]);
+
+  /** When parent passes loadSessionWithPointers (e.g. after Resume picker), enter session mode with those pointers. */
+  useEffect(() => {
+    if (!extensionMode || !loadSessionWithPointers?.sessionId) return;
+    setPointers(loadSessionWithPointers.pointers ?? []);
+    setSessionMode(true);
+    setSessionPaused(false);
+    setSessionFeedbackPending(null);
+    createCaptureRoot();
+    onSessionLoaded?.();
+  }, [extensionMode, loadSessionWithPointers, createCaptureRoot, onSessionLoaded]);
+
+  const handleSessionElementClicked = useCallback(
+    async (element: Element) => {
+      if (!getFullTabImage || sessionFeedbackPending != null) return;
+      logSession("element clicked");
+      playShutterSound();
+      let fullImage: string | null = null;
+      try {
+        fullImage = await getFullTabImage();
+      } catch {
+        return;
+      }
+      if (!fullImage) return;
+      let cropped: string;
+      try {
+        cropped = await cropScreenshotAroundElement(fullImage, element);
+      } catch {
+        return;
+      }
+      const context = buildCaptureContext(window, element);
+      lastSessionClickedElementRef.current = element instanceof HTMLElement ? element : null;
+      setSessionFeedbackPending({ screenshot: cropped, context });
+    },
+    [getFullTabImage, sessionFeedbackPending]
+  );
+
+  const handleSessionFeedbackSubmit = useCallback(
+    (transcript: string) => {
+      const pending = sessionFeedbackPending;
+      if (!pending || !transcript || transcript.trim().length === 0) {
+        setSessionFeedbackPending(null);
+        return;
+      }
+      const root = captureRootRef.current;
+      const element = lastSessionClickedElementRef.current ?? undefined;
+      const placeholderId = `pending-${Date.now()}`;
+      const processingTitle = "Saving feedback…";
+
+      /* Create marker immediately so user can continue clicking. */
+      if (root) {
+        createMarker(
+          root,
+          {
+            id: placeholderId,
+            x: 0,
+            y: 0,
+            element: element ?? undefined,
+            title: processingTitle,
+          },
+          {
+            getSessionPaused: () => sessionPausedRef.current,
+            onMarkerClick: (marker) => {
+              setHighlightTicketId(marker.id);
+              setExpandedId(marker.id);
+            },
+          }
+        );
+      }
+
+      setSessionFeedbackPending(null);
+      setState("idle");
+      lastSessionClickedElementRef.current = null;
+
+      /* Send to structure-feedback async; update marker and list when done. */
+      onComplete(transcript, pending.screenshot, {
+        onSuccess: (ticket) => {
+          if (root) {
+            updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
+          }
+          setPointers((prev) => [
+            { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
+            ...prev,
+          ]);
+          setHighlightTicketId(ticket.id);
+          setTimeout(() => setHighlightTicketId(null), 1200);
+        },
+        onError: () => {
+          if (root) removeMarker(placeholderId);
+          setErrorMessage("AI processing failed.");
+        },
+      }, pending.context ?? undefined, { sessionMode: true });
+    },
+    [sessionFeedbackPending, onComplete]
+  );
+
+  const handleSessionFeedbackCancel = useCallback(() => {
+    setSessionFeedbackPending(null);
+  }, []);
+
+  const handleSessionStartVoice = useCallback(() => {
+    const pending = sessionFeedbackPending;
+    if (!pending) return;
+    const id = generateRecordingId();
+    const newRecording: Recording = {
+      id,
+      screenshot: pending.screenshot,
+      transcript: "",
+      structuredOutput: null,
+      context: pending.context ?? null,
+      createdAt: Date.now(),
+    };
+    setRecordings((prev) => [...prev, newRecording]);
+    setActiveRecordingId(id);
+    startListening();
+  }, [sessionFeedbackPending, startListening]);
+
   const handleAddFeedback = useCallback(async () => {
     if (stateRef.current !== "idle") return;
     setErrorMessage(null);
@@ -735,6 +1034,14 @@ chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boole
       handleCancelCapture,
       getFullTabImage,
       setActiveRecordingTranscript,
+      startSession,
+      pauseSession,
+      resumeSession,
+      endSession,
+      handleSessionElementClicked,
+      handleSessionFeedbackSubmit,
+      handleSessionFeedbackCancel,
+      handleSessionStartVoice,
     }),
     [
       setIsOpen,
@@ -748,12 +1055,23 @@ chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boole
       deletePointer,
       startEditing,
       saveEdit,
+      setExpandedId,
+      setEditedTitle,
+      setEditedDescription,
       handleAddFeedback,
       handleRegionCaptured,
       handleRegionSelectStart,
       handleCancelCapture,
       getFullTabImage,
       setActiveRecordingTranscript,
+      startSession,
+      pauseSession,
+      resumeSession,
+      endSession,
+      handleSessionElementClicked,
+      handleSessionFeedbackSubmit,
+      handleSessionFeedbackCancel,
+      handleSessionStartVoice,
     ]
   );
 
@@ -787,6 +1105,9 @@ chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boole
       highlightTicketId,
       pillExiting,
       orbSuccess,
+      sessionMode,
+      sessionPaused,
+      sessionFeedbackPending,
     },
     handlers,
     refs: {

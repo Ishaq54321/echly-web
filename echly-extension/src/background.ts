@@ -32,11 +32,15 @@ let globalUIState: {
   expanded: boolean;
   isRecording: boolean;
   sessionId: string | null;
+  sessionModeActive: boolean;
+  sessionPaused: boolean;
 } = {
   visible: false,
   expanded: false,
   isRecording: false,
   sessionId: null,
+  sessionModeActive: false,
+  sessionPaused: false,
 };
 
 chrome.storage.local.get(
@@ -210,15 +214,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request.type === "ECHLY_GET_STATE") {
-    sendResponse({
-      echlyEnabled: globalUIState.visible,
-      isRecording: globalUIState.isRecording,
-      sessionId: globalUIState.sessionId,
-    });
-    return true;
-  }
-
   if (request.type === "ECHLY_SET_ACTIVE_SESSION") {
     activeSessionId = (request.sessionId as string | undefined) ?? null;
     globalUIState.sessionId = activeSessionId;
@@ -228,9 +223,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
-  if (request.type === "ECHLY_GET_ACTIVE_SESSION") {
-    sendResponse({ sessionId: activeSessionId });
-    return true;
+  if (request.type === "ECHLY_SESSION_MODE_START") {
+    globalUIState.sessionModeActive = true;
+    globalUIState.sessionPaused = false;
+    broadcastUIState();
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_SESSION_MODE_PAUSE") {
+    globalUIState.sessionPaused = true;
+    broadcastUIState();
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_SESSION_MODE_RESUME") {
+    globalUIState.sessionPaused = false;
+    broadcastUIState();
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_SESSION_MODE_END") {
+    globalUIState.sessionModeActive = false;
+    globalUIState.sessionPaused = false;
+    broadcastUIState();
+    sendResponse({ ok: true });
+    return false;
   }
 
   if (request.type === "ECHLY_GET_TOKEN") {
@@ -346,10 +366,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_UPLOAD_SCREENSHOT") {
     (async () => {
       try {
-        const { imageDataUrl, sessionId, feedbackId } = request as {
+        const { imageDataUrl, sessionId, screenshotId } = request as {
           imageDataUrl: string;
           sessionId: string;
-          feedbackId: string;
+          screenshotId: string;
         };
 
         const token = await getValidToken();
@@ -361,9 +381,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
+            screenshotId,
             imageDataUrl,
             sessionId,
-            feedbackId,
           }),
         });
 
@@ -387,6 +407,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const payload = request.payload as {
       transcript: string;
       screenshotUrl: string | null;
+      screenshotId: string | null;
       sessionId: string;
       context?: {
         url?: string;
@@ -394,6 +415,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         viewportHeight?: number;
         domPath?: string | null;
         nearbyText?: string | null;
+        subtreeText?: string | null;
       } | null;
     };
     const { transcript, sessionId, context } = payload;
@@ -412,6 +434,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         const token = await getValidToken();
         const screenshotUrl: string | null = payload.screenshotUrl ?? null;
+        const screenshotId: string | null = payload.screenshotId ?? null;
 
         const structurePayload = context ? { transcript, context } : { transcript };
         const structureRes = await fetch(`${API_BASE}/api/structure-feedback`, {
@@ -467,6 +490,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
             suggestedTags: t.suggestedTags,
             screenshotUrl: i === 0 ? screenshotUrl : null,
+            screenshotId: i === 0 && screenshotId ? screenshotId : undefined,
             metadata: { clientTimestamp: Date.now() },
           };
 
