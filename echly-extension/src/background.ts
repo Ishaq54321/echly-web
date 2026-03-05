@@ -187,6 +187,26 @@ function broadcastUIState(): void {
   });
 }
 
+/** When user switches tabs, push current session state to that tab. Fails silently if content script not loaded. */
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  const tabId = activeInfo.tabId;
+  chrome.tabs
+    .sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
+    .catch((e) => {
+      console.debug("ECHLY tab activation sync failed", e);
+    });
+});
+
+/** When a new tab is created, push current session state. Fails silently if content script not yet injected. */
+chrome.tabs.onCreated.addListener((tab) => {
+  if (!tab.id) return;
+  chrome.tabs
+    .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
+    .catch((e) => {
+      console.debug("ECHLY tab creation sync failed", e);
+    });
+});
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_TOGGLE_VISIBILITY") {
     globalUIState.visible = !globalUIState.visible;

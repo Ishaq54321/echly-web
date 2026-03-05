@@ -124,6 +124,20 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
   }, []);
 
+  /* After mount, request current session state so new tabs get overlay immediately without waiting for visibilitychange. */
+  React.useEffect(() => {
+    chrome.runtime.sendMessage(
+      { type: "ECHLY_GET_GLOBAL_STATE" },
+      (state: GlobalStateResponse) => {
+        const normalized = normalizeGlobalState(state);
+        if (!normalized) return;
+        const host = document.getElementById(SHADOW_HOST_ID);
+        if (host) (host as HTMLDivElement).style.display = normalized.visible ? "block" : "none";
+        dispatchGlobalState(normalized);
+      }
+    );
+  }, []);
+
   /* When session is active (tab load or ECHLY_GLOBAL_STATE), fetch existing feedback and pass to widget so markers persist across tabs. */
   React.useEffect(() => {
     if (!globalState.sessionModeActive || !globalState.sessionId) return;
@@ -1222,36 +1236,61 @@ function mountReactApp(host: HTMLDivElement): void {
   reactRoot.render(<ContentApp widgetRoot={container} initialTheme={initialTheme} />);
 }
 
+type GlobalStateResponse = {
+  visible?: boolean;
+  expanded?: boolean;
+  isRecording?: boolean;
+  sessionId?: string | null;
+  sessionModeActive?: boolean;
+  sessionPaused?: boolean;
+} | undefined;
+
+function normalizeGlobalState(state: GlobalStateResponse): GlobalUIState | null {
+  if (!state) return null;
+  return {
+    visible: state.visible ?? false,
+    expanded: state.expanded ?? false,
+    isRecording: state.isRecording ?? false,
+    sessionId: state.sessionId ?? null,
+    sessionModeActive: state.sessionModeActive ?? false,
+    sessionPaused: state.sessionPaused ?? false,
+  };
+}
+
+function dispatchGlobalState(state: GlobalUIState): void {
+  window.dispatchEvent(
+    new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } })
+  );
+}
+
 /** Request initial global state from background. Restores visibility, expanded, recording, session mode on load/refresh. */
 function syncInitialGlobalState(host: HTMLDivElement): void {
   chrome.runtime.sendMessage(
     { type: "ECHLY_GET_GLOBAL_STATE" },
-    (state: {
-      visible?: boolean;
-      expanded?: boolean;
-      isRecording?: boolean;
-      sessionId?: string | null;
-      sessionModeActive?: boolean;
-      sessionPaused?: boolean;
-    } | undefined) => {
-      if (!state) return;
-      host.style.display = state.visible ? "block" : "none";
-      window.dispatchEvent(
-        new CustomEvent("ECHLY_GLOBAL_STATE", {
-          detail: {
-            state: {
-              visible: state.visible ?? false,
-              expanded: state.expanded ?? false,
-              isRecording: state.isRecording ?? false,
-              sessionId: state.sessionId ?? null,
-              sessionModeActive: state.sessionModeActive ?? false,
-              sessionPaused: state.sessionPaused ?? false,
-            },
-          },
-        })
-      );
+    (state: GlobalStateResponse) => {
+      const normalized = normalizeGlobalState(state);
+      if (!normalized) return;
+      host.style.display = normalized.visible ? "block" : "none";
+      dispatchGlobalState(normalized);
     }
   );
+}
+
+/** When tab becomes visible, refresh global state from background so we never rely on a missed broadcast. */
+function ensureVisibilityStateRefresh(): void {
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    chrome.runtime.sendMessage(
+      { type: "ECHLY_GET_GLOBAL_STATE" },
+      (state: GlobalStateResponse) => {
+        const normalized = normalizeGlobalState(state);
+        if (!normalized) return;
+        const host = document.getElementById(SHADOW_HOST_ID);
+        if (host) (host as HTMLDivElement).style.display = normalized.visible ? "block" : "none";
+        dispatchGlobalState(normalized);
+      }
+    );
+  });
 }
 
 /** Listen for global state; single listener. Background is source of truth. */
@@ -1299,7 +1338,8 @@ function main(): void {
   }
 
   ensureMessageListener(host);
-  syncInitialGlobalState(host);
+  /* Initial session state is requested from ContentApp useEffect after mount so ECHLY_GLOBAL_STATE listener exists. */
+  ensureVisibilityStateRefresh();
 }
 
 main();

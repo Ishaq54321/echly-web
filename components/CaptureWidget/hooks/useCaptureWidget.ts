@@ -342,6 +342,7 @@ export function useCaptureWidget({
 
   const createCaptureRoot = useCallback(() => {
     if (captureRootRef.current) return;
+    setSessionFeedbackPending(null);
     const captureEl = document.createElement("div");
     captureEl.id = "echly-capture-root";
     document.body.appendChild(captureEl);
@@ -806,10 +807,10 @@ chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boole
 
   /**
    * Sync session mode from global state (ECHLY_GLOBAL_STATE).
-   * When sessionModeActive becomes true in this tab, initialize full capture like startSession:
-   * setSessionMode(true), setSessionPaused(false), then createCaptureRoot() so CaptureLayer,
-   * SessionOverlay, highlighter, and click handler mount. Prevents partial activation (cursor
-   * without toolbar). Only create root if it does not already exist.
+   * When sessionModeActive is true, initialize full capture so every tab that receives state
+   * joins the session. Ordering is strict to avoid partial capture state (cursor without overlay):
+   * 1. setSessionMode(true) 2. setSessionPaused(...) 3. createCaptureRoot() — only then does
+   * CaptureLayer/SessionOverlay mount and apply cursor. Never create root if one already exists.
    */
   useEffect(() => {
     if (!extensionMode || globalSessionModeActive === undefined) return;
@@ -846,6 +847,7 @@ chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boole
       if (!globalSessionModeActive || captureRootRef.current) return;
       setSessionMode(true);
       setSessionPaused(globalSessionPaused ?? false);
+      setSessionFeedbackPending(null);
       createCaptureRoot();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -865,6 +867,10 @@ chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boole
 
   const handleSessionElementClicked = useCallback(
     async (element: Element) => {
+      if (sessionFeedbackPending && !captureRootRef.current) {
+        setSessionFeedbackPending(null);
+        return;
+      }
       if (!getFullTabImage || sessionFeedbackPending != null) return;
       logSession("element clicked");
       playShutterSound();
