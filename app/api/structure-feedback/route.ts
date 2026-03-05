@@ -2,14 +2,19 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { requireAuth } from "@/lib/server/auth";
 import { echlyDebug } from "@/lib/utils/logger";
-import { segmentInstructions } from "@/lib/server/instructionSegmentation";
-import { refineInstructions } from "@/lib/server/instructionRefinement";
+import {
+  extractStructuredInstructions,
+  structuredToInstructionStrings,
+  type ExtractedInstruction,
+} from "@/lib/server/instructionExtraction";
+import { refineStructuredInstructions } from "@/lib/server/instructionRefinement";
 import { buildInstructionGraph, ticketsFromGraph } from "@/lib/server/instructionGraph";
 import { mapInstructionsToOntology } from "@/lib/server/instructionOntology";
 import { batchIntentAndTicketsFromOntology } from "@/lib/server/pipelineStages";
 import { anchorProperNouns } from "@/lib/server/properNounAnchoring";
 import { normalizeUiVocabulary } from "@/lib/server/uiVocabularyNormalization";
-import { normalizeTranscript } from "@/lib/server/transcriptNormalization";
+import { normalizeTranscript as normalizeSpeechTranscript } from "@/lib/server/speechNormalization";
+import { normalizeTranscript as normalizeTranscriptWithAI } from "@/lib/server/transcriptNormalization";
 import { verifyTicketsBatch, applyVerifierFinalDecision } from "@/lib/server/ticketVerification";
 import type { PipelineContext } from "@/lib/server/pipelineContext";
 
@@ -112,6 +117,8 @@ type StructureResponse = {
   verificationWarnings?: string[];
   /** When instructions were truncated to max. */
   instructionLimitWarning?: string | null;
+  /** Structured extraction output: intent, entity, action, confidence per instruction. */
+  extractedInstructions?: ExtractedInstruction[];
   intent?: {
     intentType: string;
     targetElement: string | null;
@@ -177,29 +184,36 @@ export async function POST(req: Request): Promise<Response> {
   // ——— UI vocabulary normalization: summit→submit, model→modal, etc. (Rule 5) ———
   const transcriptAfterUiNorm = normalizeUiVocabulary(correctedTranscript);
 
+  // ——— Speech normalization: fix common STT errors before AI extraction (e.g. "below 8" → "below it") ———
+  const transcriptAfterSpeechNorm = normalizeSpeechTranscript(transcriptAfterUiNorm);
+
   // ——— Transcript cleanup: fix STT/grammar before segmentation ———
-  const normalizedTranscript = await normalizeTranscript(client, transcriptAfterUiNorm, { retryOnce: true });
+  const normalizedTranscript = await normalizeTranscriptWithAI(client, transcriptAfterSpeechNorm, { retryOnce: true });
 
   try {
-    // ——— Stage 1: Instruction segmentation (with context, gpt-4o, retry) ———
-    const {
-      instructions: segmentedInstructions,
-      needsClarification: segmentNeedsClarification,
-      confidence: segmentConfidence,
-      intentConfidenceScore: segmentIntentScore,
-    } = await segmentInstructions(client, normalizedTranscript, ctx, { retryOnce: true });
+    // ——— Stage 1: Instruction extraction (intent, entity, action, confidence) ———
+    const extractionResult = await extractStructuredInstructions(client, normalizedTranscript, ctx, {
+      retryOnce: true,
+    });
+    const { instructions: extractedList, needsClarification: extractionNeedsClarification } = extractionResult;
+    const segmentNeedsClarification = extractionNeedsClarification;
+    const segmentConfidence =
+      extractedList.length > 0
+        ? extractedList.reduce((s, i) => s + i.confidence, 0) / extractedList.length
+        : 0;
+    const segmentIntentScore = Math.round(segmentConfidence * 100);
 
-    echlyDebug("SEGMENTATION RESULT", segmentedInstructions);
+    echlyDebug("EXTRACTION RESULT", extractedList);
 
     // Only trigger clarification when ALL are true: instructionCount === 0, transcript < 12 words, no action verbs.
-    if (segmentedInstructions.length === 0) {
+    if (extractedList.length === 0) {
       const wordCount = transcriptWordCount(normalizedTranscript);
       const hasActionVerbs = transcriptHasActionVerbs(normalizedTranscript);
       const shouldTriggerClarification = wordCount < 12 && !hasActionVerbs;
-      const intentScore = segmentIntentScore ?? 0;
+      const intentScore = segmentIntentScore;
       const clarityLayerInput = {
         instructionCount: 0,
-        averageConfidence: intentScore / 100,
+        averageConfidence: segmentConfidence,
         transcript: normalizedTranscript,
         wordCount,
         hasActionVerbs,
@@ -220,29 +234,30 @@ export async function POST(req: Request): Promise<Response> {
           ? "Please specify what you'd like to change (e.g. which element and what to change)."
           : null,
         confidence: 0,
+        extractedInstructions: extractedList,
       });
     }
 
-    // ——— Stage 2: Instruction refinement (splits compound; do not merge alternatives — see Instruction Graph) ———
-    const { instructions: refinedInstructions } = await refineInstructions(client, segmentedInstructions);
-    let instructions = refinedInstructions;
+    // ——— Stage 2: Structured refinement (splits compound instructions; preserves intent/entity/action/confidence) ———
+    let refinedStructured = await refineStructuredInstructions(client, extractedList);
 
     // ——— Instruction limit: max 12 ———
     let instructionLimitWarning: string | null = null;
-    if (instructions.length > MAX_INSTRUCTIONS) {
-      instructionLimitWarning = `Only the first ${MAX_INSTRUCTIONS} instructions were processed. ${instructions.length - MAX_INSTRUCTIONS} were skipped.`;
-      instructions = instructions.slice(0, MAX_INSTRUCTIONS);
+    if (refinedStructured.length > MAX_INSTRUCTIONS) {
+      instructionLimitWarning = `Only the first ${MAX_INSTRUCTIONS} instructions were processed. ${refinedStructured.length - MAX_INSTRUCTIONS} were skipped.`;
+      refinedStructured = refinedStructured.slice(0, MAX_INSTRUCTIONS);
     }
+
+    // Strings only for verification prompt, ontology fallback, and logging
+    const instructionStrings = structuredToInstructionStrings(refinedStructured);
 
     if (process.env.NODE_ENV !== "production") {
-      console.log("[STRUCTURE] Refined instructions:", instructions.length, instructionLimitWarning ?? "");
+      console.log("[STRUCTURE] Refined instructions:", refinedStructured.length, instructionLimitWarning ?? "");
     }
 
-    // ——— Stage 3: Instruction Graph Builder (deterministic; groups by UI target, preserves alternatives) ———
-    // Use segmented instructions for graph so we preserve multiple actions per element (refinement may merge alternatives).
-    const instructionsForGraph = segmentedInstructions.length > 0 ? segmentedInstructions.slice(0, MAX_INSTRUCTIONS) : instructions;
+    // ——— Stage 3: Instruction Graph Builder (structured only; uses refined instructions) ———
     const { graph, needsClarification: graphNeedsClarification } = buildInstructionGraph({
-      instructions: instructionsForGraph,
+      structuredInstructions: refinedStructured,
       context: ctx,
       transcript: normalizedTranscript,
     });
@@ -253,11 +268,11 @@ export async function POST(req: Request): Promise<Response> {
     );
 
     // ——— Stage 4: Ticket generation from graph (one ticket per TargetNode) ———
-    let pipelineTickets = ticketsFromGraph(graph);
+    let pipelineTickets = ticketsFromGraph(graph, refinedStructured);
 
     // Fallback: if graph produced no tickets (e.g. target heuristics missed), use ontology path once
-    if (pipelineTickets.length === 0 && instructions.length > 0) {
-      const ontologyResult = await mapInstructionsToOntology(client, instructions, ctx, { retryOnce: true });
+    if (pipelineTickets.length === 0 && instructionStrings.length > 0) {
+      const ontologyResult = await mapInstructionsToOntology(client, instructionStrings, ctx, { retryOnce: true });
       structuredInstructionsForDebug = ontologyResult.actions.map((a) => ({
         action_type: a.action_type,
         target_element: a.target_element,
@@ -267,20 +282,20 @@ export async function POST(req: Request): Promise<Response> {
         client,
         ontologyResult.actions,
         ctx,
-        { instructions, retryOnce: true }
+        { instructions: instructionStrings, retryOnce: true }
       );
       pipelineTickets = ontologyTickets;
     }
 
     echlyDebug("STRUCTURED INSTRUCTIONS", structuredInstructionsForDebug);
     echlyDebug("INSTRUCTION CONFIDENCE SCORES", structuredInstructionsForDebug.map((s) => s.confidence));
-    echlyDebug("INSTRUCTION COUNT", instructions.length);
+    echlyDebug("INSTRUCTION COUNT", refinedStructured.length);
 
     if (pipelineTickets.length === 0) {
       const avgConf = structuredInstructionsForDebug.length > 0
         ? structuredInstructionsForDebug.reduce((s, a) => s + a.confidence, 0) / structuredInstructionsForDebug.length
         : 0;
-      const clarityLayerInput = { instructionCount: instructions.length, averageConfidence: avgConf, transcript: normalizedTranscript };
+      const clarityLayerInput = { instructionCount: refinedStructured.length, averageConfidence: avgConf, transcript: normalizedTranscript };
       echlyDebug("CLARITY LAYER INPUT", clarityLayerInput);
       echlyDebug("CLARITY DECISION", true);
       return NextResponse.json({
@@ -299,19 +314,19 @@ export async function POST(req: Request): Promise<Response> {
       });
     }
 
-    // ——— Stage 5: Verification (retry once) ———
+    // ——— Stage 5: Verification (retry once; prompt uses instruction strings) ———
     const rawVerifications = await verifyTicketsBatch(
       client,
       normalizedTranscript,
-      instructions,
+      instructionStrings,
       pipelineTickets,
       { retryOnce: true }
     );
 
     // ——— Apply verifier final decision: do not override segmentation when segmentationNeedsClarification === false ———
     const verifications = applyVerifierFinalDecision(rawVerifications, {
-      instructionCount: instructions.length,
-      instructions,
+      instructionCount: refinedStructured.length,
+      instructions: instructionStrings,
       transcript: normalizedTranscript,
       segmentationNeedsClarification: segmentNeedsClarification,
     });
@@ -333,7 +348,7 @@ export async function POST(req: Request): Promise<Response> {
       const avgConfVerification =
         verifications.length > 0 ? verifications.reduce((s, v) => s + v.confidence, 0) / verifications.length : 0;
       const clarityLayerInput = {
-        instructionCount: instructions.length,
+        instructionCount: refinedStructured.length,
         averageConfidence: avgConfVerification,
         transcript: normalizedTranscript,
       };
@@ -377,7 +392,6 @@ export async function POST(req: Request): Promise<Response> {
     // Return only valid tickets; include warnings for any that failed
     const valid = validTickets.map((t) => ({
       title: t.title,
-      description: t.description,
       actionSteps: t.actionSteps,
       suggestedTags: t.tags,
       confidenceScore: t.confidenceScore,
@@ -417,6 +431,7 @@ export async function POST(req: Request): Promise<Response> {
       needsClarification: false,
       verificationWarnings: verificationWarnings.length > 0 ? verificationWarnings : undefined,
       instructionLimitWarning: instructionLimitWarning ?? undefined,
+      extractedInstructions: refinedStructured,
     });
   } catch (err) {
     console.error("STRUCTURING ERROR:", err);

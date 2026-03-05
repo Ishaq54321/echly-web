@@ -26,9 +26,6 @@ export interface ExecutionModeLayoutProps {
   onResolveAndNext: () => void;
   onSaveActionSteps: (actionSteps: string[]) => Promise<void>;
   onExpandImage: () => void;
-  descriptionDraft?: string;
-  setDescriptionDraft?: (v: string) => void;
-  saveDescription?: () => void | Promise<void>;
   sessionId?: string;
   streakCount?: number;
 }
@@ -42,9 +39,6 @@ export function ExecutionModeLayout({
   onResolveAndNext,
   onSaveActionSteps,
   onExpandImage,
-  descriptionDraft,
-  setDescriptionDraft,
-  saveDescription,
   sessionId,
 }: ExecutionModeLayoutProps) {
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
@@ -219,23 +213,6 @@ export function ExecutionModeLayout({
           <h1 className="w-full text-center text-[24px] font-semibold leading-[1.3] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] mb-6">
             {item.title}
           </h1>
-
-          <div className="w-full text-center mb-8">
-            {descriptionDraft !== undefined && setDescriptionDraft && saveDescription ? (
-              <textarea
-                value={descriptionDraft}
-                onChange={(e) => setDescriptionDraft(e.target.value)}
-                onBlur={() => void saveDescription()}
-                disabled={disabled}
-                className="w-full min-h-[80px] text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))] text-center bg-transparent border-0 resize-none focus:outline-none focus-visible:ring-0 placeholder:text-[hsl(var(--text-tertiary))]"
-                placeholder="Description…"
-              />
-            ) : (
-              <p className="text-[15px] leading-[1.7] text-[hsl(var(--text-secondary-soft))] whitespace-pre-wrap">
-                {item.description || "No description."}
-              </p>
-            )}
-          </div>
 
           {hasScreenshot && (
             <div className="w-full mb-10 flex justify-center">

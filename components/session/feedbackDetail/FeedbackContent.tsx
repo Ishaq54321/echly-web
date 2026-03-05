@@ -1,26 +1,19 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { DescriptionSection } from "./DescriptionSection";
 import { Section } from "./Section";
 import { ScreenshotBlock } from "./ScreenshotBlock";
 import { ScreenshotWithPins } from "./ScreenshotWithPins";
 import { SuggestionSection } from "./SuggestionSection";
 import { ActionItemsSection } from "./ActionItemsSection";
 import { Tag } from "@/components/ui/Tag";
+import { formatActionStep } from "@/lib/formatters/formatActionStep";
 import { AVAILABLE_TAGS, getTagDotClass } from "@/lib/tagConfig";
 import type { FeedbackItemShape } from "./types";
 import type { Comment } from "@/lib/domain/comment";
 
 interface FeedbackContentProps {
   item: FeedbackItemShape & { index?: number; total?: number };
-  isEditingDescription: boolean;
-  descriptionDraft: string;
-  setIsEditingDescription: (v: boolean) => void;
-  setDescriptionDraft: (v: string) => void;
-  saveDescription: () => void | Promise<void>;
-  isSavingDescription?: boolean;
-  saveDescriptionSuccess?: boolean;
   onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
   onSaveTags?: (suggestedTags: string[]) => Promise<void>;
   onExpandImage: () => void;
@@ -41,13 +34,6 @@ interface FeedbackContentProps {
 
 export function FeedbackContent({
   item,
-  isEditingDescription,
-  descriptionDraft,
-  setIsEditingDescription,
-  setDescriptionDraft,
-  saveDescription,
-  isSavingDescription,
-  saveDescriptionSuccess,
   onSaveActionSteps,
   onSaveTags,
   onExpandImage,
@@ -107,22 +93,6 @@ export function FeedbackContent({
 
   return (
     <>
-      <DescriptionSection
-        description={item.description}
-        isEditing={isEditingDescription}
-        draft={descriptionDraft}
-        onEdit={() => setIsEditingDescription(true)}
-        onDraftChange={setDescriptionDraft}
-        onSave={saveDescription}
-        onCancel={() => {
-          setDescriptionDraft(item.description);
-          setIsEditingDescription(false);
-        }}
-        isSaving={isSavingDescription}
-        saveSuccess={saveDescriptionSuccess}
-        isCommentMode={isCommentMode}
-        sendTextComment={sendTextComment}
-      />
       {item.screenshotUrl && (
         <Section title="Attachments">
           {sendPinComment != null ? (
@@ -165,7 +135,7 @@ export function FeedbackContent({
             <ul className="list-none space-y-2 p-0 m-0">
               {actionSteps.map((action, i) => (
                 <li key={i} className="font-mono text-[13px] text-[hsl(var(--text-primary-strong))] border border-[var(--layer-2-border)] bg-white px-2 py-1 rounded-lg inline-block">
-                  {action}
+                  {formatActionStep(action)}
                 </li>
               ))}
             </ul>

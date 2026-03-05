@@ -84,7 +84,6 @@ export async function verifyTicketsBatch(
     "",
     "Ticket to verify (single merged ticket):",
     `Title: ${ticket.title}`,
-    `Description: ${ticket.description}`,
     `Action steps: ${JSON.stringify(ticket.actionSteps)}`,
   ].join("\n\n");
 

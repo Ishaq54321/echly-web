@@ -9,13 +9,6 @@ import type { Comment } from "@/lib/domain/comment";
 
 export interface ExecutionViewProps {
   item: (FeedbackItemShape & { index: number; total: number }) | null;
-  isEditingDescription: boolean;
-  descriptionDraft: string;
-  setIsEditingDescription: (v: boolean) => void;
-  setDescriptionDraft: (v: string) => void;
-  saveDescription: () => void | Promise<void>;
-  isSavingDescription?: boolean;
-  saveDescriptionSuccess?: boolean;
   onSaveTitle?: (newTitle: string) => Promise<void>;
   onResolvedChange?: (isResolved: boolean) => void;
   onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
@@ -60,13 +53,7 @@ function StatusPill({ status }: { status: FeedbackStatus }) {
 
 export function ExecutionView({
   item,
-  isEditingDescription,
-  descriptionDraft,
-  setIsEditingDescription,
-  setDescriptionDraft,
-  saveDescription,
-  isSavingDescription,
-  saveDescriptionSuccess,
+  onSaveTitle,
   onResolvedChange,
   onSaveActionSteps,
   onSaveTags,
@@ -204,7 +191,7 @@ export function ExecutionView({
         </div>
       )}
 
-      {/* Body: description, attachments, action steps, tags only */}
+      {/* Body: attachments, action steps, tags only */}
       <div
         className={`flex-1 min-h-0 overflow-y-auto ${isCommentMode ? "cursor-crosshair" : ""}`}
         data-comment-mode={isCommentMode || undefined}
@@ -212,13 +199,6 @@ export function ExecutionView({
         <div className="py-3 space-y-4">
           <FeedbackContent
             item={item}
-            isEditingDescription={isEditingDescription}
-            descriptionDraft={descriptionDraft}
-            setIsEditingDescription={setIsEditingDescription}
-            setDescriptionDraft={setDescriptionDraft}
-            saveDescription={saveDescription}
-            isSavingDescription={isSavingDescription}
-            saveDescriptionSuccess={saveDescriptionSuccess}
             onSaveActionSteps={onSaveActionSteps}
             onSaveTags={onSaveTags}
             onExpandImage={() => setIsImageExpanded(true)}

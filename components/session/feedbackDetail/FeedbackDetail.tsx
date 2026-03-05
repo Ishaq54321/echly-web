@@ -8,13 +8,6 @@ import type { FeedbackItemShape } from "./types";
 export interface FeedbackDetailProps {
   sessionId: string;
   selectedItem: (FeedbackItemShape & { index: number; total: number }) | null;
-  isEditingDescription: boolean;
-  descriptionDraft: string;
-  setIsEditingDescription: (v: boolean) => void;
-  setDescriptionDraft: (v: string) => void;
-  saveDescription: () => void | Promise<void>;
-  isSavingDescription?: boolean;
-  saveDescriptionSuccess?: boolean;
   onSaveTitle?: (newTitle: string) => Promise<void>;
   onRequestDelete?: () => void;
   onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
@@ -27,13 +20,6 @@ export interface FeedbackDetailProps {
 
 function FeedbackDetailInner({
   selectedItem,
-  isEditingDescription,
-  descriptionDraft,
-  setIsEditingDescription,
-  setDescriptionDraft,
-  saveDescription,
-  isSavingDescription,
-  saveDescriptionSuccess,
   onSaveTitle,
   onRequestDelete,
   onSaveActionSteps,
@@ -65,13 +51,6 @@ function FeedbackDetailInner({
       />
       <FeedbackContent
         item={selectedItem}
-        isEditingDescription={isEditingDescription}
-        descriptionDraft={descriptionDraft}
-        setIsEditingDescription={setIsEditingDescription}
-        setDescriptionDraft={setDescriptionDraft}
-        saveDescription={saveDescription}
-        isSavingDescription={isSavingDescription}
-        saveDescriptionSuccess={saveDescriptionSuccess}
         onSaveActionSteps={onSaveActionSteps}
         onSaveTags={onSaveTags}
         onExpandImage={() => setIsImageExpanded(true)}

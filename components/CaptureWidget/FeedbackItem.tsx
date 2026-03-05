@@ -90,9 +90,6 @@ function FeedbackItem({
           ) : (
             <>
               <h3 className="echly-widget-item-title">{item.title}</h3>
-              {isExpanded && (
-                <p className="echly-widget-item-desc">{item.description}</p>
-              )}
             </>
           )}
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatActionStep } from "@/lib/formatters/formatActionStep";
 import { Section } from "./Section";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -116,7 +117,7 @@ export function ActionItemsSection({
       <ul className="list-none space-y-2 p-0 m-0">
         {items.map((text, i) => (
           <li key={i} className="group flex items-start gap-2">
-            <span className={numberClass}>{i + 1}</span>
+            <span className={numberClass}>{i + 1}.</span>
             {editingIndex === i ? (
               <div className="flex-1 flex gap-2 items-center min-w-0">
                 <input
@@ -151,7 +152,7 @@ export function ActionItemsSection({
                       : "text-[hsl(var(--text-primary-strong))]"
                   }`}
                 >
-                  {text}
+                  {formatActionStep(text)}
                 </button>
                 <button
                   type="button"
@@ -167,7 +168,7 @@ export function ActionItemsSection({
         ))}
         {isAdding && (
           <li className="flex items-start gap-2">
-            <span className={numberClass}>{items.length + 1}</span>
+            <span className={numberClass}>{items.length + 1}.</span>
             <input
               type="text"
               value={newItemDraft}

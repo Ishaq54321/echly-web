@@ -83,7 +83,7 @@ type SummaryResponse = {
 type TicketFromApi = {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   type: string;
   isResolved?: boolean;
   isSkipped?: boolean;
@@ -182,10 +182,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [executionStreak, setExecutionStreak] = useState(0);
   const [preloadedNextTicket, setPreloadedNextTicket] = useState<TicketFromApi | null>(null);
   const [isCommentMode, setIsCommentMode] = useState(false);
-  const [isEditingDescription, setIsEditingDescription] = useState(false);
-  const [descriptionDraft, setDescriptionDraft] = useState("");
-  const [isSavingDescription, setIsSavingDescription] = useState(false);
-  const [saveDescriptionSuccess, setSaveDescriptionSuccess] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isEditingSessionTitle, setIsEditingSessionTitle] = useState(false);
@@ -424,15 +420,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /** Pin whose inline thread popover is open (does not open right panel). */
   const [activePinIdForPopover, setActivePinIdForPopover] = useState<string | null>(null);
 
-  /* ================= SYNC DESCRIPTION (from DB-backed detail) ================= */
-
-  useEffect(() => {
-    if (detailTicket) {
-      setDescriptionDraft(detailTicket.description);
-      setIsEditingDescription(false);
-    }
-  }, [selectedId, detailTicket]);
-
   /* ================= SAVE TITLE (optimistic update, then PATCH) ================= */
 
   const saveTitle = async (newTitle: string): Promise<void> => {
@@ -469,55 +456,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             : item
         )
       );
-    }
-  };
-
-  /* ================= SAVE DESCRIPTION (optimistic update, then PATCH) ================= */
-
-  const saveDescription = async (): Promise<void> => {
-    if (!selectedId || descriptionDraft === detailTicket?.description) {
-      setIsEditingDescription(false);
-      return;
-    }
-    const previousDescription = detailTicket?.description ?? "";
-    setIsSavingDescription(true);
-    setDetailTicket((t) => (t ? { ...t, description: descriptionDraft } : null));
-    setFeedback((prev) =>
-      prev.map((item) =>
-        item.id === selectedId ? { ...item, description: descriptionDraft } : item
-      )
-    );
-    setIsEditingDescription(false);
-    setSaveDescriptionSuccess(true);
-    setTimeout(() => setSaveDescriptionSuccess(false), 1200);
-    try {
-      const res = await authFetch(`/api/tickets/${selectedId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: descriptionDraft }),
-      });
-      const data = (await res.json()) as {
-        success?: boolean;
-        ticket?: TicketFromApi;
-      };
-      if (data.success && data.ticket) {
-        setDetailTicket(data.ticket);
-        setDescriptionDraft(data.ticket.description);
-      }
-    } catch {
-      setDetailTicket((t) =>
-        t ? { ...t, description: previousDescription } : null
-      );
-      setFeedback((prev) =>
-        prev.map((item) =>
-          item.id === selectedId
-            ? { ...item, description: previousDescription }
-            : item
-        )
-      );
-      setDescriptionDraft(previousDescription);
-    } finally {
-      setIsSavingDescription(false);
     }
   };
 
@@ -1226,9 +1164,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             onResolveAndNext={handleResolveAndNext}
             onSaveActionSteps={saveActionSteps}
             onExpandImage={() => setIsImageExpanded(true)}
-            descriptionDraft={descriptionDraft}
-            setDescriptionDraft={setDescriptionDraft}
-            saveDescription={saveDescription}
             sessionId={sessionId}
           />
         </div>
@@ -1279,13 +1214,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return (
       <ExecutionView
         item={selectedItem}
-        isEditingDescription={isEditingDescription}
-        descriptionDraft={descriptionDraft}
-        setIsEditingDescription={setIsEditingDescription}
-        setDescriptionDraft={setDescriptionDraft}
-        saveDescription={saveDescription}
-        isSavingDescription={isSavingDescription}
-        saveDescriptionSuccess={saveDescriptionSuccess}
         onSaveTitle={saveTitle}
         onResolvedChange={saveResolved}
         onSaveActionSteps={saveActionSteps}

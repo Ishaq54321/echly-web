@@ -1,5 +1,7 @@
 "use client";
 
+import { formatActionStep } from "@/lib/formatters/formatActionStep";
+
 export interface ExecutionModeActionStepsProps {
   actionSteps: string[];
 }
@@ -30,7 +32,7 @@ export function ExecutionModeActionSteps({
             {i + 1}.
           </span>
           <span className="text-[15px] leading-[1.6] text-[hsl(var(--text-primary-strong))]">
-            {text}
+            {formatActionStep(text)}
           </span>
         </li>
       ))}

@@ -34,7 +34,6 @@ export interface InstructionIntent {
 
 export interface PipelineTicket {
   title: string;
-  description: string;
   actionSteps: string[];
   tags: string[];
   confidenceScore: number;
@@ -53,8 +52,7 @@ Output exactly ONE ticket. Each instruction = one action step. Preserve the user
 
 TICKET RULES:
 1. title: Short summary (4–10 words).
-2. description: One concise sentence for the changes.
-3. actionSteps: One per instruction, in order. Clear product requirements; never invent how to implement.
+2. actionSteps: One per instruction, in order. Clear product requirements; never invent how to implement.
 4. tags: 1–3 from ["UI", "Content", "UX", "Layout", "Bug", "Accessibility"].
 5. confidenceScore: Average of per-instruction confidences.
 
@@ -94,11 +92,10 @@ INPUT: You receive ontology actions and original instructions (one per action). 
 TICKET RULES (strict):
 1. Output exactly ONE ticket. Each instruction becomes one action step.
 2. title: Short summary (4–10 words) for the group of changes.
-3. description: One concise sentence for the requested changes.
-4. actionSteps: One step per instruction, in order. Rule 4 — Never invent specific UI text or values. Only content from transcript or visible UI context for identification. "Shorten the headline" → step is "Shorten the hero headline", NOT "Change headline to [page text]".
-5. tags: 1–3 from ["UI", "Content", "UX", "Layout", "Bug", "Accessibility"].
-6. confidenceScore: Average of the actions' confidence values (0–1).
-7. Do not hallucinate. Only what the instructions/actions state. Rule 10: Consistent interpretation; same feedback → same ticket style.
+3. actionSteps: One step per instruction, in order. Rule 4 — Never invent specific UI text or values. Only content from transcript or visible UI context for identification. "Shorten the headline" → step is "Shorten the hero headline", NOT "Change headline to [page text]".
+4. tags: 1–3 from ["UI", "Content", "UX", "Layout", "Bug", "Accessibility"].
+5. confidenceScore: Average of the actions' confidence values (0–1).
+6. Do not hallucinate. Only what the instructions/actions state. Rule 10: Consistent interpretation; same feedback → same ticket style.
 
 ACTION STEPS QUALITY (Rule 9):
 - Clear, developer-actionable, specific to UI element. Good: "Increase spacing between pricing cards." Bad: "Improve layout."
@@ -253,7 +250,6 @@ function normalizeSingleTicketFromOntology(
     return [
       {
         title: fallbackTitle,
-        description: "Multiple UI changes requested.",
         actionSteps: actionSteps.length > 0 ? actionSteps : actions.map((a) => ticketTitleFromAction(a)),
         tags: ["Feedback"],
         confidenceScore: avgConfidence,
@@ -265,10 +261,6 @@ function normalizeSingleTicketFromOntology(
   const rawTitle =
     typeof r.title === "string" && r.title.trim() !== "" ? String(r.title).trim() : fallbackTitle;
   const title = enforceTitle(rawTitle, fallbackTitle);
-  const description =
-    typeof r.description === "string" && r.description.trim() !== ""
-      ? String(r.description).trim().slice(0, 500)
-      : "Multiple UI changes requested.";
   const parsedSteps = Array.isArray(r.actionSteps)
     ? (r.actionSteps as unknown[])
         .filter((s) => typeof s === "string" && String(s).trim() !== "")
@@ -284,7 +276,6 @@ function normalizeSingleTicketFromOntology(
   return [
     {
       title,
-      description,
       actionSteps: steps,
       tags,
       confidenceScore: clamp(r.confidenceScore ?? avgConfidence),
@@ -320,7 +311,6 @@ function fallbackFromOntology(
     actions.length === 1 ? ticketTitleFromAction(actions[0]) : "Multiple UI changes";
   const ticket: PipelineTicket = {
     title,
-    description: "Multiple UI changes requested.",
     actionSteps: actionSteps.length > 0 ? actionSteps : actions.map((a) => ticketTitleFromAction(a)),
     tags: ["Feedback"],
     confidenceScore: avgConfidence,
@@ -457,7 +447,6 @@ function normalizeSingleTicket(raw: unknown, instructions: string[]): PipelineTi
     return [
       {
         title: fallbackTitle,
-        description: "Multiple UI changes requested.",
         actionSteps: actionSteps.length > 0 ? actionSteps : ["See instructions"],
         tags: ["Feedback"],
         confidenceScore: 0.5,
@@ -469,10 +458,6 @@ function normalizeSingleTicket(raw: unknown, instructions: string[]): PipelineTi
   const rawTitle =
     typeof r.title === "string" && r.title.trim() !== "" ? String(r.title).trim() : fallbackTitle;
   const title = enforceTitle(rawTitle, fallbackTitle);
-  const description =
-    typeof r.description === "string" && r.description.trim() !== ""
-      ? String(r.description).trim().slice(0, 500)
-      : "Multiple UI changes requested.";
   const parsedSteps = Array.isArray(r.actionSteps)
     ? (r.actionSteps as unknown[])
         .filter((s) => typeof s === "string" && String(s).trim() !== "")
@@ -488,7 +473,6 @@ function normalizeSingleTicket(raw: unknown, instructions: string[]): PipelineTi
   return [
     {
       title,
-      description,
       actionSteps: steps,
       tags,
       confidenceScore: clamp(r.confidenceScore),
@@ -504,7 +488,6 @@ function fallbackIntentAndTickets(
     .map((s) => String(s).trim());
   const ticket: PipelineTicket = {
     title: instructions.length === 1 ? instructions[0].trim().slice(0, 80) : "Multiple UI changes",
-    description: "Multiple UI changes requested.",
     actionSteps: actionSteps.length > 0 ? actionSteps : ["See instructions"],
     tags: ["Feedback"],
     confidenceScore: 0.5,
