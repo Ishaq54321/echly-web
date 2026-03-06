@@ -585,14 +585,18 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const fetchSessions = React.useCallback(async () => {
     const res = await apiFetch("/api/sessions");
     const json = (await res.json()) as { success?: boolean; sessions?: Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number }> };
+    const sessions = json.sessions ?? [];
+    console.log("[Echly] Sessions returned:", { ok: res.ok, status: res.status, success: json.success, count: sessions.length, sessions });
     if (!res.ok || !json.success) return [];
-    return json.sessions ?? [];
+    return sessions;
   }, []);
 
   const createSession = React.useCallback(async (): Promise<{ id: string } | null> => {
+    console.log("[Echly] Creating session");
     try {
       const res = await apiFetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const json = (await res.json()) as { success?: boolean; session?: { id: string } };
+      console.log("[Echly] Create session response:", { ok: res.ok, status: res.status, success: json.success, sessionId: json.session?.id });
       if (!res.ok || !json.success || !json.session?.id) return null;
       return { id: json.session.id };
     } catch (err) {
@@ -1169,7 +1173,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         onExpandRequest={onExpandRequest}
         onCollapseRequest={onCollapseRequest}
         liveStructureFetch={liveStructureFetch}
-        captureDisabled={!effectiveSessionId}
+        captureDisabled={false}
         theme={theme}
         onThemeToggle={onThemeToggle}
         fetchSessions={fetchSessions}

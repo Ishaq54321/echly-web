@@ -1,0 +1,151 @@
+[33mda2b480[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m  Middle of working on extension
+[33ma1f05dc[m  Fixing the new Chrome extension SMOOTH
+[33m7a5fc05[m  New feedback Capture experience
+[33m4bc5f95[m AI Dangerous Mode
+[33mde2b16f[m  AI Perfection up till Ontological Categorization
+[33m095cda6[m AI Perfection the next level
+[33m231e2c5[m New Dashboard features and Execution mode
+[33mf5d6a24[m New Dashboard features and Execution mode
+[33mb001b4f[m New Dashboard features and Execution mode
+[33m4ae893b[m New Dashboard features and Execution mode
+[33mbc32b87[m Fix TS target to ES2020 for regex compatibility
+[33m2a2c8b6[m Fix TS target to ES2020 for regex compatibility
+[33maf75bc0[m Fix TS target to ES2020 for regex compatibility
+[33me54205b[m Fix TS target to ES2020 for regex compatibility
+[33m79f5928[m Fix TS target to ES2020 for regex compatibility
+[33m5ea386f[m Fix TS target to ES2020 for regex compatibility
+[33m61fa838[m Fix TS target to ES2020 for regex compatibility
+[33m5d2ce10[m Widget to the next level - Stable Version
+[33m0d4b74e[m Widget to the next level - Stable Version
+[33m2f716a9[m Widget to the next level - Stable Version
+[33mfa3bea7[m Refine session loading state
+[33m38d6c7b[m Refine session loading state
+[33mf23e4f1[m Refine session loading state
+[33m9a10b6e[m Refine session loading state
+[33m5c5fd10[m Refine session loading state
+[33m8511ed5[m Refine session loading state
+[33m41c920a[m Widget to the next level - Stable Version
+[33ma4a75f2[m Widget to the next level - Stable Version
+[33m791ef92[m Refine session loading state
+[33ma492451[m Widget to the next level - Stable Version
+[33m834e9d4[m Refine session loading state
+[33m2513d40[m Widget to the next level - Stable Version
+[33mbde8163[m Widget to the next level - Stable Version
+[33md18c4a9[m[33m ([m[1;33mtag: [m[1;33mv1.0-stable[m[33m)[m Stable v1: 3D card system + theme architecture + recording polish
+[33mcec7f14[m Widget to the next level - Stable Version
+[33mddcea29[m Widget to the next level - Stable Version
+[33mac4ac7a[m Widget to the next level - Stable Version
+[33m7d867e9[m Widget to the next level - Stable Version
+[33mfeca1c7[m Widget to the next level - Stable Version
+[33m2be7cba[m Widget to the next level - Stable Version
+[33mbcf3a17[m Widget to the next level - Stable Version
+[33m51658e1[m Widget to the next level - Stable Version
+[33mf081582[m Widget to the next level - Stable Version
+[33m3675946[m Widget to the next level - Stable Version
+[33m943f94f[m Widget to the next level - Stable Version
+[33md2c4be0[m Widget to the next level - Stable Version
+[33m7dfc6ca[m Widget to the next level - Stable Version
+[33m4c24b84[m Widget to the next level - Stable Version
+[33m9f18a2e[m Widget to the next level - Stable Version
+[33mf341372[m Widget to the next level - Stable Version
+[33m293f024[m Widget to the next level - Stable Version
+[33mdec2f7c[m Widget to the next level - Stable Version
+[33m5467bb7[m Widget to the next level - Stable Version
+[33m5e1a7d3[m Widget to the next level - Stable Version
+[33m44484a1[m Widget to the next level - Stable Version
+[33m9b60980[m Widget to the next level - Stable Version
+[33me61ab7e[m Widget to the next level - Stable Version
+[33me0750f5[m Stable: Global session sync + intelligent capture foundation
+[33m5f8c1e9[m Stable: Global session sync + intelligent capture foundation
+[33mfd184b6[m Stable: Global session sync + intelligent capture foundation
+[33mc0f085a[m Stable: Global session sync + intelligent capture foundation
+[33md2cb576[m Stable: Global session sync + intelligent capture foundation
+[33m8d07853[m Stable: Global session sync + intelligent capture foundation
+[33m4068202[m Stable: Global session sync + intelligent capture foundation
+[33m5866820[m Stable: Global session sync + intelligent capture foundation
+[33m1a6b945[m Stable: Extension global state + session creation + processing pipeline before screenshot refactor
+[33m7d3f468[m message
+[33mfee89aa[m message
+[33m79bd9c3[m message
+[33md3ef159[m message
+[33m6a892b1[m message
+[33m044e47d[m message
+[33m49377e8[m message
+[33m9d7182d[m message
+[33mb048347[m[33m ([m[1;33mtag: [m[1;33mextension-stable-v1[m[33m)[m Stable extension: fixed AudioWaveform React import crash + overlay parity
+[33mad92157[m Describe what you changed
+[33m48d34b1[m[33m ([m[1;33mtag: [m[1;33mv1-stable[m[33m, [m[1;33mtag: [m[1;33mpre-refactor-x[m[33m)[m Attach Firebase ID token to web API calls
+[33mdc116c4[m Add sessions API route and extension storage refactor
+[33m883561e[m Switch to JWT verification using jose instead of firebase-admin
+[33m6f3c38c[m Add proper lockfile
+[33m6240564[m Trigger redeploy after lockfile fix
+[33m1e4a954[m Fix: add next-themes dependency
+[33m6d5e029[m Initial commit before Vercel deploy
+[33mb589a63[m Phase 1: Add authenticated API boundary
+[33m727fbfe[m Phase 1: Add authenticated API boundary
+[33mdf71738[m Structural cost protection hardening
+[33me63ffb7[m Structural cost protection hardening
+[33m8147709[m Structural cost protection hardening
+[33m57d60b2[m Structural cost protection hardening
+[33m7b5a932[m Structural cost protection hardening
+[33mbc50ff8[m Structural cost protection hardening
+[33m9a3fb9d[m Structural cost protection hardening
+[33md94e3ca[m Structural cost protection hardening
+[33ma6ee39f[m Structural cost protection hardening
+[33m5ff92bd[m Structural cost protection hardening
+[33mba1e57e[m Structural cost protection hardening
+[33m5830211[m Structural cost protection hardening
+[33m95a61ea[m Structural cost protection hardening
+[33m5e4ce93[m Structural cost protection hardening
+[33m19cad29[m Structural cost protection hardening
+[33mfa5c6b2[m Structural cost protection hardening
+[33m2010812[m Structural cost protection hardening
+[33ma74314b[m Structural cost protection hardening
+[33m2216422[m Structural cost protection hardening
+[33m397234b[m Structural cost protection hardening
+[33m311cecd[m Structural cost protection hardening
+[33m7ec26d6[m Structural cost protection hardening
+[33md33e750[m Structural cost protection hardening
+[33mdb701fc[m Structural cost protection hardening
+[33m68015c6[m Structural cost protection hardening
+[33m6304ffb[m Structural cost protection hardening
+[33m187fcc6[m Structural cost protection hardening
+[33mcb7f7f8[m Structural cost protection hardening
+[33mb1ba419[m Structural cost protection hardening
+[33mff47d33[m Structural cost protection hardening
+[33m6cefde0[m Structural cost protection hardening
+[33mb596756[m Structural cost protection hardening
+[33m46d84a8[m Structural cost protection hardening
+[33me04523e[m Structural cost protection hardening
+[33m0fa54be[m Structural cost protection hardening
+[33mb52cd98[m Structural cost protection hardening
+[33m37c24a1[m Structural cost protection hardening
+[33ma99a02f[m Structural cost protection hardening
+[33ma079de3[m Structural cost protection hardening
+[33m070c036[m Structural cost protection hardening
+[33mb7e1476[m Structural cost protection hardening
+[33m434e732[m stable before layout refactor
+[33m423127e[m stable before layout refactor
+[33m63aacda[m stable before layout refactor
+[33m9841921[m stable before layout refactor
+[33mccf912c[m stable before layout refactor
+[33mb7df89e[m stable before layout refactor
+[33m408df1d[m stable before layout refactor
+[33md755155[m stable before layout refactor
+[33m34af935[m stable before layout refactor
+[33m0ffae93[m stable before layout refactor
+[33m72f2be0[m stable before layout refactor
+[33m8a95493[m stable before layout refactor
+[33mfd1fec1[m stable before layout refactor
+[33m445734d[m stable before layout refactor
+[33m9b6c962[m stable before layout refactor
+[33m18a1c92[m stable before layout refactor
+[33m628fe13[m stable before layout refactor
+[33mddab7f4[m stable before layout refactor
+[33ma03b2cc[m stable before layout refactor
+[33m5145292[m stable before layout refactor
+[33mca33c0d[m stable before layout refactor
+[33me52059d[m stable before layout refactor
+[33m66c4338[m stable before layout refactor
+[33m669d20d[m stable before layout refactor
+[33m565b70f[m Initial commit from Create Next App

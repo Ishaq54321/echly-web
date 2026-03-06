@@ -766,6 +766,7 @@ chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boole
 
   const startSession = useCallback(async () => {
     if (stateRef.current !== "idle" || sessionModeRef.current) return;
+    console.log("[Echly] Start New Feedback Session clicked");
     logSession("start");
     if (extensionMode && onCreateSession && onActiveSessionChange) {
       const session = await onCreateSession();

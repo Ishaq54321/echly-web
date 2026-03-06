@@ -69,7 +69,10 @@ export function ResumeSessionModal({
     setError(null);
     setLoading(true);
     fetchSessions()
-      .then((list) => setSessions(list))
+      .then((list) => {
+        console.log("[Echly] Sessions returned:", list);
+        setSessions(list);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load sessions"))
       .finally(() => setLoading(false));
   }, [open, fetchSessions]);

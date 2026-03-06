@@ -10,11 +10,6 @@ import {
 } from "@/lib/repositories/feedbackRepository";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
-import { updateInstructionGraph } from "@/lib/graph/instructionGraphEngine";
-import {
-  isValidExtractionIntent,
-  type ExtractedInstruction,
-} from "@/lib/server/instructionExtraction";
 import { updateScreenshotAttachedRepo } from "@/lib/repositories/screenshotsRepository";
 
 function serializeFeedback(item: Feedback): Record<string, unknown> {
@@ -258,35 +253,6 @@ export async function POST(req: Request) {
         { success: false, error: "Feedback created but could not be read" },
         { status: 500 }
       );
-    }
-
-    // Update global instruction graph in background (do not block response).
-    const rawInstructions = Array.isArray(body.extractedInstructions)
-      ? body.extractedInstructions
-      : [];
-    const instructions: ExtractedInstruction[] = rawInstructions
-      .map((raw) => {
-        const intent =
-          typeof raw.intent === "string" && isValidExtractionIntent(raw.intent)
-            ? raw.intent
-            : "GENERAL_INVESTIGATION";
-        const entity =
-          typeof raw.entity === "string" ? raw.entity.trim().slice(0, 200) : "";
-        const action =
-          typeof raw.action === "string" ? raw.action.trim().slice(0, 500) : "";
-        const confidence =
-          typeof raw.confidence === "number" &&
-          raw.confidence >= 0 &&
-          raw.confidence <= 1
-            ? raw.confidence
-            : 0.5;
-        return { intent, entity, action, confidence };
-      })
-      .filter((i) => i.entity.length > 0 || i.action.length > 0);
-    if (instructions.length > 0) {
-      updateInstructionGraph(sessionId, docRef.id, instructions).catch((err) => {
-        console.error("[instructionGraphEngine] update failed:", err);
-      });
     }
 
     log("[API] POST /api/feedback duration:", Date.now() - start);

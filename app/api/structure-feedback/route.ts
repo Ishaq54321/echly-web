@@ -3,7 +3,6 @@ import OpenAI from "openai";
 import { requireAuth } from "@/lib/server/auth";
 import { echlyDebug } from "@/lib/utils/logger";
 import { runFeedbackPipeline } from "@/lib/ai/runFeedbackPipeline";
-import type { ExtractedInstruction } from "@/lib/server/instructionExtraction";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -35,10 +34,11 @@ function checkRateLimit(uid: string): boolean {
   return true;
 }
 
-/** Stable response shape. Never return {} or raw AI output. */
+/** Stable response shape. One recording → one ticket; tickets[] has one element for compatibility. */
 type StructureResponse = {
   success: boolean;
   tickets: Array<Record<string, unknown>>;
+  ticket?: { title: string; actionSteps: string[]; confidence: number };
   error?: string;
   clarityScore?: number;
   clarityIssues?: string[];
@@ -47,15 +47,6 @@ type StructureResponse = {
   needsClarification?: boolean;
   verificationIssues?: string[];
   verificationWarnings?: string[];
-  instructionLimitWarning?: string | null;
-  extractedInstructions?: ExtractedInstruction[];
-  intent?: {
-    intentType: string;
-    targetElement: string | null;
-    changeCategory: string;
-    problemSummary: string;
-    confidence: number;
-  };
 };
 
 /**
@@ -109,14 +100,9 @@ export async function POST(req: Request): Promise<Response> {
   echlyDebug("RAW TRANSCRIPT", transcript);
 
   try {
-    const result = await runFeedbackPipeline(
-      client,
-      { transcript, context: body?.context },
-      {
-        useTranscriptNormalization: false,
-        useVerification: true,
-      }
-    );
+    const result = await runFeedbackPipeline(client, { transcript, context: body?.context }, {
+      useVerification: true,
+    });
 
     echlyDebug("PIPELINE RESULT", { success: result.success, ticketCount: result.tickets?.length ?? 0 });
 
