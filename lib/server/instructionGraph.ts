@@ -10,8 +10,7 @@ import { echlyDebug } from "@/lib/utils/logger";
 import type { PipelineContext } from "./pipelineContext";
 import type { PipelineTicket } from "./pipelineStages";
 import type { ExtractedInstruction } from "./instructionExtraction";
-
-const MAX_TITLE_LENGTH = 60;
+import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 
 // ---------------------------------------------------------------------------
 // Graph data structures
@@ -156,8 +155,7 @@ export function ticketsFromGraph(
     const actionSteps = actionsForTarget.map((a) => a.summary);
     const averageConfidence =
       actionsForTarget.reduce((s, a) => s + a.confidence, 0) / actionsForTarget.length;
-    const placeholderTitle =
-      actionSteps[0]?.slice(0, MAX_TITLE_LENGTH).trim() ?? "Requested UI changes";
+    const placeholderTitle = generateTicketTitle(actionSteps);
 
     echlyDebug("TICKET PER ENTITY", {
       element: node.element,

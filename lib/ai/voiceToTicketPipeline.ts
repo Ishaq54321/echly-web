@@ -6,6 +6,7 @@
 import type OpenAI from "openai";
 import { truncateForTokenBudget } from "@/lib/ai/pipelineTokenBudget";
 import type { PipelineContext } from "@/lib/server/pipelineContext";
+import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 
 /** DOM context sent to the AI. Limited to <1000 tokens total. */
 export interface DomContextForAI {
@@ -30,6 +31,7 @@ export interface ExtractedAction {
 
 /** Raw JSON shape returned by the LLM. */
 export interface StructuredFeedbackJSON {
+  title?: string;
   actions: ExtractedAction[];
   confidence: number;
   notes: string;
@@ -90,6 +92,91 @@ Additional:
 - Extract ALL actions mentioned in the transcript. Each action must be a single clear developer instruction.
 - Do NOT create actions not mentioned in the transcript.
 
+TITLE GENERATION RULES
+
+Generate a short ticket title summarizing the overall feedback.
+
+The title must represent the SECTION or ELEMENT being modified, not a specific action step.
+
+The title should summarize the overall change described by all action steps.
+
+Rules:
+
+* 2 to 4 words
+* describe the element or section being modified
+* summarize the overall change
+* do NOT repeat an action step
+* no punctuation
+* generic and concise
+
+Good examples:
+
+Hero Section Update
+Product Page Adjustment
+Pricing Layout Update
+Button Style Fix
+Navigation Menu Update
+Form Validation Fix
+Card Layout Improvement
+
+Bad examples:
+
+Change Button Text
+Increase Padding
+Move Price Higher
+Zoom Image Out
+
+Those are action steps, not titles.
+
+When generating the title, prioritize identifying the primary page area or element being modified.
+
+Examples:
+
+If feedback mentions hero area → "Hero Section Update"
+If feedback mentions pricing table → "Pricing Section Update"
+If feedback mentions product page elements → "Product Page Update"
+If feedback modifies buttons → "Button Style Update"
+
+GENERIC CROSS-INDUSTRY EXAMPLES
+
+Additional generic examples:
+
+If feedback modifies a video or media preview → "Visual Update"
+
+If feedback modifies an image or visual asset → "Visual Asset Update"
+
+If feedback modifies written text → "Text Content Update"
+
+If feedback modifies wording or messaging → "Content Message Update"
+
+If feedback modifies layout or positioning → "Layout Adjustment"
+
+If feedback modifies styling or appearance → "Style Adjustment"
+
+If feedback modifies functionality or behavior → "Functionality Update"
+
+If feedback modifies a specific element → "Element Update"
+
+These examples must remain generic so they work across:
+design
+marketing
+product
+video
+development
+content editing
+documentation
+general feedback
+
+Ensure the response JSON includes: "title": "..."
+
+Example full response:
+{
+  "title": "Hero Layout Adjustment",
+  "actions": [...],
+  "confidence": 0.93,
+  "notes": ""
+}
+
 Return JSON only.`;
 
 function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomContextForAI {
@@ -119,7 +206,7 @@ function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomCon
 function truncateDomContextToBudget(ctx: DomContextForAI): DomContextForAI {
   const maxChars = DOM_CONTEXT_MAX_TOKENS * CHARS_PER_TOKEN;
   const fixedChars = (ctx.pageURL?.length ?? 0) + (ctx.domPath?.length ?? 0);
-  let remaining = maxChars - fixedChars;
+  const remaining = maxChars - fixedChars;
   if (remaining <= 0) {
     return { ...ctx, elementHTML: null, nearbyText: null, visibleText: null };
   }
@@ -186,6 +273,7 @@ const FEEDBACK_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
+    title: { type: "string" },
     actions: {
       type: "array",
       items: {
@@ -203,7 +291,7 @@ const FEEDBACK_JSON_SCHEMA = {
     confidence: { type: "number" },
     notes: { type: "string" },
   },
-  required: ["actions", "confidence", "notes"],
+  required: ["title", "actions", "confidence", "notes"],
 } as const;
 
 /** Fallback when parsing fails or actions array is missing. */
@@ -247,23 +335,19 @@ function parseStructuredResponse(text: string): StructuredFeedbackJSON | null {
     const confidence =
       typeof o.confidence === "number" && o.confidence >= 0 && o.confidence <= 1 ? o.confidence : 0.8;
     const notes = typeof o.notes === "string" ? o.notes : "";
-    return { actions, confidence, notes };
+    const title = typeof o.title === "string" ? o.title.trim() : "";
+    return { title, actions, confidence, notes };
   } catch {
     return null;
   }
 }
 
-/**
- * Deterministic ticket title from first action. No LLM call.
- */
-function generateTicketTitle(actions: ExtractedAction[]): string {
-  if (!actions || actions.length === 0) {
-    return "Update UI element";
-  }
-  const first = actions[0].description?.trim() || "Update UI element";
-  const normalized =
-    first.charAt(0).toUpperCase() + first.slice(1);
-  return normalized.slice(0, 60);
+/** Sanitize AI-generated title: max 5 words, max 60 characters. */
+function sanitizeTitle(title: string): string {
+  if (!title) return "";
+  const words = title.split(/\s+/).slice(0, 5);
+  const cleaned = words.join(" ");
+  return cleaned.slice(0, 60);
 }
 
 /**
@@ -369,11 +453,19 @@ export async function runVoiceToTicket(
     finalJson = await reviewStructuredFeedback(client, transcript, json);
   }
 
-  const title = generateTicketTitle(finalJson.actions);
   const actionSteps = finalJson.actions
     .sort((a, b) => a.step - b.step)
     .map((a) => a.description.trim())
     .filter(Boolean);
+
+  const aiTitle =
+    typeof finalJson.title === "string"
+      ? sanitizeTitle(finalJson.title)
+      : "";
+  const title =
+    aiTitle.length > 0
+      ? aiTitle
+      : generateTicketTitle(actionSteps);
 
   const ticket: VoiceTicket = {
     title,

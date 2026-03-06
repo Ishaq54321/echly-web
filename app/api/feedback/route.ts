@@ -11,6 +11,7 @@ import {
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
 import { updateScreenshotAttachedRepo } from "@/lib/repositories/screenshotsRepository";
+import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 
 function serializeFeedback(item: Feedback): Record<string, unknown> {
   const out = { ...item } as Record<string, unknown>;
@@ -171,12 +172,19 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const actionSteps =
+    Array.isArray(body.actionSteps)
+      ? body.actionSteps.filter((s): s is string => typeof s === "string" && s.trim().length > 0).map((s) => s.trim())
+      : [];
+  const title =
+    actionSteps.length > 0
+      ? generateTicketTitle(actionSteps)
+      : (typeof body.title === "string" ? body.title.trim() : "");
   const description =
     typeof body.description === "string" ? body.description.trim() : "";
   if (!title) {
     return NextResponse.json(
-      { success: false, error: "title is required" },
+      { success: false, error: "title is required (or provide actionSteps)" },
       { status: 400 }
     );
   }
@@ -204,7 +212,7 @@ export async function POST(req: Request) {
     type: "general" as const,
     contextSummary:
       typeof body.contextSummary === "string" ? body.contextSummary : undefined,
-    actionSteps: Array.isArray(body.actionSteps) ? body.actionSteps : undefined,
+    actionSteps: actionSteps.length > 0 ? actionSteps : undefined,
     suggestedTags: Array.isArray(body.suggestedTags)
       ? body.suggestedTags
       : undefined,
