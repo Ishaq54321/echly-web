@@ -17,9 +17,7 @@
 import type OpenAI from "openai";
 import { runVoiceToTicket } from "@/lib/ai/voiceToTicketPipeline";
 
-// ---------------------------------------------------------------------------
-// Capture: normalize request
-// ---------------------------------------------------------------------------
+/* ===== CAPTURE: NORMALIZE REQUEST ===== */
 
 export interface PipelineCaptureInput {
   transcript: string;
@@ -33,9 +31,7 @@ export function normalizeInput(raw: PipelineCaptureInput): { transcript: string;
   return { transcript, context };
 }
 
-// ---------------------------------------------------------------------------
-// Pipeline output (stable API shape for structure-feedback and UI)
-// ---------------------------------------------------------------------------
+/* ===== PIPELINE OUTPUT ===== */
 
 export interface PipelineOutput {
   success: boolean;

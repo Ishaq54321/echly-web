@@ -72,8 +72,6 @@ export type CaptureWidgetProps = {
   onExpandRequest?: () => void;
   /** Called when user clicks close (X) to collapse (extension sends ECHLY_COLLAPSE_WIDGET). */
   onCollapseRequest?: () => void;
-  /** Optional: fetch live title/tags/priority while user is speaking (instant structured insight). */
-  liveStructureFetch?: (transcript: string) => Promise<{ title: string; tags: string[]; priority: string } | null>;
   /** When true, Add Feedback button is disabled (e.g. no active session in extension). No message shown. */
   captureDisabled?: boolean;
   /** Theme for widget (dark/light). When provided with onThemeToggle, theme toggle is shown. */
@@ -107,7 +105,5 @@ export type CaptureWidgetProps = {
   /** Extension: notify background that session ended (disable overlay in all tabs). */
   onSessionModeEnd?: () => void;
 };
-
-export type LiveStructured = { title: string; tags: string[]; priority: string };
 
 export type Position = { x: number; y: number };

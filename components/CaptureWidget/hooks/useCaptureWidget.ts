@@ -46,6 +46,7 @@ type SpeechRecognitionInstance = { start(): void; stop(): void };
 interface SpeechRecognitionResultItem {
   0: { transcript: string };
   length: number;
+  isFinal: boolean;
 }
 
 /** Web Speech API result event (for recognition.onresult). */
@@ -62,6 +63,9 @@ declare global {
       lang: string;
       onresult: ((e: SpeechRecognitionResultEvent) => void) | null;
       onend: (() => void) | null;
+      onstart?: (() => void) | null;
+      onspeechstart?: (() => void) | null;
+      onaudiostart?: (() => void) | null;
     };
     webkitSpeechRecognition?: new () => SpeechRecognitionInstance & {
       continuous: boolean;
@@ -69,6 +73,9 @@ declare global {
       lang: string;
       onresult: ((e: SpeechRecognitionResultEvent) => void) | null;
       onend: (() => void) | null;
+      onstart?: (() => void) | null;
+      onspeechstart?: (() => void) | null;
+      onaudiostart?: (() => void) | null;
     };
   }
 }
@@ -87,9 +94,6 @@ const CAPTURE_FLOW_STATES: CaptureState[] = [
   "processing",
 ];
 
-const LIVE_STRUCTURE_DEBOUNCE_MS = 1800;
-const LIVE_STRUCTURE_MIN_LENGTH = 12;
-
 export function useCaptureWidget({
   sessionId,
   extensionMode = false,
@@ -97,7 +101,6 @@ export function useCaptureWidget({
   onComplete,
   onDelete,
   onRecordingChange,
-  liveStructureFetch,
   loadSessionWithPointers,
   onSessionLoaded,
   onCreateSession,
@@ -109,6 +112,9 @@ export function useCaptureWidget({
   onSessionModeResume,
   onSessionModeEnd,
 }: CaptureWidgetProps) {
+  if (process.env.NODE_ENV === "development") {
+    console.count("useCaptureWidget render");
+  }
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
   const [isOpen, setIsOpenState] = useState(false);
@@ -125,7 +131,6 @@ export function useCaptureWidget({
   const [position, setPosition] = useState<Position | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [pendingStructured, setPendingStructured] = useState<StructuredFeedback | null>(null);
-  const [liveStructured, setLiveStructured] = useState<{ title: string; tags: string[]; priority: string } | null>(null);
   const [listeningAudioLevel, setListeningAudioLevel] = useState(0);
   const [widgetOpenBeforeCapture, setWidgetOpenBeforeCapture] = useState(true);
   const [highlightTicketId, setHighlightTicketId] = useState<string | null>(null);
@@ -160,11 +165,16 @@ export function useCaptureWidget({
   const stateRef = useRef<CaptureState>(state);
   const editingIdRef = useRef<string | null>(null);
   const trayLockedRef = useRef(false);
-  const liveStructureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
+  /** [VOICE] Diagnostic: timestamp when UI recording started (startListening called). */
+  const voiceStartTimeRef = useRef<number | null>(null);
+  /** [VOICE] Diagnostic: timestamp when recognition.onstart fired. */
+  const recognitionOnstartTimeRef = useRef<number | null>(null);
+  /** [VOICE] Diagnostic: whether first transcript chunk has been logged for this session. */
+  const hasReceivedFirstTranscriptRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
@@ -237,42 +247,6 @@ export function useCaptureWidget({
       onRecordingChange(false);
     }
   }, [state, onRecordingChange]);
-
-  /** Live structured title while user is speaking */
-  useEffect(() => {
-    if (state !== "voice_listening" || !liveStructureFetch || !activeRecordingId) {
-      setLiveStructured(null);
-      if (liveStructureTimeoutRef.current) {
-        clearTimeout(liveStructureTimeoutRef.current);
-        liveStructureTimeoutRef.current = null;
-      }
-      return;
-    }
-    const active = recordings.find((r) => r.id === activeRecordingId);
-    const transcript = (active?.transcript ?? "").trim();
-    if (transcript.length < LIVE_STRUCTURE_MIN_LENGTH) {
-      if (liveStructureTimeoutRef.current) {
-        clearTimeout(liveStructureTimeoutRef.current);
-        liveStructureTimeoutRef.current = null;
-      }
-      return;
-    }
-    if (liveStructureTimeoutRef.current) clearTimeout(liveStructureTimeoutRef.current);
-    liveStructureTimeoutRef.current = setTimeout(() => {
-      liveStructureTimeoutRef.current = null;
-      liveStructureFetch(transcript)
-        .then((result) => {
-          if (result && stateRef.current === "voice_listening") setLiveStructured(result);
-        })
-        .catch(() => {});
-    }, LIVE_STRUCTURE_DEBOUNCE_MS);
-    return () => {
-      if (liveStructureTimeoutRef.current) {
-        clearTimeout(liveStructureTimeoutRef.current);
-        liveStructureTimeoutRef.current = null;
-      }
-    };
-  }, [state, activeRecordingId, recordings, liveStructureFetch]);
 
   const setIsOpen = useCallback((next: boolean) => {
     if (next === false) {
@@ -419,11 +393,44 @@ export function useCaptureWidget({
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
+    recognition.onstart = () => {
+      const t = Date.now();
+      recognitionOnstartTimeRef.current = t;
+      console.log("[VOICE] recognition.onstart", t);
+      const startTime = voiceStartTimeRef.current;
+      if (startTime != null) {
+        console.log("[VOICE] delay UI recording start→onstart:", t - startTime, "ms");
+      }
+    };
+    recognition.onspeechstart = () => {
+      console.log("[VOICE] speech detected", Date.now());
+    };
+    recognition.onaudiostart = () => {
+      console.log("[VOICE] audio start", Date.now());
+    };
     recognition.onresult = (event: SpeechRecognitionResultEvent) => {
       let text = "";
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const item: SpeechRecognitionResultItem = event.results[i];
-        if (item && item[0]) text += item[0].transcript;
+      for (let i = 0; i < event.results.length; ++i) {
+        const result: SpeechRecognitionResultItem = event.results[i];
+        const item = result[0];
+        if (!item) continue;
+
+        text += item.transcript + " ";
+      }
+      text = text.replace(/\s+/g, " ").trim();
+      const t = Date.now();
+      console.log("[VOICE] transcript received", t, text);
+      if (text && !hasReceivedFirstTranscriptRef.current) {
+        hasReceivedFirstTranscriptRef.current = true;
+        console.log("[VOICE] first transcript chunk:", text, "length:", text.length);
+        const startTime = voiceStartTimeRef.current;
+        const onstartTime = recognitionOnstartTimeRef.current;
+        if (startTime != null) {
+          console.log("[VOICE] delay UI→first transcript:", t - startTime, "ms");
+        }
+        if (onstartTime != null) {
+          console.log("[VOICE] delay onstart→first transcript:", t - onstartTime, "ms");
+        }
       }
       const activeId = activeRecordingIdRef.current;
       if (activeId) {
@@ -452,6 +459,11 @@ export function useCaptureWidget({
   /* ================= LISTEN ================= */
 
   const startListening = useCallback(async () => {
+    const startTime = Date.now();
+    voiceStartTimeRef.current = startTime;
+    recognitionOnstartTimeRef.current = null;
+    hasReceivedFirstTranscriptRef.current = false;
+    console.log("[VOICE] UI recording started", startTime);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
@@ -463,6 +475,7 @@ export function useCaptureWidget({
       src.connect(analyser);
       audioContextRef.current = ctx;
       analyserRef.current = analyser;
+      console.log("[VOICE] recognition.start() called", Date.now());
       recognitionRef.current?.start();
       setState("voice_listening");
       setListeningAudioLevel(0);
@@ -488,10 +501,9 @@ export function useCaptureWidget({
     }
     const currentRecordings = recordingsRef.current;
     const active = currentRecordings.find((r) => r.id === activeId);
-    const transcript = active?.transcript?.trim() ?? "";
-    if (!active || transcript.length === 0) {
-      setSessionFeedbackPending(null);
-      lastSessionClickedElementRef.current = null;
+    console.log("[VOICE] finishListening transcript:", active?.transcript);
+    if (!active || !active.transcript || active.transcript.trim().length < 5) {
+      console.warn("[VOICE] transcript too short, skipping pipeline");
       setState("idle");
       return;
     }
@@ -520,6 +532,7 @@ export function useCaptureWidget({
         setActiveRecordingId(null);
         setState("idle");
         lastSessionClickedElementRef.current = null;
+        console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
         onComplete(active.transcript, active.screenshot, {
           onSuccess: (ticket) => {
             if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
@@ -538,6 +551,7 @@ export function useCaptureWidget({
         return;
       }
       setState("processing");
+      console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
       onComplete(active.transcript, active.screenshot, {
         onSuccess: (ticket) => {
           setPointers((prev) => [
@@ -565,6 +579,7 @@ export function useCaptureWidget({
       return;
     }
     setState("processing");
+    console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
     try {
       const structured = await onComplete(active.transcript, active.screenshot);
       if (!structured) {
@@ -933,6 +948,7 @@ chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boole
       lastSessionClickedElementRef.current = null;
 
       /* Send to structure-feedback async; update marker and list when done. */
+      console.log("[VOICE] final transcript sent to pipeline:", transcript);
       onComplete(transcript, pending.screenshot, {
         onSuccess: (ticket) => {
           if (root) {
@@ -1105,7 +1121,6 @@ chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boole
       editedDescription,
       showMenu,
       position,
-      liveStructured,
       liveTranscript,
       listeningAudioLevel,
       listeningSentiment,

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { X, MoreHorizontal, Pencil, Trash2, CheckCircle2, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import type { Comment } from "@/lib/domain/comment";
+import { formatCommentDate } from "@/lib/utils/formatCommentDate";
 
 const PANEL_WIDTH = 380;
 
@@ -21,16 +22,6 @@ export interface CommentPanelProps {
   currentUserId?: string | null;
   updateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
   deleteComment?: (commentId: string) => Promise<void>;
-}
-
-function formatDate(value: Comment["createdAt"]): string {
-  if (value == null) return "Just now";
-  const seconds = typeof value === "object" && value !== null && "seconds" in value ? (value as { seconds: number }).seconds : null;
-  if (seconds != null) {
-    const d = new Date(seconds * 1000);
-    return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  }
-  return "Just now";
 }
 
 const CommentRow = memo(function CommentRow({
@@ -125,7 +116,7 @@ const CommentRow = memo(function CommentRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap gap-y-0">
           <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))]">{comment.userName}</span>
-          <span className="text-[10px] text-[hsl(var(--text-tertiary))]">{formatDate(comment.createdAt)}</span>
+          <span className="text-[10px] text-[hsl(var(--text-tertiary))]">{formatCommentDate(comment.createdAt)}</span>
           {size === "root" && (isAuthor || showResolve) && (updateComment || deleteComment) && (
             <div className="relative ml-auto shrink-0 overflow-visible" ref={menuRef}>
               <button

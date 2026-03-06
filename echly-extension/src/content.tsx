@@ -299,6 +299,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           };
           const structureBody = { transcript, context: enrichedContext };
           try {
+            console.log("[VOICE] final transcript submitted", transcript);
             const res = await apiFetch("/api/structure-feedback", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -494,6 +495,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           url: context?.url ?? currentUrl,
         },
       };
+      console.log("[VOICE] final transcript submitted", transcript);
       const res = await apiFetch("/api/structure-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -941,33 +943,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     }
   }, [isEditingFeedback]);
 
-  const liveStructureFetch = React.useCallback(
-    async (transcript: string): Promise<{ title: string; tags: string[]; priority: string } | null> => {
-      try {
-        const res = await apiFetch("/api/structure-feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: transcript.trim() }),
-        });
-        const data = (await res.json()) as {
-          success?: boolean;
-          tickets?: Array<{
-            title?: string;
-            suggestedTags?: string[];
-          }>;
-        };
-        if (!data.success || !Array.isArray(data.tickets) || data.tickets.length === 0) return null;
-        const t = data.tickets[0];
-        const title = typeof t.title === "string" ? t.title : "";
-        const tags = Array.isArray(t.suggestedTags) ? t.suggestedTags : [];
-        return { title, tags, priority: "medium" };
-      } catch {
-        return null;
-      }
-    },
-    []
-  );
-
   if (!authChecked) {
     return null;
   }
@@ -1172,7 +1147,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         expanded={globalState.expanded}
         onExpandRequest={onExpandRequest}
         onCollapseRequest={onCollapseRequest}
-        liveStructureFetch={liveStructureFetch}
         captureDisabled={false}
         theme={theme}
         onThemeToggle={onThemeToggle}

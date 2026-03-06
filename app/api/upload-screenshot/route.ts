@@ -67,11 +67,14 @@ export async function POST(req: Request) {
 
     const screenshotRef = ref(storage, storagePath);
 
+    const uploadStart = Date.now();
     await uploadString(screenshotRef, imageDataUrl, "data_url", {
       contentType: "image/png",
     });
 
     const url = await getDownloadURL(screenshotRef);
+    const uploadDuration = Date.now() - uploadStart;
+    console.log(`[UPLOAD] screenshot upload duration: ${uploadDuration}ms`);
 
     return NextResponse.json({ url });
   } catch (err) {

@@ -1,26 +1,7 @@
 "use client";
 
 import React from "react";
-
-function formatDate(
-  value: string | { seconds: number } | null | undefined
-): string {
-  if (value == null) return "—";
-  let d: Date;
-  if (typeof value === "string") {
-    d = new Date(value);
-  } else if (typeof value === "object" && typeof value.seconds === "number") {
-    d = new Date(value.seconds * 1000);
-  } else {
-    return "—";
-  }
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+import { formatCommentDate } from "@/lib/utils/formatCommentDate";
 
 export interface TicketMetadataProps {
   createdAt?: string | { seconds: number } | null;
@@ -42,13 +23,13 @@ export function TicketMetadata({
         <div>
           <dt className="text-[hsl(var(--text-tertiary))]">Created</dt>
           <dd className="text-[hsl(var(--text-primary-strong))] font-medium">
-            {formatDate(createdAt)}
+            {formatCommentDate(createdAt, { fallback: "—", includeTime: false, includeYear: true })}
           </dd>
         </div>
         <div>
           <dt className="text-[hsl(var(--text-tertiary))]">Updated</dt>
           <dd className="text-[hsl(var(--text-primary-strong))] font-medium">
-            {formatDate(updatedAt)}
+            {formatCommentDate(updatedAt, { fallback: "—", includeTime: false, includeYear: true })}
           </dd>
         </div>
         <div>

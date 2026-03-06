@@ -5,8 +5,12 @@
 
 import type OpenAI from "openai";
 import { truncateForTokenBudget } from "@/lib/ai/pipelineTokenBudget";
+import { SYSTEM_PROMPT } from "@/lib/ai/prompts/interpreterPrompt";
+import { REVIEW_PROMPT } from "@/lib/ai/prompts/reviewPrompt";
 import type { PipelineContext } from "@/lib/server/pipelineContext";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
+
+/* ===== DOM CONTEXT & TYPES ===== */
 
 /** DOM context sent to the AI. Limited to <1000 tokens total. */
 export interface DomContextForAI {
@@ -44,140 +48,6 @@ export interface VoiceTicket {
   confidence: number;
   notes?: string;
 }
-
-/**
- * Interpreter prompt for the structure-feedback AI stage.
- * The AI acts as a strict speech-to-structured-task interpreter: it must ONLY structure, polish,
- * clarify, and organize what the user actually said — never invent or guess content.
- */
-const SYSTEM_PROMPT = `You are a strict speech-to-structured-task interpreter. You convert spoken product feedback into structured developer actions. You must ONLY structure, polish, clarify, and organize what the user actually said. You must NEVER generate new content that the user did not say.
-
-RULE 1 — NO CONTENT GENERATION
-- You must NEVER generate new content, marketing copy, or sentences that were not spoken by the user.
-- You must ONLY: structure, polish, clarify, organize what the user actually said.
-- You must NOT: invent text, headlines, descriptions, names, file references, or URLs.
-- If the user did not speak the exact content, you must not create it.
-
-RULE 2 — HANDLE EXTERNAL REFERENCES SAFELY
-- If the user references something outside the screenshot (documents, Figma files, shared folders, other websites, previous designs), keep the instruction referential. Do NOT invent the referenced content.
-- Example: "Match the headline with the one from the other website" → "Update the headline to match the messaging used on the other website." Do NOT invent the headline.
-
-RULE 3 — HANDLE VAGUE OR INCOMPLETE INSTRUCTIONS
-- If the user instruction is vague, incomplete, or lacks specific details, do NOT guess missing information. Create a generic instruction reflecting the user's intent.
-- Example: "Make this section better" → "Improve the design or functionality of this section." NOT "Increase spacing and improve typography."
-
-RULE 4 — SPLIT CLEAR MULTI-STEP INSTRUCTIONS
-- If the user clearly describes multiple actions, separate them into multiple action steps (one action per step).
-
-RULE 5 — PRESERVE UNCERTAINTY
-- If the user speaks with uncertainty ("maybe", "around", "something like"), preserve that uncertainty instead of converting it into an exact requirement.
-- Example: "Maybe make the image around 20% bigger" → "Increase the image size by approximately 20%."
-
-RULE 6 — IGNORE SPEECH FRAGMENTS
-- If a transcript fragment contains only filler speech ("or something like that", "you know", "kind of", "maybe", "yeah") and does not contain a meaningful instruction, do not create a new action. Return empty actions or a single generic note if nothing substantive was said.
-
-TRANSCRIPT NORMALIZATION RULES
-Speech recognition artifacts may appear in transcripts.
-Example: "this wholesalection feels a little cramped"
-Correct output: "Increase the spacing between the cards in this section"
-
-1. If a word appears to be a malformed or merged speech-to-text artifact (for example "wholesalection", "kindaarea", etc.) rewrite the phrase into clear natural English.
-2. Prefer neutral phrases such as: "this section", "this area", "this card group".
-3. Do NOT invent section names unless they appear in visibleText or nearbyText.
-4. Maintain the user's intent but normalize spelling and grammar.
-5. Remove obvious transcription artifacts that do not exist in normal English.
-
-Additional:
-- The transcript is the source of truth. DOM context is only used to correct UI element names (e.g. button labels, section names visible on the page).
-- Extract ALL actions mentioned in the transcript. Each action must be a single clear developer instruction.
-- Do NOT create actions not mentioned in the transcript.
-
-TITLE GENERATION RULES
-
-Generate a short ticket title summarizing the overall feedback.
-
-The title must represent the SECTION or ELEMENT being modified, not a specific action step.
-
-The title should summarize the overall change described by all action steps.
-
-Rules:
-
-* 2 to 4 words
-* describe the element or section being modified
-* summarize the overall change
-* do NOT repeat an action step
-* no punctuation
-* generic and concise
-
-Good examples:
-
-Hero Section Update
-Product Page Adjustment
-Pricing Layout Update
-Button Style Fix
-Navigation Menu Update
-Form Validation Fix
-Card Layout Improvement
-
-Bad examples:
-
-Change Button Text
-Increase Padding
-Move Price Higher
-Zoom Image Out
-
-Those are action steps, not titles.
-
-When generating the title, prioritize identifying the primary page area or element being modified.
-
-Examples:
-
-If feedback mentions hero area → "Hero Section Update"
-If feedback mentions pricing table → "Pricing Section Update"
-If feedback mentions product page elements → "Product Page Update"
-If feedback modifies buttons → "Button Style Update"
-
-GENERIC CROSS-INDUSTRY EXAMPLES
-
-Additional generic examples:
-
-If feedback modifies a video or media preview → "Visual Update"
-
-If feedback modifies an image or visual asset → "Visual Asset Update"
-
-If feedback modifies written text → "Text Content Update"
-
-If feedback modifies wording or messaging → "Content Message Update"
-
-If feedback modifies layout or positioning → "Layout Adjustment"
-
-If feedback modifies styling or appearance → "Style Adjustment"
-
-If feedback modifies functionality or behavior → "Functionality Update"
-
-If feedback modifies a specific element → "Element Update"
-
-These examples must remain generic so they work across:
-design
-marketing
-product
-video
-development
-content editing
-documentation
-general feedback
-
-Ensure the response JSON includes: "title": "..."
-
-Example full response:
-{
-  "title": "Hero Layout Adjustment",
-  "actions": [...],
-  "confidence": 0.93,
-  "notes": ""
-}
-
-Return JSON only.`;
 
 function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomContextForAI {
   if (!ctx) {
@@ -258,6 +128,12 @@ function normalizeRawContext(raw: unknown): PipelineContext | null {
 }
 
 function buildUserMessage(transcript: string, domContext: DomContextForAI): string {
+  const elementHTMLChars = (domContext.elementHTML ?? "").length;
+  const nearbyTextChars = (domContext.nearbyText ?? "").length;
+  const visibleTextChars = (domContext.visibleText ?? "").length;
+  console.log(
+    `[DOM CONTEXT] elementHTML chars=${elementHTMLChars} nearbyText chars=${nearbyTextChars} visibleText chars=${visibleTextChars}`
+  );
   const parts: string[] = [`Transcript:\n${transcript.trim()}`];
   parts.push("\nContext (use only to correct UI names):");
   if (domContext.pageURL) parts.push(`Page URL: ${domContext.pageURL}`);
@@ -267,6 +143,8 @@ function buildUserMessage(transcript: string, domContext: DomContextForAI): stri
   if (domContext.visibleText) parts.push(`Visible text:\n${domContext.visibleText}`);
   return parts.join("\n");
 }
+
+/* ===== EXTRACTION & PARSING ===== */
 
 /** JSON schema for strict extraction output. Enforced via response_format. */
 const FEEDBACK_JSON_SCHEMA = {
@@ -350,6 +228,8 @@ function sanitizeTitle(title: string): string {
   return cleaned.slice(0, 60);
 }
 
+/* ===== GPT CALLS ===== */
+
 /**
  * Single GPT-4o-mini call: transcript + domContext → structured JSON.
  * Uses response_format json_schema so output is always valid JSON matching the schema.
@@ -361,6 +241,7 @@ export async function extractStructuredFeedback(
   domContext: DomContextForAI
 ): Promise<{ json: StructuredFeedbackJSON; raw: string }> {
   const userMessage = buildUserMessage(transcript, domContext);
+  const start = Date.now();
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.2,
@@ -378,6 +259,11 @@ export async function extractStructuredFeedback(
       { role: "user", content: userMessage },
     ],
   });
+  const duration = Date.now() - start;
+  console.log(`[AI PIPELINE] extractStructuredFeedback duration: ${duration}ms`);
+  const promptTokens = completion.usage?.prompt_tokens ?? 0;
+  const completionTokens = completion.usage?.completion_tokens ?? 0;
+  console.log(`[AI TOKENS] prompt=${promptTokens} completion=${completionTokens}`);
   const raw = completion.choices[0]?.message?.content?.trim() ?? "";
   const json = parseStructuredResponse(raw);
   if (!json || !Array.isArray(json.actions) || json.actions.length === 0) {
@@ -385,9 +271,6 @@ export async function extractStructuredFeedback(
   }
   return { json, raw };
 }
-
-/** Review pass: enforce strict interpreter rules — remove invented actions, do not add content the user did not say. */
-const REVIEW_PROMPT = `Review the transcript and the list of actions. Apply strict interpreter rules: remove any actions that contain content the user did not say (no invented text, headlines, or descriptions). Add only actions that were clearly in the transcript. Fix wording to reflect the user's words only; do not invent or guess. Return the same JSON shape: {"actions":[{"step":1,"description":"...","entity":"...","confidence":0.9}],"confidence":0.9,"notes":"..."}. JSON only.`;
 
 /**
  * Optional second pass when confidence < 0.85.
@@ -414,6 +297,8 @@ export async function reviewStructuredFeedback(
   }
 }
 
+/* ===== PUBLIC API ===== */
+
 /**
  * Run the minimal pipeline: transcript + context → one ticket.
  * One transcript → one ticket. Multiple actions become actionSteps on that ticket; never multiple tickets.
@@ -433,8 +318,11 @@ export async function runVoiceToTicket(
   suggestedRewrite: string | null;
 }> {
   const runReviewThreshold = options.runReviewBelowConfidence ?? 0.85;
+  const pipelineStart = Date.now();
 
   if (!transcript || !transcript.trim()) {
+    const pipelineDuration = Date.now() - pipelineStart;
+    console.log(`[AI PIPELINE] runVoiceToTicket duration: ${pipelineDuration}ms`);
     return {
       success: true,
       ticket: { title: "", actionSteps: [], confidence: 0 },
@@ -476,6 +364,9 @@ export async function runVoiceToTicket(
 
   const clarityScore = Math.round(finalJson.confidence * 100);
   const needsClarification = finalJson.confidence < 0.6;
+
+  const pipelineDuration = Date.now() - pipelineStart;
+  console.log(`[AI PIPELINE] runVoiceToTicket duration: ${pipelineDuration}ms`);
 
   return {
     success: true,

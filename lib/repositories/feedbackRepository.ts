@@ -16,7 +16,6 @@ import {
   updateDoc,
   where,
   increment,
-  writeBatch,
   type DocumentReference,
   type QueryDocumentSnapshot,
   type Timestamp,
@@ -303,7 +302,10 @@ export async function getSessionFeedbackPageRepo(
           orderBy("createdAt", "desc"),
           limit(pageSize)
         );
+  const start = Date.now();
   const snapshot = await getDocs(q);
+  const duration = Date.now() - start;
+  console.log(`[FIRESTORE] query duration: ${duration}ms`);
   const docs = snapshot.docs;
   const feedback = docs.map(docToFeedback);
   const lastVisibleDoc =
@@ -322,7 +324,9 @@ export async function getSessionFeedbackPageWithStringCursorRepo(
   const coll = collection(db, "feedback");
   let startAfterDoc: QueryDocumentSnapshot | null = null;
   if (cursorDocId && cursorDocId.trim() !== "") {
+    const cursorStart = Date.now();
     const cursorSnap = await getDoc(doc(db, "feedback", cursorDocId));
+    console.log(`[FIRESTORE] query duration: ${Date.now() - cursorStart}ms`);
     if (cursorSnap.exists()) startAfterDoc = cursorSnap as QueryDocumentSnapshot;
   }
   const q =
@@ -340,7 +344,9 @@ export async function getSessionFeedbackPageWithStringCursorRepo(
           orderBy("createdAt", "desc"),
           limit(pageSize)
         );
+  const start = Date.now();
   const snapshot = await getDocs(q);
+  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   const docs = snapshot.docs;
   const feedback = docs.map(docToFeedback);
   const lastDoc = docs.length > 0 ? docs[docs.length - 1] : null;
@@ -353,7 +359,9 @@ export async function getSessionFeedbackPageWithStringCursorRepo(
 export async function getSessionFeedbackCountRepo(sessionId: string): Promise<number> {
   const coll = collection(db, "feedback");
   const q = query(coll, where("sessionId", "==", sessionId));
+  const start = Date.now();
   const snapshot = await getCountFromServer(q);
+  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   return snapshot.data().count;
 }
 
@@ -416,6 +424,7 @@ export async function getSessionFeedbackCountsRepo(
   sessionId: string
 ): Promise<SessionFeedbackCounts> {
   const coll = collection(db, "feedback");
+  const start = Date.now();
   const [resolvedSnap, skippedSnap, totalSnap] = await Promise.all([
     getCountFromServer(
       query(coll, where("sessionId", "==", sessionId), where("status", "==", "resolved"))
@@ -425,6 +434,7 @@ export async function getSessionFeedbackCountsRepo(
     ),
     getSessionFeedbackTotalCountRepo(sessionId),
   ]);
+  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   const resolved = resolvedSnap.data().count;
   const skipped = skippedSnap.data().count;
   const total = totalSnap;
@@ -442,7 +452,9 @@ export async function getSessionFeedbackTotalCountRepo(
     collection(db, "feedback"),
     where("sessionId", "==", sessionId)
   );
+  const start = Date.now();
   const snap = await getCountFromServer(q);
+  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   return snap.data().count;
 }
 
@@ -460,7 +472,9 @@ export async function deleteAllFeedbackForSessionRepo(
     where("sessionId", "==", sessionId),
     limit(DELETE_SESSION_FEEDBACK_LIMIT)
   );
+  const start = Date.now();
   const snapshot = await getDocs(q);
+  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   await Promise.all(snapshot.docs.map((d) => deleteDoc(d.ref)));
 }
 
@@ -484,7 +498,9 @@ export async function getSessionFeedbackByResolvedRepo(
     orderBy("createdAt", "desc"),
     limit(max)
   );
+  const start = Date.now();
   const snapshot = await getDocs(q);
+  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   return snapshot.docs.map(docToFeedback);
 }
 
@@ -494,7 +510,9 @@ const OVERVIEW_FEEDBACK_BY_IDS_LIMIT = 10;
 export async function getFeedbackByIdRepo(
   feedbackId: string
 ): Promise<Feedback | null> {
+  const start = Date.now();
   const snap = await getDoc(doc(db, "feedback", feedbackId));
+  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   if (!snap.exists()) return null;
   return docToFeedback(snap as QueryDocumentSnapshot);
 }
@@ -507,9 +525,11 @@ export async function getFeedbackByIdsRepo(
   if (feedbackIds.length === 0) return [];
   const limited = feedbackIds.slice(0, max);
   assertQueryLimit(limited.length, "getFeedbackByIdsRepo");
+  const start = Date.now();
   const snaps = await Promise.all(
     limited.map((id) => getDoc(doc(db, "feedback", id)))
   );
+  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   return snaps
     .filter((s) => s.exists())
     .map((s) => docToFeedback(s as QueryDocumentSnapshot));

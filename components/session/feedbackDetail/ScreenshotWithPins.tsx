@@ -7,6 +7,7 @@ import { Expand, CheckCircle2, ExternalLink } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import type { Comment } from "@/lib/domain/comment";
 import type { CommentPosition } from "@/lib/domain/comment";
+import { formatCommentDate } from "@/lib/utils/formatCommentDate";
 
 const PIN_SIZE_PX = 23;
 const POPOVER_GAP_PERCENT = 2;
@@ -16,16 +17,6 @@ const POPOVER_MAX_WIDTH = 380;
 const POPOVER_Z_INDEX = 10050;
 const POPOVER_STYLE =
   "rounded-xl bg-white border border-neutral-200/80 shadow-[0_12px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04)] min-w-[300px] max-w-[380px] w-[min(380px,90vw)] p-6 animate-in fade-in zoom-in-95 duration-[120ms] ease-out";
-
-function formatCommentDate(value: Comment["createdAt"]): string {
-  if (value == null) return "Just now";
-  const seconds = typeof value === "object" && value !== null && "seconds" in value ? (value as { seconds: number }).seconds : null;
-  if (seconds != null) {
-    const d = new Date(seconds * 1000);
-    return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  }
-  return "Just now";
-}
 
 interface ScreenshotWithPinsProps {
   screenshotUrl: string;
