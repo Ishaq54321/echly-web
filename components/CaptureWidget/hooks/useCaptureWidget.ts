@@ -20,6 +20,7 @@ import { createMarker, removeAllMarkers, updateMarker, removeMarker } from "../s
 
 const SAFE_MARGIN = 24;
 const ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
+const OVERLAY_ROOT_ID = "echly-capture-root";
 
 export type SentimentGlow = "negative" | "neutral" | "positive";
 
@@ -85,6 +86,26 @@ function generateRecordingId(): string {
     return crypto.randomUUID();
   }
   return `rec-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+async function captureTabWithoutOverlay(
+  capture: () => Promise<string | null>
+): Promise<string | null> {
+  const overlay = document.getElementById(OVERLAY_ROOT_ID) as HTMLElement | null;
+  const previousDisplay = overlay?.style.display ?? "";
+
+  try {
+    if (overlay) {
+      overlay.style.display = "none";
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+
+    return await capture();
+  } finally {
+    if (overlay) {
+      overlay.style.display = previousDisplay;
+    }
+  }
 }
 
 const CAPTURE_FLOW_STATES: CaptureState[] = [
@@ -722,15 +743,21 @@ export function useCaptureWidget({
 
   const getFullTabImage = useCallback((): Promise<string | null> => {
     if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-      return new Promise((resolve, reject) => {
-chrome.runtime.sendMessage({ type: "CAPTURE_TAB" }, (response: { success?: boolean; screenshot?: string } | undefined) => {
-            if (!response || !response.success) {
-              reject(new Error("Capture failed"));
-            } else {
-              resolve(response.screenshot ?? null);
-            }
-          });
-      });
+      return captureTabWithoutOverlay(
+        () =>
+          new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage(
+              { type: "CAPTURE_TAB" },
+              (response: { success?: boolean; screenshot?: string } | undefined) => {
+                if (!response || !response.success) {
+                  reject(new Error("Capture failed"));
+                } else {
+                  resolve(response.screenshot ?? null);
+                }
+              }
+            );
+          })
+      );
     }
     return Promise.resolve(null);
   }, []);

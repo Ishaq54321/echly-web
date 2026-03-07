@@ -10,6 +10,17 @@ import type { CaptureContext } from "./types";
 
 const CAPTURE_TOOLTIP_OFFSET = 12;
 
+function createCommentCursor() {
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">`,
+    `<path fill="white" stroke="black" stroke-width="2" d="M21 15a2 2 0 0 1-2 2H8l-5 5V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>`,
+    `</svg>`,
+  ].join("");
+  return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") 6 6, auto`;
+}
+
+const COMMENT_CURSOR = createCommentCursor();
+
 export type SessionOverlayProps = {
   captureRoot: HTMLDivElement;
   sessionMode: boolean;
@@ -48,6 +59,7 @@ export function SessionOverlay({
 }: SessionOverlayProps) {
   const cleanupRef = useRef<(() => void)[]>([]);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const sessionCursorActive = sessionMode && !sessionPaused;
   const captureActive = sessionMode && !sessionPaused && sessionFeedbackPending == null;
 
   useEffect(() => {
@@ -70,14 +82,15 @@ export function SessionOverlay({
     };
   }, [sessionMode, captureRoot, sessionPaused, sessionFeedbackPending, onElementClicked]);
 
-  /* Cursor only when capture is fully active and root is in document (avoids pointer without overlay). */
+  /* Keep feedback cursor scoped to active session capture mode. */
   useEffect(() => {
-    if (!captureActive || !captureRoot?.isConnected) return;
-    document.body.style.cursor = "pointer";
+    if (!captureRoot?.isConnected) return;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = sessionCursorActive ? COMMENT_CURSOR : "";
     return () => {
-      document.body.style.cursor = "";
+      document.body.style.cursor = previousCursor;
     };
-  }, [captureActive, captureRoot]);
+  }, [sessionCursorActive, captureRoot]);
 
   useEffect(() => {
     if (!captureActive) {
@@ -95,6 +108,17 @@ export function SessionOverlay({
 
   const content = (
     <>
+      <div
+        aria-hidden
+        className="echly-session-overlay-cursor"
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 2147483645,
+          cursor: sessionCursorActive ? COMMENT_CURSOR : "default",
+        }}
+      />
       <SessionControlPanel sessionPaused={sessionPaused} onPause={onPause} onResume={onResume} onEnd={onEnd} />
       {captureActive && tooltipPos != null && (
         <div
