@@ -5,16 +5,24 @@
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { apiFetch } from "./contentAuthFetch";
+import { createApiClient } from "./content/contentAuth";
+import { createContentState, type GlobalUIState } from "./content/contentState";
+import { setupContentEventBridge } from "./content/contentEvents";
+import { createSessionController } from "./content/contentSession";
+import {
+  createFeedbackPipeline,
+  type ExtensionClarityPending,
+} from "./content/contentPipeline";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
-import { log } from "@/lib/utils/logger";
-import { echlyLog } from "@/lib/debug/echlyLogger";
 
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
 const THEME_STORAGE_KEY = "widget-theme";
+
+const apiClient = createApiClient();
+const contentState = createContentState({ shadowHostId: SHADOW_HOST_ID });
 
 function getPreferredTheme(): "dark" | "light" {
   try {
@@ -33,47 +41,20 @@ function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
   } catch {}
 }
 
-function setHostVisibility(visible: boolean): void {
-  const host = document.getElementById(SHADOW_HOST_ID);
-  if (host) {
-    (host as HTMLDivElement).style.display = visible ? "block" : "none";
-  }
-}
-
 type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
 
-type GlobalUIState = {
-  visible: boolean;
-  expanded: boolean;
-  isRecording: boolean;
-  sessionId: string | null;
-  sessionModeActive: boolean;
-  sessionPaused: boolean;
-};
-
-/** Ask background to open popup (e.g. in a new tab) so user can sign in. */
 function requestOpenPopup(): void {
   chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {});
 }
 
-type ContentAppProps = {
-  widgetRoot: HTMLElement;
-  initialTheme: "dark" | "light";
-};
+type ContentAppProps = { widgetRoot: HTMLElement; initialTheme: "dark" | "light" };
 
 function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [sessionMessage, setSessionMessage] = React.useState<string | null>(null);
   const [authChecked, setAuthChecked] = React.useState(false);
   const [theme, setTheme] = React.useState<"dark" | "light">(initialTheme);
-  const [globalState, setGlobalState] = React.useState<GlobalUIState>({
-    visible: false,
-    expanded: false,
-    isRecording: false,
-    sessionId: null,
-    sessionModeActive: false,
-    sessionPaused: false,
-  });
+  const [globalState, setGlobalState] = React.useState<GlobalUIState>(contentState.getInitialState());
   const [sessionIdOverride, setSessionIdOverride] = React.useState<string | null>(null);
   const [loadSessionWithPointers, setLoadSessionWithPointers] = React.useState<{
     sessionId: string;
@@ -81,94 +62,50 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   } | null>(null);
   const effectiveSessionId = sessionIdOverride ?? globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
-  const submissionLock = React.useRef(false);
+  const submissionLockRef = React.useRef(false);
+  const clarityAssistantSubmitLockRef = React.useRef(false);
+  const clarityTextareaRef = React.useRef<HTMLTextAreaElement>(null);
 
-  type ExtensionClarityPending = {
-    tickets: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
-    screenshotUrl: string | null;
-    screenshotId: string;
-    uploadPromise: Promise<string | null>;
-    transcript: string;
-    screenshot: string | null;
-    firstFeedbackId: string;
-    clarityScore: number;
-    clarityIssues: string[];
-    suggestedRewrite: string | null;
-    confidence: number;
-    callbacks: { onSuccess: (ticket: { id: string; title: string; description: string; type: string }) => void; onError: () => void };
-    context?: Record<string, unknown>;
-  };
   const [extensionClarityPending, setExtensionClarityPending] = React.useState<ExtensionClarityPending | null>(null);
   const [showClarityAssistant, setShowClarityAssistant] = React.useState(false);
   const [isEditingFeedback, setIsEditingFeedback] = React.useState(false);
   const [editedTranscript, setEditedTranscript] = React.useState("");
-  const clarityTextareaRef = React.useRef<HTMLTextAreaElement>(null);
-  const clarityAssistantSubmitLock = React.useRef(false);
   const [clarityAssistantSubmitting, setClarityAssistantSubmitting] = React.useState(false);
+
   const logoUrl =
     typeof chrome !== "undefined" && chrome.runtime?.getURL
       ? chrome.runtime.getURL("assets/Echly_logo.svg")
       : "/Echly_logo.svg";
 
   React.useEffect(() => {
-    const toggleHandler = () => {
-      widgetToggleRef.current?.();
-    };
-
+    const toggleHandler = () => widgetToggleRef.current?.();
     window.addEventListener("ECHLY_TOGGLE_WIDGET", toggleHandler);
-
-    return () => {
-      window.removeEventListener("ECHLY_TOGGLE_WIDGET", toggleHandler);
-    };
+    return () => window.removeEventListener("ECHLY_TOGGLE_WIDGET", toggleHandler);
   }, []);
 
-  /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). No local source of truth. */
+  React.useEffect(() => contentState.subscribeGlobalState(setGlobalState), []);
+
   React.useEffect(() => {
-    const handler = (e: CustomEvent<{ state: typeof globalState }>) => {
-      const s = e.detail?.state;
-      if (s) {
-        echlyLog("CONTENT", "global state received", s);
-        setHostVisibility(s.visible);
-        setGlobalState(s);
+    chrome.runtime.sendMessage({ type: "ECHLY_GET_GLOBAL_STATE" }, (response: { state?: GlobalUIState } | undefined) => {
+      if (response?.state) {
+        contentState.setHostVisibility(response.state.visible ?? false);
+        setGlobalState(response.state);
       }
-    };
-    window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
-    return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
+    });
   }, []);
 
-  /* Hydrate from background on mount so already-open tabs join active sessions without refresh. */
-  React.useEffect(() => {
-    chrome.runtime.sendMessage(
-      { type: "ECHLY_GET_GLOBAL_STATE" },
-      (response: GlobalStateResponse) => {
-        if (response?.state) {
-          setHostVisibility(response.state.visible ?? false);
-          setGlobalState(response.state);
-        }
-      }
-    );
-  }, []);
-
-  /* When session is active (tab load or ECHLY_GLOBAL_STATE), fetch existing feedback and pass to widget so markers persist across tabs. */
   React.useEffect(() => {
     if (!globalState.sessionModeActive || !globalState.sessionId) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiFetch(
+        const res = await apiClient.apiFetch(
           `/api/feedback?sessionId=${encodeURIComponent(globalState.sessionId!)}&limit=50`
         );
         if (cancelled) return;
-        const json = (await res.json()) as {
-          feedback?: Array<{ id: string; title: string; description: string; type?: string }>;
-        };
+        const json = (await res.json()) as { feedback?: Array<{ id: string; title: string; description: string; type?: string }> };
         const list = json.feedback ?? [];
-        const pointers = list.map((f) => ({
-          id: f.id,
-          title: f.title ?? "",
-          description: f.description ?? "",
-          type: f.type ?? "Feedback",
-        }));
+        const pointers = list.map((f) => ({ id: f.id, title: f.title ?? "", description: f.description ?? "", type: f.type ?? "Feedback" }));
         if (cancelled) return;
         setLoadSessionWithPointers({ sessionId: globalState.sessionId!, pointers });
       } catch (err) {
@@ -178,24 +115,17 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [globalState.sessionModeActive, globalState.sessionId]);
 
-  /* When user is on dashboard session page, set that session as the extension's active session. */
   React.useEffect(() => {
     const sendActiveSessionIfDashboard = () => {
       const origin = window.location.origin;
-      const isAppOrigin =
-        origin === "https://echly-web.vercel.app" || origin === "http://localhost:3000";
+      const isAppOrigin = origin === "https://echly-web.vercel.app" || origin === "http://localhost:3000";
       if (!isAppOrigin) return;
       const segments = window.location.pathname.split("/").filter(Boolean);
       if (segments[0] === "dashboard" && segments[1]) {
-        chrome.runtime.sendMessage(
-          { type: "ECHLY_SET_ACTIVE_SESSION", sessionId: segments[1] },
-          () => {}
-        );
+        chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: segments[1] }, () => {});
       }
     };
     sendActiveSessionIfDashboard();
@@ -207,414 +137,72 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     };
   }, []);
 
+  React.useEffect(() => {
+    chrome.runtime.sendMessage(
+      { type: "ECHLY_GET_AUTH_STATE" },
+      (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
+        if (response?.authenticated && response.user?.uid) {
+          setUser({ uid: response.user.uid, name: response.user.name ?? null, email: response.user.email ?? null, photoURL: response.user.photoURL ?? null });
+        } else setUser(null);
+        setAuthChecked(true);
+      }
+    );
+  }, []);
+
+  React.useEffect(() => {
+    if (isEditingFeedback && clarityTextareaRef.current) clarityTextareaRef.current.focus();
+  }, [isEditingFeedback]);
+
+  const sessionController = React.useMemo(
+    () =>
+      createSessionController({
+        apiFetch: apiClient.apiFetch,
+        setSessionIdOverride,
+        setLoadSessionWithPointers,
+      }),
+    []
+  );
+
+  const feedbackPipeline = React.useMemo(
+    () =>
+      createFeedbackPipeline({
+        effectiveSessionId,
+        user,
+        apiFetch: apiClient.apiFetch,
+        getVisibleTextFromScreenshot,
+        uploadScreenshot,
+        generateFeedbackId,
+        generateScreenshotId,
+        submissionLockRef,
+        clarityAssistantSubmitLockRef,
+        setExtensionClarityPending,
+        setEditedTranscript,
+        setIsEditingFeedback,
+        setClarityAssistantSubmitting,
+        setShowClarityAssistant,
+      }),
+    [effectiveSessionId, user]
+  );
+
   const onRecordingChange = React.useCallback((recording: boolean) => {
     if (recording) {
-      chrome.runtime.sendMessage(
-        { type: "START_RECORDING" },
-        (response: { ok?: boolean; error?: string } | undefined) => {
-          if (chrome.runtime.lastError) {
-            setSessionMessage(chrome.runtime.lastError.message || "Failed to start recording");
-            return;
-          }
-          if (!response?.ok) {
-            setSessionMessage(response?.error || "No active session selected.");
-          }
-        }
-      );
-    } else {
-      chrome.runtime.sendMessage({ type: "STOP_RECORDING" }).catch(() => {});
-    }
+      chrome.runtime.sendMessage({ type: "START_RECORDING" }, (response: { ok?: boolean; error?: string } | undefined) => {
+        if (chrome.runtime.lastError) setSessionMessage(chrome.runtime.lastError.message || "Failed to start recording");
+        else if (!response?.ok) setSessionMessage(response?.error || "No active session selected.");
+      });
+    } else chrome.runtime.sendMessage({ type: "STOP_RECORDING" }).catch(() => {});
   }, []);
 
-  const onExpandRequest = React.useCallback(() => {
-    chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {});
-  }, []);
-  const onCollapseRequest = React.useCallback(() => {
-    chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {});
-  }, []);
-
+  const onExpandRequest = React.useCallback(() => chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {}), []);
+  const onCollapseRequest = React.useCallback(() => chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {}), []);
   const onThemeToggle = React.useCallback(() => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
     applyThemeToRoot(widgetRoot, next);
   }, [theme, widgetRoot]);
 
-  React.useEffect(() => {
-    chrome.runtime.sendMessage(
-      { type: "ECHLY_GET_AUTH_STATE" },
-      (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
-        if (response?.authenticated && response.user?.uid) {
-          setUser({
-            uid: response.user.uid,
-            name: response.user.name ?? null,
-            email: response.user.email ?? null,
-            photoURL: response.user.photoURL ?? null,
-          });
-        } else {
-          setUser(null);
-        }
-        setAuthChecked(true);
-      }
-    );
-  }, []);
-
-  const handleComplete = React.useCallback(
-    async (
-      transcript: string,
-      screenshot: string | null,
-      callbacks?: {
-        onSuccess: (ticket: { id: string; title: string; description: string; type: string }) => void;
-        onError: () => void;
-      },
-      context?: {
-        url?: string;
-        scrollX?: number;
-        scrollY?: number;
-        viewportWidth?: number;
-        viewportHeight?: number;
-        devicePixelRatio?: number;
-        domPath?: string | null;
-        nearbyText?: string | null;
-        subtreeText?: string | null;
-        visibleText?: string | null;
-        capturedAt?: number;
-      } | null,
-      options?: { sessionMode?: boolean }
-    ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
-      echlyLog("PIPELINE", "start");
-      if (submissionLock.current) {
-        echlyLog("PIPELINE", "blocked by submissionLock");
-        callbacks?.onError?.();
-        return undefined;
-      }
-      submissionLock.current = true;
-
-      if (!effectiveSessionId || !user) {
-        echlyLog("PIPELINE", "error");
-        callbacks?.onError();
-        submissionLock.current = false;
-        return undefined;
-      }
-      if (callbacks) {
-        (async () => {
-          const visibleTextPromise = getVisibleTextFromScreenshot(screenshot ?? null);
-          const firstFeedbackId = generateFeedbackId();
-          const screenshotId = generateScreenshotId();
-          const uploadPromise = screenshot
-            ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
-            : Promise.resolve(null as string | null);
-          const visibleTextFromScreenshot = await visibleTextPromise;
-          console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
-          const currentUrl = typeof window !== "undefined" ? window.location.href : "";
-          const enrichedContext = {
-            ...(context ?? {}),
-            visibleText:
-              (visibleTextFromScreenshot?.trim() && visibleTextFromScreenshot) ||
-              context?.visibleText ||
-              null,
-            url: context?.url ?? currentUrl,
-          };
-          const structureBody = { transcript, context: enrichedContext };
-          try {
-            echlyLog("PIPELINE", "structure request");
-            console.log("[VOICE] final transcript submitted", transcript);
-            const res = await apiFetch("/api/structure-feedback", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(structureBody),
-            });
-            const data = (await res.json()) as {
-              success?: boolean;
-              tickets?: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
-              error?: string;
-              clarityScore?: number;
-              clarityIssues?: string[];
-              suggestedRewrite?: string | null;
-              confidence?: number;
-            };
-            const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-            const clarityScore = typeof data.clarityScore === "number" ? data.clarityScore : (data.clarityScore != null ? Number(data.clarityScore) : 100);
-            const clarityIssues = data.clarityIssues ?? [];
-            const suggestedRewrite = data.suggestedRewrite ?? null;
-            const confidence = data.confidence ?? 0.5;
-            const isSessionMode = Boolean(options?.sessionMode);
-
-            /* Session mode: never show clarity assistant; process silently. */
-            if (!isSessionMode) {
-              /* Intercept before any submission: pause and show clarity assistant when score <= 20 (even when tickets is empty). */
-              if (data.success && clarityScore <= 20) {
-                console.log("CLARITY GUARD TRIGGERED", clarityScore);
-                setExtensionClarityPending({
-                  tickets,
-                  screenshotUrl: null,
-                  screenshotId,
-                  uploadPromise,
-                  transcript,
-                  screenshot,
-                  firstFeedbackId,
-                  clarityScore,
-                  clarityIssues,
-                  suggestedRewrite,
-                  confidence,
-                  callbacks,
-                  context: enrichedContext,
-                });
-                setEditedTranscript(transcript);
-                setIsEditingFeedback(false);
-                clarityAssistantSubmitLock.current = false;
-                setClarityAssistantSubmitting(false);
-                setShowClarityAssistant(true);
-                submissionLock.current = false;
-                return;
-              }
-
-              /* Pipeline requested clarification (vague feedback or verification failed): show clarity assistant, do not create fallback ticket */
-              const needsClarification = Boolean((data as { needsClarification?: boolean }).needsClarification);
-              const verificationIssues = (data as { verificationIssues?: string[] }).verificationIssues ?? [];
-              if (data.success && needsClarification && tickets.length === 0) {
-                console.log("PIPELINE NEEDS CLARIFICATION", verificationIssues);
-                setExtensionClarityPending({
-                  tickets: [],
-                  screenshotUrl: null,
-                  screenshotId,
-                  uploadPromise,
-                  transcript,
-                  screenshot,
-                  firstFeedbackId,
-                  clarityScore,
-                  clarityIssues: verificationIssues.length > 0 ? verificationIssues : clarityIssues,
-                  suggestedRewrite,
-                  confidence,
-                  callbacks,
-                  context: enrichedContext,
-                });
-                setEditedTranscript(transcript);
-                setIsEditingFeedback(false);
-                clarityAssistantSubmitLock.current = false;
-                setClarityAssistantSubmitting(false);
-                setShowClarityAssistant(true);
-                submissionLock.current = false;
-                return;
-              }
-            }
-
-            if (!data.success || tickets.length === 0) {
-              chrome.runtime.sendMessage(
-                {
-                  type: "ECHLY_PROCESS_FEEDBACK",
-                  payload: { transcript, screenshotUrl: null, screenshotId, sessionId: effectiveSessionId, context: enrichedContext },
-                },
-                (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
-                  submissionLock.current = false;
-                  if (chrome.runtime.lastError) {
-                    echlyLog("PIPELINE", "error");
-                    callbacks.onError();
-                    return;
-                  }
-                  if (response?.success && response.ticket) {
-                    const ticketId = response.ticket.id;
-                    echlyLog("PIPELINE", "ticket created", { ticketId });
-                    callbacks.onSuccess({
-                      id: ticketId,
-                      title: response.ticket.title,
-                      description: response.ticket.description,
-                      type: response.ticket.type ?? "Feedback",
-                    });
-                    uploadPromise.then((url) => {
-                      if (url) {
-                        echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
-                        echlyLog("PIPELINE", "screenshot patched", { ticketId });
-                        apiFetch(`/api/tickets/${ticketId}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ screenshotUrl: url }),
-                        }).catch(() => {});
-                      }
-                    }).catch(() => {});
-                  } else {
-                    echlyLog("PIPELINE", "error");
-                    callbacks.onError();
-                  }
-                }
-              );
-              return;
-            }
-
-            /* clarityScore > 20: continue with normal submission to /api/feedback */
-            const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
-            const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
-            let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
-            for (let i = 0; i < tickets.length; i++) {
-              const t = tickets[i];
-              const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
-              const body = {
-                sessionId: effectiveSessionId,
-                title: t.title ?? "",
-                description: desc,
-                type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-                contextSummary: desc,
-                actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-                suggestedTags: t.suggestedTags,
-                screenshotUrl: null,
-                screenshotId: i === 0 ? screenshotId : undefined,
-                metadata: { clientTimestamp: Date.now() },
-                ...clarityMeta,
-              };
-              const feedbackRes = await apiFetch("/api/feedback", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-              });
-              const feedbackJson = (await feedbackRes.json()) as {
-                success?: boolean;
-                ticket?: { id: string; title: string; description: string; type?: string };
-              };
-              if (feedbackJson.success && feedbackJson.ticket) {
-                const tick = feedbackJson.ticket;
-                if (!firstCreated)
-                  firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
-              }
-            }
-            submissionLock.current = false;
-            if (firstCreated) {
-              const ticketId = firstCreated.id;
-              echlyLog("PIPELINE", "ticket created", { ticketId });
-              uploadPromise.then((url) => {
-                if (url) {
-                  echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
-                  echlyLog("PIPELINE", "screenshot patched", { ticketId });
-                  apiFetch(`/api/tickets/${ticketId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ screenshotUrl: url }),
-                  }).catch(() => {});
-                }
-              }).catch(() => {});
-              callbacks.onSuccess(firstCreated);
-            } else {
-              echlyLog("PIPELINE", "error");
-              callbacks.onError();
-            }
-          } catch (err) {
-            console.error("[Echly] Structure or submit failed:", err);
-            submissionLock.current = false;
-            echlyLog("PIPELINE", "error");
-            callbacks.onError();
-          }
-        })();
-        return;
-      }
-      try {
-      const screenshotId = generateScreenshotId();
-      const uploadPromise = screenshot
-        ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
-        : Promise.resolve(null as string | null);
-      const visibleTextFromScreenshot = await getVisibleTextFromScreenshot(screenshot ?? null);
-      console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
-      const currentUrl = typeof window !== "undefined" ? window.location.href : "";
-      const structureBody = {
-        transcript,
-        context: {
-          ...(context ?? {}),
-          visibleText:
-            (visibleTextFromScreenshot?.trim() && visibleTextFromScreenshot) ||
-            context?.visibleText ||
-            null,
-          url: context?.url ?? currentUrl,
-        },
-      };
-      echlyLog("PIPELINE", "structure request");
-      console.log("[VOICE] final transcript submitted", transcript);
-      const res = await apiFetch("/api/structure-feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(structureBody),
-      });
-      const data = (await res.json()) as {
-        success?: boolean;
-        tickets?: Array<{
-          title?: string;
-          description?: string;
-          suggestedTags?: string[];
-          actionSteps?: string[];
-        }>;
-        error?: string;
-        clarityScore?: number;
-        clarityIssues?: string[];
-        suggestedRewrite?: string | null;
-        confidence?: number;
-      };
-      const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-      const clarityScore = data.clarityScore ?? 100;
-      const clarityIssues = data.clarityIssues ?? [];
-      const suggestedRewrite = data.suggestedRewrite ?? null;
-      const confidence = data.confidence ?? 0.5;
-
-      if (!data.success || tickets.length === 0) return undefined;
-
-      const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
-      const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
-      let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
-      for (let i = 0; i < tickets.length; i++) {
-        const t = tickets[i];
-        const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
-        const body = {
-          sessionId: effectiveSessionId,
-          title: t.title ?? "",
-          description: desc,
-          type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-          contextSummary: desc,
-          actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-          suggestedTags: t.suggestedTags,
-          screenshotUrl: null,
-          screenshotId: i === 0 ? screenshotId : undefined,
-          metadata: { clientTimestamp: Date.now() },
-          ...clarityMeta,
-        };
-        const feedbackRes = await apiFetch("/api/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const feedbackJson = (await feedbackRes.json()) as {
-          success?: boolean;
-          ticket?: { id: string; title: string; description: string; type?: string };
-        };
-        if (feedbackJson.success && feedbackJson.ticket) {
-          const tick = feedbackJson.ticket;
-          if (!firstCreated)
-            firstCreated = {
-              id: tick.id,
-              title: tick.title,
-              description: tick.description,
-              type: tick.type ?? "Feedback",
-            };
-        }
-      }
-      if (firstCreated) {
-        const ticketId = firstCreated.id;
-        uploadPromise.then((url) => {
-          if (url) {
-            apiFetch(`/api/tickets/${ticketId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ screenshotUrl: url }),
-            }).catch(() => {});
-          }
-        }).catch(() => {});
-      }
-      return firstCreated;
-      } finally {
-        submissionLock.current = false;
-      }
-    },
-    [effectiveSessionId, user]
-  );
-
-  const handleDelete = React.useCallback(async (_id: string) => {}, []);
-
   const fetchSessions = React.useCallback(async () => {
-    const res = await apiFetch("/api/sessions");
+    const res = await apiClient.apiFetch("/api/sessions");
     const json = (await res.json()) as { success?: boolean; sessions?: Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number }> };
     const sessions = json.sessions ?? [];
     console.log("[Echly] Sessions returned:", { ok: res.ok, status: res.status, success: json.success, count: sessions.length, sessions });
@@ -622,373 +210,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return sessions;
   }, []);
 
-  const createSession = React.useCallback(async (): Promise<{ id: string } | null> => {
-    console.log("[Echly] Creating session");
-    try {
-      const res = await apiFetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      const json = (await res.json()) as { success?: boolean; session?: { id: string } };
-      console.log("[Echly] Create session response:", { ok: res.ok, status: res.status, success: json.success, sessionId: json.session?.id });
-      if (!res.ok || !json.success || !json.session?.id) return null;
-      return { id: json.session.id };
-    } catch (err) {
-      console.error("[Echly] Failed to create session:", err);
-      return null;
-    }
-  }, []);
+  const handleDelete = React.useCallback(async (_id: string) => {}, []);
 
-  const onActiveSessionChange = React.useCallback((newSessionId: string) => {
-    chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {});
-    setSessionIdOverride(newSessionId);
-  }, []);
-
-  const onResumeSessionSelect = React.useCallback(
-    async (sessionId: string) => {
-      chrome.runtime.sendMessage(
-        { type: "ECHLY_SET_ACTIVE_SESSION", sessionId },
-        () => {
-          chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {});
-        }
-      );
-      setSessionIdOverride(sessionId);
-      try {
-        const res = await apiFetch(`/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=50`);
-        const json = (await res.json()) as {
-          feedback?: Array<{ id: string; title: string; description: string; type?: string }>;
-        };
-        const list = json.feedback ?? [];
-        const pointers = list.map((f) => ({
-          id: f.id,
-          title: f.title ?? "",
-          description: f.description ?? "",
-          type: f.type ?? "Feedback",
-        }));
-        setLoadSessionWithPointers({ sessionId, pointers });
-      } catch (err) {
-        console.error("[Echly] Failed to load session feedback:", err);
-        setLoadSessionWithPointers({ sessionId, pointers: [] });
-      }
-    },
-    []
-  );
-
-  const submitPendingFeedback = React.useCallback(
-    async (pending: ExtensionClarityPending) => {
-      if (!effectiveSessionId) return;
-      if (pending.tickets.length === 0) {
-        chrome.runtime.sendMessage(
-          {
-            type: "ECHLY_PROCESS_FEEDBACK",
-            payload: {
-              transcript: pending.transcript,
-              screenshotUrl: null,
-              screenshotId: pending.screenshotId,
-              sessionId: effectiveSessionId,
-              context: pending.context ?? {},
-            },
-          },
-          (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
-            if (chrome.runtime.lastError) {
-              console.error("[Echly] Submit anyway failed:", chrome.runtime.lastError.message);
-              echlyLog("PIPELINE", "error");
-              pending.callbacks.onError();
-              return;
-            }
-            if (response?.success && response.ticket) {
-              const ticketId = response.ticket.id;
-              pending.callbacks.onSuccess({
-                id: ticketId,
-                title: response.ticket.title,
-                description: response.ticket.description,
-                type: response.ticket.type ?? "Feedback",
-              });
-              pending.uploadPromise.then((url) => {
-                if (url) {
-                  apiFetch(`/api/tickets/${ticketId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ screenshotUrl: url }),
-                  }).catch(() => {});
-                }
-              }).catch(() => {});
-            } else {
-              echlyLog("PIPELINE", "error");
-              pending.callbacks.onError();
-            }
-          }
-        );
-        return;
-      }
-
-      const clarityMeta = {
-        clarityScore: pending.clarityScore,
-        clarityIssues: pending.clarityIssues,
-        clarityConfidence: pending.confidence,
-        clarityStatus: (pending.clarityScore >= 85 ? "clear" : pending.clarityScore >= 60 ? "needs_improvement" : "unclear") as "clear" | "needs_improvement" | "unclear",
-      };
-      let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
-      for (let i = 0; i < pending.tickets.length; i++) {
-        const t = pending.tickets[i];
-        const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
-        const body = {
-          sessionId: effectiveSessionId,
-          title: t.title ?? "",
-          description: desc,
-          type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-          contextSummary: desc,
-          actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-          suggestedTags: t.suggestedTags,
-          screenshotUrl: null,
-          screenshotId: i === 0 ? pending.screenshotId : undefined,
-          metadata: { clientTimestamp: Date.now() },
-          ...clarityMeta,
-        };
-        const feedbackRes = await apiFetch("/api/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const feedbackJson = (await feedbackRes.json()) as {
-          success?: boolean;
-          ticket?: { id: string; title: string; description: string; type?: string };
-        };
-        if (feedbackJson.success && feedbackJson.ticket) {
-          const tick = feedbackJson.ticket;
-          if (!firstCreated)
-            firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
-        }
-      }
-      if (firstCreated) {
-        const ticketId = firstCreated.id;
-        pending.uploadPromise.then((url) => {
-          if (url) {
-            apiFetch(`/api/tickets/${ticketId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ screenshotUrl: url }),
-            }).catch(() => {});
-          }
-        }).catch(() => {});
-        pending.callbacks.onSuccess(firstCreated);
-      } else {
-        echlyLog("PIPELINE", "error");
-        pending.callbacks.onError();
-      }
-    },
-    [effectiveSessionId]
-  );
-
-  const submitEditedFeedback = React.useCallback(
-    async (pending: ExtensionClarityPending, editedText: string) => {
-      if (!effectiveSessionId) return;
-      const trimmed = editedText.trim();
-      try {
-        const structureBody = { transcript: trimmed, context: pending.context ?? {} };
-        const res = await apiFetch("/api/structure-feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(structureBody),
-        });
-        const data = (await res.json()) as {
-          success?: boolean;
-          tickets?: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
-          clarityScore?: number;
-          clarityIssues?: string[];
-          confidence?: number;
-        };
-        const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-        const clarityScore = data.clarityScore ?? 100;
-        const confidence = data.confidence ?? 0.5;
-        const clarityStatus = (clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear") as "clear" | "needs_improvement" | "unclear";
-        const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
-
-        if (tickets.length === 0) {
-          chrome.runtime.sendMessage(
-            {
-              type: "ECHLY_PROCESS_FEEDBACK",
-              payload: {
-                transcript: trimmed,
-                screenshotUrl: null,
-                screenshotId: pending.screenshotId,
-                sessionId: effectiveSessionId,
-                context: pending.context ?? {},
-              },
-            },
-            (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string } } | undefined) => {
-              if (chrome.runtime.lastError) {
-                console.error("[Echly] Submit edited feedback failed:", chrome.runtime.lastError.message);
-                echlyLog("PIPELINE", "error");
-                pending.callbacks.onError();
-                return;
-              }
-              if (response?.success && response.ticket) {
-                const ticketId = response.ticket.id;
-                pending.callbacks.onSuccess({
-                  id: ticketId,
-                  title: response.ticket.title,
-                  description: response.ticket.description,
-                  type: response.ticket.type ?? "Feedback",
-                });
-                pending.uploadPromise.then((url) => {
-                  if (url) {
-                    apiFetch(`/api/tickets/${ticketId}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ screenshotUrl: url }),
-                    }).catch(() => {});
-                  }
-                }).catch(() => {});
-              } else {
-                echlyLog("PIPELINE", "error");
-                pending.callbacks.onError();
-              }
-            }
-          );
-          return;
-        }
-
-        let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
-        for (let i = 0; i < tickets.length; i++) {
-          const t = tickets[i];
-          const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
-          const body = {
-            sessionId: effectiveSessionId,
-            title: t.title ?? "",
-            description: desc,
-            type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-            contextSummary: desc,
-            actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-            suggestedTags: t.suggestedTags,
-            screenshotUrl: null,
-            screenshotId: i === 0 ? pending.screenshotId : undefined,
-            metadata: { clientTimestamp: Date.now() },
-            ...clarityMeta,
-          };
-          const feedbackRes = await apiFetch("/api/feedback", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          const feedbackJson = (await feedbackRes.json()) as {
-            success?: boolean;
-            ticket?: { id: string; title: string; description: string; type?: string };
-          };
-          if (feedbackJson.success && feedbackJson.ticket) {
-            const tick = feedbackJson.ticket;
-            if (!firstCreated)
-              firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
-          }
-        }
-        if (firstCreated) {
-          const ticketId = firstCreated.id;
-          pending.uploadPromise.then((url) => {
-            if (url) {
-              apiFetch(`/api/tickets/${ticketId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ screenshotUrl: url }),
-              }).catch(() => {});
-            }
-          }).catch(() => {});
-          pending.callbacks.onSuccess(firstCreated);
-        } else {
-          echlyLog("PIPELINE", "error");
-          pending.callbacks.onError();
-        }
-      } catch (err) {
-        console.error("[Echly] Submit edited feedback failed:", err);
-        echlyLog("PIPELINE", "error");
-        pending.callbacks.onError();
-      }
-    },
-    [effectiveSessionId]
-  );
-
-  const handleExtensionClarityUseSuggestion = React.useCallback(async () => {
-    const pending = extensionClarityPending;
-    if (!pending?.suggestedRewrite?.trim() || !effectiveSessionId) return;
-    setExtensionClarityPending(null);
-    try {
-      const res = await apiFetch("/api/structure-feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript: pending.suggestedRewrite!.trim() }),
-      });
-      const data = (await res.json()) as {
-        success?: boolean;
-        tickets?: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
-        clarityScore?: number;
-        clarityIssues?: string[];
-        confidence?: number;
-      };
-      const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-      const clarityScore = data.clarityScore ?? 100;
-      const confidence = data.confidence ?? 0.5;
-      const clarityStatus = (clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear") as "clear" | "needs_improvement" | "unclear";
-      const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
-      let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
-      for (let i = 0; i < tickets.length; i++) {
-        const t = tickets[i];
-        const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
-        const body = {
-          sessionId: effectiveSessionId,
-          title: t.title ?? "",
-          description: desc,
-          type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-          contextSummary: desc,
-          actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-          suggestedTags: t.suggestedTags,
-          screenshotUrl: null,
-          screenshotId: i === 0 ? pending.screenshotId : undefined,
-          metadata: { clientTimestamp: Date.now() },
-          ...clarityMeta,
-        };
-        const feedbackRes = await apiFetch("/api/feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const feedbackJson = (await feedbackRes.json()) as {
-          success?: boolean;
-          ticket?: { id: string; title: string; description: string; type?: string };
-        };
-        if (feedbackJson.success && feedbackJson.ticket) {
-          const tick = feedbackJson.ticket;
-          if (!firstCreated)
-            firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
-        }
-      }
-      if (firstCreated) {
-        const ticketId = firstCreated.id;
-        pending.uploadPromise.then((url) => {
-          if (url) {
-            apiFetch(`/api/tickets/${ticketId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ screenshotUrl: url }),
-            }).catch(() => {});
-          }
-        }).catch(() => {});
-        pending.callbacks.onSuccess(firstCreated);
-      } else {
-        echlyLog("PIPELINE", "error");
-        pending.callbacks.onError();
-      }
-    } catch (err) {
-      console.error("[Echly] Use suggestion failed:", err);
-      echlyLog("PIPELINE", "error");
-      pending.callbacks.onError();
-    }
-  }, [extensionClarityPending, effectiveSessionId]);
-
-  React.useEffect(() => {
-    if (isEditingFeedback && clarityTextareaRef.current) {
-      clarityTextareaRef.current.focus();
-    }
-  }, [isEditingFeedback]);
-
-  if (!authChecked) {
-    return null;
-  }
+  if (!authChecked) return null;
 
   if (!user) {
     return (
@@ -998,18 +222,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           title="Sign in from extension"
           onClick={requestOpenPopup}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            padding: "10px 20px",
-            borderRadius: "20px",
-            border: "1px solid rgba(0,0,0,0.08)",
-            background: "#fff",
-            color: "#6b7280",
-            fontSize: "14px",
-            fontWeight: 600,
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            display: "flex", alignItems: "center", gap: "12px", padding: "10px 20px", borderRadius: "20px",
+            border: "1px solid rgba(0,0,0,0.08)", background: "#fff", color: "#6b7280", fontSize: "14px",
+            fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
           }}
         >
           <img src={logoUrl} alt="" width={22} height={22} style={{ display: "block" }} />
@@ -1024,45 +239,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   return (
     <>
       {showClarityAssistant && pending && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(0,0,0,0.15)",
-            zIndex: 999999,
-            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif',
-          }}
-        >
-          <div
-            style={{
-              maxWidth: 420,
-              width: "90%",
-              background: "#F8FBFF",
-              borderRadius: 12,
-              padding: 20,
-              boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
-              border: "1px solid #E6F0FF",
-              animation: "echly-clarity-card-in 150ms ease-out",
-            }}
-          >
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.15)", zIndex: 999999, fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif' }}>
+          <div style={{ maxWidth: 420, width: "90%", background: "#F8FBFF", borderRadius: 12, padding: 20, boxShadow: "0 12px 32px rgba(0,0,0,0.12)", border: "1px solid #E6F0FF", animation: "echly-clarity-card-in 150ms ease-out" }}>
             <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6, color: "#111" }}>Quick suggestion</div>
-            <div style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>
-              Your feedback may be unclear.
-            </div>
-            <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>
-              Try specifying what looks wrong and what change you want.
-            </div>
-            {pending.suggestedRewrite && (
-              <div style={{ fontSize: 13, fontStyle: "italic", color: "#4b5563", marginBottom: 12, opacity: 0.9 }}>
-                Example: &quot;{pending.suggestedRewrite}&quot;
-              </div>
-            )}
+            <div style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>Your feedback may be unclear.</div>
+            <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>Try specifying what looks wrong and what change you want.</div>
+            {pending.suggestedRewrite && <div style={{ fontSize: 13, fontStyle: "italic", color: "#4b5563", marginBottom: 12, opacity: 0.9 }}>Example: &quot;{pending.suggestedRewrite}&quot;</div>}
             <textarea
               ref={clarityTextareaRef}
               value={editedTranscript}
@@ -1071,19 +253,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               rows={3}
               placeholder="Your feedback"
               aria-label="Feedback message"
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "1px solid #E6F0FF",
-                fontSize: 14,
-                resize: "vertical",
-                minHeight: 72,
-                marginBottom: 16,
-                background: isEditingFeedback ? "#fff" : "#f3f4f6",
-                color: "#111",
-              }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 8, border: "1px solid #E6F0FF", fontSize: 14, resize: "vertical", minHeight: 72, marginBottom: 16, background: isEditingFeedback ? "#fff" : "#f3f4f6", color: "#111" }}
             />
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               {isEditingFeedback ? (
@@ -1091,88 +261,33 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   type="button"
                   disabled={clarityAssistantSubmitting}
                   onClick={() => {
-                    if (clarityAssistantSubmitLock.current) return;
-                    if (!pending) return;
-                    clarityAssistantSubmitLock.current = true;
+                    if (clarityAssistantSubmitLockRef.current || !pending) return;
+                    clarityAssistantSubmitLockRef.current = true;
                     setClarityAssistantSubmitting(true);
                     setShowClarityAssistant(false);
                     setExtensionClarityPending(null);
                     setIsEditingFeedback(false);
-                    const snapshot = pending;
-                    const text = editedTranscript;
-                    submitEditedFeedback(snapshot, text)
-                      .catch((err) => console.error("[Echly] Done submission failed:", err))
-                      .finally(() => {
-                        clarityAssistantSubmitLock.current = false;
-                        setClarityAssistantSubmitting(false);
-                      });
+                    feedbackPipeline.submitEditedFeedback(pending, editedTranscript).catch((err) => console.error("[Echly] Done submission failed:", err)).finally(() => { clarityAssistantSubmitLockRef.current = false; setClarityAssistantSubmitting(false); });
                   }}
-                  style={{
-                    background: "#3B82F6",
-                    color: "white",
-                    border: "none",
-                    borderRadius: 8,
-                    padding: "8px 14px",
-                    fontSize: 14,
-                    fontWeight: 500,
-                    cursor: clarityAssistantSubmitting ? "default" : "pointer",
-                    opacity: clarityAssistantSubmitting ? 0.8 : 1,
-                  }}
-                >
-                  Done
-                </button>
+                  style={{ background: "#3B82F6", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 14, fontWeight: 500, cursor: clarityAssistantSubmitting ? "default" : "pointer", opacity: clarityAssistantSubmitting ? 0.8 : 1 }}
+                >Done</button>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    disabled={clarityAssistantSubmitting}
-                    onClick={() => setIsEditingFeedback(true)}
-                    style={{
-                      background: "transparent",
-                      border: "1px solid #E6F0FF",
-                      borderRadius: 8,
-                      padding: "8px 14px",
-                      fontSize: 14,
-                      color: "#374151",
-                      cursor: clarityAssistantSubmitting ? "default" : "pointer",
-                      opacity: clarityAssistantSubmitting ? 0.7 : 1,
-                    }}
-                  >
-                    Edit feedback
-                  </button>
+                  <button type="button" disabled={clarityAssistantSubmitting} onClick={() => setIsEditingFeedback(true)} style={{ background: "transparent", border: "1px solid #E6F0FF", borderRadius: 8, padding: "8px 14px", fontSize: 14, color: "#374151", cursor: clarityAssistantSubmitting ? "default" : "pointer", opacity: clarityAssistantSubmitting ? 0.7 : 1 }}>Edit feedback</button>
                   <button
                     type="button"
                     disabled={clarityAssistantSubmitting}
                     onClick={() => {
-                      if (clarityAssistantSubmitLock.current) return;
-                      if (!pending) return;
-                      clarityAssistantSubmitLock.current = true;
+                      if (clarityAssistantSubmitLockRef.current || !pending) return;
+                      clarityAssistantSubmitLockRef.current = true;
                       setClarityAssistantSubmitting(true);
                       setShowClarityAssistant(false);
                       setExtensionClarityPending(null);
                       setIsEditingFeedback(false);
-                      const snapshot = pending;
-                      submitPendingFeedback(snapshot)
-                        .catch((err) => console.error("[Echly] Submit anyway failed:", err))
-                        .finally(() => {
-                          clarityAssistantSubmitLock.current = false;
-                          setClarityAssistantSubmitting(false);
-                        });
+                      feedbackPipeline.submitPendingFeedback(pending).catch((err) => console.error("[Echly] Submit anyway failed:", err)).finally(() => { clarityAssistantSubmitLockRef.current = false; setClarityAssistantSubmitting(false); });
                     }}
-                    style={{
-                      background: "#3B82F6",
-                      color: "white",
-                      border: "none",
-                      borderRadius: 8,
-                      padding: "8px 14px",
-                      fontSize: 14,
-                      fontWeight: 500,
-                      cursor: clarityAssistantSubmitting ? "default" : "pointer",
-                      opacity: clarityAssistantSubmitting ? 0.8 : 1,
-                    }}
-                  >
-                    Submit anyway
-                  </button>
+                    style={{ background: "#3B82F6", color: "white", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 14, fontWeight: 500, cursor: clarityAssistantSubmitting ? "default" : "pointer", opacity: clarityAssistantSubmitting ? 0.8 : 1 }}
+                  >Submit anyway</button>
                 </>
               )}
             </div>
@@ -1183,7 +298,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         sessionId={effectiveSessionId ?? ""}
         userId={user.uid}
         extensionMode={true}
-        onComplete={handleComplete}
+        onComplete={feedbackPipeline.handleComplete}
         onDelete={handleDelete}
         widgetToggleRef={widgetToggleRef}
         onRecordingChange={onRecordingChange}
@@ -1194,31 +309,26 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         theme={theme}
         onThemeToggle={onThemeToggle}
         fetchSessions={fetchSessions}
-        onResumeSessionSelect={onResumeSessionSelect}
+        onResumeSessionSelect={sessionController.onResumeSessionSelect}
         loadSessionWithPointers={loadSessionWithPointers}
         onSessionLoaded={() => setLoadSessionWithPointers(null)}
         onSessionEnd={() => setSessionIdOverride(null)}
-        onCreateSession={createSession}
-        onActiveSessionChange={onActiveSessionChange}
+        onCreateSession={sessionController.createSession}
+        onActiveSessionChange={sessionController.onActiveSessionChange}
         globalSessionModeActive={globalState.sessionModeActive ?? false}
         globalSessionPaused={globalState.sessionPaused ?? false}
-        onSessionModeStart={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {})}
-        onSessionModePause={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {})}
-        onSessionModeResume={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {})}
-        onSessionModeEnd={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }).catch(() => {})}
+        onSessionModeStart={sessionController.onSessionModeStart}
+        onSessionModePause={sessionController.onSessionModePause}
+        onSessionModeResume={sessionController.onSessionModeResume}
+        onSessionModeEnd={sessionController.onSessionModeEnd}
       />
     </>
   );
 }
 
-/** Minimal CSS reset inside shadow root for style isolation. Theme (data-theme) and color-scheme come from globals.css. */
 const SHADOW_RESET = `
   :host { all: initial; }
-  #echly-root {
-    all: initial;
-    box-sizing: border-box;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
-  }
+  #echly-root { all: initial; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif; }
   #echly-root * { box-sizing: border-box; }
 `;
 
@@ -1229,18 +339,15 @@ function injectShadowStyles(shadowRoot: ShadowRoot): void {
   link.rel = "stylesheet";
   link.href = chrome.runtime.getURL("popup.css");
   shadowRoot.appendChild(link);
-
   const reset = document.createElement("style");
   reset.id = "echly-reset";
   reset.textContent = SHADOW_RESET;
   shadowRoot.appendChild(reset);
 }
 
-/** Create shadow root, styles, container; mount React. Call only once per host. */
 function mountReactApp(host: HTMLDivElement): void {
   const shadowRoot = host.attachShadow({ mode: "open" });
   injectShadowStyles(shadowRoot);
-
   const container = document.createElement("div");
   container.id = ROOT_ID;
   container.setAttribute("data-echly-ui", "true");
@@ -1252,93 +359,10 @@ function mountReactApp(host: HTMLDivElement): void {
   const initialTheme = getPreferredTheme();
   container.setAttribute("data-theme", initialTheme);
   shadowRoot.appendChild(container);
-
   const reactRoot = createRoot(container);
   reactRoot.render(<ContentApp widgetRoot={container} initialTheme={initialTheme} />);
 }
 
-type GlobalStateResponse = {
-  state?: GlobalUIState;
-} | undefined;
-
-function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState | null {
-  if (!state) return null;
-  return {
-    visible: state.visible ?? false,
-    expanded: state.expanded ?? false,
-    isRecording: state.isRecording ?? false,
-    sessionId: state.sessionId ?? null,
-    sessionModeActive: state.sessionModeActive ?? false,
-    sessionPaused: state.sessionPaused ?? false,
-  };
-}
-
-function dispatchGlobalState(state: GlobalUIState): void {
-  echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
-  window.dispatchEvent(
-    new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } })
-  );
-}
-
-/** Request initial global state from background. Restores visibility, expanded, recording, session mode on load/refresh. */
-function syncInitialGlobalState(host: HTMLDivElement): void {
-  chrome.runtime.sendMessage(
-    { type: "ECHLY_GET_GLOBAL_STATE" },
-    (response: GlobalStateResponse) => {
-      const normalized = normalizeGlobalState(response?.state);
-      if (!normalized) return;
-      host.style.display = normalized.visible ? "block" : "none";
-      dispatchGlobalState(normalized);
-    }
-  );
-}
-
-/** When tab becomes visible, refresh global state from background so we never rely on a missed broadcast. */
-function ensureVisibilityStateRefresh(): void {
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) return;
-    chrome.runtime.sendMessage(
-      { type: "ECHLY_GET_GLOBAL_STATE" },
-      (response: GlobalStateResponse) => {
-        const normalized = normalizeGlobalState(response?.state);
-        if (!normalized) return;
-        setHostVisibility(normalized.visible);
-        dispatchGlobalState(normalized);
-      }
-    );
-  });
-}
-
-/** Listen for global state; single listener. Background is source of truth. */
-function ensureMessageListener(host: HTMLDivElement): void {
-  const win = window as Window & { __ECHLY_MESSAGE_LISTENER__?: boolean };
-  if (win.__ECHLY_MESSAGE_LISTENER__) return;
-  win.__ECHLY_MESSAGE_LISTENER__ = true;
-  chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; description: string; type?: string }; sessionId?: string }) => {
-    if (msg.type === "ECHLY_FEEDBACK_CREATED" && msg.ticket && msg.sessionId) {
-      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_FEEDBACK_CREATED" });
-      window.dispatchEvent(new CustomEvent("ECHLY_FEEDBACK_CREATED", { detail: { ticket: msg.ticket, sessionId: msg.sessionId } }));
-      return;
-    }
-    const h = document.getElementById(SHADOW_HOST_ID);
-    if (!h) return;
-    if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
-      echlyLog("CONTENT", "global state received", msg.state);
-      (h as HTMLDivElement).style.display = msg.state.visible ? "block" : "none";
-      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
-      window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: msg.state } }));
-    }
-    if (msg.type === "ECHLY_TOGGLE") {
-      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_TOGGLE_WIDGET" });
-      window.dispatchEvent(new CustomEvent("ECHLY_TOGGLE_WIDGET"));
-    }
-  });
-}
-
-/**
- * Single mount: create host once, mount React once, default hidden.
- * Visibility via ECHLY_VISIBILITY from background. No re-mount, no injection logic.
- */
 function main(): void {
   let host = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
   if (!host) {
@@ -1356,10 +380,9 @@ function main(): void {
     document.documentElement.appendChild(host);
     mountReactApp(host);
   }
-
-  ensureMessageListener(host);
-  syncInitialGlobalState(host);
-  ensureVisibilityStateRefresh();
+  setupContentEventBridge(host);
+  contentState.syncInitialGlobalState(host);
+  contentState.ensureVisibilityStateRefresh();
 }
 
 main();
