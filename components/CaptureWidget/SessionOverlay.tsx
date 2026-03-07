@@ -25,6 +25,8 @@ export type SessionOverlayProps = {
   captureRoot: HTMLDivElement;
   sessionMode: boolean;
   sessionPaused: boolean;
+  pausePending?: boolean;
+  endPending?: boolean;
   sessionFeedbackPending: { screenshot: string; context: CaptureContext | null } | null;
   state: string;
   onElementClicked: (element: Element) => void;
@@ -46,6 +48,8 @@ export function SessionOverlay({
   captureRoot,
   sessionMode,
   sessionPaused,
+  pausePending = false,
+  endPending = false,
   sessionFeedbackPending,
   state,
   onElementClicked,
@@ -59,12 +63,21 @@ export function SessionOverlay({
 }: SessionOverlayProps) {
   const cleanupRef = useRef<(() => void)[]>([]);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
-  const sessionCursorActive = sessionMode && !sessionPaused;
-  const captureActive = sessionMode && !sessionPaused && sessionFeedbackPending == null;
+  const sessionActionPending = pausePending || endPending;
+  const sessionCursorActive = sessionMode && !sessionPaused && !sessionActionPending;
+  const captureActive =
+    sessionMode &&
+    !sessionPaused &&
+    !sessionActionPending &&
+    sessionFeedbackPending == null;
 
   useEffect(() => {
     if (!sessionMode || !captureRoot) return;
-    const getActive = () => sessionMode && !sessionPaused && sessionFeedbackPending == null;
+    const getActive = () =>
+      sessionMode &&
+      !sessionPaused &&
+      !sessionActionPending &&
+      sessionFeedbackPending == null;
     cleanupRef.current.push(
       attachElementHighlighter(captureRoot, { getActive })
     );
@@ -80,7 +93,14 @@ export function SessionOverlay({
       detachElementHighlighter();
       detachClickCapture();
     };
-  }, [sessionMode, captureRoot, sessionPaused, sessionFeedbackPending, onElementClicked]);
+  }, [
+    sessionMode,
+    captureRoot,
+    sessionPaused,
+    sessionActionPending,
+    sessionFeedbackPending,
+    onElementClicked,
+  ]);
 
   /* Keep feedback cursor scoped to active session capture mode. */
   useEffect(() => {
@@ -119,7 +139,14 @@ export function SessionOverlay({
           cursor: sessionCursorActive ? COMMENT_CURSOR : "default",
         }}
       />
-      <SessionControlPanel sessionPaused={sessionPaused} onPause={onPause} onResume={onResume} onEnd={onEnd} />
+      <SessionControlPanel
+        sessionPaused={sessionPaused}
+        pausePending={pausePending}
+        endPending={endPending}
+        onPause={onPause}
+        onResume={onResume}
+        onEnd={onEnd}
+      />
       {captureActive && tooltipPos != null && (
         <div
           aria-hidden

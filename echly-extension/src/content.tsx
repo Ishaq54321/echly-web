@@ -10,6 +10,7 @@ import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./co
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
 import { log } from "@/lib/utils/logger";
+import { echlyLog } from "@/lib/debug/echlyLogger";
 
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
@@ -30,6 +31,13 @@ function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
   try {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {}
+}
+
+function setHostVisibility(visible: boolean): void {
+  const host = document.getElementById(SHADOW_HOST_ID);
+  if (host) {
+    (host as HTMLDivElement).style.display = visible ? "block" : "none";
+  }
 }
 
 type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
@@ -118,22 +126,25 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   React.useEffect(() => {
     const handler = (e: CustomEvent<{ state: typeof globalState }>) => {
       const s = e.detail?.state;
-      if (s) setGlobalState(s);
+      if (s) {
+        echlyLog("CONTENT", "global state received", s);
+        setHostVisibility(s.visible);
+        setGlobalState(s);
+      }
     };
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
   }, []);
 
-  /* After mount, request current session state so new tabs get overlay immediately without waiting for visibilitychange. */
+  /* Hydrate from background on mount so already-open tabs join active sessions without refresh. */
   React.useEffect(() => {
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_GLOBAL_STATE" },
-      (state: GlobalStateResponse) => {
-        const normalized = normalizeGlobalState(state);
-        if (!normalized) return;
-        const host = document.getElementById(SHADOW_HOST_ID);
-        if (host) (host as HTMLDivElement).style.display = normalized.visible ? "block" : "none";
-        dispatchGlobalState(normalized);
+      (response: GlobalStateResponse) => {
+        if (response?.state) {
+          setHostVisibility(response.state.visible ?? false);
+          setGlobalState(response.state);
+        }
       }
     );
   }, []);
@@ -270,10 +281,16 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       } | null,
       options?: { sessionMode?: boolean }
     ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
-      if (submissionLock.current) return undefined;
+      echlyLog("PIPELINE", "start");
+      if (submissionLock.current) {
+        echlyLog("PIPELINE", "blocked by submissionLock");
+        callbacks?.onError?.();
+        return undefined;
+      }
       submissionLock.current = true;
 
       if (!effectiveSessionId || !user) {
+        echlyLog("PIPELINE", "error");
         callbacks?.onError();
         submissionLock.current = false;
         return undefined;
@@ -299,6 +316,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           };
           const structureBody = { transcript, context: enrichedContext };
           try {
+            echlyLog("PIPELINE", "structure request");
             console.log("[VOICE] final transcript submitted", transcript);
             const res = await apiFetch("/api/structure-feedback", {
               method: "POST",
@@ -389,11 +407,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
                   submissionLock.current = false;
                   if (chrome.runtime.lastError) {
+                    echlyLog("PIPELINE", "error");
                     callbacks.onError();
                     return;
                   }
                   if (response?.success && response.ticket) {
                     const ticketId = response.ticket.id;
+                    echlyLog("PIPELINE", "ticket created", { ticketId });
                     callbacks.onSuccess({
                       id: ticketId,
                       title: response.ticket.title,
@@ -402,6 +422,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                     });
                     uploadPromise.then((url) => {
                       if (url) {
+                        echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
+                        echlyLog("PIPELINE", "screenshot patched", { ticketId });
                         apiFetch(`/api/tickets/${ticketId}`, {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
@@ -410,6 +432,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                       }
                     }).catch(() => {});
                   } else {
+                    echlyLog("PIPELINE", "error");
                     callbacks.onError();
                   }
                 }
@@ -455,8 +478,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             submissionLock.current = false;
             if (firstCreated) {
               const ticketId = firstCreated.id;
+              echlyLog("PIPELINE", "ticket created", { ticketId });
               uploadPromise.then((url) => {
                 if (url) {
+                  echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
+                  echlyLog("PIPELINE", "screenshot patched", { ticketId });
                   apiFetch(`/api/tickets/${ticketId}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -466,11 +492,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               }).catch(() => {});
               callbacks.onSuccess(firstCreated);
             } else {
+              echlyLog("PIPELINE", "error");
               callbacks.onError();
             }
           } catch (err) {
             console.error("[Echly] Structure or submit failed:", err);
             submissionLock.current = false;
+            echlyLog("PIPELINE", "error");
             callbacks.onError();
           }
         })();
@@ -495,6 +523,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           url: context?.url ?? currentUrl,
         },
       };
+      echlyLog("PIPELINE", "structure request");
       console.log("[VOICE] final transcript submitted", transcript);
       const res = await apiFetch("/api/structure-feedback", {
         method: "POST",
@@ -614,7 +643,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   const onResumeSessionSelect = React.useCallback(
     async (sessionId: string) => {
-      chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {});
+      chrome.runtime.sendMessage(
+        { type: "ECHLY_SET_ACTIVE_SESSION", sessionId },
+        () => {
+          chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {});
+        }
+      );
       setSessionIdOverride(sessionId);
       try {
         const res = await apiFetch(`/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=50`);
@@ -655,6 +689,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
             if (chrome.runtime.lastError) {
               console.error("[Echly] Submit anyway failed:", chrome.runtime.lastError.message);
+              echlyLog("PIPELINE", "error");
               pending.callbacks.onError();
               return;
             }
@@ -676,6 +711,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 }
               }).catch(() => {});
             } else {
+              echlyLog("PIPELINE", "error");
               pending.callbacks.onError();
             }
           }
@@ -734,6 +770,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }).catch(() => {});
         pending.callbacks.onSuccess(firstCreated);
       } else {
+        echlyLog("PIPELINE", "error");
         pending.callbacks.onError();
       }
     },
@@ -779,6 +816,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string } } | undefined) => {
               if (chrome.runtime.lastError) {
                 console.error("[Echly] Submit edited feedback failed:", chrome.runtime.lastError.message);
+                echlyLog("PIPELINE", "error");
                 pending.callbacks.onError();
                 return;
               }
@@ -800,6 +838,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   }
                 }).catch(() => {});
               } else {
+                echlyLog("PIPELINE", "error");
                 pending.callbacks.onError();
               }
             }
@@ -852,10 +891,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           }).catch(() => {});
           pending.callbacks.onSuccess(firstCreated);
         } else {
+          echlyLog("PIPELINE", "error");
           pending.callbacks.onError();
         }
       } catch (err) {
         console.error("[Echly] Submit edited feedback failed:", err);
+        echlyLog("PIPELINE", "error");
         pending.callbacks.onError();
       }
     },
@@ -929,10 +970,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }).catch(() => {});
         pending.callbacks.onSuccess(firstCreated);
       } else {
+        echlyLog("PIPELINE", "error");
         pending.callbacks.onError();
       }
     } catch (err) {
       console.error("[Echly] Use suggestion failed:", err);
+      echlyLog("PIPELINE", "error");
       pending.callbacks.onError();
     }
   }, [extensionClarityPending, effectiveSessionId]);
@@ -1215,15 +1258,10 @@ function mountReactApp(host: HTMLDivElement): void {
 }
 
 type GlobalStateResponse = {
-  visible?: boolean;
-  expanded?: boolean;
-  isRecording?: boolean;
-  sessionId?: string | null;
-  sessionModeActive?: boolean;
-  sessionPaused?: boolean;
+  state?: GlobalUIState;
 } | undefined;
 
-function normalizeGlobalState(state: GlobalStateResponse): GlobalUIState | null {
+function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState | null {
   if (!state) return null;
   return {
     visible: state.visible ?? false,
@@ -1236,6 +1274,7 @@ function normalizeGlobalState(state: GlobalStateResponse): GlobalUIState | null 
 }
 
 function dispatchGlobalState(state: GlobalUIState): void {
+  echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
   window.dispatchEvent(
     new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } })
   );
@@ -1245,8 +1284,8 @@ function dispatchGlobalState(state: GlobalUIState): void {
 function syncInitialGlobalState(host: HTMLDivElement): void {
   chrome.runtime.sendMessage(
     { type: "ECHLY_GET_GLOBAL_STATE" },
-    (state: GlobalStateResponse) => {
-      const normalized = normalizeGlobalState(state);
+    (response: GlobalStateResponse) => {
+      const normalized = normalizeGlobalState(response?.state);
       if (!normalized) return;
       host.style.display = normalized.visible ? "block" : "none";
       dispatchGlobalState(normalized);
@@ -1260,11 +1299,10 @@ function ensureVisibilityStateRefresh(): void {
     if (document.hidden) return;
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_GLOBAL_STATE" },
-      (state: GlobalStateResponse) => {
-        const normalized = normalizeGlobalState(state);
+      (response: GlobalStateResponse) => {
+        const normalized = normalizeGlobalState(response?.state);
         if (!normalized) return;
-        const host = document.getElementById(SHADOW_HOST_ID);
-        if (host) (host as HTMLDivElement).style.display = normalized.visible ? "block" : "none";
+        setHostVisibility(normalized.visible);
         dispatchGlobalState(normalized);
       }
     );
@@ -1278,16 +1316,20 @@ function ensureMessageListener(host: HTMLDivElement): void {
   win.__ECHLY_MESSAGE_LISTENER__ = true;
   chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; description: string; type?: string }; sessionId?: string }) => {
     if (msg.type === "ECHLY_FEEDBACK_CREATED" && msg.ticket && msg.sessionId) {
+      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_FEEDBACK_CREATED" });
       window.dispatchEvent(new CustomEvent("ECHLY_FEEDBACK_CREATED", { detail: { ticket: msg.ticket, sessionId: msg.sessionId } }));
       return;
     }
     const h = document.getElementById(SHADOW_HOST_ID);
     if (!h) return;
     if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
+      echlyLog("CONTENT", "global state received", msg.state);
       (h as HTMLDivElement).style.display = msg.state.visible ? "block" : "none";
+      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
       window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: msg.state } }));
     }
     if (msg.type === "ECHLY_TOGGLE") {
+      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_TOGGLE_WIDGET" });
       window.dispatchEvent(new CustomEvent("ECHLY_TOGGLE_WIDGET"));
     }
   });
@@ -1316,7 +1358,7 @@ function main(): void {
   }
 
   ensureMessageListener(host);
-  /* Initial session state is requested from ContentApp useEffect after mount so ECHLY_GLOBAL_STATE listener exists. */
+  syncInitialGlobalState(host);
   ensureVisibilityStateRefresh();
 }
 

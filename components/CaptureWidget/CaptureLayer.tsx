@@ -27,6 +27,8 @@ export type CaptureLayerProps = {
   /** Session Feedback Mode: when true, show session overlay instead of region capture */
   sessionMode?: boolean;
   sessionPaused?: boolean;
+  pausePending?: boolean;
+  endPending?: boolean;
   sessionFeedbackPending?: { screenshot: string; context: CaptureContext | null } | null;
   onSessionElementClicked?: (element: Element) => void;
   onSessionPause?: () => void;
@@ -52,6 +54,8 @@ export function CaptureLayer({
   onCancelCapture,
   sessionMode = false,
   sessionPaused = false,
+  pausePending = false,
+  endPending = false,
   sessionFeedbackPending = null,
   onSessionElementClicked,
   onSessionPause,
@@ -75,6 +79,8 @@ export function CaptureLayer({
           captureRoot={captureRoot}
           sessionMode={sessionMode}
           sessionPaused={sessionPaused}
+          pausePending={pausePending}
+          endPending={endPending}
           sessionFeedbackPending={sessionFeedbackPending ?? null}
           state={state}
           onElementClicked={onSessionElementClicked}

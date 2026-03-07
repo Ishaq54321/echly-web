@@ -17,10 +17,12 @@ import { playShutterSound } from "@/lib/playShutterSound";
 import { logSession } from "../session/sessionMode";
 import { cropScreenshotAroundElement } from "../session/cropAroundElement";
 import { createMarker, removeAllMarkers, updateMarker, removeMarker } from "../session/feedbackMarkers";
+import { echlyLog } from "@/lib/debug/echlyLogger";
 
 const SAFE_MARGIN = 24;
 const ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
 const OVERLAY_ROOT_ID = "echly-capture-root";
+const SESSION_WAIT_POLL_MS = 120;
 
 export type SentimentGlow = "negative" | "neutral" | "positive";
 
@@ -161,10 +163,13 @@ export function useCaptureWidget({
   const [orbSuccess, setOrbSuccess] = useState(false);
   const [sessionMode, setSessionMode] = useState(false);
   const [sessionPaused, setSessionPaused] = useState(false);
+  const [pausePending, setPausePending] = useState(false);
+  const [endPending, setEndPending] = useState(false);
   const [sessionFeedbackPending, setSessionFeedbackPending] = useState<{
     screenshot: string;
     context: CaptureContext | null;
   } | null>(null);
+  const [sessionFeedbackSaving, setSessionFeedbackSaving] = useState(false);
 
   const sessionModeRef = useRef(false);
   const sessionPausedRef = useRef(false);
@@ -184,12 +189,16 @@ export function useCaptureWidget({
   const activeRecordingIdRef = useRef<string | null>(null);
   const recordingsRef = useRef<Recording[]>(recordings);
   const stateRef = useRef<CaptureState>(state);
+  const pipelineActiveRef = useRef(false);
+  const manualStopRef = useRef(false);
   const editingIdRef = useRef<string | null>(null);
   const trayLockedRef = useRef(false);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
+  const pauseWaitTimeoutRef = useRef<number | null>(null);
+  const endWaitTimeoutRef = useRef<number | null>(null);
   /** [VOICE] Diagnostic: timestamp when UI recording started (startListening called). */
   const voiceStartTimeRef = useRef<number | null>(null);
   /** [VOICE] Diagnostic: timestamp when recognition.onstart fired. */
@@ -365,6 +374,9 @@ export function useCaptureWidget({
   }, [captureRootEl]);
 
   const removeCaptureRoot = useCallback(() => {
+    if (extensionMode && globalSessionModeActive !== false) {
+      return;
+    }
     if (captureRootRef.current) {
       try {
         document.body.removeChild(captureRootRef.current);
@@ -375,12 +387,32 @@ export function useCaptureWidget({
     }
     setCaptureRootEl(null);
     setCaptureRootReady(false);
-  }, []);
+  }, [extensionMode, globalSessionModeActive]);
 
   const restoreWidget = useCallback(() => {
     setState("idle");
     setIsOpenState(widgetOpenBeforeCapture);
   }, [widgetOpenBeforeCapture]);
+
+  const clearSessionWaitTimeout = useCallback((type: "pause" | "end") => {
+    const timeoutRef =
+      type === "pause" ? pauseWaitTimeoutRef : endWaitTimeoutRef;
+    if (timeoutRef.current != null) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pauseWaitTimeoutRef.current != null) {
+        window.clearTimeout(pauseWaitTimeoutRef.current);
+      }
+      if (endWaitTimeoutRef.current != null) {
+        window.clearTimeout(endWaitTimeoutRef.current);
+      }
+    };
+  }, []);
 
   /* ================= SYNC / LOAD SESSION FEEDBACK ================= */
 
@@ -440,6 +472,7 @@ export function useCaptureWidget({
       }
       text = text.replace(/\s+/g, " ").trim();
       const t = Date.now();
+      echlyLog("RECORDING", "result", { transcript: text });
       console.log("[VOICE] transcript received", t, text);
       if (text && !hasReceivedFirstTranscriptRef.current) {
         hasReceivedFirstTranscriptRef.current = true;
@@ -463,6 +496,16 @@ export function useCaptureWidget({
       }
     };
     recognition.onend = () => {
+      if (!manualStopRef.current) {
+        echlyLog("RECORDING", "unexpected end");
+        if (stateRef.current === "voice_listening") {
+          setState("idle");
+        }
+        return;
+      }
+
+      manualStopRef.current = false;
+
       const s = stateRef.current;
       if (s === "processing" || s === "success") return;
       setState("idle");
@@ -480,6 +523,7 @@ export function useCaptureWidget({
   /* ================= LISTEN ================= */
 
   const startListening = useCallback(async () => {
+    echlyLog("RECORDING", "start");
     const startTime = Date.now();
     voiceStartTimeRef.current = startTime;
     recognitionOnstartTimeRef.current = null;
@@ -510,6 +554,8 @@ export function useCaptureWidget({
   }, []);
 
   const finishListening = useCallback(async () => {
+    echlyLog("RECORDING", "finish requested");
+    manualStopRef.current = true;
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(8);
     }
@@ -549,32 +595,48 @@ export function useCaptureWidget({
           );
         }
         setSessionFeedbackPending(null);
+        setSessionFeedbackSaving(true);
         setRecordings((prev) => prev.filter((r) => r.id !== activeId));
         setActiveRecordingId(null);
         setState("idle");
         lastSessionClickedElementRef.current = null;
         console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
-        onComplete(active.transcript, active.screenshot, {
-          onSuccess: (ticket) => {
-            if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
-            setPointers((prev) => [
-              { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
-              ...prev,
-            ]);
-            setHighlightTicketId(ticket.id);
-            setTimeout(() => setHighlightTicketId(null), 1200);
-          },
-          onError: () => {
-            if (root) removeMarker(placeholderId);
-            setErrorMessage("AI processing failed.");
-          },
-        }, active.context ?? undefined, { sessionMode: true });
+        try {
+          pipelineActiveRef.current = true;
+          onComplete(active.transcript, active.screenshot, {
+            onSuccess: (ticket) => {
+              pipelineActiveRef.current = false;
+              setSessionFeedbackSaving(false);
+              if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
+              setPointers((prev) => [
+                { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
+                ...prev,
+              ]);
+              setHighlightTicketId(ticket.id);
+              setTimeout(() => setHighlightTicketId(null), 1200);
+            },
+            onError: () => {
+              pipelineActiveRef.current = false;
+              setSessionFeedbackSaving(false);
+              if (root) removeMarker(placeholderId);
+              setErrorMessage("AI processing failed.");
+            },
+          }, active.context ?? undefined, { sessionMode: true });
+        } catch (error) {
+          pipelineActiveRef.current = false;
+          setSessionFeedbackSaving(false);
+          if (root) removeMarker(placeholderId);
+          console.error(error);
+          setErrorMessage("AI processing failed.");
+        }
         return;
       }
       setState("processing");
       console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
+      pipelineActiveRef.current = true;
       onComplete(active.transcript, active.screenshot, {
         onSuccess: (ticket) => {
+          pipelineActiveRef.current = false;
           setPointers((prev) => [
             { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
             ...prev,
@@ -593,6 +655,7 @@ export function useCaptureWidget({
           }, 120);
         },
         onError: () => {
+          pipelineActiveRef.current = false;
           setErrorMessage("AI processing failed.");
           setState("voice_listening");
         },
@@ -633,6 +696,7 @@ export function useCaptureWidget({
   }, [onComplete, extensionMode, removeCaptureRoot, restoreWidget]);
 
   const discardListening = useCallback(() => {
+    echlyLog("RECORDING", "discard");
     recognitionRef.current?.stop();
     const activeId = activeRecordingIdRef.current;
     setRecordings((prev) => prev.filter((r) => r.id !== activeId));
@@ -807,7 +871,8 @@ export function useCaptureWidget({
   }, []);
 
   const startSession = useCallback(async () => {
-    if (stateRef.current !== "idle" || sessionModeRef.current) return;
+    if (stateRef.current !== "idle" || sessionModeRef.current || globalSessionModeActive) return;
+    echlyLog("SESSION", "start");
     console.log("[Echly] Start New Feedback Session clicked");
     logSession("start");
     if (extensionMode && onCreateSession && onActiveSessionChange) {
@@ -817,36 +882,104 @@ export function useCaptureWidget({
       setPointers([]);
       onSessionModeStart?.();
     }
-    setSessionMode(true);
-    setSessionPaused(false);
     setSessionFeedbackPending(null);
-    createCaptureRoot();
-  }, [extensionMode, onCreateSession, onActiveSessionChange, onSessionModeStart, createCaptureRoot]);
+    setSessionFeedbackSaving(false);
+    setPausePending(false);
+    setEndPending(false);
+  }, [extensionMode, onCreateSession, onActiveSessionChange, onSessionModeStart, globalSessionModeActive]);
 
   const pauseSession = useCallback(() => {
-    if (!sessionModeRef.current) return;
-    logSession("pause");
-    setSessionPaused(true);
-    onSessionModePause?.();
-  }, [onSessionModePause]);
+    if (
+      (!sessionModeRef.current && !globalSessionModeActive) ||
+      sessionPausedRef.current ||
+      pausePending ||
+      endPending
+    ) {
+      return;
+    }
+    echlyLog("SESSION", "pause requested");
+
+    const finalizePause = () => {
+      echlyLog("SESSION", "pause finalized");
+      clearSessionWaitTimeout("pause");
+      logSession("pause");
+      onSessionModePause?.();
+      setPausePending(false);
+    };
+
+    if (pipelineActiveRef.current) {
+      clearSessionWaitTimeout("pause");
+      setPausePending(true);
+
+      const waitForPipeline = () => {
+        if (pipelineActiveRef.current) {
+          pauseWaitTimeoutRef.current = window.setTimeout(
+            waitForPipeline,
+            SESSION_WAIT_POLL_MS
+          );
+          return;
+        }
+
+        finalizePause();
+      };
+
+      waitForPipeline();
+      return;
+    }
+
+    finalizePause();
+  }, [
+    clearSessionWaitTimeout,
+    endPending,
+    globalSessionModeActive,
+    onSessionModePause,
+    pausePending,
+  ]);
 
   const resumeSession = useCallback(() => {
-    if (!sessionModeRef.current) return;
+    if (!sessionModeRef.current && !globalSessionModeActive) return;
+    echlyLog("SESSION", "resume");
+    setPausePending(false);
+    setEndPending(false);
     logSession("resume");
-    setSessionPaused(false);
     onSessionModeResume?.();
-  }, [onSessionModeResume]);
+  }, [globalSessionModeActive, onSessionModeResume]);
 
-  const endSession = useCallback(() => {
-    if (!sessionModeRef.current) return;
-    logSession("end");
-    onSessionModeEnd?.();
-    removeAllMarkers();
-    setSessionMode(false);
-    setSessionPaused(false);
-    setSessionFeedbackPending(null);
-    removeCaptureRoot();
-  }, [onSessionModeEnd, removeCaptureRoot]);
+  const endSession = useCallback((afterEnd?: () => void) => {
+    if ((!sessionModeRef.current && !globalSessionModeActive) || endPending) return;
+    echlyLog("SESSION", "end requested");
+
+    const finalizeEnd = () => {
+      echlyLog("SESSION", "end finalized");
+      clearSessionWaitTimeout("end");
+      logSession("end");
+      setPausePending(false);
+      setEndPending(false);
+      setSessionFeedbackPending(null);
+      setSessionFeedbackSaving(false);
+      onSessionModeEnd?.();
+      afterEnd?.();
+    };
+
+    if (pipelineActiveRef.current) {
+      clearSessionWaitTimeout("end");
+      setEndPending(true);
+      const waitForPipeline = () => {
+        if (pipelineActiveRef.current) {
+          endWaitTimeoutRef.current = window.setTimeout(
+            waitForPipeline,
+            SESSION_WAIT_POLL_MS
+          );
+          return;
+        }
+        finalizeEnd();
+      };
+      waitForPipeline();
+      return;
+    }
+
+    finalizeEnd();
+  }, [clearSessionWaitTimeout, endPending, globalSessionModeActive, onSessionModeEnd]);
 
   /**
    * Sync session mode from global state (ECHLY_GLOBAL_STATE).
@@ -857,20 +990,28 @@ export function useCaptureWidget({
    */
   useEffect(() => {
     if (!extensionMode || globalSessionModeActive === undefined) return;
+    echlyLog("SESSION", "global sync", { active: globalSessionModeActive, paused: globalSessionPaused });
     if (globalSessionModeActive === true) {
       setSessionMode(true);
       setSessionPaused(globalSessionPaused ?? false);
       setSessionFeedbackPending(null);
+      setEndPending(false);
       if (!captureRootRef.current) {
         createCaptureRoot();
       }
     }
     if (globalSessionPaused === true) {
       setSessionPaused(true);
+      setPausePending(false);
     }
     if (globalSessionModeActive === false) {
       setSessionMode(false);
       setSessionPaused(false);
+      setPausePending(false);
+      setEndPending(false);
+      setSessionFeedbackPending(null);
+      setSessionFeedbackSaving(false);
+      removeAllMarkers();
       removeCaptureRoot();
     }
   }, [extensionMode, globalSessionModeActive, globalSessionPaused, createCaptureRoot, removeCaptureRoot]);
@@ -879,6 +1020,9 @@ export function useCaptureWidget({
   useEffect(() => {
     if (extensionMode && globalSessionModeActive && globalSessionPaused !== undefined) {
       setSessionPaused(globalSessionPaused);
+      if (globalSessionPaused) {
+        setPausePending(false);
+      }
     }
   }, [extensionMode, globalSessionModeActive, globalSessionPaused]);
 
@@ -891,6 +1035,7 @@ export function useCaptureWidget({
       setSessionMode(true);
       setSessionPaused(globalSessionPaused ?? false);
       setSessionFeedbackPending(null);
+      setEndPending(false);
       createCaptureRoot();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -901,12 +1046,9 @@ export function useCaptureWidget({
   useEffect(() => {
     if (!extensionMode || !loadSessionWithPointers?.sessionId) return;
     setPointers(loadSessionWithPointers.pointers ?? []);
-    setSessionMode(true);
-    setSessionPaused(false);
     setSessionFeedbackPending(null);
-    createCaptureRoot();
     onSessionLoaded?.();
-  }, [extensionMode, loadSessionWithPointers, createCaptureRoot, onSessionLoaded]);
+  }, [extensionMode, loadSessionWithPointers, onSessionLoaded]);
 
   const handleSessionElementClicked = useCallback(
     async (element: Element) => {
@@ -971,34 +1113,49 @@ export function useCaptureWidget({
       }
 
       setSessionFeedbackPending(null);
+      setSessionFeedbackSaving(true);
       setState("idle");
       lastSessionClickedElementRef.current = null;
 
       /* Send to structure-feedback async; update marker and list when done. */
       console.log("[VOICE] final transcript sent to pipeline:", transcript);
-      onComplete(transcript, pending.screenshot, {
-        onSuccess: (ticket) => {
-          if (root) {
-            updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
-          }
-          setPointers((prev) => [
-            { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
-            ...prev,
-          ]);
-          setHighlightTicketId(ticket.id);
-          setTimeout(() => setHighlightTicketId(null), 1200);
-        },
-        onError: () => {
-          if (root) removeMarker(placeholderId);
-          setErrorMessage("AI processing failed.");
-        },
-      }, pending.context ?? undefined, { sessionMode: true });
+      try {
+        pipelineActiveRef.current = true;
+        onComplete(transcript, pending.screenshot, {
+          onSuccess: (ticket) => {
+            pipelineActiveRef.current = false;
+            setSessionFeedbackSaving(false);
+            if (root) {
+              updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
+            }
+            setPointers((prev) => [
+              { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
+              ...prev,
+            ]);
+            setHighlightTicketId(ticket.id);
+            setTimeout(() => setHighlightTicketId(null), 1200);
+          },
+          onError: () => {
+            pipelineActiveRef.current = false;
+            setSessionFeedbackSaving(false);
+            if (root) removeMarker(placeholderId);
+            setErrorMessage("AI processing failed.");
+          },
+        }, pending.context ?? undefined, { sessionMode: true });
+      } catch (error) {
+        pipelineActiveRef.current = false;
+        setSessionFeedbackSaving(false);
+        if (root) removeMarker(placeholderId);
+        console.error(error);
+        setErrorMessage("AI processing failed.");
+      }
     },
     [sessionFeedbackPending, onComplete]
   );
 
   const handleSessionFeedbackCancel = useCallback(() => {
     setSessionFeedbackPending(null);
+    setSessionFeedbackSaving(false);
   }, []);
 
   const handleSessionStartVoice = useCallback(() => {
@@ -1156,6 +1313,8 @@ export function useCaptureWidget({
       orbSuccess,
       sessionMode,
       sessionPaused,
+      pausePending,
+      endPending,
       sessionFeedbackPending,
     },
     handlers,

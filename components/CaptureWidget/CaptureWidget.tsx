@@ -6,12 +6,10 @@ import CaptureHeader from "./CaptureHeader";
 import FeedbackItem from "./FeedbackItem";
 import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
-import { RecordingCapsule } from "./RecordingCapsule";
 import { ResumeSessionModal } from "./ResumeSessionModal";
 import type { CaptureWidgetProps, CaptureState } from "./types";
 
 const CAPTURE_FLOW_STATES: CaptureState[] = ["focus_mode", "region_selecting", "voice_listening", "processing"];
-const RECORDING_UI_STATES: CaptureState[] = ["voice_listening", "processing"];
 
 export default function CaptureWidget({
   sessionId,
@@ -73,9 +71,7 @@ export default function CaptureWidget({
   const listScrollRef = useRef<HTMLDivElement>(null);
 
   const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state) || state.pillExiting;
-  const showRecordingCapsule =
-    (RECORDING_UI_STATES.includes(state.state) || state.pillExiting) &&
-    !state.sessionFeedbackPending;
+  const hasStoredSession = Boolean(sessionId);
   const showSidebar = !isInCaptureFlow && !state.sessionMode;
   const showPanelWhenPaused = state.sessionMode && state.sessionPaused;
   const showFloatingButton = !effectiveIsOpen && showSidebar && !showPanelWhenPaused;
@@ -118,6 +114,17 @@ export default function CaptureWidget({
     };
   }, [handlers, widgetToggleRef]);
 
+  const handleResumeActiveSession = React.useCallback(() => {
+    chrome.runtime.sendMessage(
+      { type: "ECHLY_GET_ACTIVE_SESSION" },
+      (response?: { sessionId?: string | null }) => {
+        const storedSessionId = response?.sessionId;
+        if (!storedSessionId) return;
+        onResumeSessionSelect?.(storedSessionId);
+      }
+    );
+  }, [onResumeSessionSelect]);
+
   return (
     <>
       {extensionMode && fetchSessions && onResumeSessionSelect && (
@@ -143,6 +150,8 @@ export default function CaptureWidget({
             onCancelCapture={handlers.handleCancelCapture}
             sessionMode={state.sessionMode}
             sessionPaused={state.sessionPaused}
+            pausePending={state.pausePending}
+            endPending={state.endPending}
             sessionFeedbackPending={state.sessionFeedbackPending}
             onSessionElementClicked={handlers.handleSessionElementClicked}
             onSessionPause={() => {
@@ -154,8 +163,9 @@ export default function CaptureWidget({
               onCollapseRequest?.();
             }}
             onSessionEnd={() => {
-              handlers.endSession();
-              onSessionEndCallback?.();
+              handlers.endSession(() => {
+                onSessionEndCallback?.();
+              });
             }}
             onSessionRecordVoice={handlers.handleSessionStartVoice}
             onSessionDoneVoice={handlers.finishListening}
@@ -163,22 +173,6 @@ export default function CaptureWidget({
             onSessionFeedbackCancel={handlers.handleSessionFeedbackCancel}
           />
         )}
-
-      {showRecordingCapsule && (
-        <>
-          <RecordingCapsule
-            visible={true}
-            isActive={state.state === "voice_listening"}
-            isProcessing={state.state === "processing" || state.pillExiting}
-            isExiting={state.pillExiting}
-            audioLevel={state.listeningAudioLevel ?? 0}
-            sentiment={state.listeningSentiment ?? "neutral"}
-            liveTranscript={state.liveTranscript ?? ""}
-            onDone={handlers.finishListening}
-            onCancel={handlers.handleCancelCapture}
-          />
-        </>
-      )}
 
       {showFloatingButton && (
         <div className="echly-floating-trigger-wrapper">
@@ -261,7 +255,17 @@ export default function CaptureWidget({
                     onAddFeedback={handlers.handleAddFeedback}
                     extensionMode={extensionMode}
                     onStartSession={extensionMode ? handlers.startSession : undefined}
-                    onResumeSession={extensionMode && fetchSessions && onResumeSessionSelect ? () => setResumeModalOpen(true) : undefined}
+                    onResumeSession={
+                      extensionMode && hasStoredSession
+                        ? handleResumeActiveSession
+                        : undefined
+                    }
+                    onOpenPreviousSession={
+                      extensionMode && fetchSessions && onResumeSessionSelect
+                        ? () => setResumeModalOpen(true)
+                        : undefined
+                    }
+                    hasActiveSession={hasStoredSession}
                     captureDisabled={captureDisabled}
                   />
                 )}

@@ -4,12 +4,48 @@ import React from "react";
 
 export type SessionControlPanelProps = {
   sessionPaused: boolean;
+  pausePending?: boolean;
+  endPending?: boolean;
   onPause: () => void;
   onResume: () => void;
   onEnd: () => void;
 };
 
-export function SessionControlPanel({ sessionPaused, onPause, onResume, onEnd }: SessionControlPanelProps) {
+function InlineSpinner() {
+  return (
+    <>
+      <style>{`
+        @keyframes echly-inline-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
+      <span
+        aria-hidden
+        style={{
+          width: 12,
+          height: 12,
+          borderRadius: "50%",
+          border: "2px solid rgba(255,255,255,0.28)",
+          borderTopColor: "rgba(255,255,255,0.92)",
+          opacity: 0.8,
+          animation: "echly-inline-spin 0.8s linear infinite",
+          flexShrink: 0,
+        }}
+      />
+    </>
+  );
+}
+
+export function SessionControlPanel({
+  sessionPaused,
+  pausePending = false,
+  endPending = false,
+  onPause,
+  onResume,
+  onEnd,
+}: SessionControlPanelProps) {
   return (
     <div
       data-echly-ui="true"
@@ -33,10 +69,33 @@ export function SessionControlPanel({ sessionPaused, onPause, onResume, onEnd }:
       <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
         {sessionPaused ? "Session paused" : "Recording Session"}
       </span>
-      {sessionPaused ? (
+      {pausePending ? (
+        <button
+          type="button"
+          disabled
+          style={{
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: "none",
+            background: "rgba(255,255,255,0.1)",
+            color: "rgba(255,255,255,0.92)",
+            fontSize: 13,
+            fontWeight: 500,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            opacity: 0.9,
+            cursor: "default",
+          }}
+        >
+          <InlineSpinner />
+          <span>Pausing…</span>
+        </button>
+      ) : sessionPaused ? (
         <button
           type="button"
           onClick={onResume}
+          disabled={pausePending}
           style={{
             padding: "6px 12px",
             borderRadius: 8,
@@ -45,7 +104,8 @@ export function SessionControlPanel({ sessionPaused, onPause, onResume, onEnd }:
             color: "#fff",
             fontSize: 13,
             fontWeight: 500,
-            cursor: "pointer",
+            cursor: pausePending ? "default" : "pointer",
+            opacity: pausePending ? 0.7 : 1,
           }}
         >
           Resume Feedback Session
@@ -54,6 +114,7 @@ export function SessionControlPanel({ sessionPaused, onPause, onResume, onEnd }:
         <button
           type="button"
           onClick={onPause}
+          disabled={endPending}
           style={{
             padding: "6px 12px",
             borderRadius: 8,
@@ -62,28 +123,55 @@ export function SessionControlPanel({ sessionPaused, onPause, onResume, onEnd }:
             color: "rgba(255,255,255,0.9)",
             fontSize: 13,
             fontWeight: 500,
-            cursor: "pointer",
+            cursor: endPending ? "default" : "pointer",
+            opacity: endPending ? 0.7 : 1,
           }}
         >
           Pause
         </button>
       )}
-      <button
-        type="button"
-        onClick={onEnd}
-        style={{
-          padding: "6px 12px",
-          borderRadius: 8,
-          border: "none",
-          background: "rgba(239,68,68,0.9)",
-          color: "#fff",
-          fontSize: 13,
-          fontWeight: 500,
-          cursor: "pointer",
-        }}
-      >
-        End
-      </button>
+      {endPending ? (
+        <button
+          type="button"
+          disabled
+          style={{
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: "none",
+            background: "rgba(239,68,68,0.9)",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 500,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            opacity: 0.9,
+            cursor: "default",
+          }}
+        >
+          <InlineSpinner />
+          <span>Ending…</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onEnd}
+          disabled={pausePending}
+          style={{
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: "none",
+            background: "rgba(239,68,68,0.9)",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: pausePending ? "default" : "pointer",
+            opacity: pausePending ? 0.7 : 1,
+          }}
+        >
+          End
+        </button>
+      )}
     </div>
   );
 }

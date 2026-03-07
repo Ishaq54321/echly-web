@@ -4,6 +4,7 @@
  */
 import { firebaseConfig } from "../../lib/firebase/config";
 import { warn } from "../../lib/utils/logger";
+import { echlyLog } from "../../lib/debug/echlyLogger";
 
 const API_BASE = "http://localhost:3000";
 console.log("[EXTENSION] Using API_BASE:", API_BASE);
@@ -43,12 +44,27 @@ let globalUIState: {
   sessionPaused: false,
 };
 
+function persistSessionLifecycleState(): void {
+  chrome.storage.local.set({
+    activeSessionId,
+    sessionModeActive: globalUIState.sessionModeActive,
+    sessionPaused: globalUIState.sessionPaused,
+  });
+}
+
 chrome.storage.local.get(
-  ["activeSessionId"],
-  (result: { activeSessionId?: string }) => {
+  ["activeSessionId", "sessionModeActive", "sessionPaused"],
+  (result: {
+    activeSessionId?: string;
+    sessionModeActive?: boolean;
+    sessionPaused?: boolean;
+  }) => {
     const stored = result.activeSessionId;
     activeSessionId = typeof stored === "string" ? stored : null;
     globalUIState.sessionId = activeSessionId;
+    globalUIState.sessionModeActive = result.sessionModeActive === true;
+    globalUIState.sessionPaused = result.sessionPaused === true;
+    broadcastUIState();
   }
 );
 
@@ -178,6 +194,7 @@ async function getValidToken(): Promise<string> {
 }
 
 function broadcastUIState(): void {
+  echlyLog("BACKGROUND", "broadcast global state", globalUIState);
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
       if (tab.id) {
@@ -208,6 +225,7 @@ chrome.tabs.onCreated.addListener((tab) => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  echlyLog("MESSAGE", "received", request.type);
   if (request.type === "ECHLY_TOGGLE_VISIBILITY") {
     globalUIState.visible = !globalUIState.visible;
     broadcastUIState();
@@ -230,44 +248,67 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_GET_GLOBAL_STATE") {
-    sendResponse(globalUIState);
+    sendResponse({ state: { ...globalUIState } });
+    return true;
+  }
+
+  if (request.type === "ECHLY_GET_ACTIVE_SESSION") {
+    sendResponse({
+      sessionId: activeSessionId || null,
+    });
     return true;
   }
 
   if (request.type === "ECHLY_SET_ACTIVE_SESSION") {
+    echlyLog("BACKGROUND", "active session set");
     activeSessionId = (request.sessionId as string | undefined) ?? null;
     globalUIState.sessionId = activeSessionId;
-    chrome.storage.local.set({ activeSessionId });
+    persistSessionLifecycleState();
     broadcastUIState();
     sendResponse({ ok: true });
     return false;
   }
 
   if (request.type === "ECHLY_SESSION_MODE_START") {
+    echlyLog("BACKGROUND", "session start broadcast");
     globalUIState.sessionModeActive = true;
     globalUIState.sessionPaused = false;
+    globalUIState.sessionId = activeSessionId;
+    persistSessionLifecycleState();
     broadcastUIState();
     sendResponse({ ok: true });
     return false;
   }
 
   if (request.type === "ECHLY_SESSION_MODE_PAUSE") {
+    echlyLog("BACKGROUND", "session pause broadcast");
+    globalUIState.sessionModeActive = true;
     globalUIState.sessionPaused = true;
+    globalUIState.sessionId = activeSessionId;
+    persistSessionLifecycleState();
     broadcastUIState();
     sendResponse({ ok: true });
     return false;
   }
 
   if (request.type === "ECHLY_SESSION_MODE_RESUME") {
+    echlyLog("BACKGROUND", "session resume broadcast");
+    globalUIState.sessionModeActive = true;
     globalUIState.sessionPaused = false;
+    globalUIState.sessionId = activeSessionId;
+    persistSessionLifecycleState();
     broadcastUIState();
     sendResponse({ ok: true });
     return false;
   }
 
   if (request.type === "ECHLY_SESSION_MODE_END") {
+    echlyLog("BACKGROUND", "session end broadcast");
+    activeSessionId = null;
+    globalUIState.sessionId = null;
     globalUIState.sessionModeActive = false;
     globalUIState.sessionPaused = false;
+    persistSessionLifecycleState();
     broadcastUIState();
     sendResponse({ ok: true });
     return false;
