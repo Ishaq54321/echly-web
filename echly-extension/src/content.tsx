@@ -1212,13 +1212,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   );
 }
 
-/** Minimal CSS reset inside shadow root for style isolation. Theme (data-theme) and color-scheme come from globals.css. */
+/** Minimal CSS reset inside shadow root for style isolation. Theme (data-theme) and color-scheme come from globals.css. Font inherits from popup.css #echly-root. */
 const SHADOW_RESET = `
   :host { all: initial; }
   #echly-root {
     all: initial;
     box-sizing: border-box;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
   }
   #echly-root * { box-sizing: border-box; }
 `;

@@ -122,19 +122,21 @@ export function ResumeSessionModal({
         style={{
           width: "min(420px, 100%)",
           maxHeight: "85vh",
-          borderRadius: 16,
-          background: "rgba(20,22,28,0.98)",
-          backdropFilter: "blur(16px)",
-          boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
-          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: 18,
+          background: "rgba(20,22,28,0.92)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          border: "1px solid rgba(255,255,255,0.08)",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
+          fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: 16, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <h2 id="resume-session-modal-title" style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 600, color: "rgba(255,255,255,0.95)" }}>
+        <div style={{ padding: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <h2 id="resume-session-modal-title" style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 600, color: "#F3F4F6" }}>
             Resume Feedback Session
           </h2>
           <input
@@ -147,25 +149,25 @@ export function ResumeSessionModal({
               width: "100%",
               boxSizing: "border-box",
               padding: "10px 12px",
-              borderRadius: 8,
-              border: "1px solid rgba(255,255,255,0.15)",
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.08)",
               background: "rgba(255,255,255,0.06)",
-              color: "rgba(255,255,255,0.95)",
+              color: "#F3F4F6",
               fontSize: 14,
             }}
           />
-          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
             {(["today", "7days", "30days", "all"] as const).map((key) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setFilter(key)}
                 style={{
-                  padding: "6px 10px",
-                  borderRadius: 6,
+                  padding: "8px 12px",
+                  borderRadius: 10,
                   border: "none",
-                  background: filter === key ? "rgba(37, 99, 235, 0.4)" : "rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.9)",
+                  background: filter === key ? "rgba(70, 110, 255, 0.2)" : "rgba(255,255,255,0.08)",
+                  color: "#F3F4F6",
                   fontSize: 12,
                   fontWeight: 500,
                   cursor: "pointer",
@@ -178,24 +180,24 @@ export function ResumeSessionModal({
         </div>
         <div style={{ flex: 1, overflow: "auto", minHeight: 200, maxHeight: 360 }}>
           {loading && (
-            <div style={{ padding: 24, textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
+            <div style={{ padding: 24, textAlign: "center", color: "#A1A1AA", fontSize: 14 }}>
               Loading sessions…
             </div>
           )}
           {error && (
-            <div style={{ padding: 24, color: "#ef4444", fontSize: 14 }}>
+            <div style={{ padding: 24, color: "#EF4444", fontSize: 14 }}>
               {error}
             </div>
           )}
           {!loading && !error && filtered.length === 0 && (
-            <div style={{ padding: 24, textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
+            <div style={{ padding: 24, textAlign: "center", color: "#A1A1AA", fontSize: 14 }}>
               No sessions match.
             </div>
           )}
           {!loading && !error && filtered.length > 0 && (
-            <ul style={{ listStyle: "none", margin: 0, padding: 8 }}>
+            <ul style={{ listStyle: "none", margin: 0, padding: 12 }}>
               {filtered.map((s) => (
-                <li key={s.id}>
+                <li key={s.id} style={{ marginBottom: 4 }}>
                   <button
                     type="button"
                     onClick={() => {
@@ -205,24 +207,23 @@ export function ResumeSessionModal({
                     style={{
                       width: "100%",
                       textAlign: "left",
-                      padding: "12px 14px",
-                      borderRadius: 10,
+                      padding: "14px 16px",
+                      borderRadius: 14,
                       border: "none",
                       background: "transparent",
-                      color: "rgba(255,255,255,0.9)",
+                      color: "#F3F4F6",
                       fontSize: 14,
                       cursor: "pointer",
-                      marginBottom: 4,
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                      e.currentTarget.style.background = "rgba(255,255,255,0.06)";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = "transparent";
                     }}
                   >
                     <div style={{ fontWeight: 600 }}>{s.title?.trim() || "Untitled Session"}</div>
-                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: "#A1A1AA", marginTop: 4 }}>
                       {feedbackCount(s)} feedback items · {formatLastUpdated(s.updatedAt)}
                     </div>
                   </button>
@@ -231,17 +232,18 @@ export function ResumeSessionModal({
             </ul>
           )}
         </div>
-        <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <div style={{ padding: 16, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
           <button
             type="button"
             onClick={onClose}
             style={{
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "1px solid rgba(255,255,255,0.2)",
+              padding: "10px 16px",
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.08)",
               background: "transparent",
-              color: "rgba(255,255,255,0.8)",
+              color: "#A1A1AA",
               fontSize: 13,
+              fontWeight: 500,
               cursor: "pointer",
             }}
           >

@@ -45,23 +45,25 @@ export function SessionFeedbackPopup({
         left: "50%",
         transform: "translate(-50%, -50%)",
         width: "min(380px, 92vw)",
-        borderRadius: 16,
-        background: "rgba(20,22,28,0.98)",
-        backdropFilter: "blur(16px)",
-        boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
-        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: 14,
+        background: "rgba(20,22,28,0.92)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        border: "1px solid rgba(255,255,255,0.08)",
         zIndex: 2147483647,
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
+        fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
       }}
     >
-      <div style={{ padding: 16, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+      <div style={{ padding: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
         <div
           style={{
-            borderRadius: 8,
+            borderRadius: 14,
             overflow: "hidden",
-            background: "#111",
+            background: "rgba(0,0,0,0.3)",
             aspectRatio: "16/10",
             display: "flex",
             alignItems: "center",
@@ -74,12 +76,12 @@ export function SessionFeedbackPopup({
             style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
           />
         </div>
-        <p style={{ margin: "12px 0 0", fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+        <p style={{ margin: "12px 0 0", fontSize: 13, fontWeight: 500, color: "#A1A1AA" }}>
           Speak or type feedback
         </p>
       </div>
 
-      <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
         {mode === "choose" && (
           <>
             <button
@@ -89,7 +91,7 @@ export function SessionFeedbackPopup({
                 padding: "12px 16px",
                 borderRadius: 10,
                 border: "none",
-                background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                background: "#466EFF",
                 color: "#fff",
                 fontSize: 14,
                 fontWeight: 600,
@@ -104,9 +106,9 @@ export function SessionFeedbackPopup({
               style={{
                 padding: "12px 16px",
                 borderRadius: 10,
-                border: "1px solid rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.08)",
                 background: "rgba(255,255,255,0.06)",
-                color: "rgba(255,255,255,0.9)",
+                color: "#F3F4F6",
                 fontSize: 14,
                 fontWeight: 500,
                 cursor: "pointer",
@@ -126,7 +128,7 @@ export function SessionFeedbackPopup({
               padding: "12px 16px",
               borderRadius: 10,
               border: "none",
-              background: isVoiceListening ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "rgba(255,255,255,0.1)",
+              background: isVoiceListening ? "#466EFF" : "rgba(255,255,255,0.08)",
               color: "#fff",
               fontSize: 14,
               fontWeight: 600,
@@ -150,9 +152,9 @@ export function SessionFeedbackPopup({
                 boxSizing: "border-box",
                 padding: "12px 14px",
                 borderRadius: 10,
-                border: "1px solid rgba(255,255,255,0.15)",
+                border: "1px solid rgba(255,255,255,0.08)",
                 background: "rgba(255,255,255,0.06)",
-                color: "rgba(255,255,255,0.95)",
+                color: "#F3F4F6",
                 fontSize: 14,
                 resize: "vertical",
                 minHeight: 80,
@@ -166,7 +168,7 @@ export function SessionFeedbackPopup({
                 padding: "12px 16px",
                 borderRadius: 10,
                 border: "none",
-                background: textInput.trim() ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "rgba(255,255,255,0.1)",
+                background: textInput.trim() ? "#466EFF" : "rgba(255,255,255,0.08)",
                 color: "#fff",
                 fontSize: 14,
                 fontWeight: 600,
@@ -186,8 +188,9 @@ export function SessionFeedbackPopup({
               padding: "8px 12px",
               border: "none",
               background: "transparent",
-              color: "rgba(255,255,255,0.5)",
+              color: "#A1A1AA",
               fontSize: 13,
+              fontWeight: 500,
               cursor: "pointer",
               alignSelf: "flex-start",
             }}

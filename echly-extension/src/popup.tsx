@@ -90,7 +90,7 @@ function PopupApp() {
 
   if (!authChecked) {
     return (
-      <div style={{ minHeight: "120px", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontSize: 14, color: "#6b7280" }}>
+      <div className="echly-popup-loading">
         Loading…
       </div>
     );
@@ -98,65 +98,40 @@ function PopupApp() {
 
   if (authenticated) {
     return (
-      <div style={{ minHeight: "80px", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontSize: 14, color: "#6b7280" }}>
+      <div className="echly-popup-closing">
         Closing…
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        width: "400px",
-        padding: "24px",
-        borderRadius: "16px",
-        fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-        fontSize: 15,
-        color: "#1F2937",
-        background: "#F7F7F8",
-      }}
-    >
+    <div className="echly-popup-login">
       <img
         src={chrome.runtime.getURL("assets/Echly_logo.svg")}
         alt="Echly"
         width={40}
         height={40}
-        style={{ marginBottom: 24 }}
+        className="echly-popup-logo"
       />
-      <h1 style={{ fontSize: 20, fontWeight: 600, color: "#111827", margin: 0, marginBottom: 8 }}>
+      <h1 className="echly-popup-title">
         Sign in to Echly
       </h1>
-      <p style={{ fontSize: 14, color: "#6b7280", margin: 0, marginBottom: 24, lineHeight: 1.5 }}>
+      <p className="echly-popup-subtitle">
         Capture feedback instantly across any website.
       </p>
       {loginError && (
-        <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 16 }}>{loginError}</p>
+        <p className="echly-popup-error">{loginError}</p>
       )}
       <button
         type="button"
         onClick={handleContinueWithGoogle}
         disabled={loginLoading}
-        style={{
-          width: "100%",
-          height: 48,
-          borderRadius: 12,
-          background: "#fff",
-          border: "1px solid rgba(0,0,0,0.12)",
-          cursor: loginLoading ? "not-allowed" : "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 12,
-          fontSize: 15,
-          fontWeight: 500,
-          color: "#1f2937",
-          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-        }}
+        className="echly-popup-btn"
       >
         <GoogleLogoIcon />
         {loginLoading ? "Signing in…" : "Continue with Google"}
       </button>
-      <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 16, marginBottom: 0, lineHeight: 1.4 }}>
+      <p className="echly-popup-footer">
         We only use your Google account for authentication.
       </p>
     </div>

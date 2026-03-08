@@ -31,7 +31,14 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["popup.css", "assets/Echly_logo.svg"],
+      "resources": [
+        "popup.css",
+        "assets/Echly_logo.svg",
+        "fonts/PlusJakartaSans-Regular.woff2",
+        "fonts/PlusJakartaSans-Medium.woff2",
+        "fonts/PlusJakartaSans-SemiBold.woff2",
+        "fonts/PlusJakartaSans-Bold.woff2"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

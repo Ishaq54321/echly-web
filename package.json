@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "build:extension": "npm run build:extension:css && npm run build:extension:js",
-    "build:extension:css": "npx postcss app/globals.css -o echly-extension/popup.css",
+    "build:extension:css": "npx postcss app/globals.css -o echly-extension/popup.css && node -e \"const fs=require('fs'); const f=fs.readFileSync('echly-extension/extension-fonts.css','utf8'); const m=fs.readFileSync('echly-extension/popup.css','utf8'); fs.writeFileSync('echly-extension/popup.css', f+m);\"",
     "build:extension:js": "node esbuild-extension.mjs"
   },
   "dependencies": {
@@ -27,6 +27,7 @@
     "wavesurfer.js": "^7.12.1"
   },
   "devDependencies": {
+    "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@tailwindcss/postcss": "^4",
     "@types/chrome": "^0.1.37",
     "@types/express": "^5.0.6",

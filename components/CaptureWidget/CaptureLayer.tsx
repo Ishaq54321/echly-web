@@ -99,7 +99,7 @@ export function CaptureLayer({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.04)",
+            background: "rgba(0,0,0,0.08)",
             pointerEvents: "auto",
             cursor: "crosshair",
             zIndex: 2147483645,

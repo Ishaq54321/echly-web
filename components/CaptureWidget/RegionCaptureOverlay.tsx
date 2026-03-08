@@ -244,7 +244,7 @@ export function RegionCaptureOverlay({
         style={{
           position: "fixed",
           inset: 0,
-          background: hasSelection ? "transparent" : "rgba(0,0,0,0.35)",
+          background: hasSelection ? "transparent" : "rgba(0,0,0,0.4)",
           pointerEvents: releasedRect ? "none" : "auto",
           cursor: "crosshair",
           zIndex: 2147483646,
@@ -269,8 +269,6 @@ export function RegionCaptureOverlay({
           left: "50%",
           top: 24,
           transform: "translateX(-50%)",
-          fontSize: 13,
-          color: "rgba(255,255,255,0.8)",
           zIndex: 2147483647,
           pointerEvents: "none",
           opacity: releasedRect ? 0 : 1,
@@ -290,11 +288,11 @@ export function RegionCaptureOverlay({
             top: rect.y,
             width: Math.max(rect.w, 1),
             height: Math.max(rect.h, 1),
-            borderRadius: 6,
-            border: `2px solid ${flashBorder ? "#FFFFFF" : "#5B8CFF"}`,
-            boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
+            border: `2px solid ${flashBorder ? "#FFFFFF" : "#466EFF"}`,
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)",
             pointerEvents: "none",
             zIndex: 2147483646,
+            borderRadius: 14,
             transition: flashBorder ? "none" : `border-color 150ms ${ECHLY_EASE}`,
           }}
         />
@@ -310,12 +308,11 @@ export function RegionCaptureOverlay({
             bottom: Math.max(12, releasedRect.y + releasedRect.h - 48),
             transform: "translate(-50%, 100%)",
             display: "flex",
-            gap: 8,
-            padding: "8px 12px",
-            borderRadius: 12,
-            background: "rgba(20,22,28,0.95)",
-            backdropFilter: "blur(12px)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+            background: "rgba(20,22,28,0.92)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
             zIndex: 2147483647,
             animation: `echly-confirm-bar-in 220ms ${ECHLY_EASE} forwards`,
           }}
@@ -325,13 +322,8 @@ export function RegionCaptureOverlay({
             onClick={handleRetake}
             className="echly-region-confirm-btn"
             style={{
-              padding: "8px 14px",
-              borderRadius: 999,
-              border: "none",
               background: "rgba(255,255,255,0.08)",
               color: "rgba(255,255,255,0.9)",
-              fontSize: 13,
-              fontWeight: 500,
               cursor: "pointer",
             }}
           >
@@ -343,12 +335,8 @@ export function RegionCaptureOverlay({
             disabled={confirming}
             className="echly-region-confirm-btn"
             style={{
-              padding: "8px 14px",
-              borderRadius: 999,
-              border: "none",
-              background: "linear-gradient(135deg, #5B8CFF, #466EFF)",
+              background: "#466EFF",
               color: "#fff",
-              fontSize: 13,
               fontWeight: 600,
               cursor: confirming ? "not-allowed" : "pointer",
             }}

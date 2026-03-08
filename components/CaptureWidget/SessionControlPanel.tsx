@@ -57,16 +57,18 @@ export function SessionControlPanel({
         display: "flex",
         alignItems: "center",
         gap: 12,
-        padding: "10px 16px",
-        borderRadius: 12,
-        background: "rgba(20,22,28,0.95)",
-        backdropFilter: "blur(12px)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+        padding: "12px 20px",
+        borderRadius: 18,
+        background: "rgba(20,22,28,0.82)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
         zIndex: 2147483647,
         border: "1px solid rgba(255,255,255,0.08)",
+        fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
       }}
     >
-      <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
+      <span style={{ fontSize: 14, fontWeight: 600, color: "#F3F4F6" }}>
         {sessionPaused ? "Session paused" : "Recording Session"}
       </span>
       {pausePending ? (
@@ -74,16 +76,16 @@ export function SessionControlPanel({
           type="button"
           disabled
           style={{
-            padding: "6px 12px",
-            borderRadius: 8,
+            padding: "8px 14px",
+            borderRadius: 10,
             border: "none",
-            background: "rgba(255,255,255,0.1)",
-            color: "rgba(255,255,255,0.92)",
+            background: "rgba(255,255,255,0.08)",
+            color: "rgba(255,255,255,0.9)",
             fontSize: 13,
             fontWeight: 500,
             display: "inline-flex",
             alignItems: "center",
-            gap: 6,
+            gap: 8,
             opacity: 0.9,
             cursor: "default",
           }}
@@ -97,10 +99,10 @@ export function SessionControlPanel({
           onClick={onResume}
           disabled={pausePending}
           style={{
-            padding: "6px 12px",
-            borderRadius: 8,
+            padding: "8px 14px",
+            borderRadius: 10,
             border: "none",
-            background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+            background: "#466EFF",
             color: "#fff",
             fontSize: 13,
             fontWeight: 500,
@@ -116,10 +118,10 @@ export function SessionControlPanel({
           onClick={onPause}
           disabled={endPending}
           style={{
-            padding: "6px 12px",
-            borderRadius: 8,
+            padding: "8px 14px",
+            borderRadius: 10,
             border: "none",
-            background: "rgba(255,255,255,0.1)",
+            background: "rgba(255,255,255,0.08)",
             color: "rgba(255,255,255,0.9)",
             fontSize: 13,
             fontWeight: 500,
@@ -135,16 +137,16 @@ export function SessionControlPanel({
           type="button"
           disabled
           style={{
-            padding: "6px 12px",
-            borderRadius: 8,
+            padding: "8px 14px",
+            borderRadius: 10,
             border: "none",
-            background: "rgba(239,68,68,0.9)",
+            background: "#EF4444",
             color: "#fff",
             fontSize: 13,
             fontWeight: 500,
             display: "inline-flex",
             alignItems: "center",
-            gap: 6,
+            gap: 8,
             opacity: 0.9,
             cursor: "default",
           }}
@@ -158,10 +160,10 @@ export function SessionControlPanel({
           onClick={onEnd}
           disabled={pausePending}
           style={{
-            padding: "6px 12px",
-            borderRadius: 8,
+            padding: "8px 14px",
+            borderRadius: 10,
             border: "none",
-            background: "rgba(239,68,68,0.9)",
+            background: "#EF4444",
             color: "#fff",
             fontSize: 13,
             fontWeight: 500,

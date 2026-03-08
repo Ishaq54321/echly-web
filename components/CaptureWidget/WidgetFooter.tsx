@@ -48,13 +48,7 @@ export default function WidgetFooter({
               disabled={resumeDisabled}
               className={`echly-add-insight-btn echly-add-insight-btn--secondary ${resumeDisabled ? "echly-add-insight-btn--disabled" : ""}`}
               aria-label="Resume Session"
-              style={{
-                flex: 1,
-                minWidth: 0,
-                background: "rgba(37, 99, 235, 0.15)",
-                color: "#2563eb",
-                border: "1px solid rgba(37, 99, 235, 0.4)",
-              }}
+              style={{ flex: 1, minWidth: 0 }}
             >
               Resume Session
             </button>
@@ -64,13 +58,7 @@ export default function WidgetFooter({
               disabled={effectivelyDisabled}
               className={`echly-add-insight-btn echly-add-insight-btn--secondary ${effectivelyDisabled ? "echly-add-insight-btn--disabled" : ""}`}
               aria-label="Open Previous Session"
-              style={{
-                flex: 1,
-                minWidth: 0,
-                background: "rgba(255,255,255,0.08)",
-                color: "#2563eb",
-                border: "1px solid rgba(255,255,255,0.16)",
-              }}
+              style={{ flex: 1, minWidth: 0 }}
             >
               Open Previous Session
             </button>
