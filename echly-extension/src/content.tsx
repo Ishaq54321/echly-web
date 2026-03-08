@@ -16,6 +16,8 @@ import { echlyLog } from "@/lib/debug/echlyLogger";
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
 const THEME_STORAGE_KEY = "widget-theme";
+/** App origin for opening dashboard (same as API base). */
+const APP_ORIGIN = "http://localhost:3000";
 
 function getPreferredTheme(): "dark" | "light" {
   try {
@@ -50,6 +52,7 @@ type GlobalUIState = {
   sessionId: string | null;
   sessionModeActive: boolean;
   sessionPaused: boolean;
+  pointers: StructuredFeedback[];
 };
 
 /** Ask background to open popup (e.g. in a new tab) so user can sign in. */
@@ -74,14 +77,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     sessionId: null,
     sessionModeActive: false,
     sessionPaused: false,
+    pointers: [],
   });
-  const [sessionIdOverride, setSessionIdOverride] = React.useState<string | null>(null);
-  const [loadSessionWithPointers, setLoadSessionWithPointers] = React.useState<{
-    sessionId: string;
-    pointers: StructuredFeedback[];
-  } | null>(null);
   const [widgetResetKey, setWidgetResetKey] = React.useState(0);
-  const effectiveSessionId = sessionIdOverride ?? globalState.sessionId;
+  const [hasPreviousSessions, setHasPreviousSessions] = React.useState(false);
+  const [lastKnownSessionId, setLastKnownSessionId] = React.useState<string | null>(null);
+  const effectiveSessionId = globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
   const submissionLock = React.useRef(false);
 
@@ -126,7 +127,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   React.useEffect(() => {
     const handler = () => {
-      setLoadSessionWithPointers(null);
       setGlobalState((prev) => ({ ...prev, expanded: false }));
       setWidgetResetKey((k) => k + 1);
     };
@@ -136,13 +136,24 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). No local source of truth. */
   React.useEffect(() => {
-    const handler = (e: CustomEvent<{ state: typeof globalState }>) => {
+    const applyGlobalState = (state: GlobalUIState) => {
+      setHostVisibility(state.visible);
+      setGlobalState(state);
+    };
+    (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (state: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__ = applyGlobalState;
+    return () => {
+      delete (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (state: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__;
+    };
+  }, []);
+
+  /* Global UI state: always overwrite from background. No debounce or ignore; pointers come from background. */
+  React.useEffect(() => {
+    const handler = (e: CustomEvent<{ state: GlobalUIState }>) => {
       const s = e.detail?.state;
-      if (s) {
-        echlyLog("CONTENT", "global state received", s);
-        setHostVisibility(s.visible);
-        setGlobalState(s);
-      }
+      if (!s) return;
+      echlyLog("CONTENT", "global state received", s);
+      setHostVisibility(s.visible);
+      setGlobalState(s);
     };
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
@@ -161,67 +172,56 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     );
   }, []);
 
-  /* When session is active (tab load or ECHLY_GLOBAL_STATE), fetch existing feedback and pass to widget so markers persist across tabs. */
+  /* Hard resync when tab becomes visible so session end is never missed (background push is unreliable). */
   React.useEffect(() => {
-    if (!globalState.sessionModeActive || !globalState.sessionId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch(
-          `/api/feedback?sessionId=${encodeURIComponent(globalState.sessionId!)}&limit=50`
-        );
-        if (cancelled) return;
-        const json = (await res.json()) as {
-          feedback?: Array<{ id: string; title: string; description: string; type?: string; actionSteps?: string[] }>;
-        };
-        const list = json.feedback ?? [];
-        const pointers = list.map((f) => {
-          const actionSteps = f.actionSteps ?? (f.description ? f.description.split(/\n\s*\n/) : []);
-          return {
-            id: f.id,
-            title: f.title ?? "",
-            description: f.description ?? actionSteps.join("\n\n"),
-            type: f.type ?? "Feedback",
-            actionSteps,
-          };
-        });
-        if (cancelled) return;
-        setLoadSessionWithPointers({ sessionId: globalState.sessionId!, pointers });
-      } catch (err) {
-        if (!cancelled) {
-          console.error("[Echly] Failed to load session feedback for markers:", err);
-          setLoadSessionWithPointers({ sessionId: globalState.sessionId!, pointers: [] });
+    const handler = () => {
+      if (document.hidden) return;
+      chrome.runtime.sendMessage(
+        { type: "ECHLY_GET_GLOBAL_STATE" },
+        (response: GlobalStateResponse) => {
+          if (response?.state) {
+            const normalized = normalizeGlobalState(response.state);
+            if (normalized) {
+              setHostVisibility(normalized.visible);
+              setGlobalState(normalized);
+            }
+          }
         }
+      );
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, []);
+
+  /* On widget open, query backend for sessions so Resume/Previous buttons show only when sessions exist. */
+  React.useEffect(() => {
+    if (!globalState.visible) return;
+    let cancelled = false;
+    async function checkSessions() {
+      try {
+        const res = await apiFetch("/api/sessions?limit=1");
+        const data = (await res.json()) as { sessions?: unknown[] };
+        if (!cancelled) setHasPreviousSessions(Boolean(data.sessions?.length));
+      } catch {
+        if (!cancelled) setHasPreviousSessions(false);
       }
-    })();
+    }
+    checkSessions();
     return () => {
       cancelled = true;
     };
-  }, [globalState.sessionModeActive, globalState.sessionId]);
+  }, [globalState.visible]);
 
-  /* When user is on dashboard session page, set that session as the extension's active session. */
+  /* When command screen loads, request stored session so Resume button can use last active session. */
   React.useEffect(() => {
-    const sendActiveSessionIfDashboard = () => {
-      const origin = window.location.origin;
-      const isAppOrigin =
-        origin === "https://echly-web.vercel.app" || origin === "http://localhost:3000";
-      if (!isAppOrigin) return;
-      const segments = window.location.pathname.split("/").filter(Boolean);
-      if (segments[0] === "dashboard" && segments[1]) {
-        chrome.runtime.sendMessage(
-          { type: "ECHLY_SET_ACTIVE_SESSION", sessionId: segments[1] },
-          () => {}
-        );
-      }
-    };
-    sendActiveSessionIfDashboard();
-    window.addEventListener("popstate", sendActiveSessionIfDashboard);
-    const interval = setInterval(sendActiveSessionIfDashboard, 2000);
-    return () => {
-      window.removeEventListener("popstate", sendActiveSessionIfDashboard);
-      clearInterval(interval);
-    };
-  }, []);
+    if (!globalState.visible) return;
+    chrome.runtime.sendMessage({ type: "ECHLY_GET_ACTIVE_SESSION" }, (response: { sessionId?: string | null }) => {
+      if (response?.sessionId) setLastKnownSessionId(response.sessionId);
+    });
+  }, [globalState.visible]);
+
+  /* Do not automatically restore sessions. Sessions must be resumed manually by the user (Resume Session). */
+  /* Dashboard /dashboard/{sessionId} is view-only; it must NOT trigger ECHLY_SET_ACTIVE_SESSION or session lifecycle. */
 
   const onRecordingChange = React.useCallback((recording: boolean) => {
     if (recording) {
@@ -676,39 +676,23 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   const onActiveSessionChange = React.useCallback((newSessionId: string) => {
     chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {});
-    setSessionIdOverride(newSessionId);
   }, []);
 
   const onResumeSessionSelect = React.useCallback(
     async (sessionId: string, options?: { enterCaptureImmediately?: boolean }) => {
       chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {});
-      setSessionIdOverride(sessionId);
+      chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
       try {
-        const res = await apiFetch(`/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=50`);
-        const json = (await res.json()) as {
-          feedback?: Array<{ id: string; title: string; description: string; type?: string; actionSteps?: string[] }>;
-        };
-        const list = json.feedback ?? [];
-        const pointers = list.map((f) => {
-          const actionSteps = f.actionSteps ?? (f.description ? f.description.split(/\n\s*\n/) : []);
-          return {
-            id: f.id,
-            title: f.title ?? "",
-            description: f.description ?? actionSteps.join("\n\n"),
-            type: f.type ?? "Feedback",
-            actionSteps,
-          };
-        });
-        setLoadSessionWithPointers({ sessionId, pointers });
-        if (options?.enterCaptureImmediately) {
-          chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
+        const sessionRes = await apiFetch(`/api/sessions/${sessionId}`);
+        const sessionData = (await sessionRes.json()) as { session?: { url?: string } };
+        if (sessionData?.session?.url) {
+          chrome.runtime.sendMessage({
+            type: "ECHLY_OPEN_TAB",
+            url: sessionData.session.url,
+          }).catch(() => {});
         }
-      } catch (err) {
-        console.error("[Echly] Failed to load session feedback:", err);
-        setLoadSessionWithPointers({ sessionId, pointers: [] });
-        if (options?.enterCaptureImmediately) {
-          chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
-        }
+      } catch {
+        // Session URL optional; pointers loaded by background on ECHLY_SET_ACTIVE_SESSION
       }
     },
     []
@@ -1246,10 +1230,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         theme={theme}
         onThemeToggle={onThemeToggle}
         fetchSessions={fetchSessions}
+        hasPreviousSessions={hasPreviousSessions}
+        lastKnownSessionId={lastKnownSessionId}
         onResumeSessionSelect={onResumeSessionSelect}
-        loadSessionWithPointers={loadSessionWithPointers}
-        onSessionLoaded={() => setLoadSessionWithPointers(null)}
-        onSessionEnd={() => setSessionIdOverride(null)}
+        pointers={globalState.pointers ?? []}
+        onSessionEnd={() => {}}
         onCreateSession={createSession}
         onActiveSessionChange={onActiveSessionChange}
         globalSessionModeActive={globalState.sessionModeActive ?? false}
@@ -1257,7 +1242,22 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         onSessionModeStart={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {})}
         onSessionModePause={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {})}
         onSessionModeResume={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {})}
-        onSessionModeEnd={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }).catch(() => {})}
+        onSessionModeEnd={() => {
+          const sessionId = globalState.sessionId;
+          (async () => {
+            await new Promise<void>((resolve, reject) => {
+              chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, (response) => {
+                if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+                else resolve();
+              });
+            });
+            await new Promise((r) => setTimeout(r, 50));
+            if (sessionId) {
+              const url = `${APP_ORIGIN}/dashboard/${sessionId}`;
+              chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch(() => {});
+            }
+          })().catch(() => {});
+        }}
       />
     </>
   );
@@ -1321,6 +1321,7 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     sessionId: state.sessionId ?? null,
     sessionModeActive: state.sessionModeActive ?? false,
     sessionPaused: state.sessionPaused ?? false,
+    pointers: Array.isArray(state.pointers) ? state.pointers : [],
   };
 }
 
@@ -1374,10 +1375,11 @@ function ensureMessageListener(host: HTMLDivElement): void {
     const h = document.getElementById(SHADOW_HOST_ID);
     if (!h) return;
     if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
-      echlyLog("CONTENT", "global state received", msg.state);
-      (h as HTMLDivElement).style.display = msg.state.visible ? "block" : "none";
+      const state = msg.state;
+      setHostVisibility(state.visible);
+      (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(state);
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
-      window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: msg.state } }));
+      window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } }));
     }
     if (msg.type === "ECHLY_TOGGLE") {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_TOGGLE_WIDGET" });
@@ -1386,6 +1388,19 @@ function ensureMessageListener(host: HTMLDivElement): void {
     if (msg.type === "ECHLY_RESET_WIDGET") {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_RESET_WIDGET" });
       window.dispatchEvent(new CustomEvent("ECHLY_RESET_WIDGET"));
+    }
+    /* Tab activation resync: always fetch and apply state; never debounce or skip. */
+    if (msg.type === "ECHLY_SESSION_STATE_SYNC") {
+      chrome.runtime.sendMessage({ type: "ECHLY_GET_GLOBAL_STATE" }, (response: GlobalStateResponse) => {
+        if (response?.state) {
+          const normalized = normalizeGlobalState(response.state);
+          if (normalized) {
+            setHostVisibility(normalized.visible);
+            (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
+            window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
+          }
+        }
+      });
     }
   });
 }

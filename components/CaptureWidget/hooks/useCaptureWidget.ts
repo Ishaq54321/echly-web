@@ -126,6 +126,7 @@ export function useCaptureWidget({
   onUpdate,
   onRecordingChange,
   loadSessionWithPointers,
+  pointers: pointersProp,
   onSessionLoaded,
   onCreateSession,
   onActiveSessionChange,
@@ -346,10 +347,22 @@ export function useCaptureWidget({
   }, []);
 
   const createCaptureRoot = useCallback(() => {
-    if (captureRootRef.current) return;
+    if (captureRootRef.current) {
+      console.debug("ECHLY createCaptureRoot", "skipped (ref already set)");
+      return;
+    }
+    const existingRoot = document.getElementById(OVERLAY_ROOT_ID);
+    if (existingRoot) {
+      console.debug("ECHLY createCaptureRoot", "reusing existing DOM root");
+      captureRootRef.current = existingRoot as HTMLDivElement;
+      setCaptureRootEl(existingRoot as HTMLDivElement);
+      setCaptureRootReady(true);
+      return;
+    }
+    console.debug("ECHLY createCaptureRoot");
     setSessionFeedbackPending(null);
     const captureEl = document.createElement("div");
-    captureEl.id = "echly-capture-root";
+    captureEl.id = OVERLAY_ROOT_ID;
     document.body.appendChild(captureEl);
     captureRootRef.current = captureEl;
     setCaptureRootEl(captureEl);
@@ -378,14 +391,17 @@ export function useCaptureWidget({
     if (extensionMode && globalSessionModeActive !== false) {
       return;
     }
+    console.debug("ECHLY removeCaptureRoot");
     if (captureRootRef.current) {
       try {
-        document.body.removeChild(captureRootRef.current);
+        captureRootRef.current.remove();
       } catch (err) {
         console.error("CaptureWidget error:", err);
       }
       captureRootRef.current = null;
     }
+    const el = document.getElementById(OVERLAY_ROOT_ID);
+    if (el) el.remove();
     setCaptureRootEl(null);
     setCaptureRootReady(false);
   }, [extensionMode, globalSessionModeActive]);
@@ -422,6 +438,8 @@ export function useCaptureWidget({
       setPointers(initialPointers);
       return;
     }
+    /* Extension: never auto-load session from sessionId. Session loads only when user clicks Resume (loadSessionWithPointers). */
+    if (extensionMode) return;
     if (!sessionId) return;
     const loadFeedback = async () => {
       const existing = await getSessionFeedback(sessionId);
@@ -435,7 +453,7 @@ export function useCaptureWidget({
       );
     };
     loadFeedback();
-  }, [sessionId, initialPointers]);
+  }, [extensionMode, sessionId, initialPointers]);
 
   /* ================= SPEECH ================= */
 
@@ -1047,12 +1065,17 @@ export function useCaptureWidget({
     finalizeEnd();
   }, [clearSessionWaitTimeout, endPending, globalSessionModeActive, onSessionModeEnd]);
 
+  /** Session mode starts ONLY when globalSessionModeActive === true (single source of truth). Never start from sessionId or pointers. */
+  useEffect(() => {
+    if (globalSessionModeActive === true) {
+      setSessionMode(true);
+      createCaptureRoot();
+    }
+  }, [globalSessionModeActive, createCaptureRoot]);
+
   /**
    * Sync session mode from global state (ECHLY_GLOBAL_STATE).
-   * When sessionModeActive is true, initialize full capture so every tab that receives state
-   * joins the session. Ordering is strict to avoid partial capture state (cursor without overlay):
-   * 1. setSessionMode(true) 2. setSessionPaused(...) 3. createCaptureRoot() — only then does
-   * CaptureLayer/SessionOverlay mount and apply cursor. Never create root if one already exists.
+   * When globalSessionModeActive is true, overlay activates; pointers come from global state (pointersProp) or loadSessionWithPointers.
    */
   useEffect(() => {
     if (!extensionMode || globalSessionModeActive === undefined) return;
@@ -1082,17 +1105,34 @@ export function useCaptureWidget({
     }
   }, [extensionMode, globalSessionModeActive, globalSessionPaused, createCaptureRoot, removeCaptureRoot]);
 
+  /** Safety: when globalSessionModeActive is false, always clear widget and overlay so session never auto-restarts. */
+  useEffect(() => {
+    if (!extensionMode) return;
+    if (!globalSessionModeActive) {
+      setSessionMode(false);
+      setSessionPaused(false);
+      setPausePending(false);
+      setEndPending(false);
+      setSessionFeedbackPending(null);
+      setSessionFeedbackSaving(false);
+      removeAllMarkers();
+      removeCaptureRoot();
+    }
+  }, [extensionMode, globalSessionModeActive, removeCaptureRoot]);
+
   /** When globalSessionPaused changes while session mode is active, sync local paused state. */
   useEffect(() => {
     if (extensionMode && globalSessionModeActive && globalSessionPaused !== undefined) {
       setSessionPaused(globalSessionPaused);
       if (globalSessionPaused) {
         setPausePending(false);
+        setExpandedId(null);
+        setHighlightTicketId(null);
       }
     }
   }, [extensionMode, globalSessionModeActive, globalSessionPaused]);
 
-  /** Tab activation recovery: when this tab becomes visible and session is active but capture root is missing, reinitialize. */
+  /** Tab activation recovery: when session mode is active globally and capture root is missing, recreate it. */
   useEffect(() => {
     if (!extensionMode || globalSessionModeActive !== true) return;
     const onVisibilityChange = () => {
@@ -1108,7 +1148,14 @@ export function useCaptureWidget({
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [extensionMode, globalSessionModeActive, globalSessionPaused, createCaptureRoot]);
 
-  /** When parent passes loadSessionWithPointers (e.g. after Resume picker), enter session mode with those pointers. */
+  /** Extension: sync global pointers from background so all tabs show the same tray. */
+  useEffect(() => {
+    if (!extensionMode || pointersProp === undefined) return;
+    setPointers(pointersProp);
+    setSessionFeedbackPending(null);
+  }, [extensionMode, pointersProp]);
+
+  /** When parent passes loadSessionWithPointers (e.g. after Resume picker), apply once and notify. */
   useEffect(() => {
     if (!extensionMode || !loadSessionWithPointers?.sessionId) return;
     setPointers(loadSessionWithPointers.pointers ?? []);

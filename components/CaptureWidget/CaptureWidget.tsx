@@ -28,8 +28,11 @@ export default function CaptureWidget({
   theme = "dark",
   onThemeToggle,
   fetchSessions,
+  hasPreviousSessions = false,
+  lastKnownSessionId = null,
   onResumeSessionSelect,
   loadSessionWithPointers,
+  pointers: pointersProp,
   onSessionLoaded,
   onSessionEnd: onSessionEndCallback,
   onCreateSession,
@@ -59,6 +62,7 @@ export default function CaptureWidget({
     onUpdate,
     onRecordingChange,
     loadSessionWithPointers,
+    pointers: pointersProp,
     onSessionLoaded,
     onCreateSession,
     onActiveSessionChange,
@@ -83,6 +87,8 @@ export default function CaptureWidget({
 
   const hasTickets = Boolean(state.pointers?.length);
   const showSessionButtons = !hasTickets && state.state === "idle";
+  const showResumeButton = Boolean(lastKnownSessionId) || hasStoredSession;
+  const showPreviousButton = Boolean(hasPreviousSessions);
 
   // Collapse the widget while recording (controlled mode via background)
   const didCollapseRef = useRef(false);
@@ -113,7 +119,7 @@ export default function CaptureWidget({
     }
   }, [state.highlightTicketId]);
 
-  /** When session is loaded (e.g. from global state or resume picker), transition to session view so session buttons are visible. */
+  /** When session is loaded explicitly (user clicked Resume), transition to session view. Never from global state. */
   useEffect(() => {
     if (loadSessionWithPointers?.sessionId) {
       setShowCommandScreen(false);
@@ -129,15 +135,10 @@ export default function CaptureWidget({
   }, [handlers, widgetToggleRef]);
 
   const handleResumeActiveSession = React.useCallback(() => {
-    chrome.runtime.sendMessage(
-      { type: "ECHLY_GET_ACTIVE_SESSION" },
-      (response?: { sessionId?: string | null }) => {
-        const storedSessionId = response?.sessionId;
-        if (!storedSessionId) return;
-        onResumeSessionSelect?.(storedSessionId, { enterCaptureImmediately: true });
-      }
-    );
-  }, [onResumeSessionSelect]);
+    const sessionToResume = lastKnownSessionId ?? sessionId;
+    if (!sessionToResume) return;
+    onResumeSessionSelect?.(sessionToResume, { enterCaptureImmediately: true });
+  }, [lastKnownSessionId, sessionId, onResumeSessionSelect]);
 
   return (
     <>
@@ -164,6 +165,8 @@ export default function CaptureWidget({
             onRegionSelectStart={handlers.handleRegionSelectStart}
             onCancelCapture={handlers.handleCancelCapture}
             sessionMode={state.sessionMode}
+            globalSessionModeActive={globalSessionModeActive}
+            sessionId={sessionId}
             sessionPaused={state.sessionPaused}
             pausePending={state.pausePending}
             endPending={state.endPending}
@@ -272,12 +275,10 @@ export default function CaptureWidget({
                     extensionMode={extensionMode}
                     onStartSession={extensionMode ? handlers.startSession : undefined}
                     onResumeSession={
-                      extensionMode && hasStoredSession
-                        ? handleResumeActiveSession
-                        : undefined
+                      extensionMode && showResumeButton ? handleResumeActiveSession : undefined
                     }
                     onOpenPreviousSession={
-                      extensionMode && fetchSessions && onResumeSessionSelect
+                      extensionMode && showPreviousButton && fetchSessions && onResumeSessionSelect
                         ? () => setResumeModalOpen(true)
                         : undefined
                     }

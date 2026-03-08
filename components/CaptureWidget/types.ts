@@ -82,10 +82,16 @@ export type CaptureWidgetProps = {
   onThemeToggle?: () => void;
   /** Extension: fetch sessions for Resume Session picker. */
   fetchSessions?: () => Promise<Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number; [key: string]: unknown }>>;
+  /** Extension: true when backend has at least one session (from /api/sessions?limit=1). Used to show Previous Sessions button only when sessions exist. */
+  hasPreviousSessions?: boolean;
+  /** Extension: last active session id from background (ECHLY_GET_ACTIVE_SESSION). Resume button uses this so user can resume without auto-restore. */
+  lastKnownSessionId?: string | null;
   /** Extension: when user selects a session from Resume picker. Parent should set active session, fetch feedback, then pass loadSessionWithPointers. If options.enterCaptureImmediately, parent should also start session mode (overlay) after load. */
   onResumeSessionSelect?: (sessionId: string, options?: { enterCaptureImmediately?: boolean }) => void;
   /** Extension: when set, widget enters session mode with these pointers (e.g. after resuming a session). */
   loadSessionWithPointers?: { sessionId: string; pointers: StructuredFeedback[] } | null;
+  /** Extension: global session pointers from background. When provided, overrides loadSessionWithPointers for tray list; all tabs show same list. */
+  pointers?: StructuredFeedback[];
   /** Called after widget has applied loadSessionWithPointers so parent can clear it. */
   onSessionLoaded?: () => void;
   /** Called when user ends the feedback session (e.g. to clear resume override in extension). */

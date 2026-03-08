@@ -28,12 +28,12 @@ function FeedbackItem({
   onExpandChange,
 }: FeedbackItemProps) {
   const [expanded, setExpanded] = useState(false);
+  const [highlighted, setHighlighted] = useState(false);
   const [editedTitle, setEditedTitle] = useState(ticket.title);
   const [editedSteps, setEditedSteps] = useState<string[]>(ticket.actionSteps ?? []);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isHighlighted = highlightTicketId === ticket.id;
   const priority = priorityFromType(ticket.type);
 
   useEffect(() => {
@@ -43,10 +43,12 @@ function FeedbackItem({
 
   useEffect(() => {
     if (highlightTicketId === ticket.id) {
-      setExpanded(true);
-      onExpandChange?.(ticket.id);
+      setHighlighted(true);
+      setTimeout(() => {
+        setHighlighted(false);
+      }, 1200);
     }
-  }, [highlightTicketId, ticket.id, onExpandChange]);
+  }, [highlightTicketId, ticket.id]);
 
   const handleExpand = useCallback(() => {
     setExpanded((prev) => {
@@ -89,7 +91,7 @@ function FeedbackItem({
 
   return (
     <div
-      className={`echly-feedback-item ${isHighlighted ? "echly-ticket-highlight" : ""}`}
+      className={`echly-feedback-item ${highlighted ? "echly-ticket-highlight" : ""}`}
       data-priority={priority}
     >
       <div className="echly-ticket-row">

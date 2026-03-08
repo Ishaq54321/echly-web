@@ -28,6 +28,9 @@ let tokenState: TokenState = {
   user: null,
 };
 
+/** Minimal ticket shape for global tray; matches StructuredFeedback. */
+type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string };
+
 let globalUIState: {
   visible: boolean;
   expanded: boolean;
@@ -35,6 +38,7 @@ let globalUIState: {
   sessionId: string | null;
   sessionModeActive: boolean;
   sessionPaused: boolean;
+  pointers: StructuredFeedback[];
 } = {
   visible: false,
   expanded: false,
@@ -42,6 +46,7 @@ let globalUIState: {
   sessionId: null,
   sessionModeActive: false,
   sessionPaused: false,
+  pointers: [],
 };
 
 function persistSessionLifecycleState(): void {
@@ -53,17 +58,13 @@ function persistSessionLifecycleState(): void {
 }
 
 chrome.storage.local.get(
-  ["activeSessionId", "sessionModeActive", "sessionPaused"],
-  (result: {
-    activeSessionId?: string;
-    sessionModeActive?: boolean;
-    sessionPaused?: boolean;
-  }) => {
+  ["activeSessionId"],
+  (result: { activeSessionId?: string }) => {
     const stored = result.activeSessionId;
     activeSessionId = typeof stored === "string" ? stored : null;
     globalUIState.sessionId = activeSessionId;
-    globalUIState.sessionModeActive = result.sessionModeActive === true;
-    globalUIState.sessionPaused = result.sessionPaused === true;
+    globalUIState.sessionModeActive = false;
+    globalUIState.sessionPaused = false;
     broadcastUIState();
   }
 );
@@ -198,19 +199,28 @@ function broadcastUIState(): void {
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
       if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: globalUIState }).catch(() => {});
+        chrome.tabs
+          .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
+          .catch(() => {
+            console.debug("ECHLY broadcast skipped tab", tab.id);
+          });
       }
     });
   });
 }
 
-/** When user switches tabs, push current session state to that tab. Fails silently if content script not loaded. */
+/** When user switches tabs, push current session state to that tab so every tab receives state when focused. */
 chrome.tabs.onActivated.addListener((activeInfo) => {
   const tabId = activeInfo.tabId;
   chrome.tabs
     .sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
     .catch((e) => {
       console.debug("ECHLY tab activation sync failed", e);
+    });
+  chrome.tabs
+    .sendMessage(tabId, { type: "ECHLY_SESSION_STATE_SYNC" })
+    .catch((e) => {
+      console.debug("ECHLY session state sync failed for tab", tabId, e);
     });
 });
 
@@ -229,6 +239,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_TOGGLE_VISIBILITY") {
     globalUIState.visible = !globalUIState.visible;
     if (globalUIState.visible) {
+      globalUIState.expanded = false;
+      // Only reset UI lifecycle state; preserve last session id so Resume works.
+      globalUIState.sessionModeActive = false;
+      globalUIState.sessionPaused = false;
+      persistSessionLifecycleState();
+      // Reset widget in all tabs so they show command screen.
       chrome.tabs.query({}, (tabs) => {
         tabs.forEach((tab) => {
           if (tab.id) {
@@ -238,8 +254,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     }
     broadcastUIState();
-    sendResponse({ ok: true });
-    return false;
+    sendResponse({ success: true });
+    return true;
   }
 
   if (request.type === "ECHLY_EXPAND_WIDGET") {
@@ -262,20 +278,59 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_GET_ACTIVE_SESSION") {
-    sendResponse({
-      sessionId: activeSessionId || null,
+    chrome.storage.local.get(["activeSessionId"], (result) => {
+      sendResponse({
+        sessionId: result.activeSessionId || null,
+      });
     });
     return true;
   }
 
   if (request.type === "ECHLY_SET_ACTIVE_SESSION") {
-    echlyLog("BACKGROUND", "active session set");
-    activeSessionId = (request.sessionId as string | undefined) ?? null;
-    globalUIState.sessionId = activeSessionId;
-    persistSessionLifecycleState();
-    broadcastUIState();
-    sendResponse({ ok: true });
-    return false;
+    const sessionId = (request as { sessionId?: string }).sessionId ?? null;
+    activeSessionId = sessionId;
+    globalUIState.sessionId = sessionId;
+    globalUIState.sessionModeActive = true;
+    globalUIState.sessionPaused = false;
+    chrome.storage.local.set({
+      activeSessionId: sessionId,
+      sessionModeActive: true,
+      sessionPaused: false,
+    });
+    (async () => {
+      if (!sessionId) {
+        globalUIState.pointers = [];
+        broadcastUIState();
+        sendResponse({ success: true });
+        return;
+      }
+      try {
+        const token = await getValidToken();
+        const res = await fetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=200`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = (await res.json()) as { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> };
+        globalUIState.pointers = (json.feedback ?? []).map((f) => ({
+          id: f.id,
+          title: f.title ?? "",
+          actionSteps: f.actionSteps ?? [],
+        }));
+      } catch {
+        globalUIState.pointers = [];
+      }
+      broadcastUIState();
+      sendResponse({ success: true });
+    })();
+    return true;
+  }
+
+  if (request.type === "ECHLY_OPEN_TAB") {
+    const url = (request as { url?: string }).url;
+    if (url) {
+      chrome.tabs.create({ url });
+    }
+    sendResponse({ success: true });
+    return true;
   }
 
   if (request.type === "ECHLY_SESSION_MODE_START") {
@@ -317,10 +372,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionId = null;
     globalUIState.sessionModeActive = false;
     globalUIState.sessionPaused = false;
-    persistSessionLifecycleState();
+    globalUIState.pointers = [];
+    chrome.storage.local.set({
+      activeSessionId: null,
+      sessionModeActive: false,
+      sessionPaused: false,
+    });
     broadcastUIState();
-    sendResponse({ ok: true });
-    return false;
+    setTimeout(broadcastUIState, 150);
+    sendResponse({ success: true });
+    return true;
   }
 
   if (request.type === "ECHLY_GET_TOKEN") {
@@ -609,6 +670,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         }
         if (firstCreated) {
+          const pointer: StructuredFeedback = {
+            id: firstCreated.id,
+            title: firstCreated.title,
+            actionSteps: [],
+            type: firstCreated.type,
+          };
+          globalUIState.pointers = [...globalUIState.pointers, pointer];
+          broadcastUIState();
           sendResponse({ success: true, ticket: firstCreated });
           chrome.tabs.query({}, (tabs) => {
             tabs.forEach((tab) => {

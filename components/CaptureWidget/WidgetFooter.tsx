@@ -25,7 +25,7 @@ export default function WidgetFooter({
   captureDisabled = false,
 }: WidgetFooterProps) {
   const effectivelyDisabled = !isIdle || captureDisabled;
-  const resumeDisabled = effectivelyDisabled || !hasActiveSession || !onResumeSession;
+  const resumeDisabled = effectivelyDisabled || !onResumeSession;
   const showSessionActions = Boolean(onResumeSession || onOpenPreviousSession);
 
   if (extensionMode) {

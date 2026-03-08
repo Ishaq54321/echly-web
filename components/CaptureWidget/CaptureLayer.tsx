@@ -26,6 +26,10 @@ export type CaptureLayerProps = {
   onCancelCapture: () => void;
   /** Session Feedback Mode: when true, show session overlay instead of region capture */
   sessionMode?: boolean;
+  /** From background (ECHLY_GLOBAL_STATE). Overlay only shows when true and sessionId is set to avoid stale state. */
+  globalSessionModeActive?: boolean;
+  /** Active session ID. Overlay only shows when set to avoid stale state. */
+  sessionId?: string;
   sessionPaused?: boolean;
   pausePending?: boolean;
   endPending?: boolean;
@@ -53,6 +57,8 @@ export function CaptureLayer({
   onRegionSelectStart,
   onCancelCapture,
   sessionMode = false,
+  globalSessionModeActive = false,
+  sessionId: sessionIdProp,
   sessionPaused = false,
   pausePending = false,
   endPending = false,
@@ -66,7 +72,9 @@ export function CaptureLayer({
   onSessionSaveText,
   onSessionFeedbackCancel = () => {},
 }: CaptureLayerProps) {
-  const showSessionOverlay = sessionMode && extensionMode;
+  if (extensionMode && (!sessionMode || !sessionIdProp)) return null;
+  const showSessionOverlay =
+    sessionMode && extensionMode && !!globalSessionModeActive && !!sessionIdProp;
   const showDimOverlay =
     !showSessionOverlay && (state === "focus_mode" || state === "region_selecting");
   const showRegionOverlay =
