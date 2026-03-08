@@ -6,31 +6,15 @@ import type { StructuredFeedback } from "./types";
 
 type FeedbackListProps = {
   items: StructuredFeedback[];
-  expandedId: string | null;
-  editingId: string | null;
-  editedTitle: string;
-  editedDescription: string;
-  onExpand: (id: string | null) => void;
-  onStartEdit: (item: StructuredFeedback) => void;
-  onSaveEdit: (id: string) => void;
-  onDelete: (id: string) => void;
-  onEditedTitleChange: (value: string) => void;
-  onEditedDescriptionChange: (value: string) => void;
+  onUpdate: (id: string, payload: { title: string; actionSteps: string[] }) => Promise<void>;
+  onDelete: (id: string) => void | Promise<void>;
   highlightTicketId?: string | null;
 };
 
 function FeedbackList({
   items,
-  expandedId,
-  editingId,
-  editedTitle,
-  editedDescription,
-  onExpand,
-  onStartEdit,
-  onSaveEdit,
+  onUpdate,
   onDelete,
-  onEditedTitleChange,
-  onEditedDescriptionChange,
   highlightTicketId = null,
 }: FeedbackListProps) {
   return (
@@ -39,16 +23,8 @@ function FeedbackList({
         <FeedbackItem
           key={p.id}
           item={p}
-          expandedId={expandedId}
-          editingId={editingId}
-          editedTitle={editedTitle}
-          editedDescription={editedDescription}
-          onExpand={onExpand}
-          onStartEdit={onStartEdit}
-          onSaveEdit={onSaveEdit}
+          onUpdate={onUpdate}
           onDelete={onDelete}
-          onEditedTitleChange={onEditedTitleChange}
-          onEditedDescriptionChange={onEditedDescriptionChange}
           highlightTicketId={highlightTicketId}
         />
       ))}

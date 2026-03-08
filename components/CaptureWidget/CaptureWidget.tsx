@@ -18,6 +18,7 @@ export default function CaptureWidget({
   initialPointers,
   onComplete,
   onDelete,
+  onUpdate,
   widgetToggleRef,
   onRecordingChange,
   expanded,
@@ -55,6 +56,7 @@ export default function CaptureWidget({
     initialPointers,
     onComplete,
     onDelete,
+    onUpdate,
     onRecordingChange,
     loadSessionWithPointers,
     onSessionLoaded,
@@ -78,6 +80,9 @@ export default function CaptureWidget({
   const showPanelWhenPaused = state.sessionMode && state.sessionPaused;
   const showFloatingButton = !effectiveIsOpen && showSidebar && !showPanelWhenPaused;
   const showPanel = (effectiveIsOpen && showSidebar) || showPanelWhenPaused;
+
+  const hasTickets = Boolean(state.pointers?.length);
+  const showSessionButtons = !hasTickets && state.state === "idle";
 
   // Collapse the widget while recording (controlled mode via background)
   const didCollapseRef = useRef(false);
@@ -107,6 +112,13 @@ export default function CaptureWidget({
       listScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [state.highlightTicketId]);
+
+  /** When session is loaded (e.g. from global state or resume picker), transition to session view so session buttons are visible. */
+  useEffect(() => {
+    if (loadSessionWithPointers?.sessionId) {
+      setShowCommandScreen(false);
+    }
+  }, [loadSessionWithPointers?.sessionId]);
 
   React.useEffect(() => {
     if (!widgetToggleRef) return;
@@ -221,43 +233,39 @@ export default function CaptureWidget({
                 summary={summary}
                 theme={theme}
                 onThemeToggle={onThemeToggle}
+                handlers={{
+                  endSession: handlers.endSession,
+                  clearPointers: undefined,
+                }}
+                onShowCommandScreen={() => setShowCommandScreen(true)}
               />
 
               <div
                 ref={listScrollRef}
                 className="echly-sidebar-body"
               >
-                {!(extensionMode && showCommandScreen && !showPanelWhenPaused) && (
-                  <>
-                    <div className="echly-feedback-list">
-                      {state.pointers.map((p) => (
-                        <FeedbackItem
-                          key={p.id}
-                          item={p}
-                          expandedId={state.expandedId}
-                          editingId={state.editingId}
-                          editedTitle={state.editedTitle}
-                          editedDescription={state.editedDescription}
-                          onExpand={handlers.setExpandedId}
-                          onStartEdit={handlers.startEditing}
-                          onSaveEdit={handlers.saveEdit}
-                          onDelete={handlers.deletePointer}
-                          onEditedTitleChange={handlers.setEditedTitle}
-                          onEditedDescriptionChange={handlers.setEditedDescription}
-                          highlightTicketId={state.highlightTicketId}
-                        />
-                      ))}
-                    </div>
-
-                    {state.errorMessage && (
-                      <div className="echly-sidebar-error">
-                        {state.errorMessage}
-                      </div>
-                    )}
-                  </>
+                {hasTickets && (
+                  <div className="echly-feedback-list">
+                    {state.pointers.map((p) => (
+                      <FeedbackItem
+                        key={p.id}
+                        item={p}
+                        onUpdate={onUpdate ?? handlers.updatePointer}
+                        onDelete={handlers.deletePointer}
+                        highlightTicketId={state.highlightTicketId}
+                        onExpandChange={handlers.setExpandedId}
+                      />
+                    ))}
+                  </div>
                 )}
 
-                {state.state === "idle" && (
+                {state.errorMessage && (
+                  <div className="echly-sidebar-error">
+                    {state.errorMessage}
+                  </div>
+                )}
+
+                {showSessionButtons && (
                   <WidgetFooter
                     isIdle={true}
                     onAddFeedback={handlers.handleAddFeedback}

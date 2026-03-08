@@ -37,11 +37,11 @@ export function ConfirmationCard({ ticket, onConfirm, onEdit }: ConfirmationCard
         <li className="echly-confirmation-card-title" style={{ fontSize: 14, fontWeight: 600, color: "#F3F4F6", lineHeight: 1.45 }}>
           {ticket.title}
         </li>
-        {ticket.description && (
+        {ticket.actionSteps?.length ? (
           <li className="echly-confirmation-card-desc" style={{ fontSize: 13, fontWeight: 500, color: "#A1A1AA", marginTop: 6, lineHeight: 1.4 }}>
-            {ticket.description}
+            {ticket.actionSteps.join("\n\n")}
           </li>
-        )}
+        ) : null}
       </ul>
       <div className="echly-confirmation-card-actions" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <m.button

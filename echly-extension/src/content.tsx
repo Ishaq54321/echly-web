@@ -9,6 +9,7 @@ import { apiFetch } from "./contentAuthFetch";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
+import type { StructuredFeedback } from "@/components/CaptureWidget/types";
 import { log } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 
@@ -77,8 +78,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [sessionIdOverride, setSessionIdOverride] = React.useState<string | null>(null);
   const [loadSessionWithPointers, setLoadSessionWithPointers] = React.useState<{
     sessionId: string;
-    pointers: Array<{ id: string; title: string; description: string; type: string }>;
+    pointers: StructuredFeedback[];
   } | null>(null);
+  const [widgetResetKey, setWidgetResetKey] = React.useState(0);
   const effectiveSessionId = sessionIdOverride ?? globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
   const submissionLock = React.useRef(false);
@@ -95,7 +97,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     clarityIssues: string[];
     suggestedRewrite: string | null;
     confidence: number;
-    callbacks: { onSuccess: (ticket: { id: string; title: string; description: string; type: string }) => void; onError: () => void };
+    callbacks: { onSuccess: (ticket: StructuredFeedback) => void; onError: () => void };
     context?: Record<string, unknown>;
   };
   const [extensionClarityPending, setExtensionClarityPending] = React.useState<ExtensionClarityPending | null>(null);
@@ -120,6 +122,16 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return () => {
       window.removeEventListener("ECHLY_TOGGLE_WIDGET", toggleHandler);
     };
+  }, []);
+
+  React.useEffect(() => {
+    const handler = () => {
+      setLoadSessionWithPointers(null);
+      setGlobalState((prev) => ({ ...prev, expanded: false }));
+      setWidgetResetKey((k) => k + 1);
+    };
+    window.addEventListener("ECHLY_RESET_WIDGET", handler as EventListener);
+    return () => window.removeEventListener("ECHLY_RESET_WIDGET", handler as EventListener);
   }, []);
 
   /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). No local source of truth. */
@@ -160,15 +172,19 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         );
         if (cancelled) return;
         const json = (await res.json()) as {
-          feedback?: Array<{ id: string; title: string; description: string; type?: string }>;
+          feedback?: Array<{ id: string; title: string; description: string; type?: string; actionSteps?: string[] }>;
         };
         const list = json.feedback ?? [];
-        const pointers = list.map((f) => ({
-          id: f.id,
-          title: f.title ?? "",
-          description: f.description ?? "",
-          type: f.type ?? "Feedback",
-        }));
+        const pointers = list.map((f) => {
+          const actionSteps = f.actionSteps ?? (f.description ? f.description.split(/\n\s*\n/) : []);
+          return {
+            id: f.id,
+            title: f.title ?? "",
+            description: f.description ?? actionSteps.join("\n\n"),
+            type: f.type ?? "Feedback",
+            actionSteps,
+          };
+        });
         if (cancelled) return;
         setLoadSessionWithPointers({ sessionId: globalState.sessionId!, pointers });
       } catch (err) {
@@ -263,7 +279,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       transcript: string,
       screenshot: string | null,
       callbacks?: {
-        onSuccess: (ticket: { id: string; title: string; description: string; type: string }) => void;
+        onSuccess: (ticket: StructuredFeedback) => void;
         onError: () => void;
       },
       context?: {
@@ -280,7 +296,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         capturedAt?: number;
       } | null,
       options?: { sessionMode?: boolean }
-    ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
+    ): Promise<StructuredFeedback | undefined> => {
       echlyLog("PIPELINE", "start");
       if (submissionLock.current) {
         echlyLog("PIPELINE", "blocked by submissionLock");
@@ -404,7 +420,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   type: "ECHLY_PROCESS_FEEDBACK",
                   payload: { transcript, screenshotUrl: null, screenshotId, sessionId: effectiveSessionId, context: enrichedContext },
                 },
-                (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
+                (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] }; error?: string } | undefined) => {
                   submissionLock.current = false;
                   if (chrome.runtime.lastError) {
                     echlyLog("PIPELINE", "error");
@@ -413,12 +429,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   }
                   if (response?.success && response.ticket) {
                     const ticketId = response.ticket.id;
+                    const t = response.ticket;
+                    const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : (t.description ? t.description.split(/\n\s*\n/) : []);
                     echlyLog("PIPELINE", "ticket created", { ticketId });
                     callbacks.onSuccess({
                       id: ticketId,
-                      title: response.ticket.title,
-                      description: response.ticket.description,
-                      type: response.ticket.type ?? "Feedback",
+                      title: t.title,
+                      actionSteps,
+                      type: t.type ?? "Feedback",
                     });
                     uploadPromise.then((url) => {
                       if (url) {
@@ -443,17 +461,18 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             /* clarityScore > 20: continue with normal submission to /api/feedback */
             const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
             const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
-            let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
+            let firstCreated: StructuredFeedback | undefined;
             for (let i = 0; i < tickets.length; i++) {
               const t = tickets[i];
               const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
+              const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : [];
               const body = {
                 sessionId: effectiveSessionId,
                 title: t.title ?? "",
                 description: desc,
                 type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
                 contextSummary: desc,
-                actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
+                actionSteps,
                 suggestedTags: t.suggestedTags,
                 screenshotUrl: null,
                 screenshotId: i === 0 ? screenshotId : undefined,
@@ -467,12 +486,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               });
               const feedbackJson = (await feedbackRes.json()) as {
                 success?: boolean;
-                ticket?: { id: string; title: string; description: string; type?: string };
+                ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
               };
               if (feedbackJson.success && feedbackJson.ticket) {
                 const tick = feedbackJson.ticket;
+                const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
                 if (!firstCreated)
-                  firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
+                  firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
               }
             }
             submissionLock.current = false;
@@ -554,7 +574,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
       const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
       const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
-      let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
+      let firstCreated: StructuredFeedback | undefined;
       for (let i = 0; i < tickets.length; i++) {
         const t = tickets[i];
         const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
@@ -578,17 +598,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         });
         const feedbackJson = (await feedbackRes.json()) as {
           success?: boolean;
-          ticket?: { id: string; title: string; description: string; type?: string };
+          ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
         };
         if (feedbackJson.success && feedbackJson.ticket) {
           const tick = feedbackJson.ticket;
+          const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
           if (!firstCreated)
-            firstCreated = {
-              id: tick.id,
-              title: tick.title,
-              description: tick.description,
-              type: tick.type ?? "Feedback",
-            };
+            firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
         }
       }
       if (firstCreated) {
@@ -611,7 +627,29 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     [effectiveSessionId, user]
   );
 
-  const handleDelete = React.useCallback(async (_id: string) => {}, []);
+  const handleDelete = React.useCallback(async (id: string) => {
+    try {
+      await apiFetch(`/api/tickets/${id}`, { method: "DELETE" });
+    } catch (err) {
+      console.error("[Echly] Delete ticket failed:", err);
+      throw err;
+    }
+  }, []);
+
+  const handleUpdate = React.useCallback(
+    async (id: string, payload: { title: string; actionSteps: string[] }) => {
+      await apiFetch(`/api/tickets/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: payload.title,
+          description: payload.actionSteps?.join("\n") ?? "",
+          actionSteps: payload.actionSteps ?? [],
+        }),
+      });
+    },
+    []
+  );
 
   const fetchSessions = React.useCallback(async () => {
     const res = await apiFetch("/api/sessions");
@@ -648,15 +686,19 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       try {
         const res = await apiFetch(`/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=50`);
         const json = (await res.json()) as {
-          feedback?: Array<{ id: string; title: string; description: string; type?: string }>;
+          feedback?: Array<{ id: string; title: string; description: string; type?: string; actionSteps?: string[] }>;
         };
         const list = json.feedback ?? [];
-        const pointers = list.map((f) => ({
-          id: f.id,
-          title: f.title ?? "",
-          description: f.description ?? "",
-          type: f.type ?? "Feedback",
-        }));
+        const pointers = list.map((f) => {
+          const actionSteps = f.actionSteps ?? (f.description ? f.description.split(/\n\s*\n/) : []);
+          return {
+            id: f.id,
+            title: f.title ?? "",
+            description: f.description ?? actionSteps.join("\n\n"),
+            type: f.type ?? "Feedback",
+            actionSteps,
+          };
+        });
         setLoadSessionWithPointers({ sessionId, pointers });
         if (options?.enterCaptureImmediately) {
           chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
@@ -695,12 +737,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               return;
             }
             if (response?.success && response.ticket) {
-              const ticketId = response.ticket.id;
+              const t = response.ticket as { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
+              const ticketId = t.id;
+              const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : (t.description ? t.description.split(/\n\s*\n/) : []);
               pending.callbacks.onSuccess({
                 id: ticketId,
-                title: response.ticket.title,
-                description: response.ticket.description,
-                type: response.ticket.type ?? "Feedback",
+                title: t.title,
+                actionSteps,
+                type: t.type ?? "Feedback",
               });
               pending.uploadPromise.then((url) => {
                 if (url) {
@@ -726,7 +770,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         clarityConfidence: pending.confidence,
         clarityStatus: (pending.clarityScore >= 85 ? "clear" : pending.clarityScore >= 60 ? "needs_improvement" : "unclear") as "clear" | "needs_improvement" | "unclear",
       };
-      let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
+      let firstCreated: StructuredFeedback | undefined;
       for (let i = 0; i < pending.tickets.length; i++) {
         const t = pending.tickets[i];
         const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
@@ -750,12 +794,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         });
         const feedbackJson = (await feedbackRes.json()) as {
           success?: boolean;
-          ticket?: { id: string; title: string; description: string; type?: string };
+          ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
         };
         if (feedbackJson.success && feedbackJson.ticket) {
           const tick = feedbackJson.ticket;
+          const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
           if (!firstCreated)
-            firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
+            firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
         }
       }
       if (firstCreated) {
@@ -822,12 +867,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 return;
               }
               if (response?.success && response.ticket) {
-                const ticketId = response.ticket.id;
+                const t = response.ticket as { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
+                const ticketId = t.id;
+                const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : (t.description ? t.description.split(/\n\s*\n/) : []);
                 pending.callbacks.onSuccess({
                   id: ticketId,
-                  title: response.ticket.title,
-                  description: response.ticket.description,
-                  type: response.ticket.type ?? "Feedback",
+                  title: t.title,
+                  actionSteps,
+                  type: t.type ?? "Feedback",
                 });
                 pending.uploadPromise.then((url) => {
                   if (url) {
@@ -847,7 +894,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           return;
         }
 
-        let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
+        let firstCreated: StructuredFeedback | undefined;
         for (let i = 0; i < tickets.length; i++) {
           const t = tickets[i];
           const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
@@ -871,12 +918,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           });
           const feedbackJson = (await feedbackRes.json()) as {
             success?: boolean;
-            ticket?: { id: string; title: string; description: string; type?: string };
+            ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
           };
           if (feedbackJson.success && feedbackJson.ticket) {
             const tick = feedbackJson.ticket;
+            const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
             if (!firstCreated)
-              firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
+              firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
           }
         }
         if (firstCreated) {
@@ -926,7 +974,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       const confidence = data.confidence ?? 0.5;
       const clarityStatus = (clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear") as "clear" | "needs_improvement" | "unclear";
       const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
-      let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
+      let firstCreated: StructuredFeedback | undefined;
       for (let i = 0; i < tickets.length; i++) {
         const t = tickets[i];
         const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
@@ -950,12 +998,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         });
         const feedbackJson = (await feedbackRes.json()) as {
           success?: boolean;
-          ticket?: { id: string; title: string; description: string; type?: string };
+          ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
         };
         if (feedbackJson.success && feedbackJson.ticket) {
           const tick = feedbackJson.ticket;
+          const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
           if (!firstCreated)
-            firstCreated = { id: tick.id, title: tick.title, description: tick.description, type: tick.type ?? "Feedback" };
+            firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
         }
       }
       if (firstCreated) {
@@ -1181,11 +1230,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         </div>
       )}
       <CaptureWidget
+        key={widgetResetKey}
         sessionId={effectiveSessionId ?? ""}
         userId={user.uid}
         extensionMode={true}
         onComplete={handleComplete}
         onDelete={handleDelete}
+        onUpdate={handleUpdate}
         widgetToggleRef={widgetToggleRef}
         onRecordingChange={onRecordingChange}
         expanded={globalState.expanded}
@@ -1331,6 +1382,10 @@ function ensureMessageListener(host: HTMLDivElement): void {
     if (msg.type === "ECHLY_TOGGLE") {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_TOGGLE_WIDGET" });
       window.dispatchEvent(new CustomEvent("ECHLY_TOGGLE_WIDGET"));
+    }
+    if (msg.type === "ECHLY_RESET_WIDGET") {
+      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_RESET_WIDGET" });
+      window.dispatchEvent(new CustomEvent("ECHLY_RESET_WIDGET"));
     }
   });
 }

@@ -123,6 +123,7 @@ export function useCaptureWidget({
   initialPointers,
   onComplete,
   onDelete,
+  onUpdate,
   onRecordingChange,
   loadSessionWithPointers,
   onSessionLoaded,
@@ -149,7 +150,7 @@ export function useCaptureWidget({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
-  const [editedDescription, setEditedDescription] = useState("");
+  const [editedSteps, setEditedSteps] = useState<string[]>([]);
   const [showMenu, setShowMenu] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -428,7 +429,7 @@ export function useCaptureWidget({
         existing.map((item) => ({
           id: item.id,
           title: item.title,
-          description: item.description,
+          actionSteps: item.actionSteps ?? (item.description ? item.description.split("\n") : []),
           type: item.type,
         }))
       );
@@ -608,8 +609,14 @@ export function useCaptureWidget({
               pipelineActiveRef.current = false;
               setSessionFeedbackSaving(false);
               if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
+              const t = ticket as StructuredFeedback & { description?: string };
               setPointers((prev) => [
-                { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
+                {
+                  id: t.id,
+                  title: t.title,
+                  actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []),
+                  type: t.type,
+                },
                 ...prev,
               ]);
               setHighlightTicketId(ticket.id);
@@ -637,8 +644,14 @@ export function useCaptureWidget({
       onComplete(active.transcript, active.screenshot, {
         onSuccess: (ticket) => {
           pipelineActiveRef.current = false;
+          const t = ticket as StructuredFeedback & { description?: string };
           setPointers((prev) => [
-            { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
+            {
+              id: t.id,
+              title: t.title,
+              actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []),
+              type: t.type,
+            },
             ...prev,
           ]);
           setRecordings((prev) => prev.filter((r) => r.id !== activeId));
@@ -673,7 +686,12 @@ export function useCaptureWidget({
         return;
       }
       setPointers((prev) => [
-        { id: structured.id, title: structured.title, description: structured.description, type: structured.type },
+        {
+          id: structured.id,
+          title: structured.title,
+          actionSteps: structured.actionSteps ?? [],
+          type: structured.type,
+        },
         ...prev,
       ]);
       setRecordings((prev) => prev.filter((r) => r.id !== activeId));
@@ -766,17 +784,17 @@ export function useCaptureWidget({
   const startEditing = useCallback((p: StructuredFeedback) => {
     setEditingId(p.id);
     setEditedTitle(p.title);
-    setEditedDescription(p.description);
+    setEditedSteps(p.actionSteps ?? []);
   }, []);
 
   const saveEdit = useCallback(async (id: string) => {
     const title = editedTitle.trim() || editedTitle;
-    const description = editedDescription;
+    const actionSteps = editedSteps;
 
     /* Optimistic update: persist to local state and exit edit mode immediately so the UI updates on click. */
     setPointers((prev) =>
       prev.map((p) =>
-        p.id === id ? { ...p, title: title || p.title, description } : p
+        p.id === id ? { ...p, title: title || p.title, actionSteps } : p
       )
     );
     setEditingId(null);
@@ -785,15 +803,15 @@ export function useCaptureWidget({
       const res = await authFetch(`/api/tickets/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title || editedTitle, description }),
+        body: JSON.stringify({ title: title || editedTitle, actionSteps }),
       });
-      const data = (await res.json()) as { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string } };
+      const data = (await res.json()) as { success?: boolean; ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } };
       if (res.ok && data.success && data.ticket) {
         const t = data.ticket;
         setPointers((prev) =>
           prev.map((p) =>
             p.id === id
-              ? { ...p, title: t.title, description: t.description, type: t.type ?? p.type }
+              ? { ...p, title: t.title, actionSteps: t.actionSteps ?? p.actionSteps, type: t.type ?? p.type }
               : p
           )
         );
@@ -801,7 +819,54 @@ export function useCaptureWidget({
     } catch (err) {
       console.error("Save edit failed:", err);
     }
-  }, [editedTitle, editedDescription]);
+  }, [editedTitle, editedSteps]);
+
+  const updatePointer = useCallback(
+    async (id: string, payload: { title: string; actionSteps: string[] }) => {
+      try {
+        if (onUpdate) {
+          await onUpdate(id, payload);
+          setPointers((prev) =>
+            prev.map((p) =>
+              p.id === id
+                ? { ...p, title: payload.title, actionSteps: payload.actionSteps }
+                : p
+            )
+          );
+          return;
+        }
+        const res = await authFetch(`/api/tickets/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: payload.title,
+            actionSteps: payload.actionSteps,
+          }),
+        });
+        const data = (await res.json()) as {
+          success?: boolean;
+          ticket?: { id: string; title: string; actionSteps?: string[]; type?: string };
+        };
+        if (!res.ok || !data.success) throw new Error("Update failed");
+        const t = data.ticket;
+        setPointers((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  title: t?.title ?? p.title,
+                  actionSteps: t?.actionSteps ?? payload.actionSteps,
+                }
+              : p
+          )
+        );
+      } catch (err) {
+        console.error("Ticket update failed:", err);
+        throw err;
+      }
+    },
+    [onUpdate]
+  );
 
   /* ================= CAPTURE ================= */
 
@@ -1129,8 +1194,14 @@ export function useCaptureWidget({
             if (root) {
               updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
             }
+            const t = ticket as StructuredFeedback & { description?: string };
             setPointers((prev) => [
-              { id: ticket.id, title: ticket.title, description: ticket.description, type: ticket.type },
+              {
+                id: t.id,
+                title: t.title,
+                actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []),
+                type: t.type,
+              },
               ...prev,
             ]);
             setHighlightTicketId(ticket.id);
@@ -1231,11 +1302,12 @@ export function useCaptureWidget({
       finishListening,
       discardListening,
       deletePointer,
+      updatePointer,
       startEditing,
       saveEdit,
       setExpandedId,
       setEditedTitle,
-      setEditedDescription,
+      setEditedSteps,
       handleAddFeedback,
       handleRegionCaptured,
       handleRegionSelectStart,
@@ -1261,11 +1333,12 @@ export function useCaptureWidget({
       finishListening,
       discardListening,
       deletePointer,
+      updatePointer,
       startEditing,
       saveEdit,
       setExpandedId,
       setEditedTitle,
-      setEditedDescription,
+      setEditedSteps,
       handleAddFeedback,
       handleRegionCaptured,
       handleRegionSelectStart,
@@ -1303,7 +1376,7 @@ export function useCaptureWidget({
       expandedId,
       editingId,
       editedTitle,
-      editedDescription,
+      editedSteps,
       showMenu,
       position,
       liveTranscript,

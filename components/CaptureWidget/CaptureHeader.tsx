@@ -20,6 +20,11 @@ type CaptureHeaderProps = {
   summary?: string | null;
   theme?: "dark" | "light";
   onThemeToggle?: () => void;
+  handlers?: {
+    endSession?: () => void;
+    clearPointers?: () => void;
+  };
+  onShowCommandScreen?: () => void;
 };
 
 export default function CaptureHeader({
@@ -27,7 +32,16 @@ export default function CaptureHeader({
   summary = null,
   theme = "dark",
   onThemeToggle,
+  handlers,
+  onShowCommandScreen,
 }: CaptureHeaderProps) {
+  const handleClose = () => {
+    handlers?.endSession?.();
+    handlers?.clearPointers?.();
+    onShowCommandScreen?.();
+    onClose();
+  };
+
   return (
     <div className="echly-sidebar-header">
       <div className="echly-sidebar-header-left">
@@ -50,7 +64,7 @@ export default function CaptureHeader({
         )}
         <button
           type="button"
-          onClick={onClose}
+          onClick={handleClose}
           className="echly-sidebar-close"
           aria-label="Close"
         >

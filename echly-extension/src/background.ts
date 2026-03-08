@@ -228,6 +228,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   echlyLog("MESSAGE", "received", request.type);
   if (request.type === "ECHLY_TOGGLE_VISIBILITY") {
     globalUIState.visible = !globalUIState.visible;
+    if (globalUIState.visible) {
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" }).catch(() => {});
+          }
+        });
+      });
+    }
     broadcastUIState();
     sendResponse({ ok: true });
     return false;

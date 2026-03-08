@@ -3,8 +3,8 @@ import type { MutableRefObject } from "react";
 export type StructuredFeedback = {
   id: string;
   title: string;
-  description: string;
-  type: string;
+  actionSteps: string[];
+  type?: string;
 };
 
 /** Context captured with the region (URL, scroll, viewport, DOM path, nearby text). */
@@ -62,6 +62,8 @@ export type CaptureWidgetProps = {
     options?: { sessionMode?: boolean }
   ) => void | Promise<StructuredFeedback | undefined>;
   onDelete: (id: string) => Promise<void>;
+  /** Optional: when provided (e.g. extension), ticket updates use this instead of authFetch. */
+  onUpdate?: (id: string, payload: { title: string; actionSteps: string[] }) => Promise<void>;
   /** Optional ref for extension: parent can set a toggle callback to open/close widget via message. */
   widgetToggleRef?: MutableRefObject<(() => void) | null>;
   /** Optional callback when recording starts or stops (for extension global recording state). */
