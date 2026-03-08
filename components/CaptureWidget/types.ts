@@ -80,8 +80,8 @@ export type CaptureWidgetProps = {
   onThemeToggle?: () => void;
   /** Extension: fetch sessions for Resume Session picker. */
   fetchSessions?: () => Promise<Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number; [key: string]: unknown }>>;
-  /** Extension: when user selects a session from Resume picker. Parent should set active session, fetch feedback, then pass loadSessionWithPointers. */
-  onResumeSessionSelect?: (sessionId: string) => void;
+  /** Extension: when user selects a session from Resume picker. Parent should set active session, fetch feedback, then pass loadSessionWithPointers. If options.enterCaptureImmediately, parent should also start session mode (overlay) after load. */
+  onResumeSessionSelect?: (sessionId: string, options?: { enterCaptureImmediately?: boolean }) => void;
   /** Extension: when set, widget enters session mode with these pointers (e.g. after resuming a session). */
   loadSessionWithPointers?: { sessionId: string; pointers: StructuredFeedback[] } | null;
   /** Called after widget has applied loadSessionWithPointers so parent can clear it. */

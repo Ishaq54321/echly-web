@@ -642,13 +642,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   }, []);
 
   const onResumeSessionSelect = React.useCallback(
-    async (sessionId: string) => {
-      chrome.runtime.sendMessage(
-        { type: "ECHLY_SET_ACTIVE_SESSION", sessionId },
-        () => {
-          chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {});
-        }
-      );
+    async (sessionId: string, options?: { enterCaptureImmediately?: boolean }) => {
+      chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {});
       setSessionIdOverride(sessionId);
       try {
         const res = await apiFetch(`/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=50`);
@@ -663,9 +658,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           type: f.type ?? "Feedback",
         }));
         setLoadSessionWithPointers({ sessionId, pointers });
+        if (options?.enterCaptureImmediately) {
+          chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
+        }
       } catch (err) {
         console.error("[Echly] Failed to load session feedback:", err);
         setLoadSessionWithPointers({ sessionId, pointers: [] });
+        if (options?.enterCaptureImmediately) {
+          chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
+        }
       }
     },
     []

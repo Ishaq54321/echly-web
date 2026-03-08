@@ -957,6 +957,7 @@ export function useCaptureWidget({
       setEndPending(false);
       setSessionFeedbackPending(null);
       setSessionFeedbackSaving(false);
+      setPointers([]);
       onSessionModeEnd?.();
       afterEnd?.();
     };

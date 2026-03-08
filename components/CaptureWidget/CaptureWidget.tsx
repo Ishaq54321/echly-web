@@ -41,6 +41,8 @@ export default function CaptureWidget({
   onSessionModeEnd,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
+  /** Extension: when true, show command screen (3 buttons only). False when viewing a session (e.g. after Open Previous or when paused). */
+  const [showCommandScreen, setShowCommandScreen] = useState(true);
   const {
     state,
     handlers,
@@ -120,7 +122,7 @@ export default function CaptureWidget({
       (response?: { sessionId?: string | null }) => {
         const storedSessionId = response?.sessionId;
         if (!storedSessionId) return;
-        onResumeSessionSelect?.(storedSessionId);
+        onResumeSessionSelect?.(storedSessionId, { enterCaptureImmediately: true });
       }
     );
   }, [onResumeSessionSelect]);
@@ -133,6 +135,7 @@ export default function CaptureWidget({
           onClose={() => setResumeModalOpen(false)}
           fetchSessions={fetchSessions}
           onSelectSession={(sessionId) => {
+            setShowCommandScreen(false);
             onResumeSessionSelect(sessionId);
             setResumeModalOpen(false);
           }}
@@ -164,6 +167,7 @@ export default function CaptureWidget({
             }}
             onSessionEnd={() => {
               handlers.endSession(() => {
+                setShowCommandScreen(true);
                 onSessionEndCallback?.();
               });
             }}
@@ -223,30 +227,34 @@ export default function CaptureWidget({
                 ref={listScrollRef}
                 className="echly-sidebar-body"
               >
-                <div className="echly-feedback-list">
-                  {state.pointers.map((p) => (
-                    <FeedbackItem
-                      key={p.id}
-                      item={p}
-                      expandedId={state.expandedId}
-                      editingId={state.editingId}
-                      editedTitle={state.editedTitle}
-                      editedDescription={state.editedDescription}
-                      onExpand={handlers.setExpandedId}
-                      onStartEdit={handlers.startEditing}
-                      onSaveEdit={handlers.saveEdit}
-                      onDelete={handlers.deletePointer}
-                      onEditedTitleChange={handlers.setEditedTitle}
-                      onEditedDescriptionChange={handlers.setEditedDescription}
-                      highlightTicketId={state.highlightTicketId}
-                    />
-                  ))}
-                </div>
+                {!(extensionMode && showCommandScreen && !showPanelWhenPaused) && (
+                  <>
+                    <div className="echly-feedback-list">
+                      {state.pointers.map((p) => (
+                        <FeedbackItem
+                          key={p.id}
+                          item={p}
+                          expandedId={state.expandedId}
+                          editingId={state.editingId}
+                          editedTitle={state.editedTitle}
+                          editedDescription={state.editedDescription}
+                          onExpand={handlers.setExpandedId}
+                          onStartEdit={handlers.startEditing}
+                          onSaveEdit={handlers.saveEdit}
+                          onDelete={handlers.deletePointer}
+                          onEditedTitleChange={handlers.setEditedTitle}
+                          onEditedDescriptionChange={handlers.setEditedDescription}
+                          highlightTicketId={state.highlightTicketId}
+                        />
+                      ))}
+                    </div>
 
-                {state.errorMessage && (
-                  <div className="echly-sidebar-error">
-                    {state.errorMessage}
-                  </div>
+                    {state.errorMessage && (
+                      <div className="echly-sidebar-error">
+                        {state.errorMessage}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {state.state === "idle" && (
