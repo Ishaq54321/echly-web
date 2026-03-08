@@ -104,9 +104,9 @@ export default function CommandPanel({
                   onClick={onOpenPreviousSession}
                   className="echly-btn-ghost"
                   style={{ width: "100%" }}
-                  aria-label="Open previous session"
+                  aria-label="Previous Sessions"
                 >
-                  Open Previous Session
+                  Previous Sessions
                 </button>
               )}
         </section>

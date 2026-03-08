@@ -36,25 +36,27 @@ export default function CaptureHeader({
           <span className="echly-sidebar-summary">{summary}</span>
         )}
       </div>
-      {onThemeToggle && (
+      <div className="echly-header-actions">
+        {onThemeToggle && (
+          <button
+            type="button"
+            id="theme-toggle"
+            onClick={onThemeToggle}
+            className="echly-theme-toggle"
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+          </button>
+        )}
         <button
           type="button"
-          id="theme-toggle"
-          onClick={onThemeToggle}
-          className="echly-theme-toggle"
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          onClick={onClose}
+          className="echly-sidebar-close"
+          aria-label="Close"
         >
-          {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+          <X size={16} strokeWidth={1.5} />
         </button>
-      )}
-      <button
-        type="button"
-        onClick={onClose}
-        className="echly-sidebar-close"
-        aria-label="Close"
-      >
-        <X size={16} strokeWidth={1.5} />
-      </button>
+      </div>
     </div>
   );
 }

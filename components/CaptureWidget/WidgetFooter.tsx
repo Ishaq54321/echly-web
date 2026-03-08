@@ -41,14 +41,13 @@ export default function WidgetFooter({
           Start New Feedback Session
         </button>
         {showSessionActions && (
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <div className="echly-add-insight-secondary-row">
             <button
               type="button"
               onClick={resumeDisabled ? undefined : onResumeSession}
               disabled={resumeDisabled}
               className={`echly-add-insight-btn echly-add-insight-btn--secondary ${resumeDisabled ? "echly-add-insight-btn--disabled" : ""}`}
               aria-label="Resume Session"
-              style={{ flex: 1, minWidth: 0 }}
             >
               Resume Session
             </button>
@@ -57,10 +56,9 @@ export default function WidgetFooter({
               onClick={effectivelyDisabled ? undefined : onOpenPreviousSession}
               disabled={effectivelyDisabled}
               className={`echly-add-insight-btn echly-add-insight-btn--secondary ${effectivelyDisabled ? "echly-add-insight-btn--disabled" : ""}`}
-              aria-label="Open Previous Session"
-              style={{ flex: 1, minWidth: 0 }}
+              aria-label="Previous Sessions"
             >
-              Open Previous Session
+              Previous Sessions
             </button>
           </div>
         )}

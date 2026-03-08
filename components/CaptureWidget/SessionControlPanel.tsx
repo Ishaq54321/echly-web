@@ -69,7 +69,7 @@ export function SessionControlPanel({
       }}
     >
       <span style={{ fontSize: 14, fontWeight: 600, color: "#F3F4F6" }}>
-        {sessionPaused ? "Session paused" : "Recording Session"}
+        {sessionPaused ? "Session paused" : "Session started"}
       </span>
       {pausePending ? (
         <button
