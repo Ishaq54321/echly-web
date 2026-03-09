@@ -32,6 +32,7 @@ function FeedbackItem({
   const [editedTitle, setEditedTitle] = useState(ticket.title);
   const [editedSteps, setEditedSteps] = useState<string[]>(ticket.actionSteps ?? []);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const priority = priorityFromType(ticket.type);
@@ -82,12 +83,15 @@ function FeedbackItem({
   }, [onExpandChange]);
 
   const handleDelete = useCallback(async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
     try {
       await onDelete(ticket.id);
     } catch (err) {
       console.error("Delete failed", err);
+      setIsDeleting(false);
     }
-  }, [ticket.id, onDelete]);
+  }, [ticket.id, onDelete, isDeleting]);
 
   return (
     <div
@@ -117,10 +121,15 @@ function FeedbackItem({
                 <button
                   type="button"
                   onClick={handleDelete}
+                  disabled={isDeleting}
                   className="echly-delete-btn echly-widget-action-icon echly-widget-action-icon--delete"
-                  aria-label="Delete"
+                  aria-label={isDeleting ? "Deleting…" : "Delete"}
                 >
-                  <Trash2 size={16} strokeWidth={1.5} />
+                  {isDeleting ? (
+                    <span className="echly-spinner" aria-hidden />
+                  ) : (
+                    <Trash2 size={16} strokeWidth={1.5} />
+                  )}
                 </button>
               </div>
             </div>

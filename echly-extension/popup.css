@@ -3898,6 +3898,19 @@ textarea:focus-visible {
     background-color: rgb(255, 255, 255);
   }
 }
+.echly-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #5b7cff;
+  border-radius: 50%;
+  animation: echly-spin 0.7s linear infinite;
+}
+@keyframes echly-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .capture-timer {
   opacity: 0;
   animation: captureTimerFadeIn 160ms cubic-bezier(0.2, 0.8, 0.2, 1) 40ms forwards;
@@ -4331,6 +4344,23 @@ textarea:focus-visible {
   font-weight: 500;
   line-height: 1.4;
   color: var(--text-secondary);
+}
+.session-title-input {
+  font-family: "Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  outline: none;
+  width: fit-content;
+  min-width: 160px;
+}
+.session-title-input:focus {
+  border-color: #5b7cff;
+  background: rgba(91, 124, 255, 0.08);
 }
 .echly-sidebar-close {
   width: 32px;

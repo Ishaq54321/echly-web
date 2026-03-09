@@ -87,22 +87,14 @@ export default function CaptureHeader({
           <>
             {editingTitle ? (
               <input
+                id="echlyTitleEdit"
                 ref={inputRef}
                 type="text"
                 value={localTitle}
                 onChange={(e) => setLocalTitle(e.target.value)}
                 onBlur={saveTitle}
                 onKeyDown={handleTitleKeyDown}
-                className="echly-sidebar-title echly-sidebar-title-edit"
-                style={{
-                  width: "100%",
-                  background: "transparent",
-                  border: "none",
-                  borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.2))",
-                  outline: "none",
-                  font: "inherit",
-                  color: "inherit",
-                }}
+                className="echly-sidebar-title session-title-input"
                 aria-label="Session title"
               />
             ) : (
