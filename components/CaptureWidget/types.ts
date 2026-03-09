@@ -135,6 +135,10 @@ export type CaptureWidgetProps = {
   selectedMicrophoneId?: string;
   /** When set (e.g. extension shadow root container), capture root is appended here so it receives shadow DOM styles; otherwise appended to document.body. */
   captureRootParent?: HTMLElement | null;
+  /** When true, show a loading indicator above the feedback tray while a ticket is being processed (e.g. after submit). */
+  isProcessingFeedback?: boolean;
+  /** Extension: URL for the launcher logo (minimized state). When set with extensionMode, launcher shows logo instead of text. */
+  launcherLogoUrl?: string;
 };
 
 export type Position = { x: number; y: number };

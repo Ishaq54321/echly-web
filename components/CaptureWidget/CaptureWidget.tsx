@@ -47,6 +47,8 @@ export default function CaptureWidget({
   onSessionActivity,
   captureMode = "voice",
   captureRootParent,
+  isProcessingFeedback = false,
+  launcherLogoUrl,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   /** Extension: when true, show command screen (mode cards + footer). False when viewing a session (e.g. after Open Previous or when paused). */
@@ -244,10 +246,20 @@ export default function CaptureWidget({
         <div className="echly-floating-trigger-wrapper">
           <button
             type="button"
+            id={extensionMode && launcherLogoUrl ? "launcher_container" : undefined}
             onClick={() => (onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true))}
-            className="echly-floating-trigger"
+            className={`echly-floating-trigger${extensionMode && launcherLogoUrl ? " echly-launcher" : ""}`}
+            aria-label="Open Echly"
           >
-            {extensionMode ? "Echly" : "Capture feedback"}
+            {extensionMode && launcherLogoUrl ? (
+              <img
+                src={launcherLogoUrl}
+                className="echly-launcher-logo"
+                alt="Echly"
+              />
+            ) : (
+              extensionMode ? "Echly" : "Capture feedback"
+            )}
           </button>
         </div>
       )}
@@ -306,6 +318,29 @@ export default function CaptureWidget({
                 onScroll={handleListScroll}
                 onWheel={(e) => e.stopPropagation()}
               >
+                {(hasTickets || isProcessingFeedback) && (
+                  <div className="echly-feedback-list">
+                    {isProcessingFeedback && (
+                      <div id="processing_card_markup" className="echly-feedback-card echly-feedback-processing">
+                        <span className="echly-spinner" aria-hidden />
+                        <span className="echly-processing-text">
+                          Processing feedback...
+                        </span>
+                      </div>
+                    )}
+                    {hasTickets &&
+                      ticketsToShow.map((p) => (
+                        <FeedbackItem
+                          key={p.id}
+                          item={p}
+                          onUpdate={onUpdate ?? handlers.updatePointer}
+                          onDelete={handlers.deletePointer}
+                          highlightTicketId={state.highlightTicketId}
+                          onExpandChange={handlers.setExpandedId}
+                        />
+                      ))}
+                  </div>
+                )}
                 {extensionMode && showSessionButtons && (
                   <div className="echly-mode-container">
                     <div className="echly-mode-header">Select feedback mode</div>
@@ -350,21 +385,6 @@ export default function CaptureWidget({
                       </span>
                       <span className="echly-mode-card-title">Write</span>
                     </div>
-                  </div>
-                )}
-
-                {hasTickets && (
-                  <div className="echly-feedback-list">
-                    {ticketsToShow.map((p) => (
-                      <FeedbackItem
-                        key={p.id}
-                        item={p}
-                        onUpdate={onUpdate ?? handlers.updatePointer}
-                        onDelete={handlers.deletePointer}
-                        highlightTicketId={state.highlightTicketId}
-                        onExpandChange={handlers.setExpandedId}
-                      />
-                    ))}
                   </div>
                 )}
 

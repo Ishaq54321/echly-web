@@ -34,6 +34,7 @@
       "resources": [
         "popup.css",
         "assets/Echly_logo.svg",
+        "assets/Echly_logo_launcher.svg",
         "fonts/PlusJakartaSans-Regular.woff2",
         "fonts/PlusJakartaSans-Medium.woff2",
         "fonts/PlusJakartaSans-SemiBold.woff2",

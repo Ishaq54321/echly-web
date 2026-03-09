@@ -114,10 +114,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const clarityTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const clarityAssistantSubmitLock = React.useRef(false);
   const [clarityAssistantSubmitting, setClarityAssistantSubmitting] = React.useState(false);
+  const [isProcessingFeedback, setIsProcessingFeedback] = React.useState(false);
   const logoUrl =
     typeof chrome !== "undefined" && chrome.runtime?.getURL
       ? chrome.runtime.getURL("assets/Echly_logo.svg")
       : "/Echly_logo.svg";
+  const launcherLogoUrl =
+    typeof chrome !== "undefined" && chrome.runtime?.getURL
+      ? chrome.runtime.getURL("assets/Echly_logo_launcher.svg")
+      : "/Echly_logo_launcher.svg";
 
   React.useEffect(() => {
     const toggleHandler = () => {
@@ -308,6 +313,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       if (callbacks) {
         (async () => {
+          setIsProcessingFeedback(true);
           const visibleTextPromise = getVisibleTextFromScreenshot(screenshot ?? null);
           const firstFeedbackId = generateFeedbackId();
           const screenshotId = generateScreenshotId();
@@ -376,6 +382,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 setClarityAssistantSubmitting(false);
                 setShowClarityAssistant(true);
                 submissionLock.current = false;
+                setIsProcessingFeedback(false);
                 return;
               }
 
@@ -405,6 +412,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 setClarityAssistantSubmitting(false);
                 setShowClarityAssistant(true);
                 submissionLock.current = false;
+                setIsProcessingFeedback(false);
                 return;
               }
             }
@@ -417,6 +425,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 },
                 (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] }; error?: string } | undefined) => {
                   submissionLock.current = false;
+                  setIsProcessingFeedback(false);
                   if (chrome.runtime.lastError) {
                     echlyLog("PIPELINE", "error");
                     callbacks.onError();
@@ -491,6 +500,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               }
             }
             submissionLock.current = false;
+            setIsProcessingFeedback(false);
             if (firstCreated) {
               const ticketId = firstCreated.id;
               echlyLog("PIPELINE", "ticket created", { ticketId });
@@ -513,6 +523,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           } catch (err) {
             console.error("[Echly] Structure or submit failed:", err);
             submissionLock.current = false;
+            setIsProcessingFeedback(false);
             echlyLog("PIPELINE", "error");
             callbacks.onError();
           }
@@ -520,6 +531,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         return;
       }
       try {
+      setIsProcessingFeedback(true);
       const screenshotId = generateScreenshotId();
       const uploadPromise = screenshot
         ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
@@ -617,6 +629,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       return firstCreated;
       } finally {
         submissionLock.current = false;
+        setIsProcessingFeedback(false);
       }
     },
     [effectiveSessionId, user]
@@ -696,6 +709,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const submitPendingFeedback = React.useCallback(
     async (pending: ExtensionClarityPending) => {
       if (!effectiveSessionId) return;
+      setIsProcessingFeedback(true);
       if (pending.tickets.length === 0) {
         chrome.runtime.sendMessage(
           {
@@ -709,6 +723,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             },
           },
           (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
+            setIsProcessingFeedback(false);
             if (chrome.runtime.lastError) {
               console.error("[Echly] Submit anyway failed:", chrome.runtime.lastError.message);
               echlyLog("PIPELINE", "error");
@@ -793,9 +808,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             }).catch(() => {});
           }
         }).catch(() => {});
+        setIsProcessingFeedback(false);
         pending.callbacks.onSuccess(firstCreated);
       } else {
         echlyLog("PIPELINE", "error");
+        setIsProcessingFeedback(false);
         pending.callbacks.onError();
       }
     },
@@ -805,6 +822,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const submitEditedFeedback = React.useCallback(
     async (pending: ExtensionClarityPending, editedText: string) => {
       if (!effectiveSessionId) return;
+      setIsProcessingFeedback(true);
       const trimmed = editedText.trim();
       try {
         const structureBody = { transcript: trimmed, context: pending.context ?? {} };
@@ -839,6 +857,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               },
             },
             (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string } } | undefined) => {
+              setIsProcessingFeedback(false);
               if (chrome.runtime.lastError) {
                 console.error("[Echly] Submit edited feedback failed:", chrome.runtime.lastError.message);
                 echlyLog("PIPELINE", "error");
@@ -917,14 +936,17 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               }).catch(() => {});
             }
           }).catch(() => {});
+          setIsProcessingFeedback(false);
           pending.callbacks.onSuccess(firstCreated);
         } else {
           echlyLog("PIPELINE", "error");
+          setIsProcessingFeedback(false);
           pending.callbacks.onError();
         }
       } catch (err) {
         console.error("[Echly] Submit edited feedback failed:", err);
         echlyLog("PIPELINE", "error");
+        setIsProcessingFeedback(false);
         pending.callbacks.onError();
       }
     },
@@ -935,6 +957,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     const pending = extensionClarityPending;
     if (!pending?.suggestedRewrite?.trim() || !effectiveSessionId) return;
     setExtensionClarityPending(null);
+    setIsProcessingFeedback(true);
     try {
       const res = await apiFetch("/api/structure-feedback", {
         method: "POST",
@@ -997,14 +1020,17 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             }).catch(() => {});
           }
         }).catch(() => {});
+        setIsProcessingFeedback(false);
         pending.callbacks.onSuccess(firstCreated);
       } else {
         echlyLog("PIPELINE", "error");
+        setIsProcessingFeedback(false);
         pending.callbacks.onError();
       }
     } catch (err) {
       console.error("[Echly] Use suggestion failed:", err);
       echlyLog("PIPELINE", "error");
+      setIsProcessingFeedback(false);
       pending.callbacks.onError();
     }
   }, [extensionClarityPending, effectiveSessionId]);
@@ -1231,6 +1257,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         hasPreviousSessions={hasPreviousSessions}
         onPreviousSessionSelect={onPreviousSessionSelect}
         pointers={globalState.pointers ?? []}
+        isProcessingFeedback={isProcessingFeedback}
         onSessionEnd={() => {}}
         onCreateSession={createSession}
         onActiveSessionChange={onActiveSessionChange}
@@ -1257,6 +1284,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           })().catch(() => {});
         }}
         captureRootParent={widgetRoot}
+        launcherLogoUrl={launcherLogoUrl}
       />
     </>
   );
