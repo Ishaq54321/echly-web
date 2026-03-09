@@ -9,8 +9,6 @@ import { VoiceCapturePanel } from "./VoiceCapturePanel";
 import { TextFeedbackPanel } from "./TextFeedbackPanel";
 import type { CaptureContext, SessionFeedbackPending } from "./types";
 
-const CAPTURE_TOOLTIP_OFFSET = 12;
-
 function createCommentCursor() {
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">`,
@@ -69,15 +67,9 @@ export function SessionOverlay({
   audioAnalyser = null,
 }: SessionOverlayProps) {
   const cleanupRef = useRef<(() => void)[]>([]);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const voiceStartedForPendingRef = useRef(false);
   const sessionActionPending = pausePending || endPending;
   const sessionCursorActive = sessionMode && !sessionPaused && !sessionActionPending;
-  const captureActive =
-    sessionMode &&
-    !sessionPaused &&
-    !sessionActionPending &&
-    sessionFeedbackPending == null;
 
   useEffect(() => {
     if (!sessionMode || !captureRoot) return;
@@ -120,18 +112,6 @@ export function SessionOverlay({
     };
   }, [sessionCursorActive, captureRoot]);
 
-  useEffect(() => {
-    if (!captureActive) {
-      setTooltipPos(null);
-      return;
-    }
-    const onMove = (e: MouseEvent) => {
-      setTooltipPos({ x: e.clientX + CAPTURE_TOOLTIP_OFFSET, y: e.clientY + CAPTURE_TOOLTIP_OFFSET });
-    };
-    window.addEventListener("mousemove", onMove, { passive: true });
-    return () => window.removeEventListener("mousemove", onMove);
-  }, [captureActive]);
-
   /* When captureMode is voice and we have pending feedback, start voice recording immediately (once). */
   useEffect(() => {
     if (!sessionFeedbackPending || captureMode !== "voice" || voiceStartedForPendingRef.current) return;
@@ -172,29 +152,6 @@ export function SessionOverlay({
         onResume={onResume}
         onEnd={onEnd}
       />
-      {captureActive && tooltipPos != null && (
-        <div
-          aria-hidden
-          className="echly-capture-tooltip"
-          style={{
-            position: "fixed",
-            left: tooltipPos.x,
-            top: tooltipPos.y,
-            pointerEvents: "none",
-            zIndex: 2147483646,
-            padding: "6px 10px",
-            fontSize: 12,
-            fontWeight: 500,
-            color: "rgba(255,255,255,0.95)",
-            background: "rgba(0,0,0,0.75)",
-            borderRadius: 6,
-            whiteSpace: "nowrap",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-          }}
-        >
-          Click to add feedback
-        </div>
-      )}
       {sessionFeedbackPending && captureMode === "voice" && (
         <VoiceCapturePanel
           captureRoot={captureRoot}

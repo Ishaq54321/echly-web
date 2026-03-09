@@ -4339,8 +4339,33 @@ textarea:focus-visible {
 .echly-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
+}
+.echly-header-mode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--icon-color);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.echly-header-mode-toggle:hover {
+  background: var(--bg-surface-hover);
+  color: var(--icon-hover);
+}
+.echly-header-mode-toggle:focus-visible {
+  outline: none;
+  background: var(--bg-surface-hover);
+}
+.echly-header-icon {
+  width: 16px;
+  height: 16px;
 }
 .echly-sidebar-summary {
   display: block;

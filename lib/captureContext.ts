@@ -20,6 +20,10 @@ export type CaptureContext = {
   /** Visible viewport text (readable text in viewport). */
   visibleText: string | null;
   capturedAt: number;
+  /** When set, OCR should run on this image (e.g. selection crop) instead of the UI screenshot. */
+  ocrImageDataUrl?: string | null;
+  /** Pin position as percentage of container (0–100) for annotation placement. */
+  pinPosition?: { xPercent: number; yPercent: number } | null;
 };
 
 const MAX_PATH_DEPTH = 12;

@@ -309,6 +309,8 @@ export default function CaptureWidget({
                 showHomeButton={extensionMode}
                 theme={theme}
                 onThemeToggle={onThemeToggle}
+                captureMode={captureMode}
+                onCaptureModeToggle={extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : undefined}
                 onShowCommandScreen={() => setShowCommandScreen(true)}
               />
 

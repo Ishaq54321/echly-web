@@ -9,7 +9,7 @@ import { apiFetch } from "./contentAuthFetch";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
-import type { StructuredFeedback } from "@/components/CaptureWidget/types";
+import type { StructuredFeedback, CaptureContext } from "@/components/CaptureWidget/types";
 import { log } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 
@@ -314,7 +314,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       if (callbacks) {
         (async () => {
           setIsProcessingFeedback(true);
-          const visibleTextPromise = getVisibleTextFromScreenshot(screenshot ?? null);
+          const ctx = context as CaptureContext | null | undefined;
+          const imageForOcr = ctx?.ocrImageDataUrl ?? screenshot ?? null;
+          if (ctx?.ocrImageDataUrl) {
+            console.log("[ECHLY] OCR running on selection image");
+          }
+          const visibleTextPromise = getVisibleTextFromScreenshot(imageForOcr);
           const firstFeedbackId = generateFeedbackId();
           const screenshotId = generateScreenshotId();
           const uploadPromise = screenshot
@@ -322,15 +327,21 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             : Promise.resolve(null as string | null);
           const visibleTextFromScreenshot = await visibleTextPromise;
           console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
+          if (imageForOcr) {
+            console.log("[ECHLY] OCR result length:", visibleTextFromScreenshot?.length ?? 0);
+          }
           const currentUrl = typeof window !== "undefined" ? window.location.href : "";
-          const enrichedContext = {
-            ...(context ?? {}),
+          const { ocrImageDataUrl: _ocrImg, ...contextForApi } = (context ?? {}) as Record<string, unknown>;
+          const enrichedContext: CaptureContext = {
+            ...(contextForApi as Omit<CaptureContext, "visibleText" | "url">),
             visibleText:
               (visibleTextFromScreenshot?.trim() && visibleTextFromScreenshot) ||
-              context?.visibleText ||
+              (context as CaptureContext | null)?.visibleText ||
               null,
-            url: context?.url ?? currentUrl,
+            url: (context as CaptureContext | null)?.url ?? currentUrl,
           };
+          delete (enrichedContext as Record<string, unknown>).ocrImageDataUrl;
+          console.log("[ECHLY] AI payload:", { transcript, context: enrichedContext });
           const structureBody = { transcript, context: enrichedContext };
           try {
             echlyLog("PIPELINE", "structure request");
@@ -532,23 +543,35 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       try {
       setIsProcessingFeedback(true);
+      const ctx2 = context as CaptureContext | null | undefined;
+      const imageForOcr = ctx2?.ocrImageDataUrl ?? screenshot ?? null;
+      if (ctx2?.ocrImageDataUrl) {
+        console.log("[ECHLY] OCR running on selection image");
+      }
       const screenshotId = generateScreenshotId();
       const uploadPromise = screenshot
         ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
         : Promise.resolve(null as string | null);
-      const visibleTextFromScreenshot = await getVisibleTextFromScreenshot(screenshot ?? null);
+      const visibleTextFromScreenshot = await getVisibleTextFromScreenshot(imageForOcr);
       console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
+      if (imageForOcr) {
+        console.log("[ECHLY] OCR result length:", visibleTextFromScreenshot?.length ?? 0);
+      }
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+      const { ocrImageDataUrl: _ocrImg2, ...contextForApi2 } = (context ?? {}) as Record<string, unknown>;
+      const enrichedContext: CaptureContext = {
+        ...(contextForApi2 as Omit<CaptureContext, "visibleText" | "url">),
+        visibleText:
+          (visibleTextFromScreenshot?.trim() && visibleTextFromScreenshot) ||
+          (context as CaptureContext | null)?.visibleText ||
+          null,
+        url: (context as CaptureContext | null)?.url ?? currentUrl,
+      };
+      delete (enrichedContext as Record<string, unknown>).ocrImageDataUrl;
+      console.log("[ECHLY] AI payload:", { transcript, context: enrichedContext });
       const structureBody = {
         transcript,
-        context: {
-          ...(context ?? {}),
-          visibleText:
-            (visibleTextFromScreenshot?.trim() && visibleTextFromScreenshot) ||
-            context?.visibleText ||
-            null,
-          url: context?.url ?? currentUrl,
-        },
+        context: enrichedContext,
       };
       echlyLog("PIPELINE", "structure request");
       console.log("[VOICE] final transcript submitted", transcript);

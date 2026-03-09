@@ -118,7 +118,7 @@ export function VoiceCapturePanel({
       <button type="button" className="echly-finish-btn" onClick={onFinish}>
         Finish
       </button>
-      <p className="echly-capture-cancel-hint">(Press Escape to cancel)</p>
+      <p className="echly-capture-cancel-hint">(Press Esc. to cancel)</p>
     </div>
   );
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { X, Home } from "lucide-react";
+import { X, Home, Mic, PenLine } from "lucide-react";
 
 const SunIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -33,6 +33,10 @@ type CaptureHeaderProps = {
   showHomeButton?: boolean;
   theme?: "dark" | "light";
   onThemeToggle?: () => void;
+  /** Current capture mode (voice vs text). When set with onCaptureModeToggle, shows mode toggle in header. */
+  captureMode?: "voice" | "text";
+  /** Called when user clicks the capture mode toggle. */
+  onCaptureModeToggle?: () => void;
   handlers?: {
     endSession?: () => void;
     clearPointers?: () => void;
@@ -51,6 +55,8 @@ export default function CaptureHeader({
   showHomeButton = false,
   theme = "dark",
   onThemeToggle,
+  captureMode = "voice",
+  onCaptureModeToggle,
   handlers,
   onShowCommandScreen,
 }: CaptureHeaderProps) {
@@ -152,16 +158,33 @@ export default function CaptureHeader({
             id="theme-toggle"
             onClick={onThemeToggle}
             className="echly-theme-toggle"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+          </button>
+        )}
+        {onCaptureModeToggle && (
+          <button
+            type="button"
+            className="echly-header-mode-toggle"
+            onClick={onCaptureModeToggle}
+            title={captureMode === "voice" ? "Switch to text feedback mode" : "Switch to voice feedback mode"}
+            aria-label="Toggle capture mode"
+          >
+            {captureMode === "voice" ? (
+              <Mic className="echly-header-icon" size={16} strokeWidth={1.5} />
+            ) : (
+              <PenLine className="echly-header-icon" size={16} strokeWidth={1.5} />
+            )}
           </button>
         )}
         <button
           type="button"
           onClick={onClose}
           className="echly-sidebar-close"
-          aria-label="Minimize"
+          title="Minimize feedback panel"
+          aria-label="Minimize feedback panel"
         >
           <X size={16} strokeWidth={1.5} />
         </button>

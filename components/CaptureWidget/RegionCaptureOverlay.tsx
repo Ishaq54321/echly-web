@@ -8,7 +8,55 @@ import type { CaptureContext } from "./types";
 const MIN_SIZE = 24;
 const ECHLY_EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)";
 
+export function detectVisualContainer(el: Element): DOMRect {
+  const viewportW = window.innerWidth;
+  const viewportH = window.innerHeight;
+
+  let node: Element | null = el;
+  let bestRect = el.getBoundingClientRect();
+
+  while (node && node !== document.body) {
+    const rect = node.getBoundingClientRect();
+    const style = window.getComputedStyle(node);
+
+    const isLayoutContainer =
+      style.display === "flex" ||
+      style.display === "grid" ||
+      style.display === "block";
+
+    const widthRatio = rect.width / viewportW;
+    const heightRatio = rect.height / viewportH;
+
+    const goodContainer =
+      widthRatio > 0.65 ||
+      heightRatio > 0.35 ||
+      isLayoutContainer;
+
+    if (goodContainer) {
+      bestRect = rect;
+    }
+
+    if (widthRatio > 0.85 || heightRatio > 0.6) {
+      break;
+    }
+
+    node = node.parentElement;
+  }
+
+  return bestRect;
+}
+
 export type Region = { x: number; y: number; w: number; h: number };
+
+export function clampRect(rect: { x: number; y: number; w?: number; h?: number; width?: number; height?: number }): Region {
+  const x = Math.max(0, rect.x);
+  const y = Math.max(0, rect.y);
+  const maxWidth = window.innerWidth - x;
+  const maxHeight = window.innerHeight - y;
+  const w = Math.min(rect.width ?? rect.w ?? 0, maxWidth);
+  const h = Math.min(rect.height ?? rect.h ?? 0, maxHeight);
+  return { x, y, w: Math.max(0, w), h: Math.max(0, h) };
+}
 
 export type RegionCaptureOverlayProps = {
   getFullTabImage: () => Promise<string | null>;
@@ -26,6 +74,19 @@ export async function cropImageToRegion(
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
+      const expectedW = window.innerWidth * dpr;
+      const expectedH = window.innerHeight * dpr;
+      if (
+        Math.abs(img.width - expectedW) > 2 ||
+        Math.abs(img.height - expectedH) > 2
+      ) {
+        console.warn("ECHLY: screenshot dimension mismatch", {
+          imgW: img.width,
+          imgH: img.height,
+          expectedW,
+          expectedH,
+        });
+      }
       const sx = Math.round(region.x * dpr);
       const sy = Math.round(region.y * dpr);
       const sw = Math.round(region.w * dpr);
@@ -116,40 +177,64 @@ export function RegionCaptureOverlay({
         onCancel();
         return;
       }
+
+      const centerX = targetRect.x + targetRect.w / 2;
+      const centerY = targetRect.y + targetRect.h / 2;
+      let element: Element | null =
+        typeof document !== "undefined"
+          ? document.elementFromPoint(centerX, centerY)
+          : null;
+      while (element && isEchlyElement(element)) {
+        element = element.parentElement;
+      }
+      if (!element) element = document.body;
+
       if (!fullImage) {
         setConfirming(false);
         onCancel();
         return;
       }
 
+      console.log("[ECHLY] Captured viewport screenshot");
+      console.log("ECHLY ELEMENT DETECTED", element);
+
       const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-      let cropped: string;
+      const containerRect = detectVisualContainer(element);
+      const safeRect = clampRect({
+        x: containerRect.x,
+        y: containerRect.y,
+        w: containerRect.width,
+        h: containerRect.height,
+      });
+
+      console.log("ECHLY CONTAINER RECT", safeRect);
+
+      let containerCrop: string;
+      let selectionCrop: string;
       try {
-        cropped = await cropImageToRegion(fullImage, targetRect, dpr);
+        containerCrop = await cropImageToRegion(fullImage, safeRect, dpr);
+        selectionCrop = await cropImageToRegion(fullImage, clampRect(targetRect), dpr);
       } catch {
         setConfirming(false);
         onCancel();
         return;
       }
 
-      const centerX = targetRect.x + targetRect.w / 2;
-      const centerY = targetRect.y + targetRect.h / 2;
-      let element: Element | null = null;
-      if (typeof document !== "undefined" && document.elementsFromPoint) {
-        const stack = document.elementsFromPoint(centerX, centerY);
-        element =
-          stack.find((el) => !isEchlyElement(el)) ??
-          document.elementFromPoint(centerX, centerY) ??
-          document.elementFromPoint(targetRect.x + 2, targetRect.y + 2);
-        while (element && isEchlyElement(element)) {
-          element = element.parentElement;
-        }
-      }
       const context: CaptureContext | null =
         typeof window !== "undefined"
           ? buildCaptureContext(window, element)
           : null;
-      onAddVoice(cropped, context);
+
+      if (context) {
+        context.ocrImageDataUrl = selectionCrop;
+        const xPercent =
+          ((targetRect.x + targetRect.w / 2 - safeRect.x) / safeRect.w) * 100;
+        const yPercent =
+          ((targetRect.y + targetRect.h / 2 - safeRect.y) / safeRect.h) * 100;
+        context.pinPosition = { xPercent, yPercent };
+      }
+
+      onAddVoice(containerCrop, context);
       setConfirming(false);
       setReleasedRect(null);
     },
@@ -236,7 +321,12 @@ export function RegionCaptureOverlay({
       aria-hidden
       className="echly-region-overlay"
       data-echly-ui="true"
-      style={{ position: "fixed", inset: 0, zIndex: 2147483647, userSelect: "none" }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2147483647,
+        userSelect: "none",
+      }}
     >
       {/* Full-screen dim when no selection; transparent when selection exists (cutout provides dim) */}
       <div

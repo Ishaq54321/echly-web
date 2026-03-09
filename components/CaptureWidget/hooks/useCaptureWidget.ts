@@ -16,13 +16,19 @@ import type {
 import { buildCaptureContext } from "@/lib/captureContext";
 import { playShutterSound } from "@/lib/playShutterSound";
 import { logSession } from "../session/sessionMode";
-import { cropScreenshotAroundElement } from "../session/cropAroundElement";
+import {
+  detectVisualContainer,
+  clampRect,
+  cropImageToRegion,
+} from "../RegionCaptureOverlay";
+import { hideEchlyUI, restoreEchlyUI } from "../hideEchlyUI";
 import { createMarker, removeAllMarkers, updateMarker, removeMarker } from "../session/feedbackMarkers";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 
 const SAFE_MARGIN = 24;
 const ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
 const OVERLAY_ROOT_ID = "echly-capture-root";
+const SHADOW_HOST_ID = "echly-shadow-host";
 const SESSION_WAIT_POLL_MS = 120;
 
 export type SentimentGlow = "negative" | "neutral" | "positive";
@@ -94,20 +100,16 @@ function generateRecordingId(): string {
 async function captureTabWithoutOverlay(
   capture: () => Promise<string | null>
 ): Promise<string | null> {
-  const overlay = document.getElementById(OVERLAY_ROOT_ID) as HTMLElement | null;
-  const previousDisplay = overlay?.style.display ?? "";
+  const hidden = hideEchlyUI();
+  console.log("ECHLY hidden UI elements", hidden.length);
+  await new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  );
 
   try {
-    if (overlay) {
-      overlay.style.display = "none";
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    }
-
     return await capture();
   } finally {
-    if (overlay) {
-      overlay.style.display = previousDisplay;
-    }
+    restoreEchlyUI(hidden);
   }
 }
 
@@ -1272,9 +1274,19 @@ export function useCaptureWidget({
         return;
       }
       if (!fullImage) return;
+      const containerRect = detectVisualContainer(element);
+      const safeRect = clampRect({
+        x: containerRect.x,
+        y: containerRect.y,
+        w: containerRect.width,
+        h: containerRect.height,
+      });
+      console.log("ECHLY ELEMENT DETECTED", element);
+      console.log("ECHLY CONTAINER RECT", safeRect);
       let cropped: string;
       try {
-        cropped = await cropScreenshotAroundElement(fullImage, element);
+        const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+        cropped = await cropImageToRegion(fullImage, safeRect, dpr);
       } catch {
         return;
       }
