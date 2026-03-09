@@ -49,6 +49,8 @@ export default function CaptureWidget({
   captureRootParent,
   isProcessingFeedback = false,
   launcherLogoUrl,
+  sessionTitleProp,
+  onSessionTitleChange: onSessionTitleChangeProp,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   /** Extension: when true, show command screen (mode cards + footer). False when viewing a session (e.g. after Open Previous or when paused). */
@@ -75,9 +77,10 @@ export default function CaptureWidget({
     loadSessionWithPointers,
     pointers: pointersProp,
     onSessionLoaded,
-    onCreateSession,
-    onActiveSessionChange,
-    globalSessionModeActive,
+  onCreateSession,
+  onActiveSessionChange,
+  onSessionViewRequested: extensionMode ? () => setShowCommandScreen(false) : undefined,
+  globalSessionModeActive,
     globalSessionPaused,
     onSessionModeStart,
     onSessionModePause,
@@ -103,7 +106,10 @@ export default function CaptureWidget({
   const showPanel = effectiveIsOpen && (showSidebar || showSessionSidebar);
 
   const hasTickets = Boolean(state.pointers?.length);
-  const showSessionButtons = !hasTickets && state.state === "idle";
+  /** When true, we are in an active or paused session; always render session layout (ticket list or empty state), never home. */
+  const sessionModeActive = globalSessionModeActive === true || globalSessionPaused === true;
+  /** Home screen (mode tiles + Start Session / Previous Sessions footer) only when not in a session. */
+  const showHomeScreen = !sessionModeActive;
   const showPreviousButton = Boolean(hasPreviousSessions);
 
   const openTicketsCount = state.pointers.filter((p) => {
@@ -297,12 +303,12 @@ export default function CaptureWidget({
                 onClose={() => setMicDropdownOpen(false)}
               />
             )}
-            <div className="echly-sidebar-surface">
+            <div className="echly-sidebar-surface" data-theme={theme}>
               <CaptureHeader
                 onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
-                showSessionTitle={hasTickets}
-                sessionTitle={sessionTitle}
-                onSessionTitleChange={setSessionTitle}
+                showSessionTitle={hasTickets || sessionModeActive}
+                sessionTitle={sessionTitleProp ?? sessionTitle ?? "Untitled Session"}
+                onSessionTitleChange={onSessionTitleChangeProp ?? setSessionTitle}
                 openTicketCount={openTicketsCount}
                 title={undefined}
                 summary={summary}
@@ -320,7 +326,7 @@ export default function CaptureWidget({
                 onScroll={handleListScroll}
                 onWheel={(e) => e.stopPropagation()}
               >
-                {(hasTickets || isProcessingFeedback) && (
+                {((hasTickets || isProcessingFeedback) && (sessionModeActive || !extensionMode)) && (
                   <div className="echly-feedback-list">
                     {isProcessingFeedback && (
                       <div id="processing_card_markup" className="echly-feedback-card echly-feedback-processing">
@@ -343,7 +349,12 @@ export default function CaptureWidget({
                       ))}
                   </div>
                 )}
-                {extensionMode && showSessionButtons && (
+                {sessionModeActive && !hasTickets && !isProcessingFeedback && (
+                  <div className="echly-empty-session-state" aria-live="polite">
+                    <span className="echly-empty-session-text">No feedback yet. Add feedback from the page.</span>
+                  </div>
+                )}
+                {extensionMode && showHomeScreen && (
                   <div className="echly-mode-container">
                     <div className="echly-mode-header">Select feedback mode</div>
                     <div
@@ -397,7 +408,7 @@ export default function CaptureWidget({
                 )}
               </div>
 
-              {showSessionButtons && (
+              {showHomeScreen && (
                 <>
                   <div className="echly-command-divider" aria-hidden />
                   <WidgetFooter

@@ -3,6 +3,7 @@
  * Enables AI-level clarity: "On /pricing at 1440px, CTA under card #2 has alignment issue."
  * Ensures domPath, nearbyText, subtreeText, visibleText are always populated when possible.
  */
+import { ECHLY_DEBUG } from "@/lib/utils/logger";
 
 export type CaptureContext = {
   url: string;
@@ -238,7 +239,7 @@ export function extractVisibleText(win: Window | null): string | null {
 
 function echlyDebug(label: string, value: string | number): void {
   try {
-    if (typeof console !== "undefined" && console.log) {
+    if (ECHLY_DEBUG && typeof console !== "undefined" && console.log) {
       console.log(`ECHLY DEBUG — ${label}`, value);
     }
   } catch {

@@ -1,6 +1,7 @@
 "use client";
 
 import { authFetch } from "@/lib/authFetch";
+import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { playDoneClick } from "@/lib/playDoneClick";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSessionFeedback } from "@/lib/feedback";
@@ -101,7 +102,7 @@ async function captureTabWithoutOverlay(
   capture: () => Promise<string | null>
 ): Promise<string | null> {
   const hidden = hideEchlyUI();
-  console.log("ECHLY hidden UI elements", hidden.length);
+  if (ECHLY_DEBUG) console.log("ECHLY hidden UI elements", hidden.length);
   await new Promise<void>((resolve) =>
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
   );
@@ -136,6 +137,7 @@ export function useCaptureWidget({
   globalSessionModeActive,
   globalSessionPaused,
   onSessionModeStart,
+  onSessionViewRequested,
   onSessionModePause,
   onSessionModeResume,
   onSessionModeEnd,
@@ -144,9 +146,7 @@ export function useCaptureWidget({
   selectedMicrophoneId,
   captureRootParent,
 }: CaptureWidgetProps) {
-  if (process.env.NODE_ENV === "development") {
-    console.count("useCaptureWidget render");
-  }
+  if (ECHLY_DEBUG) console.count("useCaptureWidget render");
 
   if (typeof window !== "undefined" && !(window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__) {
     (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__ = {
@@ -246,7 +246,7 @@ export function useCaptureWidget({
   /** Restore persisted capture state on mount (e.g. after widget remount). */
   useEffect(() => {
     if (captureState.pending) {
-      console.log("ECHLY restoring pending capture state");
+      if (ECHLY_DEBUG) console.log("ECHLY restoring pending capture state");
       setPending(captureState.pending);
     }
   }, []);
@@ -388,24 +388,24 @@ export function useCaptureWidget({
 
   const createCaptureRoot = useCallback(() => {
     if (captureRootRef.current) {
-      console.debug("ECHLY createCaptureRoot", "skipped (ref already set)");
+      if (ECHLY_DEBUG) console.debug("ECHLY createCaptureRoot", "skipped (ref already set)");
       return;
     }
     const existingRoot = document.getElementById(OVERLAY_ROOT_ID);
     if (existingRoot) {
-      console.debug("ECHLY createCaptureRoot", "reusing existing DOM root");
+      if (ECHLY_DEBUG) console.debug("ECHLY createCaptureRoot", "reusing existing DOM root");
       (existingRoot as HTMLDivElement).style.pointerEvents = "none";
       captureRootRef.current = existingRoot as HTMLDivElement;
       setCaptureRootEl(existingRoot as HTMLDivElement);
       setCaptureRootReady(true);
       return;
     }
-    console.debug("ECHLY createCaptureRoot");
+    if (ECHLY_DEBUG) console.debug("ECHLY createCaptureRoot");
     if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-      console.log("ECHLY pending CLEARED", { reason: "createCaptureRoot" });
+      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "createCaptureRoot" });
       setPending(null);
     } else {
-      console.log("ECHLY pending clear skipped during capture");
+      if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
     }
     const captureEl = document.createElement("div");
     captureEl.id = OVERLAY_ROOT_ID;
@@ -464,7 +464,7 @@ export function useCaptureWidget({
     if (extensionMode && globalSessionModeActive !== false) {
       return;
     }
-    console.debug("ECHLY removeCaptureRoot");
+    if (ECHLY_DEBUG) console.debug("ECHLY removeCaptureRoot");
     if (captureRootRef.current) {
       try {
         captureRootRef.current.remove();
@@ -541,17 +541,17 @@ export function useCaptureWidget({
     recognition.onstart = () => {
       const t = Date.now();
       recognitionOnstartTimeRef.current = t;
-      console.log("[VOICE] recognition.onstart", t);
+      if (ECHLY_DEBUG) console.log("[VOICE] recognition.onstart", t);
       const startTime = voiceStartTimeRef.current;
-      if (startTime != null) {
+      if (ECHLY_DEBUG && startTime != null) {
         console.log("[VOICE] delay UI recording start→onstart:", t - startTime, "ms");
       }
     };
     recognition.onspeechstart = () => {
-      console.log("[VOICE] speech detected", Date.now());
+      if (ECHLY_DEBUG) console.log("[VOICE] speech detected", Date.now());
     };
     recognition.onaudiostart = () => {
-      console.log("[VOICE] audio start", Date.now());
+      if (ECHLY_DEBUG) console.log("[VOICE] audio start", Date.now());
     };
     recognition.onresult = (event: SpeechRecognitionResultEvent) => {
       let text = "";
@@ -565,17 +565,15 @@ export function useCaptureWidget({
       text = text.replace(/\s+/g, " ").trim();
       const t = Date.now();
       echlyLog("RECORDING", "result", { transcript: text });
-      console.log("[VOICE] transcript received", t, text);
+      if (ECHLY_DEBUG) console.log("[VOICE] transcript received", t, text);
       if (text && !hasReceivedFirstTranscriptRef.current) {
         hasReceivedFirstTranscriptRef.current = true;
-        console.log("[VOICE] first transcript chunk:", text, "length:", text.length);
-        const startTime = voiceStartTimeRef.current;
-        const onstartTime = recognitionOnstartTimeRef.current;
-        if (startTime != null) {
-          console.log("[VOICE] delay UI→first transcript:", t - startTime, "ms");
-        }
-        if (onstartTime != null) {
-          console.log("[VOICE] delay onstart→first transcript:", t - onstartTime, "ms");
+        if (ECHLY_DEBUG) {
+          console.log("[VOICE] first transcript chunk:", text, "length:", text.length);
+          const startTime = voiceStartTimeRef.current;
+          const onstartTime = recognitionOnstartTimeRef.current;
+          if (startTime != null) console.log("[VOICE] delay UI→first transcript:", t - startTime, "ms");
+          if (onstartTime != null) console.log("[VOICE] delay onstart→first transcript:", t - onstartTime, "ms");
         }
       }
       const activeId = activeRecordingIdRef.current;
@@ -628,7 +626,7 @@ export function useCaptureWidget({
     voiceStartTimeRef.current = startTime;
     recognitionOnstartTimeRef.current = null;
     hasReceivedFirstTranscriptRef.current = false;
-    console.log("[VOICE] UI recording started", startTime);
+    if (ECHLY_DEBUG) console.log("[VOICE] UI recording started", startTime);
     try {
       const audioConstraints: boolean | MediaTrackConstraints = selectedMicrophoneId
         ? { deviceId: { exact: selectedMicrophoneId } }
@@ -644,7 +642,7 @@ export function useCaptureWidget({
       audioContextRef.current = ctx;
       analyserRef.current = analyser;
       setAudioAnalyser(analyser);
-      console.log("[VOICE] recognition.start() called", Date.now());
+      if (ECHLY_DEBUG) console.log("[VOICE] recognition.start() called", Date.now());
       recognitionRef.current?.start();
       recordingActiveRef.current = true;
       setState("voice_listening");
@@ -681,9 +679,9 @@ export function useCaptureWidget({
     }
     const currentRecordings = recordingsRef.current;
     const active = currentRecordings.find((r) => r.id === activeId);
-    console.log("[VOICE] finishListening transcript:", active?.transcript);
+    if (ECHLY_DEBUG) console.log("[VOICE] finishListening transcript:", active?.transcript);
     if (!active || !active.transcript || active.transcript.trim().length < 5) {
-      console.warn("[VOICE] transcript too short, skipping pipeline");
+      if (ECHLY_DEBUG) console.warn("[VOICE] transcript too short, skipping pipeline");
       setState("idle");
       return;
     }
@@ -707,14 +705,14 @@ export function useCaptureWidget({
             }
           );
         }
-        console.log("ECHLY pending CLEARED", { reason: "finishListening session mode" });
+        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "finishListening session mode" });
         setPending(null);
         setSessionFeedbackSaving(true);
         setRecordings((prev) => prev.filter((r) => r.id !== activeId));
         setActiveRecordingId(null);
         setState("idle");
         lastSessionClickedElementRef.current = null;
-        console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
+        if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
         try {
           pipelineActiveRef.current = true;
           onComplete(active.transcript, active.screenshot, {
@@ -722,16 +720,13 @@ export function useCaptureWidget({
               pipelineActiveRef.current = false;
               setSessionFeedbackSaving(false);
               if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
-              const t = ticket as StructuredFeedback & { description?: string };
-              setPointers((prev) => [
-                {
-                  id: t.id,
-                  title: t.title,
-                  actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []),
-                  type: t.type,
-                },
-                ...prev,
-              ]);
+              if (!extensionMode) {
+                const t = ticket as StructuredFeedback & { description?: string };
+                setPointers((prev) => [
+                  { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []), type: t.type },
+                  ...prev,
+                ]);
+              }
               setHighlightTicketId(ticket.id);
               setTimeout(() => setHighlightTicketId(null), 1200);
             },
@@ -752,21 +747,18 @@ export function useCaptureWidget({
         return;
       }
       setState("processing");
-      console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
+      if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
       pipelineActiveRef.current = true;
       onComplete(active.transcript, active.screenshot, {
         onSuccess: (ticket) => {
           pipelineActiveRef.current = false;
-          const t = ticket as StructuredFeedback & { description?: string };
-          setPointers((prev) => [
-            {
-              id: t.id,
-              title: t.title,
-              actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []),
-              type: t.type,
-            },
-            ...prev,
-          ]);
+          if (!extensionMode) {
+            const t = ticket as StructuredFeedback & { description?: string };
+            setPointers((prev) => [
+              { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []), type: t.type },
+              ...prev,
+            ]);
+          }
           setRecordings((prev) => prev.filter((r) => r.id !== activeId));
           setActiveRecordingId(null);
           setHighlightTicketId(ticket.id);
@@ -789,7 +781,7 @@ export function useCaptureWidget({
       return;
     }
     setState("processing");
-    console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
+    if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
     try {
       const structured = await onComplete(active.transcript, active.screenshot);
       if (!structured) {
@@ -798,15 +790,12 @@ export function useCaptureWidget({
         restoreWidget();
         return;
       }
-      setPointers((prev) => [
-        {
-          id: structured.id,
-          title: structured.title,
-          actionSteps: structured.actionSteps ?? [],
-          type: structured.type,
-        },
-        ...prev,
-      ]);
+      if (!extensionMode) {
+        setPointers((prev) => [
+          { id: structured.id, title: structured.title, actionSteps: structured.actionSteps ?? [], type: structured.type },
+          ...prev,
+        ]);
+      }
       setRecordings((prev) => prev.filter((r) => r.id !== activeId));
       setActiveRecordingId(null);
       setHighlightTicketId(structured.id);
@@ -1055,21 +1044,22 @@ export function useCaptureWidget({
   const startSession = useCallback(async () => {
     if (stateRef.current !== "idle" || sessionModeRef.current || globalSessionModeActive) return;
     echlyLog("SESSION", "start");
-    console.log("[Echly] Start New Feedback Session clicked");
+    if (ECHLY_DEBUG) console.log("[Echly] Start New Feedback Session clicked");
     logSession("start");
     if (extensionMode && onCreateSession && onActiveSessionChange) {
       const session = await onCreateSession();
       if (!session?.id) return;
       onActiveSessionChange(session.id);
-    setPointers([]);
-    onSessionModeStart?.();
+      setPointers([]);
+      onSessionModeStart?.();
+      onSessionViewRequested?.();
     }
-    console.log("ECHLY pending CLEARED", { reason: "startSession" });
+    if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "startSession" });
     setPending(null);
     setSessionFeedbackSaving(false);
     setPausePending(false);
     setEndPending(false);
-  }, [extensionMode, onCreateSession, onActiveSessionChange, onSessionModeStart, globalSessionModeActive]);
+  }, [extensionMode, onCreateSession, onActiveSessionChange, onSessionModeStart, onSessionViewRequested, globalSessionModeActive]);
 
   const pauseSession = useCallback(() => {
     if (
@@ -1138,7 +1128,7 @@ export function useCaptureWidget({
       logSession("end");
       setPausePending(false);
       setEndPending(false);
-      console.log("ECHLY pending CLEARED", { reason: "endSession finalizeEnd" });
+      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "endSession finalizeEnd" });
       setPending(null);
       setSessionFeedbackSaving(false);
       setPointers([]);
@@ -1186,10 +1176,10 @@ export function useCaptureWidget({
       setSessionMode(true);
       setSessionPaused(globalSessionPaused ?? false);
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-        console.log("ECHLY pending CLEARED", { reason: "global sync (session active)" });
+        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "global sync (session active)" });
         setPending(null);
       } else {
-        console.log("ECHLY pending clear skipped during capture");
+        if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
       }
       setEndPending(false);
     }
@@ -1203,10 +1193,10 @@ export function useCaptureWidget({
       setPausePending(false);
       setEndPending(false);
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-        console.log("ECHLY pending CLEARED", { reason: "global sync (session ended)" });
+        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "global sync (session ended)" });
         setPending(null);
       } else {
-        console.log("ECHLY pending clear skipped during capture");
+        if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
       }
       setSessionFeedbackSaving(false);
       removeAllMarkers();
@@ -1231,16 +1221,16 @@ export function useCaptureWidget({
     }
   }, [extensionMode, globalSessionModeActive, globalSessionPaused]);
 
-  /** Extension: sync global pointers from background so tray updates in real time when new tickets are created. No guard during recording so tray reflects latest pointers immediately. */
+  /** Extension: sync global pointers from background so tray updates in real time. Background is source of truth; content notifies via ECHLY_FEEDBACK_CREATED when tickets are created. */
   useEffect(() => {
     if (!extensionMode || pointersProp === undefined) return;
     pointersPropRef.current = pointersProp;
     setPointers(pointersProp);
     if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-      console.log("ECHLY pending CLEARED", { reason: "pointers sync effect" });
+      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "pointers sync effect" });
       setPending(null);
     } else {
-      console.log("ECHLY pending clear skipped during capture");
+      if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
     }
   }, [extensionMode, pointersProp]);
 
@@ -1249,10 +1239,10 @@ export function useCaptureWidget({
     if (!extensionMode || !loadSessionWithPointers?.sessionId) return;
     setPointers(loadSessionWithPointers.pointers ?? []);
     if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-      console.log("ECHLY pending CLEARED", { reason: "loadSessionWithPointers" });
+      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "loadSessionWithPointers" });
       setPending(null);
     } else {
-      console.log("ECHLY pending clear skipped during capture");
+      if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
     }
     onSessionLoaded?.();
   }, [extensionMode, loadSessionWithPointers, onSessionLoaded]);
@@ -1260,7 +1250,7 @@ export function useCaptureWidget({
   const handleSessionElementClicked = useCallback(
     async (element: Element) => {
       if (sessionFeedbackPending && !captureRootRef.current) {
-        console.log("ECHLY pending CLEARED", { reason: "handleSessionElementClicked (no root)" });
+        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionElementClicked (no root)" });
         setPending(null);
         return;
       }
@@ -1281,8 +1271,10 @@ export function useCaptureWidget({
         w: containerRect.width,
         h: containerRect.height,
       });
-      console.log("ECHLY ELEMENT DETECTED", element);
-      console.log("ECHLY CONTAINER RECT", safeRect);
+      if (ECHLY_DEBUG) {
+        console.log("ECHLY ELEMENT DETECTED", element);
+        console.log("ECHLY CONTAINER RECT", safeRect);
+      }
       let cropped: string;
       try {
         const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
@@ -1301,7 +1293,7 @@ export function useCaptureWidget({
         height: rect.height,
       };
       lastSessionClickedElementRef.current = element instanceof HTMLElement ? element : null;
-      console.log("ECHLY pending SET", { screenshot: cropped, context });
+      if (ECHLY_DEBUG) console.log("ECHLY pending SET", { screenshot: cropped, context });
       sessionFeedbackPendingRef.current = true;
       setPending({ screenshot: cropped, context, elementRect });
       onSessionActivity?.();
@@ -1313,7 +1305,7 @@ export function useCaptureWidget({
     (transcript: string) => {
       const pending = sessionFeedbackPending;
       if (!pending || !transcript || transcript.trim().length === 0) {
-        console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackSubmit (invalid)" });
+        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackSubmit (invalid)" });
         setPending(null);
         return;
       }
@@ -1343,14 +1335,14 @@ export function useCaptureWidget({
         );
       }
 
-      console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackSubmit (submit)" });
+      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackSubmit (submit)" });
       setPending(null);
       setSessionFeedbackSaving(true);
       setState("idle");
       lastSessionClickedElementRef.current = null;
 
       /* Send to structure-feedback async; update marker and list when done. */
-      console.log("[VOICE] final transcript sent to pipeline:", transcript);
+      if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", transcript);
       try {
         pipelineActiveRef.current = true;
         onComplete(transcript, pending.screenshot, {
@@ -1360,16 +1352,13 @@ export function useCaptureWidget({
             if (root) {
               updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
             }
-            const t = ticket as StructuredFeedback & { description?: string };
-            setPointers((prev) => [
-              {
-                id: t.id,
-                title: t.title,
-                actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []),
-                type: t.type,
-              },
-              ...prev,
-            ]);
+            if (!extensionMode) {
+              const t = ticket as StructuredFeedback & { description?: string };
+              setPointers((prev) => [
+                { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []), type: t.type },
+                ...prev,
+              ]);
+            }
             setHighlightTicketId(ticket.id);
             setTimeout(() => setHighlightTicketId(null), 1200);
           },
@@ -1392,7 +1381,7 @@ export function useCaptureWidget({
   );
 
   const handleSessionFeedbackCancel = useCallback(() => {
-    console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackCancel" });
+    if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackCancel" });
     recognitionRef.current?.stop();
     recordingActiveRef.current = false;
     pipelineActiveRef.current = false;

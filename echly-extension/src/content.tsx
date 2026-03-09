@@ -10,7 +10,7 @@ import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./co
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
 import type { StructuredFeedback, CaptureContext } from "@/components/CaptureWidget/types";
-import { log } from "@/lib/utils/logger";
+import { ECHLY_DEBUG, log } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 
 const ROOT_ID = "echly-root";
@@ -55,6 +55,7 @@ type GlobalUIState = {
   expanded: boolean;
   isRecording: boolean;
   sessionId: string | null;
+  sessionTitle: string | null;
   sessionModeActive: boolean;
   sessionPaused: boolean;
   pointers: StructuredFeedback[];
@@ -64,6 +65,19 @@ type GlobalUIState = {
 /** Ask background to open popup (e.g. in a new tab) so user can sign in. */
 function requestOpenPopup(): void {
   chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {});
+}
+
+/** Notify background when content creates a ticket via apiFetch so globalUIState.pointers stays in sync. */
+function notifyFeedbackCreated(ticket: { id: string; title: string; actionSteps?: string[]; type?: string }): void {
+  chrome.runtime.sendMessage({
+    type: "ECHLY_FEEDBACK_CREATED",
+    ticket: {
+      id: ticket.id,
+      title: ticket.title,
+      actionSteps: ticket.actionSteps ?? [],
+      type: ticket.type ?? "Feedback",
+    },
+  }).catch(() => {});
 }
 
 type ContentAppProps = {
@@ -81,6 +95,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     expanded: false,
     isRecording: false,
     sessionId: null,
+    sessionTitle: null,
     sessionModeActive: false,
     sessionPaused: false,
     pointers: [],
@@ -317,7 +332,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           const ctx = context as CaptureContext | null | undefined;
           const imageForOcr = ctx?.ocrImageDataUrl ?? screenshot ?? null;
           if (ctx?.ocrImageDataUrl) {
-            console.log("[ECHLY] OCR running on selection image");
+            if (ECHLY_DEBUG) console.log("[ECHLY] OCR running on selection image");
           }
           const visibleTextPromise = getVisibleTextFromScreenshot(imageForOcr);
           const firstFeedbackId = generateFeedbackId();
@@ -326,9 +341,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
             : Promise.resolve(null as string | null);
           const visibleTextFromScreenshot = await visibleTextPromise;
-          console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
+          if (ECHLY_DEBUG) console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
           if (imageForOcr) {
-            console.log("[ECHLY] OCR result length:", visibleTextFromScreenshot?.length ?? 0);
+            if (ECHLY_DEBUG) console.log("[ECHLY] OCR result length:", visibleTextFromScreenshot?.length ?? 0);
           }
           const currentUrl = typeof window !== "undefined" ? window.location.href : "";
           const { ocrImageDataUrl: _ocrImg, ...contextForApi } = (context ?? {}) as Record<string, unknown>;
@@ -341,11 +356,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             url: (context as CaptureContext | null)?.url ?? currentUrl,
           };
           delete (enrichedContext as Record<string, unknown>).ocrImageDataUrl;
-          console.log("[ECHLY] AI payload:", { transcript, context: enrichedContext });
+          if (ECHLY_DEBUG) console.log("[ECHLY] AI payload:", { transcript, context: enrichedContext });
           const structureBody = { transcript, context: enrichedContext };
           try {
             echlyLog("PIPELINE", "structure request");
-            console.log("[VOICE] final transcript submitted", transcript);
+            if (ECHLY_DEBUG) console.log("[VOICE] final transcript submitted", transcript);
             const res = await apiFetch("/api/structure-feedback", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -371,7 +386,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             if (!isSessionMode) {
               /* Intercept before any submission: pause and show clarity assistant when score <= 20 (even when tickets is empty). */
               if (data.success && clarityScore <= 20) {
-                console.log("CLARITY GUARD TRIGGERED", clarityScore);
+                if (ECHLY_DEBUG) console.log("CLARITY GUARD TRIGGERED", clarityScore);
                 setExtensionClarityPending({
                   tickets,
                   screenshotUrl: null,
@@ -401,7 +416,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               const needsClarification = Boolean((data as { needsClarification?: boolean }).needsClarification);
               const verificationIssues = (data as { verificationIssues?: string[] }).verificationIssues ?? [];
               if (data.success && needsClarification && tickets.length === 0) {
-                console.log("PIPELINE NEEDS CLARIFICATION", verificationIssues);
+                if (ECHLY_DEBUG) console.log("PIPELINE NEEDS CLARIFICATION", verificationIssues);
                 setExtensionClarityPending({
                   tickets: [],
                   screenshotUrl: null,
@@ -515,6 +530,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             if (firstCreated) {
               const ticketId = firstCreated.id;
               echlyLog("PIPELINE", "ticket created", { ticketId });
+              notifyFeedbackCreated(firstCreated);
               uploadPromise.then((url) => {
                 if (url) {
                   echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
@@ -546,16 +562,16 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       const ctx2 = context as CaptureContext | null | undefined;
       const imageForOcr = ctx2?.ocrImageDataUrl ?? screenshot ?? null;
       if (ctx2?.ocrImageDataUrl) {
-        console.log("[ECHLY] OCR running on selection image");
+        if (ECHLY_DEBUG) console.log("[ECHLY] OCR running on selection image");
       }
       const screenshotId = generateScreenshotId();
       const uploadPromise = screenshot
         ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
         : Promise.resolve(null as string | null);
       const visibleTextFromScreenshot = await getVisibleTextFromScreenshot(imageForOcr);
-      console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
+      if (ECHLY_DEBUG) console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
       if (imageForOcr) {
-        console.log("[ECHLY] OCR result length:", visibleTextFromScreenshot?.length ?? 0);
+        if (ECHLY_DEBUG) console.log("[ECHLY] OCR result length:", visibleTextFromScreenshot?.length ?? 0);
       }
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
       const { ocrImageDataUrl: _ocrImg2, ...contextForApi2 } = (context ?? {}) as Record<string, unknown>;
@@ -568,13 +584,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         url: (context as CaptureContext | null)?.url ?? currentUrl,
       };
       delete (enrichedContext as Record<string, unknown>).ocrImageDataUrl;
-      console.log("[ECHLY] AI payload:", { transcript, context: enrichedContext });
+      if (ECHLY_DEBUG) console.log("[ECHLY] AI payload:", { transcript, context: enrichedContext });
       const structureBody = {
         transcript,
         context: enrichedContext,
       };
       echlyLog("PIPELINE", "structure request");
-      console.log("[VOICE] final transcript submitted", transcript);
+      if (ECHLY_DEBUG) console.log("[VOICE] final transcript submitted", transcript);
       const res = await apiFetch("/api/structure-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -639,6 +655,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       if (firstCreated) {
         const ticketId = firstCreated.id;
+        notifyFeedbackCreated(firstCreated);
         uploadPromise.then((url) => {
           if (url) {
             apiFetch(`/api/tickets/${ticketId}`, {
@@ -669,7 +686,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   const handleUpdate = React.useCallback(
     async (id: string, payload: { title: string; actionSteps: string[] }) => {
-      await apiFetch(`/api/tickets/${id}`, {
+      const res = await apiFetch(`/api/tickets/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -678,27 +695,65 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           actionSteps: payload.actionSteps ?? [],
         }),
       });
+      const data = (await res.json()) as { success?: boolean; ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } };
+      if (res.ok && data.success && data.ticket) {
+        const ticket = data.ticket;
+        chrome.runtime.sendMessage({
+          type: "ECHLY_TICKET_UPDATED",
+          ticket: {
+            id: ticket.id,
+            title: ticket.title,
+            actionSteps: ticket.actionSteps ?? [],
+            type: ticket.type ?? "Feedback",
+          },
+        }).catch(() => {});
+      }
     },
     []
+  );
+
+  const onSessionTitleChange = React.useCallback(
+    async (newTitle: string) => {
+      if (!effectiveSessionId) return;
+      try {
+        const res = await apiFetch(`/api/sessions/${effectiveSessionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: newTitle.trim() || "Untitled Session" }),
+        });
+        const data = (await res.json()) as { success?: boolean };
+        if (res.ok && data.success) {
+          chrome.runtime.sendMessage({
+            type: "ECHLY_SESSION_UPDATED",
+            sessionId: effectiveSessionId,
+            title: newTitle.trim() || "Untitled Session",
+          }).catch(() => {});
+        }
+      } catch (err) {
+        console.error("[Echly] Session title update failed:", err);
+      }
+    },
+    [effectiveSessionId]
   );
 
   const fetchSessions = React.useCallback(async () => {
     const res = await apiFetch("/api/sessions");
     const json = (await res.json()) as { success?: boolean; sessions?: Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number }> };
     const sessions = json.sessions ?? [];
-    console.log("[Echly] Sessions returned:", { ok: res.ok, status: res.status, success: json.success, count: sessions.length, sessions });
+    if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", { ok: res.ok, status: res.status, success: json.success, count: sessions.length, sessions });
     if (!res.ok || !json.success) return [];
     return sessions;
   }, []);
 
   const createSession = React.useCallback(async (): Promise<{ id: string } | null> => {
-    console.log("[Echly] Creating session");
+    if (ECHLY_DEBUG) console.log("[Echly] Creating session");
     try {
       const res = await apiFetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const json = (await res.json()) as { success?: boolean; session?: { id: string } };
-      console.log("[Echly] Create session response:", { ok: res.ok, status: res.status, success: json.success, sessionId: json.session?.id });
+      if (ECHLY_DEBUG) console.log("[Echly] Create session response:", { ok: res.ok, status: res.status, success: json.success, sessionId: json.session?.id });
       if (!res.ok || !json.success || !json.session?.id) return null;
-      return { id: json.session.id };
+      const session = { id: json.session.id };
+      return session;
     } catch (err) {
       console.error("[Echly] Failed to create session:", err);
       return null;
@@ -950,6 +1005,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
         if (firstCreated) {
           const ticketId = firstCreated.id;
+          notifyFeedbackCreated(firstCreated);
           pending.uploadPromise.then((url) => {
             if (url) {
               apiFetch(`/api/tickets/${ticketId}`, {
@@ -1034,6 +1090,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       if (firstCreated) {
         const ticketId = firstCreated.id;
+        notifyFeedbackCreated(firstCreated);
         pending.uploadPromise.then((url) => {
           if (url) {
             apiFetch(`/api/tickets/${ticketId}`, {
@@ -1280,6 +1337,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         hasPreviousSessions={hasPreviousSessions}
         onPreviousSessionSelect={onPreviousSessionSelect}
         pointers={globalState.pointers ?? []}
+        sessionTitleProp={globalState.sessionTitle ?? undefined}
+        onSessionTitleChange={onSessionTitleChange}
         isProcessingFeedback={isProcessingFeedback}
         onSessionEnd={() => {}}
         onCreateSession={createSession}
@@ -1383,6 +1442,7 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     expanded: state.expanded ?? false,
     isRecording: state.isRecording ?? false,
     sessionId: state.sessionId ?? null,
+    sessionTitle: state.sessionTitle ?? null,
     sessionModeActive: state.sessionModeActive ?? false,
     sessionPaused: state.sessionPaused ?? false,
     pointers: Array.isArray(state.pointers) ? state.pointers : [],
@@ -1477,12 +1537,12 @@ function ensureScrollDebugListeners(): void {
   win.__ECHLY_SCROLL_DEBUG__ = true;
   window.addEventListener(
     "wheel",
-    () => console.debug("ECHLY wheel event reached page"),
+    () => ECHLY_DEBUG && console.debug("ECHLY wheel event reached page"),
     { passive: true }
   );
   document.addEventListener(
     "scroll",
-    () => console.debug("ECHLY scroll event detected"),
+    () => ECHLY_DEBUG && console.debug("ECHLY scroll event detected"),
     { passive: true }
   );
 }

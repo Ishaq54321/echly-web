@@ -2,13 +2,13 @@
  * Session Feedback Mode: helpers and safety checks.
  * Do not break existing region capture flow.
  */
-
 import { isEchlyElement } from "@/lib/captureContext";
+import { ECHLY_DEBUG } from "@/lib/utils/logger";
 
 const SESSION_LOG = "[SESSION]";
 
 export function logSession(message: string): void {
-  if (typeof console !== "undefined" && console.debug) {
+  if (ECHLY_DEBUG && typeof console !== "undefined" && console.debug) {
     console.debug(`${SESSION_LOG} ${message}`);
   }
 }

@@ -3,11 +3,11 @@
  * Content scripts request tokens and auth state via messages.
  */
 import { firebaseConfig } from "../../lib/firebase/config";
-import { warn } from "../../lib/utils/logger";
+import { ECHLY_DEBUG, warn } from "../../lib/utils/logger";
 import { echlyLog } from "../../lib/debug/echlyLogger";
 
 const API_BASE = "http://localhost:3000";
-console.log("[EXTENSION] Using API_BASE:", API_BASE);
+if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 const IDP_API_KEY = firebaseConfig.apiKey;
 
 let activeSessionId: string | null = null;
@@ -36,6 +36,7 @@ let globalUIState: {
   expanded: boolean;
   isRecording: boolean;
   sessionId: string | null;
+  sessionTitle: string | null;
   sessionModeActive: boolean;
   sessionPaused: boolean;
   pointers: StructuredFeedback[];
@@ -45,6 +46,7 @@ let globalUIState: {
   expanded: false,
   isRecording: false,
   sessionId: null,
+  sessionTitle: null,
   sessionModeActive: false,
   sessionPaused: false,
   pointers: [],
@@ -67,6 +69,7 @@ function endSessionFromIdle(): void {
   clearSessionIdleTimer();
   activeSessionId = null;
   globalUIState.sessionId = null;
+  globalUIState.sessionTitle = null;
   globalUIState.sessionModeActive = false;
   globalUIState.sessionPaused = false;
   globalUIState.pointers = [];
@@ -103,14 +106,49 @@ function persistSessionLifecycleState(): void {
 
 async function initializeSessionState(): Promise<void> {
   return new Promise<void>((resolve) => {
-    chrome.storage.local.get(["activeSessionId"], (result: { activeSessionId?: string }) => {
-      const stored = result.activeSessionId;
-      activeSessionId = typeof stored === "string" ? stored : null;
-      globalUIState.sessionId = activeSessionId;
-      globalUIState.sessionModeActive = false;
-      globalUIState.sessionPaused = false;
-      resolve();
-    });
+    chrome.storage.local.get(
+      ["activeSessionId", "sessionModeActive", "sessionPaused"],
+      (result: { activeSessionId?: string; sessionModeActive?: boolean; sessionPaused?: boolean }) => {
+        activeSessionId =
+          typeof result.activeSessionId === "string"
+            ? result.activeSessionId
+            : null;
+
+        globalUIState.sessionId = activeSessionId;
+        globalUIState.sessionModeActive = result.sessionModeActive === true;
+        globalUIState.sessionPaused = result.sessionPaused === true;
+
+        const shouldReloadPointers =
+          globalUIState.sessionModeActive === true && activeSessionId != null;
+
+        if (shouldReloadPointers) {
+          getValidToken()
+            .then((token) =>
+              fetch(
+                `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId!)}&limit=200`,
+                { headers: { Authorization: `Bearer ${token}` } }
+              )
+            )
+            .then((res) => res.json())
+            .then((json: { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> }) => {
+              globalUIState.pointers = (json.feedback ?? []).map((f) => ({
+                id: f.id,
+                title: f.title ?? "",
+                actionSteps: f.actionSteps ?? [],
+              }));
+              broadcastUIState();
+              resolve();
+            })
+            .catch(() => {
+              globalUIState.pointers = [];
+              broadcastUIState();
+              resolve();
+            });
+        } else {
+          resolve();
+        }
+      }
+    );
   });
 }
 
@@ -252,7 +290,7 @@ function broadcastUIState(): void {
         chrome.tabs
           .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
           .catch(() => {
-            console.debug("ECHLY broadcast skipped tab", tab.id);
+            if (ECHLY_DEBUG) console.debug("ECHLY broadcast skipped tab", tab.id);
           });
       }
     });
@@ -265,12 +303,12 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
   chrome.tabs
     .sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
     .catch((e) => {
-      console.debug("ECHLY tab activation sync failed", e);
+      if (ECHLY_DEBUG) console.debug("ECHLY tab activation sync failed", e);
     });
   chrome.tabs
     .sendMessage(tabId, { type: "ECHLY_SESSION_STATE_SYNC" })
     .catch((e) => {
-      console.debug("ECHLY session state sync failed for tab", tabId, e);
+      if (ECHLY_DEBUG) console.debug("ECHLY session state sync failed for tab", tabId, e);
     });
 });
 
@@ -280,7 +318,7 @@ chrome.tabs.onCreated.addListener((tab) => {
   chrome.tabs
     .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
     .catch((e) => {
-      console.debug("ECHLY tab creation sync failed", e);
+      if (ECHLY_DEBUG) console.debug("ECHLY tab creation sync failed", e);
     });
 });
 
@@ -315,10 +353,56 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === "ECHLY_FEEDBACK_CREATED") {
+    const ticket = (request as { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } }).ticket;
+    if (ticket?.id && ticket?.title) {
+      const pointer: StructuredFeedback = {
+        id: ticket.id,
+        title: ticket.title,
+        actionSteps: ticket.actionSteps ?? [],
+        type: ticket.type ?? "Feedback",
+      };
+      globalUIState.pointers = [pointer, ...globalUIState.pointers];
+      resetSessionIdleTimer();
+      broadcastUIState();
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+
   if (request.type === "ECHLY_SET_CAPTURE_MODE") {
     const mode = (request as { mode?: "voice" | "text" }).mode;
     if (mode === "voice" || mode === "text") {
       globalUIState.captureMode = mode;
+      broadcastUIState();
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_SESSION_UPDATED") {
+    const { sessionId: sid, title: newTitle } = request as { sessionId?: string; title?: string };
+    if (sid === globalUIState.sessionId && typeof newTitle === "string") {
+      globalUIState.sessionTitle = newTitle;
+      broadcastUIState();
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_TICKET_UPDATED") {
+    const ticket = (request as { ticket?: StructuredFeedback }).ticket;
+    if (ticket?.id && ticket?.title) {
+      globalUIState.pointers = globalUIState.pointers.map((p) =>
+        p.id === ticket.id
+          ? {
+              id: ticket.id,
+              title: ticket.title,
+              actionSteps: ticket.actionSteps ?? [],
+              type: ticket.type ?? p.type,
+            }
+          : p
+      );
       broadcastUIState();
     }
     sendResponse({ ok: true });
@@ -349,15 +433,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       try {
         const token = await getValidToken();
-        const res = await fetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=200`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const json = (await res.json()) as { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> };
-        globalUIState.pointers = (json.feedback ?? []).map((f) => ({
+        const [feedbackRes, sessionsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=200`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE}/api/sessions`, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+        const feedbackJson = (await feedbackRes.json()) as { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> };
+        globalUIState.pointers = (feedbackJson.feedback ?? []).map((f) => ({
           id: f.id,
           title: f.title ?? "",
           actionSteps: f.actionSteps ?? [],
         }));
+        const sessionsJson = (await sessionsRes.json()) as { success?: boolean; sessions?: Array<{ id: string; title?: string }> };
+        if (sessionsJson.success && Array.isArray(sessionsJson.sessions)) {
+          const match = sessionsJson.sessions.find((s) => s.id === sessionId);
+          globalUIState.sessionTitle = match?.title ?? null;
+        }
       } catch {
         globalUIState.pointers = [];
       }
@@ -424,6 +516,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     clearSessionIdleTimer();
     activeSessionId = null;
     globalUIState.sessionId = null;
+    globalUIState.sessionTitle = null;
     globalUIState.sessionModeActive = false;
     globalUIState.sessionPaused = false;
     globalUIState.pointers = [];

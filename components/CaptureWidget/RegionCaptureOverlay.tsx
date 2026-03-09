@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { buildCaptureContext, isEchlyElement } from "@/lib/captureContext";
+import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { playShutterSound } from "@/lib/playShutterSound";
 import type { CaptureContext } from "./types";
 
@@ -77,8 +78,9 @@ export async function cropImageToRegion(
       const expectedW = window.innerWidth * dpr;
       const expectedH = window.innerHeight * dpr;
       if (
-        Math.abs(img.width - expectedW) > 2 ||
-        Math.abs(img.height - expectedH) > 2
+        (Math.abs(img.width - expectedW) > 2 ||
+          Math.abs(img.height - expectedH) > 2) &&
+        ECHLY_DEBUG
       ) {
         console.warn("ECHLY: screenshot dimension mismatch", {
           imgW: img.width,
@@ -195,8 +197,10 @@ export function RegionCaptureOverlay({
         return;
       }
 
-      console.log("[ECHLY] Captured viewport screenshot");
-      console.log("ECHLY ELEMENT DETECTED", element);
+      if (ECHLY_DEBUG) {
+        console.log("[ECHLY] Captured viewport screenshot");
+        console.log("ECHLY ELEMENT DETECTED", element);
+      }
 
       const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
       const containerRect = detectVisualContainer(element);
@@ -207,7 +211,7 @@ export function RegionCaptureOverlay({
         h: containerRect.height,
       });
 
-      console.log("ECHLY CONTAINER RECT", safeRect);
+      if (ECHLY_DEBUG) console.log("ECHLY CONTAINER RECT", safeRect);
 
       let containerCrop: string;
       let selectionCrop: string;

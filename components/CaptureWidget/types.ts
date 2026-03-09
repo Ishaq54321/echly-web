@@ -111,6 +111,10 @@ export type CaptureWidgetProps = {
   loadSessionWithPointers?: { sessionId: string; pointers: StructuredFeedback[] } | null;
   /** Extension: global session pointers from background. When provided, overrides loadSessionWithPointers for tray list; all tabs show same list. */
   pointers?: StructuredFeedback[];
+  /** Extension: session title from globalUIState. When provided, overrides internal sessionTitle for display. */
+  sessionTitleProp?: string | null;
+  /** Extension: when session title is saved in tray. When provided, called instead of internal setSessionTitle (enables PATCH + broadcast). */
+  onSessionTitleChange?: (title: string) => void | Promise<void>;
   /** Called after widget has applied loadSessionWithPointers so parent can clear it. */
   onSessionLoaded?: () => void;
   /** Called when user ends the feedback session (e.g. to clear resume override in extension). */
@@ -125,6 +129,8 @@ export type CaptureWidgetProps = {
   globalSessionPaused?: boolean;
   /** Extension: notify background that session mode started (after POST /api/sessions succeeds). */
   onSessionModeStart?: () => void;
+  /** Extension: called when Start Session succeeds so widget can switch to session view (same as Previous Session). */
+  onSessionViewRequested?: () => void;
   /** Extension: notify background to set session paused. */
   onSessionModePause?: () => void;
   /** Extension: notify background to resume session. */

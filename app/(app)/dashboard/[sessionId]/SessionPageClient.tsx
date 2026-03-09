@@ -17,7 +17,7 @@ import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
-import { log, warn } from "@/lib/utils/logger";
+import { ECHLY_DEBUG, log, warn } from "@/lib/utils/logger";
 import Image from "next/image";
 import {
   TicketList,
@@ -79,6 +79,26 @@ type PendingClaritySubmit = {
 type SummaryResponse = {
   summary?: string;
 };
+
+/** Broadcast ticket update to extension tray so tray stays in sync. */
+function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps?: string[] | null; type?: string }) {
+  if (typeof window === "undefined" || !("chrome" in window)) return;
+  try {
+    (
+      window as Window & { chrome?: { runtime?: { sendMessage?: (msg: unknown) => void } } }
+    ).chrome?.runtime?.sendMessage?.({
+      type: "ECHLY_TICKET_UPDATED",
+      ticket: {
+        id: ticket.id,
+        title: ticket.title,
+        actionSteps: ticket.actionSteps ?? [],
+        type: ticket.type ?? "Feedback",
+      },
+    });
+  } catch {
+    // Extension not available
+  }
+}
 
 /** Ticket shape returned by GET/PATCH /api/tickets/:id (DB source of truth). */
 type TicketFromApi = {
@@ -227,6 +247,22 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       // Extension not available — silent fail
     }
   }, [sessionId]);
+
+  /* Listen for ECHLY_GLOBAL_STATE from extension: update session title when tray edits it. */
+  useEffect(() => {
+    if (!sessionId || !session) return;
+    const handler = (e: Event) => {
+      const ev = e as CustomEvent<{ state?: { sessionId?: string | null; sessionTitle?: string | null } }>;
+      const state = ev.detail?.state;
+      if (!state || state.sessionId !== sessionId || state.sessionTitle == null) return;
+      setSession((prev: Session | null) =>
+        prev ? ({ ...prev, title: state.sessionTitle } as Session) : prev
+      );
+      setSessionTitleDraft(state.sessionTitle);
+    };
+    window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
+    return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
+  }, [sessionId, session]);
 
   /* Local-first: insert ticket immediately when extension creates feedback (no refetch). */
   useEffect(() => {
@@ -445,6 +481,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       };
       if (data.success && data.ticket) {
         setDetailTicket(data.ticket);
+        broadcastTicketUpdated(data.ticket);
       }
     } catch {
       setDetailTicket((t) =>
@@ -481,7 +518,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         success?: boolean;
         ticket?: TicketFromApi;
       };
-      if (data.success && data.ticket) setDetailTicket(data.ticket);
+      if (data.success && data.ticket) {
+        setDetailTicket(data.ticket);
+        broadcastTicketUpdated(data.ticket);
+      }
     } catch {
       setDetailTicket((t) => (t ? { ...t, actionSteps: previous } : null));
       setFeedback((prev) =>
@@ -512,7 +552,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         success?: boolean;
         ticket?: TicketFromApi;
       };
-      if (data.success && data.ticket) setDetailTicket(data.ticket);
+      if (data.success && data.ticket) {
+        setDetailTicket(data.ticket);
+        broadcastTicketUpdated(data.ticket);
+      }
     } catch {
       setDetailTicket((t) => (t ? { ...t, suggestedTags: previous } : null));
       setFeedback((prev) =>
@@ -551,7 +594,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         success?: boolean;
         ticket?: TicketFromApi;
       };
-      if (data.success && data.ticket) setDetailTicket(data.ticket);
+      if (data.success && data.ticket) {
+        setDetailTicket(data.ticket);
+        broadcastTicketUpdated(data.ticket);
+      }
     } catch {
       setDetailTicket((t) => (t ? { ...t, isResolved: previousResolved } : null));
       setFeedback((prev) =>
@@ -673,6 +719,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           prev ? ({ ...prev, ...data.session } as Session) : prev
         );
         setSessionTitleDraft((data.session.title as string) ?? safeTitle);
+        if (typeof window !== "undefined" && "chrome" in window) {
+          try {
+            (window as Window & { chrome?: { runtime?: { sendMessage?: (msg: unknown) => void } } }).chrome?.runtime?.sendMessage?.({
+              type: "ECHLY_SESSION_UPDATED",
+              sessionId,
+              title: (data.session.title as string) ?? safeTitle,
+            });
+          } catch {
+            // Extension not available
+          }
+        }
       }
     } catch {
       setSession((prev: Session | null) =>
@@ -854,13 +911,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       : Promise.resolve(null);
 
     const [data, screenshotUrl] = await Promise.all([structureCall, uploadCall]);
-    console.log("ECHLY CLARITY DEBUG", {
-      clarityScore: data.clarityScore,
-      clarityIssues: data.clarityIssues,
-      suggestedRewrite: data.suggestedRewrite,
-      confidence: data.confidence,
-      tickets: data.tickets,
-    });
+    if (ECHLY_DEBUG) {
+      console.log("ECHLY CLARITY DEBUG", {
+        clarityScore: data.clarityScore,
+        clarityIssues: data.clarityIssues,
+        suggestedRewrite: data.suggestedRewrite,
+        confidence: data.confidence,
+        tickets: data.tickets,
+      });
+    }
     log("STRUCTURING RESPONSE:", data);
 
     const tickets = Array.isArray(data.tickets) ? data.tickets : [];
@@ -868,12 +927,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const clarityIssues = data.clarityIssues ?? [];
     const suggestedRewrite = data.suggestedRewrite ?? null;
     const confidence = data.confidence ?? 0.5;
-    console.log("CLARITY DEBUG", {
-      clarityScore,
-      clarityIssues,
-      suggestedRewrite,
-      confidence,
-    });
+    if (ECHLY_DEBUG) {
+      console.log("CLARITY DEBUG", {
+        clarityScore,
+        clarityIssues,
+        suggestedRewrite,
+        confidence,
+      });
+    }
     const clarityStatus = buildClarityStatus(clarityScore);
 
     if (!session) return;

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { FileText } from "lucide-react";
 
 export type SessionOption = {
@@ -83,7 +84,7 @@ export function ResumeSessionModal({
     setLoading(true);
     fetchSessions()
       .then((list) => {
-        console.log("[Echly] Sessions returned:", list);
+        if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", list);
         setSessions(list);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load sessions"))

@@ -8,6 +8,7 @@ import { doc, runTransaction, type Firestore } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { ExtractedInstruction } from "@/lib/server/instructionExtraction";
 import type { ExtractionIntent } from "@/lib/server/instructionExtraction";
+import { ECHLY_DEBUG } from "@/lib/utils/logger";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,7 +109,7 @@ function groupInstructionsByNodeKey(
   const map = new Map<string, ExtractedInstruction[]>();
   for (const inst of instructions) {
     const key = nodeKey(inst.entity, inst.intent);
-    console.log("ECHLY DEBUG — GRAPH NODE KEY:", key);
+    if (ECHLY_DEBUG) console.log("ECHLY DEBUG — GRAPH NODE KEY:", key);
     const list = map.get(key) ?? [];
     list.push(inst);
     map.set(key, list);

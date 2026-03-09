@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Home, Mic, PenLine } from "lucide-react";
 
 const SunIcon = () => (
@@ -60,8 +60,8 @@ export default function CaptureHeader({
   handlers,
   onShowCommandScreen,
 }: CaptureHeaderProps) {
-  const [editingTitle, setEditingTitle] = useState(false);
   const [localTitle, setLocalTitle] = useState(sessionTitle);
+  const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -69,14 +69,14 @@ export default function CaptureHeader({
   }, [sessionTitle]);
 
   useEffect(() => {
-    if (editingTitle && inputRef.current) {
+    if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
-  }, [editingTitle]);
+  }, [isEditing]);
 
   const saveTitle = () => {
-    setEditingTitle(false);
+    setIsEditing(false);
     const trimmed = localTitle.trim() || "Untitled Session";
     setLocalTitle(trimmed);
     onSessionTitleChange?.(trimmed);
@@ -90,39 +90,41 @@ export default function CaptureHeader({
   };
 
   return (
-    <div className="echly-sidebar-header">
+    <div className="echly-sidebar-header echly-session-header">
       <div className="echly-sidebar-header-left">
         {showSessionTitle ? (
           <>
-            {editingTitle ? (
-              <input
-                id="echlyTitleEdit"
-                ref={inputRef}
-                type="text"
-                value={localTitle}
-                onChange={(e) => setLocalTitle(e.target.value)}
-                onBlur={saveTitle}
-                onKeyDown={handleTitleKeyDown}
-                className="echly-sidebar-title session-title-input"
-                aria-label="Session title"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditingTitle(true)}
-                className="echly-sidebar-title echly-sidebar-title-button"
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                {localTitle}
-              </button>
-            )}
+            <div className="echly-session-title-wrapper">
+              {isEditing ? (
+                <input
+                  id="echlyTitleEdit"
+                  ref={inputRef}
+                  type="text"
+                  value={localTitle}
+                  onChange={(e) => setLocalTitle(e.target.value)}
+                  onBlur={saveTitle}
+                  onKeyDown={handleTitleKeyDown}
+                  className="echly-sidebar-title echly-session-title-input session-title-input"
+                  aria-label="Session title"
+                />
+              ) : (
+                <span
+                  className="echly-sidebar-title echly-session-title-text"
+                  onClick={() => setIsEditing(true)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setIsEditing(true);
+                    }
+                  }}
+                  aria-label="Session title (click to edit)"
+                >
+                  {localTitle}
+                </span>
+              )}
+            </div>
             <span className="echly-sidebar-ticket-count">
               {openTicketCount} feedback ticket{openTicketCount !== 1 ? "s" : ""}
             </span>
@@ -151,7 +153,7 @@ export default function CaptureHeader({
           </>
         )}
       </div>
-      <div className="echly-header-actions">
+      <div className="echly-header-actions echly-session-icons">
         {onThemeToggle && (
           <button
             type="button"

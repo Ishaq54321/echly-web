@@ -3998,6 +3998,11 @@ textarea:focus-visible {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.5);
 }
+#echly-root[data-theme="dark"] .echly-processing-text,
+#echly-root:not([data-theme]) .echly-processing-text,
+.dark .echly-processing-text {
+  color: #fff;
+}
 @keyframes captureProcessingPulse {
   0% {
     opacity: 0.4;
@@ -4383,6 +4388,47 @@ textarea:focus-visible {
   line-height: 1.4;
   color: var(--text-secondary);
 }
+.echly-session-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.echly-session-title-wrapper {
+  flex: 1;
+  margin-right: 12px;
+  min-width: 0;
+}
+.echly-session-title-input {
+  width: 100%;
+  min-width: 160px;
+  max-width: calc(100% - 80px);
+}
+.echly-session-title-text {
+  cursor: pointer;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.echly-sidebar-surface[data-theme="light"] .echly-session-title-text,
+.light .echly-session-title-text {
+  color: #111827;
+}
+.echly-sidebar-surface[data-theme="light"] .echly-session-title-input.session-title-input,
+.light .echly-session-title-input.session-title-input {
+  color: #111827;
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+.echly-sidebar-surface[data-theme="light"] .echly-session-title-input.session-title-input:focus,
+.light .echly-session-title-input.session-title-input:focus {
+  background: rgba(91, 124, 255, 0.08);
+}
+.echly-session-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .session-title-input {
   font-family: "Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif;
   background: rgba(255, 255, 255, 0.06);
@@ -4393,8 +4439,7 @@ textarea:focus-visible {
   font-weight: 600;
   color: white;
   outline: none;
-  width: fit-content;
-  min-width: 160px;
+  box-sizing: border-box;
 }
 .session-title-input:focus {
   border-color: #5b7cff;
@@ -4540,6 +4585,14 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.echly-empty-session-state {
+  padding: 16px 0;
+}
+.echly-empty-session-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 .echly-sidebar-error {
   font-size: 13px;
@@ -5371,6 +5424,14 @@ textarea:focus-visible {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+}
+.echly-ticket-title {
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 2px;
+  color: var(--text-primary);
 }
 .echly-edit-title {
   font-size: 14px;

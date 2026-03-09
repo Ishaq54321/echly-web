@@ -103,12 +103,9 @@ function FeedbackItem({
         <div className="echly-ticket-content">
           {!expanded ? (
             <div className="echly-ticket-header">
-              <input
-                className="echly-edit-title"
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                style={{ width: "100%" }}
-              />
+              <div className="echly-ticket-title">
+                {ticket.title}
+              </div>
               <div className="echly-header-actions">
                 <button
                   type="button"

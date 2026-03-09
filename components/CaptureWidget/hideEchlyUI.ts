@@ -18,8 +18,18 @@ const UI_SELECTORS = [
   ".echly-capture-card",
   ".echly-session-controls",
   ".echly-session-overlay-cursor",
+  ".echly-session-tray",
+  ".echly-session-panel",
+  ".echly-session-widget",
+  ".echly-session-context",
   ".echly-dim-layer",
   ".echly-region-confirm-bar",
+  /* Feedback tray: voice mode selector and "Voice (Recommended)" pill */
+  ".echly-mode-container",
+  ".echly-mode-tile",
+  ".echly-mode-card",
+  ".echly-voice-pill-wrapper",
+  ".echly-voice-pill",
 ];
 
 export function hideEchlyUI(): Element[] {

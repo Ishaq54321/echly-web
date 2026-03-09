@@ -2,11 +2,11 @@
  * API client for production backend.
  * Automatically attaches Authorization: Bearer <firebase-id-token> to every request.
  */
-
+import { ECHLY_DEBUG } from "../../lib/utils/logger";
 import { auth } from "./firebase";
 
 const API_BASE = "http://localhost:3000";
-console.log("[EXTENSION] Using API_BASE:", API_BASE);
+if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 export { API_BASE };
 

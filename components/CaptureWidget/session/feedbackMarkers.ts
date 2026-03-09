@@ -2,6 +2,7 @@
  * Session Feedback Markers — visual indicators where feedback was captured.
  * Purely UI layer; markers live only during the active session.
  */
+import { ECHLY_DEBUG } from "@/lib/utils/logger";
 
 /** Below modal UI (e.g. 2147483645); layer uses 2147483644. */
 const MARKER_Z_INDEX = 2147483644;
@@ -130,14 +131,14 @@ export function createMarker(
     e.preventDefault();
     e.stopPropagation();
     if (getSessionPaused?.()) return;
-    console.log(`${LOG_PREFIX} marker clicked`, entry.id);
+    if (ECHLY_DEBUG) console.log(`${LOG_PREFIX} marker clicked`, entry.id);
     onMarkerClick?.({ id: entry.id, x: entry.x, y: entry.y, element: entry.element, title: entry.title, index: entry.index });
   });
 
   container.appendChild(marker);
   if (markers.length === 1) setupScrollResizeListeners();
 
-  console.log(`${LOG_PREFIX} marker created`, entry.id, index);
+  if (ECHLY_DEBUG) console.log(`${LOG_PREFIX} marker created`, entry.id, index);
 }
 
 /**
@@ -194,7 +195,7 @@ export function removeAllMarkers(): void {
     }
   }
   for (const entry of markers) {
-    console.log(`${LOG_PREFIX} marker removed`, entry.id);
+    if (ECHLY_DEBUG) console.log(`${LOG_PREFIX} marker removed`, entry.id);
   }
   markers.length = 0;
   container = null;
