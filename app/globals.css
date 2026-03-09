@@ -1142,14 +1142,29 @@ textarea:focus-visible {
   background: var(--bg-primary);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-depth);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.06);
   overflow: hidden;
   font-family: var(--echly-font);
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
+/* Dark mode: stronger shadow + subtle border for elevated tray card */
+#echly-root[data-theme="dark"] .echly-sidebar-surface,
+#echly-root:not([data-theme]) .echly-sidebar-surface {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+}
 .echly-sidebar-surface:hover {
   box-shadow: var(--echly-shadow-hover);
+}
+#echly-root[data-theme="light"] .echly-sidebar-surface:hover {
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.08);
 }
 .echly-sidebar-surface::before {
   content: "";
@@ -1589,7 +1604,25 @@ textarea:focus-visible {
 .echly-mode-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+}
+.echly-mode-header-block {
+  display: flex;
+  flex-direction: column;
+}
+.echly-ai-powered {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #3B82F6;
+  opacity: 0.9;
+  margin-bottom: 8px;
+}
+.echly-ai-powered svg {
+  flex-shrink: 0;
+  color: inherit;
 }
 .echly-mode-tile {
   border-radius: 14px;

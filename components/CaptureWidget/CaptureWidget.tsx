@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Mic, PenLine } from "lucide-react";
+import { Mic, PenLine, Zap } from "lucide-react";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackItem from "./FeedbackItem";
@@ -377,7 +377,13 @@ export default function CaptureWidget({
                 )}
                 {extensionMode && showHomeScreen && (
                   <div className="echly-mode-container">
-                    <div className="echly-mode-header">Select feedback mode</div>
+                    <div className="echly-mode-header-block">
+                      <div className="echly-ai-powered" aria-hidden>
+                        <Zap size={12} strokeWidth={2} aria-hidden />
+                        <span>Powered by GPT-4 + Whisper</span>
+                      </div>
+                      <div className="echly-mode-header">Select feedback mode</div>
+                    </div>
                     <div
                       className={`echly-mode-tile echly-mode-card voice-mode ${captureMode === "voice" ? "selected" : ""}`}
                       onClick={() => {
