@@ -39,6 +39,7 @@ let globalUIState: {
   sessionModeActive: boolean;
   sessionPaused: boolean;
   pointers: StructuredFeedback[];
+  captureMode: "voice" | "text";
 } = {
   visible: false,
   expanded: false,
@@ -47,6 +48,7 @@ let globalUIState: {
   sessionModeActive: false,
   sessionPaused: false,
   pointers: [],
+  captureMode: "voice",
 };
 
 function persistSessionLifecycleState(): void {
@@ -57,17 +59,23 @@ function persistSessionLifecycleState(): void {
   });
 }
 
-chrome.storage.local.get(
-  ["activeSessionId"],
-  (result: { activeSessionId?: string }) => {
-    const stored = result.activeSessionId;
-    activeSessionId = typeof stored === "string" ? stored : null;
-    globalUIState.sessionId = activeSessionId;
-    globalUIState.sessionModeActive = false;
-    globalUIState.sessionPaused = false;
-    broadcastUIState();
-  }
-);
+async function initializeSessionState(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    chrome.storage.local.get(["activeSessionId"], (result: { activeSessionId?: string }) => {
+      const stored = result.activeSessionId;
+      activeSessionId = typeof stored === "string" ? stored : null;
+      globalUIState.sessionId = activeSessionId;
+      globalUIState.sessionModeActive = false;
+      globalUIState.sessionPaused = false;
+      resolve();
+    });
+  });
+}
+
+(async () => {
+  await initializeSessionState();
+  broadcastUIState();
+})();
 
 type StoredAuthResult = {
   auth_idToken?: string;
@@ -277,13 +285,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request.type === "ECHLY_GET_ACTIVE_SESSION") {
-    chrome.storage.local.get(["activeSessionId"], (result) => {
-      sendResponse({
-        sessionId: result.activeSessionId || null,
-      });
-    });
-    return true;
+  if (request.type === "ECHLY_SET_CAPTURE_MODE") {
+    const mode = (request as { mode?: "voice" | "text" }).mode;
+    if (mode === "voice" || mode === "text") {
+      globalUIState.captureMode = mode;
+      broadcastUIState();
+    }
+    sendResponse({ ok: true });
+    return false;
   }
 
   if (request.type === "ECHLY_SET_ACTIVE_SESSION") {

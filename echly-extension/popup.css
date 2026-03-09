@@ -4097,6 +4097,9 @@ textarea:focus-visible {
   --echly-shadow-hover: 0 14px 40px rgba(0, 0, 0, 0.45);
 }
 #echly-root[data-theme="dark"] {
+  --panel-bg: #101826;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --accent-color: #5b7cff;
   --bg-primary: rgba(20, 22, 28, 0.82);
   --bg-surface: rgba(30, 32, 40, 0.65);
   --bg-surface-hover: rgba(255, 255, 255, 0.08);
@@ -4135,6 +4138,9 @@ textarea:focus-visible {
   --confirm-icon-active-bg: rgba(255, 255, 255, 0.12);
 }
 #echly-root[data-theme="light"] {
+  --panel-bg: #ffffff;
+  --panel-border: rgba(0, 0, 0, 0.08);
+  --accent-color: #5b7cff;
   --bg-primary: rgba(255, 255, 255, 0.88);
   --bg-surface: rgba(0, 0, 0, 0.04);
   --bg-surface-hover: rgba(0, 0, 0, 0.06);
@@ -4173,6 +4179,9 @@ textarea:focus-visible {
   --confirm-icon-active-bg: rgba(0, 0, 0, 0.1);
 }
 #echly-root:not([data-theme]) {
+  --panel-bg: #101826;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --accent-color: #5b7cff;
   --bg-primary: rgba(20, 22, 28, 0.82);
   --bg-surface: rgba(30, 32, 40, 0.65);
   --bg-surface-hover: rgba(255, 255, 255, 0.08);
@@ -4497,6 +4506,188 @@ textarea:focus-visible {
   background: var(--button-secondary-hover-bg);
   color: var(--button-secondary-hover-text);
   box-shadow: none;
+}
+.echly-mode-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.echly-mode-tile {
+  border-radius: 14px;
+  padding: 16px;
+  border: 1px solid var(--panel-border, rgba(0, 0, 0, 0.08));
+  background: var(--panel-bg, var(--bg-surface));
+  cursor: pointer;
+  transition: all 0.18s ease;
+  color: var(--text-primary);
+}
+.echly-mode-tile:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+.echly-mode-tile.selected {
+  border: 1px solid var(--accent-color, #5b7cff);
+  background: rgba(91, 124, 255, 0.08);
+}
+.tile-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tile-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+}
+.tile-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+.tile-badge {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--accent-color, #5b7cff);
+}
+.tile-description {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.75;
+  color: var(--text-secondary);
+}
+.echly-mic-selector {
+  position: relative;
+  margin-top: 12px;
+}
+.echly-mic-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border, rgba(0, 0, 0, 0.08));
+  background: var(--panel-bg, var(--bg-surface));
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--echly-font);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.echly-mic-button:hover {
+  border-color: var(--accent-color, #5b7cff);
+  background: rgba(91, 124, 255, 0.06);
+}
+.echly-mic-button-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.echly-mic-chevron {
+  flex-shrink: 0;
+  margin-left: 8px;
+  opacity: 0.7;
+}
+.echly-mic-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 240px;
+  margin-top: 6px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--panel-bg, var(--bg-surface));
+  border: 1px solid var(--panel-border, rgba(0, 0, 0, 0.08));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  z-index: 20;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.echly-mic-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--echly-font);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+.echly-mic-menu-item:hover {
+  background: var(--bg-surface-hover);
+}
+.echly-mic-menu-item.selected {
+  background: rgba(91, 124, 255, 0.12);
+  color: var(--accent-color, #5b7cff);
+}
+.echly-mic-check {
+  font-size: 12px;
+  font-weight: 600;
+}
+.echly-command-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 20px 0 0;
+}
+.echly-command-actions {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  flex-shrink: 0;
+  margin-top: 14px;
+}
+.echly-start-session-btn,
+.echly-previous-session-btn {
+  flex: 1;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--echly-font);
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+.echly-start-session-btn {
+  background: var(--color-accent);
+  color: var(--button-primary-text);
+  box-shadow: 0 4px 12px rgba(70, 110, 255, 0.25);
+}
+.echly-start-session-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(70, 110, 255, 0.35);
+}
+.echly-start-session-btn:disabled {
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.echly-previous-session-btn {
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  border: 1px solid var(--border-subtle);
+  box-shadow: none;
+}
+.echly-previous-session-btn:not(:disabled):hover {
+  background: var(--button-secondary-hover-bg);
+  color: var(--button-secondary-hover-text);
+}
+.echly-previous-session-btn:disabled {
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  cursor: not-allowed;
 }
 .echly-floating-trigger-wrapper {
   position: fixed;

@@ -80,14 +80,12 @@ export type CaptureWidgetProps = {
   theme?: "dark" | "light";
   /** Called when user clicks theme toggle. */
   onThemeToggle?: () => void;
-  /** Extension: fetch sessions for Resume Session picker. */
+  /** Extension: fetch sessions for Previous Sessions picker. */
   fetchSessions?: () => Promise<Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number; [key: string]: unknown }>>;
   /** Extension: true when backend has at least one session (from /api/sessions?limit=1). Used to show Previous Sessions button only when sessions exist. */
   hasPreviousSessions?: boolean;
-  /** Extension: last active session id from background (ECHLY_GET_ACTIVE_SESSION). Resume button uses this so user can resume without auto-restore. */
-  lastKnownSessionId?: string | null;
-  /** Extension: when user selects a session from Resume picker. Parent should set active session, fetch feedback, then pass loadSessionWithPointers. If options.enterCaptureImmediately, parent should also start session mode (overlay) after load. */
-  onResumeSessionSelect?: (sessionId: string, options?: { enterCaptureImmediately?: boolean }) => void;
+  /** Extension: when user selects a session from Previous Sessions picker. Parent should set active session, fetch feedback, then pass loadSessionWithPointers. If options.enterCaptureImmediately, parent should also start session mode (overlay) after load. */
+  onPreviousSessionSelect?: (sessionId: string, options?: { enterCaptureImmediately?: boolean }) => void;
   /** Extension: when set, widget enters session mode with these pointers (e.g. after resuming a session). */
   loadSessionWithPointers?: { sessionId: string; pointers: StructuredFeedback[] } | null;
   /** Extension: global session pointers from background. When provided, overrides loadSessionWithPointers for tray list; all tabs show same list. */
@@ -112,6 +110,10 @@ export type CaptureWidgetProps = {
   onSessionModeResume?: () => void;
   /** Extension: notify background that session ended (disable overlay in all tabs). */
   onSessionModeEnd?: () => void;
+  /** Extension: global capture mode (voice vs text). When "voice", element click opens voice UI; when "text", opens text UI. */
+  captureMode?: "voice" | "text";
+  /** Optional preferred microphone deviceId for voice capture (from enumerateDevices). */
+  selectedMicrophoneId?: string;
 };
 
 export type Position = { x: number; y: number };

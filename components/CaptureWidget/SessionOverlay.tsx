@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { attachElementHighlighter, detachElementHighlighter } from "./session/elementHighlighter";
 import { attachClickCapture, detachClickCapture } from "./session/clickCapture";
 import { SessionControlPanel } from "./SessionControlPanel";
-import { SessionFeedbackPopup } from "./SessionFeedbackPopup";
+import { VoiceCapturePanel } from "./VoiceCapturePanel";
+import { TextFeedbackPanel } from "./TextFeedbackPanel";
 import type { CaptureContext } from "./types";
 
 const CAPTURE_TOOLTIP_OFFSET = 12;
@@ -37,6 +38,8 @@ export type SessionOverlayProps = {
   onDoneVoice: () => void;
   onSaveText: (transcript: string) => void;
   onCancel?: () => void;
+  captureMode?: "voice" | "text";
+  listeningAudioLevel?: number;
 };
 
 /**
@@ -60,9 +63,12 @@ export function SessionOverlay({
   onDoneVoice,
   onSaveText,
   onCancel,
+  captureMode = "voice",
+  listeningAudioLevel = 0,
 }: SessionOverlayProps) {
   const cleanupRef = useRef<(() => void)[]>([]);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const voiceStartedForPendingRef = useRef(false);
   const sessionActionPending = pausePending || endPending;
   const sessionCursorActive = sessionMode && !sessionPaused && !sessionActionPending;
   const captureActive =
@@ -124,6 +130,17 @@ export function SessionOverlay({
     return () => window.removeEventListener("mousemove", onMove);
   }, [captureActive]);
 
+  /* When captureMode is voice and we have pending feedback, start voice recording immediately (once). */
+  useEffect(() => {
+    if (!sessionFeedbackPending || captureMode !== "voice" || voiceStartedForPendingRef.current) return;
+    voiceStartedForPendingRef.current = true;
+    onRecordVoice();
+  }, [sessionFeedbackPending, captureMode, onRecordVoice]);
+
+  useEffect(() => {
+    if (!sessionFeedbackPending) voiceStartedForPendingRef.current = false;
+  }, [sessionFeedbackPending]);
+
   if (!sessionMode || !captureRoot) return null;
 
   const content = (
@@ -170,13 +187,18 @@ export function SessionOverlay({
           Click to add feedback
         </div>
       )}
-      {sessionFeedbackPending && (
-        <SessionFeedbackPopup
+      {sessionFeedbackPending && captureMode === "voice" && (
+        <VoiceCapturePanel
           screenshot={sessionFeedbackPending.screenshot}
-          isVoiceListening={state === "voice_listening"}
-          onRecordVoice={onRecordVoice}
-          onDoneVoice={onDoneVoice}
-          onSaveText={onSaveText}
+          audioLevel={listeningAudioLevel}
+          isListening={state === "voice_listening"}
+          onFinish={onDoneVoice}
+        />
+      )}
+      {sessionFeedbackPending && captureMode === "text" && (
+        <TextFeedbackPanel
+          screenshot={sessionFeedbackPending.screenshot}
+          onSubmit={onSaveText}
           onCancel={onCancel}
         />
       )}

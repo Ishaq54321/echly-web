@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { Mic, MessageSquare } from "lucide-react";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackItem from "./FeedbackItem";
 import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
 import { ResumeSessionModal } from "./ResumeSessionModal";
+import { ModeTile } from "./ModeTile";
+import { MicrophoneSelector } from "./MicrophoneSelector";
 import type { CaptureWidgetProps, CaptureState } from "./types";
 
 const CAPTURE_FLOW_STATES: CaptureState[] = ["focus_mode", "region_selecting", "voice_listening", "processing"];
@@ -29,8 +32,7 @@ export default function CaptureWidget({
   onThemeToggle,
   fetchSessions,
   hasPreviousSessions = false,
-  lastKnownSessionId = null,
-  onResumeSessionSelect,
+  onPreviousSessionSelect,
   loadSessionWithPointers,
   pointers: pointersProp,
   onSessionLoaded,
@@ -43,12 +45,16 @@ export default function CaptureWidget({
   onSessionModePause,
   onSessionModeResume,
   onSessionModeEnd,
+  captureMode = "voice",
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
-  /** Extension: when true, show command screen (3 buttons only). False when viewing a session (e.g. after Open Previous or when paused). */
+  /** Extension: when true, show command screen (mode cards + footer). False when viewing a session (e.g. after Open Previous or when paused). */
   const [showCommandScreen, setShowCommandScreen] = useState(true);
   const [sessionTitle, setSessionTitle] = useState("Untitled Session");
   const [visibleTickets, setVisibleTickets] = useState(10);
+  const [microphones, setMicrophones] = useState<Array<{ deviceId: string; label: string }>>([]);
+  const [selectedMicrophone, setSelectedMicrophone] = useState<string>("");
+  const [micDropdownOpen, setMicDropdownOpen] = useState(false);
   const {
     state,
     handlers,
@@ -74,6 +80,8 @@ export default function CaptureWidget({
     onSessionModePause,
     onSessionModeResume,
     onSessionModeEnd,
+    captureMode,
+    selectedMicrophoneId: selectedMicrophone || undefined,
   });
 
   const isControlled = expanded !== undefined;
@@ -89,7 +97,6 @@ export default function CaptureWidget({
 
   const hasTickets = Boolean(state.pointers?.length);
   const showSessionButtons = !hasTickets && state.state === "idle";
-  const showResumeButton = Boolean(lastKnownSessionId) || hasStoredSession;
   const showPreviousButton = Boolean(hasPreviousSessions);
 
   // Collapse the widget while recording (controlled mode via background)
@@ -143,7 +150,7 @@ export default function CaptureWidget({
     }
   }, [state.highlightTicketId]);
 
-  /** When session is loaded explicitly (user clicked Resume), transition to session view. Never from global state. */
+  /** When session is loaded explicitly (user selected from Previous Sessions), transition to session view. */
   useEffect(() => {
     if (loadSessionWithPointers?.sessionId) {
       setShowCommandScreen(false);
@@ -158,22 +165,42 @@ export default function CaptureWidget({
     };
   }, [handlers, widgetToggleRef]);
 
-  const handleResumeActiveSession = React.useCallback(() => {
-    const sessionToResume = lastKnownSessionId ?? sessionId;
-    if (!sessionToResume) return;
-    onResumeSessionSelect?.(sessionToResume, { enterCaptureImmediately: true });
-  }, [lastKnownSessionId, sessionId, onResumeSessionSelect]);
+  const handlePreviousSessions = React.useCallback(() => {
+    setResumeModalOpen(true);
+  }, []);
+
+  function setMode(mode: "voice" | "text") {
+    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode });
+    }
+  }
+
+  useEffect(() => {
+    if (!extensionMode) return;
+    let cancelled = false;
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => {
+        if (cancelled) return;
+        const inputs = devices.filter((d) => d.kind === "audioinput");
+        setMicrophones(inputs.map((d) => ({ deviceId: d.deviceId, label: d.label || `Microphone ${inputs.indexOf(d) + 1}` })));
+        if (inputs.length && !selectedMicrophone) setSelectedMicrophone(inputs[0].deviceId || "");
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [extensionMode]);
+
 
   return (
     <>
-      {extensionMode && fetchSessions && onResumeSessionSelect && (
+      {extensionMode && fetchSessions && onPreviousSessionSelect && (
         <ResumeSessionModal
           open={resumeModalOpen}
           onClose={() => setResumeModalOpen(false)}
           fetchSessions={fetchSessions}
           onSelectSession={(sessionId) => {
             setShowCommandScreen(false);
-            onResumeSessionSelect(sessionId);
+            onPreviousSessionSelect(sessionId);
             setResumeModalOpen(false);
           }}
         />
@@ -195,6 +222,8 @@ export default function CaptureWidget({
             pausePending={state.pausePending}
             endPending={state.endPending}
             sessionFeedbackPending={state.sessionFeedbackPending}
+            captureMode={captureMode}
+            listeningAudioLevel={state.listeningAudioLevel ?? 0}
             onSessionElementClicked={handlers.handleSessionElementClicked}
             onSessionPause={() => {
               handlers.pauseSession();
@@ -274,6 +303,37 @@ export default function CaptureWidget({
                 onScroll={handleListScroll}
                 onWheel={(e) => e.stopPropagation()}
               >
+                {extensionMode && showSessionButtons && (
+                  <div className="echly-mode-container">
+                    <ModeTile
+                      icon={<Mic size={16} />}
+                      title="Voice Feedback"
+                      description="Speak naturally. Echly structures it automatically."
+                      selected={captureMode === "voice"}
+                      badge="✦"
+                      tooltip="Recommended for fastest feedback capture"
+                      onClick={() => setMode("voice")}
+                    />
+                    {captureMode === "voice" && (
+                      <MicrophoneSelector
+                        devices={microphones}
+                        selectedDeviceId={selectedMicrophone}
+                        onSelect={setSelectedMicrophone}
+                        open={micDropdownOpen}
+                        onToggle={() => setMicDropdownOpen((o) => !o)}
+                      />
+                    )}
+                    <ModeTile
+                      icon={<MessageSquare size={16} />}
+                      title="Text Feedback"
+                      description="Write comments manually on elements."
+                      selected={captureMode === "text"}
+                      tooltip="Use when you prefer typing comments"
+                      onClick={() => setMode("text")}
+                    />
+                  </div>
+                )}
+
                 {hasTickets && (
                   <div className="echly-feedback-list">
                     {ticketsToShow.map((p) => (
@@ -297,22 +357,22 @@ export default function CaptureWidget({
               </div>
 
               {showSessionButtons && (
-                <WidgetFooter
+                <>
+                  <div className="echly-command-divider" aria-hidden />
+                  <WidgetFooter
                   isIdle={true}
                   onAddFeedback={handlers.handleAddFeedback}
                   extensionMode={extensionMode}
                   onStartSession={extensionMode ? handlers.startSession : undefined}
-                  onResumeSession={
-                    extensionMode && showResumeButton ? handleResumeActiveSession : undefined
-                  }
                   onOpenPreviousSession={
-                    extensionMode && showPreviousButton && fetchSessions && onResumeSessionSelect
-                      ? () => setResumeModalOpen(true)
+                    extensionMode && showPreviousButton && fetchSessions && onPreviousSessionSelect
+                      ? handlePreviousSessions
                       : undefined
                   }
                   hasActiveSession={hasStoredSession}
                   captureDisabled={captureDisabled}
                 />
+                </>
               )}
             </div>
           </div>

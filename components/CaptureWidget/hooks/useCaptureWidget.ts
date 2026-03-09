@@ -136,6 +136,8 @@ export function useCaptureWidget({
   onSessionModePause,
   onSessionModeResume,
   onSessionModeEnd,
+  captureMode = "voice",
+  selectedMicrophoneId,
 }: CaptureWidgetProps) {
   if (process.env.NODE_ENV === "development") {
     console.count("useCaptureWidget render");
@@ -209,6 +211,8 @@ export function useCaptureWidget({
   const hasReceivedFirstTranscriptRef = useRef(false);
   /** True while in voice_listening (or equivalent) so overlay/effects do not tear down during recording. */
   const recordingActiveRef = useRef(false);
+  /** Latest pointers from background so we can sync when recording ends (callbacks have stale closure). */
+  const pointersPropRef = useRef<StructuredFeedback[] | undefined>(pointersProp);
 
   useEffect(() => {
     stateRef.current = state;
@@ -522,6 +526,9 @@ export function useCaptureWidget({
         echlyLog("RECORDING", "unexpected end");
         if (stateRef.current === "voice_listening") {
           recordingActiveRef.current = false;
+          if (extensionMode && pointersPropRef.current) {
+            setPointers(pointersPropRef.current);
+          }
           setState("idle");
         }
         return;
@@ -529,6 +536,9 @@ export function useCaptureWidget({
 
       manualStopRef.current = false;
       recordingActiveRef.current = false;
+      if (extensionMode && pointersPropRef.current) {
+        setPointers(pointersPropRef.current);
+      }
 
       const s = stateRef.current;
       if (s === "processing" || s === "success") return;
@@ -554,7 +564,10 @@ export function useCaptureWidget({
     hasReceivedFirstTranscriptRef.current = false;
     console.log("[VOICE] UI recording started", startTime);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioConstraints: boolean | MediaTrackConstraints = selectedMicrophoneId
+        ? { deviceId: { exact: selectedMicrophoneId } }
+        : true;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
       mediaStreamRef.current = stream;
       const ctx = new AudioContext();
       const analyser = ctx.createAnalyser();
@@ -572,16 +585,22 @@ export function useCaptureWidget({
     } catch (err) {
       console.error("Microphone permission denied:", err);
       recordingActiveRef.current = false;
+      if (extensionMode && pointersPropRef.current) {
+        setPointers(pointersPropRef.current);
+      }
       setErrorMessage("Microphone permission denied.");
       setState("error");
       removeCaptureRoot();
       restoreWidget();
     }
-  }, []);
+  }, [selectedMicrophoneId]);
 
   const finishListening = useCallback(async () => {
     echlyLog("RECORDING", "finish requested");
     recordingActiveRef.current = false;
+    if (extensionMode && pointersPropRef.current) {
+      setPointers(pointersPropRef.current);
+    }
     manualStopRef.current = true;
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(8);
@@ -742,6 +761,9 @@ export function useCaptureWidget({
   const discardListening = useCallback(() => {
     echlyLog("RECORDING", "discard");
     recordingActiveRef.current = false;
+    if (extensionMode && pointersPropRef.current) {
+      setPointers(pointersPropRef.current);
+    }
     recognitionRef.current?.stop();
     const activeId = activeRecordingIdRef.current;
     setRecordings((prev) => prev.filter((r) => r.id !== activeId));
@@ -749,7 +771,7 @@ export function useCaptureWidget({
     setState("cancelled");
     removeCaptureRoot();
     restoreWidget();
-  }, [removeCaptureRoot, restoreWidget]);
+  }, [extensionMode, removeCaptureRoot, restoreWidget]);
 
   /** ESC: any capture flow → cancelled */
   useEffect(() => {
@@ -1139,6 +1161,12 @@ export function useCaptureWidget({
         setPausePending(false);
         setExpandedId(null);
         setHighlightTicketId(null);
+        /* Force tray to refresh with latest pointers from background (fixes Pause → tray not updating). */
+        if (pointersPropRef.current) {
+          setTimeout(() => {
+            setPointers([...(pointersPropRef.current ?? [])]);
+          }, 50);
+        }
       }
     }
   }, [extensionMode, globalSessionModeActive, globalSessionPaused]);
@@ -1162,7 +1190,9 @@ export function useCaptureWidget({
   /** Extension: sync global pointers from background so all tabs show the same tray. */
   useEffect(() => {
     if (!extensionMode || pointersProp === undefined) return;
+    pointersPropRef.current = pointersProp;
     if (recordingActiveRef.current) return;
+
     setPointers(pointersProp);
     setSessionFeedbackPending(null);
   }, [extensionMode, pointersProp]);

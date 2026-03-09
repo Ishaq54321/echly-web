@@ -8,7 +8,6 @@ type WidgetFooterProps = {
   /** When set (extension mode), show only session actions (no "Capture feedback") */
   extensionMode?: boolean;
   onStartSession?: () => void;
-  onResumeSession?: () => void;
   onOpenPreviousSession?: () => void;
   hasActiveSession?: boolean;
   captureDisabled?: boolean;
@@ -19,49 +18,33 @@ export default function WidgetFooter({
   onAddFeedback,
   extensionMode = false,
   onStartSession,
-  onResumeSession,
   onOpenPreviousSession,
   hasActiveSession = false,
   captureDisabled = false,
 }: WidgetFooterProps) {
   const effectivelyDisabled = !isIdle || captureDisabled;
-  const resumeDisabled = effectivelyDisabled || !onResumeSession;
-  const showSessionActions = Boolean(onResumeSession || onOpenPreviousSession);
 
   if (extensionMode) {
     return (
-      <div className="echly-add-insight-wrap">
+      <div className="echly-command-actions">
         <button
           type="button"
           onClick={effectivelyDisabled ? undefined : onStartSession}
           disabled={effectivelyDisabled}
-          className={`echly-add-insight-btn ${effectivelyDisabled ? "echly-add-insight-btn--disabled" : ""}`}
-          aria-label="Start New Feedback Session"
+          className="echly-start-session-btn"
+          aria-label="Start Session"
         >
-          Start New Feedback Session
+          Start Session
         </button>
-        {showSessionActions && (
-          <div className="echly-add-insight-secondary-row">
-            <button
-              type="button"
-              onClick={resumeDisabled ? undefined : onResumeSession}
-              disabled={resumeDisabled}
-              className={`echly-add-insight-btn echly-add-insight-btn--secondary ${resumeDisabled ? "echly-add-insight-btn--disabled" : ""}`}
-              aria-label="Resume Session"
-            >
-              Resume Session
-            </button>
-            <button
-              type="button"
-              onClick={effectivelyDisabled ? undefined : onOpenPreviousSession}
-              disabled={effectivelyDisabled}
-              className={`echly-add-insight-btn echly-add-insight-btn--secondary ${effectivelyDisabled ? "echly-add-insight-btn--disabled" : ""}`}
-              aria-label="Previous Sessions"
-            >
-              Previous Sessions
-            </button>
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={effectivelyDisabled ? undefined : onOpenPreviousSession}
+          disabled={effectivelyDisabled}
+          className="echly-previous-session-btn"
+          aria-label="Previous Sessions"
+        >
+          Previous Sessions
+        </button>
       </div>
     );
   }

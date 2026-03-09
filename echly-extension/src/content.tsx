@@ -53,6 +53,7 @@ type GlobalUIState = {
   sessionModeActive: boolean;
   sessionPaused: boolean;
   pointers: StructuredFeedback[];
+  captureMode: "voice" | "text";
 };
 
 /** Ask background to open popup (e.g. in a new tab) so user can sign in. */
@@ -78,10 +79,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     sessionModeActive: false,
     sessionPaused: false,
     pointers: [],
+    captureMode: "voice",
   });
   const [widgetResetKey, setWidgetResetKey] = React.useState(0);
   const [hasPreviousSessions, setHasPreviousSessions] = React.useState(false);
-  const [lastKnownSessionId, setLastKnownSessionId] = React.useState<string | null>(null);
   const effectiveSessionId = globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
   const submissionLock = React.useRef(false);
@@ -193,7 +194,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return () => document.removeEventListener("visibilitychange", handler);
   }, []);
 
-  /* On widget open, query backend for sessions so Resume/Previous buttons show only when sessions exist. */
+  /* On widget open, query backend for sessions so Previous Sessions button shows only when sessions exist. */
   React.useEffect(() => {
     if (!globalState.visible) return;
     let cancelled = false;
@@ -211,17 +212,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       cancelled = true;
     };
   }, [globalState.visible]);
-
-  /* When command screen loads, request stored session so Resume button can use last active session. */
-  React.useEffect(() => {
-    if (!globalState.visible) return;
-    chrome.runtime.sendMessage({ type: "ECHLY_GET_ACTIVE_SESSION" }, (response: { sessionId?: string | null }) => {
-      if (response?.sessionId) setLastKnownSessionId(response.sessionId);
-    });
-  }, [globalState.visible]);
-
-  /* Do not automatically restore sessions. Sessions must be resumed manually by the user (Resume Session). */
-  /* Dashboard /dashboard/{sessionId} is view-only; it must NOT trigger ECHLY_SET_ACTIVE_SESSION or session lifecycle. */
 
   const onRecordingChange = React.useCallback((recording: boolean) => {
     if (recording) {
@@ -678,8 +668,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {});
   }, []);
 
-  const onResumeSessionSelect = React.useCallback(
-    async (sessionId: string, options?: { enterCaptureImmediately?: boolean }) => {
+  const onPreviousSessionSelect = React.useCallback(
+    async (sessionId: string, _options?: { enterCaptureImmediately?: boolean }) => {
       chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {});
       chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
       try {
@@ -1218,6 +1208,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         sessionId={effectiveSessionId ?? ""}
         userId={user.uid}
         extensionMode={true}
+        captureMode={globalState.captureMode ?? "voice"}
         onComplete={handleComplete}
         onDelete={handleDelete}
         onUpdate={handleUpdate}
@@ -1231,8 +1222,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         onThemeToggle={onThemeToggle}
         fetchSessions={fetchSessions}
         hasPreviousSessions={hasPreviousSessions}
-        lastKnownSessionId={lastKnownSessionId}
-        onResumeSessionSelect={onResumeSessionSelect}
+        onPreviousSessionSelect={onPreviousSessionSelect}
         pointers={globalState.pointers ?? []}
         onSessionEnd={() => {}}
         onCreateSession={createSession}
@@ -1322,6 +1312,7 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     sessionModeActive: state.sessionModeActive ?? false,
     sessionPaused: state.sessionPaused ?? false,
     pointers: Array.isArray(state.pointers) ? state.pointers : [],
+    captureMode: state.captureMode === "text" ? "text" : "voice",
   };
 }
 

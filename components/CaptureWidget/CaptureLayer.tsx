@@ -42,6 +42,10 @@ export type CaptureLayerProps = {
   onSessionDoneVoice?: () => void;
   onSessionSaveText?: (transcript: string) => void;
   onSessionFeedbackCancel?: () => void;
+  /** When "voice", element click opens voice UI; when "text", opens text UI. No per-click choice. */
+  captureMode?: "voice" | "text";
+  /** 0–1 normalized level for voice waveform (from useCaptureWidget state). */
+  listeningAudioLevel?: number;
 };
 
 /**
@@ -71,6 +75,8 @@ export function CaptureLayer({
   onSessionDoneVoice,
   onSessionSaveText,
   onSessionFeedbackCancel = () => {},
+  captureMode = "voice",
+  listeningAudioLevel = 0,
 }: CaptureLayerProps) {
   if (extensionMode && (!sessionMode || !sessionIdProp)) return null;
   const showSessionOverlay =
@@ -91,6 +97,8 @@ export function CaptureLayer({
           endPending={endPending}
           sessionFeedbackPending={sessionFeedbackPending ?? null}
           state={state}
+          captureMode={captureMode}
+          listeningAudioLevel={listeningAudioLevel}
           onElementClicked={onSessionElementClicked}
           onPause={onSessionPause}
           onResume={onSessionResume}
