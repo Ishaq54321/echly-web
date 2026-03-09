@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { FileText } from "lucide-react";
 
 export type SessionOption = {
   id: string;
@@ -17,6 +18,8 @@ export type ResumeSessionModalProps = {
   onClose: () => void;
   fetchSessions: () => Promise<SessionOption[]>;
   onSelectSession: (sessionId: string) => void;
+  /** Theme for modal (dark/light). Defaults to "dark". */
+  theme?: "dark" | "light";
 };
 
 type FilterKey = "today" | "7days" | "30days" | "all";
@@ -50,17 +53,27 @@ function formatLastUpdated(iso?: string): string {
   return d.toLocaleDateString();
 }
 
+const FILTER_ORDER: readonly FilterKey[] = ["all", "today", "7days", "30days"] as const;
+const FILTER_LABELS: Record<FilterKey, string> = {
+  all: "All sessions",
+  today: "Today",
+  "7days": "Last 7 days",
+  "30days": "Last 30 days",
+};
+
 export function ResumeSessionModal({
   open,
   onClose,
   fetchSessions,
   onSelectSession,
+  theme = "dark",
 }: ResumeSessionModalProps) {
   const [sessions, setSessions] = useState<SessionOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const isLight = theme === "light";
 
   useEffect(() => {
     if (!open) return;
@@ -103,6 +116,7 @@ export function ResumeSessionModal({
   return (
     <div
       data-echly-ui="true"
+      data-resume-theme={theme}
       style={{
         position: "fixed",
         inset: 0,
@@ -118,16 +132,34 @@ export function ResumeSessionModal({
       aria-modal="true"
       aria-labelledby="resume-session-modal-title"
     >
+      <style>{`
+        .echly-resume-session-item:hover {
+          background: rgba(255,255,255,.04);
+          transform: translateY(-1px);
+          transition: all 120ms ease;
+        }
+        [data-resume-theme="light"] .echly-resume-session-item:hover {
+          background: rgba(0,0,0,.04);
+        }
+        .echly-resume-cancel-button:hover {
+          background: rgba(255,255,255,.06);
+          transform: translateY(-1px);
+          transition: all 120ms ease;
+        }
+        [data-resume-theme="light"] .echly-resume-cancel-button:hover {
+          background: rgba(0,0,0,.06);
+        }
+      `}</style>
       <div
         style={{
           width: "min(420px, 100%)",
           maxHeight: "85vh",
           borderRadius: 18,
-          background: "rgba(20,22,28,0.92)",
+          background: isLight ? "white" : "rgba(20,22,28,0.92)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          border: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
@@ -135,8 +167,19 @@ export function ResumeSessionModal({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <h2 id="resume-session-modal-title" style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 600, color: "#F3F4F6" }}>
+        <div style={{
+          padding: 20,
+          borderBottom: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)",
+        }}>
+          <h2
+            id="resume-session-modal-title"
+            style={{
+              margin: "0 0 16px",
+              fontSize: 18,
+              fontWeight: 600,
+              color: isLight ? "#1F2937" : "#F3F4F6",
+            }}
+          >
             Resume Feedback Session
           </h2>
           <input
@@ -150,14 +193,14 @@ export function ResumeSessionModal({
               boxSizing: "border-box",
               padding: "10px 12px",
               borderRadius: 10,
-              border: "1px solid rgba(255,255,255,0.08)",
-              background: "rgba(255,255,255,0.06)",
-              color: "#F3F4F6",
+              border: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)",
+              background: isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.06)",
+              color: isLight ? "#1F2937" : "#F3F4F6",
               fontSize: 14,
             }}
           />
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-            {(["today", "7days", "30days", "all"] as const).map((key) => (
+            {FILTER_ORDER.map((key) => (
               <button
                 key={key}
                 type="button"
@@ -165,22 +208,27 @@ export function ResumeSessionModal({
                 style={{
                   padding: "8px 12px",
                   borderRadius: 10,
-                  border: "none",
-                  background: filter === key ? "rgba(70, 110, 255, 0.2)" : "rgba(255,255,255,0.08)",
-                  color: "#F3F4F6",
+                  border: filter === key ? "1px solid rgba(59,130,246,.45)" : "1px solid transparent",
+                  background: filter === key ? "rgba(59,130,246,.18)" : isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)",
+                  color: filter === key ? "#60A5FA" : isLight ? "#1F2937" : "#F3F4F6",
                   fontSize: 12,
                   fontWeight: 500,
                   cursor: "pointer",
                 }}
               >
-                {key === "today" ? "Today" : key === "7days" ? "Last 7 days" : key === "30days" ? "Last 30 days" : "All sessions"}
+                {FILTER_LABELS[key]}
               </button>
             ))}
           </div>
         </div>
         <div style={{ flex: 1, overflow: "auto", minHeight: 200, maxHeight: 360 }}>
           {loading && (
-            <div style={{ padding: 24, textAlign: "center", color: "#A1A1AA", fontSize: 14 }}>
+            <div style={{
+              padding: 24,
+              textAlign: "center",
+              color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
+              fontSize: 14,
+            }}>
               Loading sessions…
             </div>
           )}
@@ -190,7 +238,12 @@ export function ResumeSessionModal({
             </div>
           )}
           {!loading && !error && filtered.length === 0 && (
-            <div style={{ padding: 24, textAlign: "center", color: "#A1A1AA", fontSize: 14 }}>
+            <div style={{
+              padding: 24,
+              textAlign: "center",
+              color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
+              fontSize: 14,
+            }}>
               No sessions match.
             </div>
           )}
@@ -200,6 +253,7 @@ export function ResumeSessionModal({
                 <li key={s.id} style={{ marginBottom: 4 }}>
                   <button
                     type="button"
+                    className="echly-resume-session-item"
                     onClick={() => {
                       onSelectSession(s.id);
                       onClose();
@@ -211,20 +265,35 @@ export function ResumeSessionModal({
                       borderRadius: 14,
                       border: "none",
                       background: "transparent",
-                      color: "#F3F4F6",
+                      color: isLight ? "#1F2937" : "#F3F4F6",
                       fontSize: 14,
                       cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
                     }}
                   >
-                    <div style={{ fontWeight: 600 }}>{s.title?.trim() || "Untitled Session"}</div>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: "#A1A1AA", marginTop: 4 }}>
-                      {feedbackCount(s)} feedback items · {formatLastUpdated(s.updatedAt)}
+                    <FileText
+                      className="echly-resume-session-icon"
+                      style={{
+                        width: 18,
+                        height: 18,
+                        color: isLight ? "#111827" : "white",
+                        opacity: 0.9,
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>{s.title?.trim() || "Untitled Session"}</div>
+                      <div style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
+                        marginTop: 4,
+                      }}>
+                        {feedbackCount(s)} feedback items · {formatLastUpdated(s.updatedAt)}
+                      </div>
                     </div>
                   </button>
                 </li>
@@ -232,16 +301,20 @@ export function ResumeSessionModal({
             </ul>
           )}
         </div>
-        <div style={{ padding: 16, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <div style={{
+          padding: 16,
+          borderTop: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)",
+        }}>
           <button
             type="button"
+            className="echly-resume-cancel-button"
             onClick={onClose}
             style={{
               padding: "10px 16px",
               borderRadius: 10,
-              border: "1px solid rgba(255,255,255,0.08)",
+              border: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)",
               background: "transparent",
-              color: "#A1A1AA",
+              color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
               fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",

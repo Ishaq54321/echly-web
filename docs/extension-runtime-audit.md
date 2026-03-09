@@ -529,3 +529,90 @@ T17   showPanel=true, showCommandScreen=true → mode tiles (Voice/Text)
 | `components/CaptureWidget/hooks/useCaptureWidget.ts` | Widget state, create/remove root, recording |
 | `components/CaptureWidget/CaptureLayer.tsx` | Overlay container |
 | `components/CaptureWidget/SessionOverlay.tsx` | Session mode UI |
+
+---
+
+## Section 15 — Runtime Interference Audit (Scroll & Events)
+
+**Purpose:** Ensure the extension never breaks host page behavior (scroll, wheel, touch, clicks).
+
+### 1. Global Event Listeners (content script / extension only)
+
+| Location | Event | Target | Capture? | Passive? | Blocks scroll? |
+|----------|--------|--------|----------|----------|----------------|
+| content.tsx | ECHLY_TOGGLE_WIDGET | window | no | n/a | no |
+| content.tsx | ECHLY_RESET_WIDGET | window | no | n/a | no |
+| content.tsx | ECHLY_GLOBAL_STATE | window | no | n/a | no |
+| content.tsx | visibilitychange | document | no | n/a | no |
+| content.tsx | wheel | window | no | **yes** | no |
+| content.tsx | scroll | document | no | **yes** | no |
+| clickCapture.ts | click | **document** | **yes** | no | no (only preventDefault on valid target) |
+| useCaptureWidget.ts | mousemove, mouseup | window | no | no | no (preventDefault only when isDragging) |
+| useCaptureWidget.ts | keydown | document | no | no | no (Escape only, capture flow) |
+| useCaptureWidget.ts | mousedown | document | no | no | no (click-outside, extensionMode only) |
+| SessionOverlay.tsx | mousemove | window | no | **yes** | no |
+| elementHighlighter.ts | mousemove | document | no | **yes** | no |
+| feedbackMarkers.ts | scroll, resize | window | scroll **capture: true**, passive | no | no |
+| RegionCaptureOverlay.tsx | keydown, visibilitychange, mouseup | document/window | no | n/a | no |
+
+**Capture-phase click (clickCapture.ts):** Handler runs only when `enabledRef()` is true and `isSessionCaptureTarget(target)`. It calls `preventDefault()` and `stopPropagation()` **only for valid capture targets**, so normal page clicks and scroll are not affected.
+
+### 2. preventDefault / stopPropagation affecting scroll
+
+- **wheel / touchmove:** No listener in the extension calls `preventDefault()` on wheel or touchmove. No scroll-blocking listeners.
+- **useCaptureWidget handleMouseMove:** `e.preventDefault()` only when `isDragging` is true (during widget drag). Does not affect wheel/scroll.
+- **RegionCaptureOverlay:** `preventDefault()` on mousedown/mouseup only on the overlay’s own div (region selection). Overlay is full-screen only during region capture; when visible, blocking is intentional.
+- **Click capture:** `preventDefault()`/`stopPropagation()` only when the clicked element is a session capture target; otherwise the handler returns without touching the event.
+
+### 3. Overlay layers and pointer-events
+
+| Layer | File | Full-screen? | pointer-events | Fix applied |
+|-------|------|--------------|----------------|-------------|
+| #echly-shadow-host | content.tsx | no (bottom-right widget) | auto | none needed |
+| #echly-capture-root | useCaptureWidget.ts + content.tsx | no (wrapper) | **none** (inline + CSS) | already correct |
+| echly-marker-layer | useCaptureWidget.ts | yes (fixed 100%) | **none** | already correct |
+| Clarity assistant backdrop | content.tsx | yes | was default (auto) | **yes:** backdrop `pointer-events: none`, inner card `pointer-events: auto` |
+| Region capture dim | RegionCaptureOverlay.tsx | yes | auto when selecting, none when released | intentional during region select |
+| Session overlay | SessionOverlay.tsx | no (floating panels) | n/a | none needed |
+| echly-focus-overlay | CaptureLayer.tsx | yes | auto | only in non-extension mode; not used in content script |
+
+### 4. CSS that could block scroll
+
+| Source | Rule | Effect on host page | Fix applied |
+|--------|------|---------------------|-------------|
+| popup.css (injected into document.head) | `html, body { height: 100%; overflow: hidden; }` | **Locks page scroll** when content script injects popup.css for #echly-capture-root | **yes:** content.tsx injects style `#echly-page-scroll-restore` with `html, body { overflow: visible !important; }` after capture-root styles |
+
+**Root cause of “users cannot scroll”:** The content script injects `popup.css` into the host page’s `document.head` so that `#echly-capture-root` (light DOM) gets styles. That stylesheet contains global `html, body { overflow: hidden }`, which was applied to the host page and prevented scrolling. The fix is to inject a small override so the host page always has `overflow: visible` for html/body.
+
+### 5. Runtime overrides of browser behavior
+
+- **Prototype / API overrides:** None found in extension source (no `Event.prototype`, `Element.prototype`, `addEventListener` override, etc.).
+- **MutationObserver:** None in extension source that would inject overlays or alter layout in a way that blocks scroll.
+
+### 6. Scroll lock (body/documentElement.style.overflow)
+
+- No code in the extension sets `document.body.style.overflow` or `document.documentElement.style.overflow` to `"hidden"`.  
+- useCaptureWidget sets `document.body.style.userSelect = "none"` only during widget drag and restores it on mouseup; this does not affect scroll.
+
+### 7. Shadow host (#echly-shadow-host)
+
+- Styles: `position: fixed; bottom: 24px; right: 24px; width: auto; height: auto; z-index: 2147483647; pointer-events: auto; display: none` (then block when visible).  
+- Does not cover the full viewport and does not use `overflow: hidden`. No change needed.
+
+### 8. Exact code fixes applied
+
+1. **content.tsx — Restore host page scroll**  
+   In `injectCaptureRootStyles()`, after injecting `#echly-capture-root-pointer-events`, inject a style with id `echly-page-scroll-restore` and content `html, body { overflow: visible !important; }` so popup.css cannot lock host page scroll.
+
+2. **content.tsx — Clarity overlay**  
+   For the full-screen clarity assistant backdrop div: set `pointerEvents: "none"`. For the inner modal card div: set `pointerEvents: "auto"` so only the card captures interaction and scroll can pass through the backdrop.
+
+3. **content.tsx — Debug listeners**  
+   Renamed `ensureWheelDebugListener` to `ensureScrollDebugListeners` and added a passive `scroll` listener on `document` in addition to the existing passive `wheel` listener on `window`, for runtime verification that wheel and scroll events reach the page.
+
+### Result
+
+- Page scroll, mouse wheel, and trackpad scroll work normally.  
+- Extension UI (widget, session overlay, region capture when active) still works.  
+- Click capture still works (only valid targets get preventDefault/stopPropagation).  
+- No global JS interference: no prototype overrides; no global overflow lock; overlays that must not block scroll use `pointer-events: none` or an override.

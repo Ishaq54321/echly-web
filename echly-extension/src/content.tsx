@@ -1061,6 +1061,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             background: "rgba(0,0,0,0.15)",
             zIndex: 999999,
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif',
+            pointerEvents: "none",
           }}
         >
           <div
@@ -1068,6 +1069,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               maxWidth: 420,
               width: "90%",
               background: "#F8FBFF",
+              pointerEvents: "auto",
               borderRadius: 12,
               padding: 20,
               boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
@@ -1248,12 +1250,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             }
           })().catch(() => {});
         }}
+        captureRootParent={widgetRoot}
       />
     </>
   );
 }
 
-/** Minimal CSS reset inside shadow root for style isolation. Theme (data-theme) and color-scheme come from globals.css. Font inherits from popup.css #echly-root. */
+/** Minimal CSS reset inside shadow root for style isolation. #echly-capture-root lives in shadow DOM; pointer-events: none so page scroll works. */
 const SHADOW_RESET = `
   :host { all: initial; }
   #echly-root {
@@ -1261,6 +1264,7 @@ const SHADOW_RESET = `
     box-sizing: border-box;
   }
   #echly-root * { box-sizing: border-box; }
+  #echly-capture-root { pointer-events: none !important; }
 `;
 
 function injectShadowStyles(shadowRoot: ShadowRoot): void {
@@ -1277,8 +1281,21 @@ function injectShadowStyles(shadowRoot: ShadowRoot): void {
   shadowRoot.appendChild(reset);
 }
 
-/** Create shadow root, styles, container; mount React. Call only once per host. */
+/** Inject minimal page-level styles only. Do NOT inject popup.css into document.head (would lock host page scroll). */
+function injectPageStyles(): void {
+  /* Restore host page scroll if any extension CSS ever set overflow: hidden (use auto, not visible, to preserve scroll container). */
+  if (!document.getElementById("echly-page-scroll-restore")) {
+    const scrollRestore = document.createElement("style");
+    scrollRestore.id = "echly-page-scroll-restore";
+    scrollRestore.textContent =
+      "html, body { overflow: auto !important; }";
+    document.head.appendChild(scrollRestore);
+  }
+}
+
+/** Create shadow root, styles, container; mount React. Call only once per host. Popup styles live only in shadow DOM. */
 function mountReactApp(host: HTMLDivElement): void {
+  injectPageStyles();
   const shadowRoot = host.attachShadow({ mode: "open" });
   injectShadowStyles(shadowRoot);
 
@@ -1396,6 +1413,23 @@ function ensureMessageListener(host: HTMLDivElement): void {
   });
 }
 
+/** Debug: passive wheel + scroll listeners to verify events reach the page (never block scroll). */
+function ensureScrollDebugListeners(): void {
+  const win = window as Window & { __ECHLY_SCROLL_DEBUG__?: boolean };
+  if (win.__ECHLY_SCROLL_DEBUG__) return;
+  win.__ECHLY_SCROLL_DEBUG__ = true;
+  window.addEventListener(
+    "wheel",
+    () => console.debug("ECHLY wheel event reached page"),
+    { passive: true }
+  );
+  document.addEventListener(
+    "scroll",
+    () => console.debug("ECHLY scroll event detected"),
+    { passive: true }
+  );
+}
+
 /**
  * Single mount: create host once, mount React once, default hidden.
  * Visibility via ECHLY_VISIBILITY from background. No re-mount, no injection logic.
@@ -1421,6 +1455,7 @@ function main(): void {
   ensureMessageListener(host);
   syncInitialGlobalState(host);
   ensureVisibilityStateRefresh();
+  ensureScrollDebugListeners();
 }
 
 main();

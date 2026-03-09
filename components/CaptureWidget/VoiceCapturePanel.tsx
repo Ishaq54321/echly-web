@@ -1,24 +1,31 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import ChatGPTWaveform from "@/components/ChatGPTWaveform";
 
 export type VoiceCapturePanelProps = {
   /** 0–1 normalized microphone level (legacy, visualizer uses analyser when provided) */
   audioLevel: number;
   onFinish: () => void;
+  /** Called when user cancels (e.g. Escape). Discards the capture session. */
+  onCancel?: () => void;
   /** Optional screenshot for context (session element capture) */
   screenshot?: string;
   isListening?: boolean;
   /** AnalyserNode for real-time horizontal bar visualizer */
   analyser?: AnalyserNode | null;
+  /** DOM node to portal into (#echly-capture-root). Required for correct viewport positioning. */
+  captureRoot?: HTMLDivElement | null;
 };
 
 export function VoiceCapturePanel({
   onFinish,
+  onCancel,
   screenshot,
   isListening = true,
   analyser = null,
+  captureRoot = null,
 }: VoiceCapturePanelProps) {
   const [voiceActive, setVoiceActive] = useState(false);
   const voiceActiveRef = useRef(false);
@@ -57,64 +64,73 @@ export function VoiceCapturePanel({
     return () => cancelAnimationFrame(rafId);
   }, [analyser]);
 
-  /* Micro interaction: scale 0.98 → 1 when recording starts */
   useEffect(() => {
     if (analyser && !recordingStarted) {
       setRecordingStarted(true);
     }
   }, [analyser, recordingStarted]);
 
-  const elementPreview = screenshot ? (
-    <img
-      src={screenshot}
-      alt="Capture"
-      style={{ width: "100%", height: "100%", objectFit: "contain" }}
-    />
-  ) : null;
+  useEffect(() => {
+    if (!onCancel) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
 
-  return (
+  const dimLayer = (
     <div
-      className={`voice-capture ${recordingStarted ? "voice-capture--recording" : ""}`}
+      className={`echly-dim-layer ${recordingStarted ? "echly-dim-layer--visible" : ""}`}
+      aria-hidden
+    />
+  );
+
+  const card = (
+    <div
+      className={`echly-capture-card ${recordingStarted ? "echly-capture-card--visible" : ""}`}
       data-echly-ui="true"
-      style={{
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: 420,
-        padding: 24,
-        borderRadius: 16,
-        background: "linear-gradient(180deg, #0f172a, #020617)",
-        boxShadow: "0 20px 60px rgba(0,0,0,.35)",
-        zIndex: 2147483647,
-        overflow: "hidden",
-        fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "stretch",
-        gap: 16,
-      }}
     >
       {screenshot && (
-        <div className="capture-preview">{elementPreview}</div>
+        <div className="echly-capture-screenshot-preview">
+          <img src={screenshot} alt="Capture" />
+        </div>
       )}
 
-      <h2 className="voice-capture-title">Voice Feedback</h2>
-      <p className="voice-capture-instruction">Describe the issue on this page.</p>
+      <h2 className="echly-capture-title">Voice Feedback</h2>
+      <p className="echly-capture-instruction">
+        Describe the issue — Echly will structure it.
+      </p>
 
-      <div className="capture-visualizer">
-        <ChatGPTWaveform analyser={analyser} />
+      <div className="echly-capture-visualizer">
+        <div className="echly-waveform-container">
+          <ChatGPTWaveform analyser={analyser} />
+        </div>
       </div>
 
-      <div className="capture-status">
-        {isListening ? "Listening — describe the issue" : "Paused"}
+      <div className="echly-capture-status">
+        {isListening ? "Listening…" : "Paused"}
       </div>
 
-      <div className="voice-capture-actions">
-        <button type="button" className="finish-btn" onClick={onFinish}>
-          Finish
-        </button>
-      </div>
+      <button type="button" className="echly-finish-btn" onClick={onFinish}>
+        Finish
+      </button>
+      <p className="echly-capture-cancel-hint">(Press Escape to cancel)</p>
     </div>
   );
+
+  if (captureRoot) {
+    return createPortal(
+      <>
+        {dimLayer}
+        {card}
+      </>,
+      captureRoot
+    );
+  }
+
+  return card;
 }

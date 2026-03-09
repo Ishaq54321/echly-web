@@ -7,7 +7,7 @@ import { attachClickCapture, detachClickCapture } from "./session/clickCapture";
 import { SessionControlPanel } from "./SessionControlPanel";
 import { VoiceCapturePanel } from "./VoiceCapturePanel";
 import { TextFeedbackPanel } from "./TextFeedbackPanel";
-import type { CaptureContext } from "./types";
+import type { CaptureContext, SessionFeedbackPending } from "./types";
 
 const CAPTURE_TOOLTIP_OFFSET = 12;
 
@@ -28,7 +28,7 @@ export type SessionOverlayProps = {
   sessionPaused: boolean;
   pausePending?: boolean;
   endPending?: boolean;
-  sessionFeedbackPending: { screenshot: string; context: CaptureContext | null } | null;
+  sessionFeedbackPending: SessionFeedbackPending | null;
   state: string;
   onElementClicked: (element: Element) => void;
   onPause: () => void;
@@ -147,6 +147,12 @@ export function SessionOverlay({
 
   const content = (
     <>
+      {sessionFeedbackPending && (
+        <div
+          className="echly-dim-layer echly-dim-layer--visible"
+          aria-hidden
+        />
+      )}
       <div
         aria-hidden
         className="echly-session-overlay-cursor"
@@ -191,10 +197,12 @@ export function SessionOverlay({
       )}
       {sessionFeedbackPending && captureMode === "voice" && (
         <VoiceCapturePanel
+          captureRoot={captureRoot}
           screenshot={sessionFeedbackPending.screenshot}
           audioLevel={listeningAudioLevel}
           isListening={state === "voice_listening"}
           onFinish={onDoneVoice}
+          onCancel={onCancel}
           analyser={audioAnalyser ?? null}
         />
       )}

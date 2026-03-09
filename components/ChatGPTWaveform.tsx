@@ -7,7 +7,10 @@ const BAR_WIDTH = 2;
 const GAP = 2;
 const MAX_HEIGHT = 26;
 const MIN_HEIGHT = 2;
-const AMPLITUDE_THRESHOLD = 0.02; // normalized 0–1; below this = minimal + opacity 0.4
+/** Normalized 0–1. Below this = silence: flat bar (BASELINE_BAR_HEIGHT), no animation. */
+const SILENCE_THRESHOLD = 0.02;
+/** Bar height when amplitude is 0 or below threshold (flat/silent). */
+const BASELINE_BAR_HEIGHT = 1;
 
 export type ChatGPTWaveformProps = {
   analyser: AnalyserNode | null;
@@ -33,6 +36,8 @@ export default function ChatGPTWaveform({ analyser }: ChatGPTWaveformProps) {
     const canvasHeight = 52;
 
     let rafId: number;
+    /** Smoothed average amplitude (0–1) to avoid flicker at speech start/end. */
+    let smoothedAmplitude = 0;
 
     function draw(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
       rafId = requestAnimationFrame(() => draw(ctx, canvas));
@@ -43,7 +48,11 @@ export default function ChatGPTWaveform({ analyser }: ChatGPTWaveformProps) {
       for (let i = 0; i < dataArray.length; i++) {
         sum += dataArray[i];
       }
-      const avg = dataArray.length ? sum / dataArray.length / 255 : 0;
+      const rawAvg = dataArray.length ? sum / dataArray.length / 255 : 0;
+      const amplitude = rawAvg < SILENCE_THRESHOLD ? 0 : rawAvg;
+      smoothedAmplitude = smoothedAmplitude * 0.8 + amplitude * 0.2;
+
+      const isSilent = smoothedAmplitude < SILENCE_THRESHOLD;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -52,15 +61,16 @@ export default function ChatGPTWaveform({ analyser }: ChatGPTWaveformProps) {
       for (let i = 0; i < BAR_COUNT; i++) {
         const value = dataArray[Math.floor((i / BAR_COUNT) * bufferLength)] ?? 0;
         const normalized = value / 255;
+        const barBelowThreshold = normalized < SILENCE_THRESHOLD;
 
         let height: number;
         let opacity: number;
 
-        if (avg < AMPLITUDE_THRESHOLD) {
-          height = MIN_HEIGHT;
+        if (isSilent || barBelowThreshold) {
+          height = BASELINE_BAR_HEIGHT;
           opacity = 0.4;
         } else {
-          const scale = Math.max(0, (normalized - AMPLITUDE_THRESHOLD) / (1 - AMPLITUDE_THRESHOLD));
+          const scale = Math.max(0, (normalized - SILENCE_THRESHOLD) / (1 - SILENCE_THRESHOLD));
           height = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, MIN_HEIGHT + scale * (MAX_HEIGHT - MIN_HEIGHT)));
           opacity = 1;
         }

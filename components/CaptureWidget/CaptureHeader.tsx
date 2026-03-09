@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Home } from "lucide-react";
 
 const SunIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -29,6 +29,8 @@ type CaptureHeaderProps = {
   /** Legacy: when set and not showSessionTitle, used as main header title. Otherwise "Echly". */
   title?: string | null;
   summary?: string | null;
+  /** When true (e.g. extension mode), show Home icon button instead of "Echly" title. */
+  showHomeButton?: boolean;
   theme?: "dark" | "light";
   onThemeToggle?: () => void;
   handlers?: {
@@ -46,6 +48,7 @@ export default function CaptureHeader({
   openTicketCount = 0,
   title = null,
   summary = null,
+  showHomeButton = false,
   theme = "dark",
   onThemeToggle,
   handlers,
@@ -118,6 +121,21 @@ export default function CaptureHeader({
               {openTicketCount} feedback ticket{openTicketCount !== 1 ? "s" : ""}
             </span>
           </>
+        ) : showHomeButton ? (
+          <button
+            type="button"
+            className={`echly-header-home-wrap${theme === "dark" ? " dark" : ""}`}
+            onClick={() => {
+              if (typeof chrome !== "undefined" && chrome.tabs?.create) {
+                chrome.tabs.create({ url: "https://app.echly.com/dashboard" });
+              }
+            }}
+            aria-label="Open Echly dashboard"
+          >
+            <div className="header-home-btn">
+              <Home size={18} />
+            </div>
+          </button>
         ) : (
           <>
             <span className="echly-sidebar-title">{title ?? "Echly"}</span>

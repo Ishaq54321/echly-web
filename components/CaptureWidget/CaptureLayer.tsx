@@ -84,10 +84,13 @@ export function CaptureLayer({
   if (extensionMode && (!sessionMode || !sessionIdProp)) return null;
   const showSessionOverlay =
     sessionMode && extensionMode && !!globalSessionModeActive && !!sessionIdProp;
-  const showDimOverlay =
-    !showSessionOverlay && (state === "focus_mode" || state === "region_selecting");
   const showRegionOverlay =
     !showSessionOverlay && extensionMode && (state === "focus_mode" || state === "region_selecting");
+  /* Do not show focus overlay when region overlay is shown (avoids full-screen pointer-events:auto blocking scroll). */
+  const showDimOverlay =
+    !showSessionOverlay &&
+    !showRegionOverlay &&
+    (state === "focus_mode" || state === "region_selecting");
 
   const captureContent = (
     <>

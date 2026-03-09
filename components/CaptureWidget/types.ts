@@ -7,6 +7,23 @@ export type StructuredFeedback = {
   type?: string;
 };
 
+/** Element bounding rect (viewport coordinates) for anchoring capture card. */
+export type ElementRect = {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+};
+
+/** Pending session feedback (screenshot + context + optional element position). */
+export type SessionFeedbackPending = {
+  screenshot: string;
+  context: CaptureContext | null;
+  elementRect?: ElementRect | null;
+};
+
 /** Context captured with the region (URL, scroll, viewport, DOM path, nearby text). */
 export type CaptureContext = {
   url: string;
@@ -114,6 +131,8 @@ export type CaptureWidgetProps = {
   captureMode?: "voice" | "text";
   /** Optional preferred microphone deviceId for voice capture (from enumerateDevices). */
   selectedMicrophoneId?: string;
+  /** When set (e.g. extension shadow root container), capture root is appended here so it receives shadow DOM styles; otherwise appended to document.body. */
+  captureRootParent?: HTMLElement | null;
 };
 
 export type Position = { x: number; y: number };

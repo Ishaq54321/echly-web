@@ -308,6 +308,7 @@ export function RegionCaptureOverlay({
             bottom: Math.max(12, releasedRect.y + releasedRect.h - 48),
             transform: "translate(-50%, 100%)",
             display: "flex",
+            pointerEvents: "auto",
             background: "rgba(20,22,28,0.92)",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",

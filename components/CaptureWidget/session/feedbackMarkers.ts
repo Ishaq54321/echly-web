@@ -3,7 +3,8 @@
  * Purely UI layer; markers live only during the active session.
  */
 
-const MARKER_Z_INDEX = 2147483646;
+/** Below modal UI (e.g. 2147483645); layer uses 2147483644. */
+const MARKER_Z_INDEX = 2147483644;
 const LOG_PREFIX = "[SESSION]";
 
 export type FeedbackMarkerData = {
@@ -89,44 +90,43 @@ export function createMarker(
     y = center.y;
   }
 
-  const domEl = document.createElement("div");
-  domEl.className = "echly-feedback-marker";
-  domEl.setAttribute("data-echly-ui", "true");
-  domEl.setAttribute("aria-label", `Feedback ${index}`);
-  domEl.textContent = String(index);
-  domEl.title = data.title ?? `Feedback #${index}`;
+  const marker = document.createElement("div");
+  marker.className = "echly-marker";
+  marker.setAttribute("data-echly-ui", "true");
+  marker.setAttribute("aria-label", `Feedback ${index}`);
+  marker.textContent = String(index);
+  marker.title = data.title ?? `Feedback #${index}`;
 
-  domEl.style.cssText = [
-    "width:22px",
-    "height:22px",
-    "border-radius:50%",
-    "background:#2563eb",
+  marker.style.cssText = [
+    "position:absolute",
+    "width:24px",
+    "height:24px",
+    "border-radius:999px",
+    "background:#FF553D",
     "color:white",
     "font-size:12px",
     "font-weight:600",
     "display:flex",
     "align-items:center",
     "justify-content:center",
-    "position:fixed",
-    `z-index:${MARKER_Z_INDEX}`,
-    "box-shadow:0 4px 12px rgba(0,0,0,0.15)",
+    "box-shadow:0 2px 6px rgba(0,0,0,.35)",
     "cursor:pointer",
     "pointer-events:auto",
     "box-sizing:border-box",
   ].join(";");
 
-  applyPosition(domEl, x, y);
+  applyPosition(marker, x, y);
 
   const entry: MarkerEntry = {
     ...data,
     x,
     y,
     index,
-    domElement: domEl,
+    domElement: marker,
   };
   markers.push(entry);
 
-  domEl.addEventListener("click", (e) => {
+  marker.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (getSessionPaused?.()) return;
@@ -134,7 +134,7 @@ export function createMarker(
     onMarkerClick?.({ id: entry.id, x: entry.x, y: entry.y, element: entry.element, title: entry.title, index: entry.index });
   });
 
-  container.appendChild(domEl);
+  container.appendChild(marker);
   if (markers.length === 1) setupScrollResizeListeners();
 
   console.log(`${LOG_PREFIX} marker created`, entry.id, index);

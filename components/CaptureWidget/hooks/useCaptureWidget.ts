@@ -11,6 +11,7 @@ import type {
   CaptureWidgetProps,
   Position,
   CaptureContext,
+  SessionFeedbackPending,
 } from "../types";
 import { buildCaptureContext } from "@/lib/captureContext";
 import { playShutterSound } from "@/lib/playShutterSound";
@@ -138,19 +139,20 @@ export function useCaptureWidget({
   onSessionModeEnd,
   captureMode = "voice",
   selectedMicrophoneId,
+  captureRootParent,
 }: CaptureWidgetProps) {
   if (process.env.NODE_ENV === "development") {
     console.count("useCaptureWidget render");
   }
 
-  if (typeof window !== "undefined" && !(window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: { screenshot: string; context: CaptureContext | null } | null } }).__ECHLY_CAPTURE_STATE__) {
-    (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: { screenshot: string; context: CaptureContext | null } | null } }).__ECHLY_CAPTURE_STATE__ = {
+  if (typeof window !== "undefined" && !(window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__) {
+    (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__ = {
       pending: null,
     };
   }
   const captureState = (typeof window !== "undefined"
-    ? (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: { screenshot: string; context: CaptureContext | null } | null } }).__ECHLY_CAPTURE_STATE__
-    : { pending: null as { screenshot: string; context: CaptureContext | null } | null }) ?? { pending: null };
+    ? (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__
+    : { pending: null as SessionFeedbackPending | null }) ?? { pending: null };
 
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
@@ -180,10 +182,7 @@ export function useCaptureWidget({
   const [sessionPaused, setSessionPaused] = useState(false);
   const [pausePending, setPausePending] = useState(false);
   const [endPending, setEndPending] = useState(false);
-  const [sessionFeedbackPending, setSessionFeedbackPending] = useState<{
-    screenshot: string;
-    context: CaptureContext | null;
-  } | null>(captureState.pending);
+  const [sessionFeedbackPending, setSessionFeedbackPending] = useState<SessionFeedbackPending | null>(captureState.pending);
   const [sessionFeedbackSaving, setSessionFeedbackSaving] = useState(false);
 
   const sessionModeRef = useRef(false);
@@ -236,7 +235,7 @@ export function useCaptureWidget({
   }, [sessionFeedbackPending]);
 
   /** Sync pending to global store so it survives React remounts. */
-  const setPending = useCallback((value: { screenshot: string; context: CaptureContext | null } | null) => {
+  const setPending = useCallback((value: SessionFeedbackPending | null) => {
     captureState.pending = value;
     setSessionFeedbackPending(value);
   }, []);
@@ -392,6 +391,7 @@ export function useCaptureWidget({
     const existingRoot = document.getElementById(OVERLAY_ROOT_ID);
     if (existingRoot) {
       console.debug("ECHLY createCaptureRoot", "reusing existing DOM root");
+      (existingRoot as HTMLDivElement).style.pointerEvents = "none";
       captureRootRef.current = existingRoot as HTMLDivElement;
       setCaptureRootEl(existingRoot as HTMLDivElement);
       setCaptureRootReady(true);
@@ -406,29 +406,56 @@ export function useCaptureWidget({
     }
     const captureEl = document.createElement("div");
     captureEl.id = OVERLAY_ROOT_ID;
-    document.body.appendChild(captureEl);
+    /* pointer-events: none so wheel/scroll/touch pass through to page; interactive children use pointer-events: auto */
+    captureEl.style.pointerEvents = "none";
+    captureEl.style.zIndex = "2147483645";
+    const parent = captureRootParent ?? document.body;
+    parent.appendChild(captureEl);
     captureRootRef.current = captureEl;
     setCaptureRootEl(captureEl);
     setCaptureRootReady(true);
-  }, []);
+  }, [captureRootParent]);
 
-  /* Dedicated marker layer: appended after React portal so reconciliation does not remove markers. */
+  /* Extension: marker layer on document.body so getElementById finds it (capture root lives in shadow DOM). Mount when session starts; remove when session ends. */
+  const MARKER_LAYER_Z = 2147483644;
   useEffect(() => {
+    if (!extensionMode) return;
+    if (globalSessionModeActive) {
+      let layer = document.getElementById("echly-marker-layer");
+      if (!layer) {
+        layer = document.createElement("div");
+        layer.id = "echly-marker-layer";
+        layer.style.cssText = [
+          "position:fixed",
+          "inset:0",
+          "pointer-events:none",
+          `z-index:${MARKER_LAYER_Z}`,
+        ].join(";");
+        document.body.appendChild(layer);
+      }
+      return () => {};
+    }
+    const layer = document.getElementById("echly-marker-layer");
+    if (layer && layer.parentNode === document.body) {
+      layer.remove();
+    }
+  }, [extensionMode, globalSessionModeActive]);
+
+  /* Non-extension: marker layer inside capture root so reconciliation does not remove markers. */
+  useEffect(() => {
+    if (extensionMode) return;
     const root = document.getElementById("echly-capture-root");
     if (!root || root.querySelector("#echly-marker-layer")) return;
     const markerLayer = document.createElement("div");
     markerLayer.id = "echly-marker-layer";
     markerLayer.style.cssText = [
       "position:fixed",
-      "top:0",
-      "left:0",
-      "width:100%",
-      "height:100%",
+      "inset:0",
       "pointer-events:none",
-      "z-index:2147483646",
+      `z-index:${MARKER_LAYER_Z}`,
     ].join(";");
     root.appendChild(markerLayer);
-  }, [captureRootEl]);
+  }, [extensionMode, captureRootEl]);
 
   const removeCaptureRoot = useCallback(() => {
     if (extensionMode && globalSessionModeActive !== false) {
@@ -1201,7 +1228,7 @@ export function useCaptureWidget({
     }
   }, [extensionMode, globalSessionModeActive, globalSessionPaused]);
 
-  /** Extension: sync global pointers from background so all tabs show the same tray. Never skip updates. */
+  /** Extension: sync global pointers from background so tray updates in real time when new tickets are created. No guard during recording so tray reflects latest pointers immediately. */
   useEffect(() => {
     if (!extensionMode || pointersProp === undefined) return;
     pointersPropRef.current = pointersProp;
@@ -1251,10 +1278,19 @@ export function useCaptureWidget({
         return;
       }
       const context = buildCaptureContext(window, element);
+      const rect = element.getBoundingClientRect();
+      const elementRect = {
+        top: rect.top,
+        left: rect.left,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
       lastSessionClickedElementRef.current = element instanceof HTMLElement ? element : null;
       console.log("ECHLY pending SET", { screenshot: cropped, context });
       sessionFeedbackPendingRef.current = true;
-      setPending({ screenshot: cropped, context });
+      setPending({ screenshot: cropped, context, elementRect });
     },
     [getFullTabImage, sessionFeedbackPending]
   );
@@ -1343,9 +1379,18 @@ export function useCaptureWidget({
 
   const handleSessionFeedbackCancel = useCallback(() => {
     console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackCancel" });
+    recognitionRef.current?.stop();
+    recordingActiveRef.current = false;
+    pipelineActiveRef.current = false;
+    const activeId = activeRecordingIdRef.current;
+    if (activeId) {
+      setRecordings((prev) => prev.filter((r) => r.id !== activeId));
+      setActiveRecordingId(null);
+    }
     setPending(null);
     setSessionFeedbackSaving(false);
-  }, []);
+    setState("idle");
+  }, [setPending]);
 
   const handleSessionStartVoice = useCallback(() => {
     const pending = sessionFeedbackPending;

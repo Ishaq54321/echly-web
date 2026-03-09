@@ -26,6 +26,7 @@ export function TextFeedbackPanel({
       data-echly-ui="true"
       style={{
         position: "fixed",
+        pointerEvents: "auto",
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",

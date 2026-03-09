@@ -51,9 +51,10 @@ export function SessionControlPanel({
       data-echly-ui="true"
       style={{
         position: "fixed",
-        top: 24,
+        top: 16,
         left: "50%",
         transform: "translateX(-50%)",
+        pointerEvents: "auto",
         display: "flex",
         alignItems: "center",
         gap: 12,

@@ -1,25 +1,17 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Mic, MessageSquare, Gem } from "lucide-react";
+import { Mic, Gem, PenLine } from "lucide-react";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackItem from "./FeedbackItem";
 import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
 import { ResumeSessionModal } from "./ResumeSessionModal";
-import { ModeTile } from "./ModeTile";
 import { MicrophonePanel } from "./MicrophonePanel";
 import type { CaptureWidgetProps, CaptureState } from "./types";
 
 const CAPTURE_FLOW_STATES: CaptureState[] = ["focus_mode", "region_selecting", "voice_listening", "processing"];
-
-function shortDeviceName(label: string): string {
-  return label
-    .replace("Microphone (", "")
-    .replace(")", "")
-    .replace("Podcast Microphone", "Podcast Mic");
-}
 
 export default function CaptureWidget({
   sessionId,
@@ -53,6 +45,7 @@ export default function CaptureWidget({
   onSessionModeResume,
   onSessionModeEnd,
   captureMode = "voice",
+  captureRootParent,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   /** Extension: when true, show command screen (mode cards + footer). False when viewing a session (e.g. after Open Previous or when paused). */
@@ -89,6 +82,7 @@ export default function CaptureWidget({
     onSessionModeEnd,
     captureMode,
     selectedMicrophoneId: selectedMicrophone || undefined,
+    captureRootParent,
   });
 
   const isControlled = expanded !== undefined;
@@ -98,9 +92,11 @@ export default function CaptureWidget({
   const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state) || state.pillExiting;
   const hasStoredSession = Boolean(sessionId);
   const showSidebar = !isInCaptureFlow && !state.sessionMode;
-  const showPanelWhenPaused = state.sessionMode && state.sessionPaused;
-  const showFloatingButton = !effectiveIsOpen && showSidebar && !showPanelWhenPaused;
-  const showPanel = (effectiveIsOpen && showSidebar) || showPanelWhenPaused;
+  /** Session sidebar visible only when session is active (not paused, not ended). */
+  const showSessionSidebar =
+    extensionMode && Boolean(globalSessionModeActive) && !globalSessionPaused;
+  const showFloatingButton = !effectiveIsOpen && (showSidebar || showSessionSidebar);
+  const showPanel = effectiveIsOpen && (showSidebar || showSessionSidebar);
 
   const hasTickets = Boolean(state.pointers?.length);
   const showSessionButtons = !hasTickets && state.state === "idle";
@@ -210,6 +206,7 @@ export default function CaptureWidget({
             onPreviousSessionSelect(sessionId);
             setResumeModalOpen(false);
           }}
+          theme={theme}
         />
       )}
       {/* Capture layer: portaled into #echly-capture-root. Never inside sidebar. */}
@@ -308,6 +305,7 @@ export default function CaptureWidget({
                 openTicketCount={openTicketsCount}
                 title={undefined}
                 summary={summary}
+                showHomeButton={extensionMode}
                 theme={theme}
                 onThemeToggle={onThemeToggle}
                 onShowCommandScreen={() => setShowCommandScreen(true)}
@@ -322,36 +320,50 @@ export default function CaptureWidget({
                 {extensionMode && showSessionButtons && (
                   <div className="echly-mode-container">
                     <div className="echly-mode-header">Select feedback mode</div>
-                    <ModeTile
-                      icon={<Mic size={16} />}
-                      title="Voice (Recommended)"
-                      description="Speak naturally. Echly structures it automatically."
-                      selected={captureMode === "voice"}
-                      badge={<Gem size={16} strokeWidth={2} className="voice-recommended-icon" />}
-                      tooltip="Recommended for fastest feedback capture"
-                      onClick={() => setMode("voice")}
-                    />
-                    {captureMode === "voice" && (
-                      <div
-                        className="echly-mic-indicator"
-                        onClick={() => setMicDropdownOpen(true)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => e.key === "Enter" && setMicDropdownOpen(true)}
-                      >
-                        Select microphone: {shortDeviceName(
-                          microphones.find((m) => m.deviceId === selectedMicrophone)?.label ?? "Default"
-                        )}
-                      </div>
-                    )}
-                    <ModeTile
-                      icon={<MessageSquare size={16} />}
-                      title="Text"
-                      description="Write comments on elements. Echly structures them with AI."
-                      selected={captureMode === "text"}
-                      tooltip="Use when you prefer typing comments"
+                    <div
+                      className={`echly-mode-tile echly-mode-card voice-mode ${captureMode === "voice" ? "selected" : ""}`}
+                      onClick={() => {
+                        if (captureMode !== "voice") {
+                          setMode("voice");
+                        } else {
+                          setMicDropdownOpen(true);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          if (captureMode !== "voice") {
+                            setMode("voice");
+                          } else {
+                            setMicDropdownOpen(true);
+                          }
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={captureMode === "voice"}
+                      aria-label={captureMode === "voice" ? "Voice (Recommended). Click to select microphone." : "Voice (Recommended)"}
+                    >
+                      <span className="echly-mode-card-icon echly-mic-trigger" aria-hidden>
+                        <Mic size={18} strokeWidth={2} />
+                      </span>
+                      <span className="echly-mode-card-title">Voice (Recommended)</span>
+                      <span className="echly-mode-card-gem voice-recommended-icon" aria-hidden>
+                        <Gem size={18} strokeWidth={2} />
+                      </span>
+                    </div>
+                    <div
+                      className={`echly-mode-tile echly-mode-card text-mode ${captureMode === "text" ? "selected" : ""}`}
                       onClick={() => setMode("text")}
-                    />
+                      onKeyDown={(e) => e.key === "Enter" && setMode("text")}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={captureMode === "text"}
+                    >
+                      <span className="echly-mode-card-icon">
+                        <PenLine className="mode-icon" size={18} strokeWidth={2} />
+                      </span>
+                      <span className="echly-mode-card-title">Write</span>
+                    </div>
                   </div>
                 )}
 
