@@ -47,6 +47,8 @@ export default function CaptureWidget({
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   /** Extension: when true, show command screen (3 buttons only). False when viewing a session (e.g. after Open Previous or when paused). */
   const [showCommandScreen, setShowCommandScreen] = useState(true);
+  const [sessionTitle, setSessionTitle] = useState("Untitled Session");
+  const [visibleTickets, setVisibleTickets] = useState(10);
   const {
     state,
     handlers,
@@ -102,15 +104,37 @@ export default function CaptureWidget({
     onCollapseRequest?.();
   }, [isInCaptureFlow, onCollapseRequest]);
 
-  const insightCount = state.pointers.length;
+  const openTicketsCount = state.pointers.filter((p) => {
+    const status = (p as { status?: string }).status;
+    const isResolved = (p as { isResolved?: boolean }).isResolved;
+    if (status === "resolved" || isResolved === true) return false;
+    return true;
+  }).length;
+
+  // Lazy-load: reset when list shrinks, cap visible to actual length
+  const ticketsToShow = state.pointers.slice(0, Math.min(visibleTickets, state.pointers.length));
+  const handleListScroll = React.useCallback(() => {
+    const el = listScrollRef.current;
+    if (!el || state.pointers.length <= visibleTickets) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    const scrollRatio = (scrollTop + clientHeight) / scrollHeight;
+    if (scrollRatio > 0.8) {
+      setVisibleTickets((prev) => Math.min(prev + 10, state.pointers.length));
+    }
+  }, [state.pointers.length, visibleTickets]);
+  useEffect(() => {
+    if (state.pointers.length < visibleTickets) {
+      setVisibleTickets((prev) => Math.min(prev, Math.max(10, state.pointers.length)));
+    }
+  }, [state.pointers.length, visibleTickets]);
   const highPriorityCount = state.pointers.filter((p) =>
     /critical|bug|high|urgent/i.test(p.type || "")
   ).length;
   const summary =
-    insightCount > 0
+    openTicketsCount > 0
       ? highPriorityCount > 0
-        ? `${insightCount} insights • ${highPriorityCount} need attention`
-        : `${insightCount} insights`
+        ? `${highPriorityCount} need attention`
+        : null
       : null;
 
   useEffect(() => {
@@ -233,23 +257,26 @@ export default function CaptureWidget({
             <div className="echly-sidebar-surface">
               <CaptureHeader
                 onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
+                showSessionTitle={hasTickets}
+                sessionTitle={sessionTitle}
+                onSessionTitleChange={setSessionTitle}
+                openTicketCount={openTicketsCount}
+                title={undefined}
                 summary={summary}
                 theme={theme}
                 onThemeToggle={onThemeToggle}
-                handlers={{
-                  endSession: handlers.endSession,
-                  clearPointers: undefined,
-                }}
                 onShowCommandScreen={() => setShowCommandScreen(true)}
               />
 
               <div
                 ref={listScrollRef}
                 className="echly-sidebar-body"
+                onScroll={handleListScroll}
+                onWheel={(e) => e.stopPropagation()}
               >
                 {hasTickets && (
                   <div className="echly-feedback-list">
-                    {state.pointers.map((p) => (
+                    {ticketsToShow.map((p) => (
                       <FeedbackItem
                         key={p.id}
                         item={p}
@@ -267,26 +294,26 @@ export default function CaptureWidget({
                     {state.errorMessage}
                   </div>
                 )}
-
-                {showSessionButtons && (
-                  <WidgetFooter
-                    isIdle={true}
-                    onAddFeedback={handlers.handleAddFeedback}
-                    extensionMode={extensionMode}
-                    onStartSession={extensionMode ? handlers.startSession : undefined}
-                    onResumeSession={
-                      extensionMode && showResumeButton ? handleResumeActiveSession : undefined
-                    }
-                    onOpenPreviousSession={
-                      extensionMode && showPreviousButton && fetchSessions && onResumeSessionSelect
-                        ? () => setResumeModalOpen(true)
-                        : undefined
-                    }
-                    hasActiveSession={hasStoredSession}
-                    captureDisabled={captureDisabled}
-                  />
-                )}
               </div>
+
+              {showSessionButtons && (
+                <WidgetFooter
+                  isIdle={true}
+                  onAddFeedback={handlers.handleAddFeedback}
+                  extensionMode={extensionMode}
+                  onStartSession={extensionMode ? handlers.startSession : undefined}
+                  onResumeSession={
+                    extensionMode && showResumeButton ? handleResumeActiveSession : undefined
+                  }
+                  onOpenPreviousSession={
+                    extensionMode && showPreviousButton && fetchSessions && onResumeSessionSelect
+                      ? () => setResumeModalOpen(true)
+                      : undefined
+                  }
+                  hasActiveSession={hasStoredSession}
+                  captureDisabled={captureDisabled}
+                />
+              )}
             </div>
           </div>
         </>

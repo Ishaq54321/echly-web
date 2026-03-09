@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState, useRef, useEffect } from "react";
 import { X } from "lucide-react";
 
 const SunIcon = () => (
@@ -17,6 +18,16 @@ const MoonIcon = () => (
 
 type CaptureHeaderProps = {
   onClose: () => void;
+  /** When true, show editable session title + ticket count. Otherwise show "Echly" and optional summary. */
+  showSessionTitle?: boolean;
+  /** Session title (e.g. "Untitled Session"). Used when showSessionTitle is true. */
+  sessionTitle?: string;
+  /** Called when user saves the session title (blur or Enter). */
+  onSessionTitleChange?: (title: string) => void;
+  /** Open ticket count; shown as subtext when showSessionTitle. */
+  openTicketCount?: number;
+  /** Legacy: when set and not showSessionTitle, used as main header title. Otherwise "Echly". */
+  title?: string | null;
   summary?: string | null;
   theme?: "dark" | "light";
   onThemeToggle?: () => void;
@@ -29,25 +40,99 @@ type CaptureHeaderProps = {
 
 export default function CaptureHeader({
   onClose,
+  showSessionTitle = false,
+  sessionTitle = "Untitled Session",
+  onSessionTitleChange,
+  openTicketCount = 0,
+  title = null,
   summary = null,
   theme = "dark",
   onThemeToggle,
   handlers,
   onShowCommandScreen,
 }: CaptureHeaderProps) {
-  const handleClose = () => {
-    handlers?.endSession?.();
-    handlers?.clearPointers?.();
-    onShowCommandScreen?.();
-    onClose();
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [localTitle, setLocalTitle] = useState(sessionTitle);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLocalTitle(sessionTitle);
+  }, [sessionTitle]);
+
+  useEffect(() => {
+    if (editingTitle && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingTitle]);
+
+  const saveTitle = () => {
+    setEditingTitle(false);
+    const trimmed = localTitle.trim() || "Untitled Session";
+    setLocalTitle(trimmed);
+    onSessionTitleChange?.(trimmed);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveTitle();
+    }
   };
 
   return (
     <div className="echly-sidebar-header">
       <div className="echly-sidebar-header-left">
-        <span className="echly-sidebar-title">Echly</span>
-        {summary && (
-          <span className="echly-sidebar-summary">{summary}</span>
+        {showSessionTitle ? (
+          <>
+            {editingTitle ? (
+              <input
+                ref={inputRef}
+                type="text"
+                value={localTitle}
+                onChange={(e) => setLocalTitle(e.target.value)}
+                onBlur={saveTitle}
+                onKeyDown={handleTitleKeyDown}
+                className="echly-sidebar-title echly-sidebar-title-edit"
+                style={{
+                  width: "100%",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.2))",
+                  outline: "none",
+                  font: "inherit",
+                  color: "inherit",
+                }}
+                aria-label="Session title"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingTitle(true)}
+                className="echly-sidebar-title echly-sidebar-title-button"
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                {localTitle}
+              </button>
+            )}
+            <span className="echly-sidebar-ticket-count">
+              {openTicketCount} feedback ticket{openTicketCount !== 1 ? "s" : ""}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="echly-sidebar-title">{title ?? "Echly"}</span>
+            {summary && (
+              <span className="echly-sidebar-summary">{summary}</span>
+            )}
+          </>
         )}
       </div>
       <div className="echly-header-actions">
@@ -64,9 +149,9 @@ export default function CaptureHeader({
         )}
         <button
           type="button"
-          onClick={handleClose}
+          onClick={onClose}
           className="echly-sidebar-close"
-          aria-label="Close"
+          aria-label="Minimize"
         >
           <X size={16} strokeWidth={1.5} />
         </button>

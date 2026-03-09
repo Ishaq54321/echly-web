@@ -207,6 +207,8 @@ export function useCaptureWidget({
   const recognitionOnstartTimeRef = useRef<number | null>(null);
   /** [VOICE] Diagnostic: whether first transcript chunk has been logged for this session. */
   const hasReceivedFirstTranscriptRef = useRef(false);
+  /** True while in voice_listening (or equivalent) so overlay/effects do not tear down during recording. */
+  const recordingActiveRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
@@ -388,6 +390,7 @@ export function useCaptureWidget({
   }, [captureRootEl]);
 
   const removeCaptureRoot = useCallback(() => {
+    if (recordingActiveRef.current) return;
     if (extensionMode && globalSessionModeActive !== false) {
       return;
     }
@@ -518,12 +521,14 @@ export function useCaptureWidget({
       if (!manualStopRef.current) {
         echlyLog("RECORDING", "unexpected end");
         if (stateRef.current === "voice_listening") {
+          recordingActiveRef.current = false;
           setState("idle");
         }
         return;
       }
 
       manualStopRef.current = false;
+      recordingActiveRef.current = false;
 
       const s = stateRef.current;
       if (s === "processing" || s === "success") return;
@@ -561,10 +566,12 @@ export function useCaptureWidget({
       analyserRef.current = analyser;
       console.log("[VOICE] recognition.start() called", Date.now());
       recognitionRef.current?.start();
+      recordingActiveRef.current = true;
       setState("voice_listening");
       setListeningAudioLevel(0);
     } catch (err) {
       console.error("Microphone permission denied:", err);
+      recordingActiveRef.current = false;
       setErrorMessage("Microphone permission denied.");
       setState("error");
       removeCaptureRoot();
@@ -574,6 +581,7 @@ export function useCaptureWidget({
 
   const finishListening = useCallback(async () => {
     echlyLog("RECORDING", "finish requested");
+    recordingActiveRef.current = false;
     manualStopRef.current = true;
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(8);
@@ -733,6 +741,7 @@ export function useCaptureWidget({
 
   const discardListening = useCallback(() => {
     echlyLog("RECORDING", "discard");
+    recordingActiveRef.current = false;
     recognitionRef.current?.stop();
     const activeId = activeRecordingIdRef.current;
     setRecordings((prev) => prev.filter((r) => r.id !== activeId));
@@ -1083,7 +1092,7 @@ export function useCaptureWidget({
     if (globalSessionModeActive === true) {
       setSessionMode(true);
       setSessionPaused(globalSessionPaused ?? false);
-      setSessionFeedbackPending(null);
+      if (!recordingActiveRef.current) setSessionFeedbackPending(null);
       setEndPending(false);
       if (!captureRootRef.current) {
         createCaptureRoot();
@@ -1094,6 +1103,7 @@ export function useCaptureWidget({
       setPausePending(false);
     }
     if (globalSessionModeActive === false) {
+      if (recordingActiveRef.current) return;
       setSessionMode(false);
       setSessionPaused(false);
       setPausePending(false);
@@ -1109,6 +1119,7 @@ export function useCaptureWidget({
   useEffect(() => {
     if (!extensionMode) return;
     if (!globalSessionModeActive) {
+      if (recordingActiveRef.current) return;
       setSessionMode(false);
       setSessionPaused(false);
       setPausePending(false);
@@ -1151,6 +1162,7 @@ export function useCaptureWidget({
   /** Extension: sync global pointers from background so all tabs show the same tray. */
   useEffect(() => {
     if (!extensionMode || pointersProp === undefined) return;
+    if (recordingActiveRef.current) return;
     setPointers(pointersProp);
     setSessionFeedbackPending(null);
   }, [extensionMode, pointersProp]);
