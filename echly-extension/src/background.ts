@@ -39,6 +39,7 @@ let globalUIState: {
   sessionTitle: string | null;
   sessionModeActive: boolean;
   sessionPaused: boolean;
+  sessionLoading: boolean;
   pointers: StructuredFeedback[];
   captureMode: "voice" | "text";
 } = {
@@ -49,6 +50,7 @@ let globalUIState: {
   sessionTitle: null,
   sessionModeActive: false,
   sessionPaused: false,
+  sessionLoading: false,
   pointers: [],
   captureMode: "voice",
 };
@@ -72,6 +74,7 @@ function endSessionFromIdle(): void {
   globalUIState.sessionTitle = null;
   globalUIState.sessionModeActive = false;
   globalUIState.sessionPaused = false;
+  globalUIState.sessionLoading = false;
   globalUIState.pointers = [];
   chrome.storage.local.set({
     activeSessionId: null,
@@ -415,6 +418,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionId = sessionId;
     globalUIState.sessionModeActive = true;
     globalUIState.sessionPaused = false;
+    globalUIState.sessionLoading = Boolean(sessionId);
     chrome.storage.local.set({
       activeSessionId: sessionId,
       sessionModeActive: true,
@@ -424,9 +428,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       globalUIState.expanded = true;
       resetSessionIdleTimer();
     }
+    broadcastUIState();
     (async () => {
       if (!sessionId) {
         globalUIState.pointers = [];
+        globalUIState.sessionLoading = false;
         broadcastUIState();
         sendResponse({ success: true });
         return;
@@ -453,6 +459,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } catch {
         globalUIState.pointers = [];
       }
+      globalUIState.sessionLoading = false;
       broadcastUIState();
       sendResponse({ success: true });
     })();
@@ -519,6 +526,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionTitle = null;
     globalUIState.sessionModeActive = false;
     globalUIState.sessionPaused = false;
+    globalUIState.sessionLoading = false;
     globalUIState.pointers = [];
     chrome.storage.local.set({
       activeSessionId: null,

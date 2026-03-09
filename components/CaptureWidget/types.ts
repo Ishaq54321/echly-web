@@ -111,6 +111,8 @@ export type CaptureWidgetProps = {
   loadSessionWithPointers?: { sessionId: string; pointers: StructuredFeedback[] } | null;
   /** Extension: global session pointers from background. When provided, overrides loadSessionWithPointers for tray list; all tabs show same list. */
   pointers?: StructuredFeedback[];
+  /** Extension: true while loading a previous session's feedback; show spinner instead of empty state. */
+  sessionLoading?: boolean;
   /** Extension: session title from globalUIState. When provided, overrides internal sessionTitle for display. */
   sessionTitleProp?: string | null;
   /** Extension: when session title is saved in tray. When provided, called instead of internal setSessionTitle (enables PATCH + broadcast). */
@@ -147,8 +149,20 @@ export type CaptureWidgetProps = {
   captureRootParent?: HTMLElement | null;
   /** When true, show a loading indicator above the feedback tray while a ticket is being processed (e.g. after submit). */
   isProcessingFeedback?: boolean;
+  /** Extension: list of in-flight and failed feedback jobs. When provided, tray shows one card per job (processing / failed) instead of a single isProcessingFeedback flag. */
+  feedbackJobs?: FeedbackJob[];
   /** Extension: URL for the launcher logo (minimized state). When set with extensionMode, launcher shows logo instead of text. */
   launcherLogoUrl?: string;
+};
+
+/** One feedback job in the pipeline (processing or failed). Completed jobs are removed and the ticket appears in pointers. */
+export type FeedbackJob = {
+  id: string;
+  status: "processing" | "failed";
+  transcript: string;
+  screenshot: string | null;
+  createdAt: number;
+  errorMessage?: string;
 };
 
 export type Position = { x: number; y: number };

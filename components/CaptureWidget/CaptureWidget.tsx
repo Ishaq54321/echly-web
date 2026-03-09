@@ -34,6 +34,7 @@ export default function CaptureWidget({
   onPreviousSessionSelect,
   loadSessionWithPointers,
   pointers: pointersProp,
+  sessionLoading = false,
   onSessionLoaded,
   onSessionEnd: onSessionEndCallback,
   onCreateSession,
@@ -48,6 +49,7 @@ export default function CaptureWidget({
   captureMode = "voice",
   captureRootParent,
   isProcessingFeedback = false,
+  feedbackJobs,
   launcherLogoUrl,
   sessionTitleProp,
   onSessionTitleChange: onSessionTitleChangeProp,
@@ -306,7 +308,7 @@ export default function CaptureWidget({
             <div className="echly-sidebar-surface" data-theme={theme}>
               <CaptureHeader
                 onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
-                showSessionTitle={hasTickets || sessionModeActive}
+                showSessionTitle={hasTickets || sessionModeActive || sessionLoading}
                 sessionTitle={sessionTitleProp ?? sessionTitle ?? "Untitled Session"}
                 onSessionTitleChange={onSessionTitleChangeProp ?? setSessionTitle}
                 openTicketCount={openTicketsCount}
@@ -326,9 +328,28 @@ export default function CaptureWidget({
                 onScroll={handleListScroll}
                 onWheel={(e) => e.stopPropagation()}
               >
-                {((hasTickets || isProcessingFeedback) && (sessionModeActive || !extensionMode)) && (
+                {sessionModeActive && sessionLoading && (
+                  <div className="echly-session-loading-state" aria-live="polite" aria-busy="true">
+                    <span className="echly-spinner" aria-hidden />
+                    <span className="echly-session-loading-text">Loading session...</span>
+                  </div>
+                )}
+                {((hasTickets || isProcessingFeedback || (feedbackJobs && feedbackJobs.length > 0)) && (sessionModeActive || !extensionMode) && !sessionLoading) && (
                   <div className="echly-feedback-list">
-                    {isProcessingFeedback && (
+                    {feedbackJobs?.filter((j) => j.status === "processing").map((job) => (
+                      <div key={job.id} id="processing_card_markup" className="echly-feedback-card echly-feedback-processing" aria-live="polite">
+                        <span className="echly-spinner" aria-hidden />
+                        <span className="echly-processing-text">
+                          Processing feedback...
+                        </span>
+                      </div>
+                    ))}
+                    {feedbackJobs?.filter((j) => j.status === "failed").map((job) => (
+                      <div key={job.id} className="echly-feedback-card echly-feedback-failed" aria-live="polite">
+                        <span className="echly-failed-text">{job.errorMessage ?? "AI processing failed."}</span>
+                      </div>
+                    ))}
+                    {!feedbackJobs?.length && isProcessingFeedback && (
                       <div id="processing_card_markup" className="echly-feedback-card echly-feedback-processing">
                         <span className="echly-spinner" aria-hidden />
                         <span className="echly-processing-text">
@@ -349,7 +370,7 @@ export default function CaptureWidget({
                       ))}
                   </div>
                 )}
-                {sessionModeActive && !hasTickets && !isProcessingFeedback && (
+                {sessionModeActive && !hasTickets && !isProcessingFeedback && !(feedbackJobs && feedbackJobs.length > 0) && !sessionLoading && (
                   <div className="echly-empty-session-state" aria-live="polite">
                     <span className="echly-empty-session-text">No feedback yet. Add feedback from the page.</span>
                   </div>

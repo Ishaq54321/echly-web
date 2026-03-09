@@ -1441,6 +1441,24 @@ textarea:focus-visible {
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-top-color: #60A5FA;
 }
+.echly-feedback-failed {
+  display: flex;
+  align-items: center;
+  padding: 16px 18px;
+  border-radius: 14px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 14px;
+  background: rgba(239, 68, 68, 0.08);
+}
+.dark .echly-feedback-failed {
+  background: rgba(239, 68, 68, 0.12);
+}
+.echly-feedback-failed .echly-failed-text {
+  color: #dc2626;
+}
+.dark .echly-feedback-failed .echly-failed-text {
+  color: #f87171;
+}
 @keyframes echly-spin {
   to {
     transform: rotate(360deg);
@@ -1459,6 +1477,29 @@ textarea:focus-visible {
   color: var(--text-secondary);
   line-height: 1.4;
 }
+
+/* Session loading: centered spinner while previous session feedback is fetched */
+.echly-session-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 16px;
+  min-height: 120px;
+}
+.echly-session-loading-state .echly-spinner {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
+  flex-shrink: 0;
+}
+.echly-session-loading-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
 .echly-sidebar-error {
   font-size: 13px;
   font-weight: 500;

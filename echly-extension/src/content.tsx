@@ -9,7 +9,7 @@ import { apiFetch } from "./contentAuthFetch";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
-import type { StructuredFeedback, CaptureContext } from "@/components/CaptureWidget/types";
+import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/components/CaptureWidget/types";
 import { ECHLY_DEBUG, log } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 
@@ -58,9 +58,17 @@ type GlobalUIState = {
   sessionTitle: string | null;
   sessionModeActive: boolean;
   sessionPaused: boolean;
+  sessionLoading: boolean;
   pointers: StructuredFeedback[];
   captureMode: "voice" | "text";
 };
+
+/** Generate a unique id for a feedback job (used for concurrent job queue). */
+function createUniqueId(): string {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `job-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
 
 /** Ask background to open popup (e.g. in a new tab) so user can sign in. */
 function requestOpenPopup(): void {
@@ -98,6 +106,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     sessionTitle: null,
     sessionModeActive: false,
     sessionPaused: false,
+    sessionLoading: false,
     pointers: [],
     captureMode: "voice",
   });
@@ -105,7 +114,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [hasPreviousSessions, setHasPreviousSessions] = React.useState(false);
   const effectiveSessionId = globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
-  const submissionLock = React.useRef(false);
 
   type ExtensionClarityPending = {
     tickets: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
@@ -130,6 +138,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const clarityAssistantSubmitLock = React.useRef(false);
   const [clarityAssistantSubmitting, setClarityAssistantSubmitting] = React.useState(false);
   const [isProcessingFeedback, setIsProcessingFeedback] = React.useState(false);
+  /** Job queue for concurrent feedback captures; each job shows its own Processing/failed card in the tray. */
+  const [feedbackJobs, setFeedbackJobs] = React.useState<FeedbackJob[]>([]);
   const logoUrl =
     typeof chrome !== "undefined" && chrome.runtime?.getURL
       ? chrome.runtime.getURL("assets/Echly_logo.svg")
@@ -313,22 +323,24 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       options?: { sessionMode?: boolean }
     ): Promise<StructuredFeedback | undefined> => {
       echlyLog("PIPELINE", "start");
-      if (submissionLock.current) {
-        echlyLog("PIPELINE", "blocked by submissionLock");
-        callbacks?.onError?.();
-        return undefined;
-      }
-      submissionLock.current = true;
 
       if (!effectiveSessionId || !user) {
         echlyLog("PIPELINE", "error");
-        callbacks?.onError();
-        submissionLock.current = false;
+        callbacks?.onError?.();
         return undefined;
       }
       if (callbacks) {
+        const jobId = createUniqueId();
+        const job: FeedbackJob = {
+          id: jobId,
+          status: "processing",
+          transcript,
+          screenshot,
+          createdAt: Date.now(),
+        };
+        setFeedbackJobs((prev) => [job, ...prev]);
+
         (async () => {
-          setIsProcessingFeedback(true);
           const ctx = context as CaptureContext | null | undefined;
           const imageForOcr = ctx?.ocrImageDataUrl ?? screenshot ?? null;
           if (ctx?.ocrImageDataUrl) {
@@ -407,8 +419,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 clarityAssistantSubmitLock.current = false;
                 setClarityAssistantSubmitting(false);
                 setShowClarityAssistant(true);
-                submissionLock.current = false;
-                setIsProcessingFeedback(false);
+                setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
                 return;
               }
 
@@ -437,8 +448,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 clarityAssistantSubmitLock.current = false;
                 setClarityAssistantSubmitting(false);
                 setShowClarityAssistant(true);
-                submissionLock.current = false;
-                setIsProcessingFeedback(false);
+                setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
                 return;
               }
             }
@@ -450,10 +460,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   payload: { transcript, screenshotUrl: null, screenshotId, sessionId: effectiveSessionId, context: enrichedContext },
                 },
                 (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] }; error?: string } | undefined) => {
-                  submissionLock.current = false;
-                  setIsProcessingFeedback(false);
                   if (chrome.runtime.lastError) {
                     echlyLog("PIPELINE", "error");
+                    setFeedbackJobs((prev) =>
+                      prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "AI processing failed." } : j))
+                    );
                     callbacks.onError();
                     return;
                   }
@@ -462,6 +473,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                     const t = response.ticket;
                     const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : (t.description ? t.description.split(/\n\s*\n/) : []);
                     echlyLog("PIPELINE", "ticket created", { ticketId });
+                    setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
                     callbacks.onSuccess({
                       id: ticketId,
                       title: t.title,
@@ -481,6 +493,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                     }).catch(() => {});
                   } else {
                     echlyLog("PIPELINE", "error");
+                    setFeedbackJobs((prev) =>
+                      prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "AI processing failed." } : j))
+                    );
                     callbacks.onError();
                   }
                 }
@@ -525,11 +540,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
               }
             }
-            submissionLock.current = false;
-            setIsProcessingFeedback(false);
             if (firstCreated) {
               const ticketId = firstCreated.id;
               echlyLog("PIPELINE", "ticket created", { ticketId });
+              setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
               notifyFeedbackCreated(firstCreated);
               uploadPromise.then((url) => {
                 if (url) {
@@ -545,12 +559,16 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               callbacks.onSuccess(firstCreated);
             } else {
               echlyLog("PIPELINE", "error");
+              setFeedbackJobs((prev) =>
+                prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "AI processing failed." } : j))
+              );
               callbacks.onError();
             }
           } catch (err) {
             console.error("[Echly] Structure or submit failed:", err);
-            submissionLock.current = false;
-            setIsProcessingFeedback(false);
+            setFeedbackJobs((prev) =>
+              prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "AI processing failed." } : j))
+            );
             echlyLog("PIPELINE", "error");
             callbacks.onError();
           }
@@ -668,7 +686,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       return firstCreated;
       } finally {
-        submissionLock.current = false;
         setIsProcessingFeedback(false);
       }
     },
@@ -1337,9 +1354,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         hasPreviousSessions={hasPreviousSessions}
         onPreviousSessionSelect={onPreviousSessionSelect}
         pointers={globalState.pointers ?? []}
+        sessionLoading={globalState.sessionLoading ?? false}
         sessionTitleProp={globalState.sessionTitle ?? undefined}
         onSessionTitleChange={onSessionTitleChange}
         isProcessingFeedback={isProcessingFeedback}
+        feedbackJobs={feedbackJobs}
         onSessionEnd={() => {}}
         onCreateSession={createSession}
         onActiveSessionChange={onActiveSessionChange}
@@ -1445,6 +1464,7 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     sessionTitle: state.sessionTitle ?? null,
     sessionModeActive: state.sessionModeActive ?? false,
     sessionPaused: state.sessionPaused ?? false,
+    sessionLoading: state.sessionLoading ?? false,
     pointers: Array.isArray(state.pointers) ? state.pointers : [],
     captureMode: state.captureMode === "text" ? "text" : "voice",
   };
