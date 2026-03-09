@@ -127,6 +127,8 @@ export type CaptureWidgetProps = {
   onSessionModeResume?: () => void;
   /** Extension: notify background that session ended (disable overlay in all tabs). */
   onSessionModeEnd?: () => void;
+  /** Extension: notify background of user activity (resets 30-min idle timeout). Called on click capture, etc. */
+  onSessionActivity?: () => void;
   /** Extension: global capture mode (voice vs text). When "voice", element click opens voice UI; when "text", opens text UI. */
   captureMode?: "voice" | "text";
   /** Optional preferred microphone deviceId for voice capture (from enumerateDevices). */

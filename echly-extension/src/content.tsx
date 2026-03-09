@@ -43,6 +43,11 @@ function setHostVisibility(visible: boolean): void {
   }
 }
 
+/** Tray remains visible when session is active or paused; hide only when session ends. */
+function getShouldShowTray(state: GlobalUIState): boolean {
+  return state.visible === true || state.sessionModeActive === true || state.sessionPaused === true;
+}
+
 type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
 
 type GlobalUIState = {
@@ -138,7 +143,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). No local source of truth. */
   React.useEffect(() => {
     const applyGlobalState = (state: GlobalUIState) => {
-      setHostVisibility(state.visible);
+      setHostVisibility(getShouldShowTray(state));
       setGlobalState(state);
     };
     (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (state: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__ = applyGlobalState;
@@ -153,7 +158,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       const s = e.detail?.state;
       if (!s) return;
       echlyLog("CONTENT", "global state received", s);
-      setHostVisibility(s.visible);
+      setHostVisibility(getShouldShowTray(s));
       setGlobalState(s);
     };
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
@@ -166,7 +171,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       { type: "ECHLY_GET_GLOBAL_STATE" },
       (response: GlobalStateResponse) => {
         if (response?.state) {
-          setHostVisibility(response.state.visible ?? false);
+          setHostVisibility(getShouldShowTray(response.state));
           setGlobalState(response.state);
         }
       }
@@ -183,7 +188,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           if (response?.state) {
             const normalized = normalizeGlobalState(response.state);
             if (normalized) {
-              setHostVisibility(normalized.visible);
+              setHostVisibility(getShouldShowTray(normalized));
               setGlobalState(normalized);
             }
           }
@@ -1234,6 +1239,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         onSessionModeStart={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {})}
         onSessionModePause={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {})}
         onSessionModeResume={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {})}
+        onSessionActivity={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch(() => {})}
         onSessionModeEnd={() => {
           const sessionId = globalState.sessionId;
           (async () => {
@@ -1347,7 +1353,7 @@ function syncInitialGlobalState(host: HTMLDivElement): void {
     (response: GlobalStateResponse) => {
       const normalized = normalizeGlobalState(response?.state);
       if (!normalized) return;
-      host.style.display = normalized.visible ? "block" : "none";
+      host.style.display = getShouldShowTray(normalized) ? "block" : "none";
       dispatchGlobalState(normalized);
     }
   );
@@ -1362,7 +1368,7 @@ function ensureVisibilityStateRefresh(): void {
       (response: GlobalStateResponse) => {
         const normalized = normalizeGlobalState(response?.state);
         if (!normalized) return;
-        setHostVisibility(normalized.visible);
+        setHostVisibility(getShouldShowTray(normalized));
         dispatchGlobalState(normalized);
       }
     );
@@ -1384,7 +1390,7 @@ function ensureMessageListener(host: HTMLDivElement): void {
     if (!h) return;
     if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
       const state = msg.state;
-      setHostVisibility(state.visible);
+      setHostVisibility(getShouldShowTray(state));
       (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(state);
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
       window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } }));
@@ -1403,7 +1409,7 @@ function ensureMessageListener(host: HTMLDivElement): void {
         if (response?.state) {
           const normalized = normalizeGlobalState(response.state);
           if (normalized) {
-            setHostVisibility(normalized.visible);
+            setHostVisibility(getShouldShowTray(normalized));
             (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
             window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
           }

@@ -51,6 +51,48 @@ let globalUIState: {
   captureMode: "voice",
 };
 
+/** 30-minute safety timeout: session ends after this much inactivity. */
+const SESSION_IDLE_TIMEOUT = 30 * 60 * 1000;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearSessionIdleTimer(): void {
+  if (idleTimer != null) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+}
+
+function endSessionFromIdle(): void {
+  echlyLog("BACKGROUND", "session idle timeout — ending session");
+  clearSessionIdleTimer();
+  activeSessionId = null;
+  globalUIState.sessionId = null;
+  globalUIState.sessionModeActive = false;
+  globalUIState.sessionPaused = false;
+  globalUIState.pointers = [];
+  chrome.storage.local.set({
+    activeSessionId: null,
+    sessionModeActive: false,
+    sessionPaused: false,
+  });
+  broadcastUIState();
+  chrome.tabs.query({}, (tabs) => {
+    tabs.forEach((tab) => {
+      if (tab.id) {
+        chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" }).catch(() => {});
+      }
+    });
+  });
+}
+
+function resetSessionIdleTimer(): void {
+  if (!globalUIState.sessionModeActive) return;
+  clearSessionIdleTimer();
+  idleTimer = setTimeout(() => {
+    endSessionFromIdle();
+  }, SESSION_IDLE_TIMEOUT);
+}
+
 function persistSessionLifecycleState(): void {
   chrome.storage.local.set({
     activeSessionId,
@@ -294,6 +336,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sessionModeActive: true,
       sessionPaused: false,
     });
+    if (sessionId) {
+      globalUIState.expanded = true;
+      resetSessionIdleTimer();
+    }
     (async () => {
       if (!sessionId) {
         globalUIState.pointers = [];
@@ -335,8 +381,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionModeActive = true;
     globalUIState.sessionPaused = false;
     globalUIState.sessionId = activeSessionId;
+    globalUIState.expanded = true;
     persistSessionLifecycleState();
     broadcastUIState();
+    resetSessionIdleTimer();
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_SESSION_ACTIVITY") {
+    resetSessionIdleTimer();
     sendResponse({ ok: true });
     return false;
   }
@@ -348,6 +402,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionId = activeSessionId;
     persistSessionLifecycleState();
     broadcastUIState();
+    resetSessionIdleTimer();
     sendResponse({ ok: true });
     return false;
   }
@@ -359,12 +414,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionId = activeSessionId;
     persistSessionLifecycleState();
     broadcastUIState();
+    resetSessionIdleTimer();
     sendResponse({ ok: true });
     return false;
   }
 
   if (request.type === "ECHLY_SESSION_MODE_END") {
     echlyLog("BACKGROUND", "session end broadcast");
+    clearSessionIdleTimer();
     activeSessionId = null;
     globalUIState.sessionId = null;
     globalUIState.sessionModeActive = false;
@@ -467,6 +524,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionId = activeSessionId;
     globalUIState.isRecording = true;
     broadcastUIState();
+    resetSessionIdleTimer();
     sendResponse({ ok: true });
     return false;
   }
@@ -680,6 +738,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             type: firstCreated.type,
           };
           globalUIState.pointers = [...globalUIState.pointers, pointer];
+          resetSessionIdleTimer();
           broadcastUIState();
           sendResponse({ success: true, ticket: firstCreated });
           chrome.tabs.query({}, (tabs) => {

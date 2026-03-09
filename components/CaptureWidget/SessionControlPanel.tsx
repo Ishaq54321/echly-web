@@ -49,9 +49,10 @@ export function SessionControlPanel({
   return (
     <div
       data-echly-ui="true"
+      className="echly-session-controls"
       style={{
         position: "fixed",
-        top: 16,
+        bottom: 24,
         left: "50%",
         transform: "translateX(-50%)",
         pointerEvents: "auto",
@@ -64,7 +65,7 @@ export function SessionControlPanel({
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-        zIndex: 2147483647,
+        zIndex: 2147483646,
         border: "1px solid rgba(255,255,255,0.08)",
         fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
       }}

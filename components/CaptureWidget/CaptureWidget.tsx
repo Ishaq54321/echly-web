@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Mic, Gem, PenLine } from "lucide-react";
+import { Mic, PenLine } from "lucide-react";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackItem from "./FeedbackItem";
@@ -44,6 +44,7 @@ export default function CaptureWidget({
   onSessionModePause,
   onSessionModeResume,
   onSessionModeEnd,
+  onSessionActivity,
   captureMode = "voice",
   captureRootParent,
 }: CaptureWidgetProps) {
@@ -80,6 +81,7 @@ export default function CaptureWidget({
     onSessionModePause,
     onSessionModeResume,
     onSessionModeEnd,
+    onSessionActivity,
     captureMode,
     selectedMicrophoneId: selectedMicrophone || undefined,
     captureRootParent,
@@ -92,27 +94,15 @@ export default function CaptureWidget({
   const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state) || state.pillExiting;
   const hasStoredSession = Boolean(sessionId);
   const showSidebar = !isInCaptureFlow && !state.sessionMode;
-  /** Session sidebar visible only when session is active (not paused, not ended). */
-  const showSessionSidebar =
-    extensionMode && Boolean(globalSessionModeActive) && !globalSessionPaused;
+  /** Session sidebar visible when session is active or paused; hide only when session ends. */
+  const shouldShowTray = globalSessionModeActive === true || globalSessionPaused === true;
+  const showSessionSidebar = extensionMode && shouldShowTray;
   const showFloatingButton = !effectiveIsOpen && (showSidebar || showSessionSidebar);
   const showPanel = effectiveIsOpen && (showSidebar || showSessionSidebar);
 
   const hasTickets = Boolean(state.pointers?.length);
   const showSessionButtons = !hasTickets && state.state === "idle";
   const showPreviousButton = Boolean(hasPreviousSessions);
-
-  // Collapse the widget while recording (controlled mode via background)
-  const didCollapseRef = useRef(false);
-  useEffect(() => {
-    if (!isInCaptureFlow) {
-      didCollapseRef.current = false;
-      return;
-    }
-    if (didCollapseRef.current) return;
-    didCollapseRef.current = true;
-    onCollapseRequest?.();
-  }, [isInCaptureFlow, onCollapseRequest]);
 
   const openTicketsCount = state.pointers.filter((p) => {
     const status = (p as { status?: string }).status;
@@ -236,7 +226,6 @@ export default function CaptureWidget({
             }}
             onSessionResume={() => {
               handlers.resumeSession();
-              onCollapseRequest?.();
             }}
             onSessionEnd={() => {
               handlers.endSession(() => {
@@ -347,9 +336,6 @@ export default function CaptureWidget({
                         <Mic size={18} strokeWidth={2} />
                       </span>
                       <span className="echly-mode-card-title">Voice (Recommended)</span>
-                      <span className="echly-mode-card-gem voice-recommended-icon" aria-hidden>
-                        <Gem size={18} strokeWidth={2} />
-                      </span>
                     </div>
                     <div
                       className={`echly-mode-tile echly-mode-card text-mode ${captureMode === "text" ? "selected" : ""}`}

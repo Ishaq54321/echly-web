@@ -137,6 +137,7 @@ export function useCaptureWidget({
   onSessionModePause,
   onSessionModeResume,
   onSessionModeEnd,
+  onSessionActivity,
   captureMode = "voice",
   selectedMicrophoneId,
   captureRootParent,
@@ -1291,8 +1292,9 @@ export function useCaptureWidget({
       console.log("ECHLY pending SET", { screenshot: cropped, context });
       sessionFeedbackPendingRef.current = true;
       setPending({ screenshot: cropped, context, elementRect });
+      onSessionActivity?.();
     },
-    [getFullTabImage, sessionFeedbackPending]
+    [getFullTabImage, sessionFeedbackPending, onSessionActivity]
   );
 
   const handleSessionFeedbackSubmit = useCallback(
