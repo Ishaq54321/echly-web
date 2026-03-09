@@ -1,0 +1,119 @@
+"use client";
+
+import React, { useEffect, useRef } from "react";
+
+const BAR_COUNT = 120;
+const BAR_WIDTH = 2;
+const GAP = 2;
+const MAX_HEIGHT = 26;
+const MIN_HEIGHT = 2;
+const AMPLITUDE_THRESHOLD = 0.02; // normalized 0–1; below this = minimal + opacity 0.4
+
+export type ChatGPTWaveformProps = {
+  analyser: AnalyserNode | null;
+};
+
+export default function ChatGPTWaveform({ analyser }: ChatGPTWaveformProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!analyser) return;
+
+    const node = analyser;
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+
+    const ctx2d = canvasEl.getContext("2d");
+    if (!ctx2d) return;
+
+    const bufferLength = node.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    const totalWidth = BAR_COUNT * (BAR_WIDTH + GAP) - GAP;
+    const canvasWidth = totalWidth;
+    const canvasHeight = 52;
+
+    let rafId: number;
+
+    function draw(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+      rafId = requestAnimationFrame(() => draw(ctx, canvas));
+
+      node.getByteFrequencyData(dataArray);
+
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+      }
+      const avg = dataArray.length ? sum / dataArray.length / 255 : 0;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const centerY = canvasHeight / 2;
+
+      for (let i = 0; i < BAR_COUNT; i++) {
+        const value = dataArray[Math.floor((i / BAR_COUNT) * bufferLength)] ?? 0;
+        const normalized = value / 255;
+
+        let height: number;
+        let opacity: number;
+
+        if (avg < AMPLITUDE_THRESHOLD) {
+          height = MIN_HEIGHT;
+          opacity = 0.4;
+        } else {
+          const scale = Math.max(0, (normalized - AMPLITUDE_THRESHOLD) / (1 - AMPLITUDE_THRESHOLD));
+          height = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, MIN_HEIGHT + scale * (MAX_HEIGHT - MIN_HEIGHT)));
+          opacity = 1;
+        }
+
+        const x = i * (BAR_WIDTH + GAP);
+        const halfH = height / 2;
+
+        ctx.fillStyle = `rgba(59, 130, 246, ${opacity})`;
+        roundRect(ctx, x, centerY - halfH, BAR_WIDTH, height, 2);
+        ctx.fill();
+      }
+    }
+
+    function roundRect(
+      c: CanvasRenderingContext2D,
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      r: number
+    ) {
+      if (r <= 0) {
+        c.rect(x, y, w, h);
+        return;
+      }
+      c.beginPath();
+      c.moveTo(x + r, y);
+      c.lineTo(x + w - r, y);
+      c.quadraticCurveTo(x + w, y, x + w, y + r);
+      c.lineTo(x + w, y + h - r);
+      c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      c.lineTo(x + r, y + h);
+      c.quadraticCurveTo(x, y + h, x, y + h - r);
+      c.lineTo(x, y + r);
+      c.quadraticCurveTo(x, y, x + r, y);
+      c.closePath();
+    }
+
+    draw(ctx2d, canvasEl);
+
+    return () => cancelAnimationFrame(rafId);
+  }, [analyser]);
+
+  if (!analyser) {
+    return <div className="waveform-placeholder" />;
+  }
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={BAR_COUNT * (BAR_WIDTH + GAP) - GAP}
+      height={52}
+      className="echly-chatgpt-waveform"
+    />
+  );
+}

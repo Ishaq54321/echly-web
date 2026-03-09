@@ -46,6 +46,8 @@ export type CaptureLayerProps = {
   captureMode?: "voice" | "text";
   /** 0–1 normalized level for voice waveform (from useCaptureWidget state). */
   listeningAudioLevel?: number;
+  /** AnalyserNode for real-time audio visualizer (from useCaptureWidget state). */
+  audioAnalyser?: AnalyserNode | null;
 };
 
 /**
@@ -77,6 +79,7 @@ export function CaptureLayer({
   onSessionFeedbackCancel = () => {},
   captureMode = "voice",
   listeningAudioLevel = 0,
+  audioAnalyser = null,
 }: CaptureLayerProps) {
   if (extensionMode && (!sessionMode || !sessionIdProp)) return null;
   const showSessionOverlay =
@@ -99,6 +102,7 @@ export function CaptureLayer({
           state={state}
           captureMode={captureMode}
           listeningAudioLevel={listeningAudioLevel}
+          audioAnalyser={audioAnalyser ?? null}
           onElementClicked={onSessionElementClicked}
           onPause={onSessionPause}
           onResume={onSessionResume}

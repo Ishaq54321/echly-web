@@ -1,113 +1,117 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import ChatGPTWaveform from "@/components/ChatGPTWaveform";
 
 export type VoiceCapturePanelProps = {
-  /** 0–1 normalized microphone level for waveform */
+  /** 0–1 normalized microphone level (legacy, visualizer uses analyser when provided) */
   audioLevel: number;
   onFinish: () => void;
   /** Optional screenshot for context (session element capture) */
   screenshot?: string;
   isListening?: boolean;
+  /** AnalyserNode for real-time horizontal bar visualizer */
+  analyser?: AnalyserNode | null;
 };
 
-const WAVEFORM_BARS = 24;
-
 export function VoiceCapturePanel({
-  audioLevel,
   onFinish,
   screenshot,
   isListening = true,
+  analyser = null,
 }: VoiceCapturePanelProps) {
-  const bars = useMemo(() => {
-    const arr: number[] = [];
-    for (let i = 0; i < WAVEFORM_BARS; i++) {
-      const t = i / (WAVEFORM_BARS - 1);
-      const center = 0.5;
-      const dist = Math.abs(t - center);
-      const base = Math.max(0.15, 1 - dist * 1.2);
-      const level = isListening ? base * (0.4 + 0.6 * audioLevel) : base * 0.3;
-      arr.push(level);
+  const [voiceActive, setVoiceActive] = useState(false);
+  const voiceActiveRef = useRef(false);
+  const [recordingStarted, setRecordingStarted] = useState(false);
+
+  useEffect(() => {
+    voiceActiveRef.current = voiceActive;
+  }, [voiceActive]);
+
+  useEffect(() => {
+    if (!analyser) {
+      setVoiceActive(false);
+      return;
     }
-    return arr;
-  }, [audioLevel, isListening]);
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    let rafId: number;
+
+    const tick = () => {
+      analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+      }
+      const avg = dataArray.length ? sum / dataArray.length : 0;
+      const isSpeaking = avg > 20;
+
+      if (isSpeaking !== voiceActiveRef.current) {
+        voiceActiveRef.current = isSpeaking;
+        setVoiceActive(isSpeaking);
+      }
+
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [analyser]);
+
+  /* Micro interaction: scale 0.98 → 1 when recording starts */
+  useEffect(() => {
+    if (analyser && !recordingStarted) {
+      setRecordingStarted(true);
+    }
+  }, [analyser, recordingStarted]);
+
+  const elementPreview = screenshot ? (
+    <img
+      src={screenshot}
+      alt="Capture"
+      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+    />
+  ) : null;
 
   return (
     <div
-      className="voice-capture"
+      className={`voice-capture ${recordingStarted ? "voice-capture--recording" : ""}`}
       data-echly-ui="true"
       style={{
         position: "fixed",
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
-        width: "min(380px, 92vw)",
-        borderRadius: 14,
-        background: "rgba(20,22,28,0.92)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        width: 420,
+        padding: 24,
+        borderRadius: 16,
+        background: "linear-gradient(180deg, #0f172a, #020617)",
+        boxShadow: "0 20px 60px rgba(0,0,0,.35)",
         zIndex: 2147483647,
         overflow: "hidden",
+        fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
         display: "flex",
         flexDirection: "column",
-        fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
+        alignItems: "stretch",
+        gap: 16,
       }}
     >
       {screenshot && (
-        <div style={{ padding: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <div
-            style={{
-              borderRadius: 14,
-              overflow: "hidden",
-              background: "rgba(0,0,0,0.3)",
-              aspectRatio: "16/10",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <img
-              src={screenshot}
-              alt="Capture"
-              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-            />
-          </div>
-        </div>
+        <div className="capture-preview">{elementPreview}</div>
       )}
-      <div className="voice-waveform" style={{ padding: "24px 20px", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, minHeight: 56 }}>
-        {bars.map((h, i) => (
-          <div
-            key={i}
-            style={{
-              width: 6,
-              height: 24,
-              borderRadius: 3,
-              background: "rgba(90,120,255,0.7)",
-              transform: `scaleY(${h})`,
-              transformOrigin: "center",
-              transition: "transform 0.08s ease-out",
-            }}
-          />
-        ))}
+
+      <h2 className="voice-capture-title">Voice Feedback</h2>
+      <p className="voice-capture-instruction">Describe the issue on this page.</p>
+
+      <div className="capture-visualizer">
+        <ChatGPTWaveform analyser={analyser} />
       </div>
-      <div className="voice-controls" style={{ padding: "0 20px 20px", display: "flex", justifyContent: "center" }}>
-        <button
-          type="button"
-          className="voice-stop"
-          onClick={onFinish}
-          style={{
-            padding: "12px 24px",
-            borderRadius: 10,
-            border: "none",
-            background: "#466EFF",
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
+
+      <div className="capture-status">
+        {isListening ? "Listening — describe the issue" : "Paused"}
+      </div>
+
+      <div className="voice-capture-actions">
+        <button type="button" className="finish-btn" onClick={onFinish}>
           Finish
         </button>
       </div>

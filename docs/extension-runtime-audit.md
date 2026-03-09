@@ -1,643 +1,531 @@
-# Extension Runtime Architecture Audit
+# Echly Chrome Extension — Full Runtime Architecture Audit
 
 **Read-only investigation.** No code was modified.  
-Purpose: map full data flow and runtime behavior to diagnose **Bug A** (latest feedback not in tray after Pause) and **Bug B** (Resume button does not restore last session on fresh open).
+Purpose: diagnose state bugs and UI flow failures.
 
 ---
 
-## Section 1 — Global State Structure
+## Executive Summary
 
-**Primary file:** `echly-extension/src/background.ts`
+This audit maps the complete runtime architecture of the Echly Chrome extension to diagnose:
 
-### Module-level variable (line 13)
+1. **Capture UI flash and disappear** — overlay briefly appears then vanishes
+2. **Unexpected session end** — session terminates without user action
+3. **Popup opens on wrong screen** — widget shows tray/cards instead of home
+4. **Global state synchronization** — potential desync between background and content
 
-| Variable           | Type              | When it changes |
-|--------------------|-------------------|------------------|
-| `activeSessionId` | `string \| null`  | Set by `ECHLY_SET_ACTIVE_SESSION` (284); set `null` by `ECHLY_SESSION_MODE_END` (366). Restored from `chrome.storage.local` on background load (62). |
+---
 
-### `globalUIState` (lines 34–49)
+## Section 1 — Entry Points
 
-Defined as:
+### manifest.json
+
+| Entry | File | Purpose |
+|-------|------|---------|
+| **Action popup** | `popup.html` | `"action":{"default_popup":"popup.html"}` — extension icon click opens this |
+| **Background** | `background.js` | Service worker; source of truth for auth, tokens, `globalUIState` |
+| **Content script** | `content.js` | Injected on `<all_urls>` at `document_idle` |
+
+### Which File Mounts the Widget
+
+| Responsibility | File | Function |
+|----------------|------|----------|
+| **Widget host creation** | `content.tsx` | `main()` (lines 1403–1425) creates `#echly-shadow-host` div, appends to `document.documentElement` |
+| **React mount** | `content.tsx` | `mountReactApp(host)` (lines 1000–1015) attaches shadow root, creates `#echly-root`, renders `<ContentApp>` |
+| **Widget component** | `content.tsx` | `ContentApp` renders `<CaptureWidget>` (line 918) |
+
+**Flow:** `main()` → `mountReactApp(host)` → `createRoot(container).render(<ContentApp />)` → `ContentApp` renders `CaptureWidget`.
+
+### Which File Controls the Popup UI
+
+| UI | File | Entry |
+|----|------|-------|
+| **Extension popup** | `popup.tsx` | `popup.html` loads `popup.js` (bundled from `popup.tsx`); `createRoot(rootEl).render(<PopupApp />)` |
+| **Popup behavior** | `popup.tsx` | Login-only: if authenticated → `toggleVisibility()` + `window.close()`; else shows "Continue with Google" |
+
+**Note:** The extension popup has no "home" vs "tray" screens — it is login-only. The **in-page widget** (CaptureWidget) has multiple screens: command screen (mode tiles), feedback tray, session overlay.
+
+---
+
+## Section 2 — Widget Mount Flow
+
+### createCaptureRoot
+
+**File:** `components/CaptureWidget/hooks/useCaptureWidget.ts` (lines 357–375)
 
 ```ts
-let globalUIState: {
-  visible: boolean;
-  expanded: boolean;
-  isRecording: boolean;
-  sessionId: string | null;
-  sessionModeActive: boolean;
-  sessionPaused: boolean;
-  pointers: StructuredFeedback[];
-} = {
-  visible: false,
-  expanded: false,
-  isRecording: false,
-  sessionId: null,
-  sessionModeActive: false,
-  sessionPaused: false,
-  pointers: [],
-};
-```
-
-### Property-by-property
-
-| Property            | File:Line   | Type                    | When it changes |
-|---------------------|------------|-------------------------|------------------|
-| `sessionId`         | background.ts:41, 63, 288, 311, 322, 334, 344, 356, 366, 418 | `string \| null` | Mirrored from `activeSessionId` on restore (63), `ECHLY_SET_ACTIVE_SESSION` (288), session mode handlers (311, 322, 334, 344), `ECHLY_SESSION_MODE_END` (366), `START_RECORDING` (418). |
-| `sessionModeActive` | background.ts:42, 66, 239, 290, 311, 322, 334, 346, 356, 364 | `boolean` | `false` on load (66) and `ECHLY_TOGGLE_VISIBILITY` (239); `true` on `ECHLY_SET_ACTIVE_SESSION` (290), `ECHLY_SESSION_MODE_START` (311), `ECHLY_SESSION_MODE_PAUSE` (322), `ECHLY_SESSION_MODE_RESUME` (334); `false` on `ECHLY_SESSION_MODE_END` (346, 356, 364). |
-| `sessionPaused`     | background.ts:43, 67, 239, 293, 325, 334, 347, 356, 364 | `boolean` | `false` on load (67), toggle visibility (239), set active (293), start (325), resume (334), end (347, 356, 364); `true` only in `ECHLY_SESSION_MODE_PAUSE` (325). |
-| `pointers`          | background.ts:46, 298, 310, 369, 421 | `StructuredFeedback[]` | Cleared in `ECHLY_SET_ACTIVE_SESSION` when `sessionId` null (298), set from API in `ECHLY_SET_ACTIVE_SESSION` (310), cleared in `ECHLY_SESSION_MODE_END` (369); appended in `ECHLY_PROCESS_FEEDBACK` (421). |
-| `visible`           | background.ts:40, 236 | `boolean` | Toggled in `ECHLY_TOGGLE_VISIBILITY` (236). |
-| `expanded`           | background.ts:41, 239, 258, 266 | `boolean` | `false` in `ECHLY_TOGGLE_VISIBILITY` when visible (239); `true` in `ECHLY_EXPAND_WIDGET` (258); `false` in `ECHLY_COLLAPSE_WIDGET` (266). |
-| `isRecording`        | background.ts:44, 341, 347 | `boolean` | `true` in `START_RECORDING` (341); `false` in `STOP_RECORDING` (347). |
-
-### Recording-related state (widget / content)
-
-- **Background:** Only `globalUIState.isRecording` (above).
-- **Widget:** `recordingActiveRef` and `pipelineActiveRef` in `useCaptureWidget.ts` (see Section 11). They are not part of `globalUIState` but can block pointer sync.
-
----
-
-## Section 2 — Session Lifecycle Command Handlers
-
-All in `echly-extension/src/background.ts`, inside `chrome.runtime.onMessage.addListener`.
-
-### ECHLY_SET_ACTIVE_SESSION (lines 286–324)
-
-```ts
-if (request.type === "ECHLY_SET_ACTIVE_SESSION") {
-  const sessionId = (request as { sessionId?: string }).sessionId ?? null;
-  activeSessionId = sessionId;
-  globalUIState.sessionId = sessionId;
-  globalUIState.sessionModeActive = true;
-  globalUIState.sessionPaused = false;
-  chrome.storage.local.set({
-    activeSessionId: sessionId,
-    sessionModeActive: true,
-    sessionPaused: false,
-  });
-  (async () => {
-    if (!sessionId) {
-      globalUIState.pointers = [];
-      broadcastUIState();
-      sendResponse({ success: true });
-      return;
-    }
-    try {
-      const token = await getValidToken();
-      const res = await fetch(`${API_BASE}/api/feedback?sessionId=...&limit=200`, ...);
-      const json = ...;
-      globalUIState.pointers = (json.feedback ?? []).map(...);
-    } catch {
-      globalUIState.pointers = [];
-    }
-    broadcastUIState();
-    sendResponse({ success: true });
-  })();
-  return true;
-}
-```
-
-- **Fields changed:** `activeSessionId`, `globalUIState.sessionId`, `sessionModeActive`, `sessionPaused`, `globalUIState.pointers` (after fetch).
-- **broadcastUIState():** Yes (sync when `sessionId` null; after async fetch when non-null).
-
----
-
-### ECHLY_SESSION_MODE_START (lines 336–345)
-
-```ts
-if (request.type === "ECHLY_SESSION_MODE_START") {
-  globalUIState.sessionModeActive = true;
-  globalUIState.sessionPaused = false;
-  globalUIState.sessionId = activeSessionId;
-  persistSessionLifecycleState();
-  broadcastUIState();
-  sendResponse({ ok: true });
-  return false;
-}
-```
-
-- **Fields changed:** `sessionModeActive`, `sessionPaused`, `sessionId`.
-- **broadcastUIState():** Yes.
-
----
-
-### ECHLY_SESSION_MODE_PAUSE (lines 347–356)
-
-```ts
-if (request.type === "ECHLY_SESSION_MODE_PAUSE") {
-  globalUIState.sessionModeActive = true;
-  globalUIState.sessionPaused = true;
-  globalUIState.sessionId = activeSessionId;
-  persistSessionLifecycleState();
-  broadcastUIState();
-  sendResponse({ ok: true });
-  return false;
-}
-```
-
-- **Fields changed:** `sessionModeActive`, `sessionPaused`, `sessionId` (no change to `pointers`).
-- **broadcastUIState():** Yes.
-
----
-
-### ECHLY_SESSION_MODE_RESUME (lines 358–367)
-
-```ts
-if (request.type === "ECHLY_SESSION_MODE_RESUME") {
-  globalUIState.sessionModeActive = true;
-  globalUIState.sessionPaused = false;
-  globalUIState.sessionId = activeSessionId;
-  persistSessionLifecycleState();
-  broadcastUIState();
-  sendResponse({ ok: true });
-  return false;
-}
-```
-
-- **Fields changed:** `sessionModeActive`, `sessionPaused`, `sessionId`.
-- **broadcastUIState():** Yes.
-
----
-
-### ECHLY_SESSION_MODE_END (lines 369–383)
-
-```ts
-if (request.type === "ECHLY_SESSION_MODE_END") {
-  activeSessionId = null;
-  globalUIState.sessionId = null;
-  globalUIState.sessionModeActive = false;
-  globalUIState.sessionPaused = false;
-  globalUIState.pointers = [];
-  chrome.storage.local.set({ activeSessionId: null, sessionModeActive: false, sessionPaused: false });
-  broadcastUIState();
-  setTimeout(broadcastUIState, 150);
-  sendResponse({ success: true });
-  return true;
-}
-```
-
-- **Fields changed:** `activeSessionId`, `sessionId`, `sessionModeActive`, `sessionPaused`, `pointers`.
-- **broadcastUIState():** Yes, plus delayed once.
-
----
-
-### ECHLY_PROCESS_FEEDBACK (lines 537–702)
-
-Handler is long; relevant part for pointers (lines 419–434):
-
-```ts
-if (typedFeedbackJson.success && typedFeedbackJson.ticket) {
-  const tick = typedFeedbackJson.ticket;
-  // ... firstCreated assignment ...
-}
-if (firstCreated) {
-  const pointer: StructuredFeedback = { id: firstCreated.id, title: firstCreated.title, actionSteps: [], type: firstCreated.type };
-  globalUIState.pointers = [...globalUIState.pointers, pointer];
-  broadcastUIState();
-  sendResponse({ success: true, ticket: firstCreated });
-  chrome.tabs.query({}, (tabs) => {
-    tabs.forEach((tab) => {
-      if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, { type: "ECHLY_FEEDBACK_CREATED", ticket: firstCreated, sessionId }).catch(() => {});
-      }
-    });
-  });
-}
-```
-
-- **Fields changed:** `globalUIState.pointers` (append).
-- **broadcastUIState():** Yes (once per successful feedback creation).
-
----
-
-## Section 3 — Pointer Update Flow
-
-### Path: ECHLY_PROCESS_FEEDBACK → pointer in tray
-
-1. **Content** sends `ECHLY_PROCESS_FEEDBACK` (e.g. from `onComplete` / session feedback pipeline in `useCaptureWidget.ts`).
-2. **Background** (537–702): validates payload, calls structure API, then for each ticket POSTs `/api/feedback`; on first success builds `firstCreated`.
-3. **Pointer construction** (419–424):  
-   `const pointer: StructuredFeedback = { id: firstCreated.id, title: firstCreated.title, actionSteps: [], type: firstCreated.type };`
-4. **Add to global state** (421):  
-   `globalUIState.pointers = [...globalUIState.pointers, pointer];`
-5. **Broadcast** (422):  
-   `broadcastUIState();`
-6. **Tabs receive** `ECHLY_GLOBAL_STATE` with `state.pointers` including the new pointer.
-7. **Content** applies state (message listener + CustomEvent) → `setGlobalState(state)` → widget gets `pointersProp = globalState.pointers`.
-8. **Widget** (`useCaptureWidget.ts`): effect with deps `[extensionMode, pointersProp]` runs; **if `recordingActiveRef.current` is false**, it runs `setPointers(pointersProp)` (1162–1168). If `recordingActiveRef.current` is true, the effect returns early and **does not** call `setPointers`, so the tray does not update.
-
-Exact code path for pointer creation:
-
-- `background.ts` 419–424 (build pointer), 421 (append to `globalUIState.pointers`), 422 (`broadcastUIState()`).
-- Content: `ensureMessageListener` → `msg.type === "ECHLY_GLOBAL_STATE"` → `__ECHLY_APPLY_GLOBAL_STATE__?.(state)` and `window.dispatchEvent(ECHLY_GLOBAL_STATE)`.
-- ContentApp: listener calls `setGlobalState(s)` (content.tsx 148–156).
-- CaptureWidget receives `pointers={globalState.pointers}` (content.tsx 1236).
-- useCaptureWidget effect (1162–1168): `if (recordingActiveRef.current) return; setPointers(pointersProp);`
-
----
-
-## Section 4 — Global State Broadcast System
-
-### broadcastUIState() (background.ts 197–209)
-
-```ts
-function broadcastUIState(): void {
-  echlyLog("BACKGROUND", "broadcast global state", globalUIState);
-  chrome.tabs.query({}, (tabs) => {
-    tabs.forEach((tab) => {
-      if (tab.id) {
-        chrome.tabs
-          .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
-          .catch(() => { console.debug("ECHLY broadcast skipped tab", tab.id); });
-      }
-    });
-  });
-}
-```
-
-### Call sites (all in background.ts)
-
-| Line(s) | Trigger |
-|--------|--------|
-| 68 | Background startup after `chrome.storage.local.get(["activeSessionId"], ...)` |
-| 256 | ECHLY_TOGGLE_VISIBILITY |
-| 263 | ECHLY_EXPAND_WIDGET |
-| 270 | ECHLY_COLLAPSE_WIDGET |
-| 303 | ECHLY_SET_ACTIVE_SESSION (when sessionId null) |
-| 321 | ECHLY_SET_ACTIVE_SESSION (after feedback fetch) |
-| 342 | ECHLY_SESSION_MODE_START |
-| 353 | ECHLY_SESSION_MODE_PAUSE |
-| 364 | ECHLY_SESSION_MODE_RESUME |
-| 381, 382 | ECHLY_SESSION_MODE_END (immediate + setTimeout 150ms) |
-| 466 | START_RECORDING |
-| 472 | STOP_RECORDING |
-| 680 | ECHLY_PROCESS_FEEDBACK (after appending pointer) |
-
-Additional single-tab pushes (not `broadcastUIState`):
-
-- **onActivated** (212–223): `sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })` and `ECHLY_SESSION_STATE_SYNC`.
-- **onCreated** (226–234): `sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })`.
-
-### Message structure
-
-- **Type:** `"ECHLY_GLOBAL_STATE"`.
-- **Payload:** `{ type: "ECHLY_GLOBAL_STATE", state: globalUIState }` where `globalUIState` is the object defined in Section 1 (visible, expanded, isRecording, sessionId, sessionModeActive, sessionPaused, pointers).
-
-### How tabs receive it
-
-- Content script registers a single `chrome.runtime.onMessage` listener in `ensureMessageListener(host)` (content.tsx 1368–1414).
-- On `msg.type === "ECHLY_GLOBAL_STATE"` and `msg.state`: sets host visibility, calls `window.__ECHLY_APPLY_GLOBAL_STATE__?.(state)`, and dispatches `window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } }))`.
-- ContentApp has a `window.addEventListener("ECHLY_GLOBAL_STATE", handler)` (148–158) that calls `setHostVisibility(s.visible)` and `setGlobalState(s)` with no skip logic (no `ignoreNextGlobalState` in current code).
-
----
-
-## Section 5 — Content Script State Pipeline
-
-**File:** `echly-extension/src/content.tsx`
-
-### ECHLY_GLOBAL_STATE handling
-
-1. **Message listener** (1377–1382): On `msg.type === "ECHLY_GLOBAL_STATE"` and `msg.state`:
-   - `setHostVisibility(state.visible)`
-   - `(window as any).__ECHLY_APPLY_GLOBAL_STATE__?.(state)`
-   - `window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } }))`
-
-2. **__ECHLY_APPLY_GLOBAL_STATE__** is set in ContentApp (136–139):
-   - `applyGlobalState = (state) => { setHostVisibility(state.visible); setGlobalState(state); }`
-   - Assigned to `window.__ECHLY_APPLY_GLOBAL_STATE__` in a useEffect (no cleanup that would prevent applying).
-
-3. **ContentApp CustomEvent handler** (148–158): On "ECHLY_GLOBAL_STATE":
-   - If `e.detail?.state` missing, return.
-   - `setHostVisibility(s.visible)` and `setGlobalState(s)`.
-   - No guard that skips when `sessionId` is unchanged; state is always overwritten.
-
-So: **ECHLY_APPLY_GLOBAL_STATE** is effectively “apply this full state to host visibility and React globalState.” There is no logic that ignores pointer updates when `sessionId` stays the same.
-
-### ECHLY_GET_GLOBAL_STATE
-
-- Sent from content (e.g. mount 164–172, visibility 176–189, `syncInitialGlobalState` 1337–1344, `ECHLY_SESSION_STATE_SYNC` 1393–1401).
-- Background responds with `{ state: { ...globalUIState } }` (274–276).
-- Content applies via `normalizeGlobalState` and then `setHostVisibility` + `dispatchGlobalState` (or `__ECHLY_APPLY_GLOBAL_STATE__` + CustomEvent).
-
----
-
-## Section 6 — Widget Pointer Sync
-
-**File:** `components/CaptureWidget/hooks/useCaptureWidget.ts`
-
-### Effect that updates pointers from props (1161–1168)
-
-```ts
-/** Extension: sync global pointers from background so all tabs show the same tray. */
-useEffect(() => {
-  if (!extensionMode || pointersProp === undefined) return;
-  if (recordingActiveRef.current) return;
-  setPointers(pointersProp);
+const createCaptureRoot = useCallback(() => {
+  if (captureRootRef.current) {
+    console.debug("ECHLY createCaptureRoot", "skipped (ref already set)");
+    return;
+  }
+  const existingRoot = document.getElementById(OVERLAY_ROOT_ID);
+  if (existingRoot) {
+    console.debug("ECHLY createCaptureRoot", "reusing existing DOM root");
+    captureRootRef.current = existingRoot as HTMLDivElement;
+    setCaptureRootEl(existingRoot as HTMLDivElement);
+    setCaptureRootReady(true);
+    return;
+  }
+  console.debug("ECHLY createCaptureRoot");
   setSessionFeedbackPending(null);
-}, [extensionMode, pointersProp]);
+  const captureEl = document.createElement("div");
+  captureEl.id = OVERLAY_ROOT_ID;  // "echly-capture-root"
+  document.body.appendChild(captureEl);
+  captureRootRef.current = captureEl;
+  setCaptureRootEl(captureEl);
+  setCaptureRootReady(true);
+}, []);
 ```
 
-- **Dependencies:** `extensionMode`, `pointersProp`.
-- **Guard:** If `recordingActiveRef.current === true`, the effect returns without calling `setPointers(pointersProp)`. So **recordingActiveRef blocks pointer updates** while the user is in a recording flow (voice_listening, processing, pill exiting, etc.).
+**Guards:**
+- `captureRootRef.current` → skip if ref already set
+- `document.getElementById(OVERLAY_ROOT_ID)` → reuse existing DOM root if present
 
-### pauseSession (983–1029)
+### removeCaptureRoot
 
-- Calls `onSessionModePause?.()` (which sends `ECHLY_SESSION_MODE_PAUSE`).
-- If `pipelineActiveRef.current` is true, sets `pausePending` and polls until pipeline is done, then calls `finalizePause()` → `onSessionModePause?.()`.
-- Does not modify `pointers` or `pointersProp`; pause is purely lifecycle + broadcast.
+**File:** `components/CaptureWidget/hooks/useCaptureWidget.ts` (lines 398–415)
 
-### resumeSession (1031–1038)
+```ts
+const removeCaptureRoot = useCallback(() => {
+  if (recordingActiveRef.current) return;  // BLOCKS during recording
+  if (extensionMode && globalSessionModeActive !== false) return;  // BLOCKS if session active
+  // ... removes DOM, clears refs
+}, [extensionMode, globalSessionModeActive]);
+```
 
-- Sets `pausePending`/`endPending` false, calls `onSessionModeResume?.()` (sends `ECHLY_SESSION_MODE_RESUME`).
+### When Root Is Created
 
-### endSession (1040–1076)
+| Trigger | Location | Condition |
+|---------|----------|-----------|
+| `globalSessionModeActive === true` | useCaptureWidget.ts:1106–1108 | Effect `[globalSessionModeActive, createCaptureRoot]` |
+| Sync from global state | useCaptureWidget.ts:1123 | Effect when `globalSessionModeActive === true` and `!captureRootRef.current` |
+| Tab visibility | useCaptureWidget.ts:1187 | Visibility effect: tab becomes visible, `globalSessionModeActive === true`, `!captureRootRef.current` |
+| "Add feedback" click | useCaptureWidget.ts:1348 | `handleAddFeedback` |
 
-- Clears pending, calls `setPointers([])` in `finalizeEnd`, then `onSessionModeEnd?.()` (sends `ECHLY_SESSION_MODE_END`).
+### When Root Is Destroyed
 
----
+| Trigger | Location |
+|---------|----------|
+| `globalSessionModeActive === false` | useCaptureWidget.ts:1139, 1155 |
+| Non-session capture flow end | useCaptureWidget.ts:596, 713, 732, 753, 775, 978 |
+| Microphone permission denied | useCaptureWidget.ts:440 |
+| Discard listening | useCaptureWidget.ts:744 |
 
-## Section 7 — Pause Recording Flow
+### Multiple Roots
 
-### Sequence (SessionControlPanel → widget → content → background → broadcast → widget)
+**Guard in createCaptureRoot:** `if (captureRootRef.current) return` — prevents creating a second root when ref is set.
 
-1. **User clicks Pause**  
-   SessionControlPanel (e.g. SessionOverlay → SessionControlPanel) calls `onPause` → widget’s `handlers.pauseSession()` (useCaptureWidget 983–1029).
+**Reuse path:** If `document.getElementById(OVERLAY_ROOT_ID)` exists but `captureRootRef.current` is null (e.g. after remount), the function reuses the existing DOM element. Only one `#echly-capture-root` can exist in the document.
 
-2. **pauseSession() in useCaptureWidget**  
-   - If `pipelineActiveRef.current`: set `pausePending`, poll until pipeline finishes, then `finalizePause()`.  
-   - `finalizePause()`: `onSessionModePause?.()`.
-
-3. **Content**  
-   `onSessionModePause` (content.tsx 1242): `chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" })`.
-
-4. **Background**  
-   ECHLY_SESSION_MODE_PAUSE (347–356): set `sessionModeActive`, `sessionPaused`, `sessionId`, persist, **broadcastUIState()**.
-
-5. **Broadcast**  
-   All tabs get `ECHLY_GLOBAL_STATE` with `sessionPaused: true` and **current** `globalUIState.pointers` (whatever they are at that moment).
-
-6. **Content**  
-   Message listener applies state, dispatches CustomEvent; ContentApp runs `setGlobalState(s)` → widget receives new `globalSessionPaused` and `pointers` (content 1236, 1240–1241).
-
-7. **Widget**  
-   - Session sync effect (1089–1116, 1134–1144): sets `sessionPaused(true)`, `pausePending(false)`.  
-   - Pointer sync effect (1162–1168): runs when `pointersProp` changes; **if `recordingActiveRef.current` is true, it returns without `setPointers(pointersProp)`**, so tray does not update.
-
-### Order of events and Bug A
-
-- **If ECHLY_PROCESS_FEEDBACK finishes before Pause broadcast:**  
-  Background already has the new pointer; pause broadcast includes it. Content updates `globalState.pointers`. Widget effect runs; if `recordingActiveRef.current` is still true (user still in processing/pill state), pointer update is skipped → **latest feedback can still be missing in tray**.
-
-- **If user presses Pause before ECHLY_PROCESS_FEEDBACK completes:**  
-  Pause broadcast carries old pointers. Later, ECHLY_PROCESS_FEEDBACK completes and broadcasts again with new pointer. When that second broadcast is applied, `recordingActiveRef` may still be true (e.g. pipeline just finished, UI not yet idle), so again the pointer sync effect can skip the update.
-
-So the critical point is: **whether the pointer broadcast happens before or after Pause, the tray can fail to show the latest feedback because the pointer sync effect refuses to run while `recordingActiveRef.current` is true.**
-
-### Timeline (conceptual)
-
-| T | Event |
-|---|--------|
-| T0 | User submits feedback (e.g. voice) → pipeline starts, `recordingActiveRef = true`, `pipelineActiveRef = true`. |
-| T1 | Background may still be running ECHLY_PROCESS_FEEDBACK (async). |
-| T2 | User clicks Pause. pauseSession() runs; if pipeline active, waits. |
-| T3 | Pipeline finishes (content onSuccess / background success). `pipelineActiveRef = false`; background may append pointer and broadcast. |
-| T4 | finalizePause() runs → ECHLY_SESSION_MODE_PAUSE → broadcast. |
-| T5 | Tab receives one or two ECHLY_GLOBAL_STATE messages (with or without new pointer). Content sets `globalState` (including pointers). |
-| T6 | Widget pointer sync effect runs. If `recordingActiveRef.current` is still true (e.g. state not yet "idle"), **setPointers is skipped** → tray does not show latest feedback. |
+**Conclusion:** Multiple roots are prevented. A single `#echly-capture-root` exists per tab.
 
 ---
 
-## Section 8 — Resume Button Logic
+## Section 3 — Click → Feedback Flow
 
-### Where the Resume button is shown and enabled
+### Complete Path: User Clicks Page (Session Mode)
 
-**CaptureWidget.tsx (92, 161–165, 305–306):**
+| Step | File:Line | Function / Event |
+|------|-----------|------------------|
+| 1 | SessionOverlay.tsx | `attachClickCapture` / `attachElementHighlighter` — click capture active when `sessionMode && !sessionPaused && !sessionActionPending && sessionFeedbackPending == null` |
+| 2 | session/clickCapture.ts | Click handler captures element |
+| 3 | useCaptureWidget.ts:1189 | `handleSessionElementClicked(element)` |
+| 4 | useCaptureWidget.ts:1195–1210 | `getFullTabImage()` → `cropScreenshotAroundElement()` → `buildCaptureContext()` |
+| 5 | useCaptureWidget.ts:1211 | `setSessionFeedbackPending({ screenshot, context })` |
+| 6 | CaptureLayer → SessionOverlay | Renders voice or text UI based on `captureMode` |
+| 7 | Voice: `handleSessionStartVoice` | useCaptureWidget.ts:1290 — creates Recording, `startListening()` |
+| 7 | Text: `handleSessionFeedbackSubmit` | useCaptureWidget.ts:1199 — sends transcript to `onComplete` |
+| 8 | useCaptureWidget.ts:569 | `recordingActiveRef.current = true`; `setState("voice_listening")` |
+| 9 | recognitionRef.start() | Web Speech API starts |
+| 10 | User stops → `finishListening` | useCaptureWidget.ts:451 |
+| 11 | useCaptureWidget.ts:476–478 | `pipelineActiveRef.current = true`; `onComplete(transcript, screenshot, callbacks, context, { sessionMode: true })` |
+| 12 | content.tsx:handleComplete | Sends `ECHLY_PROCESS_FEEDBACK` or calls API directly |
+| 13 | background.ts:546 | `ECHLY_PROCESS_FEEDBACK` → structure-feedback → create ticket → `globalUIState.pointers` append → `broadcastUIState()` |
+| 14 | onSuccess callback | useCaptureWidget.ts:521–528 — `updateMarker`, `setPointers`, `setHighlightTicketId` |
 
-- `showResumeButton = Boolean(lastKnownSessionId) || hasStoredSession`  
-  where `hasStoredSession = Boolean(sessionId)` (82) and `sessionId` is the prop from content (globalState.sessionId).
-- `onResumeSession` is passed as `handleResumeActiveSession` when `extensionMode && showResumeButton`.
-- `handleResumeActiveSession`: uses `lastKnownSessionId ?? sessionId` and calls `onResumeSessionSelect?.(sessionToResume, { enterCaptureImmediately: true })`.
+### Functions Involved
 
-**WidgetFooter.tsx (28, 47–48):**
-
-- `resumeDisabled = effectivelyDisabled || !onResumeSession`
-- `effectivelyDisabled = !isIdle || captureDisabled`
-- So Resume is disabled if not idle, or capture disabled, or **onResumeSession is not passed**. It is passed only when `showResumeButton` is true.
-
-So the effective condition for the Resume button to be **enabled** is:
-
-- `showResumeButton === true` → `Boolean(lastKnownSessionId) || Boolean(sessionId)`.
-- And `onResumeSession` is only passed when `showResumeButton` is true, so the button is hidden/disabled when both `lastKnownSessionId` and `sessionId` are falsy.
-
-**Variables that control it:**
-
-- **lastKnownSessionId** (content.tsx): Set by effect when `globalState.visible` is true; sends `ECHLY_GET_ACTIVE_SESSION` and sets `lastKnownSessionId(response.sessionId)` (216–221).
-- **sessionId** (prop): From content `globalState.sessionId`, which comes from the last `ECHLY_GLOBAL_STATE` (or `ECHLY_GET_GLOBAL_STATE`) applied.
-
-So Resume is disabled when both:
-
-- `lastKnownSessionId` is null (e.g. ECHLY_GET_ACTIVE_SESSION not yet returned or returned null), and  
-- `sessionId` is null (e.g. last applied global state had no session).
-
----
-
-## Section 9 — Last Session Persistence
-
-### chrome.storage.local usage (background.ts)
-
-| Keys written | When | Location |
-|-------------|------|----------|
-| `activeSessionId`, `sessionModeActive`, `sessionPaused` | persistSessionLifecycleState() | 51–57 |
-| Same | ECHLY_SET_ACTIVE_SESSION | 292–296 |
-| Same | ECHLY_SESSION_MODE_END | 374–378 |
-| `activeSessionId` only (read) | Background startup | 60–69 |
-| `activeSessionId` (read) | ECHLY_GET_ACTIVE_SESSION handler | 278–285 |
-
-**No** `lastSessionIdWithTickets` or similar; only `activeSessionId` (+ lifecycle flags) is persisted for session.
-
-### When it is saved
-
-- **activeSessionId:** On ECHLY_SET_ACTIVE_SESSION (with request’s sessionId), and via `persistSessionLifecycleState()` in ECHLY_SESSION_MODE_START, PAUSE, RESUME, and ECHLY_TOGGLE_VISIBILITY (when visible becomes true). Not cleared until ECHLY_SESSION_MODE_END.
-
-### When it is restored
-
-- **Background startup** (60–69): `chrome.storage.local.get(["activeSessionId"], (result) => { activeSessionId = stored; globalUIState.sessionId = activeSessionId; globalUIState.sessionModeActive = false; globalUIState.sessionPaused = false; broadcastUIState(); })`.  
-  So only **activeSessionId** is read from storage; sessionModeActive and sessionPaused are always reset to false on load. If the get callback has not run yet (e.g. right after service worker starts), `globalUIState.sessionId` is still the initial `null` when the first broadcast runs.
-
-- **ECHLY_GET_ACTIVE_SESSION:** Does its own `chrome.storage.local.get(["activeSessionId"], ...)` and returns `sessionId: result.activeSessionId || null`. It does not rely on in-memory `activeSessionId`.
-
-### Extension startup (background)
-
-- On load, the script runs top-down; the only session-related init is the async `chrome.storage.local.get(["activeSessionId"], ...)` (60–69). No other startup logic restores session. So the first `broadcastUIState()` (e.g. triggered by ECHLY_TOGGLE_VISIBILITY right after open) can run **before** this callback, and then the broadcast carries `sessionId: null`.
+- `attachClickCapture` / `detachClickCapture` — session/clickCapture.ts
+- `attachElementHighlighter` / `detachElementHighlighter` — session/elementHighlighter.ts
+- `handleSessionElementClicked` — useCaptureWidget.ts:1189
+- `getFullTabImage` — useCaptureWidget.ts:691 (sends `CAPTURE_TAB` to background)
+- `cropScreenshotAroundElement` — session/cropAroundElement.ts
+- `buildCaptureContext` — lib/captureContext.ts
+- `startListening` — useCaptureWidget.ts:418
+- `finishListening` — useCaptureWidget.ts:451
+- `handleComplete` — content.tsx:267 (ContentApp)
+- `ECHLY_PROCESS_FEEDBACK` — background.ts:546
 
 ---
 
-## Section 10 — Tab Initialization
+## Section 4 — Session Lifecycle
 
-### Content script load
+### ECHLY_SESSION_MODE_START
 
-- Injected per manifest. No explicit “tab load” handler in this audit; `main()` (1410–1434) runs when the script runs: ensures host element, mounts React, `ensureMessageListener(host)`, `syncInitialGlobalState(host)`, `ensureVisibilityStateRefresh()`.
+| Location | Action |
+|----------|--------|
+| **background.ts:345–354** | `sessionModeActive = true`, `sessionPaused = false`, `sessionId = activeSessionId`, `persistSessionLifecycleState()`, `broadcastUIState()` |
+| **Sender** | Content (CaptureWidget) via `onSessionModeStart` → `chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" })` |
+| **Storage** | `chrome.storage.local.set({ activeSessionId, sessionModeActive, sessionPaused })` |
 
-### syncInitialGlobalState(host) (1336–1346)
+### ECHLY_SESSION_MODE_PAUSE
 
-- Sends `ECHLY_GET_GLOBAL_STATE` to background.
-- On response, normalizes state, sets host visibility, and `dispatchGlobalState(normalized)` (CustomEvent), which ContentApp’s listener uses to call `setGlobalState(s)`.
+| Location | Action |
+|----------|--------|
+| **background.ts:356–365** | `sessionModeActive = true`, `sessionPaused = true`, `sessionId = activeSessionId`, `persistSessionLifecycleState()`, `broadcastUIState()` |
+| **Sender** | CaptureWidget `pauseSession` → `onSessionModePause` |
+| **Storage** | Same as START |
 
-So when a tab loads the extension (content script runs), it immediately requests current global state and applies it. If the background has not yet run its storage callback, the response can still have `sessionId` from in-memory `globalUIState` (which may be null).
+### ECHLY_SESSION_MODE_RESUME
 
-### How state reaches the widget
+| Location | Action |
+|----------|--------|
+| **background.ts:367–376** | `sessionModeActive = true`, `sessionPaused = false`, `sessionId = activeSessionId`, `persistSessionLifecycleState()`, `broadcastUIState()` |
+| **Sender** | CaptureWidget `resumeSession` → `onSessionModeResume` |
 
-- ContentApp state `globalState` is updated by ECHLY_GLOBAL_STATE (message + CustomEvent) and ECHLY_GET_GLOBAL_STATE (syncInitialGlobalState, visibility, ECHLY_SESSION_STATE_SYNC).
-- CaptureWidget is rendered with `pointers={globalState.pointers}`, `globalSessionModeActive={globalState.sessionModeActive}`, `globalSessionPaused={globalState.sessionPaused}`, `sessionId` from effective session, etc. (content.tsx 1235–1241).
-- So the widget receives state purely via React props driven by content’s `globalState`.
+### ECHLY_SESSION_MODE_END
 
----
+| Location | Action |
+|----------|--------|
+| **background.ts:378–394** | `activeSessionId = null`, `sessionId = null`, `sessionModeActive = false`, `sessionPaused = false`, `pointers = []`, `chrome.storage.local.set(...)`, `broadcastUIState()`, `setTimeout(broadcastUIState, 150)` |
+| **Sender** | CaptureWidget `endSession` → `onSessionModeEnd` |
 
-## Section 11 — Recording State Variables
+### Unexpected Session End
 
-Variables that can block pointer or UI updates:
+**Potential causes:**
 
-| Variable | File:location | When set true | When set false |
-|----------|----------------|----------------|-----------------|
-| recordingActiveRef | useCaptureWidget.ts:211, 524, 531, 569, 574, 583, 744 | startListening (569) | recognition onend (524, 531), finishListening (583), discardListening (744), error paths (574) |
-| pipelineActiveRef | useCaptureWidget.ts:189, 632, 635, 652, 659, 669, 672, 697, 1248, 1251, 1270, 1277 | Before onComplete / session feedback pipeline | In onSuccess/onError and catch (635, 652, 659, 672, 697, 1251, 1270, 1277) |
-| pausePending | useCaptureWidget.ts | When pause requested while pipeline active (1003) | finalizePause, or when globalSessionPaused sync (1102) |
-| endPending | useCaptureWidget.ts | When end requested while pipeline active (1057) | finalizeEnd (1055) |
+1. **ECHLY_TOGGLE_VISIBILITY** (background.ts:247–267): When `visible` becomes `true`, background sets `sessionModeActive = false`, `sessionPaused = false`, and sends `ECHLY_RESET_WIDGET`. This clears session state on every widget open.
 
-**Where they block updates:**
+2. **initializeSessionState race** (background.ts:62–73): `chrome.storage.local.get` is async. If `broadcastUIState()` runs before the callback, `globalUIState.sessionId` can still be null.
 
-- **recordingActiveRef:** Pointer sync effect (1165): `if (recordingActiveRef.current) return;` → no `setPointers(pointersProp)`. Also removeCaptureRoot (393) and global sync effects (1106, 1122) can bail when `recordingActiveRef.current` is true.
-- **pipelineActiveRef:** Pause and end handlers wait for it before sending ECHLY_SESSION_MODE_PAUSE / ECHLY_SESSION_MODE_END; it does not directly guard the pointer effect, but the pipeline keeps the UI in a non-idle state so `recordingActiveRef` may still be true when the broadcast is applied.
-
----
-
-## Section 12 — Event Timelines
-
-### Timeline A — Pause flow (with feedback)
-
-| Step | Actor | Event |
-|------|--------|--------|
-| 1 | User | Submits feedback (e.g. voice) |
-| 2 | Widget | Enters processing, sets recordingActiveRef/pipelineActiveRef true |
-| 3 | Content | Sends ECHLY_PROCESS_FEEDBACK (or local pipeline runs) |
-| 4 | Background | Processes feedback (async); on success appends to globalUIState.pointers, broadcastUIState() |
-| 5 | User | Presses Pause |
-| 6 | Widget | pauseSession(); if pipeline active, sets pausePending, waits |
-| 7 | Widget/Background | Pipeline completes; background may have already broadcast with new pointer |
-| 8 | Widget | finalizePause() → onSessionModePause → content sends ECHLY_SESSION_MODE_PAUSE |
-| 9 | Background | ECHLY_SESSION_MODE_PAUSE handler: sessionPaused = true, broadcastUIState() |
-| 10 | Content | Receives ECHLY_GLOBAL_STATE, setGlobalState (pointers may or may not include latest) |
-| 11 | Widget | Session sync effect: setSessionPaused(true). Pointer sync effect runs; if recordingActiveRef still true → **setPointers skipped** → tray does not show latest feedback |
-
-### Timeline B — Resume flow (extension opens fresh)
-
-| Step | Actor | Event |
-|------|--------|--------|
-| 1 | User | Opens extension (e.g. clicks icon) |
-| 2 | Background | May start or already running; chrome.storage.local.get(["activeSessionId"], ...) is async |
-| 3 | Popup | Sends ECHLY_TOGGLE_VISIBILITY |
-| 4 | Background | visible = true; sessionModeActive/sessionPaused = false; ECHLY_RESET_WIDGET to tabs; broadcastUIState() |
-| 5 | Background | If storage get has not run yet, globalUIState.sessionId is still null → broadcast carries sessionId: null |
-| 6 | Content | Receives ECHLY_GLOBAL_STATE (and RESET); setGlobalState(state) → sessionId can be null |
-| 7 | Content | Effect (visible true) runs: sends ECHLY_GET_ACTIVE_SESSION |
-| 8 | Background | ECHLY_GET_ACTIVE_SESSION: chrome.storage.local.get(["activeSessionId"], ...) → sendResponse({ sessionId }) |
-| 9 | Content | Callback: if response.sessionId, setLastKnownSessionId(response.sessionId) |
-| 10 | Widget | showResumeButton = Boolean(lastKnownSessionId) \|\| hasStoredSession. If step 9 is delayed or fails, lastKnownSessionId stays null and sessionId from state is null → **Resume button disabled or not shown** |
+3. **No explicit session-end message from content** other than `ECHLY_SESSION_MODE_END`. Session end is driven by user action or the above reset.
 
 ---
 
-## Section 13 — Root Cause Analysis
+## Section 5 — Global State Flow
 
-### Bug A — Latest feedback does not appear in tray when user presses Pause
-
-**Cause:** The widget’s pointer sync in `useCaptureWidget.ts` does not apply incoming `pointersProp` (from ECHLY_GLOBAL_STATE) while `recordingActiveRef.current` is true.
-
-- **File:** `components/CaptureWidget/hooks/useCaptureWidget.ts`
-- **Function:** Effect at lines 1162–1168 (Extension: sync global pointers from background).
-- **Exact line:** 1165: `if (recordingActiveRef.current) return;`
-
-When the user presses Pause, the broadcast (with or without the new pointer) is applied in content and `pointersProp` updates. The effect runs but exits early when the user is still in a recording-related state (voice_listening, processing, or pill exiting), so `setPointers(pointersProp)` is never called and the tray keeps the old list. So the **exact state transition that fails** is: “apply latest global pointers to the widget’s local `pointers` state when the last broadcast includes the new feedback but the widget is still in a recording flow.”
-
----
-
-### Bug B — Resume button does not restore last active session when extension is opened fresh
-
-**Contributing causes:**
-
-1. **Broadcast before restore (background)**  
-   On startup, only `chrome.storage.local.get(["activeSessionId"], ...)` restores session id; the callback is async. If ECHLY_TOGGLE_VISIBILITY runs and calls `broadcastUIState()` before that callback, `globalUIState.sessionId` is still null, so the first ECHLY_GLOBAL_STATE sent to tabs has `sessionId: null`. Then `hasStoredSession = Boolean(sessionId)` is false.
-
-2. **Resume depends on async ECHLY_GET_ACTIVE_SESSION**  
-   `lastKnownSessionId` is set only when the effect (content.tsx 216–221) runs (visible true) and the ECHLY_GET_ACTIVE_SESSION response returns a sessionId. So on first paint, `lastKnownSessionId` can still be null and `sessionId` (from global state) can be null → `showResumeButton` is false and the Resume button is disabled or not passed.
-
-3. **Exact failure point**  
-   - **File:** `echly-extension/src/background.ts` (startup 60–69): first broadcast can happen before storage callback populates `globalUIState.sessionId`.  
-   - **File:** `echly-extension/src/content.tsx` (216–221): `lastKnownSessionId` is set asynchronously; until the ECHLY_GET_ACTIVE_SESSION callback runs, Resume is disabled if `sessionId` is also null.  
-   - **File:** `components/CaptureWidget/CaptureWidget.tsx` (92): `showResumeButton = Boolean(lastKnownSessionId) || hasStoredSession` — both can be false on first render after fresh open.
-
-So the **exact state transition that fails** is: “show Resume as enabled and bind it to the last session as soon as the extension is opened,” because either the first broadcast has no sessionId or the UI renders before ECHLY_GET_ACTIVE_SESSION has set lastKnownSessionId.
-
----
-
-## Section 14 — Architecture Diagram
+### Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ BACKGROUND (echly-extension/src/background.ts)                            │
-│   activeSessionId (module)  ←→  globalUIState.sessionId                   │
-│   globalUIState: visible, expanded, isRecording, sessionId,               │
-│                  sessionModeActive, sessionPaused, pointers[]             │
-│   Persist: chrome.storage.local [activeSessionId, sessionModeActive,       │
-│            sessionPaused]  (on load: get activeSessionId only)             │
+│ BACKGROUND (background.ts)                                               │
+│   globalUIState: { visible, expanded, isRecording, sessionId,            │
+│     sessionModeActive, sessionPaused, pointers, captureMode }             │
+│   broadcastUIState() → chrome.tabs.sendMessage(tabId, ECHLY_GLOBAL_STATE) │
 └─────────────────────────────────────────────────────────────────────────┘
-         │
-         │ broadcastUIState() → chrome.tabs.sendMessage(tabId,
-         │   { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
-         │ Also: onActivated / onCreated → same message to one tab
-         ▼
+                                    │
+                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ CONTENT SCRIPT (echly-extension/src/content.tsx)                         │
-│   chrome.runtime.onMessage → ECHLY_GLOBAL_STATE:                         │
-│     setHostVisibility(state.visible)                                      │
-│     __ECHLY_APPLY_GLOBAL_STATE__?.(state)  → setGlobalState(state)       │
-│     dispatchEvent(ECHLY_GLOBAL_STATE)                                     │
-│   ContentApp: globalState (React state) ← from ECHLY_GLOBAL_STATE /      │
-│               ECHLY_GET_GLOBAL_STATE                                     │
-│   lastKnownSessionId ← ECHLY_GET_ACTIVE_SESSION (when visible)            │
+│ CONTENT (content.tsx)                                                    │
+│   chrome.runtime.onMessage → msg.type === "ECHLY_GLOBAL_STATE"            │
+│   → setHostVisibility(state.visible)                                     │
+│   → __ECHLY_APPLY_GLOBAL_STATE__?.(state)  // direct React setter         │
+│   → window.dispatchEvent(ECHLY_GLOBAL_STATE)                             │
 └─────────────────────────────────────────────────────────────────────────┘
-         │
-         │ props: sessionId, pointers (= globalState.pointers),              │
-         │        globalSessionModeActive, globalSessionPaused,              │
-         │        lastKnownSessionId, onSessionModePause, ...               │
-         ▼
+                                    │
+                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ WIDGET (CaptureWidget.tsx + useCaptureWidget.ts)                         │
-│   pointersProp (from content globalState.pointers)                        │
-│   Effect: if !recordingActiveRef.current → setPointers(pointersProp)     │
-│           else → SKIP (Bug A: tray does not update)                      │
-│   Session: globalSessionModeActive / globalSessionPaused → sessionMode,  │
-│            sessionPaused, pauseSession/resumeSession/endSession          │
-│   Resume: showResumeButton = lastKnownSessionId || sessionId (Bug B:    │
-│           both null on fresh open until ECHLY_GET_ACTIVE_SESSION returns)  │
+│ ContentApp (content.tsx)                                                  │
+│   useEffect: ECHLY_GLOBAL_STATE listener → setHostVisibility, setGlobalState │
+│   useEffect: __ECHLY_APPLY_GLOBAL_STATE__ = (state) => { setHostVisibility, setGlobalState } │
+│   useEffect: ECHLY_GET_GLOBAL_STATE on mount → hydrate                    │
+│   useEffect: visibilitychange → ECHLY_GET_GLOBAL_STATE → resync           │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ CaptureWidget (CaptureWidget.tsx)                                         │
+│   props: pointers, expanded, globalSessionModeActive, globalSessionPaused, captureMode │
+│   ← globalState.pointers, globalState.expanded, etc. from ContentApp     │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ useCaptureWidget                                                         │
+│   pointersProp → setPointers (if !recordingActiveRef.current)             │
+│   globalSessionModeActive → setSessionMode, createCaptureRoot/removeCaptureRoot │
+│   globalSessionPaused → setSessionPaused                                 │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Pointer update flow (detail)
+### State Change Locations
+
+| Location | What Changes |
+|----------|-------------|
+| background.ts | All `globalUIState` mutations |
+| content.tsx:139 | `setGlobalState` from ECHLY_GLOBAL_STATE, ECHLY_GET_GLOBAL_STATE, visibilitychange |
+| content.tsx:144 | `__ECHLY_APPLY_GLOBAL_STATE__` — direct apply from message handler |
+| useCaptureWidget.ts:1165 | `setPointers(pointersProp)` — **guarded by `!recordingActiveRef.current`** |
+| useCaptureWidget.ts:1102–1104 | `setSessionFeedbackPending(null)` when globalSessionPaused |
+
+---
+
+## Section 6 — Pointer / Feedback Flow
+
+### ECHLY_PROCESS_FEEDBACK Path
+
+| Step | File:Line | Action |
+|------|-----------|--------|
+| 1 | content.tsx or useCaptureWidget | Sends `ECHLY_PROCESS_FEEDBACK` with `{ transcript, screenshotUrl, screenshotId, sessionId, context }` |
+| 2 | background.ts:546 | Receives; validates transcript + sessionId |
+| 3 | background.ts:447 | `/api/structure-feedback` |
+| 4 | background.ts:497–531 | For each ticket: `/api/feedback` POST |
+| 5 | background.ts:532–538 | `firstCreated` → `globalUIState.pointers = [...pointers, pointer]` |
+| 6 | background.ts:539 | `broadcastUIState()` |
+| 7 | background.ts:540–548 | `ECHLY_FEEDBACK_CREATED` to all tabs |
+| 8 | content.tsx:1361–1363 | Dispatches `ECHLY_FEEDBACK_CREATED` CustomEvent |
+| 9 | useCaptureWidget.ts:1162–1169 | Effect `[extensionMode, pointersProp]`: **if `recordingActiveRef.current` return**; else `setPointers(pointersProp)` |
+
+### Pointer Update Skip
+
+**Root cause:** useCaptureWidget.ts:1165 — `if (recordingActiveRef.current) return` prevents `setPointers(pointersProp)` while the user is in a recording flow (voice_listening, processing, pill exiting).
+
+When feedback is created and broadcast, the widget may still have `recordingActiveRef.current === true`, so the pointer sync effect returns early and the tray does not update.
+
+---
+
+## Section 7 — Mode Selection
+
+### Voice vs Text Mode
+
+| Storage | Location |
+|---------|----------|
+| **Background** | `globalUIState.captureMode` ("voice" \| "text") — background.ts:43, 291 |
+| **Set by** | `ECHLY_SET_CAPTURE_MODE` (background.ts:288–296) |
+| **Read by** | Content passes `captureMode={globalState.captureMode ?? "voice"}` to CaptureWidget |
+
+### Mode Persistence
+
+- **Not persisted to chrome.storage** — only in-memory `globalUIState`
+- On extension reload or background restart, `captureMode` resets to `"voice"` (default in background.ts:52)
+- Mode is broadcast via `broadcastUIState()` when changed
+
+### Mode Reset
+
+Mode can reset when:
+1. Background service worker restarts (in-memory state lost)
+2. `ECHLY_TOGGLE_VISIBILITY` does not clear captureMode, but `ECHLY_RESET_WIDGET` remounts the widget; CaptureWidget receives fresh `captureMode` from `globalState` which is unchanged
+
+---
+
+## Section 8 — Recording Pipeline
+
+### State Variables
+
+| Variable | File | When Set True | When Set False |
+|----------|------|---------------|----------------|
+| **recordingActiveRef** | useCaptureWidget.ts:211 | `startListening` (line 439) | `recording.onend`, `finishListening`, `discardListening`, error paths |
+| **pipelineActiveRef** | useCaptureWidget.ts:189 | Before `onComplete` / session feedback (lines 476, 534, 912, 1248) | In onSuccess/onError callbacks |
+| **pausePending** | useCaptureWidget.ts:169 | `pauseSession` when `pipelineActiveRef.current` (line 1003) | `finalizePause`, global sync (line 1102) |
+| **endPending** | useCaptureWidget.ts:170 | `endSession` when `pipelineActiveRef.current` (line 1057) | `finalizeEnd` (line 1055) |
+
+### Blocking Behavior
+
+| Ref | Blocks |
+|-----|--------|
+| **recordingActiveRef** | `removeCaptureRoot` (line 399), pointer sync effect (line 1165), global sync effects (lines 1132, 1152) |
+| **pipelineActiveRef** | `pauseSession` and `endSession` wait via polling until pipeline finishes |
+| **pausePending** | Resume button disabled (SessionControlPanel) |
+| **endPending** | End button disabled |
+
+---
+
+## Section 9 — Popup Behavior
+
+### Extension Icon Click Flow
+
+| Step | File | Action |
+|------|------|--------|
+| 1 | Chrome | Opens `popup.html` (manifest action default_popup) |
+| 2 | popup.tsx | `createRoot(rootEl).render(<PopupApp />)` |
+| 3 | PopupApp | `getAuthState()` on mount |
+| 4 | If authenticated | `toggleVisibility()` → `ECHLY_TOGGLE_VISIBILITY`; `window.close()` |
+| 5 | If not authenticated | Renders "Continue with Google" |
+
+### Popup Screens
+
+The extension popup has only:
+- Loading
+- Login (Continue with Google)
+- Closing (when authenticated)
+
+There is no "home" vs "tray" in the popup. The **in-page widget** has:
+- **Command screen** (showCommandScreen=true): mode tiles (Voice/Text)
+- **Feedback tray** (showCommandScreen=false): list of feedback items
+- **Session overlay**: when in session mode
+
+### Why Widget Might Open on Tray Instead of Home
+
+| Cause | Location |
+|-------|----------|
+| **showCommandScreen** | CaptureWidget.tsx:59 — `useState(true)`; set false by `loadSessionWithPointers` (163), `onPreviousSessionSelect` (209) |
+| **ECHLY_RESET_WIDGET** | content.tsx:131 — `setWidgetResetKey(k => k + 1)` → remounts CaptureWidget → `showCommandScreen` resets to true |
+| **loadSessionWithPointers** | Content does not pass `loadSessionWithPointers` to CaptureWidget — prop is undefined |
+| **Stale expanded** | ECHLY_TOGGLE_VISIBILITY sets `expanded = false` when opening; ECHLY_RESET_WIDGET also triggers remount |
+
+**Conclusion:** After ECHLY_RESET_WIDGET, the widget remounts with `showCommandScreen=true`. If the user reports "opens on tray," possible causes:
+1. Message ordering: ECHLY_GLOBAL_STATE with `expanded=true` applied before ECHLY_RESET_WIDGET
+2. Tab-specific state: different tab had `showCommandScreen=false` before reset
+3. User interpretation: "tray" = expanded panel with feedback list; "home" = collapsed floating button or command screen
+
+---
+
+## Section 10 — Message System
+
+| Message | Sender | Receiver | Side Effects |
+|---------|--------|----------|--------------|
+| **ECHLY_GLOBAL_STATE** | Background | Content (all tabs) | setHostVisibility, __ECHLY_APPLY_GLOBAL_STATE__, dispatch CustomEvent |
+| **ECHLY_PROCESS_FEEDBACK** | Content | Background | Structure + create ticket, append to pointers, broadcast |
+| **ECHLY_SESSION_MODE_START** | Content | Background | sessionModeActive=true, sessionPaused=false, persist, broadcast |
+| **ECHLY_SESSION_MODE_PAUSE** | Content | Background | sessionModeActive=true, sessionPaused=true, persist, broadcast |
+| **ECHLY_SESSION_MODE_RESUME** | Content | Background | sessionModeActive=true, sessionPaused=false, persist, broadcast |
+| **ECHLY_SESSION_MODE_END** | Content | Background | Clear session, pointers; persist; broadcast |
+| **ECHLY_SET_ACTIVE_SESSION** | Content | Background | Set activeSessionId, fetch pointers, broadcast |
+| **ECHLY_GET_GLOBAL_STATE** | Content, Popup | Background | Returns `{ state: globalUIState }` |
+| **ECHLY_GET_ACTIVE_SESSION** | — | — | Not present in codebase |
+| **ECHLY_TOGGLE_VISIBILITY** | Popup | Background | Toggle visible; if visible→true: clear session, ECHLY_RESET_WIDGET, broadcast |
+| **ECHLY_RESET_WIDGET** | Background | Content | Dispatch CustomEvent → ContentApp sets widgetResetKey++, expanded=false |
+| **ECHLY_FEEDBACK_CREATED** | Background | Content | Dispatch CustomEvent |
+| **ECHLY_SESSION_STATE_SYNC** | Background | Content | Tab activation → content fetches ECHLY_GET_GLOBAL_STATE and applies |
+
+---
+
+## Section 11 — Crash Points
+
+### Potential Runtime Errors
+
+| Risk | Location | Condition |
+|------|----------|-----------|
+| **undefined analyser** | useCaptureWidget.ts:254 | `state === "voice_listening"` but `analyserRef.current` null — effect returns early |
+| **null capture root** | useCaptureWidget.ts:451, 471 | `captureRootRef.current` can be null; `createMarker`/`updateMarker` receive `root` — guarded by `if (root)` |
+| **Missing DOM container** | content.tsx:1405 | `document.getElementById(SHADOW_HOST_ID)` — created in main() if missing |
+| **Invalid pointer** | useCaptureWidget.ts:1165 | `setPointers(pointersProp)` — pointersProp from background; could be malformed if API returns bad data |
+
+### Flash Then Disappear
+
+| Scenario | Cause |
+|----------|-------|
+| **createCaptureRoot then removeCaptureRoot** | globalSessionModeActive flips true→false quickly (e.g. ECHLY_TOGGLE_VISIBILITY clears session right after start) |
+| **recordingActiveRef blocks removeCaptureRoot** | removeCaptureRoot returns early when recordingActiveRef; but when recording ends, a subsequent effect may call removeCaptureRoot |
+| **Effect ordering** | globalSessionModeActive effect creates root; seconds later, another effect (e.g. visibility) or sync sees `globalSessionModeActive=false` and removes root |
+| **Tab switch** | Tab A has session; user switches to Tab B; Tab B gets ECHLY_GLOBAL_STATE with sessionId; then ECHLY_SESSION_STATE_SYNC fetches state — if session ended meanwhile, Tab B could get stale then fresh state |
+
+---
+
+## Section 12 — Duplicate Roots
+
+### createCaptureRoot Guard
+
+```ts
+if (captureRootRef.current) {
+  console.debug("ECHLY createCaptureRoot", "skipped (ref already set)");
+  return;
+}
+```
+
+**Conclusion:** Yes — `if (captureRootRef.current) return` prevents creating a second root when the ref is already set.
+
+**Edge case:** After a React remount (e.g. widgetResetKey change), `captureRootRef` is a new ref and starts as null. The DOM element `#echly-capture-root` may still exist. The function checks `document.getElementById(OVERLAY_ROOT_ID)` and reuses it, so only one root exists.
+
+---
+
+## Section 13 — Timelines
+
+### Timeline A: Click Page → Voice Capture UI
 
 ```
-ECHLY_PROCESS_FEEDBACK (content → background)
-  → background: POST structure + feedback APIs
-  → firstCreated → pointer = { id, title, actionSteps, type }
-  → globalUIState.pointers = [...globalUIState.pointers, pointer]
-  → broadcastUIState()
-  → each tab: ECHLY_GLOBAL_STATE { state: globalUIState }
-  → content: setGlobalState(state)  →  pointersProp = state.pointers
-  → widget effect [extensionMode, pointersProp]:
-       if (recordingActiveRef.current) return;   // ← BLOCKS HERE (Bug A)
-       setPointers(pointersProp);
+T0    User clicks element on page (session mode active)
+T1    attachClickCapture fires → handleSessionElementClicked(element)
+T2    getFullTabImage() → CAPTURE_TAB to background → screenshot
+T3    cropScreenshotAroundElement(fullImage, element)
+T4    setSessionFeedbackPending({ screenshot, context })
+T5    SessionOverlay re-renders → VoiceCapturePanel (captureMode=voice)
+T6    User clicks mic → handleSessionStartVoice
+T7    startListening() → recordingActiveRef=true, setState("voice_listening")
+T8    navigator.mediaDevices.getUserMedia, AudioContext, recognition.start()
+T9    User speaks → recognition.onresult → setRecordings transcript
+T10   User stops → finishListening
+T11   pipelineActiveRef=true, onComplete(transcript, screenshot, callbacks, { sessionMode: true })
+T12   content handleComplete → ECHLY_PROCESS_FEEDBACK or direct API
+T13   Background creates ticket, globalUIState.pointers append, broadcastUIState
+T14   Content receives ECHLY_GLOBAL_STATE; useCaptureWidget pointer effect runs
+T15   If recordingActiveRef false: setPointers(pointersProp); else SKIP
+T16   onSuccess callback: updateMarker, setPointers (local), setHighlightTicketId
+```
+
+### Timeline B: Extension Icon Click → Popup / Widget
+
+```
+T0    User clicks extension icon
+T1    Chrome opens popup.html
+T2    popup.js loads → PopupApp mounts
+T3    getAuthState() → ECHLY_GET_AUTH_STATE
+T4    If authenticated: toggleVisibility() → ECHLY_TOGGLE_VISIBILITY
+T5    window.close() — popup closes
+T6    Background: visible=true, sessionModeActive=false, sessionPaused=false, ECHLY_RESET_WIDGET to all tabs
+T7    Background: broadcastUIState()
+T8    Content: ECHLY_RESET_WIDGET → setWidgetResetKey++, setGlobalState(expanded=false)
+T9    Content: ECHLY_GLOBAL_STATE → setHostVisibility(true), setGlobalState
+T10   CaptureWidget remounts (key change) → showCommandScreen=true
+T11   Host display=block → widget visible
+T12   expanded=false → showFloatingButton=true (collapsed)
+T13   User sees floating "Echly" button
+T14   User clicks → onExpandRequest → ECHLY_EXPAND_WIDGET
+T15   Background: expanded=true, broadcastUIState
+T16   Content: setGlobalState(expanded=true)
+T17   showPanel=true, showCommandScreen=true → mode tiles (Voice/Text)
 ```
 
 ---
 
-**End of audit.** No code was modified; this is an investigation report only.
+## Section 14 — Root Cause Analysis
+
+### 1. Capture Screen Flash and Disappear
+
+| Cause | File:Line | Explanation |
+|-------|-----------|-------------|
+| **Effect race** | useCaptureWidget.ts:1106–1157 | Multiple effects depend on `globalSessionModeActive`. One creates root, another may remove it if state flips. |
+| **recordingActiveRef guard** | useCaptureWidget.ts:399 | removeCaptureRoot returns early when recording; when recording ends, a later effect can run and remove root. |
+| **ECHLY_TOGGLE_VISIBILITY clears session** | background.ts:251–261 | On widget open, session state is cleared and ECHLY_RESET_WIDGET is sent. If a session was active, this can tear down the overlay. |
+| **Double broadcast** | background.ts:392 | `setTimeout(broadcastUIState, 150)` after ECHLY_SESSION_MODE_END — second broadcast can trigger effects that remove root. |
+
+### 2. Unexpected Session End
+
+| Cause | File:Line | Explanation |
+|-------|-----------|-------------|
+| **ECHLY_TOGGLE_VISIBILITY** | background.ts:251–254 | When opening widget, background sets `sessionModeActive=false`, `sessionPaused=false`, persists, and sends ECHLY_RESET_WIDGET. Session is cleared on every open. |
+| **initializeSessionState race** | background.ts:62–78 | `chrome.storage.local.get` is async. First `broadcastUIState()` can run before restore, so tabs get `sessionId=null`. |
+| **Tab activation sync** | background.ts:221–234 | On tab switch, ECHLY_GLOBAL_STATE and ECHLY_SESSION_STATE_SYNC are sent. If session ended in another tab, this tab gets the cleared state. |
+
+### 3. Popup Opens on Wrong Screen
+
+| Cause | File:Line | Explanation |
+|-------|-----------|-------------|
+| **Extension popup** | popup.tsx | Popup is login-only; no home/tray. If user means the popup, the only screens are Loading, Login, Closing. |
+| **Widget showCommandScreen** | CaptureWidget.tsx:59, 163, 209 | `showCommandScreen` controls command tiles vs tray. Reset remounts with true. If `loadSessionWithPointers` were passed and set, it would switch to tray. |
+| **Message ordering** | content.tsx:1359–1395 | ECHLY_GLOBAL_STATE can arrive before ECHLY_RESET_WIDGET. Brief stale state (e.g. expanded=true) before remount. |
+| **expanded state** | background.ts:249 | ECHLY_TOGGLE_VISIBILITY sets expanded=false when opening. If a prior broadcast had expanded=true, a race could show the panel expanded. |
+
+### 4. Global State Synchronization
+
+| Issue | Location | Explanation |
+|-------|----------|-------------|
+| **recordingActiveRef blocks pointer sync** | useCaptureWidget.ts:1165 | `if (recordingActiveRef.current) return` — tray does not update with new pointers while recording. |
+| **No persistence of captureMode** | background.ts | captureMode is in-memory only; lost on service worker restart. |
+| **Multiple state sources** | content.tsx | ECHLY_GLOBAL_STATE, ECHLY_GET_GLOBAL_STATE, visibilitychange, __ECHLY_APPLY_GLOBAL_STATE__ — all can update state; ordering matters. |
+
+---
+
+## Appendix: File Reference
+
+| File | Role |
+|------|------|
+| `echly-extension/manifest.json` | Entry points |
+| `echly-extension/src/background.ts` | Global state, messages, auth |
+| `echly-extension/src/content.tsx` | Widget host, ContentApp, message routing |
+| `echly-extension/src/popup.tsx` | Extension popup (login) |
+| `components/CaptureWidget/CaptureWidget.tsx` | Widget shell |
+| `components/CaptureWidget/hooks/useCaptureWidget.ts` | Widget state, create/remove root, recording |
+| `components/CaptureWidget/CaptureLayer.tsx` | Overlay container |
+| `components/CaptureWidget/SessionOverlay.tsx` | Session mode UI |

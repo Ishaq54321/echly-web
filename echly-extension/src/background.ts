@@ -248,18 +248,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.visible = !globalUIState.visible;
     if (globalUIState.visible) {
       globalUIState.expanded = false;
-      // Only reset UI lifecycle state; preserve last session id so Resume works.
-      globalUIState.sessionModeActive = false;
-      globalUIState.sessionPaused = false;
-      persistSessionLifecycleState();
-      // Reset widget in all tabs so they show command screen.
-      chrome.tabs.query({}, (tabs) => {
-        tabs.forEach((tab) => {
-          if (tab.id) {
-            chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" }).catch(() => {});
-          }
-        });
-      });
     }
     broadcastUIState();
     sendResponse({ success: true });
@@ -388,7 +376,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sessionPaused: false,
     });
     broadcastUIState();
-    setTimeout(broadcastUIState, 150);
+    chrome.tabs.query({}, (tabs) => {
+      tabs.forEach((tab) => {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" }).catch(() => {});
+        }
+      });
+    });
     sendResponse({ success: true });
     return true;
   }

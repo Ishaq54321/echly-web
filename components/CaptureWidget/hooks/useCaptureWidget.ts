@@ -142,6 +142,16 @@ export function useCaptureWidget({
   if (process.env.NODE_ENV === "development") {
     console.count("useCaptureWidget render");
   }
+
+  if (typeof window !== "undefined" && !(window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: { screenshot: string; context: CaptureContext | null } | null } }).__ECHLY_CAPTURE_STATE__) {
+    (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: { screenshot: string; context: CaptureContext | null } | null } }).__ECHLY_CAPTURE_STATE__ = {
+      pending: null,
+    };
+  }
+  const captureState = (typeof window !== "undefined"
+    ? (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: { screenshot: string; context: CaptureContext | null } | null } }).__ECHLY_CAPTURE_STATE__
+    : { pending: null as { screenshot: string; context: CaptureContext | null } | null }) ?? { pending: null };
+
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
   const [isOpen, setIsOpenState] = useState(false);
@@ -159,6 +169,7 @@ export function useCaptureWidget({
   const [isDragging, setIsDragging] = useState(false);
   const [pendingStructured, setPendingStructured] = useState<StructuredFeedback | null>(null);
   const [listeningAudioLevel, setListeningAudioLevel] = useState(0);
+  const [audioAnalyser, setAudioAnalyser] = useState<AnalyserNode | null>(null);
   const [widgetOpenBeforeCapture, setWidgetOpenBeforeCapture] = useState(true);
   const [highlightTicketId, setHighlightTicketId] = useState<string | null>(null);
   const [pillExiting, setPillExiting] = useState(false);
@@ -172,7 +183,7 @@ export function useCaptureWidget({
   const [sessionFeedbackPending, setSessionFeedbackPending] = useState<{
     screenshot: string;
     context: CaptureContext | null;
-  } | null>(null);
+  } | null>(captureState.pending);
   const [sessionFeedbackSaving, setSessionFeedbackSaving] = useState(false);
 
   const sessionModeRef = useRef(false);
@@ -213,10 +224,30 @@ export function useCaptureWidget({
   const recordingActiveRef = useRef(false);
   /** Latest pointers from background so we can sync when recording ends (callbacks have stale closure). */
   const pointersPropRef = useRef<StructuredFeedback[] | undefined>(pointersProp);
+  /** True when sessionFeedbackPending is set (capture UI visible); used to protect from spurious clears. */
+  const sessionFeedbackPendingRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  useEffect(() => {
+    sessionFeedbackPendingRef.current = sessionFeedbackPending != null;
+  }, [sessionFeedbackPending]);
+
+  /** Sync pending to global store so it survives React remounts. */
+  const setPending = useCallback((value: { screenshot: string; context: CaptureContext | null } | null) => {
+    captureState.pending = value;
+    setSessionFeedbackPending(value);
+  }, []);
+
+  /** Restore persisted capture state on mount (e.g. after widget remount). */
+  useEffect(() => {
+    if (captureState.pending) {
+      console.log("ECHLY restoring pending capture state");
+      setPending(captureState.pending);
+    }
+  }, []);
 
   /** Focus mode: dim overlay + desaturation when in focus_mode or region_selecting */
   useEffect(() => {
@@ -242,6 +273,7 @@ export function useCaptureWidget({
       audioContextRef.current?.close().catch(() => {});
       audioContextRef.current = null;
       analyserRef.current = null;
+      setAudioAnalyser(null);
       setListeningAudioLevel(0);
       return;
     }
@@ -366,7 +398,12 @@ export function useCaptureWidget({
       return;
     }
     console.debug("ECHLY createCaptureRoot");
-    setSessionFeedbackPending(null);
+    if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
+      console.log("ECHLY pending CLEARED", { reason: "createCaptureRoot" });
+      setPending(null);
+    } else {
+      console.log("ECHLY pending clear skipped during capture");
+    }
     const captureEl = document.createElement("div");
     captureEl.id = OVERLAY_ROOT_ID;
     document.body.appendChild(captureEl);
@@ -394,7 +431,6 @@ export function useCaptureWidget({
   }, [captureRootEl]);
 
   const removeCaptureRoot = useCallback(() => {
-    if (recordingActiveRef.current) return;
     if (extensionMode && globalSessionModeActive !== false) {
       return;
     }
@@ -572,11 +608,12 @@ export function useCaptureWidget({
       const ctx = new AudioContext();
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.7;
+      analyser.smoothingTimeConstant = 0.85;
       const src = ctx.createMediaStreamSource(stream);
       src.connect(analyser);
       audioContextRef.current = ctx;
       analyserRef.current = analyser;
+      setAudioAnalyser(analyser);
       console.log("[VOICE] recognition.start() called", Date.now());
       recognitionRef.current?.start();
       recordingActiveRef.current = true;
@@ -640,7 +677,8 @@ export function useCaptureWidget({
             }
           );
         }
-        setSessionFeedbackPending(null);
+        console.log("ECHLY pending CLEARED", { reason: "finishListening session mode" });
+        setPending(null);
         setSessionFeedbackSaving(true);
         setRecordings((prev) => prev.filter((r) => r.id !== activeId));
         setActiveRecordingId(null);
@@ -993,10 +1031,11 @@ export function useCaptureWidget({
       const session = await onCreateSession();
       if (!session?.id) return;
       onActiveSessionChange(session.id);
-      setPointers([]);
-      onSessionModeStart?.();
+    setPointers([]);
+    onSessionModeStart?.();
     }
-    setSessionFeedbackPending(null);
+    console.log("ECHLY pending CLEARED", { reason: "startSession" });
+    setPending(null);
     setSessionFeedbackSaving(false);
     setPausePending(false);
     setEndPending(false);
@@ -1069,7 +1108,8 @@ export function useCaptureWidget({
       logSession("end");
       setPausePending(false);
       setEndPending(false);
-      setSessionFeedbackPending(null);
+      console.log("ECHLY pending CLEARED", { reason: "endSession finalizeEnd" });
+      setPending(null);
       setSessionFeedbackSaving(false);
       setPointers([]);
       onSessionModeEnd?.();
@@ -1096,17 +1136,18 @@ export function useCaptureWidget({
     finalizeEnd();
   }, [clearSessionWaitTimeout, endPending, globalSessionModeActive, onSessionModeEnd]);
 
-  /** Session mode starts ONLY when globalSessionModeActive === true (single source of truth). Never start from sessionId or pointers. */
+  /** Root lifecycle: ONLY depends on globalSessionModeActive. Single source of truth from background. */
   useEffect(() => {
-    if (globalSessionModeActive === true) {
-      setSessionMode(true);
+    if (globalSessionModeActive) {
       createCaptureRoot();
+    } else {
+      removeCaptureRoot();
     }
-  }, [globalSessionModeActive, createCaptureRoot]);
+  }, [globalSessionModeActive, createCaptureRoot, removeCaptureRoot]);
 
   /**
    * Sync session mode from global state (ECHLY_GLOBAL_STATE).
-   * When globalSessionModeActive is true, overlay activates; pointers come from global state (pointersProp) or loadSessionWithPointers.
+   * Root lifecycle is handled by the dedicated effect above.
    */
   useEffect(() => {
     if (!extensionMode || globalSessionModeActive === undefined) return;
@@ -1114,44 +1155,33 @@ export function useCaptureWidget({
     if (globalSessionModeActive === true) {
       setSessionMode(true);
       setSessionPaused(globalSessionPaused ?? false);
-      if (!recordingActiveRef.current) setSessionFeedbackPending(null);
-      setEndPending(false);
-      if (!captureRootRef.current) {
-        createCaptureRoot();
+      if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
+        console.log("ECHLY pending CLEARED", { reason: "global sync (session active)" });
+        setPending(null);
+      } else {
+        console.log("ECHLY pending clear skipped during capture");
       }
+      setEndPending(false);
     }
     if (globalSessionPaused === true) {
       setSessionPaused(true);
       setPausePending(false);
     }
     if (globalSessionModeActive === false) {
-      if (recordingActiveRef.current) return;
       setSessionMode(false);
       setSessionPaused(false);
       setPausePending(false);
       setEndPending(false);
-      setSessionFeedbackPending(null);
+      if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
+        console.log("ECHLY pending CLEARED", { reason: "global sync (session ended)" });
+        setPending(null);
+      } else {
+        console.log("ECHLY pending clear skipped during capture");
+      }
       setSessionFeedbackSaving(false);
       removeAllMarkers();
-      removeCaptureRoot();
     }
-  }, [extensionMode, globalSessionModeActive, globalSessionPaused, createCaptureRoot, removeCaptureRoot]);
-
-  /** Safety: when globalSessionModeActive is false, always clear widget and overlay so session never auto-restarts. */
-  useEffect(() => {
-    if (!extensionMode) return;
-    if (!globalSessionModeActive) {
-      if (recordingActiveRef.current) return;
-      setSessionMode(false);
-      setSessionPaused(false);
-      setPausePending(false);
-      setEndPending(false);
-      setSessionFeedbackPending(null);
-      setSessionFeedbackSaving(false);
-      removeAllMarkers();
-      removeCaptureRoot();
-    }
-  }, [extensionMode, globalSessionModeActive, removeCaptureRoot]);
+  }, [extensionMode, globalSessionModeActive, globalSessionPaused]);
 
   /** When globalSessionPaused changes while session mode is active, sync local paused state. */
   useEffect(() => {
@@ -1171,44 +1201,37 @@ export function useCaptureWidget({
     }
   }, [extensionMode, globalSessionModeActive, globalSessionPaused]);
 
-  /** Tab activation recovery: when session mode is active globally and capture root is missing, recreate it. */
-  useEffect(() => {
-    if (!extensionMode || globalSessionModeActive !== true) return;
-    const onVisibilityChange = () => {
-      if (document.hidden) return;
-      if (!globalSessionModeActive || captureRootRef.current) return;
-      setSessionMode(true);
-      setSessionPaused(globalSessionPaused ?? false);
-      setSessionFeedbackPending(null);
-      setEndPending(false);
-      createCaptureRoot();
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [extensionMode, globalSessionModeActive, globalSessionPaused, createCaptureRoot]);
-
-  /** Extension: sync global pointers from background so all tabs show the same tray. */
+  /** Extension: sync global pointers from background so all tabs show the same tray. Never skip updates. */
   useEffect(() => {
     if (!extensionMode || pointersProp === undefined) return;
     pointersPropRef.current = pointersProp;
-    if (recordingActiveRef.current) return;
-
     setPointers(pointersProp);
-    setSessionFeedbackPending(null);
+    if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
+      console.log("ECHLY pending CLEARED", { reason: "pointers sync effect" });
+      setPending(null);
+    } else {
+      console.log("ECHLY pending clear skipped during capture");
+    }
   }, [extensionMode, pointersProp]);
 
   /** When parent passes loadSessionWithPointers (e.g. after Resume picker), apply once and notify. */
   useEffect(() => {
     if (!extensionMode || !loadSessionWithPointers?.sessionId) return;
     setPointers(loadSessionWithPointers.pointers ?? []);
-    setSessionFeedbackPending(null);
+    if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
+      console.log("ECHLY pending CLEARED", { reason: "loadSessionWithPointers" });
+      setPending(null);
+    } else {
+      console.log("ECHLY pending clear skipped during capture");
+    }
     onSessionLoaded?.();
   }, [extensionMode, loadSessionWithPointers, onSessionLoaded]);
 
   const handleSessionElementClicked = useCallback(
     async (element: Element) => {
       if (sessionFeedbackPending && !captureRootRef.current) {
-        setSessionFeedbackPending(null);
+        console.log("ECHLY pending CLEARED", { reason: "handleSessionElementClicked (no root)" });
+        setPending(null);
         return;
       }
       if (!getFullTabImage || sessionFeedbackPending != null) return;
@@ -1229,7 +1252,9 @@ export function useCaptureWidget({
       }
       const context = buildCaptureContext(window, element);
       lastSessionClickedElementRef.current = element instanceof HTMLElement ? element : null;
-      setSessionFeedbackPending({ screenshot: cropped, context });
+      console.log("ECHLY pending SET", { screenshot: cropped, context });
+      sessionFeedbackPendingRef.current = true;
+      setPending({ screenshot: cropped, context });
     },
     [getFullTabImage, sessionFeedbackPending]
   );
@@ -1238,7 +1263,8 @@ export function useCaptureWidget({
     (transcript: string) => {
       const pending = sessionFeedbackPending;
       if (!pending || !transcript || transcript.trim().length === 0) {
-        setSessionFeedbackPending(null);
+        console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackSubmit (invalid)" });
+        setPending(null);
         return;
       }
       const root = captureRootRef.current;
@@ -1267,7 +1293,8 @@ export function useCaptureWidget({
         );
       }
 
-      setSessionFeedbackPending(null);
+      console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackSubmit (submit)" });
+      setPending(null);
       setSessionFeedbackSaving(true);
       setState("idle");
       lastSessionClickedElementRef.current = null;
@@ -1315,7 +1342,8 @@ export function useCaptureWidget({
   );
 
   const handleSessionFeedbackCancel = useCallback(() => {
-    setSessionFeedbackPending(null);
+    console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackCancel" });
+    setPending(null);
     setSessionFeedbackSaving(false);
   }, []);
 
@@ -1479,6 +1507,7 @@ export function useCaptureWidget({
       pausePending,
       endPending,
       sessionFeedbackPending,
+      audioAnalyser,
     },
     handlers,
     refs: {

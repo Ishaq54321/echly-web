@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Mic, MessageSquare } from "lucide-react";
+import { Mic, MessageSquare, Gem } from "lucide-react";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
 import FeedbackItem from "./FeedbackItem";
@@ -9,10 +9,17 @@ import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
 import { ResumeSessionModal } from "./ResumeSessionModal";
 import { ModeTile } from "./ModeTile";
-import { MicrophoneSelector } from "./MicrophoneSelector";
+import { MicrophonePanel } from "./MicrophonePanel";
 import type { CaptureWidgetProps, CaptureState } from "./types";
 
 const CAPTURE_FLOW_STATES: CaptureState[] = ["focus_mode", "region_selecting", "voice_listening", "processing"];
+
+function shortDeviceName(label: string): string {
+  return label
+    .replace("Microphone (", "")
+    .replace(")", "")
+    .replace("Podcast Microphone", "Podcast Mic");
+}
 
 export default function CaptureWidget({
   sessionId,
@@ -224,6 +231,7 @@ export default function CaptureWidget({
             sessionFeedbackPending={state.sessionFeedbackPending}
             captureMode={captureMode}
             listeningAudioLevel={state.listeningAudioLevel ?? 0}
+            audioAnalyser={state.audioAnalyser ?? null}
             onSessionElementClicked={handlers.handleSessionElementClicked}
             onSessionPause={() => {
               handlers.pauseSession();
@@ -283,6 +291,14 @@ export default function CaptureWidget({
                 : undefined
             }
           >
+            {extensionMode && captureMode === "voice" && micDropdownOpen && (
+              <MicrophonePanel
+                devices={microphones}
+                selectedDeviceId={selectedMicrophone}
+                onSelect={setSelectedMicrophone}
+                onClose={() => setMicDropdownOpen(false)}
+              />
+            )}
             <div className="echly-sidebar-surface">
               <CaptureHeader
                 onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
@@ -305,28 +321,33 @@ export default function CaptureWidget({
               >
                 {extensionMode && showSessionButtons && (
                   <div className="echly-mode-container">
+                    <div className="echly-mode-header">Select feedback mode</div>
                     <ModeTile
                       icon={<Mic size={16} />}
-                      title="Voice Feedback"
+                      title="Voice (Recommended)"
                       description="Speak naturally. Echly structures it automatically."
                       selected={captureMode === "voice"}
-                      badge="✦"
+                      badge={<Gem size={16} strokeWidth={2} className="voice-recommended-icon" />}
                       tooltip="Recommended for fastest feedback capture"
                       onClick={() => setMode("voice")}
                     />
                     {captureMode === "voice" && (
-                      <MicrophoneSelector
-                        devices={microphones}
-                        selectedDeviceId={selectedMicrophone}
-                        onSelect={setSelectedMicrophone}
-                        open={micDropdownOpen}
-                        onToggle={() => setMicDropdownOpen((o) => !o)}
-                      />
+                      <div
+                        className="echly-mic-indicator"
+                        onClick={() => setMicDropdownOpen(true)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === "Enter" && setMicDropdownOpen(true)}
+                      >
+                        Select microphone: {shortDeviceName(
+                          microphones.find((m) => m.deviceId === selectedMicrophone)?.label ?? "Default"
+                        )}
+                      </div>
                     )}
                     <ModeTile
                       icon={<MessageSquare size={16} />}
-                      title="Text Feedback"
-                      description="Write comments manually on elements."
+                      title="Text"
+                      description="Write comments on elements. Echly structures them with AI."
                       selected={captureMode === "text"}
                       tooltip="Use when you prefer typing comments"
                       onClick={() => setMode("text")}

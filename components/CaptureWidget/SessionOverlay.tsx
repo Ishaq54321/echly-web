@@ -40,6 +40,7 @@ export type SessionOverlayProps = {
   onCancel?: () => void;
   captureMode?: "voice" | "text";
   listeningAudioLevel?: number;
+  audioAnalyser?: AnalyserNode | null;
 };
 
 /**
@@ -65,6 +66,7 @@ export function SessionOverlay({
   onCancel,
   captureMode = "voice",
   listeningAudioLevel = 0,
+  audioAnalyser = null,
 }: SessionOverlayProps) {
   const cleanupRef = useRef<(() => void)[]>([]);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
@@ -193,6 +195,7 @@ export function SessionOverlay({
           audioLevel={listeningAudioLevel}
           isListening={state === "voice_listening"}
           onFinish={onDoneVoice}
+          analyser={audioAnalyser ?? null}
         />
       )}
       {sessionFeedbackPending && captureMode === "text" && (

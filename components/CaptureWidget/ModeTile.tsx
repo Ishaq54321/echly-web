@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 
 export interface ModeTileProps {
   icon: ReactNode;
@@ -8,7 +8,7 @@ export interface ModeTileProps {
   description: string;
   selected: boolean;
   onClick: () => void;
-  badge?: string;
+  badge?: ReactNode;
   tooltip?: string;
 }
 
@@ -36,7 +36,11 @@ export function ModeTile({
         <div className="tile-title">{title}</div>
         {badge && <div className="tile-badge">{badge}</div>}
       </div>
-      <div className="tile-description">{description}</div>
+      {!selected && (
+        <div className="tile-description">
+          {description}
+        </div>
+      )}
     </div>
   );
 }
