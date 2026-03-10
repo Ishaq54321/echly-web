@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
-import type { Comment, CommentPosition, CommentTextRange } from "@/lib/domain/comment";
+import type { Comment, CommentAttachment, CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import {
   incrementSessionCommentCountRepo,
   updateSessionUpdatedAtRepo,
@@ -31,6 +31,7 @@ export interface AddCommentData {
   position?: CommentPosition;
   textRange?: CommentTextRange;
   threadId?: string | null;
+  attachment?: CommentAttachment;
 }
 
 export async function addCommentRepo(
@@ -52,6 +53,7 @@ export async function addCommentRepo(
   if (data.position != null) payload.position = data.position;
   if (data.textRange != null) payload.textRange = data.textRange;
   if (data.threadId != null) payload.threadId = data.threadId;
+  if (data.attachment != null) payload.attachment = data.attachment;
 
   const ref = await addDoc(collectionRef, payload);
   await incrementSessionCommentCountRepo(sessionId);

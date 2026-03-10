@@ -21,13 +21,22 @@ export interface DiscussionItem {
   isUnread?: boolean;
 }
 
+export interface ProjectItem {
+  id: string;
+  name: string;
+}
+
 export interface DiscussionListProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   search?: string;
   refreshKey?: number;
+  /** When set, only show threads for this session (project) */
+  filterBySessionId?: string | null;
   /** Called when loading completes with whether there are any discussions */
   onEmptyChange?: (isEmpty: boolean) => void;
+  /** Called when discussions load with unique sessions (projects) derived from the list */
+  onProjectsLoaded?: (projects: ProjectItem[]) => void;
 }
 
 function parseUpdatedAt(item: DiscussionItem): number {
@@ -51,13 +60,17 @@ export function DiscussionList({
   onSelect,
   search = "",
   refreshKey = 0,
+  filterBySessionId = null,
   onEmptyChange,
+  onProjectsLoaded,
 }: DiscussionListProps) {
   const [items, setItems] = useState<DiscussionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const onEmptyChangeRef = useRef(onEmptyChange);
   onEmptyChangeRef.current = onEmptyChange;
+  const onProjectsLoadedRef = useRef(onProjectsLoaded);
+  onProjectsLoadedRef.current = onProjectsLoaded;
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +106,14 @@ export function DiscussionList({
           };
         });
         setItems(list);
+        const projectMap = new Map<string, string>();
+        list.forEach((i) => {
+          if (i.sessionId && !projectMap.has(i.sessionId)) {
+            projectMap.set(i.sessionId, i.sessionName ?? "Session");
+          }
+        });
+        const projects: ProjectItem[] = Array.from(projectMap.entries()).map(([id, name]) => ({ id, name }));
+        onProjectsLoadedRef.current?.(projects);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
@@ -106,21 +127,22 @@ export function DiscussionList({
   }, [refreshKey]);
 
   const filteredItems = useMemo(() => {
+    let list = items;
+    if (filterBySessionId) {
+      list = list.filter((i) => i.sessionId === filterBySessionId);
+    }
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
+    if (!q) return list;
+    return list.filter(
       (i) =>
         i.title.toLowerCase().includes(q) ||
         (i.sessionName ?? "").toLowerCase().includes(q)
     );
-  }, [items, search]);
+  }, [items, search, filterBySessionId]);
 
   if (loading) {
     return (
-      <div
-        className="w-[320px] shrink-0 flex flex-col overflow-hidden bg-white border-r border-neutral-200"
-        style={{ minHeight: 200 }}
-      >
+      <div className="flex flex-col overflow-hidden bg-transparent" style={{ minHeight: 200 }}>
         <div className="p-4 space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
@@ -135,7 +157,7 @@ export function DiscussionList({
 
   if (error) {
     return (
-      <div className="w-[320px] shrink-0 flex flex-col items-center justify-center p-8 text-center bg-white border-r border-neutral-200">
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-transparent">
         <p className="text-sm text-neutral-600">{error}</p>
       </div>
     );
@@ -143,7 +165,7 @@ export function DiscussionList({
 
   if (items.length === 0) {
     return (
-      <div className="w-[320px] shrink-0 flex flex-col overflow-hidden bg-white border-r border-neutral-200">
+      <div className="flex flex-col overflow-hidden bg-transparent">
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
           <MessageSquareMore className="w-12 h-12 text-neutral-300 mb-4" />
           <h2 className="text-lg font-semibold text-neutral-900">
@@ -164,8 +186,8 @@ export function DiscussionList({
   }
 
   return (
-    <div className="w-[320px] shrink-0 flex flex-col overflow-hidden bg-white border-r border-neutral-200 font-sans">
-      <div className="flex-1 overflow-y-auto p-2">
+    <div className="flex flex-col overflow-hidden bg-transparent font-sans h-full">
+      <div className="flex-1 overflow-y-auto p-2 min-h-0">
         {filteredItems.length === 0 ? (
           <p className="text-sm text-neutral-500 py-4 px-4 text-center">
             No discussions match your search.
@@ -196,7 +218,7 @@ export function DiscussionList({
                   }}
                   className={`px-4 py-4 cursor-pointer transition-colors ${
                     isSelected
-                      ? "border-l-2 border-[#155DFC] bg-[#F6F8FF]"
+                      ? "bg-neutral-100"
                       : "hover:bg-neutral-50"
                   }`}
                 >

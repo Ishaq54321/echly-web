@@ -38,6 +38,8 @@ export interface TicketListProps {
   onMarkAllTicketsResolved?: () => void;
   /** Mark all tickets in this session as unresolved. */
   onMarkAllTicketsUnresolved?: () => void;
+  /** When set (e.g. from ?ticket= deep link), expand the section containing this id and scroll to it. */
+  scrollToId?: string | null;
 }
 
 function TicketListInner({
@@ -65,10 +67,12 @@ function TicketListInner({
   onScrollContainerReady,
   onMarkAllTicketsResolved,
   onMarkAllTicketsUnresolved,
+  scrollToId,
 }: TicketListProps) {
   const [searchInput, setSearchInput] = useState("");
   const [sidebarMenuOpen, setSidebarMenuOpen] = useState(false);
   const sidebarMenuRef = useRef<HTMLDivElement>(null);
+  const scrollToIdApplied = useRef(false);
 
   useEffect(() => {
     if (!sidebarMenuOpen) return;
@@ -137,6 +141,24 @@ function TicketListInner({
   }, [items, query]);
 
   const [skippedExpanded, setSkippedExpanded] = useState(false);
+
+  // Deep link: expand section containing scrollToId and scroll to it (once per mount).
+  useEffect(() => {
+    if (!scrollToId || scrollToIdApplied.current) return;
+    if (openItems.some((i) => i.id === scrollToId)) setOpenExpanded(true);
+    if (skippedItems.some((i) => i.id === scrollToId)) setSkippedExpanded(true);
+    if (resolvedItems.some((i) => i.id === scrollToId)) setResolvedExpanded(true);
+    scrollToIdApplied.current = true;
+  }, [scrollToId, openItems, skippedItems, resolvedItems]);
+
+  useEffect(() => {
+    if (!scrollToId) return;
+    const t = setTimeout(() => {
+      const el = document.querySelector(`[data-ticket-id="${CSS.escape(scrollToId)}"]`);
+      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }, 100);
+    return () => clearTimeout(t);
+  }, [scrollToId]);
 
   const canEditTitle =
     typeof onSessionTitleChange === "function" &&

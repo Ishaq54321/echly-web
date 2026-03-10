@@ -12,6 +12,10 @@ export interface ActivitySlideOverProps {
   comments: Comment[];
   loading: boolean;
   sendComment: (message: string) => void;
+  /** Optional: for edit/delete comment actions */
+  currentUserId?: string | null;
+  onUpdateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
+  onDeleteComment?: (commentId: string) => Promise<void>;
   /** Optional: show resolve history when resolved */
   isResolved?: boolean;
   updatedAt?: string | { seconds: number } | null;
@@ -55,6 +59,9 @@ function ActivityPanelContent({
   handleSend,
   isResolved,
   updatedAt,
+  currentUserId,
+  onUpdateComment,
+  onDeleteComment,
 }: {
   onClose: () => void;
   comments: Comment[];
@@ -64,6 +71,9 @@ function ActivityPanelContent({
   handleSend: (message: string) => void;
   isResolved?: boolean;
   updatedAt?: string | { seconds: number } | null;
+  currentUserId?: string | null;
+  onUpdateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
+  onDeleteComment?: (commentId: string) => Promise<void>;
 }) {
   return (
     <>
@@ -92,7 +102,13 @@ function ActivityPanelContent({
 
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="px-4 py-4">
-          <ActivityThread comments={comments} loading={loading} />
+          <ActivityThread
+            comments={comments}
+            loading={loading}
+            currentUserId={currentUserId}
+            onUpdateComment={onUpdateComment}
+            onDeleteComment={onDeleteComment}
+          />
           {isResolved && (
             <div className="mt-4 pt-4 border-t border-[var(--layer-2-border)]">
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--text-tertiary))]">
@@ -115,6 +131,9 @@ export function ActivitySlideOver({
   comments,
   loading,
   sendComment,
+  currentUserId,
+  onUpdateComment,
+  onDeleteComment,
   isResolved,
   updatedAt,
   variant = "overlay",
@@ -152,6 +171,9 @@ export function ActivitySlideOver({
       handleSend={handleSend}
       isResolved={isResolved}
       updatedAt={updatedAt}
+      currentUserId={currentUserId}
+      onUpdateComment={onUpdateComment}
+      onDeleteComment={onDeleteComment}
     />
   );
 

@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
-import { X, MoreHorizontal, Pencil, Trash2, CheckCircle2, RotateCcw } from "lucide-react";
-import Image from "next/image";
+import { X, CheckCircle2, RotateCcw } from "lucide-react";
 import type { Comment } from "@/lib/domain/comment";
-import { formatCommentDate } from "@/lib/utils/formatCommentDate";
+import { CommentItem } from "@/components/comments/CommentItem";
 
 const PANEL_WIDTH = 380;
 
@@ -30,7 +29,6 @@ const CommentRow = memo(function CommentRow({
   currentUserId,
   updateComment,
   deleteComment,
-  onDeleted,
   showResolve,
 }: {
   comment: Comment;
@@ -38,166 +36,39 @@ const CommentRow = memo(function CommentRow({
   currentUserId: string | null;
   updateComment?: (id: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
   deleteComment?: (id: string) => Promise<void>;
-  onDeleted?: () => void;
   showResolve?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [editDraft, setEditDraft] = useState(comment.message);
-  const [saving, setSaving] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const isAuthor = currentUserId != null && comment.userId === currentUserId;
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [menuOpen]);
-
-  const handleSaveEdit = useCallback(async () => {
-    const trimmed = editDraft.trim();
-    if (trimmed === comment.message || !updateComment) {
-      setEditing(false);
-      return;
-    }
-    setSaving(true);
-    try {
-      await updateComment(comment.id, { message: trimmed });
-      setEditing(false);
-    } finally {
-      setSaving(false);
-    }
-  }, [comment.id, comment.message, editDraft, updateComment]);
-
-  const handleDelete = useCallback(async () => {
-    if (!deleteComment) return;
-    setSaving(true);
-    try {
-      await deleteComment(comment.id);
-      setDeleteConfirm(false);
-      setMenuOpen(false);
-      onDeleted?.();
-    } finally {
-      setSaving(false);
-    }
-  }, [comment.id, deleteComment, onDeleted]);
-
-  const handleResolve = useCallback(async () => {
-    if (!updateComment) return;
-    await updateComment(comment.id, { resolved: true });
-    setMenuOpen(false);
-  }, [comment.id, updateComment]);
-
-  const handleUnresolve = useCallback(async () => {
-    if (!updateComment) return;
-    await updateComment(comment.id, { resolved: false });
-    setMenuOpen(false);
-  }, [comment.id, updateComment]);
-
-  const avatarSize = size === "root" ? "h-8 w-8" : "h-6 w-6";
-  const textSize = size === "root" ? "text-[13px]" : "text-[12px]";
+  const resolveMenuItems =
+    showResolve && updateComment ? (
+      comment.resolved ? (
+        <button
+          type="button"
+          onClick={() => void updateComment(comment.id, { resolved: false })}
+          className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] cursor-pointer"
+        >
+          <RotateCcw className="h-3.5 w-3.5" /> Mark as unresolved
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void updateComment(comment.id, { resolved: true })}
+          className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] text-emerald-700 hover:bg-emerald-50 transition-colors duration-150 cursor-pointer"
+        >
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Mark as resolved
+        </button>
+      )
+    ) : null;
 
   return (
-    <div className="flex gap-2 py-2 group relative">
-      <div className={`${avatarSize} shrink-0 rounded-full overflow-hidden bg-[var(--layer-2-border)]`}>
-        {comment.userAvatar ? (
-          <Image src={comment.userAvatar} alt="" width={size === "root" ? 32 : 24} height={size === "root" ? 32 : 24} className="w-full h-full object-cover" unoptimized />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-[10px] font-medium text-[hsl(var(--text-tertiary))]">
-            {comment.userName?.charAt(0) ?? "?"}
-          </div>
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap gap-y-0">
-          <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))]">{comment.userName}</span>
-          <span className="text-[10px] text-[hsl(var(--text-tertiary))]">{formatCommentDate(comment.createdAt)}</span>
-          {size === "root" && (isAuthor || showResolve) && (updateComment || deleteComment) && (
-            <div className="relative ml-auto shrink-0 overflow-visible" ref={menuRef}>
-              <button
-                type="button"
-                onClick={() => setMenuOpen((o) => !o)}
-                className="p-1 rounded hover:bg-[var(--layer-2-hover-bg)] text-[hsl(var(--text-tertiary))] cursor-pointer"
-                aria-label="Actions"
-              >
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </button>
-              {menuOpen && (
-                <div className="absolute right-0 top-full mt-1.5 py-1.5 min-w-[160px] rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-1-border)] shadow-[var(--shadow-level-4)] z-[200]">
-                  {isAuthor && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => { setEditing(true); setEditDraft(comment.message); setMenuOpen(false); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] cursor-pointer"
-                      >
-                        <Pencil className="h-3.5 w-3.5" /> Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setDeleteConfirm(true); setMenuOpen(false); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] text-red-600 hover:bg-red-50 transition-colors duration-150 cursor-pointer"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Delete
-                      </button>
-                    </>
-                  )}
-                  {showResolve && updateComment && !comment.resolved && (
-                    <button
-                      type="button"
-                      onClick={handleResolve}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] text-emerald-700 hover:bg-emerald-50 transition-colors duration-150 cursor-pointer"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Mark as resolved
-                    </button>
-                  )}
-                  {showResolve && updateComment && comment.resolved && (
-                    <button
-                      type="button"
-                      onClick={handleUnresolve}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] cursor-pointer"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" /> Mark as unresolved
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        {editing ? (
-          <div className="mt-1 space-y-2">
-            <textarea
-              value={editDraft}
-              onChange={(e) => setEditDraft(e.target.value)}
-              className="box-border w-full min-h-[60px] rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-2-bg)] px-3 py-2.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] resize-none"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <button type="button" onClick={() => { setEditing(false); setEditDraft(comment.message); }} className="text-[11px] font-medium px-2 py-1 rounded border border-[var(--layer-2-border)] cursor-pointer">Cancel</button>
-              <button type="button" onClick={() => void handleSaveEdit()} disabled={saving || editDraft.trim() === comment.message} className="text-[11px] font-medium px-2 py-1 rounded bg-[var(--accent-operational)] text-white disabled:opacity-50 cursor-pointer">Save</button>
-            </div>
-          </div>
-        ) : (
-          <p className={`mt-0.5 ${textSize} text-[hsl(var(--text-secondary-soft))] leading-relaxed ${comment.resolved ? "opacity-75 line-through" : ""}`}>{comment.message}</p>
-        )}
-      </div>
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4 cursor-pointer" onClick={() => setDeleteConfirm(false)} aria-hidden>
-          <div className="bg-white rounded-xl shadow-xl p-4 max-w-sm w-full border border-[var(--layer-2-border)]" onClick={(e) => e.stopPropagation()}>
-            <p className="text-[13px] text-[hsl(var(--text-primary-strong))]">Delete this comment? This cannot be undone.</p>
-            <div className="flex justify-end gap-2 mt-4">
-              <button type="button" onClick={() => setDeleteConfirm(false)} className="text-[12px] font-medium px-3 py-1.5 rounded border cursor-pointer">Cancel</button>
-              <button type="button" onClick={() => void handleDelete()} disabled={saving} className="text-[12px] font-medium px-3 py-1.5 rounded bg-red-600 text-white disabled:opacity-50 cursor-pointer">Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="py-2">
+      <CommentItem
+        comment={comment}
+        currentUserId={currentUserId}
+        onUpdate={updateComment}
+        onDelete={deleteComment}
+        additionalMenuItems={resolveMenuItems}
+        size={size === "root" ? "default" : "compact"}
+      />
     </div>
   );
 });

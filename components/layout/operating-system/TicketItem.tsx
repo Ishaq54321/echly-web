@@ -29,6 +29,7 @@ function TicketItemInner({
     <button
       type="button"
       onClick={handleClick}
+      data-ticket-id={id}
       className={`sidebar-row-interactive group relative flex w-full items-center gap-2 px-3 py-2.5 rounded-xl text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] ${
         active
           ? "bg-[var(--layer-2-hover-bg)]"

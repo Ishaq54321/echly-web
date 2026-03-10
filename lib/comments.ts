@@ -1,7 +1,7 @@
 // lib/comments.ts
 
-export type { Comment, CommentPosition, CommentTextRange, CommentType } from "@/lib/domain/comment";
-import type { CommentPosition, CommentTextRange } from "@/lib/domain/comment";
+export type { Comment, CommentAttachment, CommentPosition, CommentTextRange, CommentType } from "@/lib/domain/comment";
+import type { CommentAttachment, CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import {
   addCommentRepo,
   getSessionRecentCommentsRepo,
@@ -23,6 +23,7 @@ export interface AddCommentOptions {
   position?: CommentPosition;
   textRange?: CommentTextRange;
   threadId?: string | null;
+  attachment?: CommentAttachment;
 }
 
 export async function addComment(

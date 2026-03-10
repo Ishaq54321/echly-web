@@ -2,7 +2,7 @@
 
 import { authFetch } from "@/lib/authFetch";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { addFeedback } from "@/lib/feedback";
@@ -155,6 +155,8 @@ function SessionPageSkeleton() {
 
 export default function SessionPageClient({ sessionId }: { sessionId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const ticketIdFromUrl = searchParams.get("ticket");
 
   const [session, setSession] = useState<Session | null>(null);
   const [userName, setUserName] = useState<string>("");
@@ -333,12 +335,23 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     };
   }, [sessionId, authUser, authLoading, router]);
 
-  // Select first feedback when first page loads and none selected.
+  // Deep link: when ?ticket= is present, select that ticket and open detail panel.
+  const hasAppliedTicketParam = useRef(false);
   useEffect(() => {
-    if (feedback.length > 0 && selectedId === null) {
+    if (!ticketIdFromUrl || feedback.length === 0 || hasAppliedTicketParam.current) return;
+    const exists = feedback.some((f) => f.id === ticketIdFromUrl);
+    if (exists) {
+      hasAppliedTicketParam.current = true;
+      setSelectedId(ticketIdFromUrl);
+    }
+  }, [ticketIdFromUrl, feedback]);
+
+  // Select first feedback when first page loads and none selected (no ticket param).
+  useEffect(() => {
+    if (feedback.length > 0 && selectedId === null && !ticketIdFromUrl) {
       setSelectedId(feedback[0].id);
     }
-  }, [feedback, selectedId]);
+  }, [feedback, selectedId, ticketIdFromUrl]);
 
   /* ================= FETCH DETAIL FROM DB (single source of truth) ================= */
 
@@ -1341,6 +1354,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             onScrollContainerReady={() => setListScrollReady((n) => n + 1)}
             onMarkAllTicketsResolved={handleMarkAllResolved}
             onMarkAllTicketsUnresolved={handleMarkAllUnresolved}
+            scrollToId={ticketIdFromUrl}
           />
         </aside>
 
@@ -1512,6 +1526,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               onScrollContainerReady={() => setListScrollReady((n) => n + 1)}
               onMarkAllTicketsResolved={handleMarkAllResolved}
               onMarkAllTicketsUnresolved={handleMarkAllUnresolved}
+              scrollToId={ticketIdFromUrl}
             />
           </div>
         </div>

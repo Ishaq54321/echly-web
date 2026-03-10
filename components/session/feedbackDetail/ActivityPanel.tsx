@@ -9,12 +9,18 @@ interface ActivityPanelProps {
   comments: Comment[];
   loading: boolean;
   sendComment: (message: string) => void;
+  currentUserId?: string | null;
+  onUpdateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
+  onDeleteComment?: (commentId: string) => Promise<void>;
 }
 
 export function ActivityPanel({
   comments,
   loading,
   sendComment,
+  currentUserId = null,
+  onUpdateComment,
+  onDeleteComment,
 }: ActivityPanelProps) {
   const [newMessage, setNewMessage] = useState("");
 
@@ -41,7 +47,13 @@ export function ActivityPanel({
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-2">
         <div className="px-6 py-6">
-          <ActivityThread comments={comments} loading={loading} />
+          <ActivityThread
+            comments={comments}
+            loading={loading}
+            currentUserId={currentUserId}
+            onUpdateComment={onUpdateComment}
+            onDeleteComment={onDeleteComment}
+          />
         </div>
       </div>
     </div>

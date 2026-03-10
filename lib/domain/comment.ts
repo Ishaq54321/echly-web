@@ -34,5 +34,13 @@ export interface Comment {
   threadId?: string | null;
   /** Thread resolved. */
   resolved?: boolean;
+  /** Optional attachment (one per comment). */
+  attachment?: CommentAttachment;
+}
+
+export interface CommentAttachment {
+  file_name: string;
+  file_url: string;
+  file_size: number;
 }
 
