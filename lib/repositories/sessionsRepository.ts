@@ -51,11 +51,13 @@ export async function createSessionRepo(
  * Lists user sessions. Sorted by most recent activity (updatedAt desc).
  * Composite index required: (userId Ascending, updatedAt Descending).
  * When archivedOnly is true: (userId Ascending, archived Ascending, updatedAt Descending).
+ * When includeArchived is true, returns both active and archived sessions.
  */
 export async function getUserSessionsRepo(
   userId: string,
   max: number = 50,
-  archivedOnly?: boolean
+  archivedOnly?: boolean,
+  includeArchived?: boolean
 ): Promise<Session[]> {
   assertQueryLimit(max, "getUserSessionsRepo");
   const q = query(
@@ -72,6 +74,7 @@ export async function getUserSessionsRepo(
 
   return snapshot.docs
     .filter((docSnap) => {
+      if (includeArchived) return true;
       const archived = (docSnap.data() as { archived?: boolean }).archived === true;
       return archivedOnly ? archived : !archived;
     })
