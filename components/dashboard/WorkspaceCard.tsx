@@ -3,8 +3,9 @@
 import { authFetch } from "@/lib/authFetch";
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle, Folder, Hash } from "lucide-react";
+import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle, FileText, Hash } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
+import { formatRelativeTime } from "@/lib/utils/time";
 import { ShareSessionModal } from "./ShareSessionModal";
 import { RenameSessionModal } from "./RenameSessionModal";
 import { DeleteSessionModal } from "./DeleteSessionModal";
@@ -224,20 +225,27 @@ export function WorkspaceCard({
         onClick={handleCardClick}
         onKeyDown={handleCardKeyDown}
         className="
-          workspace-card-in
-          card-depth
           group
           relative
           w-full
+          rounded-2xl
+          border border-neutral-200/70
+          bg-gradient-to-b from-white to-neutral-50
           p-5
+          overflow-hidden
+          transition-all duration-300
+          shadow-[0_1px_0_rgba(0,0,0,0.02)]
+          shadow-[0_12px_32px_rgba(0,0,0,0.06)]
+          hover:-translate-y-[3px]
+          hover:shadow-[0_22px_60px_rgba(0,0,0,0.12)]
           cursor-pointer
           outline-none
           focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2
-          transition-[transform,box-shadow] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)]
         "
         style={{ animationDelay: `${index * 50}ms` } as React.CSSProperties}
         data-session-id={session.id}
       >
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-blue-500/70 rounded-t-2xl" aria-hidden />
         {/* 3-DOTS — visible on hover; tooltip only when hover and dropdown closed */}
         <div className="absolute top-4 right-4">
           <div data-card-actions className="relative z-10 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
@@ -384,50 +392,52 @@ export function WorkspaceCard({
 
         <div className="flex h-full flex-col justify-between">
           <div>
-            {/* Title row — stronger hierarchy, no decorative dot */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2.5 min-w-0 flex-1 pr-10">
-                <Folder
-                  className="h-[18px] w-[18px] relative top-[2px] shrink-0 text-[hsl(var(--text-tertiary))] transition-colors duration-[var(--motion-duration)] group-hover:text-[hsl(var(--text-primary-strong))]"
-                  strokeWidth={1.5}
-                  aria-hidden
-                />
-                <h3 className="text-[17px] font-semibold leading-[1.3] tracking-[-0.015em] text-[hsl(var(--text-primary-strong))] line-clamp-2 overflow-hidden text-ellipsis min-w-0 flex-1">
+            {/* Header: icon + title */}
+            <div className="flex items-center gap-3 mb-5 pr-10 min-w-0">
+              <div
+                className="
+                  flex items-center justify-center
+                  w-10 h-10
+                  rounded-xl
+                  bg-gradient-to-br from-blue-100 to-blue-50
+                  text-blue-600
+                  ring-1 ring-blue-200
+                  shadow-inner
+                  shrink-0
+                "
+              >
+                <FileText size={18} aria-hidden />
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2 overflow-hidden text-ellipsis min-w-0">
                   {session.title}
                 </h3>
+                <div className="text-xs text-neutral-400 font-medium mt-1">
+                  Updated {session.updatedAt ? formatRelativeTime(session.updatedAt) : "recently"}
+                </div>
               </div>
             </div>
 
-            {/* Metrics row — clear separation, token-based */}
-            <div className="mt-5 flex items-center gap-3">
-              <div className="inline-flex items-center rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] px-3 py-2 shadow-[var(--shadow-level-1)]">
-                <span className="text-[14px] font-medium text-[hsl(var(--text-primary-strong))] tabular-nums">
-                  {feedbackCount}
-                </span>
-                <span className="ml-2 text-[12px] text-[hsl(var(--text-tertiary))]">
-                  feedback
-                </span>
-              </div>
-              <div className="inline-flex items-center rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] px-3 py-2 shadow-[var(--shadow-level-1)]">
-                <span className="text-[14px] font-medium text-[hsl(var(--text-primary-strong))] tabular-nums">
-                  {openCount}
-                </span>
-                <span className="ml-2 text-[12px] text-[hsl(var(--text-tertiary))]">
-                  open
-                </span>
-              </div>
+            {/* Signal pills */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="px-2.5 py-1 rounded-full text-xs bg-neutral-100 text-neutral-700 tabular-nums">
+                {feedbackCount} feedback
+              </span>
+              <span className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-600 tabular-nums">
+                {openCount} open
+              </span>
             </div>
           </div>
 
-          <div className="mt-6 flex flex-col border-t border-[var(--layer-2-border)] pt-4">
-            {/* Activity row — tertiary, breathing room */}
-            <div className="flex items-center gap-5 text-[13px] text-[hsl(var(--text-tertiary))]">
-              <div className="flex items-center gap-2">
-                <Eye className="h-[14px] w-[14px] shrink-0 text-[hsl(var(--text-tertiary))]" strokeWidth={1.5} aria-hidden />
+          <div className="mt-auto">
+            <div className="h-px bg-gradient-to-r from-transparent via-neutral-200 to-transparent mb-3" />
+            <div className="flex items-center gap-4 text-neutral-500 text-sm">
+              <div className="flex items-center gap-1">
+                <Eye size={14} aria-hidden />
                 <span>{viewCount}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <MessageCircle className="h-[14px] w-[14px] shrink-0 text-[hsl(var(--text-tertiary))]" strokeWidth={1.5} aria-hidden />
+              <div className="flex items-center gap-1">
+                <MessageCircle size={14} aria-hidden />
                 <span>{commentCount}</span>
               </div>
             </div>
