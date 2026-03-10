@@ -79,7 +79,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
         </h2>
 
         {hasSteps && (
-          <div className="rounded-xl border border-neutral-200 bg-[#F9FAFB] p-4 shadow-sm">
+          <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
             <p className="text-[12px] uppercase font-semibold tracking-wide text-neutral-500 mb-2">
               Action steps
             </p>

@@ -118,7 +118,7 @@ export function DiscussionList({
   if (loading) {
     return (
       <div
-        className="w-[320px] shrink-0 flex flex-col overflow-hidden bg-[#F8FAFC] border-r border-neutral-200"
+        className="w-[320px] shrink-0 flex flex-col overflow-hidden bg-white border-r border-neutral-200"
         style={{ minHeight: 200 }}
       >
         <div className="p-4 space-y-2">
@@ -135,7 +135,7 @@ export function DiscussionList({
 
   if (error) {
     return (
-      <div className="w-[320px] shrink-0 flex flex-col items-center justify-center p-8 text-center bg-[#F8FAFC] border-r border-neutral-200">
+      <div className="w-[320px] shrink-0 flex flex-col items-center justify-center p-8 text-center bg-white border-r border-neutral-200">
         <p className="text-sm text-neutral-600">{error}</p>
       </div>
     );
@@ -143,7 +143,7 @@ export function DiscussionList({
 
   if (items.length === 0) {
     return (
-      <div className="w-[320px] shrink-0 flex flex-col overflow-hidden bg-[#F8FAFC] border-r border-neutral-200">
+      <div className="w-[320px] shrink-0 flex flex-col overflow-hidden bg-white border-r border-neutral-200">
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
           <MessageSquareMore className="w-12 h-12 text-neutral-300 mb-4" />
           <h2 className="text-lg font-semibold text-neutral-900">
@@ -164,14 +164,14 @@ export function DiscussionList({
   }
 
   return (
-    <div className="w-[320px] shrink-0 flex flex-col overflow-hidden bg-[#F8FAFC] border-r border-neutral-200 font-sans">
+    <div className="w-[320px] shrink-0 flex flex-col overflow-hidden bg-white border-r border-neutral-200 font-sans">
       <div className="flex-1 overflow-y-auto p-2">
         {filteredItems.length === 0 ? (
           <p className="text-sm text-neutral-500 py-4 px-4 text-center">
             No discussions match your search.
           </p>
         ) : (
-          <div className="space-y-1">
+          <div className="divide-y divide-neutral-100">
             {filteredItems.map((item) => {
               const isSelected = selectedId === item.id;
               const ts = parseUpdatedAt(item);
@@ -194,10 +194,10 @@ export function DiscussionList({
                       onSelect(item.id);
                     }
                   }}
-                  className={`px-4 py-[14px] rounded-xl transition-all duration-150 cursor-pointer ${
+                  className={`px-4 py-4 cursor-pointer transition-colors ${
                     isSelected
-                      ? "bg-[#EEF3FF] border-l-[3px] border-[#155DFC]"
-                      : "hover:bg-[#F6F8FF] hover:translate-x-[2px]"
+                      ? "border-l-2 border-[#155DFC] bg-[#F6F8FF]"
+                      : "hover:bg-neutral-50"
                   }`}
                 >
                   <div className="flex items-start gap-3">

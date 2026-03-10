@@ -25,7 +25,7 @@ export default function DiscussionPage() {
           </p>
         </header>
         <div className="flex flex-1 min-h-0 h-full">
-          <div className="w-[320px] shrink-0 border-r border-neutral-200 bg-[#F8FAFC] p-4">
+          <div className="w-[320px] shrink-0 border-r border-neutral-200 bg-white p-4">
             <DiscussionSkeleton />
           </div>
           <div className="flex-1 flex items-center justify-center bg-white">
@@ -67,7 +67,7 @@ export default function DiscussionPage() {
       </header>
 
       {/* Two-panel workspace: Discussion Inbox | Conversation Workspace */}
-      <div className="flex flex-1 min-h-0 h-full font-sans">
+      <div className="flex flex-1 min-h-0 h-full font-sans bg-white">
         {isEmpty === true ? (
           <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
             <MessageSquareMore className="w-12 h-12 text-neutral-300 mb-4" />
@@ -95,7 +95,7 @@ export default function DiscussionPage() {
             />
             {/* Right: Conversation Workspace — anchored left, max 960px */}
             <div className="flex-1 min-w-0 flex flex-col min-h-0 max-w-[960px] ml-10">
-              <div className="flex-1 min-h-0 min-w-0 bg-[#F8FAFC] p-6 rounded-[20px]">
+              <div className="flex-1 min-h-0 min-w-0 bg-white p-6">
                 <DiscussionThread
                   feedbackId={selectedId}
                   onCommentAdded={() => setRefreshKey((k) => k + 1)}

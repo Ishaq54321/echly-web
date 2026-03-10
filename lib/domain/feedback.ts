@@ -32,6 +32,17 @@ export interface StructuredFeedback {
 /** Derived status for a ticket. Prefer explicit checks over !isResolved. */
 export type TicketStatus = "open" | "resolved" | "skipped";
 
+/**
+ * Anchor used to scroll to a specific feedback location in the UI.
+ * - `selector`: preferred when present (DOM lookup)
+ * - `x`/`y`: fallback absolute page coordinates
+ */
+export type FeedbackAnchor = {
+  selector?: string;
+  x?: number;
+  y?: number;
+};
+
 export interface Feedback {
   id: string;
   sessionId: string;

@@ -140,7 +140,7 @@ export function DiscussionThread({
   if (loading || !ticket) {
     return (
       <div className="flex-1 flex flex-col p-8 bg-white overflow-auto min-w-0 font-sans">
-        <div className="max-w-[880px] w-full mx-auto space-y-4">
+        <div className="w-full space-y-4">
           <div className="h-48 bg-neutral-100 rounded-xl animate-pulse" />
           <div className="h-6 w-3/4 bg-neutral-200 rounded animate-pulse" />
           <div className="h-20 bg-neutral-100 rounded animate-pulse" />
@@ -166,9 +166,9 @@ export function DiscussionThread({
   const userInitial = user?.displayName?.charAt(0) ?? "?";
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-transparent font-sans">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-white font-sans">
       <div className="flex-1 min-w-0 overflow-y-auto">
-        <div className="max-w-[880px] w-full mx-auto flex flex-col gap-5">
+        <div className="w-full flex flex-col gap-5">
           <div>
             {/* Workspace header: Ticket title + Session reference */}
             <h2 className="text-[18px] font-semibold text-neutral-900">
@@ -190,7 +190,7 @@ export function DiscussionThread({
             <div className="flex flex-col gap-4">
               {/* Screenshot context card */}
               {hasScreenshot && (
-                <div className="rounded-xl border border-[#ECEFF3] bg-[#FAFBFC] p-4 flex items-center justify-center">
+                <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm flex items-center justify-center">
                   <Image
                     src={ticket.screenshotUrl!}
                     alt="Feedback screenshot"
@@ -206,7 +206,7 @@ export function DiscussionThread({
 
               {/* Action steps card */}
               {hasSteps && (
-                <div className="rounded-[16px] bg-[#F8FAFC] border border-[#E5E7EB] p-4 transition-all duration-150 ease-out">
+                <div className="rounded-xl bg-white border border-neutral-200 p-4 shadow-sm transition-all duration-150 ease-out">
                   <p className="text-[12px] tracking-[0.05em] uppercase text-[#6B7280] mb-2">
                     Action steps
                   </p>
