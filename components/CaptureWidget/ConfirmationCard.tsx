@@ -54,10 +54,10 @@ export function ConfirmationCard({ ticket, onConfirm, onEdit }: ConfirmationCard
             fontSize: 14,
             fontWeight: 600,
             border: "none",
-            background: "#466EFF",
+            background: "#155DFC",
             color: "#fff",
             cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(70, 110, 255, 0.25)",
+            boxShadow: "0 4px 12px rgba(21, 93, 252, 0.25)",
           }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}

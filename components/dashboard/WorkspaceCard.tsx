@@ -3,7 +3,8 @@
 import { authFetch } from "@/lib/authFetch";
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle, FileText, Hash } from "lucide-react";
+import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle, FileText, FolderPlus, ArrowLeft } from "lucide-react";
+import { useDragSession } from "./context/DragSessionContext";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { ShareSessionModal } from "./ShareSessionModal";
@@ -21,6 +22,13 @@ export interface WorkspaceCardProps {
   onRenameSuccess?: (session: { id: string; title: string; updatedAt?: unknown }) => void;
   onArchiveSuccess?: (sessionId: string) => void;
   onDeleteSuccess?: (sessionId: string) => void;
+  /** If true, this session is in a folder (root sessions only can be dragged) */
+  isRootSession?: boolean;
+  /** Open move-to-folder modal for this session (dashboard only) */
+  onOpenMoveToFolder?: (sessionId: string) => void;
+  /** When set, show "Remove from folder" and call onRemoveFromFolder (folder page only) */
+  folderId?: string;
+  onRemoveFromFolder?: (sessionId: string) => void;
 }
 
 const COPIED_TOOLTIP_MS = 2000;
@@ -32,7 +40,12 @@ export function WorkspaceCard({
   onRenameSuccess,
   onArchiveSuccess,
   onDeleteSuccess,
+  isRootSession = true,
+  onOpenMoveToFolder,
+  folderId,
+  onRemoveFromFolder,
 }: WorkspaceCardProps) {
+  const { setDraggedSessionId } = useDragSession();
   const { session, counts } = item;
   const feedbackCount = counts.open + counts.resolved;
   const openFeedbackCount = counts.open;
@@ -140,6 +153,19 @@ export function WorkspaceCard({
     }
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", session.id);
+    setDraggedSessionId(session.id);
+    const img = new Image();
+    img.src = "data:image/gif;base64,R0lGOODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    e.dataTransfer.setDragImage(img, 0, 0);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedSessionId(null);
+  };
+
   const handleCopyLink = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -222,22 +248,23 @@ export function WorkspaceCard({
       <div
         role="button"
         tabIndex={0}
+        draggable={isRootSession}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         onClick={handleCardClick}
         onKeyDown={handleCardKeyDown}
         className="
           group
           relative
           w-full
-          rounded-2xl
-          border border-neutral-200/70
-          bg-gradient-to-b from-white to-neutral-50
+          rounded-xl
+          border border-neutral-200
+          bg-white
           p-5
           overflow-hidden
-          transition-all duration-300
-          shadow-[0_1px_0_rgba(0,0,0,0.02)]
-          shadow-[0_12px_32px_rgba(0,0,0,0.06)]
-          hover:-translate-y-[3px]
-          hover:shadow-[0_22px_60px_rgba(0,0,0,0.12)]
+          shadow-sm
+          hover:shadow-md
+          transition
           cursor-pointer
           outline-none
           focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2
@@ -245,7 +272,7 @@ export function WorkspaceCard({
         style={{ animationDelay: `${index * 50}ms` } as React.CSSProperties}
         data-session-id={session.id}
       >
-        <div className="absolute top-0 left-0 right-0 h-[3px] bg-blue-500/70 rounded-t-2xl" aria-hidden />
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-blue-500/70 rounded-t-xl" aria-hidden />
         {/* 3-DOTS — visible on hover; tooltip only when hover and dropdown closed */}
         <div className="absolute top-4 right-4">
           <div data-card-actions className="relative z-10 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
@@ -333,21 +360,38 @@ export function WorkspaceCard({
                 <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 Copy link
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const id = session.id ? `FB-${session.id.slice(-6).toUpperCase()}` : session.id;
-                  if (id && navigator.clipboard?.writeText) {
-                    navigator.clipboard.writeText(id);
-                  }
-                  closeMenu();
-                }}
-                className={menuItemClass}
-                role="menuitem"
-              >
-                <Hash className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                Copy session ID
-              </button>
+              {onOpenMoveToFolder && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onOpenMoveToFolder(session.id);
+                    closeMenu();
+                  }}
+                  className={menuItemClass}
+                  role="menuitem"
+                >
+                  <FolderPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Move to folder
+                </button>
+              )}
+              {folderId && onRemoveFromFolder && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemoveFromFolder(session.id);
+                    closeMenu();
+                  }}
+                  className={menuItemClass}
+                  role="menuitem"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Remove from folder
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleShare}

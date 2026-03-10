@@ -1,10 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, arrayUnion } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useWorkspaceOverview } from "./hooks/useWorkspaceOverview";
 import type { SessionWithCounts } from "./hooks/useWorkspaceOverview";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
+import { SessionsHeader } from "@/components/dashboard/SessionsHeader";
+import { FolderCard } from "@/components/dashboard/FolderCard";
+import { MoveSessionsModal } from "@/components/dashboard/MoveSessionsModal";
+import { DragSessionProvider, useDragSession } from "@/components/dashboard/context/DragSessionContext";
+import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
+import { DragGhostChip } from "@/components/dashboard/DragGhostChip";
+
+export interface DashboardFolder {
+  id: string;
+  name: string;
+  sessions: string[];
+}
 
 function filterAndSortSessions(sessions: SessionWithCounts[], search: string): SessionWithCounts[] {
   const q = search.trim().toLowerCase();
@@ -23,8 +38,11 @@ function filterAndSortSessions(sessions: SessionWithCounts[], search: string): S
   });
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
+  const { showToast } = useToast();
+  const { draggedSessionId, setDraggedSessionId } = useDragSession();
+  const [hoveredFolder, setHoveredFolder] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"all" | "archived">("all");
   const {
     sessions,
@@ -34,11 +52,87 @@ export default function DashboardPage() {
     removeSession,
   } = useWorkspaceOverview(viewMode);
   const [search, setSearch] = useState("");
+  const [folders, setFolders] = useState<DashboardFolder[]>([]);
+  const [moveModalFolder, setMoveModalFolder] = useState<DashboardFolder | null>(null);
+  const [moveToFolderSessionId, setMoveToFolderSessionId] = useState<string | null>(null);
+
+  const loadFolders = async () => {
+    const snapshot = await getDocs(collection(db, "folders"));
+    const folderData: DashboardFolder[] = snapshot.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        name: data.name ?? "Untitled Folder",
+        sessions: data.sessionIds ?? [],
+      };
+    });
+    setFolders(folderData);
+  };
+
+  useEffect(() => {
+    loadFolders();
+  }, []);
+
+  const createFolder = async () => {
+    await addDoc(collection(db, "folders"), {
+      name: "Untitled Folder",
+      sessionIds: [],
+      createdAt: serverTimestamp(),
+    });
+    await loadFolders();
+  };
+
+  const updateFolder = async (id: string, updates: Partial<Pick<DashboardFolder, "name" | "sessions">>) => {
+    setFolders((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, ...updates } : f))
+    );
+    const ref = doc(db, "folders", id);
+    const payload: Record<string, unknown> = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.sessions !== undefined) payload.sessionIds = updates.sessions;
+    if (Object.keys(payload).length > 0) await updateDoc(ref, payload);
+  };
+
+  const removeFolder = async (id: string) => {
+    setFolders((prev) => prev.filter((f) => f.id !== id));
+    await deleteDoc(doc(db, "folders", id));
+  };
+
+  const sessionIdsInFolders = useMemo(
+    () => new Set(folders.flatMap((f) => f.sessions)),
+    [folders]
+  );
+
+  const rootSessions = useMemo(
+    () => sessions.filter(({ session }) => !sessionIdsInFolders.has(session.id)),
+    [sessions, sessionIdsInFolders]
+  );
 
   const filteredSessions = useMemo(
-    () => filterAndSortSessions(sessions, search),
-    [sessions, search]
+    () => filterAndSortSessions(rootSessions, search),
+    [rootSessions, search]
   );
+
+  const handleMoveSessions = async (sessionIds: string[], folderId: string) => {
+    await updateDoc(doc(db, "folders", folderId), {
+      sessionIds: arrayUnion(...sessionIds),
+    });
+    await loadFolders();
+    const folder = folders.find((f) => f.id === folderId);
+    if (folder) showToast(`Session${sessionIds.length > 1 ? "s" : ""} moved to ${folder.name}`);
+  };
+
+  const moveSessionToFolder = async (folderId: string) => {
+    if (!draggedSessionId) return;
+    await updateDoc(doc(db, "folders", folderId), {
+      sessionIds: arrayUnion(draggedSessionId),
+    });
+    await loadFolders();
+    setDraggedSessionId(null);
+    setHoveredFolder(null);
+    const folder = folders.find((f) => f.id === folderId);
+    if (folder) showToast(`Session moved to ${folder.name}`);
+  };
 
   const handleView = (sessionId: string) => {
     router.push(`/dashboard/${sessionId}`);
@@ -46,7 +140,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="surface-main flex flex-col w-full min-h-[40vh]">
+      <div className="bg-white flex flex-col w-full min-h-[40vh]">
         <div className="mx-auto w-full max-w-[1800px] px-10 py-8 flex items-center justify-center">
           <p className="text-[14px] text-[hsl(var(--text-tertiary))]">Loading workspace…</p>
         </div>
@@ -55,70 +149,59 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="surface-main flex flex-col w-full min-h-0">
-      <div className="mx-auto w-full max-w-[1800px] px-10 pt-6 pb-8">
-        <div className="flex items-start justify-between gap-6">
-          <div className="mb-6">
-            <h1 className="text-[26px] font-semibold leading-[1.1] tracking-[-0.03em] text-[hsl(var(--text-primary-strong))]">
-              Workspaces
-            </h1>
-            <p className="mt-2.5 text-[14px] leading-[1.5] text-[hsl(var(--text-tertiary))]">
-              All your team's sessions in one place.
-            </p>
-          </div>
-          <div className="flex items-center gap-6 flex-shrink-0">
-            <div
-              className="flex rounded-xl border border-[var(--glass-1-border)] bg-[var(--glass-1-bg)] backdrop-blur-[8px] p-0.5"
-              role="tablist"
-              aria-label="Filter sessions"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === "all"}
-                onClick={() => setViewMode("all")}
-                className={`h-9 px-4 rounded-xl text-[13px] font-medium transition-colors duration-[var(--motion-duration)] ${
-                  viewMode === "all"
-                    ? "bg-[var(--layer-2-hover-bg)] text-[hsl(var(--text-primary-strong))]"
-                    : "text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))]"
-                }`}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === "archived"}
-                onClick={() => setViewMode("archived")}
-                className={`h-9 px-4 rounded-xl text-[13px] font-medium transition-colors duration-[var(--motion-duration)] ${
-                  viewMode === "archived"
-                    ? "bg-[var(--layer-2-hover-bg)] text-[hsl(var(--text-primary-strong))]"
-                    : "text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))]"
-                }`}
-              >
-                Archived
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={handleCreateSession}
-              className="btn-primary-glow h-9 rounded-xl bg-[var(--color-primary)] text-white text-[14px] px-5 font-semibold shadow-[0_2px_8px_rgba(26,86,219,0.28)] hover:bg-[var(--color-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2 transition-[transform,box-shadow,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer"
-            >
-              New Session
-            </button>
-            <input
-              type="search"
-              placeholder="Search sessions"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-9 px-4 min-w-[180px] rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] text-[14px] text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)]"
-              aria-label="Search sessions"
-            />
-          </div>
+    <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20 relative">
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 w-[560px]">
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
+          <input
+            type="search"
+            placeholder="Search sessions"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-10 pl-9 pr-4 rounded-full border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+            aria-label="Search sessions"
+          />
         </div>
+      </div>
+      <div className="mx-auto w-full max-w-[1800px] px-10 pt-10 pb-8">
+        <SessionsHeader
+          activeTab={viewMode}
+          onTabChange={setViewMode}
+          sessionCount={sessions.length}
+          onNewFolder={createFolder}
+          onNewSession={handleCreateSession}
+        />
 
-        <main className="flex-1 mt-6">
+        <main className="flex-1">
           <div className="pt-8">
+            {folders.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-sm font-semibold text-neutral-700 mb-3">
+                  Folders
+                </h2>
+                <div className="flex gap-4 flex-wrap">
+                  {folders.map((folder) => (
+                    <FolderCard
+                      key={folder.id}
+                      folder={folder}
+                      onRename={(name) => updateFolder(folder.id, { name })}
+                      onDelete={() => removeFolder(folder.id)}
+                      onMoveSessionsClick={() => setMoveModalFolder(folder)}
+                      onDropSession={() => moveSessionToFolder(folder.id)}
+                      onDragEnter={() => setHoveredFolder(folder.id)}
+                      onDragLeave={() => setHoveredFolder(null)}
+                      hoveredFolderId={hoveredFolder}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {folders.length > 0 && (
+              <h2 className="text-sm font-semibold text-neutral-700 mb-3">
+                Sessions
+              </h2>
+            )}
             <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
             {filteredSessions.map((item, index) => (
               <WorkspaceCard
@@ -131,6 +214,7 @@ export default function DashboardPage() {
                 }
                 onArchiveSuccess={removeSession}
                 onDeleteSuccess={removeSession}
+                onOpenMoveToFolder={setMoveToFolderSessionId}
               />
             ))}
             </div>
@@ -146,6 +230,42 @@ export default function DashboardPage() {
           )}
         </main>
       </div>
+
+      <MoveSessionsModal
+        open={!!moveModalFolder || !!moveToFolderSessionId}
+        onClose={() => {
+          setMoveModalFolder(null);
+          setMoveToFolderSessionId(null);
+        }}
+        folder={moveModalFolder ?? { id: "", name: "" }}
+        sessions={moveModalFolder ? rootSessions : []}
+        sessionIdToMove={moveToFolderSessionId}
+        folders={
+          moveToFolderSessionId
+            ? folders.map((f) => ({ id: f.id, name: f.name }))
+            : []
+        }
+        onMove={async (ids, folderId) => {
+          await handleMoveSessions(ids, folderId);
+          setMoveModalFolder(null);
+          setMoveToFolderSessionId(null);
+        }}
+      />
+
+      <DragGhostChip
+        visible={!!draggedSessionId}
+        sessionTitle={sessions.find((s) => s.session.id === draggedSessionId)?.session.title}
+      />
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <ToastProvider>
+      <DragSessionProvider>
+        <DashboardContent />
+      </DragSessionProvider>
+    </ToastProvider>
   );
 }

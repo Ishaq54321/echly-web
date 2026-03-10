@@ -114,7 +114,7 @@ export function TextFeedbackPanel({
               padding: "12px 20px",
               borderRadius: 10,
               border: "none",
-              background: text.trim() ? "#466EFF" : "rgba(255,255,255,0.08)",
+              background: text.trim() ? "#155DFC" : "rgba(255,255,255,0.08)",
               color: "#fff",
               fontSize: 14,
               fontWeight: 600,

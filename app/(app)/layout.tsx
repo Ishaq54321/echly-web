@@ -1,4 +1,5 @@
 import GlobalRail from "@/components/layout/GlobalRail";
+import { FloatingUtilityActions } from "@/components/layout/FloatingUtilityActions";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function AppLayout({
@@ -9,7 +10,8 @@ export default function AppLayout({
   return (
     <div className="flex flex-1 min-h-0">
       <GlobalRail />
-      <main className="flex flex-1 min-h-0 overflow-auto">
+      <main className="relative flex flex-1 min-h-0 overflow-auto">
+        <FloatingUtilityActions />
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
       <div className="fixed bottom-4 right-6 text-[11px] text-neutral-400 pointer-events-none">

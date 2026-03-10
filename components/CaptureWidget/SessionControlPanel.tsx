@@ -104,7 +104,7 @@ export function SessionControlPanel({
             padding: "8px 14px",
             borderRadius: 10,
             border: "none",
-            background: "#466EFF",
+            background: "#155DFC",
             color: "#fff",
             fontSize: 13,
             fontWeight: 500,
