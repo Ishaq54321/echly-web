@@ -20,6 +20,7 @@ import {
   incrementSessionCommentCountRepo,
   updateSessionUpdatedAtRepo,
 } from "@/lib/repositories/sessionsRepository";
+import { incrementFeedbackCommentCountRepo } from "@/lib/repositories/feedbackRepository";
 
 export interface AddCommentData {
   userId: string;
@@ -54,6 +55,7 @@ export async function addCommentRepo(
 
   const ref = await addDoc(collectionRef, payload);
   await incrementSessionCommentCountRepo(sessionId);
+  await incrementFeedbackCommentCountRepo(feedbackId, data.message);
   await updateSessionUpdatedAtRepo(sessionId);
   return ref.id;
 }

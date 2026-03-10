@@ -44,6 +44,12 @@ export interface Feedback {
   /** True when ticket was skipped (e.g. in Execution Mode). Excluded from open count. */
   isSkipped?: boolean;
   createdAt: Timestamp | null;
+  /** Number of comments on this feedback. Used for Discussion feed (conversations only). */
+  commentCount?: number;
+  /** Truncated last comment message for feed preview. */
+  lastCommentPreview?: string;
+  /** Timestamp of last comment. */
+  lastCommentAt?: Timestamp | null;
 
   // Structuring (V2)
   contextSummary?: string | null;

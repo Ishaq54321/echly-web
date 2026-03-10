@@ -11,6 +11,34 @@ import { log } from "@/lib/utils/logger";
 
 type PatchBody = { title?: string; archived?: boolean };
 
+/** GET /api/sessions/:id — return session metadata (e.g. title for Discussion context). */
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (res) {
+    return res as Response;
+  }
+  const { id } = await params;
+  if (!id) {
+    return NextResponse.json({ success: false, error: "Missing session id" }, { status: 400 });
+  }
+  const session = await getSessionByIdRepo(id);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+  }
+  if (session.userId !== user.uid) {
+    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
+  return NextResponse.json({
+    success: true,
+    session: serializeSession(session),
+  });
+}
+
 /** PATCH /api/sessions/:id — update session; body: { title?: string, archived?: boolean }. */
 export async function PATCH(
   req: Request,

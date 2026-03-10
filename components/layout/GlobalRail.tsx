@@ -7,6 +7,7 @@ import { useRef, useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Folder,
+  MessageSquare,
   BarChart3,
   Settings,
   UserPlus,
@@ -15,6 +16,7 @@ import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/discussion", icon: MessageSquare, label: "Discussion" },
   { href: "/dashboard/sessions", icon: Folder, label: "Sessions" },
   { href: "/dashboard/insights", icon: BarChart3, label: "Insights" },
   { href: "/dashboard/settings", icon: Settings, label: "Settings" },
@@ -22,6 +24,7 @@ const NAV_ITEMS = [
 
 function isActive(href: string, pathname: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
+  if (href === "/discussion") return pathname === "/discussion";
   return pathname === href || (href !== "/dashboard" && pathname.startsWith(href + "/"));
 }
 

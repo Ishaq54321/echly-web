@@ -37,6 +37,7 @@ const feedbackPayload = (
   type: data.type,
   status: "open" as const,
   createdAt: serverTimestamp(),
+  commentCount: 0,
 
   contextSummary: data.contextSummary ?? null,
   actionSteps: data.actionSteps ?? null,
@@ -272,6 +273,9 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     clarityIssues: data.clarityIssues ?? null,
     clarityConfidence: data.clarityConfidence ?? null,
     clarityCheckedAt: data.clarityCheckedAt ?? null,
+    commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
+    lastCommentPreview: typeof data.lastCommentPreview === "string" ? data.lastCommentPreview : undefined,
+    lastCommentAt: (data.lastCommentAt ?? null) as Timestamp | null,
   };
 }
 
@@ -515,6 +519,71 @@ export async function getFeedbackByIdRepo(
   console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   if (!snap.exists()) return null;
   return docToFeedback(snap as QueryDocumentSnapshot);
+}
+
+const USER_FEEDBACK_ALL_LIMIT = 100;
+
+/**
+ * Fetches all feedback for a user across sessions (for Discussion inbox).
+ * Composite index required: feedback (userId ASC, createdAt DESC).
+ */
+export async function getUserFeedbackAllRepo(
+  userId: string,
+  max: number = USER_FEEDBACK_ALL_LIMIT
+): Promise<Feedback[]> {
+  assertQueryLimit(max, "getUserFeedbackAllRepo");
+  const coll = collection(db, "feedback");
+  const q = query(
+    coll,
+    where("userId", "==", userId),
+    orderBy("createdAt", "desc"),
+    limit(max)
+  );
+  const start = Date.now();
+  const snapshot = await getDocs(q);
+  console.log(`[FIRESTORE] getUserFeedbackAllRepo duration: ${Date.now() - start}ms`);
+  return snapshot.docs.map(docToFeedback);
+}
+
+/**
+ * Increments feedback.commentCount and updates lastCommentPreview/lastCommentAt.
+ * Call when a comment is added.
+ */
+export async function incrementFeedbackCommentCountRepo(
+  feedbackId: string,
+  lastMessage: string
+): Promise<void> {
+  const preview = lastMessage.trim().slice(0, 120);
+  const feedbackRef = doc(db, "feedback", feedbackId);
+  await updateDoc(feedbackRef, {
+    commentCount: increment(1),
+    lastCommentPreview: preview || null,
+    lastCommentAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Fetches feedback with at least one comment (conversations only).
+ * Composite index required: feedback (userId ASC, commentCount DESC).
+ * Results are sorted by lastCommentAt DESC in the API layer.
+ */
+export async function getUserFeedbackWithCommentsRepo(
+  userId: string,
+  max: number = USER_FEEDBACK_ALL_LIMIT
+): Promise<Feedback[]> {
+  assertQueryLimit(max, "getUserFeedbackWithCommentsRepo");
+  const coll = collection(db, "feedback");
+  const q = query(
+    coll,
+    where("userId", "==", userId),
+    where("commentCount", ">", 0),
+    orderBy("commentCount", "desc"),
+    limit(max)
+  );
+  const start = Date.now();
+  const snapshot = await getDocs(q);
+  console.log(`[FIRESTORE] getUserFeedbackWithCommentsRepo duration: ${Date.now() - start}ms`);
+  return snapshot.docs.map(docToFeedback);
 }
 
 /** Fetches feedback docs by IDs (e.g. for activity titles). Limited for cost safety. */

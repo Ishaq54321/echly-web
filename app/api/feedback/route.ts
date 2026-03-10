@@ -7,6 +7,8 @@ import {
   getFeedbackByIdRepo,
   getSessionFeedbackPageWithStringCursorRepo,
   getSessionFeedbackCountsRepo,
+  getUserFeedbackAllRepo,
+  getUserFeedbackWithCommentsRepo,
 } from "@/lib/repositories/feedbackRepository";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
@@ -20,6 +22,12 @@ function serializeFeedback(item: Feedback): Record<string, unknown> {
     out.createdAt = { seconds: Math.floor(createdAt.toDate().getTime() / 1000) };
   } else if (createdAt != null && typeof (createdAt as { seconds?: number }).seconds === "number") {
     out.createdAt = { seconds: (createdAt as { seconds: number }).seconds };
+  }
+  const lastCommentAt = item.lastCommentAt as { toDate?: () => Date; seconds?: number } | null | undefined;
+  if (lastCommentAt != null && typeof lastCommentAt.toDate === "function") {
+    out.lastCommentAt = { seconds: Math.floor(lastCommentAt.toDate().getTime() / 1000) };
+  } else if (lastCommentAt != null && typeof (lastCommentAt as { seconds?: number }).seconds === "number") {
+    out.lastCommentAt = { seconds: (lastCommentAt as { seconds: number }).seconds };
   }
   return out;
 }
@@ -43,11 +51,48 @@ export async function GET(req: Request) {
   const limitParam = searchParams.get("limit");
   const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10)), 50) : 20;
 
+  // When sessionId is omitted, return feedback across sessions (Discussion inbox)
+  // Use conversationsOnly=true to fetch only feedback with comments (conversation feed)
   if (!sessionId || sessionId.trim() === "") {
-    return NextResponse.json(
-      { error: "Missing sessionId" },
-      { status: 400 }
-    );
+    const conversationsOnly = searchParams.get("conversationsOnly") === "true";
+    try {
+      const feedback = conversationsOnly
+        ? await getUserFeedbackWithCommentsRepo(user.uid, limit)
+        : await getUserFeedbackAllRepo(user.uid, limit);
+      const sessionIds = [...new Set(feedback.map((f) => f.sessionId))];
+      const sessions = await Promise.all(
+        sessionIds.map((id) => getSessionByIdRepo(id))
+      );
+      const sessionMap = new Map(
+        sessions.filter(Boolean).map((s) => [s!.id, s!.title])
+      );
+      const enriched = feedback.map((f) => {
+        const serialized = serializeFeedback(f) as Record<string, unknown>;
+        serialized.sessionName = sessionMap.get(f.sessionId) ?? "Unknown Session";
+        return serialized;
+      });
+      // Sort by lastCommentAt DESC (newest activity first) for discussion inbox
+      if (conversationsOnly) {
+        enriched.sort((a, b) => {
+          const aTs = (a.lastCommentAt as { seconds?: number })?.seconds ?? 0;
+          const bTs = (b.lastCommentAt as { seconds?: number })?.seconds ?? 0;
+          return bTs - aTs;
+        });
+      }
+      log("[API] GET /api/feedback (all) duration:", Date.now() - start);
+      return NextResponse.json({
+        feedback: enriched,
+        nextCursor: null,
+        hasMore: false,
+      });
+    } catch (err) {
+      console.error("GET /api/feedback (all):", err);
+      log("[API] GET /api/feedback (all) duration (error):", Date.now() - start);
+      return NextResponse.json(
+        { error: "Server error" },
+        { status: 500 }
+      );
+    }
   }
 
   const session = await getSessionByIdRepo(sessionId);
