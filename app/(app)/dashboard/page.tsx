@@ -5,10 +5,6 @@ import { useRouter } from "next/navigation";
 import { useWorkspaceOverview } from "./hooks/useWorkspaceOverview";
 import type { SessionWithCounts } from "./hooks/useWorkspaceOverview";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
-import { InsightStrip } from "@/components/dashboard/InsightStrip";
-import { NeedsAttentionSection } from "@/components/dashboard/NeedsAttentionSection";
-
-const NEEDS_ATTENTION_LIMIT = 5;
 
 function filterAndSortSessions(sessions: SessionWithCounts[], search: string): SessionWithCounts[] {
   const q = search.trim().toLowerCase();
@@ -27,23 +23,6 @@ function filterAndSortSessions(sessions: SessionWithCounts[], search: string): S
   });
 }
 
-function needsAttentionItems(sessions: SessionWithCounts[]): SessionWithCounts[] {
-  return sessions
-    .filter((item) => {
-      const open = item.session.openCount ?? item.counts.open;
-      return open > 0;
-    })
-    .sort((a, b) => {
-      const openA = a.session.openCount ?? a.counts.open;
-      const openB = b.session.openCount ?? b.counts.open;
-      if (openB !== openA) return openB - openA;
-      const ta = a.session.updatedAt as { seconds?: number } | null | undefined;
-      const tb = b.session.updatedAt as { seconds?: number } | null | undefined;
-      return (tb?.seconds ?? 0) - (ta?.seconds ?? 0);
-    })
-    .slice(0, NEEDS_ATTENTION_LIMIT);
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"all" | "archived">("all");
@@ -59,11 +38,6 @@ export default function DashboardPage() {
   const filteredSessions = useMemo(
     () => filterAndSortSessions(sessions, search),
     [sessions, search]
-  );
-
-  const attentionItems = useMemo(
-    () => (viewMode === "all" ? needsAttentionItems(sessions) : []),
-    [viewMode, sessions]
   );
 
   const handleView = (sessionId: string) => {
@@ -93,11 +67,6 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-6 flex-shrink-0">
-            <div
-              className="flex items-center py-3 px-6 rounded-[var(--radius-card)] border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-1)]"
-            >
-              <InsightStrip />
-            </div>
             <div
               className="flex rounded-xl border border-[var(--glass-1-border)] bg-[var(--glass-1-bg)] backdrop-blur-[8px] p-0.5"
               role="tablist"
@@ -149,9 +118,6 @@ export default function DashboardPage() {
         </div>
 
         <main className="flex-1 mt-6">
-          {viewMode === "all" && (
-            <NeedsAttentionSection items={attentionItems} onView={handleView} />
-          )}
           <div className="pt-8">
             <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
             {filteredSessions.map((item, index) => (

@@ -30,13 +30,6 @@ async function loadSessionsAndCounts(
   return { sessions: userSessions, counts: Object.fromEntries(counts) };
 }
 
-export interface WorkspaceStats {
-  totalSessions: number;
-  activeSessions: number;
-  totalFeedbackItems: number;
-  openIssues: number;
-}
-
 export interface SessionWithCounts {
   session: Session;
   counts: SessionFeedbackCounts;
@@ -92,19 +85,6 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       .finally(() => setLoading(false));
   }, [user?.uid, archivedOnly]);
 
-  const stats: WorkspaceStats = {
-    totalSessions: sessions.length,
-    activeSessions: sessions.filter((s) => {
-      const c = sessionCounts[s.id];
-      return c ? c.open + c.resolved > 0 : false;
-    }).length,
-    totalFeedbackItems: Object.values(sessionCounts).reduce(
-      (acc, c) => acc + c.open + c.resolved,
-      0
-    ),
-    openIssues: Object.values(sessionCounts).reduce((acc, c) => acc + c.open, 0),
-  };
-
   const sessionsWithCounts: SessionWithCounts[] = sessions.map((session) => ({
     session,
     counts: sessionCounts[session.id] ?? { open: 0, resolved: 0 },
@@ -143,7 +123,6 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
   return {
     user,
     sessions: sessionsWithCounts,
-    stats,
     loading,
     handleCreateSession,
     refreshSessions,
