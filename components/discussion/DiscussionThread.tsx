@@ -129,10 +129,15 @@ export function DiscussionThread({
 
   if (!feedbackId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white text-center min-w-0 font-sans">
-        <p className="text-sm text-neutral-500 font-normal">
-          Select a discussion to view conversation
-        </p>
+      <div className="flex-1 flex h-full items-center justify-center bg-white min-w-0 font-sans">
+        <div className="text-center max-w-sm">
+          <p className="text-lg font-medium text-neutral-800">
+            Select a ticket to view conversation
+          </p>
+          <p className="text-sm text-neutral-500 mt-2">
+            Choose a discussion from the left panel
+          </p>
+        </div>
       </div>
     );
   }
@@ -206,8 +211,8 @@ export function DiscussionThread({
 
               {/* Action steps card */}
               {hasSteps && (
-                <div className="rounded-xl bg-white border border-neutral-200 p-4 shadow-sm transition-all duration-150 ease-out">
-                  <p className="text-[12px] tracking-[0.05em] uppercase text-[#6B7280] mb-2">
+                <div className="px-1 py-2 transition-all duration-150 ease-out">
+                  <p className="text-xs uppercase tracking-wide font-semibold text-neutral-500 mb-2">
                     Action steps
                   </p>
                   <ul className="text-[14px] leading-relaxed text-neutral-700 space-y-1 list-disc list-inside">

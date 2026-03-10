@@ -28,10 +28,15 @@ export default function DiscussionPage() {
           <div className="w-[320px] shrink-0 border-r border-neutral-200 bg-white p-4">
             <DiscussionSkeleton />
           </div>
-          <div className="flex-1 flex items-center justify-center bg-white">
-            <p className="text-sm text-neutral-500 font-normal">
-              Select a discussion to view conversation
-            </p>
+          <div className="flex-1 flex h-full items-center justify-center bg-white">
+            <div className="text-center max-w-sm">
+              <p className="text-lg font-medium text-neutral-800">
+                Select a ticket to view conversation
+              </p>
+              <p className="text-sm text-neutral-500 mt-2">
+                Choose a discussion from the left panel
+              </p>
+            </div>
           </div>
         </div>
       </div>
