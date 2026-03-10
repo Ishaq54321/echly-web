@@ -171,8 +171,8 @@ export function FolderCard({
   return (
     <>
       <div
-        className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-xl cursor-pointer transition hover:bg-neutral-50 group min-w-[200px] relative ${
-          isHovered ? "border-[#155DFC]" : "border-neutral-200"
+        className={`flex items-center gap-3 px-4 py-3 bg-white border border-neutral-200 rounded-xl cursor-pointer transition-all duration-200 ease-out hover:bg-neutral-50 hover:!border-[#155DFC80] hover:ring-1 hover:ring-[#155DFC40] hover:shadow-md hover:-translate-y-[1px] group min-w-[200px] relative shadow-sm ${
+          isHovered ? "!border-[#155DFC80] !ring-1 !ring-[#155DFC40]" : ""
         }`}
         data-folder-id={folder.id}
         onClick={() => router.push(`/folders/${folder.id}`)}

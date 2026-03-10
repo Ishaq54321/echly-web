@@ -10,6 +10,8 @@ import type { SessionWithCounts } from "./hooks/useWorkspaceOverview";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { SessionsHeader } from "@/components/dashboard/SessionsHeader";
 import { FolderCard } from "@/components/dashboard/FolderCard";
+import SessionsGridSkeleton from "@/components/skeleton/SessionsGridSkeleton";
+import FolderSkeleton from "@/components/skeleton/FolderSkeleton";
 import { MoveSessionsModal } from "@/components/dashboard/MoveSessionsModal";
 import { DragSessionProvider, useDragSession } from "@/components/dashboard/context/DragSessionContext";
 import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
@@ -53,10 +55,12 @@ function DashboardContent() {
   } = useWorkspaceOverview(viewMode);
   const [search, setSearch] = useState("");
   const [folders, setFolders] = useState<DashboardFolder[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(true);
   const [moveModalFolder, setMoveModalFolder] = useState<DashboardFolder | null>(null);
   const [moveToFolderSessionId, setMoveToFolderSessionId] = useState<string | null>(null);
 
   const loadFolders = async () => {
+    setFoldersLoading(true);
     const snapshot = await getDocs(collection(db, "folders"));
     const folderData: DashboardFolder[] = snapshot.docs.map((d) => {
       const data = d.data();
@@ -67,6 +71,7 @@ function DashboardContent() {
       };
     });
     setFolders(folderData);
+    setFoldersLoading(false);
   };
 
   useEffect(() => {
@@ -138,16 +143,6 @@ function DashboardContent() {
     router.push(`/dashboard/${sessionId}`);
   };
 
-  if (loading) {
-    return (
-      <div className="bg-white flex flex-col w-full min-h-[40vh]">
-        <div className="mx-auto w-full max-w-[1800px] px-10 py-8 flex items-center justify-center">
-          <p className="text-[14px] text-[hsl(var(--text-tertiary))]">Loading workspace…</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20 relative">
       <div className="absolute top-6 left-1/2 -translate-x-1/2 w-[560px]">
@@ -174,7 +169,17 @@ function DashboardContent() {
 
         <main className="flex-1">
           <div className="pt-8">
-            {folders.length > 0 && (
+            {foldersLoading ? (
+              <div className="mb-8">
+                <h2 className="text-sm font-semibold text-neutral-700 mb-3">
+                  Folders
+                </h2>
+                <div className="flex gap-4 flex-wrap">
+                  <FolderSkeleton />
+                  <FolderSkeleton />
+                </div>
+              </div>
+            ) : folders.length > 0 ? (
               <div className="mb-8">
                 <h2 className="text-sm font-semibold text-neutral-700 mb-3">
                   Folders
@@ -195,39 +200,47 @@ function DashboardContent() {
                   ))}
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {folders.length > 0 && (
+            {(foldersLoading || folders.length > 0) && (
               <h2 className="text-sm font-semibold text-neutral-700 mb-3">
                 Sessions
               </h2>
             )}
-            <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
-            {filteredSessions.map((item, index) => (
-              <WorkspaceCard
-                key={item.session.id}
-                item={item}
-                onView={handleView}
-                index={index}
-                onRenameSuccess={(session) =>
-                  updateSession(session.id, { title: session.title })
-                }
-                onArchiveSuccess={removeSession}
-                onDeleteSuccess={removeSession}
-                onOpenMoveToFolder={setMoveToFolderSessionId}
-              />
-            ))}
+            <div className="transition-opacity duration-200">
+              {loading ? (
+                <SessionsGridSkeleton />
+              ) : (
+                <>
+                  <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
+                    {filteredSessions.map((item, index) => (
+                      <WorkspaceCard
+                        key={item.session.id}
+                        item={item}
+                        onView={handleView}
+                        index={index}
+                        onRenameSuccess={(session) =>
+                          updateSession(session.id, { title: session.title })
+                        }
+                        onArchiveSuccess={removeSession}
+                        onDeleteSuccess={removeSession}
+                        onOpenMoveToFolder={setMoveToFolderSessionId}
+                      />
+                    ))}
+                  </div>
+                  {filteredSessions.length === 0 && (
+                    <p className="text-[14px] text-[hsl(var(--text-tertiary))] py-8">
+                      {search.trim()
+                        ? "No sessions match your search."
+                        : viewMode === "archived"
+                          ? "No archived sessions."
+                          : "No sessions yet. Create one to get started."}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </div>
-          {filteredSessions.length === 0 && (
-            <p className="text-[14px] text-[hsl(var(--text-tertiary))] py-8">
-              {search.trim()
-                ? "No sessions match your search."
-                : viewMode === "archived"
-                  ? "No archived sessions."
-                  : "No sessions yet. Create one to get started."}
-            </p>
-          )}
         </main>
       </div>
 

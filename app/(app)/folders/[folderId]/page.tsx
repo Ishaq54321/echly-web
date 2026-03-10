@@ -17,6 +17,7 @@ import { useWorkspaceOverview } from "@/app/(app)/dashboard/hooks/useWorkspaceOv
 import { Folder } from "lucide-react";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { MoveSessionsModal } from "@/components/dashboard/MoveSessionsModal";
+import SessionsGridSkeleton from "@/components/skeleton/SessionsGridSkeleton";
 import { DragSessionProvider } from "@/components/dashboard/context/DragSessionContext";
 
 interface FolderData {
@@ -185,19 +186,7 @@ function FolderPageContent() {
     await loadFolder();
   };
 
-  if (loading) {
-    return (
-      <div className="bg-white flex flex-col w-full min-h-[40vh]">
-        <div className="mx-auto w-full max-w-[1800px] px-10 py-8 flex items-center justify-center">
-          <p className="text-[14px] text-[hsl(var(--text-tertiary))]">
-            Loading folder…
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!folder) {
+  if (!folder && !loading) {
     return (
       <div className="bg-white flex flex-col w-full min-h-[40vh]">
         <div className="mx-auto w-full max-w-[1800px] px-10 py-8 flex items-center justify-center">
@@ -217,59 +206,69 @@ function FolderPageContent() {
             <div className="text-sm text-neutral-500 font-medium">
               Folder
             </div>
-            <h1 className="text-4xl font-semibold">
-              {folder.name}
-            </h1>
+            {loading ? (
+              <div className="h-10 w-48 bg-neutral-200 rounded animate-pulse mt-1" />
+            ) : folder ? (
+              <h1 className="text-4xl font-semibold">
+                {folder.name}
+              </h1>
+            ) : null}
           </div>
 
           <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleCreateSession}
-              className="bg-[#155DFC] text-white rounded-full px-5 py-2 text-sm font-semibold hover:bg-[#0F4ED1] transition"
-            >
-              New Session
-            </button>
+            {!loading && (
+              <button
+                type="button"
+                onClick={handleCreateSession}
+                className="bg-[#155DFC] text-white rounded-full px-5 py-2 text-sm font-semibold hover:bg-[#0F4ED1] transition"
+              >
+                New Session
+              </button>
+            )}
           </div>
         </div>
 
         <main className="flex-1">
           <div className="pt-8">
-            {folder.sessionIds.length > 0 ? (
-              <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
-                {sessions.map((item, index) => (
-                  <WorkspaceCard
-                    key={item.session.id}
-                    item={item}
-                    onView={handleView}
-                    index={index}
-                    onRenameSuccess={handleRenameSuccess}
-                    onArchiveSuccess={handleArchiveOrDelete}
-                    onDeleteSuccess={handleArchiveOrDelete}
-                    isRootSession={false}
-                    folderId={folderId}
-                    onRemoveFromFolder={removeSessionFromFolder}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center mt-24 text-center">
-                <Folder className="w-12 h-12 text-[#155DFC] mb-4" />
-                <h3 className="text-lg font-semibold text-neutral-900 mb-1">
-                  This folder is empty
-                </h3>
-                <p className="text-sm text-neutral-500 mb-6 max-w-sm">
-                  Move sessions into this folder to organize your feedback and recordings.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setMoveModalOpen(true)}
-                  className="bg-[#155DFC] text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-[#0F4ED1]"
-                >
-                  Add Sessions
-                </button>
-              </div>
-            )}
+            <div className="transition-opacity duration-200">
+              {loading ? (
+                <SessionsGridSkeleton />
+              ) : folder && folder.sessionIds.length > 0 ? (
+                <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
+                  {sessions.map((item, index) => (
+                    <WorkspaceCard
+                      key={item.session.id}
+                      item={item}
+                      onView={handleView}
+                      index={index}
+                      onRenameSuccess={handleRenameSuccess}
+                      onArchiveSuccess={handleArchiveOrDelete}
+                      onDeleteSuccess={handleArchiveOrDelete}
+                      isRootSession={false}
+                      folderId={folderId}
+                      onRemoveFromFolder={removeSessionFromFolder}
+                    />
+                  ))}
+                </div>
+              ) : folder ? (
+                <div className="flex flex-col items-center justify-center mt-24 text-center">
+                  <Folder className="w-12 h-12 text-[#155DFC] mb-4" />
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-1">
+                    This folder is empty
+                  </h3>
+                  <p className="text-sm text-neutral-500 mb-6 max-w-sm">
+                    Move sessions into this folder to organize your feedback and recordings.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setMoveModalOpen(true)}
+                    className="bg-[#155DFC] text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-[#0F4ED1]"
+                  >
+                    Add Sessions
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </main>
       </div>

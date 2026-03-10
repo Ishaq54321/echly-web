@@ -263,10 +263,16 @@ export function WorkspaceCard({
           p-5
           overflow-hidden
           shadow-sm
+          hover:bg-neutral-50
+          hover:!border-[#155DFC80]
+          hover:ring-1
+          hover:ring-[#155DFC40]
           hover:shadow-md
-          transition
+          hover:-translate-y-[1px]
+          transition-all
+          duration-200
+          ease-out
           cursor-pointer
-          outline-none
           focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2
         "
         style={{ animationDelay: `${index * 50}ms` } as React.CSSProperties}
