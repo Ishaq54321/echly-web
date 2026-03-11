@@ -9,6 +9,7 @@ import { auth } from "@/lib/firebase";
 import { addComment, updateComment, deleteComment } from "@/lib/comments";
 import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
 import type { Comment, CommentAttachment } from "@/lib/domain/comment";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { AttachmentUploadModal } from "@/components/discussion/AttachmentUploadModal";
 import { CommentItem } from "@/components/comments/CommentItem";
 
@@ -57,8 +58,10 @@ export function DiscussionThread({
     async (attachment: CommentAttachment) => {
       const user = auth.currentUser;
       if (!user || !feedbackId || !ticket?.sessionId) return;
+      const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
       const optimisticComment: Comment = {
         id: `temp-attach-${Date.now()}`,
+        workspaceId,
         sessionId: ticket.sessionId,
         feedbackId,
         userId: user.uid,
@@ -74,7 +77,7 @@ export function DiscussionThread({
       onCommentAdded?.();
       setSending(true);
       try {
-        await addComment(ticket.sessionId, feedbackId, {
+        await addComment(workspaceId, ticket.sessionId, feedbackId, {
           userId: user.uid,
           userName: user.displayName || "User",
           userAvatar: user.photoURL || "",
@@ -169,9 +172,11 @@ export function DiscussionThread({
     if (!user || !feedbackId || !ticket?.sessionId) return;
     const trimmed = commentDraft.trim();
     if (!trimmed) return;
+    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
 
     const optimisticComment: Comment = {
       id: `temp-${Date.now()}`,
+      workspaceId,
       sessionId: ticket.sessionId,
       feedbackId,
       userId: user.uid,
@@ -187,7 +192,7 @@ export function DiscussionThread({
 
     setSending(true);
     try {
-      await addComment(ticket.sessionId, feedbackId, {
+      await addComment(workspaceId, ticket.sessionId, feedbackId, {
         userId: user.uid,
         userName: user.displayName || "User",
         userAvatar: user.photoURL || "",

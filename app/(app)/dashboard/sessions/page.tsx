@@ -6,11 +6,12 @@ import { collection, getDocs } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { clearAuthTokenCache } from "@/lib/authFetch";
-import { getUserSessions } from "@/lib/sessions";
+import { getWorkspaceSessions, getUserSessions } from "@/lib/sessions";
 import { getSessionFeedbackCounts } from "@/lib/feedback";
 import { Search, Folder } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import SessionsTableSkeleton from "@/components/skeleton/SessionsTableSkeleton";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 
 function formatLastActivity(updatedAt: unknown): string {
   if (updatedAt == null) return "—";
@@ -39,9 +40,14 @@ interface FolderData {
 async function loadSessionsAndCounts(
   uid: string
 ): Promise<SessionWithCounts[]> {
-  const userSessions = await getUserSessions(uid, SESSION_LIMIT, {
+  const workspaceId = (await getUserWorkspaceIdRepo(uid)) ?? uid;
+  const workspaceSessions = await getWorkspaceSessions(workspaceId, SESSION_LIMIT, {
     includeArchived: true,
   });
+  const userSessions =
+    workspaceSessions.length > 0
+      ? workspaceSessions
+      : await getUserSessions(uid, SESSION_LIMIT, { includeArchived: true });
   const withCounts = await Promise.all(
     userSessions.map(async (session) => {
       const counts = await getSessionFeedbackCounts(session.id);

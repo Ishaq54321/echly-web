@@ -8,7 +8,7 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-1 min-h-0">
+    <div className="flex flex-1 min-h-0 overflow-hidden relative z-10">
       <GlobalRail />
       <main className="relative flex flex-1 min-h-screen overflow-auto bg-white">
         <FloatingUtilityActions />

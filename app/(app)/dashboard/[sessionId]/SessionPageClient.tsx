@@ -463,6 +463,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     deleteComment,
   } = useFeedbackDetailController({
     sessionId,
+    workspaceId: session?.workspaceId ?? session?.userId ?? null,
     feedbackId: selectedId,
   });
 
@@ -854,6 +855,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     } | null
   ): Promise<Feedback[]> => {
     if (!session) return [];
+    const workspaceId = session.workspaceId ?? session.userId;
+    const createdByUserId = session.userId;
+    if (!workspaceId || !createdByUserId) return [];
     const effectiveFirstId =
       tickets.length > 0 && screenshotUrl !== null ? firstFeedbackId : null;
     const created: Feedback[] = [];
@@ -880,15 +884,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         }),
       };
       const docRef = await addFeedback(
+        workspaceId,
         sessionId,
-        session.userId,
+        createdByUserId,
         payload,
         i === 0 && effectiveFirstId ? effectiveFirstId : undefined
       );
       const newItem: Feedback = {
         id: docRef.id,
+        workspaceId,
         sessionId,
-        userId: session.userId,
+        userId: createdByUserId,
         title: payload.title,
         description: payload.description,
         type: payload.type,
@@ -979,6 +985,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
     /* Raw fallback when AI fails or returns no tickets (and not needsClarification) */
     if (!data.success || tickets.length === 0) {
+      const workspaceId = session.workspaceId ?? session.userId;
+      const createdByUserId = session.userId;
+      if (!workspaceId || !createdByUserId) return;
       const rawPayload = {
         title: transcript.slice(0, 80),
         description: transcript,
@@ -994,15 +1003,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         clarityConfidence: 0,
       };
       const docRef = await addFeedback(
+        workspaceId,
         sessionId,
-        session.userId,
+        createdByUserId,
         rawPayload,
         firstFeedbackId
       );
       const newItem: Feedback = {
         id: docRef.id,
+        workspaceId,
         sessionId,
-        userId: session.userId,
+        userId: createdByUserId,
         title: rawPayload.title,
         description: rawPayload.description,
         type: rawPayload.type,

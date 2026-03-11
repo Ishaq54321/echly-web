@@ -5,6 +5,7 @@ import {
   deleteSessionRepo,
   getSessionByIdRepo,
   getUserSessionsRepo,
+  getWorkspaceSessionsRepo,
   updateSessionArchivedRepo,
   updateSessionTitleRepo,
   recordSessionViewIfNewRepo,
@@ -19,10 +20,11 @@ import {
 ================================ */
 
 export async function createSession(
+  workspaceId: string,
   userId: string,
   createdBy?: SessionCreatedBy | null
 ): Promise<string> {
-  return await createSessionRepo(userId, createdBy);
+  return await createSessionRepo(workspaceId, userId, createdBy);
 }
 
 /* ================================
@@ -40,6 +42,20 @@ export async function recordSessionViewIfNew(
    GET USER SESSIONS
 ================================ */
 
+export async function getWorkspaceSessions(
+  workspaceId: string,
+  max?: number,
+  options?: { archivedOnly?: boolean; includeArchived?: boolean }
+): Promise<Session[]> {
+  return await getWorkspaceSessionsRepo(
+    workspaceId,
+    max ?? 50,
+    options?.archivedOnly,
+    options?.includeArchived
+  );
+}
+
+/** Legacy: pre-workspaces sessions list (fallback only). */
 export async function getUserSessions(
   userId: string,
   max?: number,

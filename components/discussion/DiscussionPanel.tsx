@@ -9,6 +9,7 @@ import { addComment } from "@/lib/comments";
 import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
 import type { Comment } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 
 const PANEL_WIDTH = 420;
 
@@ -114,7 +115,8 @@ export function DiscussionPanel({
 
     setSending(true);
     try {
-      await addComment(ticket.sessionId, feedbackId, {
+      const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+      await addComment(workspaceId, ticket.sessionId, feedbackId, {
         userId: user.uid,
         userName: user.displayName || "User",
         userAvatar: user.photoURL || "",

@@ -13,9 +13,10 @@ import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
  */
 export function useFeedbackDetailController(args: {
   sessionId: string;
+  workspaceId: string | null | undefined;
   feedbackId: string | null | undefined;
 }) {
-  const { sessionId, feedbackId } = args;
+  const { sessionId, workspaceId, feedbackId } = args;
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -60,7 +61,7 @@ export function useFeedbackDetailController(args: {
 
   const sendComment = async (message: string): Promise<void> => {
     const user = auth.currentUser;
-    if (!user || !feedbackId) return;
+    if (!user || !feedbackId || !workspaceId) return;
     const trimmed = message.trim();
     if (!trimmed) return;
     const payload = {
@@ -69,15 +70,15 @@ export function useFeedbackDetailController(args: {
       userAvatar: user.photoURL || "",
       message: trimmed,
     };
-    addComment(sessionId, feedbackId, payload).catch(console.error);
+    addComment(workspaceId, sessionId, feedbackId, payload).catch(console.error);
   };
 
   const sendReply = async (threadId: string, message: string): Promise<void> => {
     const user = auth.currentUser;
-    if (!user || !feedbackId) return;
+    if (!user || !feedbackId || !workspaceId) return;
     const trimmed = message.trim();
     if (!trimmed) return;
-    addComment(sessionId, feedbackId, {
+    addComment(workspaceId, sessionId, feedbackId, {
       userId: user.uid,
       userName: user.displayName || "User",
       userAvatar: user.photoURL || "",
@@ -91,11 +92,11 @@ export function useFeedbackDetailController(args: {
     message: string
   ): Promise<string | null> => {
     const user = auth.currentUser;
-    if (!user || !feedbackId) return null;
+    if (!user || !feedbackId || !workspaceId) return null;
     const trimmed = message.trim();
     if (!trimmed) return null;
     try {
-      const id = await addComment(sessionId, feedbackId, {
+      const id = await addComment(workspaceId, sessionId, feedbackId, {
         userId: user.uid,
         userName: user.displayName || "User",
         userAvatar: user.photoURL || "",
@@ -115,11 +116,11 @@ export function useFeedbackDetailController(args: {
     message: string
   ): Promise<string | null> => {
     const user = auth.currentUser;
-    if (!user || !feedbackId) return null;
+    if (!user || !feedbackId || !workspaceId) return null;
     const trimmed = message.trim();
     if (!trimmed) return null;
     try {
-      const id = await addComment(sessionId, feedbackId, {
+      const id = await addComment(workspaceId, sessionId, feedbackId, {
         userId: user.uid,
         userName: user.displayName || "User",
         userAvatar: user.photoURL || "",

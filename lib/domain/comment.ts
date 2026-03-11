@@ -17,6 +17,8 @@ export type CommentType = "pin" | "text" | "general";
 
 export interface Comment {
   id: string;
+  /** Workspace scope (primary). */
+  workspaceId?: string;
   sessionId: string;
   feedbackId: string;
   userId: string;

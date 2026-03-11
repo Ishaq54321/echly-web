@@ -27,11 +27,12 @@ export interface AddCommentOptions {
 }
 
 export async function addComment(
+  workspaceId: string,
   sessionId: string,
   feedbackId: string,
   data: AddCommentOptions
 ): Promise<string> {
-  return addCommentRepo(sessionId, feedbackId, data as AddCommentData);
+  return addCommentRepo(workspaceId, sessionId, feedbackId, data as AddCommentData);
 }
 
 export async function updatePinPosition(

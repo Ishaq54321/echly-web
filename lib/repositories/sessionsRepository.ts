@@ -28,10 +28,12 @@ type SessionDoc = Omit<Session, "id"> & { createdAt?: Timestamp | null; updatedA
  * existing session documents. Sets createdBy, viewCount, commentCount.
  */
 export async function createSessionRepo(
+  workspaceId: string,
   userId: string,
   createdBy?: SessionCreatedBy | null
 ): Promise<string> {
   const docRef = await addDoc(collection(db, "sessions"), {
+    workspaceId,
     userId,
     title: "Untitled Session",
     createdAt: serverTimestamp(),
@@ -48,10 +50,45 @@ export async function createSessionRepo(
 }
 
 /**
- * Lists user sessions. Sorted by most recent activity (updatedAt desc).
- * Composite index required: (userId Ascending, updatedAt Descending).
- * When archivedOnly is true: (userId Ascending, archived Ascending, updatedAt Descending).
+ * Lists workspace sessions. Sorted by most recent activity (updatedAt desc).
+ * Composite index required: (workspaceId Ascending, updatedAt Descending).
+ * When archivedOnly is true: (workspaceId Ascending, archived Ascending, updatedAt Descending).
  * When includeArchived is true, returns both active and archived sessions.
+ */
+export async function getWorkspaceSessionsRepo(
+  workspaceId: string,
+  max: number = 50,
+  archivedOnly?: boolean,
+  includeArchived?: boolean
+): Promise<Session[]> {
+  assertQueryLimit(max, "getWorkspaceSessionsRepo");
+  const q = query(
+    collection(db, "sessions"),
+    where("workspaceId", "==", workspaceId),
+    ...(archivedOnly === true
+      ? [where("archived", "==", true) as ReturnType<typeof where>]
+      : []),
+    orderBy("updatedAt", "desc"),
+    limit(max)
+  );
+
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs
+    .filter((docSnap) => {
+      if (includeArchived) return true;
+      const archived = (docSnap.data() as { archived?: boolean }).archived === true;
+      return archivedOnly ? archived : !archived;
+    })
+    .map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as SessionDoc),
+    }));
+}
+
+/**
+ * Legacy listing: sessions were previously scoped by userId. Keep this for backward compatibility
+ * and migration fallback. Prefer getWorkspaceSessionsRepo going forward.
  */
 export async function getUserSessionsRepo(
   userId: string,

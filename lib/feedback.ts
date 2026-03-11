@@ -35,12 +35,13 @@ export type {
 ================================ */
 
 export async function addFeedback(
+  workspaceId: string,
   sessionId: string,
   userId: string,
   data: StructuredFeedback,
   feedbackId?: string
 ): Promise<DocumentReference> {
-  return addFeedbackWithSessionCountersRepo(sessionId, userId, data, feedbackId);
+  return addFeedbackWithSessionCountersRepo(workspaceId, sessionId, userId, data, feedbackId);
 }
 
 /* ================================

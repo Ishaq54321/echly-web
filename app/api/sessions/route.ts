@@ -4,8 +4,10 @@ import { requireAuth } from "@/lib/server/auth";
 import {
   getUserSessionsRepo,
   createSessionRepo,
+  getWorkspaceSessionsRepo,
 } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 
 /** GET /api/sessions — list sessions for the authenticated user. */
 export async function GET(req: Request) {
@@ -19,7 +21,12 @@ export async function GET(req: Request) {
   }
 
   try {
-    const sessions = await getUserSessionsRepo(user.uid, 100);
+    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+    const workspaceSessions = await getWorkspaceSessionsRepo(workspaceId, 100);
+    const sessions =
+      workspaceSessions.length > 0
+        ? workspaceSessions
+        : await getUserSessionsRepo(user.uid, 100);
     log("[API] GET /api/sessions duration:", Date.now() - start);
     return NextResponse.json({
       success: true,
@@ -44,7 +51,8 @@ export async function POST(req: Request) {
     return res as Response;
   }
   try {
-    const id = await createSessionRepo(user.uid, null);
+    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+    const id = await createSessionRepo(workspaceId, user.uid, null);
     return NextResponse.json({ success: true, session: { id } });
   } catch (err) {
     console.error("POST /api/sessions:", err);

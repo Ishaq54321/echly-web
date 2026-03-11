@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, Fragment } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import {
   Monitor,
   Laptop,
@@ -15,6 +15,15 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Switch } from "@/components/ui/Switch";
 import { Modal } from "@/components/ui/Modal";
+import type { Workspace } from "@/lib/domain/workspace";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import {
+  listenToWorkspace,
+  updateWorkspaceAppearance,
+  updateWorkspaceName,
+  updateWorkspaceNotifications,
+  updateWorkspaceSettings,
+} from "@/lib/repositories/workspacesRepository";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
@@ -55,6 +64,44 @@ type TabId = (typeof TABS)[number]["id"];
 export default function SettingsPage() {
   const { user } = useAuthGuard();
   const [activeTab, setActiveTab] = useState<TabId>("general");
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [loadingWorkspace, setLoadingWorkspace] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!user) {
+        if (!cancelled) {
+          setWorkspaceId(null);
+          setWorkspace(null);
+          setLoadingWorkspace(false);
+        }
+        return;
+      }
+      setLoadingWorkspace(true);
+      const wid = await getUserWorkspaceIdRepo(user.uid);
+      if (cancelled) return;
+      setWorkspaceId(wid);
+      setLoadingWorkspace(false);
+    }
+    run().catch((e) => {
+      console.error("Failed to load workspaceId:", e);
+      setLoadingWorkspace(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!workspaceId) {
+      setWorkspace(null);
+      return;
+    }
+    const unsub = listenToWorkspace(workspaceId, setWorkspace);
+    return () => unsub();
+  }, [workspaceId]);
 
   return (
     <div className="flex flex-1 min-h-0 bg-white overflow-auto">
@@ -101,7 +148,12 @@ export default function SettingsPage() {
 
         {/* Tab content */}
         {activeTab === "general" && (
-          <GeneralTab onNavigateToBilling={() => setActiveTab("billing")} />
+          <GeneralTab
+            workspace={workspace}
+            workspaceId={workspaceId}
+            loading={loadingWorkspace}
+            onNavigateToBilling={() => setActiveTab("billing")}
+          />
         )}
         {activeTab === "security" && <SecurityTab user={user} />}
         {activeTab === "integrations" && (
@@ -114,17 +166,54 @@ export default function SettingsPage() {
 }
 
 /* ——— General tab: Workspace, Appearance, Notifications only ——— */
-function GeneralTab({ onNavigateToBilling }: { onNavigateToBilling: () => void }) {
+function GeneralTab({
+  workspace,
+  workspaceId,
+  loading,
+  onNavigateToBilling,
+}: {
+  workspace: Workspace | null;
+  workspaceId: string | null;
+  loading: boolean;
+  onNavigateToBilling: () => void;
+}) {
   return (
     <div className={`${CARD_GAP} pb-16`}>
-      <WorkspaceCard />
-      <AppearanceCard onNavigateToBilling={onNavigateToBilling} />
-      <NotificationsCard />
+      <WorkspaceCard workspace={workspace} workspaceId={workspaceId} loading={loading} />
+      <AppearanceCard
+        workspace={workspace}
+        workspaceId={workspaceId}
+        loading={loading}
+        onNavigateToBilling={onNavigateToBilling}
+      />
+      <NotificationsCard workspace={workspace} workspaceId={workspaceId} loading={loading} />
+      <AdvancedSettingsCard workspace={workspace} workspaceId={workspaceId} loading={loading} />
     </div>
   );
 }
 
-function WorkspaceCard() {
+function WorkspaceCard({
+  workspace,
+  workspaceId,
+  loading,
+}: {
+  workspace: Workspace | null;
+  workspaceId: string | null;
+  loading: boolean;
+}) {
+  const [nameDraft, setNameDraft] = useState("");
+  const lastWorkspaceIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (workspaceId !== lastWorkspaceIdRef.current) {
+      lastWorkspaceIdRef.current = workspaceId;
+      setNameDraft(workspace?.name ?? "");
+    } else if (workspace && nameDraft === "") {
+      setNameDraft(workspace.name ?? "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId, workspace?.name]);
+
   return (
     <Card className={SETTINGS_CARD} as="article">
       <SectionHeader
@@ -139,7 +228,17 @@ function WorkspaceCard() {
           </div>
           <input
             type="text"
-            defaultValue="My Workspace"
+            value={nameDraft}
+            disabled={loading || !workspaceId}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={() => {
+              if (!workspaceId) return;
+              const next = nameDraft.trim() || "My Workspace";
+              if (workspace?.name === next) return;
+              updateWorkspaceName(workspaceId, next).catch((e) =>
+                console.error("Failed to update workspace name:", e)
+              );
+            }}
             className="max-w-[360px] w-full min-w-0 px-3 py-2.5 rounded-lg border border-[var(--border-default)] text-[15px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition-all duration-200 shrink-0"
           />
         </div>
@@ -163,19 +262,28 @@ function WorkspaceCard() {
 }
 
 const NOTIFICATION_OPTIONS = [
-  { key: "feedback", title: "Email Notifications for Feedback", desc: "Get notified when someone submits new feedback on your tickets." },
-  { key: "replies", title: "Email Notifications for Replies", desc: "Get notified when someone responds to feedback on your tickets." },
-  { key: "digest", title: "Daily Activity Digest", desc: "Receive a daily summary of activity in your workspace." },
-  { key: "mentions", title: "Comment Mentions", desc: "Receive alerts when teammates mention you in comments." },
+  { key: "feedbackSubmitted", title: "Email Notifications for Feedback", desc: "Get notified when someone submits new feedback on your tickets." },
+  { key: "replyPosted", title: "Email Notifications for Replies", desc: "Get notified when someone responds to feedback on your tickets." },
+  { key: "dailyDigest", title: "Daily Activity Digest", desc: "Receive a daily summary of activity in your workspace." },
+  { key: "commentMentions", title: "Comment Mentions", desc: "Receive alerts when teammates mention you in comments." },
 ];
 
-function NotificationsCard() {
-  const [feedback, setFeedback] = useState(true);
-  const [replies, setReplies] = useState(true);
-  const [digest, setDigest] = useState(false);
-  const [mentions, setMentions] = useState(true);
-  const state = { feedback, replies, digest, mentions };
-  const setters = { feedback: setFeedback, replies: setReplies, digest: setDigest, mentions: setMentions };
+function NotificationsCard({
+  workspace,
+  workspaceId,
+  loading,
+}: {
+  workspace: Workspace | null;
+  workspaceId: string | null;
+  loading: boolean;
+}) {
+  const email = workspace?.notifications?.email;
+  const state = {
+    feedbackSubmitted: email?.feedbackSubmitted ?? true,
+    replyPosted: email?.replyPosted ?? true,
+    dailyDigest: email?.dailyDigest ?? false,
+    commentMentions: email?.commentMentions ?? true,
+  };
 
   return (
     <Card className={SETTINGS_CARD} as="article">
@@ -195,7 +303,20 @@ function NotificationsCard() {
             </div>
             <Switch
               checked={state[key as keyof typeof state]}
-              onChange={setters[key as keyof typeof setters]}
+              disabled={loading || !workspaceId}
+              onChange={(v) => {
+                if (!workspaceId) return;
+                const next = {
+                  ...(workspace?.notifications ?? { email: state }),
+                  email: {
+                    ...(workspace?.notifications?.email ?? state),
+                    [key]: v,
+                  },
+                } as Workspace["notifications"];
+                updateWorkspaceNotifications(workspaceId, next).catch((e) =>
+                  console.error("Failed to update notifications:", e)
+                );
+              }}
               className="shrink-0 transition-all duration-200 ease-out"
             />
           </div>
@@ -234,11 +355,22 @@ function UpgradePlanBadge({ onClick, title }: { onClick?: () => void; title?: st
   );
 }
 
-function AppearanceCard({ onNavigateToBilling }: { onNavigateToBilling: () => void }) {
+function AppearanceCard({
+  workspace,
+  workspaceId,
+  loading,
+  onNavigateToBilling,
+}: {
+  workspace: Workspace | null;
+  workspaceId: string | null;
+  loading: boolean;
+  onNavigateToBilling: () => void;
+}) {
   const isPro = false; // TODO: from plan/subscription
-  const [logoOnScreen, setLogoOnScreen] = useState(false);
-  const [accentColor, setAccentColor] = useState(false);
-  const [removeBranding, setRemoveBranding] = useState(false);
+  const appearance = workspace?.appearance;
+  const logoOnScreen = appearance?.logoOnFeedbackScreen ?? false;
+  const accentColorEnabled = (appearance?.accentColor ?? null) != null;
+  const removeBranding = appearance?.removeEchlyBranding ?? false;
 
   function AppearanceRow({
     title,
@@ -291,19 +423,58 @@ function AppearanceCard({ onNavigateToBilling }: { onNavigateToBilling: () => vo
           title="Logo on Feedback Screen"
           preview="Add your company logo to feedback sessions."
           checked={logoOnScreen}
-          onChange={setLogoOnScreen}
+          onChange={(v) => {
+            if (!workspaceId) return;
+            const next = {
+              ...(workspace?.appearance ?? {
+                logoOnFeedbackScreen: false,
+                accentColor: null,
+                removeEchlyBranding: false,
+              }),
+              logoOnFeedbackScreen: v,
+            };
+            updateWorkspaceAppearance(workspaceId, next).catch((e) =>
+              console.error("Failed to update appearance:", e)
+            );
+          }}
         />
         <AppearanceRow
           title="Custom Accent Color"
           preview="Match the feedback UI to your brand color."
-          checked={accentColor}
-          onChange={setAccentColor}
+          checked={accentColorEnabled}
+          onChange={(v) => {
+            if (!workspaceId) return;
+            const next = {
+              ...(workspace?.appearance ?? {
+                logoOnFeedbackScreen: false,
+                accentColor: null,
+                removeEchlyBranding: false,
+              }),
+              accentColor: v ? (appearance?.accentColor ?? "#155DFC") : null,
+            };
+            updateWorkspaceAppearance(workspaceId, next).catch((e) =>
+              console.error("Failed to update appearance:", e)
+            );
+          }}
         />
         <AppearanceRow
           title="Remove Echly Branding"
           preview="Hide Echly logo and branding on shared feedback pages."
           checked={removeBranding}
-          onChange={setRemoveBranding}
+          onChange={(v) => {
+            if (!workspaceId) return;
+            const next = {
+              ...(workspace?.appearance ?? {
+                logoOnFeedbackScreen: false,
+                accentColor: null,
+                removeEchlyBranding: false,
+              }),
+              removeEchlyBranding: v,
+            };
+            updateWorkspaceAppearance(workspaceId, next).catch((e) =>
+              console.error("Failed to update appearance:", e)
+            );
+          }}
         />
       </div>
     </Card>
@@ -316,13 +487,21 @@ const ADVANCED_OPTIONS = [
   { key: "aiActionSteps", title: "AI Action Steps", desc: "Use AI to suggest action steps from feedback content." },
 ];
 
-function AdvancedSettingsCard() {
+function AdvancedSettingsCard({
+  workspace,
+  workspaceId,
+  loading,
+}: {
+  workspace: Workspace | null;
+  workspaceId: string | null;
+  loading: boolean;
+}) {
   const [open, setOpen] = useState(false); /* collapsed by default */
-  const [autoCreateTicket, setAutoCreateTicket] = useState(false);
-  const [guestComments, setGuestComments] = useState(false);
-  const [aiActionSteps, setAiActionSteps] = useState(true);
-  const state = { autoCreateTicket, guestComments, aiActionSteps };
-  const setters = { autoCreateTicket: setAutoCreateTicket, guestComments: setGuestComments, aiActionSteps: setAiActionSteps };
+  const state = {
+    autoCreateTicket: workspace?.automations?.autoCreateTicketOnFeedback ?? false,
+    guestComments: workspace?.permissions?.allowGuestComments ?? false,
+    aiActionSteps: workspace?.ai?.actionStepsEnabled ?? true,
+  };
 
   return (
     <Card className={SETTINGS_CARD} as="article">
@@ -353,7 +532,36 @@ function AdvancedSettingsCard() {
               </div>
               <Switch
                 checked={state[key as keyof typeof state]}
-                onChange={setters[key as keyof typeof setters]}
+                disabled={loading || !workspaceId}
+                onChange={(v) => {
+                  if (!workspaceId) return;
+                  if (key === "autoCreateTicket") {
+                    updateWorkspaceSettings(workspaceId, {
+                      automations: {
+                        ...(workspace?.automations ?? { autoCreateTicketOnFeedback: false }),
+                        autoCreateTicketOnFeedback: v,
+                      },
+                    }).catch((e) => console.error("Failed to update automations:", e));
+                    return;
+                  }
+                  if (key === "guestComments") {
+                    updateWorkspaceSettings(workspaceId, {
+                      permissions: {
+                        ...(workspace?.permissions ?? { allowGuestComments: false }),
+                        allowGuestComments: v,
+                      },
+                    }).catch((e) => console.error("Failed to update permissions:", e));
+                    return;
+                  }
+                  if (key === "aiActionSteps") {
+                    updateWorkspaceSettings(workspaceId, {
+                      ai: {
+                        ...(workspace?.ai ?? { actionStepsEnabled: true }),
+                        actionStepsEnabled: v,
+                      },
+                    }).catch((e) => console.error("Failed to update ai:", e));
+                  }
+                }}
                 className="shrink-0 transition-all duration-200 ease-out"
               />
             </div>

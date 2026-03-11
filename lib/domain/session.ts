@@ -9,7 +9,10 @@ export interface SessionCreatedBy {
 
 export interface Session {
   id: string;
-  userId: string;
+  /** Workspace scope (primary). */
+  workspaceId?: string;
+  /** Legacy scope (pre-workspaces). */
+  userId?: string;
   title: string;
   archived?: boolean;
   createdAt?: Timestamp | null;

@@ -108,6 +108,11 @@ export function useFeedback({
     if (!session) {
       throw new Error("Session required for feedback");
     }
+    const workspaceId = session.workspaceId ?? session.userId;
+    const createdByUserId = session.userId;
+    if (!workspaceId || !createdByUserId) {
+      throw new Error("Session missing workspaceId/userId");
+    }
 
     const created: Feedback[] = [];
     let ticketIndex = 0;
@@ -124,16 +129,18 @@ export function useFeedback({
       };
 
       const docRef = await addFeedback(
+        workspaceId,
         sessionId,
-        session.userId,
+        createdByUserId,
         payload,
         ticketIndex === 0 && firstFeedbackId ? firstFeedbackId : undefined
       );
       ticketIndex++;
       const newItem: Feedback = {
         id: docRef.id,
+        workspaceId: session.workspaceId ?? undefined,
         sessionId,
-        userId: session.userId,
+        userId: session.userId ?? undefined,
         title: payload.title,
         description: payload.description,
         suggestion: "",

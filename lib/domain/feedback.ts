@@ -45,8 +45,11 @@ export type FeedbackAnchor = {
 
 export interface Feedback {
   id: string;
+  /** Workspace scope (primary). */
+  workspaceId?: string;
   sessionId: string;
-  userId: string;
+  /** Legacy scope (pre-workspaces). */
+  userId?: string;
   title: string;
   description: string;
   suggestion?: string;

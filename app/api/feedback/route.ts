@@ -7,6 +7,8 @@ import {
   getFeedbackByIdRepo,
   getSessionFeedbackPageWithStringCursorRepo,
   getSessionFeedbackCountsRepo,
+  getWorkspaceFeedbackAllRepo,
+  getWorkspaceFeedbackWithCommentsRepo,
   getUserFeedbackAllRepo,
   getUserFeedbackWithCommentsRepo,
 } from "@/lib/repositories/feedbackRepository";
@@ -14,6 +16,7 @@ import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
 import { updateScreenshotAttachedRepo } from "@/lib/repositories/screenshotsRepository";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 
 function serializeFeedback(item: Feedback): Record<string, unknown> {
   const out = { ...item } as Record<string, unknown>;
@@ -56,9 +59,16 @@ export async function GET(req: Request) {
   if (!sessionId || sessionId.trim() === "") {
     const conversationsOnly = searchParams.get("conversationsOnly") === "true";
     try {
-      const feedback = conversationsOnly
-        ? await getUserFeedbackWithCommentsRepo(user.uid, limit)
-        : await getUserFeedbackAllRepo(user.uid, limit);
+      const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+      const workspaceFeedback = conversationsOnly
+        ? await getWorkspaceFeedbackWithCommentsRepo(workspaceId, limit)
+        : await getWorkspaceFeedbackAllRepo(workspaceId, limit);
+      const feedback =
+        workspaceFeedback.length > 0
+          ? workspaceFeedback
+          : conversationsOnly
+            ? await getUserFeedbackWithCommentsRepo(user.uid, limit)
+            : await getUserFeedbackAllRepo(user.uid, limit);
       const sessionIds = [...new Set(feedback.map((f) => f.sessionId))];
       const sessions = await Promise.all(
         sessionIds.map((id) => getSessionByIdRepo(id))
@@ -103,10 +113,15 @@ export async function GET(req: Request) {
     );
   }
   if (session.userId !== user.uid) {
-    return NextResponse.json(
-      { error: "Forbidden" },
-      { status: 403 }
-    );
+    const userWorkspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+    const sessionWorkspaceId = session.workspaceId ?? session.userId ?? null;
+    const ok = sessionWorkspaceId != null && sessionWorkspaceId === userWorkspaceId;
+    if (!ok) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 }
+      );
+    }
   }
 
   try {
@@ -242,10 +257,15 @@ export async function POST(req: Request) {
     );
   }
   if (session.userId !== user.uid) {
-    return NextResponse.json(
-      { success: false, error: "Forbidden" },
-      { status: 403 }
-    );
+    const userWorkspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+    const sessionWorkspaceId = session.workspaceId ?? session.userId ?? null;
+    const ok = sessionWorkspaceId != null && sessionWorkspaceId === userWorkspaceId;
+    if (!ok) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
+    }
   }
 
   const meta = body.metadata;
@@ -288,7 +308,9 @@ export async function POST(req: Request) {
   };
 
   try {
+    const workspaceId = session.workspaceId ?? session.userId ?? ((await getUserWorkspaceIdRepo(user.uid)) ?? user.uid);
     const docRef = await addFeedbackWithSessionCountersRepo(
+      workspaceId,
       sessionId,
       user.uid,
       structuredData

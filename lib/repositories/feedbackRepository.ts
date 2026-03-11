@@ -25,10 +25,12 @@ import { assertQueryLimit } from "@/lib/querySafety";
 import type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
 
 const feedbackPayload = (
+  workspaceId: string,
   sessionId: string,
   userId: string,
   data: StructuredFeedback
 ) => ({
+  workspaceId,
   sessionId,
   userId,
   title: data.title,
@@ -62,12 +64,13 @@ const feedbackPayload = (
 });
 
 export async function addFeedbackRepo(
+  workspaceId: string,
   sessionId: string,
   userId: string,
   data: StructuredFeedback,
   feedbackId?: string
 ): Promise<DocumentReference> {
-  const payload = feedbackPayload(sessionId, userId, data);
+  const payload = feedbackPayload(workspaceId, sessionId, userId, data);
 
   if (feedbackId != null && feedbackId !== "") {
     const docRef = doc(db, "feedback", feedbackId);
@@ -84,12 +87,13 @@ export async function addFeedbackRepo(
  * Use for feedback create to avoid race conditions. Migration-safe: uses increment(1).
  */
 export async function addFeedbackWithSessionCountersRepo(
+  workspaceId: string,
   sessionId: string,
   userId: string,
   data: StructuredFeedback,
   feedbackId?: string
 ): Promise<DocumentReference> {
-  const payload = feedbackPayload(sessionId, userId, data);
+  const payload = feedbackPayload(workspaceId, sessionId, userId, data);
   const sessionRef = doc(db, "sessions", sessionId);
 
   return await runTransaction(db, async (tx) => {
@@ -250,6 +254,7 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
   const isSkipped = status === "skipped";
   return {
     id: docSnap.id,
+    workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : undefined,
     sessionId: data.sessionId,
     userId: data.userId,
     title: data.title,
@@ -546,6 +551,28 @@ export async function getUserFeedbackAllRepo(
 }
 
 /**
+ * Workspace-scoped Discussion inbox.
+ * Composite index required: feedback (workspaceId ASC, createdAt DESC).
+ */
+export async function getWorkspaceFeedbackAllRepo(
+  workspaceId: string,
+  max: number = USER_FEEDBACK_ALL_LIMIT
+): Promise<Feedback[]> {
+  assertQueryLimit(max, "getWorkspaceFeedbackAllRepo");
+  const coll = collection(db, "feedback");
+  const q = query(
+    coll,
+    where("workspaceId", "==", workspaceId),
+    orderBy("createdAt", "desc"),
+    limit(max)
+  );
+  const start = Date.now();
+  const snapshot = await getDocs(q);
+  console.log(`[FIRESTORE] getWorkspaceFeedbackAllRepo duration: ${Date.now() - start}ms`);
+  return snapshot.docs.map(docToFeedback);
+}
+
+/**
  * Increments feedback.commentCount and updates lastCommentPreview/lastCommentAt.
  * Call when a comment is added.
  */
@@ -583,6 +610,29 @@ export async function getUserFeedbackWithCommentsRepo(
   const start = Date.now();
   const snapshot = await getDocs(q);
   console.log(`[FIRESTORE] getUserFeedbackWithCommentsRepo duration: ${Date.now() - start}ms`);
+  return snapshot.docs.map(docToFeedback);
+}
+
+/**
+ * Workspace-scoped conversations only (commentCount > 0).
+ * Composite index required: feedback (workspaceId ASC, commentCount DESC).
+ */
+export async function getWorkspaceFeedbackWithCommentsRepo(
+  workspaceId: string,
+  max: number = USER_FEEDBACK_ALL_LIMIT
+): Promise<Feedback[]> {
+  assertQueryLimit(max, "getWorkspaceFeedbackWithCommentsRepo");
+  const coll = collection(db, "feedback");
+  const q = query(
+    coll,
+    where("workspaceId", "==", workspaceId),
+    where("commentCount", ">", 0),
+    orderBy("commentCount", "desc"),
+    limit(max)
+  );
+  const start = Date.now();
+  const snapshot = await getDocs(q);
+  console.log(`[FIRESTORE] getWorkspaceFeedbackWithCommentsRepo duration: ${Date.now() - start}ms`);
   return snapshot.docs.map(docToFeedback);
 }
 

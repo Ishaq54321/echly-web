@@ -10,6 +10,7 @@ import { clearAuthTokenCache } from "@/lib/authFetch";
 import { createSession } from "@/lib/sessions";
 import { getSessionFeedbackCounts } from "@/lib/feedback";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import type { Session } from "@/lib/domain/session";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
@@ -137,6 +138,7 @@ function FolderPageContent() {
   const handleCreateSession = useCallback(async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
+    const workspaceId = (await getUserWorkspaceIdRepo(currentUser.uid)) ?? currentUser.uid;
 
     const parts = (currentUser.displayName || "User").trim().split(/\s+/);
     const firstName = parts[0] || "User";
@@ -148,7 +150,7 @@ function FolderPageContent() {
       avatarUrl: currentUser.photoURL ?? undefined,
     };
 
-    const sessionId = await createSession(currentUser.uid, createdBy);
+    const sessionId = await createSession(workspaceId, currentUser.uid, createdBy);
 
     if (folderId) {
       const { updateDoc, arrayUnion } = await import("firebase/firestore");

@@ -35,12 +35,14 @@ export interface AddCommentData {
 }
 
 export async function addCommentRepo(
+  workspaceId: string,
   sessionId: string,
   feedbackId: string,
   data: AddCommentData
 ): Promise<string> {
   const collectionRef = collection(db, "comments");
   const payload: Record<string, unknown> = {
+    workspaceId,
     sessionId,
     feedbackId,
     userId: data.userId,

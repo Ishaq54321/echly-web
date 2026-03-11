@@ -5,6 +5,7 @@ import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { clearAuthTokenCache } from "@/lib/authFetch";
+import { ensureUserWorkspaceLinkRepo } from "@/lib/repositories/usersRepository";
 
 type UseAuthGuardOptions = {
   /** If provided, redirect to /login when user is null (after first check). */
@@ -29,6 +30,13 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser ?? null);
       setLoading(false);
+      if (currentUser) {
+        // Idempotent: creates user + workspace + links workspaceId if missing.
+        // Fire-and-forget so auth transitions aren't blocked.
+        ensureUserWorkspaceLinkRepo(currentUser).catch((err) => {
+          console.error("Failed to ensure user workspace link:", err);
+        });
+      }
       if (currentUser == null && router) {
         clearAuthTokenCache();
         if (useReplace) {
