@@ -17,13 +17,13 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
         return (
           <div key={step.label} className="flex items-center">
             <span
-              className={`block shrink-0 rounded-full transition-all duration-300 ${
-                isActive ? "w-2.5 h-2.5 bg-[#466EFF]" : "w-2 h-2 bg-gray-300"
+              className={`block shrink-0 rounded-full transition-all duration-150 ease-out ${
+                isActive ? "w-3 h-3 bg-[#466EFF] shadow-[0_0_12px_rgba(70,110,255,0.45)]" : "w-3 h-3 bg-gray-300"
               }`}
               aria-current={isActive ? "step" : undefined}
             />
             {!isLast && (
-              <div className="h-[1px] w-16 bg-gray-200 shrink-0 mx-1" aria-hidden />
+              <div className="h-[2px] w-20 bg-gray-200 shrink-0 mx-0" aria-hidden />
             )}
           </div>
         );

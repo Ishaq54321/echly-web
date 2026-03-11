@@ -345,6 +345,15 @@ button[aria-disabled="true"],
   font-family: "Plus Jakarta Sans", sans-serif;
 }
 
+/* Onboarding: Linear-style animated selection highlight */
+.selection-highlight {
+  position: absolute;
+  background: rgba(70, 110, 255, 0.12);
+  border: 1px solid rgba(70, 110, 255, 0.35);
+  border-radius: 16px;
+  transition: all 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 /* ======================================
    INSIGHTS PAGE — CARD FADE-IN
 ====================================== */

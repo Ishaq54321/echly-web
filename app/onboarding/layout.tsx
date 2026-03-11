@@ -51,7 +51,7 @@ export default function OnboardingLayout({
           }}
         />
       </div>
-      <div className="w-full min-h-screen flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full min-h-screen flex flex-col items-center pt-[8vh] px-4 pb-12">
         {children}
       </div>
     </div>
