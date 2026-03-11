@@ -11,7 +11,7 @@ import { ResizeHandle } from "@/components/discussion/ResizeHandle";
 
 const MIN_SIDEBAR = 200;
 const MAX_SIDEBAR = 360;
-const MIN_LIST = 280;
+const MIN_LIST = 238; /* ~15% lower than 280 for better narrow-viewport shrink */
 const MAX_LIST = 420;
 const MIN_RIGHT = 520;
 const DEFAULT_LIST_BASIS = 320;
@@ -72,16 +72,7 @@ export default function DiscussionPage() {
             >
               <DiscussionSkeleton />
             </div>
-            <div className="flex-1 min-w-0 bg-white flex justify-center px-4 py-4 min-h-0 overflow-hidden">
-              <div className="text-center max-w-sm">
-                <p className="text-lg font-medium text-neutral-800">
-                  Select a ticket to view conversation
-                </p>
-                <p className="text-sm text-secondary mt-2">
-                  Choose a discussion from the middle panel
-                </p>
-              </div>
-            </div>
+            <div className="discussion-panel-right flex-1 min-w-0 bg-white flex justify-center px-4 py-4 min-h-0 overflow-hidden" />
           </div>
         </div>
       </div>
@@ -102,7 +93,7 @@ export default function DiscussionPage() {
           <div className="discussion-layout flex flex-1 min-h-0 w-full pt-0 items-stretch">
             <div className="shrink-0 bg-white px-3 py-2" style={{ flex: "0 0 260px" }} />
             <div className="shrink-0 bg-white pl-0 pr-3 py-2 border-l border-neutral-300" style={{ flex: `1 1 ${DEFAULT_LIST_BASIS}px` }} />
-            <div className="flex-1 min-w-0 bg-white flex justify-center items-center px-4 py-4">
+            <div className="discussion-panel-right flex-1 min-w-0 bg-white flex justify-center items-center px-4 py-4">
               <p className="text-sm text-secondary font-normal">
                 Please sign in to view discussions.
               </p>
@@ -210,13 +201,14 @@ export default function DiscussionPage() {
 
           {/* RIGHT: Ticket workspace (strong) — left-aligned reading column */}
           <div
-            className="flex-1 min-w-0 bg-white flex py-4 min-h-0 overflow-hidden"
+            className="discussion-panel-right flex-1 min-w-0 bg-white flex py-4 min-h-0 overflow-hidden"
             style={{ flex: "2 1 auto", minWidth: MIN_RIGHT }}
           >
             <div className="w-full min-h-0 flex flex-col">
               <DiscussionThread
                 feedbackId={selectedId}
                 onCommentAdded={handleCommentAdded}
+                listLoaded={isEmpty !== null}
               />
             </div>
           </div>

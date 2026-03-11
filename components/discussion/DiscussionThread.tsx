@@ -15,6 +15,8 @@ import { CommentItem } from "@/components/comments/CommentItem";
 export interface DiscussionThreadProps {
   feedbackId: string | null;
   onCommentAdded?: () => void;
+  /** When false, do not show empty-state message (e.g. while ticket list is still loading). */
+  listLoaded?: boolean;
 }
 
 interface TicketData {
@@ -29,6 +31,7 @@ interface TicketData {
 export function DiscussionThread({
   feedbackId,
   onCommentAdded,
+  listLoaded = true,
 }: DiscussionThreadProps) {
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
@@ -200,6 +203,9 @@ export function DiscussionThread({
   };
 
   if (!feedbackId) {
+    if (!listLoaded) {
+      return <div className="flex-1 flex h-full min-w-0 bg-white" />;
+    }
     return (
       <div className="flex-1 flex h-full items-center justify-center bg-white min-w-0">
         <div className="text-center max-w-sm">
@@ -217,7 +223,7 @@ export function DiscussionThread({
   if (loading || !ticket) {
     return (
       <div className="flex-1 flex flex-col p-8 bg-white overflow-auto min-w-0">
-        <div className="w-full space-y-4 max-w-[720px] ml-8 mr-auto">
+        <div className="w-full space-y-4 max-w-[720px] mx-auto">
           <div className="h-48 w-full skeleton rounded-xl" />
           <div className="h-5 w-3/4 skeleton max-w-[240px]" />
           <div className="space-y-2">
@@ -258,7 +264,7 @@ export function DiscussionThread({
   const user = auth.currentUser;
   const userInitial = user?.displayName?.charAt(0) ?? "?";
 
-  const contentClass = "max-w-[720px] ml-8 mr-auto";
+  const contentClass = "max-w-[720px] w-full mx-auto";
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-white">
       <div className="flex-1 min-w-0 overflow-y-auto">

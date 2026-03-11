@@ -2328,6 +2328,13 @@ textarea:focus-visible {
   margin-left: 0;
 }
 
+/* Right panel: permanent internal padding so content never touches middle divider */
+.discussion-panel-right {
+  padding-left: 24px;
+  padding-right: 24px;
+  box-sizing: border-box;
+}
+
 /* Discussion list (middle panel) ticket row: full-height rail + Gmail-style divider (separate) */
 .ticket-item {
   position: relative;
