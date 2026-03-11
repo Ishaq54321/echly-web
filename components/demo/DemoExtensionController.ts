@@ -10,7 +10,8 @@ export type DemoFeedbackMode = "voice" | "write"
 export type DemoTicket = { id: string; title: string; status: "open" | "resolved" }
 
 export type DemoExtensionState = {
-  mode: DemoFeedbackMode
+  /** null = no mode selected yet (for onboarding). */
+  mode: DemoFeedbackMode | null
   sessionActive: boolean
   selection: { x: number; y: number } | null
   feedback: string | null
@@ -19,7 +20,7 @@ export type DemoExtensionState = {
 }
 
 export const DEFAULT_DEMO_EXTENSION_STATE: DemoExtensionState = {
-  mode: "voice",
+  mode: null,
   sessionActive: false,
   selection: null,
   feedback: null,

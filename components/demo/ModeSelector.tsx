@@ -5,7 +5,7 @@ import { Mic, Pencil } from "lucide-react"
 import type { DemoFeedbackMode } from "./DemoExtensionController"
 
 export type ModeSelectorProps = {
-  selectedMode: DemoFeedbackMode
+  selectedMode: DemoFeedbackMode | null
   onSelect: (mode: DemoFeedbackMode) => void
   disabled?: boolean
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useRef, useState } from "react"
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motion"
 import {
   Download,
@@ -11,8 +11,10 @@ import {
   Sparkles,
 } from "lucide-react"
 import DemoFeedbackDashboard from "../../../components/demo/DemoFeedbackDashboard"
-import DemoGuide from "@/components/demo/DemoGuide"
+import { CursorAnnotation, DemoHighlight } from "@/components/demo/DemoGuide"
+import DemoArrow from "@/components/demo/DemoArrow"
 import ExtensionPopup from "@/components/demo/ExtensionPopup"
+import ReplayDemoButton from "@/components/demo/ReplayDemoButton"
 import SessionControlBar from "@/components/demo/SessionControlBar"
 import {
   createDemoExtensionController,
@@ -38,6 +40,7 @@ type GuidedStep =
   | "finish_feedback"
   | "processing"
   | "end_session"
+  | "demo_completed"
 
 type CursorMode = "default" | "interactive" | "comment"
 
@@ -64,15 +67,65 @@ const DEMO_SEQUENCE: Array<{ step: Step; duration: number }> = [
 ]
 
 const GUIDE_TEXTS: Record<Exclude<GuidedStep, "processing">, string> = {
-  install_extension: "Click the extension icon on top right",
+  install_extension: "Click the extension icon",
   open_extension: "Choose a feedback mode",
   choose_mode: "Click Start Session",
-  click_page: "Click anywhere on the page to capture feedback",
+  click_page: "Click anywhere on the page to add feedback",
   selection_created: "Screenshot captured — now add your feedback",
   voice_feedback: "Click Finish when done",
   write_feedback: "Type your feedback and submit",
   finish_feedback: "Finish to generate tickets",
-  end_session: "Click End to finish your feedback session",
+  end_session: "Click End to generate tickets",
+  demo_completed: "Demo completed — click Replay to try again",
+}
+
+type DemoStepConfig = {
+  target: string | null
+  message: string
+  arrowDirection: "top" | "bottom" | "left" | "right" | "topRight"
+  /** When set, no highlight rectangle — arrow only. */
+  arrowOnly?: boolean
+  /** Highlight this element; arrow points to arrowTarget (for write_feedback). */
+  highlightTarget?: string
+  /** Arrow points here (e.g. submit button); highlight stays on highlightTarget. */
+  arrowTarget?: string
+  placementVariant?: "extensionIcon" | "startSession" | "submitButton" | "endButton"
+}
+
+/** Demo step config: target selector, message, arrow direction. null target = no arrow/highlight, message only (cursor-attached). */
+const DEMO_STEPS: Partial<Record<Exclude<GuidedStep, "processing" | "demo_completed">, DemoStepConfig>> = {
+  install_extension: {
+    target: "[data-demo-target=\"extension-icon\"]",
+    message: "Click the extension icon",
+    arrowDirection: "topRight",
+    placementVariant: "extensionIcon",
+  },
+  open_extension: { target: "[data-demo-target=\"mode-selector\"]", message: "Choose a feedback mode", arrowDirection: "right" },
+  choose_mode: {
+    target: "[data-demo-target=\"start-session\"]",
+    message: "Click Start Session",
+    arrowDirection: "bottom",
+    arrowOnly: true,
+    placementVariant: "startSession",
+  },
+  click_page: { target: null, message: "Click anywhere on the page to add feedback", arrowDirection: "top" },
+  selection_created: { target: null, message: "Screenshot captured — now add your feedback", arrowDirection: "top" },
+  voice_feedback: { target: "[data-demo-target=\"finish\"]", message: "Click Finish when done", arrowDirection: "top" },
+  write_feedback: {
+    target: "[data-demo-target=\"write-feedback-input\"]",
+    message: "Submit your feedback",
+    arrowDirection: "top",
+    highlightTarget: "[data-demo-target=\"write-feedback-input\"]",
+    arrowTarget: "[data-demo-target=\"submit-feedback\"]",
+    placementVariant: "submitButton",
+  },
+  finish_feedback: { target: "[data-demo-target=\"finish\"]", message: "Click Finish when done", arrowDirection: "top" },
+  end_session: {
+    target: "[data-demo-target=\"end\"]",
+    message: "Click End to generate tickets",
+    arrowDirection: "top",
+    placementVariant: "endButton",
+  },
 }
 
 export default function ActivationPage() {
@@ -93,6 +146,7 @@ export default function ActivationPage() {
   const selectionCreatedTimeoutRef = useRef<number | null>(null)
   const processingTasksTimeoutRef = useRef<number | null>(null)
   const [dashboardPhase, setDashboardPhase] = useState<null | "loading" | "ready">(null)
+  const [pendingDemoComplete, setPendingDemoComplete] = useState(false)
 
   const actionCards: ActionCard[] = useMemo(
     () => [
@@ -132,6 +186,7 @@ export default function ActivationPage() {
   // Sync step / demoStage / capturePhase from guided step when in guided mode
   useEffect(() => {
     if (guidedStep == null) return
+    if (guidedStep === "demo_completed") return
     if (guidedStep === "install_extension" || guidedStep === "open_extension" || guidedStep === "choose_mode") {
       setStep("install")
       setDemoStage("open_click")
@@ -159,7 +214,7 @@ export default function ActivationPage() {
     }
   }, [guidedStep])
 
-  // Cursor mode derived from guided step
+  // Cursor mode: comment cursor as soon as Start Session is clicked (click_page)
   useEffect(() => {
     if (guidedStep == null) {
       setCursorMode("default")
@@ -175,11 +230,10 @@ export default function ActivationPage() {
       case "finish_feedback":
       case "processing":
       case "end_session":
+      case "demo_completed":
         setCursorMode("default")
         break
       case "click_page":
-        setCursorMode("interactive")
-        break
       case "selection_created":
         setCursorMode("comment")
         break
@@ -194,10 +248,9 @@ export default function ActivationPage() {
     const tOverlay = window.setTimeout(() => setDemoStage("overlay"), 1200)
     const tComment = window.setTimeout(() => setDemoStage("comment"), 1200 + 1000)
     selectionCreatedTimeoutRef.current = window.setTimeout(() => {
-      const mode = demoExtensionState.mode
+      const mode = demoExtensionState.mode ?? "voice"
       if (mode === "voice") setGuidedStep("voice_feedback")
-      else if (mode === "write") setGuidedStep("write_feedback")
-      else setGuidedStep("voice_feedback")
+      else setGuidedStep("write_feedback")
       setSelection(null)
       demoController.clearSelection()
     }, 1200 + 1000 + 600)
@@ -242,15 +295,26 @@ export default function ActivationPage() {
     }
   }, [guidedStep, tasksStarted])
 
-  // After End session: show loading 800ms then dashboard
+  // After End session: show loading 800ms then dashboard (tickets UI)
   useEffect(() => {
     if (dashboardPhase !== "loading") return
     const t = window.setTimeout(() => setDashboardPhase("ready"), 800)
     return () => window.clearTimeout(t)
   }, [dashboardPhase])
 
+  // When dashboard is ready after End: transition to demo_completed (replay button visible)
+  useEffect(() => {
+    if (dashboardPhase !== "ready" || !pendingDemoComplete) return
+    const t = window.setTimeout(() => {
+      setGuidedStep("demo_completed")
+      setPendingDemoComplete(false)
+    }, 800)
+    return () => window.clearTimeout(t)
+  }, [dashboardPhase, pendingDemoComplete])
+
   const handleReplayDemo = () => {
     setDashboardPhase(null)
+    setPendingDemoComplete(false)
     setGuidedStep("install_extension")
     demoController.reset()
     setStep("install")
@@ -261,30 +325,8 @@ export default function ActivationPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center pt-[7vh] px-6 pb-20 relative">
-      {guidedStep != null ? (
-        <button
-          type="button"
-          onClick={() => {
-            setGuidedStep(null)
-            demoController.reset()
-            setStep("install")
-            setDemoStage("open_click")
-            setCapturePhase("none")
-            setSelection(null)
-          }}
-          className="absolute right-6 top-6 z-50 text-sm font-medium text-gray-500 hover:text-gray-900"
-        >
-          Skip demo
-        </button>
-      ) : null}
-      {dashboardPhase === "ready" ? (
-        <button
-          type="button"
-          onClick={handleReplayDemo}
-          className="absolute right-6 top-6 z-50 text-sm font-medium text-[#1D4ED8] hover:text-[#0F3DB8] bg-[#E8F1FF] hover:bg-[#BBD1FF] px-3 py-1.5 rounded-lg border border-[#BBD1FF] transition-colors"
-        >
-          Replay Demo
-        </button>
+      {(guidedStep === "demo_completed" || dashboardPhase === "ready") ? (
+        <ReplayDemoButton onReplay={handleReplayDemo} />
       ) : null}
       <div className="text-center max-w-3xl">
         <h1 className="text-4xl font-semibold tracking-tight whitespace-nowrap text-gray-900">
@@ -306,7 +348,9 @@ export default function ActivationPage() {
             </div>
           </div>
         ) : dashboardPhase === "ready" ? (
-          <DemoFeedbackDashboard />
+          <div className="relative">
+            <DemoFeedbackDashboard />
+          </div>
         ) : (
           <BrowserDemo
             containerRef={containerRef}
@@ -322,10 +366,15 @@ export default function ActivationPage() {
             selection={selection}
             createSelection={createSelection}
             cursorMode={cursorMode}
-            onEndSession={() => {
-              setGuidedStep(null)
-              setDashboardPhase("loading")
+            onModeSelect={(mode) => {
+              demoController.selectMode(mode)
+              setGuidedStep("choose_mode")
             }}
+            onEndSession={() => {
+              setDashboardPhase("loading")
+              setPendingDemoComplete(true)
+            }}
+            isDemoReplay={guidedStep != null || dashboardPhase === "ready"}
           />
         )}
       </motion.div>
@@ -395,7 +444,9 @@ function BrowserDemo({
   selection,
   createSelection,
   cursorMode,
+  onModeSelect,
   onEndSession,
+  isDemoReplay,
 }: {
   containerRef: React.RefObject<HTMLDivElement | null>
   step: Step
@@ -410,7 +461,10 @@ function BrowserDemo({
   selection: { x: number; y: number } | null
   createSelection: (e: React.MouseEvent<HTMLDivElement>) => void
   cursorMode: CursorMode
+  onModeSelect?: (mode: import("@/components/demo/DemoExtensionController").DemoFeedbackMode) => void
   onEndSession?: () => void
+  /** When true, demo guidance (arrows, highlights, annotations) is shown. Do not affect production capture flow. */
+  isDemoReplay?: boolean
 }) {
   const showWebsite = step !== "install"
   const websiteStage: "opening" | "ready" = step === "open" ? "opening" : "ready"
@@ -421,9 +475,13 @@ function BrowserDemo({
   const isGuided = guidedStep != null
   const extensionIconRef = useRef<HTMLButtonElement | null>(null)
   const voiceModeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const endButtonRef = useRef<HTMLButtonElement | null>(null)
+  const modeSelectorRef = useRef<HTMLDivElement | null>(null)
+  const finishButtonRef = useRef<HTMLButtonElement | null>(null)
   const [clickRipple, setClickRipple] = useState<{ x: number; y: number } | null>(null)
   const sessionActive =
     isGuided &&
+    guidedStep !== "demo_completed" &&
     [
       "click_page",
       "selection_created",
@@ -439,8 +497,30 @@ function BrowserDemo({
     (guidedStep == null || guidedStep === "open_extension" || guidedStep === "choose_mode")
   const showExtensionIconInChrome = isGuided && guidedStep === "install_extension"
 
+  const browserDemoRootRef = useRef<HTMLDivElement | null>(null)
+  const [contentOffset, setContentOffset] = useState({ x: 0, y: 0 })
+
+  useLayoutEffect(() => {
+    const root = browserDemoRootRef.current
+    const container = containerRef.current
+    if (!root || !container) return
+    const update = () => {
+      const r = root.getBoundingClientRect()
+      const c = container.getBoundingClientRect()
+      setContentOffset({ x: c.left - r.left, y: c.top - r.top })
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(root)
+    return () => ro.disconnect()
+  }, [showExtensionPopup, step, guidedStep])
+
+  const stepConfig = guidedStep != null && guidedStep !== "processing" && guidedStep !== "demo_completed"
+    ? DEMO_STEPS[guidedStep]
+    : null
+
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden relative">
+    <div ref={browserDemoRootRef} className="rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden relative">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-400 rounded-full" />
@@ -452,6 +532,7 @@ function BrowserDemo({
           <motion.button
             type="button"
             ref={extensionIconRef}
+            data-demo-target="extension-icon"
             onClick={() => setGuidedStep("open_extension")}
             className="ml-auto h-8 w-8 rounded-lg flex items-center justify-center border pointer-events-auto"
             animate={{
@@ -545,6 +626,7 @@ function BrowserDemo({
                 waveformActive={waveformActive}
                 tasksStarted={tasksStarted}
                 tickets={demoExtensionState.tickets}
+                finishButtonRef={finishButtonRef}
                 onVoiceFinish={
                   isGuided
                     ? () => {
@@ -588,16 +670,6 @@ function BrowserDemo({
           ) : null}
         </AnimatePresence>
 
-        {guidedStep != null && guidedStep !== "processing" ? (
-          <DemoGuide
-            text={GUIDE_TEXTS[guidedStep]}
-            followCursor
-            cursorX={cursorX}
-            cursorY={cursorY}
-            containerRef={containerRef}
-            arrowPosition={guidedStep === "install_extension" ? "bottom" : "side"}
-          />
-        ) : null}
         {guidedStep != null ? (
           <GuideCursor guidedStep={guidedStep} cursorX={cursorX} cursorY={cursorY} cursorMode={cursorMode} />
         ) : null}
@@ -615,6 +687,7 @@ function BrowserDemo({
               }
             }}
             highlightEnd={guidedStep === "end_session"}
+            endButtonRef={endButtonRef}
           />
         ) : null}
 
@@ -623,7 +696,7 @@ function BrowserDemo({
             <ExtensionPopup
               key="popup-install"
               selectedMode={demoExtensionState.mode}
-              onModeSelect={(mode: DemoFeedbackMode) => demoController.selectMode(mode)}
+              onModeSelect={(mode: DemoFeedbackMode) => (onModeSelect ?? demoController.selectMode)(mode)}
               onStartSession={
                 isGuided
                   ? () => {
@@ -633,10 +706,43 @@ function BrowserDemo({
                   : undefined
               }
               startSessionButtonRef={voiceModeButtonRef}
+              modeSelectorRef={modeSelectorRef}
+              startSessionHighlight={guidedStep === "choose_mode"}
             />
           ) : null}
         </AnimatePresence>
       </div>
+
+      {/* Demo guidance layer: only when isDemoReplay so production capture flow is unaffected. */}
+      {isDemoReplay !== false && stepConfig != null ? (
+        <div
+          id="echly-demo-layer"
+          className="absolute inset-0 z-[999999] pointer-events-none overflow-visible"
+          style={{ position: "absolute" }}
+          aria-hidden
+        >
+          {stepConfig.highlightTarget != null ? (
+            <DemoHighlight rootRef={browserDemoRootRef} targetSelector={stepConfig.highlightTarget} />
+          ) : stepConfig.target != null && !stepConfig.arrowOnly ? (
+            <DemoHighlight rootRef={browserDemoRootRef} targetSelector={stepConfig.target} />
+          ) : null}
+          {(stepConfig.arrowTarget ?? stepConfig.target) != null ? (
+            <DemoArrow
+              rootRef={browserDemoRootRef}
+              targetSelector={stepConfig.arrowTarget ?? stepConfig.target!}
+              direction={stepConfig.arrowDirection}
+              placementVariant={stepConfig.placementVariant}
+            />
+          ) : null}
+          <CursorAnnotation
+            cursorX={cursorX}
+            cursorY={cursorY}
+            text={stepConfig.message}
+            contentOffset={contentOffset}
+            rootRef={browserDemoRootRef}
+          />
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -645,24 +751,48 @@ function WebsiteSkeleton() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between">
-        <div className="h-4 bg-gray-200 rounded w-[220px]" />
-        <div className="h-8 bg-gray-200 rounded-full w-[120px]" />
+        <div className="h-8 w-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500">
+          <Globe className="h-4 w-4" />
+        </div>
+        <div className="h-8 w-20 rounded-full bg-gray-100" />
       </div>
 
-      <div className="mt-10 space-y-3">
-        <div className="h-9 bg-gray-200 rounded-xl w-[520px]" />
-        <div className="h-9 bg-gray-200 rounded-xl w-[420px]" />
-        <div className="h-4 bg-gray-200 rounded w-[560px]" />
-        <div className="h-4 bg-gray-200 rounded w-[520px]" />
+      <div className="mt-10">
+        <div className="text-[28px] leading-tight font-semibold text-gray-900 max-w-[620px]">
+          Build better products with structured feedback
+        </div>
+        <div className="mt-2 text-sm text-gray-600 max-w-[640px]">
+          Capture website issues instantly and convert them into actionable tickets.
+        </div>
       </div>
 
-      <div className="mt-10 grid grid-cols-3 gap-4">
-        <div className="bg-gray-200/70 h-24 rounded-2xl" />
-        <div className="bg-gray-200/70 h-24 rounded-2xl" />
-        <div className="bg-gray-200/70 h-24 rounded-2xl" />
+      <div className="mt-8 grid grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
+          <div className="mt-3 font-medium text-gray-900 text-sm">Fast setup</div>
+          <div className="mt-1 text-xs text-gray-600">Start capturing feedback in seconds</div>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
+          <div className="mt-3 font-medium text-gray-900 text-sm">Clean UI</div>
+          <div className="mt-1 text-xs text-gray-600">Simple interface designed for teams</div>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
+          <div className="mt-3 font-medium text-gray-900 text-sm">Better feedback</div>
+          <div className="mt-1 text-xs text-gray-600">Turn comments into structured tickets automatically</div>
+        </div>
       </div>
 
-      <div className="mt-8 bg-gray-200/70 rounded-2xl flex-1" />
+      <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 flex-1">
+        <div className="h-4 bg-gray-100 rounded w-[260px]" />
+        <div className="mt-4 space-y-3">
+          <div className="h-3 bg-gray-100 rounded w-[92%]" />
+          <div className="h-3 bg-gray-100 rounded w-[86%]" />
+          <div className="h-3 bg-gray-100 rounded w-[78%]" />
+          <div className="h-3 bg-gray-100 rounded w-[88%]" />
+        </div>
+      </div>
     </div>
   )
 }
@@ -672,8 +802,8 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-xl bg-blue-600/10 flex items-center justify-center text-blue-700">
-            <Sparkles className="h-4 w-4" />
+          <div className="h-8 w-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500">
+            <Globe className="h-4 w-4" />
           </div>
           <div className="font-semibold text-gray-900">Example Website</div>
         </div>
@@ -690,10 +820,10 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
           transition={{ duration: 0.35, ease: "easeOut" }}
           className="text-[28px] leading-tight font-semibold text-gray-900 max-w-[620px]"
         >
-          Landing page headline
+          Build better products with structured feedback
         </motion.div>
         <div className="mt-2 text-sm text-gray-600 max-w-[640px]">
-          A clean layout with feature cards and a content section to simulate a real website.
+          Capture website issues instantly and convert them into actionable tickets.
         </div>
       </div>
 
@@ -703,13 +833,21 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
         transition={{ duration: 0.4, ease: "easeOut", delay: 0.08 }}
         className="mt-8 grid grid-cols-3 gap-4"
       >
-        {["Fast setup", "Clean UI", "Better feedback"].map((t) => (
-          <div key={t} className="rounded-2xl border border-gray-200 bg-white p-4">
-            <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
-            <div className="mt-3 font-medium text-gray-900 text-sm">{t}</div>
-            <div className="mt-1 text-xs text-gray-600">Short description goes here.</div>
-          </div>
-        ))}
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
+          <div className="mt-3 font-medium text-gray-900 text-sm">Fast setup</div>
+          <div className="mt-1 text-xs text-gray-600">Start capturing feedback in seconds</div>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
+          <div className="mt-3 font-medium text-gray-900 text-sm">Clean UI</div>
+          <div className="mt-1 text-xs text-gray-600">Simple interface designed for teams</div>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
+          <div className="mt-3 font-medium text-gray-900 text-sm">Better feedback</div>
+          <div className="mt-1 text-xs text-gray-600">Turn comments into structured tickets automatically</div>
+        </div>
       </motion.div>
 
       <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 flex-1">
@@ -978,6 +1116,7 @@ function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void }
         </div>
 
         <textarea
+          data-demo-target="write-feedback-input"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="e.g. The CTA button spacing looks off..."
@@ -987,6 +1126,7 @@ function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void }
 
         <button
           type="button"
+          data-demo-target="submit-feedback"
           onClick={() => onSubmit?.(value)}
           className="mt-4 h-10 w-full rounded-xl bg-gray-900 hover:bg-black text-white text-[12px] font-semibold"
         >
@@ -997,7 +1137,13 @@ function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void }
   )
 }
 
-function VoiceFeedbackPopup({ onFinish }: { onFinish?: () => void } = {}) {
+function VoiceFeedbackPopup({
+  onFinish,
+  finishButtonRef,
+}: {
+  onFinish?: () => void
+  finishButtonRef?: React.RefObject<HTMLButtonElement | null>
+} = {}) {
   const bars = useMemo(() => Array.from({ length: 20 }), [])
 
   return (
@@ -1118,7 +1264,9 @@ function VoiceFeedbackPopup({ onFinish }: { onFinish?: () => void } = {}) {
         <div className="mt-3 text-[12px] text-gray-600">Listening...</div>
 
         <button
+          ref={finishButtonRef}
           type="button"
+          data-demo-target="finish"
           onClick={onFinish}
           className="mt-4 h-10 w-full rounded-xl bg-gray-900 hover:bg-black text-white text-[12px] font-semibold"
         >
@@ -1293,9 +1441,11 @@ function CollapsibleTicketGroup({
 function VoicePanelCard({
   waveformActive,
   onFinish,
+  finishButtonRef,
 }: {
   waveformActive: boolean
   onFinish?: () => void
+  finishButtonRef?: React.RefObject<HTMLButtonElement | null>
 }) {
   return (
     <motion.div
@@ -1307,7 +1457,7 @@ function VoicePanelCard({
     >
       <div className="rounded-2xl border border-gray-200 bg-white/80 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.16)] overflow-hidden pointer-events-auto">
         <div className={["p-4", waveformActive ? "" : "wave-idle"].join(" ")}>
-          <VoiceFeedbackPopup onFinish={onFinish} />
+          <VoiceFeedbackPopup onFinish={onFinish} finishButtonRef={finishButtonRef} />
         </div>
       </div>
     </motion.div>
@@ -1322,6 +1472,7 @@ function CapturePanels({
   tickets,
   onVoiceFinish,
   onWriteSubmit,
+  finishButtonRef,
 }: {
   guidedStep: GuidedStep | null
   phase: CapturePhase
@@ -1330,6 +1481,7 @@ function CapturePanels({
   tickets: DemoTicket[]
   onVoiceFinish?: () => void
   onWriteSubmit?: (text?: string) => void
+  finishButtonRef?: React.RefObject<HTMLButtonElement | null>
 }) {
   return (
     <motion.div
@@ -1346,6 +1498,7 @@ function CapturePanels({
               key="voice"
               waveformActive={waveformActive}
               onFinish={onVoiceFinish}
+              finishButtonRef={finishButtonRef}
             />
           ) : phase === "write" ? (
             <WritePanelCard key="write" onSubmit={onWriteSubmit} />

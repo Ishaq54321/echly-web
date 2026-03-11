@@ -7,10 +7,13 @@ import ModeSelector from "./ModeSelector"
 import type { DemoFeedbackMode } from "./DemoExtensionController"
 
 export type ExtensionPopupProps = {
-  selectedMode: DemoFeedbackMode
+  selectedMode: DemoFeedbackMode | null
   onModeSelect: (mode: DemoFeedbackMode) => void
   onStartSession?: () => void
   startSessionButtonRef?: React.RefObject<HTMLButtonElement | null>
+  modeSelectorRef?: React.RefObject<HTMLDivElement | null>
+  /** When true (e.g. demo step is choose_mode), button shows active/CTA style. */
+  startSessionHighlight?: boolean
 }
 
 export default function ExtensionPopup({
@@ -18,7 +21,10 @@ export default function ExtensionPopup({
   onModeSelect,
   onStartSession,
   startSessionButtonRef,
+  modeSelectorRef,
+  startSessionHighlight = false,
 }: ExtensionPopupProps) {
+  const startSessionActive = selectedMode != null || startSessionHighlight
   return (
     <motion.div
       initial={{ opacity: 0, y: -10, scale: 0.98 }}
@@ -51,7 +57,7 @@ export default function ExtensionPopup({
           SELECT FEEDBACK MODE
         </div>
 
-        <div className="mt-3">
+        <div ref={modeSelectorRef} className="mt-3" data-demo-target="mode-selector">
           <ModeSelector selectedMode={selectedMode} onSelect={onModeSelect} />
         </div>
 
@@ -59,8 +65,15 @@ export default function ExtensionPopup({
           <button
             ref={startSessionButtonRef}
             type="button"
+            data-demo-target="start-session"
             onClick={onStartSession}
-            className="h-10 rounded-xl bg-[#FF7A00] hover:bg-[#E66D00] text-white text-[12px] font-semibold shadow-[0_10px_24px_rgba(255,122,0,0.28)]"
+            disabled={selectedMode == null}
+            className={
+              "echly-start-session h-10 rounded-[12px] text-[12px] font-semibold transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed " +
+              (startSessionActive
+                ? "bg-[#FF4B14] text-white hover:bg-[#FF4B14] active:bg-[#E64112]"
+                : "bg-[#E5E7EB] text-[#374151] hover:bg-[#D1D5DB] active:bg-[#D1D5DB]")
+            }
           >
             Start Session
           </button>

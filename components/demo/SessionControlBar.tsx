@@ -8,9 +8,10 @@ export type SessionControlBarProps = {
   onResume?: () => void
   onEnd?: () => void
   highlightEnd?: boolean
+  endButtonRef?: React.RefObject<HTMLButtonElement | null>
 }
 
-export default function SessionControlBar({ onPause, onResume, onEnd, highlightEnd }: SessionControlBarProps) {
+export default function SessionControlBar({ onPause, onResume, onEnd, highlightEnd, endButtonRef }: SessionControlBarProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -39,11 +40,13 @@ export default function SessionControlBar({ onPause, onResume, onEnd, highlightE
             Resume
           </button>
           <motion.button
+            ref={endButtonRef}
             type="button"
+            data-demo-target="end"
             onClick={onEnd}
-            className="h-8 px-3 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 text-[12px] font-medium"
-            animate={highlightEnd ? { scale: [1, 1.04, 1], boxShadow: ["0 0 0 0 rgba(239,68,68,0)", "0 0 0 6px rgba(239,68,68,0.2)", "0 0 0 0 rgba(239,68,68,0)"] } : {}}
-            transition={{ duration: 1.6, repeat: highlightEnd ? Infinity : 0, ease: "easeInOut" }}
+            className="h-8 px-3 rounded-[10px] bg-red-100 hover:bg-red-200 text-red-700 text-[12px] font-medium border-none"
+            animate={highlightEnd ? { scale: [1, 1.03, 1], boxShadow: ["0 0 0 6px rgba(59,130,246,0.08), 0 0 18px rgba(59,130,246,0.35)", "0 0 0 6px rgba(59,130,246,0.08), 0 0 22px rgba(59,130,246,0.4)", "0 0 0 6px rgba(59,130,246,0.08), 0 0 18px rgba(59,130,246,0.35)"] } : {}}
+            transition={{ duration: 2, repeat: highlightEnd ? Infinity : 0, ease: "easeInOut" }}
           >
             End
           </motion.button>
