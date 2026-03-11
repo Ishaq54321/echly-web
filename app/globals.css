@@ -310,6 +310,19 @@ button[aria-disabled="true"],
   background: #9ca3af;
 }
 
+/* Integrations (Settings) — align logo with title */
+.integration-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.integration-logo {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
 /* ======================================
    MODAL (Discussion delete confirmation, etc.)
 ====================================== */

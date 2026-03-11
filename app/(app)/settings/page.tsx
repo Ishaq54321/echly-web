@@ -512,48 +512,11 @@ function SecurityTab({ user }: { user: { email: string | null } | null }) {
   );
 }
 
-/* ——— Integration brand icons (official-style filled) ——— */
-function SlackIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z" fill="#E01E5A" />
-      <path d="M6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A" />
-      <path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834z" fill="#36C5F0" />
-      <path d="M8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0" />
-      <path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834z" fill="#2EB67D" />
-      <path d="M17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D" />
-      <path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52z" fill="#ECB22E" />
-      <path d="M15.165 17.688a2.527 2.527 0 0 1-2.521-2.523 2.526 2.526 0 0 1 2.521-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E" />
-    </svg>
-  );
-}
-function LinearIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M3 3l7.5 18 3-6.5L21 3 13.5 21 10.5 15 3 3z" fill="#0D0D0D" />
-    </svg>
-  );
-}
-function JiraIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214h2.129A5.215 5.215 0 0 0 24 12.518V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.143 0H12.518a1.005 1.005 0 0 0-1.005 1.005v11.513h11.513a1.005 1.005 0 0 0 1.005-1.001V1.005A1.001 1.001 0 0 0 23.143 0z" fill="#2684FF" />
-    </svg>
-  );
-}
-function ZapierIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 24C5.385 24 0 18.615 0 12S5.385 0 12 0s12 5.385 12 12-5.385 12-12 12zM6.231 7.2h3.6l-2.4 4.8h3.6l-4.8 9.6 2.4-9.6H4.831l4.8-4.8zm11.538 0l-2.4 4.8h-3.6l4.8 9.6 2.4-9.6h3.6l-4.8-4.8zm-3.6-4.8L12 7.2 9.231 2.4h3.6L12 7.2l2.169-4.8h3.6z" fill="#FF4F00" />
-    </svg>
-  );
-}
-
-const INTEGRATIONS: { id: string; name: string; Icon: React.ComponentType<{ className?: string }>; description: string; pro: boolean }[] = [
-  { id: "slack", name: "Slack", Icon: SlackIcon, description: "Receive feedback notifications in Slack.", pro: true },
-  { id: "linear", name: "Linear", Icon: LinearIcon, description: "Sync feedback and tickets with Linear.", pro: true },
-  { id: "jira", name: "Jira", Icon: JiraIcon, description: "Link Echly feedback to Jira issues.", pro: true },
-  { id: "zapier", name: "Zapier", Icon: ZapierIcon, description: "Connect Echly to thousands of apps with Zapier.", pro: true },
+const INTEGRATIONS: { id: string; name: string; logoSrc: string; description: string; pro: boolean }[] = [
+  { id: "slack", name: "Slack", logoSrc: "/assets/integrations/slack.svg", description: "Receive feedback notifications in Slack.", pro: true },
+  { id: "linear", name: "Linear", logoSrc: "/assets/integrations/linear.svg", description: "Sync feedback and tickets with Linear.", pro: true },
+  { id: "jira", name: "Jira", logoSrc: "/assets/integrations/jira.svg", description: "Link Echly feedback to Jira issues.", pro: true },
+  { id: "zapier", name: "Zapier", logoSrc: "/assets/integrations/zapier.svg", description: "Connect Echly to thousands of apps with Zapier.", pro: true },
 ];
 
 function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => void }) {
@@ -564,16 +527,21 @@ function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => v
         description="Connect Echly with your existing tools."
       />
       <div className="grid gap-8 sm:grid-cols-2">
-        {INTEGRATIONS.map(({ id, name, Icon, description, pro }) => (
+        {INTEGRATIONS.map(({ id, name, logoSrc, description, pro }) => (
           <Card
             key={id}
             className={`${SETTINGS_CARD} flex flex-col transition-all duration-200 ease-out`}
             as="article"
           >
-            <div className="flex items-center gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-neutral-50 border border-[var(--border-default)]">
-                <Icon className="h-6 w-6 min-w-[24px] min-h-[24px]" aria-hidden />
-              </div>
+            <div className="integration-header">
+              <img
+                className="integration-logo"
+                src={logoSrc}
+                alt={`${name} logo`}
+                width={28}
+                height={28}
+                loading="lazy"
+              />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-[18px] font-semibold text-neutral-900">{name}</h3>
