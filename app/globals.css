@@ -3560,3 +3560,13 @@ textarea:focus-visible {
   color: #6b7280;
   font-family: var(--echly-font);
 }
+
+/* ======================================
+   DEMO CONTAINER — HIDE SYSTEM CURSOR
+   Onboarding demo: custom cursor only inside .demo-container
+====================================== */
+
+.demo-container,
+.demo-container * {
+  cursor: none !important;
+}

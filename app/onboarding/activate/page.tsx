@@ -1,23 +1,45 @@
 "use client"
 
 import React, { useEffect, useMemo, useRef, useState } from "react"
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motion"
 import {
   Download,
   Globe,
-  Home,
   MessageSquare,
   Mic,
-  Moon,
   Pencil,
   Sparkles,
-  X,
 } from "lucide-react"
+import DemoFeedbackDashboard from "../../../components/demo/DemoFeedbackDashboard"
+import DemoGuide from "@/components/demo/DemoGuide"
+import ExtensionPopup from "@/components/demo/ExtensionPopup"
+import SessionControlBar from "@/components/demo/SessionControlBar"
+import {
+  createDemoExtensionController,
+  DEFAULT_DEMO_EXTENSION_STATE,
+  type DemoExtensionState,
+  type DemoTicket,
+  type DemoFeedbackMode,
+} from "@/components/demo/DemoExtensionController"
 
 type Step = "install" | "open" | "capture"
 type PendingTransition = "open" | null
 type DemoStage = "open_click" | "selection" | "overlay" | "comment" | "capture"
-type CapturePhase = "none" | "voice" | "processing"
+type CapturePhase = "none" | "voice" | "write" | "processing"
+
+type GuidedStep =
+  | "install_extension"
+  | "open_extension"
+  | "choose_mode"
+  | "click_page"
+  | "selection_created"
+  | "voice_feedback"
+  | "write_feedback"
+  | "finish_feedback"
+  | "processing"
+  | "end_session"
+
+type CursorMode = "default" | "interactive" | "comment"
 
 type ActionCard = {
   key: Step
@@ -41,27 +63,36 @@ const DEMO_SEQUENCE: Array<{ step: Step; duration: number }> = [
   { step: "capture", duration: 4500 },
 ]
 
-const GENERATED_TASKS = [
-  "Create ticket: spacing issue",
-  "Adjust CTA button style",
-] as const
+const GUIDE_TEXTS: Record<Exclude<GuidedStep, "processing">, string> = {
+  install_extension: "Click the extension icon on top right",
+  open_extension: "Choose a feedback mode",
+  choose_mode: "Click Start Session",
+  click_page: "Click anywhere on the page to capture feedback",
+  selection_created: "Screenshot captured — now add your feedback",
+  voice_feedback: "Click Finish when done",
+  write_feedback: "Type your feedback and submit",
+  finish_feedback: "Finish to generate tickets",
+  end_session: "Click End to finish your feedback session",
+}
 
 export default function ActivationPage() {
   const [step, setStep] = useState<Step>("install")
-  const [stage, setStage] = useState(0)
-  const [autoPlay, setAutoPlay] = useState(true)
-  const [resetting, setResetting] = useState(false)
-  const [transitioning, setTransitioning] = useState(false)
-  const [pendingTransition, setPendingTransition] = useState<PendingTransition>(null)
   const [demoStage, setDemoStage] = useState<DemoStage>("open_click")
-  const [openClickPulse, setOpenClickPulse] = useState(0)
   const [capturePhase, setCapturePhase] = useState<CapturePhase>("none")
   const [waveformActive, setWaveformActive] = useState(false)
   const [tasksStarted, setTasksStarted] = useState(false)
-  const [captureIdle, setCaptureIdle] = useState(false)
-  const demoNonceRef = useRef(0)
-  const loopTimeoutRef = useRef<number | null>(null)
-  const resetTimeoutRef = useRef<number | null>(null)
+  const [demoExtensionState, setDemoExtensionState] = useState<DemoExtensionState>(
+    DEFAULT_DEMO_EXTENSION_STATE
+  )
+  const demoControllerRef = useRef(createDemoExtensionController(setDemoExtensionState))
+  const demoController = demoControllerRef.current
+  const [guidedStep, setGuidedStep] = useState<GuidedStep | null>("install_extension")
+  const [selection, setSelection] = useState<{ x: number; y: number } | null>(null)
+  const [cursorMode, setCursorMode] = useState<CursorMode>("default")
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const selectionCreatedTimeoutRef = useRef<number | null>(null)
+  const processingTasksTimeoutRef = useRef<number | null>(null)
+  const [dashboardPhase, setDashboardPhase] = useState<null | "loading" | "ready">(null)
 
   const actionCards: ActionCard[] = useMemo(
     () => [
@@ -88,219 +119,173 @@ export default function ActivationPage() {
     [],
   )
 
-  const setStepWithReset = (next: Step, nextCapturePhase: CapturePhase = "none") => {
-    demoNonceRef.current += 1
-    setDemoStage("open_click")
-    setOpenClickPulse(0)
-    setCapturePhase(next === "capture" ? nextCapturePhase : "none")
-    setWaveformActive(false)
-    setTasksStarted(false)
-    setCaptureIdle(false)
-    setStep(next)
+  const createSelection = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = containerRef.current!.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    setSelection({ x, y })
+    demoController.captureSelection(x, y)
+    setDemoStage("selection")
+    setGuidedStep("selection_created")
   }
 
-  const resetDemoState = () => {
-    demoNonceRef.current += 1
-    setTransitioning(false)
-    setPendingTransition(null)
-    setDemoStage("open_click")
-    setOpenClickPulse(0)
-    setCapturePhase("none")
-    setWaveformActive(false)
-    setTasksStarted(false)
-    setCaptureIdle(false)
-  }
-
-  const requestStep = (next: Step) => {
-    if (next === step) return
-
-    // install → open: keep the install frame visible while the website layout mounts,
-    // then crossfade into the open state (never render an empty browser).
-    if (step === "install" && next === "open") {
-      setTransitioning(true)
-      setPendingTransition("open")
-
-      // Preload + begin fade in immediately; commit the step once the content is mounted.
-      window.setTimeout(() => {
-        setStepWithReset("open")
-        setTransitioning(false)
-        setPendingTransition(null)
-      }, 360)
-      return
-    }
-
-    setTransitioning(false)
-    setPendingTransition(null)
-    if (next === "capture") {
-      setStepWithReset("capture", "voice")
-      return
-    }
-    setStepWithReset(next)
-  }
-
+  // Sync step / demoStage / capturePhase from guided step when in guided mode
   useEffect(() => {
-    if (!autoPlay) return
-
-    const HOLD_AFTER_TASKS_MS = 2000
-    let cancelled = false
-
-    const clearTimers = () => {
-      if (loopTimeoutRef.current != null) window.clearTimeout(loopTimeoutRef.current)
-      if (resetTimeoutRef.current != null) window.clearTimeout(resetTimeoutRef.current)
-      loopTimeoutRef.current = null
-      resetTimeoutRef.current = null
-    }
-
-    const totalDuration =
-      DEMO_SEQUENCE.reduce((sum, item) => sum + item.duration, 0) + HOLD_AFTER_TASKS_MS
-
-    const runCycle = () => {
-      if (cancelled) return
-
-      setStage(0)
-      setResetting(true)
-
-      // Hard reset demo visuals before the loop restarts.
-      resetTimeoutRef.current = window.setTimeout(() => {
-        if (cancelled) return
-        resetDemoState()
-        setStepWithReset("install")
-        setResetting(false)
-      }, 420)
-
-      const tInstall = DEMO_SEQUENCE[0]?.duration ?? 0
-      const tOpen = tInstall + (DEMO_SEQUENCE[1]?.duration ?? 0)
-
-      window.setTimeout(() => {
-        if (cancelled) return
-        setStage(1)
-        requestStep("open")
-      }, tInstall)
-
-      window.setTimeout(() => {
-        if (cancelled) return
-        setStage(2)
-        requestStep("capture")
-      }, tOpen)
-
-      loopTimeoutRef.current = window.setTimeout(() => {
-        if (cancelled) return
-        runCycle()
-      }, totalDuration)
-    }
-
-    clearTimers()
-    runCycle()
-
-    return () => {
-      cancelled = true
-      clearTimers()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPlay])
-
-  useEffect(() => {
-    if (step !== "capture") return
-    const myNonce = demoNonceRef.current
-
-    // Timeline (Capture Feedback)
-    // 0.0s voice panel appears (already visible when entering capture)
-    // 0.5s waveform starts
-    // 1.2s processing panel appears
-    // 1.6s first task card appears
-    // 2.0s second task card appears
-    // 3.0s idle display (hold)
-    setCapturePhase("voice")
-    setWaveformActive(false)
-    setTasksStarted(false)
-    setCaptureIdle(false)
-
-    const tWave = window.setTimeout(() => {
-      if (demoNonceRef.current !== myNonce) return
-      setWaveformActive(true)
-    }, 500)
-
-    const tProcessing = window.setTimeout(() => {
-      if (demoNonceRef.current !== myNonce) return
-      setCapturePhase("processing")
-    }, 1200)
-
-    const tTasks = window.setTimeout(() => {
-      if (demoNonceRef.current !== myNonce) return
-      setTasksStarted(true)
-    }, 1600)
-
-    const tIdle = window.setTimeout(() => {
-      if (demoNonceRef.current !== myNonce) return
-      setCaptureIdle(true)
-    }, 3000)
-
-    return () => {
-      window.clearTimeout(tWave)
-      window.clearTimeout(tProcessing)
-      window.clearTimeout(tTasks)
-      window.clearTimeout(tIdle)
-    }
-  }, [step])
-
-  useEffect(() => {
-    if (!autoPlay) {
-      const timer = window.setTimeout(() => {
-        setAutoPlay(true)
-      }, 8000)
-
-      return () => window.clearTimeout(timer)
-    }
-  }, [autoPlay])
-
-  useEffect(() => {
-    if (step !== "open") return
-    const myNonce = demoNonceRef.current
-
-    setDemoStage("open_click")
-    setCapturePhase("none")
-
-    // Timeline (Open Website)
-    // 0.0s pointer appears
-    // 0.7s pointer clicks element
-    // 1.0s selection rectangle appears
-    // 1.4s screenshot overlay appears
-    // 2.0s comment bubble appears
-    const tClick = window.setTimeout(() => {
-      if (demoNonceRef.current !== myNonce) return
-      setOpenClickPulse((v) => v + 1)
-    }, 700)
-
-    const tSelection = window.setTimeout(() => {
-      if (demoNonceRef.current !== myNonce) return
-      setDemoStage("selection")
-    }, 1000)
-
-    const tOverlay = window.setTimeout(() => {
-      if (demoNonceRef.current !== myNonce) return
-      setDemoStage("overlay")
-    }, 1400)
-
-    const tComment = window.setTimeout(() => {
-      if (demoNonceRef.current !== myNonce) return
+    if (guidedStep == null) return
+    if (guidedStep === "install_extension" || guidedStep === "open_extension" || guidedStep === "choose_mode") {
+      setStep("install")
+      setDemoStage("open_click")
+      setCapturePhase("none")
+    } else if (guidedStep === "click_page") {
+      setStep("open")
+      setDemoStage("open_click")
+      setCapturePhase("none")
+    } else if (guidedStep === "selection_created") {
+      setStep("open")
+      setCapturePhase("none")
+      // demoStage stays "selection" from createSelection; we transition to overlay in timeout
+    } else if (guidedStep === "voice_feedback" || guidedStep === "finish_feedback") {
+      setStep("capture")
+      setCapturePhase("voice")
       setDemoStage("comment")
-    }, 2000)
+    } else if (guidedStep === "write_feedback") {
+      setStep("capture")
+      setCapturePhase("write")
+      setDemoStage("comment")
+    } else if (guidedStep === "processing") {
+      setStep("capture")
+      setCapturePhase("processing")
+      setDemoStage("comment")
+    }
+  }, [guidedStep])
 
+  // Cursor mode derived from guided step
+  useEffect(() => {
+    if (guidedStep == null) {
+      setCursorMode("default")
+      return
+    }
+
+    switch (guidedStep) {
+      case "install_extension":
+      case "open_extension":
+      case "choose_mode":
+      case "voice_feedback":
+      case "write_feedback":
+      case "finish_feedback":
+      case "processing":
+      case "end_session":
+        setCursorMode("default")
+        break
+      case "click_page":
+        setCursorMode("interactive")
+        break
+      case "selection_created":
+        setCursorMode("comment")
+        break
+      default:
+        setCursorMode("default")
+    }
+  }, [guidedStep])
+
+  // Screenshot flow: selection 1200ms → overlay 1000ms → comment 600ms → feedback (voice/write by mode)
+  useEffect(() => {
+    if (guidedStep !== "selection_created") return
+    const tOverlay = window.setTimeout(() => setDemoStage("overlay"), 1200)
+    const tComment = window.setTimeout(() => setDemoStage("comment"), 1200 + 1000)
+    selectionCreatedTimeoutRef.current = window.setTimeout(() => {
+      const mode = demoExtensionState.mode
+      if (mode === "voice") setGuidedStep("voice_feedback")
+      else if (mode === "write") setGuidedStep("write_feedback")
+      else setGuidedStep("voice_feedback")
+      setSelection(null)
+      demoController.clearSelection()
+    }, 1200 + 1000 + 600)
     return () => {
-      window.clearTimeout(tClick)
-      window.clearTimeout(tSelection)
       window.clearTimeout(tOverlay)
       window.clearTimeout(tComment)
+      if (selectionCreatedTimeoutRef.current != null) {
+        window.clearTimeout(selectionCreatedTimeoutRef.current)
+        selectionCreatedTimeoutRef.current = null
+      }
     }
-  }, [step])
+  }, [guidedStep, demoExtensionState.mode])
 
+  // When entering processing, show processing steps then generate tickets after 1200ms
   useEffect(() => {
-    if (step === "install") resetDemoState()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step])
+    if (guidedStep !== "processing") return
+    setTasksStarted(false)
+    processingTasksTimeoutRef.current = window.setTimeout(() => {
+      demoControllerRef.current.generateTickets()
+      setTasksStarted(true)
+    }, 1200)
+    return () => {
+      if (processingTasksTimeoutRef.current != null) {
+        window.clearTimeout(processingTasksTimeoutRef.current)
+        processingTasksTimeoutRef.current = null
+      }
+    }
+  }, [guidedStep])
+
+  // After tickets appear, show end_session guidance after 1800ms
+  const endSessionTimeoutRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (guidedStep !== "processing" || !tasksStarted) return
+    endSessionTimeoutRef.current = window.setTimeout(() => {
+      setGuidedStep("end_session")
+    }, 1800)
+    return () => {
+      if (endSessionTimeoutRef.current != null) {
+        window.clearTimeout(endSessionTimeoutRef.current)
+        endSessionTimeoutRef.current = null
+      }
+    }
+  }, [guidedStep, tasksStarted])
+
+  // After End session: show loading 800ms then dashboard
+  useEffect(() => {
+    if (dashboardPhase !== "loading") return
+    const t = window.setTimeout(() => setDashboardPhase("ready"), 800)
+    return () => window.clearTimeout(t)
+  }, [dashboardPhase])
+
+  const handleReplayDemo = () => {
+    setDashboardPhase(null)
+    setGuidedStep("install_extension")
+    demoController.reset()
+    setStep("install")
+    setDemoStage("open_click")
+    setCapturePhase("none")
+    setSelection(null)
+  }
 
   return (
-    <div className="min-h-screen flex flex-col items-center pt-[7vh] px-6 pb-20">
+    <div className="min-h-screen flex flex-col items-center pt-[7vh] px-6 pb-20 relative">
+      {guidedStep != null ? (
+        <button
+          type="button"
+          onClick={() => {
+            setGuidedStep(null)
+            demoController.reset()
+            setStep("install")
+            setDemoStage("open_click")
+            setCapturePhase("none")
+            setSelection(null)
+          }}
+          className="absolute right-6 top-6 z-50 text-sm font-medium text-gray-500 hover:text-gray-900"
+        >
+          Skip demo
+        </button>
+      ) : null}
+      {dashboardPhase === "ready" ? (
+        <button
+          type="button"
+          onClick={handleReplayDemo}
+          className="absolute right-6 top-6 z-50 text-sm font-medium text-[#1D4ED8] hover:text-[#0F3DB8] bg-[#E8F1FF] hover:bg-[#BBD1FF] px-3 py-1.5 rounded-lg border border-[#BBD1FF] transition-colors"
+        >
+          Replay Demo
+        </button>
+      ) : null}
       <div className="text-center max-w-3xl">
         <h1 className="text-4xl font-semibold tracking-tight whitespace-nowrap text-gray-900">
           You&apos;re ready to capture feedback
@@ -313,18 +298,36 @@ export default function ActivationPage() {
         transition={{ duration: 0.4, ease: "easeOut" }}
         className="mt-12 w-full max-w-[920px]"
       >
-        <BrowserDemo
-          step={step}
-          resetting={resetting}
-          demoStage={demoStage}
-          openClickPulse={openClickPulse}
-          capturePhase={capturePhase}
-          waveformActive={waveformActive}
-          tasksStarted={tasksStarted}
-          captureIdle={captureIdle}
-          transitioning={transitioning}
-          pendingTransition={pendingTransition}
-        />
+        {dashboardPhase === "loading" ? (
+          <div className="flex items-center justify-center h-[440px] rounded-2xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex flex-col items-center gap-4">
+              <Spinner />
+              <p className="text-sm font-medium text-gray-600">Loading feedback...</p>
+            </div>
+          </div>
+        ) : dashboardPhase === "ready" ? (
+          <DemoFeedbackDashboard />
+        ) : (
+          <BrowserDemo
+            containerRef={containerRef}
+            step={step}
+            demoStage={demoStage}
+            capturePhase={capturePhase}
+            waveformActive={waveformActive}
+            tasksStarted={tasksStarted}
+            guidedStep={guidedStep}
+            setGuidedStep={setGuidedStep}
+            demoExtensionState={demoExtensionState}
+            demoController={demoController}
+            selection={selection}
+            createSelection={createSelection}
+            cursorMode={cursorMode}
+            onEndSession={() => {
+              setGuidedStep(null)
+              setDashboardPhase("loading")
+            }}
+          />
+        )}
       </motion.div>
 
       <div className="mt-12 w-full max-w-[920px]">
@@ -353,10 +356,6 @@ export default function ActivationPage() {
                 description={c.description}
                 button={c.cta}
                 active={step === c.key}
-                onClick={() => {
-                  setAutoPlay(false)
-                  requestStep(c.key)
-                }}
               />
             </motion.div>
           ))}
@@ -373,32 +372,72 @@ export default function ActivationPage() {
   )
 }
 
+function Spinner() {
+  return (
+    <div
+      className="w-8 h-8 rounded-full border-2 border-gray-200 border-t-blue-500 animate-spin"
+      aria-hidden
+    />
+  )
+}
+
 function BrowserDemo({
+  containerRef,
   step,
-  resetting,
   demoStage,
-  openClickPulse,
   capturePhase,
   waveformActive,
   tasksStarted,
-  captureIdle,
-  transitioning,
-  pendingTransition,
+  guidedStep,
+  setGuidedStep,
+  demoExtensionState,
+  demoController,
+  selection,
+  createSelection,
+  cursorMode,
+  onEndSession,
 }: {
+  containerRef: React.RefObject<HTMLDivElement | null>
   step: Step
-  resetting: boolean
   demoStage: DemoStage
-  openClickPulse: number
   capturePhase: CapturePhase
   waveformActive: boolean
   tasksStarted: boolean
-  captureIdle: boolean
-  transitioning: boolean
-  pendingTransition: PendingTransition
+  guidedStep: GuidedStep | null
+  setGuidedStep: (s: GuidedStep | null) => void
+  demoExtensionState: DemoExtensionState
+  demoController: ReturnType<typeof createDemoExtensionController>
+  selection: { x: number; y: number } | null
+  createSelection: (e: React.MouseEvent<HTMLDivElement>) => void
+  cursorMode: CursorMode
+  onEndSession?: () => void
 }) {
-  const showWebsite = step !== "install" || (transitioning && pendingTransition === "open")
-  const websiteStage: "opening" | "ready" =
-    step === "open" || (transitioning && pendingTransition === "open") ? "opening" : "ready"
+  const showWebsite = step !== "install"
+  const websiteStage: "opening" | "ready" = step === "open" ? "opening" : "ready"
+  const cursorXBase = useMotionValue(420)
+  const cursorYBase = useMotionValue(190)
+  const cursorX = useSpring(cursorXBase, { stiffness: 120, damping: 18 })
+  const cursorY = useSpring(cursorYBase, { stiffness: 120, damping: 18 })
+  const isGuided = guidedStep != null
+  const extensionIconRef = useRef<HTMLButtonElement | null>(null)
+  const voiceModeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const [clickRipple, setClickRipple] = useState<{ x: number; y: number } | null>(null)
+  const sessionActive =
+    isGuided &&
+    [
+      "click_page",
+      "selection_created",
+      "voice_feedback",
+      "write_feedback",
+      "finish_feedback",
+      "processing",
+      "end_session",
+    ].includes(guidedStep!)
+
+  const showExtensionPopup =
+    step === "install" &&
+    (guidedStep == null || guidedStep === "open_extension" || guidedStep === "choose_mode")
+  const showExtensionIconInChrome = isGuided && guidedStep === "install_extension"
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden relative">
@@ -409,12 +448,56 @@ function BrowserDemo({
           <div className="w-3 h-3 bg-green-400 rounded-full" />
         </div>
         <div className="ml-4 text-xs text-gray-400 select-none">example-website.com</div>
+        {showExtensionIconInChrome ? (
+          <motion.button
+            type="button"
+            ref={extensionIconRef}
+            onClick={() => setGuidedStep("open_extension")}
+            className="ml-auto h-8 w-8 rounded-lg flex items-center justify-center border pointer-events-auto"
+            animate={{
+              scale: [1, 1.12, 1],
+              backgroundColor: ["#E0EDFF", "#BBD1FF", "#E0EDFF"],
+              borderColor: ["#93B8FF", "#6A9AFF", "#93B8FF"],
+            }}
+            transition={{
+              duration: 1.8,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            aria-label="Open Echly extension"
+          >
+            <motion.span
+              animate={{ color: ["#1D4ED8", "#0F3DB8", "#1D4ED8"] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <Sparkles className="h-4 w-4" />
+            </motion.span>
+          </motion.button>
+        ) : null}
       </div>
 
-      <div className="relative h-[440px] p-6 bg-gradient-to-b from-white to-gray-50 overflow-hidden">
+      <div
+        ref={containerRef}
+        className="demo-container relative h-[440px] p-6 bg-gradient-to-b from-white to-gray-50 overflow-hidden cursor-none"
+        onMouseMove={(e) => {
+          if (!containerRef.current) return
+          const rect = containerRef.current.getBoundingClientRect()
+          const x = e.clientX - rect.left
+          const y = e.clientY - rect.top
+          cursorXBase.set(x)
+          cursorYBase.set(y)
+        }}
+        onClick={(e) => {
+          if (guidedStep === "click_page") {
+            const rect = containerRef.current!.getBoundingClientRect()
+            setClickRipple({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+            createSelection(e)
+          }
+        }}
+      >
         {/* Keep both layers mounted so the browser never renders blank. */}
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div key="browser-content" className="h-full relative">
+          <motion.div key="browser-content" className="h-full relative pointer-events-none">
             <motion.div
               initial={false}
               animate={{ opacity: showWebsite ? 0 : 1 }}
@@ -439,13 +522,17 @@ function BrowserDemo({
 
         <motion.div
           initial={false}
-          animate={{ opacity: step === "install" || resetting ? 0 : 1 }}
-          transition={{ duration: 0.4, ease: "easeInOut" }}
+          animate={{ opacity: step === "install" ? 0 : 1 }}
+          transition={{ duration: 0.35, ease: [0.25, 0.8, 0.25, 1] }}
           className="absolute inset-0 pointer-events-none"
         >
           <AnimatePresence mode="wait" initial={false}>
             {step === "open" ? (
-              <OpenWebsiteSequence key="open-seq" stage={demoStage} clickPulse={openClickPulse} />
+              <OpenWebsiteSequence
+                key="open-seq"
+                stage={demoStage}
+                selection={selection}
+              />
             ) : null}
           </AnimatePresence>
 
@@ -453,16 +540,102 @@ function BrowserDemo({
             {step === "capture" ? (
               <CapturePanels
                 key="capture-panels"
+                guidedStep={guidedStep}
                 phase={capturePhase}
                 waveformActive={waveformActive}
                 tasksStarted={tasksStarted}
-                captureIdle={captureIdle}
+                tickets={demoExtensionState.tickets}
+                onVoiceFinish={
+                  isGuided
+                    ? () => {
+                        demoController.submitVoice()
+                        demoController.processFeedback()
+                        setGuidedStep("processing")
+                      }
+                    : undefined
+                }
+                onWriteSubmit={
+                  isGuided
+                    ? (text?: string) => {
+                        if (text != null) demoController.submitWrite(text)
+                        demoController.processFeedback()
+                        setGuidedStep("processing")
+                      }
+                    : undefined
+                }
               />
             ) : null}
           </AnimatePresence>
         </motion.div>
 
-        <AnimatePresence>{step === "install" && <ExtensionPopup key="popup-install" />}</AnimatePresence>
+        <AnimatePresence>
+          {clickRipple ? (
+            <motion.div
+              key="ripple"
+              initial={{ opacity: 0.6, scale: 1 }}
+              animate={{ opacity: 0, scale: 1.6 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              onAnimationComplete={() => setClickRipple(null)}
+              className="absolute left-0 top-0 z-10 pointer-events-none rounded-full bg-blue-400/50"
+              style={{
+                width: 48,
+                height: 48,
+                left: clickRipple.x,
+                top: clickRipple.y,
+                transform: "translate(-50%, -50%)",
+              }}
+            />
+          ) : null}
+        </AnimatePresence>
+
+        {guidedStep != null && guidedStep !== "processing" ? (
+          <DemoGuide
+            text={GUIDE_TEXTS[guidedStep]}
+            followCursor
+            cursorX={cursorX}
+            cursorY={cursorY}
+            containerRef={containerRef}
+            arrowPosition={guidedStep === "install_extension" ? "bottom" : "side"}
+          />
+        ) : null}
+        {guidedStep != null ? (
+          <GuideCursor guidedStep={guidedStep} cursorX={cursorX} cursorY={cursorY} cursorMode={cursorMode} />
+        ) : null}
+
+        {sessionActive ? (
+          <SessionControlBar
+            onPause={() => {}}
+            onResume={() => {}}
+            onEnd={() => {
+              if (onEndSession) {
+                onEndSession()
+              } else {
+                demoController.endSession()
+                setGuidedStep(null)
+              }
+            }}
+            highlightEnd={guidedStep === "end_session"}
+          />
+        ) : null}
+
+        <AnimatePresence>
+          {showExtensionPopup ? (
+            <ExtensionPopup
+              key="popup-install"
+              selectedMode={demoExtensionState.mode}
+              onModeSelect={(mode: DemoFeedbackMode) => demoController.selectMode(mode)}
+              onStartSession={
+                isGuided
+                  ? () => {
+                      demoController.startSession()
+                      setGuidedStep("click_page")
+                    }
+                  : undefined
+              }
+              startSessionButtonRef={voiceModeButtonRef}
+            />
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   )
@@ -556,21 +729,6 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
   )
 }
 
-function CommentPointer({ className }: { className?: string }) {
-  return (
-    <div
-      className={[
-        "h-8 w-8 rounded-full bg-white border-2 border-blue-500",
-        "shadow-[0_14px_28px_rgba(0,0,0,0.18)]",
-        "flex items-center justify-center text-blue-600",
-        className ?? "",
-      ].join(" ")}
-    >
-      <MessageSquare className="h-4 w-4" />
-    </div>
-  )
-}
-
 function FigmaCommentBubble() {
   return (
     <div className="h-6 w-6 rounded-full bg-blue-600 text-white text-[12px] font-semibold flex items-center justify-center shadow-[0_10px_24px_rgba(37,99,235,0.35)]">
@@ -579,62 +737,66 @@ function FigmaCommentBubble() {
   )
 }
 
-function OpenWebsiteSequence({ stage, clickPulse }: { stage: DemoStage; clickPulse: number }) {
-  const showPointer = stage !== "capture"
-  const showSelection = stage === "selection"
+function GuideCursor({
+  guidedStep,
+  cursorX,
+  cursorY,
+  cursorMode,
+}: {
+  guidedStep: GuidedStep
+  cursorX: import("framer-motion").MotionValue<number>
+  cursorY: import("framer-motion").MotionValue<number>
+  cursorMode: CursorMode
+}) {
+  const showCommentIcon = cursorMode === "comment"
+
+  return (
+    <motion.div
+      initial={false}
+      style={{ x: cursorX, y: cursorY }}
+      className="absolute left-0 top-0 z-40 pointer-events-none"
+    >
+      <div className="-translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+        {cursorMode === "interactive" && !showCommentIcon && (
+          <motion.div className="w-[26px] h-[26px] rounded-full bg-white border-2 border-gray-400 shadow-lg flex items-center justify-center">
+            <div className="w-2 h-2 bg-blue-500 rounded-full" />
+          </motion.div>
+        )}
+        {showCommentIcon && <MessageSquare className="w-5 h-5 text-blue-500" />}
+        {cursorMode === "default" && !showCommentIcon && (
+          <div className="w-[26px] h-[26px] rounded-full bg-white border-2 border-gray-400 shadow-lg flex items-center justify-center">
+            <div className="w-2 h-2 bg-blue-500 rounded-full" />
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+function OpenWebsiteSequence({
+  stage,
+  selection,
+}: {
+  stage: DemoStage
+  selection?: { x: number; y: number } | null
+}) {
+  const showSelection = stage === "selection" && selection != null
   const showScreenshot = stage === "overlay" || stage === "comment"
   const showCommentBubble = stage === "comment"
 
-  const selectionRect = {
-    left: 310,
-    top: 150,
-    width: 190,
-    height: 96,
-  }
+  const defaultRect = { left: 310, top: 150, width: 190, height: 96 }
+  const selectionRect =
+    selection != null
+      ? {
+          left: Math.max(0, selection.x - defaultRect.width / 2),
+          top: Math.max(0, selection.y - defaultRect.height / 2),
+          width: defaultRect.width,
+          height: defaultRect.height,
+        }
+      : defaultRect
 
   return (
     <div className="absolute inset-0 pointer-events-none">
-      <AnimatePresence mode="wait" initial={false}>
-        {showPointer ? (
-          <motion.div
-            key="pointer"
-            initial={{ opacity: 0, x: 420, y: 190, scale: 0.92 }}
-            animate={{
-              opacity: 1,
-              x: [420, 434],
-              y: [190, 198],
-              scale: clickPulse > 0 ? [1, 0.9, 1] : 1,
-            }}
-            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.18, ease: "easeInOut" } }}
-            transition={{
-              duration: 0.6,
-              ease: "easeOut",
-              scale: clickPulse > 0 ? { duration: 0.2, times: [0, 0.45, 1], ease: "easeInOut" } : undefined,
-            }}
-            className="absolute z-30"
-            style={{ left: 0, top: 0 }}
-          >
-            <CommentPointer />
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence initial={false}>
-        {stage === "open_click" && clickPulse > 0 ? (
-          <motion.div
-            key={clickPulse}
-            initial={{ opacity: 0, scale: 0.65 }}
-            animate={{ opacity: [0, 1, 0], scale: [0.65, 1.1, 1.35] }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.55, ease: "easeOut" }}
-            className="absolute z-20"
-            style={{ left: 418, top: 188 }}
-          >
-            <div className="h-10 w-10 rounded-full border-2 border-blue-500/80 bg-blue-500/5" />
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
       <AnimatePresence initial={false}>
         {showSelection ? (
           <motion.div
@@ -644,14 +806,19 @@ function OpenWebsiteSequence({ stage, clickPulse }: { stage: DemoStage; clickPul
               opacity: 1,
               scale: 1,
               boxShadow: [
-                "0 0 0 0 rgba(59,130,246,0.00)",
-                "0 0 0 6px rgba(59,130,246,0.14)",
-                "0 0 0 0 rgba(59,130,246,0.00)",
+                "0 0 0 0 rgba(59,130,246,0)",
+                "0 0 0 8px rgba(59,130,246,0.25)",
+                "0 0 20px 4px rgba(59,130,246,0.2)",
+                "0 0 0 8px rgba(59,130,246,0.25)",
               ],
             }}
             exit={{ opacity: 0, transition: { duration: 0.16 } }}
-            transition={{ duration: 0.22, ease: "easeOut", boxShadow: { duration: 1.2, repeat: Infinity, ease: "easeInOut" } }}
-            className="absolute pointer-events-none z-20 border-2 border-blue-500 rounded-md bg-blue-100/10"
+            transition={{
+              opacity: { duration: 0.22, ease: "easeOut" },
+              scale: { duration: 0.22, ease: "easeOut" },
+              boxShadow: { duration: 1.4, repeat: Infinity, ease: "easeInOut" },
+            }}
+            className="absolute pointer-events-none z-20 border-2 border-blue-500 rounded-md bg-blue-100/10 animate-pulse"
             style={selectionRect}
           />
         ) : null}
@@ -665,22 +832,32 @@ function OpenWebsiteSequence({ stage, clickPulse }: { stage: DemoStage; clickPul
             animate={{ opacity: [0, 1], scale: [0.96, 1] }}
             exit={{ opacity: 0, scale: 0.985, transition: { duration: 0.2, ease: "easeInOut" } }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="absolute z-30"
+            className="absolute z-30 pointer-events-none"
             style={{ left: selectionRect.left, top: selectionRect.top }}
           >
             <div
               className="rounded-md border border-blue-500/30 shadow-[0_18px_40px_rgba(0,0,0,0.18)] overflow-hidden"
               style={{ width: selectionRect.width, height: selectionRect.height }}
             >
-              <div className="h-full w-full bg-gradient-to-br from-blue-50 via-white to-gray-50 p-2">
-                <div className="bg-white rounded-lg shadow-sm p-3 space-y-2 border border-gray-100">
-                  <div className="h-2 w-16 bg-gray-300 rounded" />
-                  <div className="h-3 w-24 bg-gray-200 rounded" />
-                  <div className="flex gap-2 items-center">
-                    <div className="w-4 h-4 bg-blue-300 rounded-full" />
-                    <div className="h-2 w-14 bg-gray-200 rounded" />
+              <div className="h-full w-full bg-white rounded-sm overflow-hidden flex flex-col">
+                {/* Mini browser chrome */}
+                <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-gray-100 bg-gray-50/80 shrink-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                  <div className="flex-1 min-w-0 h-1.5 bg-gray-200 rounded ml-1" />
+                </div>
+                {/* UI card preview: header + content block + highlighted CTA */}
+                <div className="flex-1 p-2 flex flex-col gap-2 min-w-0">
+                  <div className="h-2 w-[70%] bg-gray-200 rounded shrink-0" />
+                  <div className="h-1.5 w-full max-w-[85%] bg-gray-100 rounded shrink-0" />
+                  <div className="flex-1 rounded-md border border-gray-200 bg-gray-50/60 p-2 flex flex-col gap-1.5">
+                    <div className="h-2 w-12 bg-gray-200 rounded" />
+                    <div className="flex-1 rounded border-2 border-blue-500 bg-blue-50/80 flex items-center justify-center shadow-[0_0_0_2px_rgba(59,130,246,0.2)] relative">
+                      <span className="text-[8px] font-semibold text-blue-700">Get started</span>
+                    </div>
+                    <div className="h-1.5 w-14 bg-gray-100 rounded" />
                   </div>
-                  <div className="h-6 w-20 bg-blue-200 rounded" />
                 </div>
               </div>
             </div>
@@ -693,7 +870,7 @@ function OpenWebsiteSequence({ stage, clickPulse }: { stage: DemoStage; clickPul
                   animate={{ opacity: 1, y: [ -8, 0, -2, 0 ], scale: [0.85, 1.06, 0.98, 1] }}
                   exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.16, ease: "easeInOut" } }}
                   transition={{ duration: 0.42, ease: "easeOut" }}
-                  className="absolute -right-3 -top-3"
+                  className="absolute -right-3 -top-3 pointer-events-none"
                 >
                   <FigmaCommentBubble />
                 </motion.div>
@@ -783,76 +960,44 @@ function StepProgress({ step }: { step: Step }) {
   )
 }
 
-function ExtensionPopup() {
+function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void } = {}) {
+  const [value, setValue] = useState("")
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: -10, scale: 0.98 }}
+      initial={{ opacity: 0, y: -10, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ type: "spring", stiffness: 520, damping: 34 }}
-      className="absolute right-6 top-6 w-[320px] bg-white border border-gray-200 shadow-[0_18px_60px_rgba(0,0,0,0.18)] rounded-2xl overflow-hidden"
+      className="bg-transparent rounded-2xl overflow-hidden"
     >
-      <div className="flex items-center justify-between px-4 pt-3">
-        <div className="flex items-center gap-2 text-gray-700">
-          <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center">
-            <Home className="h-[18px] w-[18px]" />
-          </div>
-          <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center">
-            <Moon className="h-[18px] w-[18px]" />
-          </div>
-          <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center">
-            <Mic className="h-[18px] w-[18px]" />
-          </div>
-        </div>
-        <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center text-gray-500">
-          <X className="h-[18px] w-[18px]" />
-        </div>
-      </div>
-
-      <div className="px-4 pb-4 pt-2">
-        <div className="text-[12px] text-gray-600">⚡ Powered by GPT-4 + Whisper</div>
-
-        <div className="mt-4 text-[11px] font-semibold tracking-wide text-gray-500">
-          SELECT FEEDBACK MODE
+      <div className="px-4 py-4">
+        <div className="font-semibold text-gray-900 text-[13px]">Write Feedback</div>
+        <div className="mt-1 text-[12px] text-gray-600">
+          Describe the issue — Echly will structure it.
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-xl bg-blue-600 text-white px-3 py-2.5 flex items-center gap-2 shadow-[0_10px_24px_rgba(37,99,235,0.22)]">
-            <Mic className="h-4 w-4" />
-            <div className="leading-tight">
-              <div className="text-[12px] font-semibold">Voice</div>
-              <div className="text-[10px] opacity-90">Recommended</div>
-            </div>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 flex items-center gap-2 text-gray-800">
-            <Pencil className="h-4 w-4 text-gray-700" />
-            <div className="leading-tight">
-              <div className="text-[12px] font-semibold">Write</div>
-              <div className="text-[10px] text-gray-500">Manual</div>
-            </div>
-          </div>
-        </div>
+        <textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="e.g. The CTA button spacing looks off..."
+          className="mt-4 w-full h-24 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          rows={4}
+        />
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            className="h-10 rounded-xl bg-[#FF7A1A] hover:bg-[#ff6f08] text-white text-[12px] font-semibold shadow-[0_10px_24px_rgba(255,122,26,0.28)]"
-          >
-            Start Session
-          </button>
-          <button
-            type="button"
-            className="h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-semibold"
-          >
-            Previous Sessions
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => onSubmit?.(value)}
+          className="mt-4 h-10 w-full rounded-xl bg-gray-900 hover:bg-black text-white text-[12px] font-semibold"
+        >
+          Submit
+        </button>
       </div>
     </motion.div>
   )
 }
 
-function VoiceFeedbackPopup() {
+function VoiceFeedbackPopup({ onFinish }: { onFinish?: () => void } = {}) {
   const bars = useMemo(() => Array.from({ length: 20 }), [])
 
   return (
@@ -974,6 +1119,7 @@ function VoiceFeedbackPopup() {
 
         <button
           type="button"
+          onClick={onFinish}
           className="mt-4 h-10 w-full rounded-xl bg-gray-900 hover:bg-black text-white text-[12px] font-semibold"
         >
           Finish
@@ -1016,9 +1162,19 @@ function ProcessingStack() {
   )
 }
 
-function ProcessingPanelCard({ tasksStarted }: { tasksStarted: boolean }) {
-  const items = ["Processing feedback...", "Text Adjustment", "Button Adjustment", "Image Adjustment"]
-  const tasks = GENERATED_TASKS.slice(0, 2)
+function ProcessingPanelCard({
+  tasksStarted,
+  tickets,
+}: {
+  tasksStarted: boolean
+  tickets: DemoTicket[]
+}) {
+  const items = [
+    "Analyzing feedback...",
+    "Structuring insights...",
+    tasksStarted ? "Tickets generated" : "Generating tickets...",
+  ]
+  const tasks = tickets.slice(0, 2)
 
   return (
     <motion.div
@@ -1034,7 +1190,7 @@ function ProcessingPanelCard({ tasksStarted }: { tasksStarted: boolean }) {
           <div className="mt-3 space-y-2">
             {items.map((label, idx) => (
               <motion.div
-                key={label}
+                key={idx}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.08 * idx, duration: 0.28, ease: "easeOut" }}
@@ -1056,15 +1212,15 @@ function ProcessingPanelCard({ tasksStarted }: { tasksStarted: boolean }) {
           >
             <div className="text-[11px] font-semibold tracking-wide text-gray-500">GENERATED TASKS</div>
             <div className="mt-2 space-y-2 generated-tasks">
-              {tasks.slice(0, 2).map((t, i) => (
+              {tasks.map((t, i) => (
                 <motion.div
-                  key={t}
+                  key={t.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={tasksStarted ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
                   transition={{ duration: 0.28, ease: "easeOut", delay: i * 0.4 }}
                   className="rounded-xl bg-white/70 backdrop-blur border border-gray-200 px-3 py-2.5 shadow-[0_10px_34px_rgba(0,0,0,0.08)]"
                 >
-                  <div className="text-[12px] font-medium text-gray-900">{t}</div>
+                  <div className="text-[12px] font-medium text-gray-900">{t.title}</div>
                 </motion.div>
               ))}
             </div>
@@ -1075,7 +1231,72 @@ function ProcessingPanelCard({ tasksStarted }: { tasksStarted: boolean }) {
   )
 }
 
-function VoicePanelCard({ waveformActive, captureIdle }: { waveformActive: boolean; captureIdle: boolean }) {
+function CollapsibleTicketGroup({
+  label,
+  count,
+  expanded,
+  onToggle,
+  tickets,
+  tasksStarted,
+}: {
+  label: string
+  count: number
+  expanded: boolean
+  onToggle: () => void
+  tickets: DemoTicket[]
+  tasksStarted: boolean
+}) {
+  return (
+    <div className="mb-3 last:mb-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between text-left py-1.5 px-1 rounded-lg hover:bg-gray-100/80 transition-colors"
+      >
+        <span className="text-[11px] font-semibold text-gray-700">
+          {label} ({count})
+        </span>
+        <motion.span
+          animate={{ rotate: expanded ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="text-gray-400"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="inline-block">
+            <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </motion.span>
+      </button>
+      <motion.div
+        initial={false}
+        animate={{ height: expanded ? "auto" : 0, opacity: expanded ? 1 : 0 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className="overflow-hidden"
+      >
+        <div className="space-y-2 pt-1">
+          {tickets.map((t, i) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={tasksStarted ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+              transition={{ duration: 0.28, ease: "easeOut", delay: i * 0.1 }}
+              className="rounded-xl bg-white/70 backdrop-blur border border-gray-200 px-3 py-2.5 shadow-[0_10px_34px_rgba(0,0,0,0.08)]"
+            >
+              <div className="text-[12px] font-medium text-gray-900">{t.title}</div>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+function VoicePanelCard({
+  waveformActive,
+  onFinish,
+}: {
+  waveformActive: boolean
+  onFinish?: () => void
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.99 }}
@@ -1085,8 +1306,8 @@ function VoicePanelCard({ waveformActive, captureIdle }: { waveformActive: boole
       className="w-full max-w-[360px] pointer-events-none"
     >
       <div className="rounded-2xl border border-gray-200 bg-white/80 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.16)] overflow-hidden pointer-events-auto">
-        <div className={["p-4", waveformActive && !captureIdle ? "" : "wave-idle"].join(" ")}>
-          <VoiceFeedbackPopup />
+        <div className={["p-4", waveformActive ? "" : "wave-idle"].join(" ")}>
+          <VoiceFeedbackPopup onFinish={onFinish} />
         </div>
       </div>
     </motion.div>
@@ -1094,15 +1315,21 @@ function VoicePanelCard({ waveformActive, captureIdle }: { waveformActive: boole
 }
 
 function CapturePanels({
+  guidedStep,
   phase,
   waveformActive,
   tasksStarted,
-  captureIdle,
+  tickets,
+  onVoiceFinish,
+  onWriteSubmit,
 }: {
+  guidedStep: GuidedStep | null
   phase: CapturePhase
   waveformActive: boolean
   tasksStarted: boolean
-  captureIdle: boolean
+  tickets: DemoTicket[]
+  onVoiceFinish?: () => void
+  onWriteSubmit?: (text?: string) => void
 }) {
   return (
     <motion.div
@@ -1114,16 +1341,46 @@ function CapturePanels({
     >
       <div className="absolute inset-0 flex items-center justify-center">
         <AnimatePresence mode="wait" initial={false}>
-          {phase === "voice" || phase === "processing" ? (
-            <VoicePanelCard key="voice" waveformActive={waveformActive} captureIdle={captureIdle} />
+          {phase === "voice" ? (
+            <VoicePanelCard
+              key="voice"
+              waveformActive={waveformActive}
+              onFinish={onVoiceFinish}
+            />
+          ) : phase === "write" ? (
+            <WritePanelCard key="write" onSubmit={onWriteSubmit} />
           ) : null}
         </AnimatePresence>
       </div>
 
       <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none">
         <AnimatePresence mode="wait" initial={false}>
-          {phase === "processing" ? <ProcessingPanelCard key="processing" tasksStarted={tasksStarted} /> : null}
+          {guidedStep === "processing" ? (
+            <ProcessingPanelCard
+              key="processing"
+              tasksStarted={tasksStarted}
+              tickets={tickets}
+            />
+          ) : null}
         </AnimatePresence>
+      </div>
+    </motion.div>
+  )
+}
+
+function WritePanelCard({ onSubmit }: { onSubmit?: (text?: string) => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.99 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 10 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="w-full max-w-[360px] pointer-events-none"
+    >
+      <div className="rounded-2xl border border-gray-200 bg-white/80 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.16)] overflow-hidden pointer-events-auto">
+        <div className="p-4">
+          <WriteFeedbackPopup onSubmit={onSubmit} />
+        </div>
       </div>
     </motion.div>
   )
@@ -1135,24 +1392,20 @@ function StepCard({
   description,
   button,
   active,
-  onClick,
 }: {
   icon: React.ReactNode
   title: string
   description: string
   button?: string
   active: boolean
-  onClick: () => void
 }) {
   return (
     <motion.div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onClick()
+      whileHover={{
+        scale: 1.03,
+        y: -4,
+        boxShadow: "0 18px 40px rgba(0,0,0,0.12)",
       }}
-      whileHover={{ scale: 1.02, y: -3 }}
       whileTap={{ scale: 0.99 }}
       className={[
         "w-full p-7 rounded-2xl border cursor-pointer select-none transition-all duration-300",
