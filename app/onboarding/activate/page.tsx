@@ -3,11 +3,13 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motion"
 import {
-  Download,
   Globe,
   MessageSquare,
   Mic,
+  MousePointerClick,
   Pencil,
+  Puzzle,
+  Share2,
   Sparkles,
 } from "lucide-react"
 import DemoFeedbackDashboard from "../../../components/demo/DemoFeedbackDashboard"
@@ -44,20 +46,7 @@ type GuidedStep =
 
 type CursorMode = "default" | "interactive" | "comment"
 
-type ActionCard = {
-  key: Step
-  icon: React.ReactNode
-  title: string
-  description: string
-  cta?: string
-}
-
 const STEP_ORDER: Step[] = ["install", "open", "capture"]
-const STEP_LABELS: Record<Step, string> = {
-  install: "Install Extension",
-  open: "Open Website",
-  capture: "Capture Feedback",
-}
 
 const DEMO_SEQUENCE: Array<{ step: Step; duration: number }> = [
   { step: "install", duration: 2200 },
@@ -147,31 +136,6 @@ export default function ActivationPage() {
   const processingTasksTimeoutRef = useRef<number | null>(null)
   const [dashboardPhase, setDashboardPhase] = useState<null | "loading" | "ready">(null)
   const [pendingDemoComplete, setPendingDemoComplete] = useState(false)
-
-  const actionCards: ActionCard[] = useMemo(
-    () => [
-      {
-        key: "install",
-        icon: <Download className="h-[18px] w-[18px]" />,
-        title: "Install Extension",
-        description: "Add Echly to your browser to capture feedback directly from websites.",
-        cta: "Install extension",
-      },
-      {
-        key: "open",
-        icon: <Globe className="h-[18px] w-[18px]" />,
-        title: "Open Website",
-        description: "Visit any website where you want to collect feedback.",
-      },
-      {
-        key: "capture",
-        icon: <MessageSquare className="h-[18px] w-[18px]" />,
-        title: "Capture Feedback",
-        description: "Select elements and add comments to create tickets instantly.",
-      },
-    ],
-    [],
-  )
 
   const createSelection = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = containerRef.current!.getBoundingClientRect()
@@ -348,8 +312,10 @@ export default function ActivationPage() {
             </div>
           </div>
         ) : dashboardPhase === "ready" ? (
-          <div className="relative">
-            <DemoFeedbackDashboard />
+          <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl min-h-[440px]">
+            <div className="relative">
+              <DemoFeedbackDashboard />
+            </div>
           </div>
         ) : (
           <BrowserDemo
@@ -379,37 +345,39 @@ export default function ActivationPage() {
         )}
       </motion.div>
 
-      <div className="mt-12 w-full max-w-[920px]">
-        <StepProgress step={step} />
-
-        <motion.div
-          initial="hidden"
-          animate="show"
-          variants={{
-            hidden: {},
-            show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
-          }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6"
-        >
-          {actionCards.map((c) => (
-            <motion.div
-              key={c.key}
-              variants={{
-                hidden: { opacity: 0, y: 10 },
-                show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
-              }}
-            >
-              <StepCard
-                icon={c.icon}
-                title={c.title}
-                description={c.description}
-                button={c.cta}
-                active={step === c.key}
-              />
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
+      {/* How Echly Works — premium step cards */}
+      <section className="max-w-[1100px] mx-auto mt-14 mb-6">
+        <h2 className="text-2xl font-semibold text-center mb-10">How Echly Works</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-7 rounded-xl border border-gray-200 bg-white transition-all hover:shadow-md hover:-translate-y-1">
+            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+              <Puzzle className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Install the Echly Extension</h3>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Capture feedback instantly from any website with a single click.
+            </p>
+          </div>
+          <div className="p-7 rounded-xl border border-gray-200 bg-white transition-all hover:shadow-md hover:-translate-y-1">
+            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+              <MousePointerClick className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Capture Feedback</h3>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Click anywhere on the page and describe issues using voice or text.
+            </p>
+          </div>
+          <div className="p-7 rounded-xl border border-gray-200 bg-white transition-all hover:shadow-md hover:-translate-y-1">
+            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+              <Share2 className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Share Your Session</h3>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Your feedback session is ready. Share the link with teammates or clients.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <button
         type="button"
@@ -1044,60 +1012,6 @@ function HighlightBox({
   )
 }
 
-function StepProgress({ step }: { step: Step }) {
-  const idx = STEP_ORDER.indexOf(step)
-  const clampedIdx = Math.max(0, idx)
-  const fillPct = (clampedIdx / (STEP_ORDER.length - 1)) * 100
-
-  return (
-    <div className="relative w-full max-w-xl mx-auto mb-10 px-2">
-      <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2">
-        <div className="h-[2px] bg-gray-200 w-full" />
-        <motion.div
-          className="h-[2px] bg-blue-500 absolute left-0 top-0"
-          initial={false}
-          animate={{ width: `${fillPct}%` }}
-          transition={{ duration: 0.45, ease: "easeInOut" }}
-        />
-      </div>
-
-      <div className="relative grid grid-cols-3 items-center">
-        {STEP_ORDER.map((s, i) => {
-          const isActive = s === step
-          const isDone = i < clampedIdx
-          return (
-            <div key={s} className="flex flex-col items-center gap-3">
-              <motion.div
-                initial={false}
-                animate={
-                  isActive
-                    ? { scale: 1.06 }
-                    : { scale: 1 }
-                }
-                transition={{ type: "spring", stiffness: 520, damping: 32 }}
-                className={[
-                  "h-4 w-4 rounded-full border flex items-center justify-center bg-white",
-                  isDone || isActive ? "border-blue-500" : "border-gray-300",
-                ].join(" ")}
-              >
-                <div
-                  className={[
-                    "h-2.5 w-2.5 rounded-full",
-                    isDone || isActive ? "bg-blue-500" : "bg-gray-300",
-                  ].join(" ")}
-                />
-              </motion.div>
-              <div className={`text-[12px] font-medium ${isActive ? "text-blue-700" : "text-gray-600"}`}>
-                {STEP_LABELS[s]}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void } = {}) {
   const [value, setValue] = useState("")
 
@@ -1539,61 +1453,3 @@ function WritePanelCard({ onSubmit }: { onSubmit?: (text?: string) => void }) {
   )
 }
 
-function StepCard({
-  icon,
-  title,
-  description,
-  button,
-  active,
-}: {
-  icon: React.ReactNode
-  title: string
-  description: string
-  button?: string
-  active: boolean
-}) {
-  return (
-    <motion.div
-      whileHover={{
-        scale: 1.03,
-        y: -4,
-        boxShadow: "0 18px 40px rgba(0,0,0,0.12)",
-      }}
-      whileTap={{ scale: 0.99 }}
-      className={[
-        "w-full p-7 rounded-2xl border cursor-pointer select-none transition-all duration-300",
-        "shadow-sm hover:shadow-lg",
-        active
-          ? "bg-blue-50 border-blue-400 shadow-md"
-          : "border-gray-200 bg-gradient-to-b from-white/80 to-white backdrop-blur",
-      ].join(" ")}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className="w-11 h-11 rounded-2xl bg-blue-100/80 border border-blue-200/60 flex items-center justify-center text-blue-700">
-          {icon}
-        </div>
-        {active ? (
-          <motion.div
-            initial={{ opacity: 0, y: -2 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-[11px] font-semibold text-blue-700 bg-blue-100/70 border border-blue-200/70 px-2 py-1 rounded-full"
-          >
-            Active
-          </motion.div>
-        ) : null}
-      </div>
-
-      <div className="mt-3 font-semibold text-gray-900 text-[16px]">{title}</div>
-      <div className="text-sm text-gray-600 mt-1">{description}</div>
-
-      {button ? (
-        <button
-          type="button"
-          className="mt-4 h-10 px-4 rounded-full text-white text-sm bg-gradient-to-r from-[#466EFF] to-[#6A8CFF]"
-        >
-          {button}
-        </button>
-      ) : null}
-    </motion.div>
-  )
-}
