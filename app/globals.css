@@ -121,6 +121,10 @@
   --layer-2-border: rgba(0, 0, 0, 0.045);
   --layer-2-hover-bg: #F4F5F7;
 
+  /* Settings / premium surfaces */
+  --border-default: rgba(0, 0, 0, 0.08);
+  --settings-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
   /* ---- SPATIAL ARCHITECTURE: 6 elevation layers ---- */
   /* Layer 0 — Ambient: .env-canvas (gradients + noise) */
   /* Layer 1 — Structural: sidebar, topbar (--shadow-level-1) */
@@ -541,6 +545,115 @@ select:focus-visible,
 textarea:focus-visible {
   outline: none;
   box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+/* ======================================
+   BILLING PAGE — LAYOUT CONSISTENCY
+   Keep within existing spacing system.
+====================================== */
+
+.billing-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.billing-pricing-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .billing-pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    align-items: stretch;
+  }
+}
+
+.billing-card {
+  border-radius: 18px;
+  padding: 28px;
+  background: white;
+  border: 1px solid #E6EAF0;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.billing-card:hover {
+  transform: translateY(-2px);
+}
+
+.billing-card--business {
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(120deg, #4F7BFF, #7AA2FF, #5BD1FF) border-box;
+  border: 2px solid transparent;
+}
+
+.secondary-cta {
+  background: #EEF4FF;
+  color: #1F5EFF;
+  border: 1px solid #D6E4FF;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 500;
+}
+.secondary-cta:hover {
+  background: #E4EDFF;
+}
+
+.price {
+  white-space: nowrap;
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.price-suffix {
+  font-size: 18px;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.plan-title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.plan-features {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 16px;
+}
+
+.plan-feature {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.plan-feature:last-child {
+  margin-bottom: 0;
+}
+
+.feature-icon {
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.plan-feature span {
+  text-align: left;
+  line-height: 1.5;
+}
+
+.plan-feature-text {
+  font-size: 15px;
+  font-weight: 500;
 }
 
 /* ======================================

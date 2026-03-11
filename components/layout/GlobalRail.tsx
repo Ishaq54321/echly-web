@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   { href: "/discussion", icon: MessageSquare, label: "Discussion" },
   { href: "/dashboard/sessions", icon: Folder, label: "Sessions" },
   { href: "/dashboard/insights", icon: BarChart3, label: "Insights" },
-  { href: "/dashboard/settings", icon: Settings, label: "Settings" },
+  { href: "/settings", icon: Settings, label: "Settings" },
 ] as const;
 
 function isActive(href: string, pathname: string): boolean {
