@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useMemo, useRef, useState } from "react"
-import { AnimatePresence, motion, useAnimation } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
 import {
   Download,
   Globe,
@@ -9,14 +9,15 @@ import {
   MessageSquare,
   Mic,
   Moon,
-  MousePointer2,
   Pencil,
   Sparkles,
   X,
 } from "lucide-react"
 
 type Step = "install" | "open" | "capture"
-type OpenSubstep = "idle" | "cursor" | "clicked"
+type PendingTransition = "open" | null
+type DemoStage = "open_click" | "selection" | "overlay" | "comment" | "capture"
+type CapturePhase = "none" | "voice" | "processing"
 
 type ActionCard = {
   key: Step
@@ -26,10 +27,41 @@ type ActionCard = {
   cta?: string
 }
 
+const STEP_ORDER: Step[] = ["install", "open", "capture"]
+const STEP_LABELS: Record<Step, string> = {
+  install: "Install Extension",
+  open: "Open Website",
+  capture: "Capture Feedback",
+}
+
+const DEMO_SEQUENCE: Array<{ step: Step; duration: number }> = [
+  { step: "install", duration: 2200 },
+  { step: "open", duration: 3000 },
+  // Keep capture visible long enough for voice → processing → tasks.
+  { step: "capture", duration: 4500 },
+]
+
+const GENERATED_TASKS = [
+  "Create ticket: spacing issue",
+  "Adjust CTA button style",
+] as const
+
 export default function ActivationPage() {
   const [step, setStep] = useState<Step>("install")
-  const [openSubstep, setOpenSubstep] = useState<OpenSubstep>("idle")
+  const [stage, setStage] = useState(0)
+  const [autoPlay, setAutoPlay] = useState(true)
+  const [resetting, setResetting] = useState(false)
+  const [transitioning, setTransitioning] = useState(false)
+  const [pendingTransition, setPendingTransition] = useState<PendingTransition>(null)
+  const [demoStage, setDemoStage] = useState<DemoStage>("open_click")
+  const [openClickPulse, setOpenClickPulse] = useState(0)
+  const [capturePhase, setCapturePhase] = useState<CapturePhase>("none")
+  const [waveformActive, setWaveformActive] = useState(false)
+  const [tasksStarted, setTasksStarted] = useState(false)
+  const [captureIdle, setCaptureIdle] = useState(false)
   const demoNonceRef = useRef(0)
+  const loopTimeoutRef = useRef<number | null>(null)
+  const resetTimeoutRef = useRef<number | null>(null)
 
   const actionCards: ActionCard[] = useMemo(
     () => [
@@ -56,61 +88,279 @@ export default function ActivationPage() {
     [],
   )
 
-  useEffect(() => {
-    setOpenSubstep("idle")
+  const setStepWithReset = (next: Step, nextCapturePhase: CapturePhase = "none") => {
     demoNonceRef.current += 1
+    setDemoStage("open_click")
+    setOpenClickPulse(0)
+    setCapturePhase(next === "capture" ? nextCapturePhase : "none")
+    setWaveformActive(false)
+    setTasksStarted(false)
+    setCaptureIdle(false)
+    setStep(next)
+  }
+
+  const resetDemoState = () => {
+    demoNonceRef.current += 1
+    setTransitioning(false)
+    setPendingTransition(null)
+    setDemoStage("open_click")
+    setOpenClickPulse(0)
+    setCapturePhase("none")
+    setWaveformActive(false)
+    setTasksStarted(false)
+    setCaptureIdle(false)
+  }
+
+  const requestStep = (next: Step) => {
+    if (next === step) return
+
+    // install → open: keep the install frame visible while the website layout mounts,
+    // then crossfade into the open state (never render an empty browser).
+    if (step === "install" && next === "open") {
+      setTransitioning(true)
+      setPendingTransition("open")
+
+      // Preload + begin fade in immediately; commit the step once the content is mounted.
+      window.setTimeout(() => {
+        setStepWithReset("open")
+        setTransitioning(false)
+        setPendingTransition(null)
+      }, 360)
+      return
+    }
+
+    setTransitioning(false)
+    setPendingTransition(null)
+    if (next === "capture") {
+      setStepWithReset("capture", "voice")
+      return
+    }
+    setStepWithReset(next)
+  }
+
+  useEffect(() => {
+    if (!autoPlay) return
+
+    const HOLD_AFTER_TASKS_MS = 2000
+    let cancelled = false
+
+    const clearTimers = () => {
+      if (loopTimeoutRef.current != null) window.clearTimeout(loopTimeoutRef.current)
+      if (resetTimeoutRef.current != null) window.clearTimeout(resetTimeoutRef.current)
+      loopTimeoutRef.current = null
+      resetTimeoutRef.current = null
+    }
+
+    const totalDuration =
+      DEMO_SEQUENCE.reduce((sum, item) => sum + item.duration, 0) + HOLD_AFTER_TASKS_MS
+
+    const runCycle = () => {
+      if (cancelled) return
+
+      setStage(0)
+      setResetting(true)
+
+      // Hard reset demo visuals before the loop restarts.
+      resetTimeoutRef.current = window.setTimeout(() => {
+        if (cancelled) return
+        resetDemoState()
+        setStepWithReset("install")
+        setResetting(false)
+      }, 420)
+
+      const tInstall = DEMO_SEQUENCE[0]?.duration ?? 0
+      const tOpen = tInstall + (DEMO_SEQUENCE[1]?.duration ?? 0)
+
+      window.setTimeout(() => {
+        if (cancelled) return
+        setStage(1)
+        requestStep("open")
+      }, tInstall)
+
+      window.setTimeout(() => {
+        if (cancelled) return
+        setStage(2)
+        requestStep("capture")
+      }, tOpen)
+
+      loopTimeoutRef.current = window.setTimeout(() => {
+        if (cancelled) return
+        runCycle()
+      }, totalDuration)
+    }
+
+    clearTimers()
+    runCycle()
+
+    return () => {
+      cancelled = true
+      clearTimers()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay])
+
+  useEffect(() => {
+    if (step !== "capture") return
+    const myNonce = demoNonceRef.current
+
+    // Timeline (Capture Feedback)
+    // 0.0s voice panel appears (already visible when entering capture)
+    // 0.5s waveform starts
+    // 1.2s processing panel appears
+    // 1.6s first task card appears
+    // 2.0s second task card appears
+    // 3.0s idle display (hold)
+    setCapturePhase("voice")
+    setWaveformActive(false)
+    setTasksStarted(false)
+    setCaptureIdle(false)
+
+    const tWave = window.setTimeout(() => {
+      if (demoNonceRef.current !== myNonce) return
+      setWaveformActive(true)
+    }, 500)
+
+    const tProcessing = window.setTimeout(() => {
+      if (demoNonceRef.current !== myNonce) return
+      setCapturePhase("processing")
+    }, 1200)
+
+    const tTasks = window.setTimeout(() => {
+      if (demoNonceRef.current !== myNonce) return
+      setTasksStarted(true)
+    }, 1600)
+
+    const tIdle = window.setTimeout(() => {
+      if (demoNonceRef.current !== myNonce) return
+      setCaptureIdle(true)
+    }, 3000)
+
+    return () => {
+      window.clearTimeout(tWave)
+      window.clearTimeout(tProcessing)
+      window.clearTimeout(tTasks)
+      window.clearTimeout(tIdle)
+    }
   }, [step])
+
+  useEffect(() => {
+    if (!autoPlay) {
+      const timer = window.setTimeout(() => {
+        setAutoPlay(true)
+      }, 8000)
+
+      return () => window.clearTimeout(timer)
+    }
+  }, [autoPlay])
 
   useEffect(() => {
     if (step !== "open") return
     const myNonce = demoNonceRef.current
 
-    const t1 = window.setTimeout(() => {
-      if (demoNonceRef.current !== myNonce) return
-      setOpenSubstep("cursor")
-    }, 450)
+    setDemoStage("open_click")
+    setCapturePhase("none")
 
-    const t2 = window.setTimeout(() => {
+    // Timeline (Open Website)
+    // 0.0s pointer appears
+    // 0.7s pointer clicks element
+    // 1.0s selection rectangle appears
+    // 1.4s screenshot overlay appears
+    // 2.0s comment bubble appears
+    const tClick = window.setTimeout(() => {
       if (demoNonceRef.current !== myNonce) return
-      setOpenSubstep("clicked")
-    }, 2450)
+      setOpenClickPulse((v) => v + 1)
+    }, 700)
 
-    const t3 = window.setTimeout(() => {
+    const tSelection = window.setTimeout(() => {
       if (demoNonceRef.current !== myNonce) return
-      setStep("capture")
-    }, 3400)
+      setDemoStage("selection")
+    }, 1000)
+
+    const tOverlay = window.setTimeout(() => {
+      if (demoNonceRef.current !== myNonce) return
+      setDemoStage("overlay")
+    }, 1400)
+
+    const tComment = window.setTimeout(() => {
+      if (demoNonceRef.current !== myNonce) return
+      setDemoStage("comment")
+    }, 2000)
 
     return () => {
-      window.clearTimeout(t1)
-      window.clearTimeout(t2)
-      window.clearTimeout(t3)
+      window.clearTimeout(tClick)
+      window.clearTimeout(tSelection)
+      window.clearTimeout(tOverlay)
+      window.clearTimeout(tComment)
     }
+  }, [step])
+
+  useEffect(() => {
+    if (step === "install") resetDemoState()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
   return (
     <div className="min-h-screen flex flex-col items-center pt-[7vh] px-6 pb-20">
-      <div className="text-center max-w-xl">
-        <h1 className="text-[36px] leading-[1.12] font-semibold tracking-tight text-gray-900">
+      <div className="text-center max-w-3xl">
+        <h1 className="text-4xl font-semibold tracking-tight whitespace-nowrap text-gray-900">
           You&apos;re ready to capture feedback
         </h1>
       </div>
 
-      <div className="mt-12 w-full max-w-[920px]">
-        <BrowserDemo step={step} openSubstep={openSubstep} />
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="mt-12 w-full max-w-[920px]"
+      >
+        <BrowserDemo
+          step={step}
+          resetting={resetting}
+          demoStage={demoStage}
+          openClickPulse={openClickPulse}
+          capturePhase={capturePhase}
+          waveformActive={waveformActive}
+          tasksStarted={tasksStarted}
+          captureIdle={captureIdle}
+          transitioning={transitioning}
+          pendingTransition={pendingTransition}
+        />
+      </motion.div>
 
-      <div className="mt-12 w-full max-w-[920px] grid grid-cols-1 md:grid-cols-3 gap-6">
-        {actionCards.map((c) => (
-          <StepCard
-            key={c.key}
-            icon={c.icon}
-            title={c.title}
-            description={c.description}
-            button={c.cta}
-            active={step === c.key}
-            onClick={() => setStep(c.key)}
-          />
-        ))}
+      <div className="mt-12 w-full max-w-[920px]">
+        <StepProgress step={step} />
+
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={{
+            hidden: {},
+            show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+          }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        >
+          {actionCards.map((c) => (
+            <motion.div
+              key={c.key}
+              variants={{
+                hidden: { opacity: 0, y: 10 },
+                show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
+              }}
+            >
+              <StepCard
+                icon={c.icon}
+                title={c.title}
+                description={c.description}
+                button={c.cta}
+                active={step === c.key}
+                onClick={() => {
+                  setAutoPlay(false)
+                  requestStep(c.key)
+                }}
+              />
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
 
       <button
@@ -123,7 +373,33 @@ export default function ActivationPage() {
   )
 }
 
-function BrowserDemo({ step, openSubstep }: { step: Step; openSubstep: OpenSubstep }) {
+function BrowserDemo({
+  step,
+  resetting,
+  demoStage,
+  openClickPulse,
+  capturePhase,
+  waveformActive,
+  tasksStarted,
+  captureIdle,
+  transitioning,
+  pendingTransition,
+}: {
+  step: Step
+  resetting: boolean
+  demoStage: DemoStage
+  openClickPulse: number
+  capturePhase: CapturePhase
+  waveformActive: boolean
+  tasksStarted: boolean
+  captureIdle: boolean
+  transitioning: boolean
+  pendingTransition: PendingTransition
+}) {
+  const showWebsite = step !== "install" || (transitioning && pendingTransition === "open")
+  const websiteStage: "opening" | "ready" =
+    step === "open" || (transitioning && pendingTransition === "open") ? "opening" : "ready"
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden relative">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white">
@@ -135,50 +411,58 @@ function BrowserDemo({ step, openSubstep }: { step: Step; openSubstep: OpenSubst
         <div className="ml-4 text-xs text-gray-400 select-none">example-website.com</div>
       </div>
 
-      <div className="relative h-[440px] p-6 bg-gradient-to-b from-white to-gray-50">
-        <AnimatePresence mode="wait">
-          {step === "install" ? (
+      <div className="relative h-[440px] p-6 bg-gradient-to-b from-white to-gray-50 overflow-hidden">
+        {/* Keep both layers mounted so the browser never renders blank. */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key="browser-content" className="h-full relative">
             <motion.div
-              key="skeleton"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="h-full"
+              initial={false}
+              animate={{ opacity: showWebsite ? 0 : 1 }}
+              transition={{ duration: 0.32, ease: "easeInOut" }}
+              className="absolute inset-0"
+              style={{ willChange: "opacity" }}
             >
               <WebsiteSkeleton />
             </motion.div>
-          ) : (
+
             <motion.div
-              key="website"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.35 }}
-              className="h-full"
+              initial={false}
+              animate={{ opacity: showWebsite ? 1 : 0, y: showWebsite ? 0 : 6 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="absolute inset-0"
+              style={{ willChange: "opacity, transform" }}
             >
-              <WebsiteLayout />
+              <WebsiteLayout stage={websiteStage} />
             </motion.div>
-          )}
+          </motion.div>
         </AnimatePresence>
 
-        <AnimatePresence>{step === "open" && <CursorSequence substep={openSubstep} />}</AnimatePresence>
+        <motion.div
+          initial={false}
+          animate={{ opacity: step === "install" || resetting ? 0 : 1 }}
+          transition={{ duration: 0.4, ease: "easeInOut" }}
+          className="absolute inset-0 pointer-events-none"
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            {step === "open" ? (
+              <OpenWebsiteSequence key="open-seq" stage={demoStage} clickPulse={openClickPulse} />
+            ) : null}
+          </AnimatePresence>
 
-        <AnimatePresence>
-          {step === "capture" && (
-            <HighlightBox key="highlight" top={150} left={350} width={210} height={54} />
-          )}
-        </AnimatePresence>
+          <AnimatePresence mode="wait" initial={false}>
+            {step === "capture" ? (
+              <CapturePanels
+                key="capture-panels"
+                phase={capturePhase}
+                waveformActive={waveformActive}
+                tasksStarted={tasksStarted}
+                captureIdle={captureIdle}
+              />
+            ) : null}
+          </AnimatePresence>
+        </motion.div>
 
         <AnimatePresence>{step === "install" && <ExtensionPopup key="popup-install" />}</AnimatePresence>
-
-        <AnimatePresence>
-          {step === "capture" && (
-            <div className="absolute right-6 top-6 w-[320px] flex flex-col gap-3">
-              <VoiceFeedbackPopup key="popup-voice" />
-              <ProcessingStack key="processing" />
-            </div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   )
@@ -210,7 +494,7 @@ function WebsiteSkeleton() {
   )
 }
 
-function WebsiteLayout() {
+function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between">
@@ -227,15 +511,25 @@ function WebsiteLayout() {
       </div>
 
       <div className="mt-10">
-        <div className="text-[28px] leading-tight font-semibold text-gray-900 max-w-[620px]">
+        <motion.div
+          initial={stage === "opening" ? { opacity: 0, y: 6 } : false}
+          animate={stage === "opening" ? { opacity: 1, y: 0 } : false}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="text-[28px] leading-tight font-semibold text-gray-900 max-w-[620px]"
+        >
           Landing page headline
-        </div>
+        </motion.div>
         <div className="mt-2 text-sm text-gray-600 max-w-[640px]">
           A clean layout with feature cards and a content section to simulate a real website.
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-3 gap-4">
+      <motion.div
+        initial={stage === "opening" ? { opacity: 0, y: 10 } : false}
+        animate={stage === "opening" ? { opacity: 1, y: 0 } : false}
+        transition={{ duration: 0.4, ease: "easeOut", delay: 0.08 }}
+        className="mt-8 grid grid-cols-3 gap-4"
+      >
         {["Fast setup", "Clean UI", "Better feedback"].map((t) => (
           <div key={t} className="rounded-2xl border border-gray-200 bg-white p-4">
             <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
@@ -243,7 +537,7 @@ function WebsiteLayout() {
             <div className="mt-1 text-xs text-gray-600">Short description goes here.</div>
           </div>
         ))}
-      </div>
+      </motion.div>
 
       <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 flex-1">
         <div className="h-4 bg-gray-100 rounded w-[260px]" />
@@ -262,67 +556,153 @@ function WebsiteLayout() {
   )
 }
 
-function CursorSequence({ substep }: { substep: OpenSubstep }) {
-  const cursorControls = useAnimation()
-  const pulseControls = useAnimation()
+function CommentPointer({ className }: { className?: string }) {
+  return (
+    <div
+      className={[
+        "h-8 w-8 rounded-full bg-white border-2 border-blue-500",
+        "shadow-[0_14px_28px_rgba(0,0,0,0.18)]",
+        "flex items-center justify-center text-blue-600",
+        className ?? "",
+      ].join(" ")}
+    >
+      <MessageSquare className="h-4 w-4" />
+    </div>
+  )
+}
 
-  useEffect(() => {
-    if (substep !== "cursor") return
-    ;(async () => {
-      await cursorControls.set({ opacity: 0, x: 80, y: 260, rotate: -6, scale: 1 })
-      await cursorControls.start({
-        opacity: 1,
-        x: 280,
-        y: 160,
-        rotate: 0,
-        transition: { duration: 0.9, ease: "easeOut" },
-      })
-      await cursorControls.start({
-        x: 355,
-        y: 168,
-        transition: { duration: 0.85, ease: "easeInOut" },
-      })
-    })()
-  }, [cursorControls, substep])
+function FigmaCommentBubble() {
+  return (
+    <div className="h-6 w-6 rounded-full bg-blue-600 text-white text-[12px] font-semibold flex items-center justify-center shadow-[0_10px_24px_rgba(37,99,235,0.35)]">
+      1
+    </div>
+  )
+}
 
-  useEffect(() => {
-    if (substep !== "clicked") return
-    ;(async () => {
-      await pulseControls.start({
-        opacity: [0, 1, 0],
-        scale: [0.6, 1.15, 1.35],
-        transition: { duration: 0.55, ease: "easeOut" },
-      })
-      await pulseControls.set({ opacity: 0, scale: 1 })
-    })()
-  }, [pulseControls, substep])
+function OpenWebsiteSequence({ stage, clickPulse }: { stage: DemoStage; clickPulse: number }) {
+  const showPointer = stage !== "capture"
+  const showSelection = stage === "selection"
+  const showScreenshot = stage === "overlay" || stage === "comment"
+  const showCommentBubble = stage === "comment"
+
+  const selectionRect = {
+    left: 310,
+    top: 150,
+    width: 190,
+    height: 96,
+  }
 
   return (
-    <>
-      <AnimatePresence>
-        {substep === "clicked" && (
-          <HighlightBox key="highlight-open" top={150} left={350} width={210} height={54} />
-        )}
+    <div className="absolute inset-0 pointer-events-none">
+      <AnimatePresence mode="wait" initial={false}>
+        {showPointer ? (
+          <motion.div
+            key="pointer"
+            initial={{ opacity: 0, x: 420, y: 190, scale: 0.92 }}
+            animate={{
+              opacity: 1,
+              x: [420, 434],
+              y: [190, 198],
+              scale: clickPulse > 0 ? [1, 0.9, 1] : 1,
+            }}
+            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.18, ease: "easeInOut" } }}
+            transition={{
+              duration: 0.6,
+              ease: "easeOut",
+              scale: clickPulse > 0 ? { duration: 0.2, times: [0, 0.45, 1], ease: "easeInOut" } : undefined,
+            }}
+            className="absolute z-30"
+            style={{ left: 0, top: 0 }}
+          >
+            <CommentPointer />
+          </motion.div>
+        ) : null}
       </AnimatePresence>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={pulseControls}
-        className="absolute pointer-events-none"
-        style={{ left: 368, top: 178 }}
-      >
-        <div className="h-10 w-10 rounded-full border-2 border-blue-500/80" />
-      </motion.div>
+      <AnimatePresence initial={false}>
+        {stage === "open_click" && clickPulse > 0 ? (
+          <motion.div
+            key={clickPulse}
+            initial={{ opacity: 0, scale: 0.65 }}
+            animate={{ opacity: [0, 1, 0], scale: [0.65, 1.1, 1.35] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.55, ease: "easeOut" }}
+            className="absolute z-20"
+            style={{ left: 418, top: 188 }}
+          >
+            <div className="h-10 w-10 rounded-full border-2 border-blue-500/80 bg-blue-500/5" />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={cursorControls}
-        className="absolute pointer-events-none z-20 text-gray-900 drop-shadow-[0_10px_18px_rgba(0,0,0,0.18)]"
-        style={{ left: 0, top: 0 }}
-      >
-        <MousePointer2 className="h-6 w-6 fill-white" />
-      </motion.div>
-    </>
+      <AnimatePresence initial={false}>
+        {showSelection ? (
+          <motion.div
+            key="selection"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+              boxShadow: [
+                "0 0 0 0 rgba(59,130,246,0.00)",
+                "0 0 0 6px rgba(59,130,246,0.14)",
+                "0 0 0 0 rgba(59,130,246,0.00)",
+              ],
+            }}
+            exit={{ opacity: 0, transition: { duration: 0.16 } }}
+            transition={{ duration: 0.22, ease: "easeOut", boxShadow: { duration: 1.2, repeat: Infinity, ease: "easeInOut" } }}
+            className="absolute pointer-events-none z-20 border-2 border-blue-500 rounded-md bg-blue-100/10"
+            style={selectionRect}
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence mode="wait" initial={false}>
+        {showScreenshot ? (
+          <motion.div
+            key="screenshot"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: [0, 1], scale: [0.96, 1] }}
+            exit={{ opacity: 0, scale: 0.985, transition: { duration: 0.2, ease: "easeInOut" } }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="absolute z-30"
+            style={{ left: selectionRect.left, top: selectionRect.top }}
+          >
+            <div
+              className="rounded-md border border-blue-500/30 shadow-[0_18px_40px_rgba(0,0,0,0.18)] overflow-hidden"
+              style={{ width: selectionRect.width, height: selectionRect.height }}
+            >
+              <div className="h-full w-full bg-gradient-to-br from-blue-50 via-white to-gray-50 p-2">
+                <div className="bg-white rounded-lg shadow-sm p-3 space-y-2 border border-gray-100">
+                  <div className="h-2 w-16 bg-gray-300 rounded" />
+                  <div className="h-3 w-24 bg-gray-200 rounded" />
+                  <div className="flex gap-2 items-center">
+                    <div className="w-4 h-4 bg-blue-300 rounded-full" />
+                    <div className="h-2 w-14 bg-gray-200 rounded" />
+                  </div>
+                  <div className="h-6 w-20 bg-blue-200 rounded" />
+                </div>
+              </div>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {showCommentBubble ? (
+                <motion.div
+                  key="comment-bubble"
+                  initial={{ opacity: 0, y: -8, scale: 0.85 }}
+                  animate={{ opacity: 1, y: [ -8, 0, -2, 0 ], scale: [0.85, 1.06, 0.98, 1] }}
+                  exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.16, ease: "easeInOut" } }}
+                  transition={{ duration: 0.42, ease: "easeOut" }}
+                  className="absolute -right-3 -top-3"
+                >
+                  <FigmaCommentBubble />
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
   )
 }
 
@@ -346,6 +726,60 @@ function HighlightBox({
       className="absolute pointer-events-none rounded-xl border-2 border-blue-500 shadow-[0_0_0_6px_rgba(59,130,246,0.18)]"
       style={{ top, left, width, height }}
     />
+  )
+}
+
+function StepProgress({ step }: { step: Step }) {
+  const idx = STEP_ORDER.indexOf(step)
+  const clampedIdx = Math.max(0, idx)
+  const fillPct = (clampedIdx / (STEP_ORDER.length - 1)) * 100
+
+  return (
+    <div className="relative w-full max-w-xl mx-auto mb-10 px-2">
+      <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2">
+        <div className="h-[2px] bg-gray-200 w-full" />
+        <motion.div
+          className="h-[2px] bg-blue-500 absolute left-0 top-0"
+          initial={false}
+          animate={{ width: `${fillPct}%` }}
+          transition={{ duration: 0.45, ease: "easeInOut" }}
+        />
+      </div>
+
+      <div className="relative grid grid-cols-3 items-center">
+        {STEP_ORDER.map((s, i) => {
+          const isActive = s === step
+          const isDone = i < clampedIdx
+          return (
+            <div key={s} className="flex flex-col items-center gap-3">
+              <motion.div
+                initial={false}
+                animate={
+                  isActive
+                    ? { scale: 1.06 }
+                    : { scale: 1 }
+                }
+                transition={{ type: "spring", stiffness: 520, damping: 32 }}
+                className={[
+                  "h-4 w-4 rounded-full border flex items-center justify-center bg-white",
+                  isDone || isActive ? "border-blue-500" : "border-gray-300",
+                ].join(" ")}
+              >
+                <div
+                  className={[
+                    "h-2.5 w-2.5 rounded-full",
+                    isDone || isActive ? "bg-blue-500" : "bg-gray-300",
+                  ].join(" ")}
+                />
+              </motion.div>
+              <div className={`text-[12px] font-medium ${isActive ? "text-blue-700" : "text-gray-600"}`}>
+                {STEP_LABELS[s]}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -419,36 +853,121 @@ function ExtensionPopup() {
 }
 
 function VoiceFeedbackPopup() {
+  const bars = useMemo(() => Array.from({ length: 20 }), [])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -10, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ type: "spring", stiffness: 520, damping: 34 }}
-      className="bg-white border border-gray-200 shadow-[0_18px_60px_rgba(0,0,0,0.18)] rounded-2xl overflow-hidden"
+      className="bg-transparent rounded-2xl overflow-hidden"
     >
+      <style jsx global>{`
+        .voice-wave {
+          display: flex;
+          align-items: flex-end;
+          gap: 3px;
+          height: 20px;
+        }
+        .wave-bar {
+          width: 3px;
+          background: #3b82f6;
+          border-radius: 2px;
+          animation: wave 1.1s infinite ease-in-out;
+        }
+        .wave-idle .wave-bar {
+          animation-play-state: paused;
+          opacity: 0.55;
+          height: 4px;
+        }
+        .wave-bar:nth-child(1) {
+          animation-delay: 0.05s;
+        }
+        .wave-bar:nth-child(2) {
+          animation-delay: 0.1s;
+        }
+        .wave-bar:nth-child(3) {
+          animation-delay: 0.15s;
+        }
+        .wave-bar:nth-child(4) {
+          animation-delay: 0.2s;
+        }
+        .wave-bar:nth-child(5) {
+          animation-delay: 0.25s;
+        }
+        .wave-bar:nth-child(6) {
+          animation-delay: 0.3s;
+        }
+        .wave-bar:nth-child(7) {
+          animation-delay: 0.35s;
+        }
+        .wave-bar:nth-child(8) {
+          animation-delay: 0.4s;
+        }
+        .wave-bar:nth-child(9) {
+          animation-delay: 0.45s;
+        }
+        .wave-bar:nth-child(10) {
+          animation-delay: 0.5s;
+        }
+        @keyframes wave {
+          0% {
+            height: 4px;
+          }
+          50% {
+            height: 18px;
+          }
+          100% {
+            height: 4px;
+          }
+        }
+
+        .generated-tasks {
+          max-height: 140px;
+          overflow: hidden;
+        }
+
+        .shimmer-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 9999px;
+          background: rgba(148, 163, 184, 0.9);
+          box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.35);
+          animation: shimmerDot 1.05s infinite ease-in-out;
+          will-change: transform, opacity, box-shadow;
+        }
+        @keyframes shimmerDot {
+          0% {
+            transform: translateY(0px) scale(0.95);
+            opacity: 0.45;
+            box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.15);
+          }
+          50% {
+            transform: translateY(-1px) scale(1);
+            opacity: 0.85;
+            box-shadow: 0 0 0 6px rgba(148, 163, 184, 0.06);
+          }
+          100% {
+            transform: translateY(0px) scale(0.95);
+            opacity: 0.45;
+            box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.15);
+          }
+        }
+      `}</style>
       <div className="px-4 py-4">
         <div className="font-semibold text-gray-900 text-[13px]">Voice Feedback</div>
         <div className="mt-1 text-[12px] text-gray-600">
           Describe the issue — Echly will structure it.
         </div>
 
-        <div className="mt-4 flex items-end gap-1.5 h-8">
-          {Array.from({ length: 18 }).map((_, i) => (
-            <motion.div
+        <div className="mt-4">
+          <div className="voice-wave">
+            {bars.map((_, i) => (
               // eslint-disable-next-line react/no-array-index-key
-              key={i}
-              animate={{ height: [6, 22, 10, 26, 8] }}
-              transition={{
-                repeat: Infinity,
-                duration: 1.25,
-                delay: i * 0.045,
-                ease: "easeInOut",
-              }}
-              className="w-[3px] rounded bg-blue-600/90"
-              style={{ height: 10 }}
-            />
-          ))}
+              <span key={i} className="wave-bar" />
+            ))}
+          </div>
         </div>
 
         <div className="mt-3 text-[12px] text-gray-600">Listening...</div>
@@ -464,8 +983,12 @@ function VoiceFeedbackPopup() {
   )
 }
 
+function LoadingIndicator() {
+  return <span className="shimmer-dot" aria-hidden="true" />
+}
+
 function ProcessingStack() {
-  const items = ["Processing feedback...", "Text Adjustment", "Button Adjustment", "Image Adjustment", "Card Update"]
+  const items = ["Processing feedback...", "Text Adjustment", "Button Adjustment", "Image Adjustment"]
 
   return (
     <motion.div
@@ -481,14 +1004,127 @@ function ProcessingStack() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 * idx, duration: 0.28 }}
-          className="bg-white border border-gray-200 shadow-[0_14px_44px_rgba(0,0,0,0.12)] rounded-2xl px-4 py-3 flex items-center justify-between"
+          className="bg-white/70 backdrop-blur border border-gray-200 shadow-[0_10px_34px_rgba(0,0,0,0.10)] rounded-2xl px-4 py-3 flex items-center justify-between"
         >
           <span className={`text-[12px] ${idx === 0 ? "font-semibold text-gray-900" : "font-medium text-gray-800"}`}>
             {label}
           </span>
-          <span className="text-gray-400 text-[11px]">…</span>
+          <LoadingIndicator />
         </motion.div>
       ))}
+    </motion.div>
+  )
+}
+
+function ProcessingPanelCard({ tasksStarted }: { tasksStarted: boolean }) {
+  const items = ["Processing feedback...", "Text Adjustment", "Button Adjustment", "Image Adjustment"]
+  const tasks = GENERATED_TASKS.slice(0, 2)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 12, scale: 0.99 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 12, scale: 0.99 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="w-[280px]"
+    >
+      <div className="rounded-2xl border border-gray-200 bg-white/80 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.16)] overflow-hidden pointer-events-auto">
+        <div className="p-4">
+          <div className="font-semibold text-gray-900 text-[13px]">Processing</div>
+          <div className="mt-3 space-y-2">
+            {items.map((label, idx) => (
+              <motion.div
+                key={label}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.08 * idx, duration: 0.28, ease: "easeOut" }}
+                className="flex items-center justify-between rounded-xl bg-white/70 backdrop-blur border border-gray-200 shadow-[0_10px_34px_rgba(0,0,0,0.10)] px-4 py-3"
+              >
+                <span className={`text-[12px] ${idx === 0 ? "font-semibold text-gray-900" : "font-medium text-gray-800"}`}>
+                  {label}
+                </span>
+                <LoadingIndicator />
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div
+            initial={false}
+            animate={{ opacity: tasksStarted ? 1 : 0, height: tasksStarted ? "auto" : 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="mt-4 overflow-hidden"
+          >
+            <div className="text-[11px] font-semibold tracking-wide text-gray-500">GENERATED TASKS</div>
+            <div className="mt-2 space-y-2 generated-tasks">
+              {tasks.slice(0, 2).map((t, i) => (
+                <motion.div
+                  key={t}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={tasksStarted ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+                  transition={{ duration: 0.28, ease: "easeOut", delay: i * 0.4 }}
+                  className="rounded-xl bg-white/70 backdrop-blur border border-gray-200 px-3 py-2.5 shadow-[0_10px_34px_rgba(0,0,0,0.08)]"
+                >
+                  <div className="text-[12px] font-medium text-gray-900">{t}</div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function VoicePanelCard({ waveformActive, captureIdle }: { waveformActive: boolean; captureIdle: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.99 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 10 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="w-full max-w-[360px] pointer-events-none"
+    >
+      <div className="rounded-2xl border border-gray-200 bg-white/80 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.16)] overflow-hidden pointer-events-auto">
+        <div className={["p-4", waveformActive && !captureIdle ? "" : "wave-idle"].join(" ")}>
+          <VoiceFeedbackPopup />
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function CapturePanels({
+  phase,
+  waveformActive,
+  tasksStarted,
+  captureIdle,
+}: {
+  phase: CapturePhase
+  waveformActive: boolean
+  tasksStarted: boolean
+  captureIdle: boolean
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+    >
+      <div className="absolute inset-0 flex items-center justify-center">
+        <AnimatePresence mode="wait" initial={false}>
+          {phase === "voice" || phase === "processing" ? (
+            <VoicePanelCard key="voice" waveformActive={waveformActive} captureIdle={captureIdle} />
+          ) : null}
+        </AnimatePresence>
+      </div>
+
+      <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none">
+        <AnimatePresence mode="wait" initial={false}>
+          {phase === "processing" ? <ProcessingPanelCard key="processing" tasksStarted={tasksStarted} /> : null}
+        </AnimatePresence>
+      </div>
     </motion.div>
   )
 }
@@ -516,13 +1152,29 @@ function StepCard({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") onClick()
       }}
-      whileHover={{ y: -4 }}
-      className={`w-full p-6 rounded-xl border cursor-pointer transition-all select-none ${
-        active ? "bg-blue-50 border-blue-500 shadow-lg" : "bg-white border-gray-200"
-      }`}
+      whileHover={{ scale: 1.02, y: -3 }}
+      whileTap={{ scale: 0.99 }}
+      className={[
+        "w-full p-7 rounded-2xl border cursor-pointer select-none transition-all duration-300",
+        "shadow-sm hover:shadow-lg",
+        active
+          ? "bg-blue-50 border-blue-400 shadow-md"
+          : "border-gray-200 bg-gradient-to-b from-white/80 to-white backdrop-blur",
+      ].join(" ")}
     >
-      <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
-        {icon}
+      <div className="flex items-start justify-between gap-4">
+        <div className="w-11 h-11 rounded-2xl bg-blue-100/80 border border-blue-200/60 flex items-center justify-center text-blue-700">
+          {icon}
+        </div>
+        {active ? (
+          <motion.div
+            initial={{ opacity: 0, y: -2 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-[11px] font-semibold text-blue-700 bg-blue-100/70 border border-blue-200/70 px-2 py-1 rounded-full"
+          >
+            Active
+          </motion.div>
+        ) : null}
       </div>
 
       <div className="mt-3 font-semibold text-gray-900 text-[16px]">{title}</div>
