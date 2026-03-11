@@ -107,10 +107,12 @@ export function FeedbackListPanel({
             }
           }
         }}
-        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-all ${
+        className={`ticket-item flex items-stretch gap-3 px-4 cursor-pointer transition-all ${
           isSelected ? "bg-[var(--accent-operational)]/10" : "hover:bg-black/[0.03]"
         }`}
+        data-selected={isSelected}
       >
+        <div className="ticket-rail" aria-hidden />
         {selectionMode && onSelectionModeChange ? (
           <button
             type="button"

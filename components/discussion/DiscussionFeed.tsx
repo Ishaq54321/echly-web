@@ -170,7 +170,7 @@ export function DiscussionFeed({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="text-sm text-neutral-600">{error}</p>
+        <p className="text-sm text-secondary">{error}</p>
       </div>
     );
   }
@@ -182,7 +182,7 @@ export function DiscussionFeed({
         <h2 className="text-lg font-semibold text-neutral-900">
           No discussions yet
         </h2>
-        <p className="mt-2 text-sm text-neutral-500 max-w-[280px]">
+        <p className="mt-2 text-sm text-secondary max-w-[280px]">
           When people comment on feedback, conversations will appear here.
         </p>
       </div>
@@ -212,19 +212,19 @@ export function DiscussionFeed({
             <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2">
               {item.title}
             </h3>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-secondary">
               <span>{item.sessionName ?? "Unknown Session"}</span>
               {item.commentCount != null && item.commentCount > 0 && (
                 <span>· {item.commentCount} comments</span>
               )}
             </div>
             {item.lastCommentPreview && (
-              <p className="mt-2 text-sm text-neutral-600 line-clamp-2">
+              <p className="mt-2 text-sm text-secondary line-clamp-2">
                 {item.lastCommentPreview}
               </p>
             )}
             {ts > 0 && (
-              <p className="mt-1.5 text-[11px] text-neutral-400">
+              <p className="mt-1.5 text-[11px] text-meta">
                 Updated {formatRelativeTime(new Date(ts))}
               </p>
             )}

@@ -137,7 +137,7 @@ function SessionPageSkeleton() {
                 Loading…
               </p>
             </div>
-            <div className="text-[13px] text-neutral-500 flex-shrink-0">
+            <div className="text-[13px] text-secondary flex-shrink-0">
               —
             </div>
           </div>
@@ -1566,7 +1566,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             >
               Delete this ticket?
             </h2>
-            <p className="mt-2 text-[14px] text-neutral-500">
+            <p className="mt-2 text-[14px] text-secondary">
               This action cannot be undone.
             </p>
             <div className="mt-6 flex gap-3 justify-end">

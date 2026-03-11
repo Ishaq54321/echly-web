@@ -77,13 +77,13 @@ export function MoveToFolderModal({
         >
           Move session
         </h2>
-        <p className="text-sm text-neutral-500 mb-4">
+        <p className="text-sm text-secondary mb-4">
           Select a folder to move this session into.
         </p>
 
         {folders.length === 0 ? (
           <div className="text-center py-10">
-            <p className="text-sm text-neutral-500 mb-4">
+            <p className="text-sm text-secondary mb-4">
               No folders created yet
             </p>
             <button
@@ -114,7 +114,7 @@ export function MoveToFolderModal({
                       {folder.name}
                     </span>
                   </div>
-                  <span className="text-xs text-neutral-500">
+                  <span className="text-xs text-secondary">
                     {folder.sessionIds.length}
                   </span>
                 </button>
@@ -125,7 +125,7 @@ export function MoveToFolderModal({
               <button
                 type="button"
                 onClick={handleClose}
-                className="text-neutral-600 hover:text-neutral-900 px-4 py-2 text-sm font-medium rounded-lg hover:bg-neutral-100 transition"
+                className="text-secondary hover:text-neutral-900 px-4 py-2 text-sm font-medium rounded-lg hover:bg-neutral-100 transition"
               >
                 Cancel
               </button>

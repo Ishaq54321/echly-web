@@ -20,7 +20,7 @@ export function SessionsHeader({
       {/* Title + Actions */}
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-sm text-neutral-500 font-medium">Library</div>
+          <div className="text-sm text-secondary font-medium">Library</div>
           <h1 className="text-4xl font-semibold">Sessions</h1>
         </div>
 
@@ -53,7 +53,7 @@ export function SessionsHeader({
               aria-selected={activeTab === "all"}
               onClick={() => onTabChange("all")}
               className={`relative pb-3 text-sm font-semibold ${
-                activeTab === "all" ? "text-neutral-900" : "text-neutral-500"
+                activeTab === "all" ? "text-neutral-900" : "text-secondary"
               }`}
             >
               Sessions
@@ -70,7 +70,7 @@ export function SessionsHeader({
               className={`relative pb-3 text-sm font-semibold ${
                 activeTab === "archived"
                   ? "text-neutral-900"
-                  : "text-neutral-500"
+                  : "text-secondary"
               }`}
             >
               Archived
@@ -81,7 +81,7 @@ export function SessionsHeader({
           </div>
 
           {/* Session Count — aligned with tabs */}
-          <div className="text-sm text-neutral-400">
+          <div className="text-sm text-meta">
             {sessionCount} sessions
           </div>
         </div>

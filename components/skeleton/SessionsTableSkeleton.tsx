@@ -4,22 +4,22 @@ export default function SessionsTableSkeleton() {
       <table className="w-full text-left border-collapse">
         <thead>
           <tr>
-            <th className="text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2">
+            <th className="text-[11px] tracking-wide text-meta font-medium px-3 py-2">
               Session
             </th>
-            <th className="text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2 w-[110px]">
+            <th className="text-[11px] tracking-wide text-meta font-medium px-3 py-2 w-[110px]">
               Status
             </th>
-            <th className="text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2 w-[80px] text-right">
+            <th className="text-[11px] tracking-wide text-meta font-medium px-3 py-2 w-[80px] text-right">
               Open
             </th>
-            <th className="text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2 w-[90px] text-right">
+            <th className="text-[11px] tracking-wide text-meta font-medium px-3 py-2 w-[90px] text-right">
               Resolved
             </th>
-            <th className="text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2 w-[120px] text-right">
+            <th className="text-[11px] tracking-wide text-meta font-medium px-3 py-2 w-[120px] text-right">
               Progress
             </th>
-            <th className="text-right w-[140px] text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2">
+            <th className="text-right w-[140px] text-[11px] tracking-wide text-meta font-medium px-3 py-2">
               Last Activity
             </th>
           </tr>

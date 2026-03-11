@@ -147,13 +147,13 @@ function DashboardContent() {
     <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20 relative">
       <div className="absolute top-6 left-1/2 -translate-x-1/2 w-[560px]">
         <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-meta pointer-events-none" />
           <input
             type="search"
             placeholder="Search sessions"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-4 rounded-full border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+            className="w-full h-10 pl-9 pr-4 rounded-full border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
             aria-label="Search sessions"
           />
         </div>

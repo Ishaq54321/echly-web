@@ -154,7 +154,7 @@ export function MoveSessionsModal({
               placeholder="Search sessions"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full border border-neutral-200 rounded-full px-4 py-2 text-sm mt-4 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-transparent"
+              className="w-full border border-neutral-200 rounded-full px-4 py-2 text-sm mt-4 text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-transparent"
               aria-label="Search sessions"
             />
 
@@ -193,7 +193,7 @@ export function MoveSessionsModal({
                         {session.title}
                       </span>
                     </div>
-                    <p className="text-xs text-neutral-500 mt-0.5">
+                    <p className="text-xs text-secondary mt-0.5">
                       Updated{" "}
                       {session.updatedAt
                         ? formatRelativeTime(session.updatedAt)
@@ -205,7 +205,7 @@ export function MoveSessionsModal({
             </div>
 
             {filteredSessions.length === 0 && (
-              <p className="text-sm text-neutral-500 py-4">
+              <p className="text-sm text-secondary py-4">
                 {search.trim()
                   ? "No sessions match your search."
                   : "No sessions available to move."}
@@ -218,7 +218,7 @@ export function MoveSessionsModal({
           <button
             type="button"
             onClick={handleClose}
-            className="text-neutral-600 text-sm px-4 py-2 hover:text-neutral-900 transition"
+            className="text-secondary text-sm px-4 py-2 hover:text-neutral-900 transition"
           >
             Cancel
           </button>

@@ -1,13 +1,14 @@
 /* Popup-only overrides: ensure #echly-root theme applies in popup document */
 /* Fallbacks when popup loads without full widget theme */
 #echly-root.echly-popup-root {
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-meta: #64748B;
   --button-primary-bg: #111827;
   --button-primary-text: #ffffff;
   --color-alert: #dc2626;
   background: #f8f9fa;
-  color: #111827;
+  color: var(--text-primary);
   width: 100%;
   min-height: 100%;
   padding: 0;

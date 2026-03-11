@@ -92,12 +92,12 @@ export function CommentItem({
 
   const avatarSize = size === "compact" ? "w-6 h-6" : "w-8 h-8";
   const textSize = size === "compact" ? "text-[13px]" : "text-[15px]";
-  const metaSize = size === "compact" ? "text-[11px]" : "text-[12px]";
+  const metaSize = size === "compact" ? "text-[11px]" : "text-xs";
 
   return (
-    <div className={`flex gap-3 group relative font-sans ${className}`}>
+    <div className={`flex gap-2.5 group relative ${className}`}>
       <div
-        className={`${avatarSize} shrink-0 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-neutral-600 overflow-hidden`}
+        className={`${avatarSize} shrink-0 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-secondary overflow-hidden`}
       >
         {comment.userAvatar?.trim() ? (
           <img
@@ -112,10 +112,10 @@ export function CommentItem({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center flex-wrap gap-2">
-          <span className={`font-medium text-neutral-900 ${size === "compact" ? "text-[13px]" : "text-[14px]"}`}>
+          <span className={`font-semibold text-neutral-900 ${size === "compact" ? "text-[13px]" : "text-[14px]"}`}>
             {comment.userName ?? "User"}
           </span>
-          <span className={`text-neutral-400 ${metaSize}`}>
+          <span className={`text-xs text-meta ${metaSize}`}>
             {formatCommentDate(comment.createdAt)}
           </span>
           {showMenu && (
@@ -123,7 +123,7 @@ export function CommentItem({
               <button
                 type="button"
                 onClick={() => setMenuOpen((o) => !o)}
-                className="p-1 rounded text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+                className="p-1 rounded text-secondary hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
                 aria-label="Comment actions"
               >
                 <MoreVertical className={size === "compact" ? "h-3.5 w-3.5" : "h-4 w-4"} strokeWidth={1.5} />
@@ -167,7 +167,7 @@ export function CommentItem({
             <textarea
               value={editDraft}
               onChange={(e) => setEditDraft(e.target.value)}
-              className="w-full min-h-[80px] rounded-xl border border-neutral-200 px-4 py-3 text-[14px] font-normal text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition resize-none"
+              className="w-full min-h-[80px] rounded-xl border border-neutral-200 px-4 py-3 text-[14px] font-normal text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition resize-none"
               autoFocus
             />
             <div className="flex gap-2">
@@ -199,7 +199,7 @@ export function CommentItem({
           </div>
         ) : (
           <>
-            <p className={`mt-1 leading-relaxed text-neutral-700 ${textSize} ${comment.resolved ? "opacity-75 line-through" : ""}`}>
+            <p className={`mt-1 leading-relaxed text-secondary font-medium ${textSize} ${comment.resolved ? "opacity-75 line-through" : ""}`}>
               {comment.message}
             </p>
             {comment.attachment && (
@@ -235,14 +235,14 @@ export function CommentItem({
             <h2 id="delete-comment-title" className="text-lg font-semibold text-neutral-900">
               Delete comment
             </h2>
-            <p className="mt-2 text-sm text-neutral-600">
+            <p className="mt-2 text-sm text-secondary">
               Are you sure you want to delete this comment?
               This action cannot be undone.
             </p>
             <div className="mt-4 p-3 rounded-lg border border-neutral-200 bg-neutral-50/80">
               <div className="flex gap-3">
                 <div
-                  className={`${avatarSize} shrink-0 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-neutral-600 overflow-hidden`}
+                  className={`${avatarSize} shrink-0 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-secondary overflow-hidden`}
                 >
                   {comment.userAvatar?.trim() ? (
                     <img
@@ -259,7 +259,7 @@ export function CommentItem({
                     <span className="text-sm font-medium text-neutral-900">
                       {comment.userName ?? "User"}
                     </span>
-                    <span className={`text-neutral-400 ${metaSize}`}>
+                    <span className={`text-meta ${metaSize}`}>
                       {formatCommentDate(comment.createdAt)}
                     </span>
                   </div>

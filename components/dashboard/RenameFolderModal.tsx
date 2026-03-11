@@ -77,7 +77,7 @@ export function RenameFolderModal({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-transparent"
+          className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-transparent"
           aria-label="Folder name"
           aria-invalid={!!error}
         />
@@ -90,7 +90,7 @@ export function RenameFolderModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-600 hover:bg-neutral-100 transition"
+            className="px-4 py-2.5 text-sm font-medium rounded-xl text-secondary hover:bg-neutral-100 transition"
           >
             Cancel
           </button>

@@ -136,7 +136,7 @@ export default function InsightsPage() {
             <h1 className="text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-neutral-900">
               Insights
             </h1>
-            <p className="mt-1 text-[13px] text-neutral-500">
+            <p className="mt-1 text-[13px] text-secondary">
               Product value and activity across your feedback.
             </p>
           </header>
@@ -176,7 +176,7 @@ export default function InsightsPage() {
           <h1 className="text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-neutral-900">
             Insights
           </h1>
-          <p className="mt-1 text-[13px] text-neutral-500">
+          <p className="mt-1 text-[13px] text-secondary">
             Product value and activity across your feedback.
           </p>
         </header>
@@ -187,13 +187,13 @@ export default function InsightsPage() {
             <Sparkles className="text-blue-600 w-5 h-5" strokeWidth={1.5} />
           </div>
           <div className="flex flex-col min-w-0">
-            <p className="text-xs uppercase tracking-wide text-neutral-500">
+            <p className="text-xs uppercase tracking-wide text-secondary">
               Time saved reviewing feedback
             </p>
             <h2 className="text-3xl font-semibold tracking-tight text-neutral-900">
               {timeSaved.formatted} saved
             </h2>
-            <div className="flex gap-5 mt-2 text-sm text-neutral-600">
+            <div className="flex gap-5 mt-2 text-sm text-secondary">
               <span>{ticketCount} issues captured</span>
               <span>•</span>
               <span>{replyCount} replies</span>
@@ -211,7 +211,7 @@ export default function InsightsPage() {
             </div>
             <div className="min-w-0">
               <p className="text-4xl font-semibold text-neutral-900">{ticketCount}</p>
-              <p className="text-xs uppercase tracking-wide font-medium text-neutral-600 mt-1">Visual feedback captured</p>
+              <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Visual feedback captured</p>
             </div>
           </div>
           <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-200 bg-purple-50 hover:shadow-lg transition flex items-center gap-3">
@@ -220,7 +220,7 @@ export default function InsightsPage() {
             </div>
             <div className="min-w-0">
               <p className="text-4xl font-semibold text-neutral-900">{replyCount}</p>
-              <p className="text-xs uppercase tracking-wide font-medium text-neutral-600 mt-1">Replies made</p>
+              <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Replies made</p>
             </div>
           </div>
           <div className="bg-white rounded-xl p-6 shadow-sm border border-indigo-200 bg-indigo-50 hover:shadow-lg transition flex items-center gap-3">
@@ -229,7 +229,7 @@ export default function InsightsPage() {
             </div>
             <div className="min-w-0">
               <p className="text-4xl font-semibold text-neutral-900">{sessionCount}</p>
-              <p className="text-xs uppercase tracking-wide font-medium text-neutral-600 mt-1">Sessions reviewed</p>
+              <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Sessions reviewed</p>
             </div>
           </div>
           <div className="bg-white rounded-xl p-6 shadow-sm border border-green-200 bg-green-50 hover:shadow-lg transition flex items-center gap-3">
@@ -238,7 +238,7 @@ export default function InsightsPage() {
             </div>
             <div className="min-w-0">
               <p className="text-4xl font-semibold text-neutral-900">{resolvedCount}</p>
-              <p className="text-xs uppercase tracking-wide font-medium text-neutral-600 mt-1">Discussions resolved</p>
+              <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Discussions resolved</p>
             </div>
           </div>
         </section>
@@ -249,7 +249,7 @@ export default function InsightsPage() {
             <h3 className="text-sm font-semibold text-neutral-900 mb-4">Most Commented Sessions</h3>
             <ul className="text-sm text-neutral-700">
               {mostCommentedSessions.length === 0 ? (
-                <li className="py-2 px-3 text-neutral-500">No sessions with comments yet.</li>
+                <li className="py-2 px-3 text-secondary">No sessions with comments yet.</li>
               ) : (
                 mostCommentedSessions.map((s, i) => (
                   <li key={s.sessionId} className="flex items-center gap-3 py-2 px-3 rounded-md hover:bg-neutral-50 transition">
@@ -266,7 +266,7 @@ export default function InsightsPage() {
             <h3 className="text-sm font-semibold text-neutral-900 mb-4">Most Reported Issue Type</h3>
             <ul className="text-sm text-neutral-700">
               {mostReportedIssueTypes.length === 0 ? (
-                <li className="py-2 px-3 text-neutral-500">No issue types yet.</li>
+                <li className="py-2 px-3 text-secondary">No issue types yet.</li>
               ) : (
                 mostReportedIssueTypes.map((type, i) => (
                   <li key={type.type} className="flex items-center gap-3 py-2 px-3 rounded-md hover:bg-neutral-50 transition">
@@ -283,14 +283,14 @@ export default function InsightsPage() {
             <h3 className="text-sm font-semibold text-neutral-900 mb-4">Team Response Speed</h3>
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <p className="text-xs text-neutral-500">Average first reply</p>
+                <p className="text-xs text-secondary">Average first reply</p>
                 <p className="text-xl font-semibold text-neutral-900 mt-0.5">{responseSpeed.averageFirstReply}</p>
-                <p className="text-xs text-neutral-500 mt-1">Typical response speed</p>
+                <p className="text-xs text-secondary mt-1">Typical response speed</p>
               </div>
               <div>
-                <p className="text-xs text-neutral-500">Average resolution time</p>
+                <p className="text-xs text-secondary">Average resolution time</p>
                 <p className="text-xl font-semibold text-neutral-900 mt-0.5">{responseSpeed.averageResolutionTime}</p>
-                <p className="text-xs text-neutral-500 mt-1">Time to close discussions</p>
+                <p className="text-xs text-secondary mt-1">Time to close discussions</p>
               </div>
             </div>
           </div>
@@ -300,14 +300,14 @@ export default function InsightsPage() {
               <>
                 <p className="text-lg font-semibold text-neutral-900">{mostActiveSession.sessionName}</p>
                 <div className="border-t border-neutral-200 mt-4 pt-3" aria-hidden />
-                <div className="flex gap-6 mt-3 text-sm text-neutral-600">
+                <div className="flex gap-6 mt-3 text-sm text-secondary">
                   <span>{mostActiveSession.issues} issues</span>
                   <span>{mostActiveSession.replies} replies</span>
                   <span>{mostActiveSession.collaborators} collaborators</span>
                 </div>
               </>
             ) : (
-              <p className="text-neutral-500">No session data yet.</p>
+              <p className="text-secondary">No session data yet.</p>
             )}
           </div>
         </section>

@@ -266,7 +266,7 @@ export default function SessionOverviewPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--canvas-base)]">
-        <p className="text-sm text-neutral-600">Failed to load overview.</p>
+        <p className="text-sm text-secondary">Failed to load overview.</p>
       </div>
     );
   }

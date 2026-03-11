@@ -57,7 +57,7 @@ export function CommentAttachmentCard({ attachment, onImageClick }: CommentAttac
             </a>
           )}
           <div className="flex items-center gap-2 mt-1">
-            <FileIcon className="h-4 w-4 text-neutral-500 shrink-0" strokeWidth={1.5} />
+            <FileIcon className="h-4 w-4 text-secondary shrink-0" strokeWidth={1.5} />
             <span className="text-sm text-neutral-700 truncate min-w-0" title={name}>
               {name}
             </span>
@@ -74,7 +74,7 @@ export function CommentAttachmentCard({ attachment, onImageClick }: CommentAttac
         </>
       ) : (
         <div className="flex items-center gap-2">
-          <FileIcon className="h-4 w-4 text-neutral-500 shrink-0" strokeWidth={1.5} />
+          <FileIcon className="h-4 w-4 text-secondary shrink-0" strokeWidth={1.5} />
           <span className="text-sm text-neutral-700 truncate min-w-0" title={name}>
             {name}
           </span>

@@ -203,7 +203,7 @@ function FolderPageContent() {
       <div className="mx-auto w-full max-w-[1800px] px-10 pt-10 pb-8">
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-sm text-neutral-500 font-medium">
+            <div className="text-sm text-secondary font-medium">
               Folder
             </div>
             {loading ? (
@@ -256,7 +256,7 @@ function FolderPageContent() {
                   <h3 className="text-lg font-semibold text-neutral-900 mb-1">
                     This folder is empty
                   </h3>
-                  <p className="text-sm text-neutral-500 mb-6 max-w-sm">
+                  <p className="text-sm text-secondary mb-6 max-w-sm">
                     Move sessions into this folder to organize your feedback and recordings.
                   </p>
                   <button

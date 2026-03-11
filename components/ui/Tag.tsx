@@ -4,7 +4,7 @@ import { getTagPillClass } from "@/lib/tagConfig";
 
 export type TagVariant = "default" | "sidebar";
 
-const SIDEBAR_NEUTRAL_CLASS = "bg-neutral-100 text-[12px] text-neutral-400";
+const SIDEBAR_NEUTRAL_CLASS = "bg-neutral-100 text-[12px] text-meta";
 
 interface TagProps {
   name: string;

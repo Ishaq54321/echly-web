@@ -52,7 +52,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
   if (!feedbackId) {
     return (
       <div className="w-[320px] shrink-0 flex flex-col items-center justify-center p-8 bg-white text-center border-r border-neutral-200">
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-secondary">
           Select a discussion to view ticket details
         </p>
       </div>
@@ -80,7 +80,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
 
         {hasSteps && (
           <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <p className="text-[12px] uppercase font-semibold tracking-wide text-neutral-500 mb-2">
+            <p className="text-[12px] uppercase font-semibold tracking-wide text-secondary mb-2">
               Action steps
             </p>
             <ul className="text-[14px] leading-relaxed text-neutral-700 space-y-1 list-disc list-inside">

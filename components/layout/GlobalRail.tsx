@@ -132,7 +132,7 @@ export default function GlobalRail() {
               <p className="text-sm font-medium text-neutral-900 truncate">
                 {WORKSPACE_NAME}
               </p>
-              <p className="text-xs text-neutral-500">1 member</p>
+              <p className="text-xs text-secondary">1 member</p>
             </div>
           </div>
           <button
@@ -179,13 +179,13 @@ export default function GlobalRail() {
               placeholder="email@example.com"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              className="mt-4 w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="mt-4 w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setInviteModalOpen(false)}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-600 hover:bg-neutral-100 transition"
+                className="px-4 py-2.5 text-sm font-medium rounded-xl text-secondary hover:bg-neutral-100 transition"
               >
                 Cancel
               </button>

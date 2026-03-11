@@ -462,7 +462,7 @@ export function WorkspaceCard({
                 <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2 overflow-hidden text-ellipsis min-w-0">
                   {session.title}
                 </h3>
-                <div className="text-xs text-neutral-400 font-medium mt-1">
+                <div className="text-xs text-meta font-medium mt-1">
                   Updated {session.updatedAt ? formatRelativeTime(session.updatedAt) : "recently"}
                 </div>
               </div>
@@ -481,7 +481,7 @@ export function WorkspaceCard({
 
           <div className="mt-auto">
             <div className="h-px bg-gradient-to-r from-transparent via-neutral-200 to-transparent mb-3" />
-            <div className="flex items-center gap-4 text-neutral-500 text-sm">
+            <div className="flex items-center gap-4 text-secondary text-sm">
               <div className="flex items-center gap-1">
                 <Eye size={14} aria-hidden />
                 <span>{viewCount}</span>

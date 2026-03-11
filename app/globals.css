@@ -61,6 +61,9 @@
   --color-primary-hover: #1648b8;
   --color-primary-soft: rgba(26, 86, 219, 0.08);
   --color-primary-ring: rgba(26, 86, 219, 0.35);
+  /* Brand blue for discussion selection and links */
+  --brand-blue: #155DFC;
+
   /* Legacy/alias for existing usage */
   --accent-operational: #1a56db;
   --accent-operational-border: rgba(26, 86, 219, 0.25);
@@ -89,10 +92,12 @@
   --surface-2: 220 12% 96%;
   --surface-3: 220 10% 93%;
   --border: 220 13% 91%;
-  --text-primary: 222 47% 11%;
+  /* Typography hierarchy: premium contrast, no faded greys */
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-meta: #64748B;
   --text-active: 220 9% 46%;
-  --text-secondary: 220 9% 46%;
-  --text-muted: 220 8% 60%;
+  --text-muted: var(--text-meta);
   --brand: 217 85% 52%;
   --brand-ring: 217 85% 52% / 0.35;
 
@@ -144,6 +149,12 @@
   --text-tertiary: 220 9% 48%;
 }
 
+/* Text hierarchy utilities: use vars for secondary/meta only; primary stays default or explicit */
+.text-secondary { color: var(--text-secondary); }
+.text-meta { color: var(--text-meta); }
+.placeholder\:text-meta::placeholder { color: var(--text-meta); }
+.placeholder\:text-secondary::placeholder { color: var(--text-secondary); }
+
 /* ======================================
    BASE STYLES
 ====================================== */
@@ -153,7 +164,7 @@ body {
   height: 100%;
   overflow: hidden;
   background-color: var(--env-base);
-  color: #1a1a1a;
+  color: var(--text-primary);
   font-size: 15px;
   line-height: 1.65;
   font-family: "Plus Jakarta Sans", sans-serif;
@@ -274,6 +285,25 @@ button[aria-disabled="true"],
 
 *::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.18);
+}
+
+/* Discussion list: slim scrollbar (6px) */
+.discussion-list-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+.discussion-list-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.discussion-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.discussion-list-scroll::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 6px;
+}
+.discussion-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 
 /* ======================================
@@ -2274,6 +2304,80 @@ textarea:focus-visible {
   flex-direction: column;
   gap: 8px;
 }
+
+/* Discussion page: responsive flex layout */
+.discussion-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+/* Resize handle between panels */
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+}
+.resize-handle:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* Middle panel: no left spacing so blue selection rail aligns with divider */
+.discussion-panel-list {
+  padding-left: 0;
+  margin-left: 0;
+}
+
+/* Discussion list (middle panel) ticket row: full-height rail + Gmail-style divider (separate) */
+.ticket-item {
+  position: relative;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.ticket-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 3px;
+  background: transparent;
+  border-radius: 2px;
+}
+.ticket-item.selected::before {
+  background: var(--brand-blue);
+}
+.ticket-item:not(:last-child) {
+  border-bottom: 1px solid #E5E7EB;
+}
+.ticket-rail {
+  width: 3px;
+  background: #E5E7EB;
+  border-radius: 2px;
+  height: 100%;
+  flex-shrink: 0;
+}
+.ticket-item[data-selected="true"] .ticket-rail {
+  background: var(--brand-blue);
+}
+
+/* Subtle skeleton loading placeholders */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f5f5f5 25%,
+    #f0f0f0 37%,
+    #f5f5f5 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-loading 1.2s ease infinite;
+  border-radius: 6px;
+}
+@keyframes skeleton-loading {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
 .echly-feedback-item:hover {
   background: var(--bg-surface-hover);
 }

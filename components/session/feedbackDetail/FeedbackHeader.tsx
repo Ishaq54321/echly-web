@@ -132,11 +132,11 @@ export function FeedbackHeader({
               </h1>
               {onSaveTitle && (
                 saveSuccess ? (
-                  <Check size={14} className="text-neutral-600 shrink-0 flex-shrink-0" aria-hidden />
+                  <Check size={14} className="text-secondary shrink-0 flex-shrink-0" aria-hidden />
                 ) : (
                   <Pencil
                     size={14}
-                    className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-neutral-600 shrink-0 flex-shrink-0"
+                    className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-secondary shrink-0 flex-shrink-0"
                     aria-hidden
                   />
                 )
@@ -144,7 +144,7 @@ export function FeedbackHeader({
             </div>
           )}
           {saveSuccess && !isEditingTitle && (
-            <p className="text-[14px] text-neutral-600 mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
+            <p className="text-[14px] text-secondary mt-0.5 flex items-center gap-1.5 transition-opacity duration-150">
               <Check size={12} className="shrink-0" aria-hidden />
               Saved
             </p>

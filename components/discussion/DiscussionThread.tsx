@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Paperclip, Send } from "lucide-react";
+import { ArrowUpRight, Expand, Paperclip, Send } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { auth } from "@/lib/firebase";
 import { addComment, updateComment, deleteComment } from "@/lib/comments";
@@ -23,6 +23,7 @@ interface TicketData {
   sessionId?: string;
   screenshotUrl?: string | null;
   actionSteps?: string[];
+  createdAt?: string;
 }
 
 export function DiscussionThread({
@@ -37,12 +38,37 @@ export function DiscussionThread({
   const [commentDraft, setCommentDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
+  const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!screenshotModalOpen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setScreenshotModalOpen(false);
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [screenshotModalOpen]);
 
   const handleAttachmentSend = useCallback(
     async (attachment: CommentAttachment) => {
       const user = auth.currentUser;
       if (!user || !feedbackId || !ticket?.sessionId) return;
+      const optimisticComment: Comment = {
+        id: `temp-attach-${Date.now()}`,
+        sessionId: ticket.sessionId,
+        feedbackId,
+        userId: user.uid,
+        userName: user.displayName || "User",
+        userAvatar: user.photoURL || "",
+        message: "",
+        createdAt: null,
+        type: "general",
+        attachment,
+      };
+      setComments((prev) => [...prev, optimisticComment]);
+      setAttachmentModalOpen(false);
+      onCommentAdded?.();
       setSending(true);
       try {
         await addComment(ticket.sessionId, feedbackId, {
@@ -53,10 +79,9 @@ export function DiscussionThread({
           type: "general",
           attachment,
         });
-        setAttachmentModalOpen(false);
-        onCommentAdded?.();
       } catch (err) {
         console.error("[DiscussionThread] send attachment comment:", err);
+        setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
       } finally {
         setSending(false);
       }
@@ -142,6 +167,21 @@ export function DiscussionThread({
     const trimmed = commentDraft.trim();
     if (!trimmed) return;
 
+    const optimisticComment: Comment = {
+      id: `temp-${Date.now()}`,
+      sessionId: ticket.sessionId,
+      feedbackId,
+      userId: user.uid,
+      userName: user.displayName || "User",
+      userAvatar: user.photoURL || "",
+      message: trimmed,
+      createdAt: null,
+      type: "general",
+    };
+    setComments((prev) => [...prev, optimisticComment]);
+    setCommentDraft("");
+    onCommentAdded?.();
+
     setSending(true);
     try {
       await addComment(ticket.sessionId, feedbackId, {
@@ -151,10 +191,9 @@ export function DiscussionThread({
         message: trimmed,
         type: "general",
       });
-      setCommentDraft("");
-      onCommentAdded?.();
     } catch (err) {
       console.error("[DiscussionThread] send comment:", err);
+      setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
     } finally {
       setSending(false);
     }
@@ -162,12 +201,12 @@ export function DiscussionThread({
 
   if (!feedbackId) {
     return (
-      <div className="flex-1 flex h-full items-center justify-center bg-white min-w-0 font-sans">
+      <div className="flex-1 flex h-full items-center justify-center bg-white min-w-0">
         <div className="text-center max-w-sm">
           <p className="text-lg font-medium text-neutral-800">
             Select a ticket to view conversation
           </p>
-          <p className="text-sm text-neutral-500 mt-2">
+          <p className="text-sm text-secondary mt-2">
             Choose a discussion from the middle panel
           </p>
         </div>
@@ -177,11 +216,27 @@ export function DiscussionThread({
 
   if (loading || !ticket) {
     return (
-      <div className="flex-1 flex flex-col p-8 bg-white overflow-auto min-w-0 font-sans">
-        <div className="w-full space-y-4">
-          <div className="h-48 bg-neutral-100 rounded-xl animate-pulse" />
-          <div className="h-6 w-3/4 bg-neutral-200 rounded animate-pulse" />
-          <div className="h-20 bg-neutral-100 rounded animate-pulse" />
+      <div className="flex-1 flex flex-col p-8 bg-white overflow-auto min-w-0">
+        <div className="w-full space-y-4 max-w-[720px] ml-8 mr-auto">
+          <div className="h-48 w-full skeleton rounded-xl" />
+          <div className="h-5 w-3/4 skeleton max-w-[240px]" />
+          <div className="space-y-2">
+            <div className="h-3 w-full skeleton" />
+            <div className="h-3 w-4/5 skeleton" />
+            <div className="h-3 w-2/3 skeleton" />
+          </div>
+          <div className="rounded-2xl border border-neutral-200 p-6 mt-5 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-2.5">
+                <div className="w-8 h-8 rounded-full skeleton shrink-0" />
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="h-3 w-24 skeleton" />
+                  <div className="h-3 w-full skeleton" />
+                  <div className="h-3 w-4/5 skeleton" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -203,54 +258,69 @@ export function DiscussionThread({
   const user = auth.currentUser;
   const userInitial = user?.displayName?.charAt(0) ?? "?";
 
+  const contentClass = "max-w-[720px] ml-8 mr-auto";
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-white font-sans">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-white">
       <div className="flex-1 min-w-0 overflow-y-auto">
-        <div className="w-full max-w-[640px] ml-8 flex flex-col gap-5">
-          <div>
-            <h2 className="text-[18px] font-semibold text-neutral-900">
-              {ticket.title ?? "Untitled"}
-            </h2>
+        <div className={`w-full ${contentClass} flex flex-col text-left`}>
+          {/* Ticket header: title (left) + View feedback ticket (right) */}
+          <div className="mt-5 first:mt-0">
+            <div className="ticket-header flex items-center justify-between gap-4">
+              <h2 className="ticket-title text-lg font-semibold text-neutral-900 truncate min-w-0">
+                {ticket.title ?? "Untitled"}
+              </h2>
+              {ticket.sessionId && feedbackId ? (
+                <Link
+                  href={`/dashboard/${ticket.sessionId}?ticket=${feedbackId}`}
+                  className="text-blue-600 hover:text-blue-700 font-medium inline-flex gap-1 items-center shrink-0 hover:underline"
+                >
+                  View feedback ticket
+                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+                </Link>
+              ) : null}
+            </div>
+            {sessionName && ticket.sessionId && (
+              <p className="text-sm text-secondary mt-1">
+                {sessionName}
+              </p>
+            )}
           </div>
 
           {(hasScreenshot || hasSteps) && (
-            <div className="flex flex-col gap-4">
-              {/* Screenshot context card */}
+            <div className="flex flex-col mt-5">
+              {/* Screenshot — primary artifact; no overlay */}
               {hasScreenshot && (
-                <div className="max-w-[640px]">
-                  <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm flex items-center justify-center">
+                <div className="w-full screenshot-container relative">
+                  <div className="relative rounded-xl border border-[#e5e7eb] bg-white overflow-hidden flex items-center justify-center">
                     <Image
                       src={ticket.screenshotUrl!}
                       alt="Feedback screenshot"
                       width={800}
                       height={400}
-                      sizes="(max-width: 640px) 100vw, 640px"
-                      className="w-full max-h-[200px] object-contain"
+                      sizes="(max-width: 720px) 100vw, 720px"
+                      className="w-full max-h-[320px] object-contain"
                       loading="lazy"
                       unoptimized={ticket.screenshotUrl!.startsWith("data:")}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setScreenshotModalOpen(true)}
+                      className="expand-button absolute top-[10px] right-[10px] w-7 h-7 rounded-md bg-white/85 flex items-center justify-center cursor-pointer border-0 shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:bg-white hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition-all duration-150"
+                      aria-label="Expand screenshot"
+                    >
+                      <Expand className="w-3.5 h-3.5 text-neutral-700" strokeWidth={2} />
+                    </button>
                   </div>
-                  {ticket.sessionId && feedbackId && (
-                    <p className="mt-2 text-[13px]">
-                      <Link
-                        href={`/dashboard/${ticket.sessionId}?ticket=${feedbackId}`}
-                        className="inline-flex items-center gap-1 text-neutral-700 hover:text-blue-600 transition-colors font-sans"
-                      >
-                        View feedback ticket
-                        <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                      </Link>
-                    </p>
-                  )}
                 </div>
               )}
 
-              {/* Action steps card */}
+              {/* Action steps */}
               {hasSteps && (
-                <div className="max-w-[640px] px-1 py-2 transition-all duration-150 ease-out">
-                  <p className="text-xs uppercase tracking-wide font-semibold text-neutral-500 mb-2">
-                    Action steps
+                <div className="w-full mt-5">
+                  <p className="font-semibold text-orange-600 text-sm tracking-[0.02em] mb-2">
+                    Action Steps
                   </p>
-                  <ul className="text-[14px] leading-relaxed text-neutral-700 space-y-1 list-disc list-inside">
+                  <ul className="list-disc pl-[18px] leading-[1.6] text-neutral-700 space-y-1">
                     {steps!.map((step, i) => (
                       <li key={i}>{step}</li>
                     ))}
@@ -260,29 +330,29 @@ export function DiscussionThread({
             </div>
           )}
 
-          {/* Conversation container */}
-          <div className="max-w-[640px] rounded-2xl border border-neutral-200 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.05)] p-6">
-            {/* Thread: Avatar | Name | Timestamp / Message */}
-            <div className="mb-5">
+          {/* Comments */}
+          <div className="w-full rounded-2xl border border-neutral-200 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.05)] p-6 mt-5">
+            <div className="space-y-0">
               {!commentsInitialized ? (
                 <div className="space-y-4" aria-hidden>
                   {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="flex gap-3 animate-pulse">
-                      <div className="w-8 h-8 rounded-full bg-neutral-200 shrink-0" />
+                    <div key={i} className="flex gap-2.5">
+                      <div className="w-8 h-8 rounded-full skeleton shrink-0" />
                       <div className="flex-1 min-w-0 space-y-2">
-                        <div className="h-3 w-32 bg-neutral-200 rounded" />
-                        <div className="h-3 w-56 bg-neutral-200 rounded" />
+                        <div className="h-3 w-32 skeleton" />
+                        <div className="h-3 w-56 skeleton" />
+                        <div className="h-3 w-40 skeleton" />
                       </div>
                     </div>
                   ))}
                 </div>
               ) : rootComments.length === 0 ? (
-                <p className="text-sm text-neutral-500 font-normal">No comments yet.</p>
+                <p className="text-sm text-secondary">No comments yet.</p>
               ) : (
                 rootComments.map((root) => {
                   const replies = byThread.get(root.id) ?? [];
                   return (
-                    <div key={root.id} className="mb-5 last:mb-0">
+                    <div key={root.id} className="mt-[14px] first:mt-0">
                       <CommentItem
                         comment={root}
                         currentUserId={user?.uid ?? null}
@@ -292,7 +362,7 @@ export function DiscussionThread({
                       {replies.map((r) => (
                         <div
                           key={r.id}
-                          className="mt-4 ml-4 pl-3 border-l-2 border-neutral-200"
+                          className="mt-[14px] ml-4 pl-3 border-l-2 border-neutral-200"
                         >
                           <CommentItem
                             comment={r}
@@ -309,8 +379,8 @@ export function DiscussionThread({
               )}
             </div>
 
-            {/* Composer: Avatar | Input | Attach | Send */}
-            <div className="pt-5 border-t border-neutral-100">
+            {/* Composer: Avatar | Input | Attach | Send — no border under last comment */}
+            <div className="pt-5">
               <div className="flex items-center gap-3">
               <div className="w-[30px] h-[30px] rounded-full bg-[#EEF3FF] text-[#155DFC] font-semibold flex items-center justify-center shrink-0 overflow-hidden">
                 {userInitial}
@@ -326,12 +396,12 @@ export function DiscussionThread({
                     handleSendComment();
                   }
                 }}
-                className="flex-1 min-w-0 h-[44px] rounded-xl border border-neutral-200 px-4 text-[14px] font-normal text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition"
+                className="flex-1 min-w-0 h-[44px] rounded-xl border border-neutral-200 px-4 text-[14px] font-normal text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition"
               />
               <button
                 type="button"
                 onClick={() => setAttachmentModalOpen(true)}
-                className="p-2.5 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors shrink-0"
+                className="p-2.5 rounded-lg text-secondary hover:bg-neutral-100 hover:text-neutral-700 transition-colors shrink-0"
                 aria-label="Attach file"
               >
                 <Paperclip className="h-4 w-4" strokeWidth={1.5} />
@@ -356,6 +426,31 @@ export function DiscussionThread({
         onClose={() => setAttachmentModalOpen(false)}
         onSend={handleAttachmentSend}
       />
+
+      {/* Screenshot modal overlay */}
+      {screenshotModalOpen && ticket?.screenshotUrl && (
+        <div
+          className="fixed inset-0 bg-black/35 flex items-center justify-center z-[1000]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Screenshot preview"
+          onClick={() => setScreenshotModalOpen(false)}
+        >
+          <div
+            className="max-w-[85vw] max-h-[85vh] rounded-[10px] shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden bg-white animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Image
+              src={ticket.screenshotUrl}
+              alt="Feedback screenshot"
+              width={1200}
+              height={800}
+              className="w-full h-full object-contain max-w-[85vw] max-h-[85vh]"
+              unoptimized={ticket.screenshotUrl.startsWith("data:")}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

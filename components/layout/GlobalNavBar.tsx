@@ -77,7 +77,7 @@ export function GlobalNavBar() {
           className={`${iconButtonClass} rounded-full overflow-hidden`}
           aria-label="User menu"
         >
-          <div className="h-8 w-8 rounded-full bg-neutral-200 flex items-center justify-center text-[14px] font-medium text-neutral-600">
+          <div className="h-8 w-8 rounded-full bg-neutral-200 flex items-center justify-center text-[14px] font-medium text-secondary">
             U
           </div>
         </button>

@@ -194,7 +194,7 @@ export function FolderCard({
           <div className="text-sm font-semibold text-neutral-900 truncate">
             {folder.name}
           </div>
-          <div className="text-xs text-neutral-500">
+          <div className="text-xs text-secondary">
             {folder.sessions.length} sessions
           </div>
         </div>
@@ -210,7 +210,7 @@ export function FolderCard({
             aria-label="Folder actions"
             aria-expanded={moreOpen}
             aria-haspopup="menu"
-            className="flex items-center justify-center h-8 w-8 rounded-lg text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 transition opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+            className="flex items-center justify-center h-8 w-8 rounded-lg text-meta hover:bg-neutral-200 hover:text-secondary transition opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
@@ -268,7 +268,7 @@ export function FolderCard({
             <button
               type="button"
               onClick={handleDeleteClick}
-              className="w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-neutral-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+              className="w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-secondary hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
               role="menuitem"
             >
               <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />

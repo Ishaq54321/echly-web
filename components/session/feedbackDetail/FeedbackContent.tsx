@@ -202,7 +202,7 @@ export function FeedbackContent({
                       dropdownAnimate ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
                     }`}
                   >
-                    <p className="text-[14px] text-neutral-500">All tags added</p>
+                    <p className="text-[14px] text-secondary">All tags added</p>
                   </div>
                 )}
               </div>

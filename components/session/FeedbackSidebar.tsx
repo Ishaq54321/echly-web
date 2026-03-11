@@ -110,10 +110,10 @@ function FeedbackSidebarInner({
         {/* Header (fixed) */}
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
-            <h2 className="text-[12px] uppercase tracking-[0.08em] text-neutral-400">
+            <h2 className="text-[12px] uppercase tracking-[0.08em] text-meta">
               Feedback
             </h2>
-            <p className="text-[13px] text-neutral-400 mt-1">
+            <p className="text-[13px] text-meta mt-1">
               {subline}
             </p>
           </div>
@@ -124,7 +124,7 @@ function FeedbackSidebarInner({
               className="p-1.5 rounded-md cursor-pointer hover:bg-neutral-100 transition-colors duration-150"
               aria-label="Options"
             >
-              <MoreHorizontal className="h-4 w-4 text-neutral-500" />
+              <MoreHorizontal className="h-4 w-4 text-secondary" />
             </button>
             {menuOpen && (
               <div
@@ -187,7 +187,7 @@ function FeedbackSidebarInner({
             placeholder="Search feedback…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-full text-[15px] px-3 rounded-md bg-white border border-neutral-200 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
+            className="h-9 w-full text-[15px] px-3 rounded-md bg-white border border-neutral-200 placeholder:text-meta focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
             aria-label="Search feedback"
           />
         </div>
@@ -232,7 +232,7 @@ function FeedbackSidebarInner({
                   </span>
                   <button
                     type="button"
-                    className="opacity-0 group-hover:opacity-100 transition-colors duration-120 ease-out p-0.5 rounded-md text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 cursor-pointer border-0 bg-transparent shrink-0"
+                    className="opacity-0 group-hover:opacity-100 transition-colors duration-120 ease-out p-0.5 rounded-md text-meta hover:text-neutral-900 hover:bg-neutral-100 cursor-pointer border-0 bg-transparent shrink-0"
                     onClick={(e) => e.stopPropagation()}
                     aria-label="More actions"
                   >
@@ -249,17 +249,17 @@ function FeedbackSidebarInner({
           </div>
           {loadMoreRef && <div ref={loadMoreRef} />}
           {loadingMore && (
-            <div className="text-[14px] text-neutral-500 py-4 text-center">
+            <div className="text-[14px] text-secondary py-4 text-center">
               Loading…
             </div>
           )}
           {!hasMore && feedback.length > 0 && (
-            <div className="text-[12px] text-neutral-400 py-4 text-center">
+            <div className="text-[12px] text-meta py-4 text-center">
               No more feedback
             </div>
           )}
           {hasReachedLimit && feedback.length > 0 && (
-            <div className="shrink-0 px-3 py-1.5 text-[12px] text-neutral-400 text-center">
+            <div className="shrink-0 px-3 py-1.5 text-[12px] text-meta text-center">
               Reached maximum items
             </div>
           )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Upload, FileIcon } from "lucide-react";
 import type { CommentAttachment } from "@/lib/domain/comment";
 import { uploadAttachmentWithProgress } from "@/lib/uploadAttachment";
@@ -31,14 +31,14 @@ export function AttachmentUploadModal({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const objectUrlRef = useRef<string | null>(null);
 
   const resetState = useCallback(() => {
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
-    }
+    setImagePreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
     setSelectedFile(null);
     setUploadedAttachment(null);
     setUploading(false);
@@ -151,25 +151,22 @@ export function AttachmentUploadModal({
     return () => window.removeEventListener("keydown", handleEsc);
   }, [open, handleClose]);
 
+  useEffect(() => {
+    if (!selectedFile || !selectedFile.type.startsWith("image/")) {
+      setImagePreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      return;
+    }
+    const url = URL.createObjectURL(selectedFile);
+    setImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedFile]);
+
   if (!open) return null;
 
   const showPreview = selectedFile != null;
-
-  const imagePreviewUrl = useMemo(() => {
-    if (!selectedFile || !selectedFile.type.startsWith("image/")) return null;
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    objectUrlRef.current = URL.createObjectURL(selectedFile);
-    return objectUrlRef.current;
-  }, [selectedFile]);
-
-  useEffect(() => {
-    return () => {
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
-    };
-  }, []);
 
   return (
     <>
@@ -196,14 +193,14 @@ export function AttachmentUploadModal({
               >
                 Upload attachment
               </h2>
-              <p className="mt-1 text-sm text-neutral-500">
+              <p className="mt-1 text-sm text-secondary">
                 Attach a file to this discussion
               </p>
             </div>
             <button
               type="button"
               onClick={handleClose}
-              className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+              className="p-2 rounded-lg text-secondary hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
               aria-label="Close"
             >
               <X className="h-5 w-5" strokeWidth={1.5} />
@@ -230,13 +227,13 @@ export function AttachmentUploadModal({
                   onChange={handleChange}
                   accept="*/*"
                 />
-                <div className="flex justify-center text-neutral-400 mb-3">
+                <div className="flex justify-center text-meta mb-3">
                   <Upload className="h-10 w-10" strokeWidth={1.25} />
                 </div>
                 <p className="text-sm font-medium text-neutral-700">
                   Drag & drop a file here
                 </p>
-                <p className="text-sm text-neutral-500 mt-0.5">or</p>
+                <p className="text-sm text-secondary mt-0.5">or</p>
                 <button
                   type="button"
                   className="mt-2 px-4 py-2 rounded-lg bg-neutral-100 text-neutral-700 text-sm font-medium hover:bg-neutral-200 transition-colors"
@@ -257,7 +254,7 @@ export function AttachmentUploadModal({
             )}
 
             {!showPreview && (
-              <p className="mt-4 text-sm text-neutral-500">
+              <p className="mt-4 text-sm text-secondary">
                 Max file size: <strong className="text-neutral-700">15 MB</strong>
               </p>
             )}
@@ -277,20 +274,20 @@ export function AttachmentUploadModal({
                     <p className="mt-2 text-sm font-medium text-neutral-700 truncate max-w-full">
                       {selectedFile.name}
                     </p>
-                    <p className="text-xs text-neutral-500">
+                    <p className="text-xs text-secondary">
                       {formatFileSize(selectedFile.size)}
                     </p>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3 p-4 rounded-xl border border-neutral-200 bg-neutral-50">
-                    <div className="shrink-0 w-10 h-10 rounded-lg bg-neutral-200 flex items-center justify-center text-neutral-500">
+                    <div className="shrink-0 w-10 h-10 rounded-lg bg-neutral-200 flex items-center justify-center text-secondary">
                       <FileIcon className="h-5 w-5" strokeWidth={1.5} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-neutral-800 truncate">
                         {selectedFile.name}
                       </p>
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-xs text-secondary">
                         {formatFileSize(selectedFile.size)}
                       </p>
                     </div>
@@ -307,7 +304,7 @@ export function AttachmentUploadModal({
                         }}
                       />
                     </div>
-                    <p className="mt-1.5 text-sm text-neutral-500">
+                    <p className="mt-1.5 text-sm text-secondary">
                       Uploading…
                     </p>
                   </div>
@@ -319,7 +316,7 @@ export function AttachmentUploadModal({
                   </p>
                 )}
 
-                <p className="mt-4 text-sm text-neutral-500">
+                <p className="mt-4 text-sm text-secondary">
                   Max file size: <strong className="text-neutral-700">15 MB</strong>
                 </p>
               </div>

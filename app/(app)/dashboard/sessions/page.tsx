@@ -75,7 +75,7 @@ function FolderItem({
         <p className="text-[15px] font-semibold text-neutral-900 truncate">
           {folder.name}
         </p>
-        <p className="text-[13px] text-neutral-500">
+        <p className="text-[13px] text-secondary">
           {count} {count === 1 ? "session" : "sessions"}
         </p>
       </div>
@@ -167,7 +167,7 @@ export default function SessionsPage() {
     <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20">
       <div className="mx-auto w-full max-w-[1200px] px-8 pt-8 pb-10">
         <div className="mb-6">
-          <div className="text-sm text-neutral-500 font-medium">
+          <div className="text-sm text-secondary font-medium">
             Table View
           </div>
           <h1 className="text-4xl font-semibold text-neutral-900">
@@ -176,13 +176,13 @@ export default function SessionsPage() {
         </div>
 
         <div className="relative w-full max-w-md mb-8">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-meta pointer-events-none" />
           <input
             type="search"
             placeholder="Search sessions"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-4 rounded-full border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+            className="w-full h-10 pl-9 pr-4 rounded-full border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
             aria-label="Search sessions"
           />
         </div>
@@ -225,22 +225,22 @@ export default function SessionsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr>
-                  <th className="text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2">
+                  <th className="text-[11px] tracking-wide text-meta font-medium px-3 py-2">
                     Session
                   </th>
-                  <th className="text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2 w-[110px]">
+                  <th className="text-[11px] tracking-wide text-meta font-medium px-3 py-2 w-[110px]">
                     Status
                   </th>
-                  <th className="text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2 w-[80px] text-right">
+                  <th className="text-[11px] tracking-wide text-meta font-medium px-3 py-2 w-[80px] text-right">
                     Open
                   </th>
-                  <th className="text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2 w-[90px] text-right">
+                  <th className="text-[11px] tracking-wide text-meta font-medium px-3 py-2 w-[90px] text-right">
                     Resolved
                   </th>
-                  <th className="text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2 w-[120px] text-right">
+                  <th className="text-[11px] tracking-wide text-meta font-medium px-3 py-2 w-[120px] text-right">
                     Progress
                   </th>
-                  <th className="text-right w-[140px] text-[11px] tracking-wide text-neutral-400 font-medium px-3 py-2">
+                  <th className="text-right w-[140px] text-[11px] tracking-wide text-meta font-medium px-3 py-2">
                     Last Activity
                   </th>
                 </tr>
@@ -274,11 +274,11 @@ export default function SessionsPage() {
                             {session.title || "Untitled Session"}
                           </p>
                           {folder && (
-                            <p className="text-xs text-neutral-500 mt-1">
+                            <p className="text-xs text-secondary mt-1">
                               Folder: {folder.name}
                             </p>
                           )}
-                          <p className="text-xs text-neutral-500 mt-1">
+                          <p className="text-xs text-secondary mt-1">
                             Created by {createdBy} • {total} feedback
                           </p>
                         </div>
@@ -294,10 +294,10 @@ export default function SessionsPage() {
                           {status}
                         </span>
                       </td>
-                      <td className="px-3 py-[12px] text-right tabular-nums text-[13px] text-neutral-600">
+                      <td className="px-3 py-[12px] text-right tabular-nums text-[13px] text-secondary">
                         {open}
                       </td>
-                      <td className="px-3 py-[12px] text-right tabular-nums text-[13px] text-neutral-600">
+                      <td className="px-3 py-[12px] text-right tabular-nums text-[13px] text-secondary">
                         {resolved}
                       </td>
                       <td className="px-3 py-[12px]">
@@ -308,7 +308,7 @@ export default function SessionsPage() {
                           />
                         </div>
                       </td>
-                      <td className="px-3 py-[12px] text-right text-neutral-500 text-[13px]">
+                      <td className="px-3 py-[12px] text-right text-secondary text-[13px]">
                         {formatLastActivity(session.updatedAt)}
                       </td>
                     </tr>
@@ -320,7 +320,7 @@ export default function SessionsPage() {
         ) : null}
 
         {!loading && filteredSessions.length === 0 && (
-          <p className="text-[14px] text-neutral-500 py-8">
+          <p className="text-[14px] text-secondary py-8">
             {search.trim()
               ? "No sessions match your search."
               : "No sessions yet. Create one from the Dashboard to get started."}

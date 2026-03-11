@@ -350,7 +350,7 @@ const ScreenshotWithPinsInner = ({
                     {userAvatar ? (
                       <Image src={userAvatar} alt="" width={36} height={36} className="w-full h-full object-cover" unoptimized />
                     ) : (
-                      <span className="w-full h-full flex items-center justify-center text-[12px] font-medium text-neutral-500">{userName.charAt(0)}</span>
+                      <span className="w-full h-full flex items-center justify-center text-[12px] font-medium text-secondary">{userName.charAt(0)}</span>
                     )}
                   </div>
                   <span className="text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] truncate">{userName}</span>
@@ -359,7 +359,7 @@ const ScreenshotWithPinsInner = ({
                   value={draftMessage}
                   onChange={(e) => setDraftMessage(e.target.value)}
                   placeholder="Add a comment..."
-                  className="box-border w-full min-h-[56px] rounded-lg bg-[#f5f5f5] border border-neutral-200/80 px-3 py-2.5 text-[13px] leading-[1.5] text-[hsl(var(--text-primary-strong))] placeholder:text-neutral-400 focus:outline-none focus:border-neutral-300 focus:ring-1 focus:ring-[var(--accent-operational)]/20 resize-none transition-all duration-[120ms] ease-out"
+                  className="box-border w-full min-h-[56px] rounded-lg bg-[#f5f5f5] border border-neutral-200/80 px-3 py-2.5 text-[13px] leading-[1.5] text-[hsl(var(--text-primary-strong))] placeholder:text-meta focus:outline-none focus:border-neutral-300 focus:ring-1 focus:ring-[var(--accent-operational)]/20 resize-none transition-all duration-[120ms] ease-out"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Escape") handleCancelDraft();
@@ -409,7 +409,7 @@ const ScreenshotWithPinsInner = ({
                     {root.userAvatar ? (
                       <Image src={root.userAvatar} alt="" width={36} height={36} className="w-full h-full object-cover" unoptimized />
                     ) : (
-                      <span className="w-full h-full flex items-center justify-center text-[12px] font-medium text-neutral-500">{root.userName?.charAt(0) ?? "?"}</span>
+                      <span className="w-full h-full flex items-center justify-center text-[12px] font-medium text-secondary">{root.userName?.charAt(0) ?? "?"}</span>
                     )}
                   </div>
                   <div className="min-w-0">

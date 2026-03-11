@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import { MessageSquareMore, ArrowUpRight } from "lucide-react";
+import { MessageSquareMore } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { getTicketStatus } from "@/lib/domain/feedback";
@@ -37,6 +37,9 @@ export interface DiscussionListProps {
   onEmptyChange?: (isEmpty: boolean) => void;
   /** Called when discussions load with unique sessions (projects) derived from the list */
   onProjectsLoaded?: (projects: ProjectItem[]) => void;
+  /** Optional controlled list state; when provided, fetch updates this instead of internal state (avoids reload on reply). */
+  items?: DiscussionItem[];
+  setItems?: React.Dispatch<React.SetStateAction<DiscussionItem[]>>;
 }
 
 function parseUpdatedAt(item: DiscussionItem): number {
@@ -63,14 +66,19 @@ export function DiscussionList({
   filterBySessionId = null,
   onEmptyChange,
   onProjectsLoaded,
+  items: controlledItems,
+  setItems: controlledSetItems,
 }: DiscussionListProps) {
-  const [items, setItems] = useState<DiscussionItem[]>([]);
+  const [internalItems, setInternalItems] = useState<DiscussionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const onEmptyChangeRef = useRef(onEmptyChange);
   onEmptyChangeRef.current = onEmptyChange;
   const onProjectsLoadedRef = useRef(onProjectsLoaded);
   onProjectsLoadedRef.current = onProjectsLoaded;
+
+  const items = controlledItems !== undefined ? controlledItems : internalItems;
+  const setItems = controlledSetItems ?? setInternalItems;
 
   useEffect(() => {
     let cancelled = false;
@@ -143,13 +151,19 @@ export function DiscussionList({
   if (loading) {
     return (
       <div className="flex flex-col overflow-hidden bg-transparent" style={{ minHeight: 200 }}>
-        <div className="p-4 space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-20 rounded-xl bg-neutral-200/60 animate-pulse"
-            />
-          ))}
+        <div className="discussion-list-scroll flex-1 overflow-y-auto min-h-0 pl-0 pr-3 py-2">
+          <div className="flex flex-col gap-0">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-2.5 pl-3 pr-3 py-3">
+                <div className="w-8 h-8 rounded-full skeleton shrink-0" />
+                <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+                  <div className="h-4 w-3/4 skeleton max-w-[200px]" />
+                  <div className="h-3 w-1/2 skeleton max-w-[120px]" />
+                  <div className="h-3 w-1/3 skeleton max-w-[80px]" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -158,7 +172,7 @@ export function DiscussionList({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center bg-transparent">
-        <p className="text-sm text-neutral-600">{error}</p>
+        <p className="text-sm text-secondary">{error}</p>
       </div>
     );
   }
@@ -171,7 +185,7 @@ export function DiscussionList({
           <h2 className="text-lg font-semibold text-neutral-900">
             No discussions yet
           </h2>
-          <p className="mt-2 text-sm text-neutral-500 max-w-[240px]">
+          <p className="mt-2 text-sm text-secondary max-w-[240px]">
             When feedback receives comments, they will appear here.
           </p>
           <Link
@@ -186,14 +200,14 @@ export function DiscussionList({
   }
 
   return (
-    <div className="flex flex-col overflow-hidden bg-transparent font-sans h-full">
-      <div className="flex-1 overflow-y-auto p-2 min-h-0">
+    <div className="flex flex-col overflow-hidden bg-transparent h-full">
+      <div className="discussion-list-scroll flex-1 overflow-y-auto min-h-0 pl-0 pr-3 py-2">
         {filteredItems.length === 0 ? (
-          <p className="text-sm text-neutral-500 py-4 px-4 text-center">
+          <p className="text-sm text-secondary py-4 px-2 text-center">
             No discussions match your search.
           </p>
         ) : (
-          <div className="divide-y divide-neutral-100">
+          <div className="flex flex-col gap-0">
             {filteredItems.map((item) => {
               const isSelected = selectedId === item.id;
               const ts = parseUpdatedAt(item);
@@ -216,33 +230,31 @@ export function DiscussionList({
                       onSelect(item.id);
                     }
                   }}
-                  className={`px-4 py-4 cursor-pointer transition-colors ${
-                    isSelected
-                      ? "bg-neutral-100"
-                      : "hover:bg-neutral-50"
+                  className={`ticket-item flex items-center gap-2.5 pl-3 pr-3 py-3 cursor-pointer transition-colors ${
+                    isSelected ? "selected bg-blue-50" : "hover:bg-neutral-50"
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="w-[30px] h-[30px] rounded-full bg-[#EEF3FF] text-[#155DFC] font-semibold flex items-center justify-center shrink-0"
-                      aria-hidden
-                    >
-                      {initial}
+                  <div
+                    className="w-8 h-8 rounded-full bg-[#EEF3FF] text-[#155DFC] font-semibold text-sm flex items-center justify-center shrink-0"
+                    aria-hidden
+                  >
+                    {initial}
+                  </div>
+                  <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+                    <div className="ticket-header flex items-center justify-between gap-2">
+                      <h3 className="ticket-title font-semibold text-neutral-900 truncate text-[15px] min-w-0">
+                        {item.title}
+                      </h3>
+                      <span className="ticket-time text-xs text-meta shrink-0">
+                        {timeLabel}
+                      </span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-[15px] font-semibold text-neutral-900 truncate">
-                          {item.title}
-                        </h3>
-                        <ArrowUpRight className="h-4 w-4 text-neutral-400 shrink-0" aria-hidden />
-                      </div>
-                      <p className="mt-0.5 text-[12px] text-neutral-500 truncate">
-                        {sessionDisplay}
-                      </p>
-                      <p className="mt-0.5 text-[12px] text-neutral-400">
-                        {replyLabel} • {timeLabel}
-                      </p>
-                    </div>
+                    <p className="text-sm text-secondary truncate">
+                      {sessionDisplay}
+                    </p>
+                    <p className="text-xs text-meta">
+                      {replyLabel}
+                    </p>
                   </div>
                 </div>
               );
