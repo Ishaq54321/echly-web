@@ -1,16 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { Bell } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
+import { ProfileCommandPanel } from "@/components/layout/ProfileCommandPanel";
 
 export function DashboardHeaderActions() {
   const { user } = useAuthGuard();
+  const [profilePanelOpen, setProfilePanelOpen] = useState(false);
 
   return (
+    <>
     <div className="dashboard-header-actions fixed top-4 right-6 z-[1000] flex items-center gap-[14px]">
       <button
         type="button"
-        className="bg-[#155DFC] text-white px-4 py-1.5 rounded-full font-medium hover:bg-[#0F4ED1] transition"
+        className="primary-cta px-4 py-1.5 rounded-full transition"
       >
         Upgrade
       </button>
@@ -23,7 +27,12 @@ export function DashboardHeaderActions() {
         <Bell size={24} strokeWidth={1.8} />
       </button>
 
-      <button type="button" aria-label="Profile" className="cursor-pointer">
+      <button
+        type="button"
+        aria-label="Profile"
+        className="cursor-pointer"
+        onClick={() => setProfilePanelOpen(true)}
+      >
         <img
           src={user?.photoURL || "/avatar-placeholder.png"}
           alt=""
@@ -31,6 +40,11 @@ export function DashboardHeaderActions() {
         />
       </button>
     </div>
+    <ProfileCommandPanel
+      open={profilePanelOpen}
+      onClose={() => setProfilePanelOpen(false)}
+    />
+    </>
   );
 }
 

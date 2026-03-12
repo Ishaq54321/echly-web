@@ -1262,13 +1262,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                       });
                   }}
                   style={{
-                    background: "#3B82F6",
-                    color: "white",
+                    background: "#9FE870",
+                    color: "#111111",
                     border: "none",
                     borderRadius: 8,
                     padding: "8px 14px",
                     fontSize: 14,
-                    fontWeight: 500,
+                    fontWeight: 600,
                     cursor: clarityAssistantSubmitting ? "default" : "pointer",
                     opacity: clarityAssistantSubmitting ? 0.8 : 1,
                   }}
@@ -1314,13 +1314,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                         });
                     }}
                     style={{
-                      background: "#3B82F6",
-                      color: "white",
+                      background: "#9FE870",
+                      color: "#111111",
                       border: "none",
                       borderRadius: 8,
                       padding: "8px 14px",
                       fontSize: 14,
-                      fontWeight: 500,
+                      fontWeight: 600,
                       cursor: clarityAssistantSubmitting ? "default" : "pointer",
                       opacity: clarityAssistantSubmitting ? 0.8 : 1,
                     }}

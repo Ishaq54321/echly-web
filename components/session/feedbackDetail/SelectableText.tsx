@@ -113,7 +113,7 @@ export function SelectableText({
             value={draftMessage}
             onChange={(e) => setDraftMessage(e.target.value)}
             placeholder="Add a comment…"
-            className="w-full min-h-[60px] rounded border border-[var(--layer-2-border)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)] resize-none"
+            className="w-full min-h-[60px] rounded border border-[var(--layer-2-border)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-gray-300 resize-none"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Escape") setShowBubble(false);

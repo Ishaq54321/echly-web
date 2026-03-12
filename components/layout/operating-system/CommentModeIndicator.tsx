@@ -15,7 +15,7 @@ export function CommentModeIndicator({ onExit }: { onExit: () => void }) {
       <button
         type="button"
         onClick={onExit}
-        className="ml-2 text-[11px] font-medium text-[var(--accent-operational)] hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded"
+        className="ml-2 text-[11px] font-medium text-[var(--accent-operational)] hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300 rounded"
       >
         Exit
       </button>

@@ -1,21 +1,19 @@
 /* Plus Jakarta Sans: app uses next/font in layout.tsx; extension loads via echly-extension/extension-fonts.css (prepended at build) */
 
 @import "tailwindcss";
+@import "../styles/design-system.css";
 
-/* Tailwind theme extension: brand + semantic colors */
+/* Tailwind theme extension: fintech green accent */
 @theme {
-  --color-primary: #2A2A2A;
-  --color-active: #6E6E6E;
-  --color-brand-primary: #111827;
-  --color-brand-accent: #2563EB;
-  --color-brand-soft: #F3F4F6;
-  /* Semantic color system (must be in @theme for Tailwind v4) */
-  --color-semantic-system: #2563EB;
-  --color-semantic-insight: #7C3AED;
-  --color-semantic-success: #059669;
+  --color-primary: #9FE870;
+  --color-primary-hover: #8FD764;
+  --color-primary-active: #7CCB56;
+  --color-brand-primary: #111111;
+  --color-brand-accent: #9FE870;
+  --color-brand-soft: #DDF3C8;
+  --color-semantic-success: #4CAF50;
   --color-semantic-attention: #D97706;
   --color-semantic-danger: #DC2626;
-  /* Interaction transitions */
   --transition-duration-120: 120ms;
 }
 
@@ -51,106 +49,77 @@
   --radius: 14px;
   --radius-md: 14px;
   --radius-lg: 18px;
-  --radius-card: 22px;
+  --radius-card: 16px;
   --radius-xl: 24px;
   --radius-pill: 9999px;
 
-  /* ---- COLOR SYSTEM: alive but controlled. No full-saturation. ---- */
-  /* Primary: AI Blue — deep, intelligent, slightly electric, mature */
-  --color-primary: #1a56db;
-  --color-primary-hover: #1648b8;
-  --color-primary-soft: rgba(26, 86, 219, 0.08);
-  --color-primary-ring: rgba(26, 86, 219, 0.35);
-  /* Brand blue for discussion selection and links */
-  --brand-blue: #155DFC;
-
-  /* Legacy/alias for existing usage */
-  --accent-operational: #1a56db;
-  --accent-operational-border: rgba(26, 86, 219, 0.25);
-  --accent-operational-muted: rgba(26, 86, 219, 0.08);
-
-  /* Success: intelligent green — calm, not neon */
-  --color-success: #0d9488;
-  --color-success-soft: rgba(13, 148, 136, 0.1);
-
-  /* Skipped/Deferred: soft amber — intentional, not warning */
+  /* ---- FINTECH COLOR SYSTEM (green accent, neutral surfaces) ---- */
+  --color-primary: #9FE870;
+  --color-primary-hover: #8FD764;
+  --color-primary-active: #7CCB56;
+  --color-primary-soft: #DDF3C8;
+  --color-primary-ring: rgba(159, 232, 112, 0.25);
+  --brand-blue: #111111;
+  --accent-operational: #9FE870;
+  --accent-operational-border: rgba(159, 232, 112, 0.35);
+  --accent-operational-muted: #E9ECEB;
+  --color-success: #4CAF50;
+  --color-success-soft: rgba(76, 175, 80, 0.1);
   --color-skipped: #b45309;
   --color-skipped-soft: rgba(180, 83, 9, 0.08);
-
-  /* Danger: refined red — desaturated, controlled */
-  --color-danger: #b91c1c;
-  --color-danger-soft: rgba(185, 28, 28, 0.08);
-
-  /* Brand / text */
-  --brand-primary: #111827;
-  --brand-primary-rgb: 17, 24, 39;
-  --brand-subtle: var(--color-primary-soft);
-
-  /* Base Surfaces (HSL for Tailwind) */
-  --background: 220 12% 97%;
+  --color-danger: #DC2626;
+  --color-danger-soft: rgba(220, 38, 38, 0.08);
+  --brand-primary: #111111;
+  --brand-primary-rgb: 17, 17, 17;
+  --brand-subtle: #DDF3C8;
+  --background: 120 10% 97%;
   --surface-1: 0 0% 100%;
-  --surface-2: 220 12% 96%;
-  --surface-3: 220 10% 93%;
-  --border: 220 13% 91%;
-  /* Typography hierarchy: premium contrast, no faded greys */
-  --text-primary: #0F172A;
-  --text-secondary: #334155;
-  --text-meta: #64748B;
-  --text-active: 220 9% 46%;
-  --text-muted: var(--text-meta);
-  --brand: 217 85% 52%;
-  --brand-ring: 217 85% 52% / 0.35;
-
-  /* ---- GLOBAL BACKGROUND: atmospheric surface (LEVEL 0) ---- */
-  --env-base: #F6F7F9;
-  --env-gradient-top: rgba(226, 232, 240, 0.045);
-  --env-gradient-bottom: rgba(209, 250, 229, 0.04);
+  --surface-2: 120 8% 95%;
+  --surface-3: 120 6% 94%;
+  --border: 120 6% 90%;
+  --text-primary: #111111;
+  --text-secondary: #6B7280;
+  --text-meta: #6B7280;
+  --text-active: 0 0% 7%;
+  --text-muted: #6B7280;
+  --brand: 95 70% 58%;
+  --brand-ring: 95 70% 58% / 0.25;
+  --env-base: #FFFFFF;
+  --env-gradient-top: rgba(236, 248, 227, 0.2);
+  --env-gradient-bottom: rgba(221, 243, 200, 0.15);
   --canvas-base: #FFFFFF;
   --canvas-base-top: #FFFFFF;
   --canvas-base-bottom: #FFFFFF;
-  /* Structural: elevated panels */
-  --structural-gray: #F2F3F5;
-  --structural-gray-rail: #EEF0F2;
-  --structural-gray-ticket: #F8F9FA;
-  --glass-1-bg: rgba(255, 255, 255, 0.7);
-  --glass-1-border: rgba(0, 0, 0, 0.04);
-  --glass-1-edge: 0 1px 0 rgba(255, 255, 255, 0.85);
+  --structural-gray: #FFFFFF;
+  --structural-gray-rail: #FFFFFF;
+  --structural-gray-ticket: #FFFFFF;
+  --glass-1-bg: rgba(255, 255, 255, 0.85);
+  --glass-1-border: #E3E6E5;
   --layer-1-bg: #FFFFFF;
-  --layer-1-border: rgba(0, 0, 0, 0.045);
-  --layer-2-bg: #FAFBFC;
-  --layer-2-border: rgba(0, 0, 0, 0.045);
-  --layer-2-hover-bg: #F4F5F7;
-
-  /* Settings / premium surfaces */
-  --border-default: rgba(0, 0, 0, 0.08);
-  --settings-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-
-  /* ---- SPATIAL ARCHITECTURE: 6 elevation layers ---- */
-  /* Layer 0 — Ambient: .env-canvas (gradients + noise) */
-  /* Layer 1 — Structural: sidebar, topbar (--shadow-level-1) */
-  /* Layer 2 — Content container: main surface (--shadow-level-2) */
-  /* Layer 3 — Cards: .card-depth (--shadow-level-3) */
-  /* Layer 4 — Hover: interactive lift (--shadow-level-4) */
-  /* Layer 5 — Focus: active emphasis (--shadow-level-5) */
-  --shadow-level-1: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-level-2: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --shadow-level-3: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
-  --shadow-level-3-lift: 0 2px 4px rgba(0, 0, 0, 0.04);
-  --shadow-level-4: 0 8px 24px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
-  --shadow-level-5: 0 12px 32px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05);
-  /* Card-specific: dual stack + inner highlight */
-  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --elevation-2: 0 4px 12px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.03);
+  --layer-1-border: #E3E6E5;
+  --layer-2-bg: #FFFFFF;
+  --layer-2-border: #E3E6E5;
+  --layer-2-hover-bg: #E9ECEB;
+  --border-default: #E3E6E5;
+  --settings-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-level-1: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-level-2: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-level-3: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-level-3-lift: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-level-4: 0 6px 20px rgba(0, 0, 0, 0.08);
+  --shadow-level-5: 0 6px 20px rgba(0, 0, 0, 0.08);
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --elevation-2: 0 1px 2px rgba(0, 0, 0, 0.05);
   --layer-2-shadow: var(--elevation-1);
   --layer-2-shadow-hover: var(--elevation-2);
-  --card-border: 1px solid rgba(255, 255, 255, 0.4);
-  --card-inner-highlight: linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 12px);
-
-  --ai-accent: #1a56db;
-  --ai-accent-ring: rgba(26, 86, 219, 0.28);
-  --text-primary-strong: 220 14% 7%;
-  --text-secondary-soft: 220 10% 36%;
-  --text-tertiary: 220 9% 48%;
+  --card-border: 1px solid #E3E6E5;
+  --card-inner-highlight: none;
+  --ai-accent: #9FE870;
+  --ai-accent-ring: rgba(159, 232, 112, 0.25);
+  /* Primary text: #111111. Secondary/metadata: #6B7280 (HSL 220 9% 46%) */
+  --text-primary-strong: 0 0% 7%;
+  --text-secondary-soft: 220 9% 46%;
+  --text-tertiary: 220 9% 46%;
 }
 
 /* Text hierarchy utilities: use vars for secondary/meta only; primary stays default or explicit */
@@ -168,12 +137,61 @@ body {
   height: 100%;
   overflow: hidden;
   background-color: var(--env-base);
-  color: var(--text-primary);
-  font-size: 15px;
-  line-height: 1.65;
-  font-family: "Plus Jakarta Sans", sans-serif;
+  color: #111111;
+  font-size: 16px;
+  line-height: 1.5;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Fintech typography scale — use these instead of arbitrary sizes */
+.text-display { font-size: 40px; line-height: 1.2; font-weight: 600; }
+.text-h1 { font-size: 32px; line-height: 1.25; font-weight: 600; }
+.text-h2 { font-size: 24px; line-height: 1.3; font-weight: 600; }
+.text-h3 { font-size: 20px; line-height: 1.35; font-weight: 600; }
+.text-body { font-size: 16px; line-height: 1.5; }
+.text-meta { font-size: 14px; line-height: 1.45; }
+.text-caption { font-size: 12px; line-height: 1.4; }
+
+/* Chat UI: message bubbles and input bar — fintech clean */
+.chat-bubble-user {
+  background: #F1F3F2;
+  border-radius: 18px;
+  padding: 14px 16px;
+  max-width: 520px;
+}
+.chat-bubble-system {
+  background: white;
+  border: 1px solid #E3E6E5;
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+.chat-container { max-width: 720px; margin: 0 auto; }
+.chat-message-gap { gap: 16px; }
+.chat-input-bar {
+  border-radius: 999px;
+  border: 1px solid #E3E6E5;
+  padding: 10px 16px;
+  background: #FFFFFF;
+}
+.chat-send-btn {
+  background: #9FE870;
+  color: #111111;
+  border-radius: 999px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  font-weight: 600;
+}
+/* Icon system: neutral monochrome outline — default / hover / active */
+.echly-icon-default { color: #111111; }
+.echly-icon-default:hover { color: #111111; }
+.echly-icon-active { color: #111111; }
+.chat-send-btn:hover {
+  background: #8FD764;
 }
 
 /* ======================================
@@ -206,22 +224,19 @@ body {
 
 .surface-rail {
   background-color: var(--structural-gray-rail);
-  box-shadow: var(--shadow-level-1);
   border-right: 1px solid var(--layer-1-border);
 }
 
 .surface-sidebar {
   background-color: var(--structural-gray);
-  box-shadow: var(--shadow-level-1);
   border-right: 1px solid var(--layer-1-border);
 }
 
 .surface-main {
-  background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(248,249,250,0.88) 100%);
+  background: #FFFFFF;
   position: relative;
   z-index: 1;
   border-radius: 0;
-  box-shadow: var(--shadow-level-1);
 }
 
 /* Main content area when it needs a solid surface (e.g. cards on top) */
@@ -334,22 +349,24 @@ button[aria-disabled="true"],
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  font-family: "Plus Jakarta Sans", sans-serif;
+  background: rgba(0, 0, 0, 0.2);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
 }
 
 .echly-modal-panel {
-  background: #fff;
+  background: #FFFFFF;
   border-radius: 16px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-  font-family: "Plus Jakarta Sans", sans-serif;
+  border: 1px solid #E3E6E5;
+  padding: 24px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
 }
 
-/* Onboarding: Linear-style animated selection highlight */
+/* Onboarding: fintech selection highlight */
 .selection-highlight {
   position: absolute;
-  background: rgba(70, 110, 255, 0.12);
-  border: 1px solid rgba(70, 110, 255, 0.35);
+  background: rgba(159, 232, 112, 0.2);
+  border: 1px solid rgba(159, 232, 112, 0.5);
   border-radius: 16px;
   transition: all 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -428,44 +445,25 @@ button[aria-disabled="true"],
 ====================================== */
 
 .card-depth {
-  border-radius: var(--radius-card);
-  background: var(--layer-2-bg);
-  box-shadow: var(--shadow-level-3), var(--shadow-level-3-lift);
-  border: var(--card-border);
+  border-radius: 16px;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid #E3E6E5;
+  padding: 24px;
   position: relative;
   overflow: hidden;
-  transition:
-    box-shadow 200ms var(--ease-premium),
-    transform 200ms var(--ease-premium);
+  transition: box-shadow 200ms var(--ease-premium), transform 200ms var(--ease-premium);
 }
-.card-depth::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--card-inner-highlight);
-  pointer-events: none;
-}
+.card-depth::before,
 .card-depth::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(0,0,0,0.01) 0%, rgba(0,0,0,0.02) 100%);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 200ms var(--ease-premium);
+  display: none;
 }
 .card-depth:hover {
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
-  transform: translateY(-2px) scale(1.01);
-}
-.card-depth:hover::after {
-  opacity: 1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transform: translateY(0);
 }
 .card-depth:active {
-  transform: translateY(-1px) scale(0.998);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.03);
+  transform: translateY(0);
 }
 
 /* ======================================
@@ -475,20 +473,14 @@ button[aria-disabled="true"],
 .btn-primary-glow {
   position: relative;
   overflow: hidden;
-  transition:
-    transform 200ms var(--ease-premium),
-    box-shadow 200ms var(--ease-premium);
+  transition: transform 200ms var(--ease-premium), box-shadow 200ms var(--ease-premium);
 }
 .btn-primary-glow::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: radial-gradient(
-    circle at center,
-    rgba(26, 86, 219, 0.2),
-    transparent 70%
-  );
+  background: radial-gradient(circle at center, rgba(159, 232, 112, 0.2), transparent 70%);
   opacity: 0;
   pointer-events: none;
   transition: opacity 200ms var(--ease-premium);
@@ -498,11 +490,22 @@ button[aria-disabled="true"],
 }
 .btn-primary-glow:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(26, 86, 219, 0.35);
+  box-shadow: 0 2px 8px rgba(159, 232, 112, 0.3);
 }
 .btn-primary-glow:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 2px 10px rgba(26, 86, 219, 0.28);
+  box-shadow: 0 1px 4px rgba(159, 232, 112, 0.25);
+}
+
+/* Primary CTA — green button, black text, consistent hover */
+.primary-cta {
+  background: #9FE870;
+  color: #111111;
+  font-weight: 600;
+  border-radius: 999px;
+}
+.primary-cta:hover {
+  background: #8EDB62;
 }
 
 /* ======================================
@@ -513,32 +516,15 @@ button[aria-disabled="true"],
   transition: background-color 150ms ease-in-out, box-shadow 150ms ease-in-out;
 }
 .sidebar-row-interactive:hover:not([aria-current="true"]) {
-  background-color: rgba(0, 0, 0, 0.025);
+  background-color: #E9ECEB;
 }
 .sidebar-row-interactive::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 0;
-  border-radius: 0 2px 2px 0;
-  background: var(--color-primary);
-  opacity: 0;
-  transition: height 150ms ease-in-out, opacity 150ms ease-in-out;
-}
-.sidebar-row-interactive:hover::before {
-  height: 20px;
-  opacity: 0.5;
-}
-.sidebar-row-interactive[aria-current="true"]::before {
-  height: 22px;
-  opacity: 1;
-  background: var(--color-primary);
+  display: none;
 }
 .sidebar-row-interactive[aria-current="true"] {
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
+  background-color: #E9ECEB;
+  color: #111111;
+  font-weight: 600;
 }
 
 /* ======================================
@@ -555,18 +541,23 @@ button[aria-disabled="true"],
 .focus-ring-brand:focus-visible {
   outline: none;
   box-shadow:
-    0 0 0 2px var(--env-base),
-    0 0 0 4px var(--color-primary);
+    0 0 0 2px #FFFFFF,
+    0 0 0 4px #D1D5DB;
 }
 
 button:focus-visible,
 a:focus-visible,
-[role="button"]:focus-visible,
+[role="button"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #D1D5DB;
+}
+/* Input field system: focus border + ring — neutral gray */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px var(--color-primary);
+  border-color: #D1D5DB;
+  box-shadow: 0 0 0 3px rgba(209, 213, 219, 0.4);
 }
 
 /* ======================================
@@ -596,10 +587,10 @@ textarea:focus-visible {
 }
 
 .billing-card {
-  border-radius: 18px;
-  padding: 28px;
+  border-radius: 16px;
+  padding: 24px;
   background: white;
-  border: 1px solid #E6EAF0;
+  border: 1px solid #E3E6E5;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
@@ -612,20 +603,20 @@ textarea:focus-visible {
 .billing-card--business {
   background:
     linear-gradient(white, white) padding-box,
-    linear-gradient(120deg, #4F7BFF, #7AA2FF, #5BD1FF) border-box;
+    linear-gradient(120deg, #9FE870, #8EDB62, #79C94E) border-box;
   border: 2px solid transparent;
 }
 
 .secondary-cta {
-  background: #EEF4FF;
-  color: #1F5EFF;
-  border: 1px solid #D6E4FF;
-  border-radius: 10px;
+  background: #E9ECEB;
+  color: #111111;
+  border: 1px solid #E3E6E5;
+  border-radius: 999px;
   padding: 10px 16px;
   font-weight: 500;
 }
 .secondary-cta:hover {
-  background: #E4EDFF;
+  background: #E9ECEB;
 }
 
 .price {
@@ -857,10 +848,10 @@ textarea:focus-visible {
   box-shadow: 0 0 28px rgba(255, 255, 255, 0.06), 0 0 32px rgba(220, 38, 38, 0.15);
 }
 .echly-mic-orb-sentiment--positive .echly-mic-orb-ring {
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2), 0 0 24px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2), 0 0 24px rgba(159, 232, 112, 0.25);
 }
 .echly-mic-orb-sentiment--positive .echly-mic-orb-ring.echly-mic-orb-ring--active {
-  box-shadow: 0 0 28px rgba(255, 255, 255, 0.06), 0 0 32px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.06), 0 0 32px rgba(159, 232, 112, 0.3);
 }
 .echly-mic-orb {
   width: 56px;
@@ -925,7 +916,7 @@ textarea:focus-visible {
   width: 14px;
   height: 14px;
   border: 2px solid rgba(255, 255, 255, 0.25);
-  border-top-color: #5b7cff;
+  border-top-color: #9FE870;
   border-radius: 50%;
   animation: echly-spin 0.7s linear infinite;
 }
@@ -963,13 +954,13 @@ textarea:focus-visible {
 }
 @keyframes captureHeaderPulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.08);
+    box-shadow: 0 0 0 0 rgba(159, 232, 112, 0.2);
     border-radius: 6px;
     padding: 2px;
     margin: -2px;
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.04);
+    box-shadow: 0 0 0 8px rgba(159, 232, 112, 0.12);
     border-radius: 8px;
     padding: 2px;
     margin: -2px;
@@ -1118,7 +1109,7 @@ textarea:focus-visible {
    ECHLY — Premium 2026 design system (extension + app)
    Theme tokens. #echly-root[data-theme] scopes widget styles.
    Typography: Plus Jakarta Sans + system stack.
-   Colors: neutral-first, accent #155DFC. Subtle glass.
+   Colors: neutral-first, accent #9FE870. Subtle glass.
 ====================================== */
 
 :root {
@@ -1135,7 +1126,7 @@ textarea:focus-visible {
 #echly-root[data-theme="dark"] {
   --panel-bg: #101826;
   --panel-border: rgba(255, 255, 255, 0.08);
-  --accent-color: #5b7cff;
+  --accent-color: #9FE870;
   --bg-primary: rgba(20, 22, 28, 0.82);
   --bg-surface: rgba(30, 32, 40, 0.65);
   --bg-surface-hover: rgba(255, 255, 255, 0.08);
@@ -1143,13 +1134,13 @@ textarea:focus-visible {
   --border-subtle: rgba(255, 255, 255, 0.08);
   --text-primary: #F3F4F6;
   --text-secondary: #A1A1AA;
-  --color-accent: #155DFC;
-  --color-accent-soft: rgba(21, 93, 252, 0.12);
+  --color-accent: #9FE870;
+  --color-accent-soft: rgba(159, 232, 112, 0.2);
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-alert: #EF4444;
-  --button-primary-bg: #155DFC;
-  --button-primary-text: #ffffff;
+  --button-primary-bg: #9FE870;
+  --button-primary-text: #111111;
   --button-secondary-bg: rgba(255, 255, 255, 0.08);
   --button-secondary-text: rgba(255, 255, 255, 0.9);
   --button-secondary-hover-bg: rgba(255, 255, 255, 0.12);
@@ -1165,8 +1156,8 @@ textarea:focus-visible {
     0 10px 30px rgba(0, 0, 0, 0.35);
   --input-bg: rgba(255, 255, 255, 0.06);
   --input-border: rgba(255, 255, 255, 0.08);
-  --input-border-focus: rgba(255, 255, 255, 0.2);
-  --icon-color: #A1A1AA;
+  --input-border-focus: rgba(159, 232, 112, 0.5);
+  --icon-color: #F3F4F6;
   --icon-hover: #F3F4F6;
   --priority-medium: rgba(255, 255, 255, 0.4);
   --priority-low: rgba(255, 255, 255, 0.25);
@@ -1174,53 +1165,49 @@ textarea:focus-visible {
   --confirm-icon-active-bg: rgba(255, 255, 255, 0.12);
 }
 
+/* Extension light theme: aligned with fintech green accent */
 #echly-root[data-theme="light"] {
   --panel-bg: #ffffff;
-  --panel-border: rgba(0, 0, 0, 0.08);
-  --accent-color: #5b7cff;
-  --bg-primary: rgba(255, 255, 255, 0.88);
-  --bg-surface: rgba(0, 0, 0, 0.04);
-  --bg-surface-hover: rgba(0, 0, 0, 0.06);
+  --panel-border: #E3E6E5;
+  --accent-color: #9FE870;
+  --bg-primary: #FFFFFF;
+  --bg-surface: #FFFFFF;
+  --bg-surface-hover: #E9ECEB;
   --glass-highlight: rgba(0, 0, 0, 0.03);
-  --border-subtle: rgba(0, 0, 0, 0.08);
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --color-accent: #155DFC;
-  --color-accent-soft: rgba(21, 93, 252, 0.1);
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
+  --border-subtle: #E3E6E5;
+  --text-primary: #111111;
+  --text-secondary: #111111;
+  --color-accent: #9FE870;
+  --color-accent-soft: #E9ECEB;
+  --color-success: #4CAF50;
+  --color-warning: #D97706;
   --color-alert: #EF4444;
-  --button-primary-bg: #155DFC;
-  --button-primary-text: #ffffff;
-  --button-secondary-bg: rgba(0, 0, 0, 0.06);
-  --button-secondary-text: #111827;
-  --button-secondary-hover-bg: rgba(0, 0, 0, 0.1);
-  --button-secondary-hover-text: #111827;
-  --shadow-depth: 0 10px 30px rgba(0, 0, 0, 0.08);
-  --shadow-strong: 0 14px 40px rgba(0, 0, 0, 0.12);
-  --bg-widget-gradient: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.6) 0%,
-    rgba(255, 255, 255, 0.4) 100%
-  );
-  --shadow-depth-recording: 0 0 0 1px rgba(0, 0, 0, 0.06),
-    0 10px 30px rgba(0, 0, 0, 0.08);
-  --input-bg: rgba(0, 0, 0, 0.04);
-  --input-border: rgba(0, 0, 0, 0.1);
-  --input-border-focus: rgba(0, 0, 0, 0.2);
-  --icon-color: #6b7280;
-  --icon-hover: #111827;
+  --button-primary-bg: #9FE870;
+  --button-primary-text: #111111;
+  --button-secondary-bg: #E9ECEB;
+  --button-secondary-text: #111111;
+  --button-secondary-hover-bg: #DDF3C8;
+  --button-secondary-hover-text: #111111;
+  --shadow-depth: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-strong: 0 6px 20px rgba(0, 0, 0, 0.08);
+  --bg-widget-gradient: linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 100%);
+  --shadow-depth-recording: 0 0 0 1px #E3E6E5, 0 1px 2px rgba(0, 0, 0, 0.05);
+  --input-bg: #FFFFFF;
+  --input-border: #E3E6E5;
+  --input-border-focus: #9FE870;
+  --icon-color: #111111;
+  --icon-hover: #111111;
   --priority-medium: rgba(0, 0, 0, 0.4);
   --priority-low: rgba(0, 0, 0, 0.25);
-  --confirm-icon-hover-bg: rgba(0, 0, 0, 0.06);
-  --confirm-icon-active-bg: rgba(0, 0, 0, 0.1);
+  --confirm-icon-hover-bg: #E9ECEB;
+  --confirm-icon-active-bg: #DADDDD;
 }
 
 /* Fallback when widget is used without data-theme (e.g. app embed): default dark */
 #echly-root:not([data-theme]) {
   --panel-bg: #101826;
   --panel-border: rgba(255, 255, 255, 0.08);
-  --accent-color: #5b7cff;
+  --accent-color: #9FE870;
   --bg-primary: rgba(20, 22, 28, 0.82);
   --bg-surface: rgba(30, 32, 40, 0.65);
   --bg-surface-hover: rgba(255, 255, 255, 0.08);
@@ -1228,13 +1215,13 @@ textarea:focus-visible {
   --border-subtle: rgba(255, 255, 255, 0.08);
   --text-primary: #F3F4F6;
   --text-secondary: #A1A1AA;
-  --color-accent: #155DFC;
-  --color-accent-soft: rgba(21, 93, 252, 0.12);
+  --color-accent: #9FE870;
+  --color-accent-soft: rgba(159, 232, 112, 0.2);
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-alert: #EF4444;
-  --button-primary-bg: #155DFC;
-  --button-primary-text: #ffffff;
+  --button-primary-bg: #9FE870;
+  --button-primary-text: #111111;
   --button-secondary-bg: rgba(255, 255, 255, 0.08);
   --button-secondary-text: rgba(255, 255, 255, 0.9);
   --button-secondary-hover-bg: rgba(255, 255, 255, 0.12);
@@ -1250,8 +1237,8 @@ textarea:focus-visible {
     0 10px 30px rgba(0, 0, 0, 0.35);
   --input-bg: rgba(255, 255, 255, 0.06);
   --input-border: rgba(255, 255, 255, 0.08);
-  --input-border-focus: rgba(255, 255, 255, 0.2);
-  --icon-color: #A1A1AA;
+  --input-border-focus: rgba(159, 232, 112, 0.5);
+  --icon-color: #F3F4F6;
   --icon-hover: #F3F4F6;
   --priority-medium: rgba(255, 255, 255, 0.4);
   --priority-low: rgba(255, 255, 255, 0.25);
@@ -1512,8 +1499,8 @@ textarea:focus-visible {
   box-sizing: border-box;
 }
 .session-title-input:focus {
-  border-color: #5b7cff;
-  background: rgba(91, 124, 255, 0.08);
+  border-color: #D1D5DB;
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .echly-sidebar-close {
@@ -1642,13 +1629,13 @@ textarea:focus-visible {
   height: 12px;
   flex-shrink: 0;
   border: 2px solid rgba(0, 0, 0, 0.15);
-  border-top-color: #3B82F6;
+  border-top-color: #9FE870;
   border-radius: 50%;
   animation: echly-spin 0.8s linear infinite;
 }
 .dark .echly-feedback-processing .echly-spinner {
   border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #60A5FA;
+  border-top-color: #9FE870;
 }
 .echly-feedback-failed {
   display: flex;
@@ -1746,11 +1733,11 @@ textarea:focus-visible {
   letter-spacing: -0.01em;
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
-  box-shadow: 0 4px 12px rgba(21, 93, 252, 0.25);
+  box-shadow: 0 4px 12px rgba(159, 232, 112, 0.3);
 }
 .echly-add-insight-btn:not(.echly-add-insight-btn--disabled):hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(21, 93, 252, 0.35);
+  box-shadow: 0 6px 20px rgba(159, 232, 112, 0.35);
 }
 .echly-add-insight-btn:not(.echly-add-insight-btn--disabled):active {
   transform: translateY(0);
@@ -1810,7 +1797,7 @@ textarea:focus-visible {
   gap: 6px;
   font-size: 12px;
   font-weight: 500;
-  color: #3B82F6;
+  color: #111111;
   opacity: 0.9;
   margin-bottom: 8px;
 }
@@ -1831,23 +1818,23 @@ textarea:focus-visible {
   transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 }
-/* Selected: same blue styling for all modes */
+/* Selected: fintech green styling for all modes */
 .echly-mode-tile.selected {
-  border: 1px solid rgba(59, 130, 246, 0.55);
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.08));
+  border: 1px solid rgba(159, 232, 112, 0.55);
+  background: linear-gradient(135deg, rgba(159, 232, 112, 0.2), rgba(159, 232, 112, 0.08));
 }
-/* Light mode: selected card = solid blue fill + white text/icons */
+/* Light mode: selected card = solid green fill + deep green text/icons */
 #echly-root[data-theme="light"] .echly-mode-tile.selected {
-  background: #3B82F6;
-  border-color: #3B82F6;
-  color: white;
+  background: #9FE870;
+  border-color: #9FE870;
+  color: #111111;
 }
 #echly-root[data-theme="light"] .echly-mode-tile.selected .tile-title,
 #echly-root[data-theme="light"] .echly-mode-tile.selected .echly-mode-card-title {
-  color: white;
+  color: #111111;
 }
 #echly-root[data-theme="light"] .echly-mode-tile.selected .tile-description {
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(17, 17, 17, 0.85);
 }
 #echly-root[data-theme="light"] .echly-mode-tile.selected .tile-icon,
 #echly-root[data-theme="light"] .echly-mode-tile.selected .echly-mode-card-icon,
@@ -1857,22 +1844,22 @@ textarea:focus-visible {
 #echly-root[data-theme="light"] .echly-mode-tile.selected .mode-icon svg,
 #echly-root[data-theme="light"] .echly-mode-tile.selected .voice-recommended-icon,
 #echly-root[data-theme="light"] .echly-mode-tile.selected svg {
-  color: white;
+  color: #111111;
 }
-/* Dark mode: selected card = dark background + blue text/icons */
+/* Dark mode: selected card = dark background + green text/icons */
 #echly-root[data-theme="dark"] .echly-mode-tile.selected,
 #echly-root:not([data-theme]) .echly-mode-tile.selected {
-  color: #60A5FA;
+  color: #9FE870;
 }
 #echly-root[data-theme="dark"] .echly-mode-tile.selected .tile-title,
 #echly-root[data-theme="dark"] .echly-mode-tile.selected .echly-mode-card-title,
 #echly-root:not([data-theme]) .echly-mode-tile.selected .tile-title,
 #echly-root:not([data-theme]) .echly-mode-tile.selected .echly-mode-card-title {
-  color: #60A5FA;
+  color: #9FE870;
 }
 #echly-root[data-theme="dark"] .echly-mode-tile.selected .tile-description,
 #echly-root:not([data-theme]) .echly-mode-tile.selected .tile-description {
-  color: rgba(96, 165, 250, 0.85);
+  color: rgba(159, 232, 112, 0.85);
 }
 #echly-root[data-theme="dark"] .echly-mode-tile.selected .tile-icon,
 #echly-root[data-theme="dark"] .echly-mode-tile.selected .echly-mode-card-icon,
@@ -1890,7 +1877,7 @@ textarea:focus-visible {
 #echly-root:not([data-theme]) .echly-mode-tile.selected .mode-icon svg,
 #echly-root:not([data-theme]) .echly-mode-tile.selected .voice-recommended-icon,
 #echly-root:not([data-theme]) .echly-mode-tile.selected svg {
-  color: #60A5FA;
+  color: #9FE870;
 }
 .echly-mode-tile.selected .tile-icon,
 .echly-mode-tile.selected .echly-mode-card-icon,
@@ -1910,10 +1897,10 @@ textarea:focus-visible {
 .echly-mode-tile:not(.selected) .echly-mode-card-icon svg,
 .echly-mode-tile:not(.selected) .mode-icon,
 .echly-mode-tile:not(.selected) .mode-icon svg {
-  color: #5B7CFF;
+  color: #5F6368;
 }
 .echly-mode-tile:not(.selected) .voice-recommended-icon {
-  color: #5B7CFF;
+  color: #5F6368;
 }
 .tile-header {
   display: flex;
@@ -1942,7 +1929,7 @@ textarea:focus-visible {
 }
 
 .echly-mode-tile:not(.selected) .voice-recommended-icon {
-  color: #5B7CFF;
+  color: #5F6368;
 }
 .tile-description {
   margin-top: 6px;
@@ -1988,7 +1975,7 @@ textarea:focus-visible {
   opacity: 0.9;
 }
 .echly-mic-trigger:focus-visible {
-  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline: 2px solid rgba(159, 232, 112, 0.6);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -1996,16 +1983,19 @@ textarea:focus-visible {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: rgba(59, 130, 246, 0.9);
+  background: rgba(159, 232, 112, 0.9);
   flex-shrink: 0;
   display: inline-block;
 }
 #echly-root[data-theme="dark"] .echly-mode-selection-dot,
 #echly-root:not([data-theme]) .echly-mode-selection-dot {
-  background: rgba(59, 130, 246, 0.9);
+  background: rgba(159, 232, 112, 0.9);
 }
 .echly-mode-tile.selected .echly-mode-selection-dot {
-  background: white;
+  background: #111111;
+}
+#echly-root[data-theme="light"] .echly-mode-tile.selected .echly-mode-selection-dot {
+  background: #111111;
 }
 
 /* ---- Microphone panel: Loom-style floating panel to the left ---- */
@@ -2053,7 +2043,7 @@ textarea:focus-visible {
   background: var(--bg-surface-hover);
 }
 .echly-mic-panel-item.selected {
-  background: rgba(91, 124, 255, 0.12);
+  background: rgba(159, 232, 112, 0.2);
   color: var(--accent-color);
 }
 .echly-mic-panel-check {
@@ -2080,10 +2070,10 @@ textarea:focus-visible {
   width: 70px;
   height: 70px;
   border-radius: 50%;
-  background: radial-gradient(circle at center, #5B7CFF, #2E4FFF);
+  background: radial-gradient(circle at center, #9FE870, #79C94E);
   box-shadow:
-    0 0 20px rgba(91, 124, 255, 0.5),
-    0 0 40px rgba(91, 124, 255, 0.3);
+    0 0 20px rgba(159, 232, 112, 0.5),
+    0 0 40px rgba(159, 232, 112, 0.3);
   animation: pulseOrb 1.8s infinite ease-in-out;
 }
 @keyframes pulseOrb {
@@ -2244,20 +2234,20 @@ textarea:focus-visible {
   height: 40px;
   padding: 0 18px;
   border-radius: 10px;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 14px;
   cursor: pointer;
   border: none;
   font-family: var(--echly-font);
   transition: background 120ms ease-out;
-  background: #3b82f6;
-  color: white;
+  background: #9FE870;
+  color: #111111;
 }
 #echly-root[data-theme="light"] .echly-finish-btn {
-  background: #2563eb;
+  background: #9FE870;
 }
 .echly-finish-btn:hover {
-  background: #1d4ed8 !important;
+  background: #8EDB62 !important;
 }
 
 .echly-capture-cancel-hint {
@@ -2457,7 +2447,7 @@ textarea:focus-visible {
   background: rgba(0, 0, 0, 0.05);
 }
 
-/* Middle panel: no left spacing so blue selection rail aligns with divider */
+/* Middle panel: no left spacing so selection rail aligns with divider */
 .discussion-panel-list {
   padding-left: 0;
   margin-left: 0;
@@ -2487,10 +2477,10 @@ textarea:focus-visible {
   border-radius: 2px;
 }
 .ticket-item.selected::before {
-  background: var(--brand-blue);
+  background: transparent;
 }
 .ticket-item:not(:last-child) {
-  border-bottom: 1px solid #E5E7EB;
+  border-bottom: 1px solid #E3E6E5;
 }
 .ticket-rail {
   width: 3px;
@@ -2500,7 +2490,7 @@ textarea:focus-visible {
   flex-shrink: 0;
 }
 .ticket-item[data-selected="true"] .ticket-rail {
-  background: var(--brand-blue);
+  background: #D1D5DB;
 }
 
 /* Subtle skeleton loading placeholders */
@@ -2525,7 +2515,7 @@ textarea:focus-visible {
 }
 .echly-feedback-item.echly-ticket-highlight {
   background: var(--color-accent-soft);
-  box-shadow: 0 0 0 1px rgba(21, 93, 252, 0.25) inset;
+  box-shadow: 0 0 0 1px rgba(159, 232, 112, 0.35) inset;
 }
 .echly-feedback-item-actions {
   display: flex;
@@ -3347,8 +3337,8 @@ textarea:focus-visible {
   animation: echly-ticket-pulse 1.2s ease-out;
 }
 @keyframes echly-ticket-pulse {
-  0% { background-color: rgba(21, 93, 252, 0.18); box-shadow: 0 0 0 1px rgba(21, 93, 252, 0.35) inset; }
-  100% { background-color: rgba(21, 93, 252, 0.12); box-shadow: 0 0 0 1px rgba(21, 93, 252, 0.25) inset; }
+  0% { background-color: rgba(159, 232, 112, 0.2); box-shadow: 0 0 0 1px rgba(159, 232, 112, 0.35) inset; }
+  100% { background-color: rgba(159, 232, 112, 0.12); box-shadow: 0 0 0 1px rgba(159, 232, 112, 0.25) inset; }
 }
 
 @keyframes echly-selection-fade-in {
@@ -3414,13 +3404,14 @@ textarea:focus-visible {
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 .echly-confirmation-btn--confirm {
-  background: #155DFC;
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(21, 93, 252, 0.25);
+  background: #9FE870;
+  color: #111111;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(159, 232, 112, 0.3);
 }
 .echly-confirmation-btn--confirm:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(21, 93, 252, 0.35);
+  box-shadow: 0 6px 20px rgba(159, 232, 112, 0.35);
 }
 .echly-confirmation-btn--confirm:active {
   transform: translateY(0);
@@ -3449,7 +3440,7 @@ textarea:focus-visible {
   color: rgba(255, 255, 255, 0.85);
 }
 .echly-region-cutout {
-  border: 2px solid #155DFC;
+  border: 2px solid #9FE870;
   border-radius: 14px;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
 }

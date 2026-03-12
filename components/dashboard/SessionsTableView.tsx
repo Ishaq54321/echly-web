@@ -59,13 +59,13 @@ export function SessionsTableView({ items, onView }: SessionsTableViewProps) {
             return (
               <tr
                 key={session.id}
-                className="border-b border-[var(--layer-1-border)] last:border-b-0 hover:bg-[var(--structural-gray-ticket)] transition-colors duration-120"
+                className="border-b border-[var(--layer-1-border)] last:border-b-0 hover:bg-[#E9ECEB] transition-colors duration-120"
               >
                 <td className="px-4 py-3">
                   <button
                     type="button"
                     onClick={() => onView(session.id)}
-                    className="text-[14px] font-medium text-[hsl(var(--text-primary-strong))] hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded"
+                    className="text-[14px] font-medium text-[hsl(var(--text-primary-strong))] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300 rounded"
                   >
                     {session.title || "Untitled Session"}
                   </button>
@@ -86,7 +86,7 @@ export function SessionsTableView({ items, onView }: SessionsTableViewProps) {
                   <button
                     type="button"
                     onClick={() => onView(session.id)}
-                    className="text-[12px] font-medium text-[var(--accent-operational)] hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded"
+                    className="text-[12px] font-medium text-[hsl(var(--text-secondary-soft))] hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300 rounded"
                   >
                     Open
                   </button>

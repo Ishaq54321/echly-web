@@ -10,7 +10,7 @@ export default function AppLayout({
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden relative z-10">
       <GlobalRail />
-      <main className="relative flex flex-1 min-h-screen overflow-auto bg-white">
+      <main className="relative flex flex-1 min-h-screen overflow-auto bg-[#FFFFFF]">
         <FloatingUtilityActions />
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>

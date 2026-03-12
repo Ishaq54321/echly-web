@@ -139,7 +139,7 @@ export default function InsightsPage() {
       <div className="flex flex-1 min-h-0 flex-col w-full bg-[var(--canvas-base)] overflow-auto">
         <div className="max-w-6xl mx-auto px-8 py-8 space-y-8">
           <header>
-            <h1 className="text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-neutral-900">
+            <h1 className="text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-[#111111]">
               Insights
             </h1>
             <p className="mt-1 text-[13px] text-secondary">
@@ -181,27 +181,27 @@ export default function InsightsPage() {
     <div className="flex flex-1 min-h-0 flex-col w-full bg-[var(--canvas-base)] overflow-auto">
       <div className="max-w-6xl mx-auto px-8 py-8 space-y-8">
         <header>
-          <h1 className="text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-neutral-900">
+          <h1 className="text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-[#111111]">
             Insights
           </h1>
-          <p className="mt-1 text-[13px] text-secondary">
+          <p className="mt-1 text-[13px] text-[#6B7280]">
             Product value and activity across your feedback.
           </p>
         </header>
 
         {/* Hero insight panel — time saved from lifetime tickets */}
-        <div className="bg-white border border-neutral-200 rounded-xl px-10 py-7 shadow-sm flex items-center gap-5 min-h-[110px] hover:shadow-md transition-shadow duration-200">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-            <Sparkles className="text-blue-600 w-5 h-5" strokeWidth={1.5} />
+        <div className="bg-white border border-[#E3E6E5] rounded-[16px] px-10 py-7 shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center gap-5 min-h-[110px] transition-shadow duration-200">
+          <div className="w-10 h-10 rounded-lg bg-[#F1F3F2] border border-[#E3E6E5] flex items-center justify-center shrink-0">
+            <Sparkles className="text-[#111111] w-5 h-5" strokeWidth={1.5} />
           </div>
           <div className="flex flex-col min-w-0">
-            <p className="text-xs uppercase tracking-wide text-secondary">
+            <p className="text-xs uppercase tracking-wide text-[#6B7280] font-medium">
               Time saved reviewing feedback
             </p>
-            <h2 className="text-3xl font-semibold tracking-tight text-neutral-900">
+            <h2 className="text-3xl font-semibold tracking-tight text-[#111111]">
               {timeSaved.formatted} saved
             </h2>
-            <div className="flex gap-5 mt-2 text-sm text-secondary">
+            <div className="flex gap-5 mt-2 text-sm text-[#6B7280]">
               <span>{ticketCount} issues captured</span>
               <span>•</span>
               <span>{replyCount} replies</span>
@@ -213,55 +213,55 @@ export default function InsightsPage() {
 
         {/* Key metrics row */}
         <section className="grid grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-200 bg-blue-50 hover:shadow-lg transition flex items-center gap-3">
-            <div className="w-11 h-11 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+          <div className="bg-white rounded-[16px] p-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] border border-[#E3E6E5] hover:bg-[#E9ECEB] transition flex items-center gap-3">
+            <div className="w-11 h-11 rounded-lg bg-[#F1F3F2] border border-[#E3E6E5] flex items-center justify-center text-[#6B7280] shrink-0">
               <Ticket className="w-4 h-4" strokeWidth={1.5} />
             </div>
             <div className="min-w-0">
-              <p className="text-4xl font-semibold text-neutral-900">{ticketCount}</p>
-              <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Visual feedback captured</p>
+              <p className="text-4xl font-semibold text-[#111111]">{ticketCount}</p>
+              <p className="text-xs uppercase tracking-wide font-medium text-[#6B7280] mt-1">Visual feedback captured</p>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-200 bg-purple-50 hover:shadow-lg transition flex items-center gap-3">
-            <div className="w-11 h-11 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+          <div className="bg-white rounded-[16px] p-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] border border-[#E3E6E5] hover:bg-[#E9ECEB] transition flex items-center gap-3">
+            <div className="w-11 h-11 rounded-lg bg-[#F1F3F2] border border-[#E3E6E5] flex items-center justify-center text-[#6B7280] shrink-0">
               <MessageCircle className="w-4 h-4" strokeWidth={1.5} />
             </div>
             <div className="min-w-0">
-              <p className="text-4xl font-semibold text-neutral-900">{replyCount}</p>
-              <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Replies made</p>
+              <p className="text-4xl font-semibold text-[#111111]">{replyCount}</p>
+              <p className="text-xs uppercase tracking-wide font-medium text-[#6B7280] mt-1">Replies made</p>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-indigo-200 bg-indigo-50 hover:shadow-lg transition flex items-center gap-3">
-            <div className="w-11 h-11 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+          <div className="bg-white rounded-[16px] p-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] border border-[#E3E6E5] hover:bg-[#E9ECEB] transition flex items-center gap-3">
+            <div className="w-11 h-11 rounded-lg bg-[#F1F3F2] border border-[#E3E6E5] flex items-center justify-center text-[#6B7280] shrink-0">
               <Layers className="w-4 h-4" strokeWidth={1.5} />
             </div>
             <div className="min-w-0">
-              <p className="text-4xl font-semibold text-neutral-900">{sessionCount}</p>
-              <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Sessions reviewed</p>
+              <p className="text-4xl font-semibold text-[#111111]">{sessionCount}</p>
+              <p className="text-xs uppercase tracking-wide font-medium text-[#6B7280] mt-1">Sessions reviewed</p>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-green-200 bg-green-50 hover:shadow-lg transition flex items-center gap-3">
-            <div className="w-11 h-11 rounded-lg bg-green-100 flex items-center justify-center text-green-600 shrink-0">
+          <div className="bg-white rounded-[16px] p-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] border border-[#E3E6E5] hover:bg-[#E9ECEB] transition flex items-center gap-3">
+            <div className="w-11 h-11 rounded-lg bg-[#F1F3F2] border border-[#E3E6E5] flex items-center justify-center text-[#6B7280] shrink-0">
               <CheckCircle className="w-4 h-4" strokeWidth={1.5} />
             </div>
             <div className="min-w-0">
-              <p className="text-4xl font-semibold text-neutral-900">{resolvedCount}</p>
-              <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Discussions resolved</p>
+              <p className="text-4xl font-semibold text-[#111111]">{resolvedCount}</p>
+              <p className="text-xs uppercase tracking-wide font-medium text-[#6B7280] mt-1">Discussions resolved</p>
             </div>
           </div>
         </section>
 
         {/* Activity insights */}
         <section className="grid grid-cols-2 gap-6">
-          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3">
-            <h3 className="text-sm font-semibold text-neutral-900 mb-4">Most Commented Sessions</h3>
-            <ul className="text-sm text-neutral-700">
+          <div className="bg-white border border-[#E3E6E5] rounded-[16px] p-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-shadow space-y-3">
+            <h3 className="text-sm font-semibold text-[#111111] mb-4">Most Commented Sessions</h3>
+            <ul className="text-sm text-[#111111]">
               {mostCommentedSessions.length === 0 ? (
-                <li className="py-2 px-3 text-secondary">No sessions with comments yet.</li>
+                <li className="py-2 px-3 text-[#6B7280]">No sessions with comments yet.</li>
               ) : (
                 mostCommentedSessions.map((s, i) => (
-                  <li key={s.sessionId} className="flex items-center gap-3 py-2 px-3 rounded-md hover:bg-neutral-50 transition">
-                    <span className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 text-xs font-semibold flex items-center justify-center shrink-0">
+                  <li key={s.sessionId} className="flex items-center gap-3 py-2 px-3 rounded-md hover:bg-[#E9ECEB] transition">
+                    <span className="w-7 h-7 rounded-full bg-[#DDF3C8] text-[#111111] text-xs font-semibold flex items-center justify-center shrink-0">
                       {i + 1}
                     </span>
                     {s.sessionName}
@@ -270,15 +270,15 @@ export default function InsightsPage() {
               )}
             </ul>
           </div>
-          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3">
-            <h3 className="text-sm font-semibold text-neutral-900 mb-4">Most Reported Issue Type</h3>
-            <ul className="text-sm text-neutral-700">
+          <div className="bg-white border border-[#E3E6E5] rounded-[16px] p-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-shadow space-y-3">
+            <h3 className="text-sm font-semibold text-[#111111] mb-4">Most Reported Issue Type</h3>
+            <ul className="text-sm text-[#111111]">
               {mostReportedIssueTypes.length === 0 ? (
-                <li className="py-2 px-3 text-secondary">No issue types yet.</li>
+                <li className="py-2 px-3 text-[#6B7280]">No issue types yet.</li>
               ) : (
                 mostReportedIssueTypes.map((type, i) => (
-                  <li key={type.type} className="flex items-center gap-3 py-2 px-3 rounded-md hover:bg-neutral-50 transition">
-                    <span className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 text-xs font-semibold flex items-center justify-center shrink-0">
+                  <li key={type.type} className="flex items-center gap-3 py-2 px-3 rounded-md hover:bg-[#E9ECEB] transition">
+                    <span className="w-7 h-7 rounded-full bg-[#DDF3C8] text-[#111111] text-xs font-semibold flex items-center justify-center shrink-0">
                       {i + 1}
                     </span>
                     {type.type}
@@ -287,35 +287,35 @@ export default function InsightsPage() {
               )}
             </ul>
           </div>
-          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3 col-span-2">
-            <h3 className="text-sm font-semibold text-neutral-900 mb-4">Team Response Speed</h3>
+          <div className="bg-white border border-[#E3E6E5] rounded-[16px] p-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-shadow space-y-3 col-span-2">
+            <h3 className="text-sm font-semibold text-[#111111] mb-4">Team Response Speed</h3>
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <p className="text-xs text-secondary">Average first reply</p>
-                <p className="text-xl font-semibold text-neutral-900 mt-0.5">{responseSpeed.averageFirstReply}</p>
-                <p className="text-xs text-secondary mt-1">Typical response speed</p>
+                <p className="text-xs text-[#6B7280]">Average first reply</p>
+                <p className="text-xl font-semibold text-[#111111] mt-0.5">{responseSpeed.averageFirstReply}</p>
+                <p className="text-xs text-[#6B7280] mt-1">Typical response speed</p>
               </div>
               <div>
-                <p className="text-xs text-secondary">Average resolution time</p>
-                <p className="text-xl font-semibold text-neutral-900 mt-0.5">{responseSpeed.averageResolutionTime}</p>
-                <p className="text-xs text-secondary mt-1">Time to close discussions</p>
+                <p className="text-xs text-[#6B7280]">Average resolution time</p>
+                <p className="text-xl font-semibold text-[#111111] mt-0.5">{responseSpeed.averageResolutionTime}</p>
+                <p className="text-xs text-[#6B7280] mt-1">Time to close discussions</p>
               </div>
             </div>
           </div>
-          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3 col-span-2">
-            <h3 className="text-sm font-semibold text-neutral-900 mb-4">Most Active Session</h3>
+          <div className="bg-white border border-[#E3E6E5] rounded-[16px] p-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-shadow space-y-3 col-span-2">
+            <h3 className="text-sm font-semibold text-[#111111] mb-4">Most Active Session</h3>
             {mostActiveSession ? (
               <>
-                <p className="text-lg font-semibold text-neutral-900">{mostActiveSession.sessionName}</p>
+                <p className="text-lg font-semibold text-[#111111]">{mostActiveSession.sessionName}</p>
                 <div className="border-t border-neutral-200 mt-4 pt-3" aria-hidden />
-                <div className="flex gap-6 mt-3 text-sm text-secondary">
+                <div className="flex gap-6 mt-3 text-sm text-[#6B7280]">
                   <span>{mostActiveSession.issues} issues</span>
                   <span>{mostActiveSession.replies} replies</span>
                   <span>{mostActiveSession.collaborators} collaborators</span>
                 </div>
               </>
             ) : (
-              <p className="text-secondary">No session data yet.</p>
+              <p className="text-[#6B7280]">No session data yet.</p>
             )}
           </div>
         </section>

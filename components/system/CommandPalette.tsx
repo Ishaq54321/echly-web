@@ -166,7 +166,7 @@ export default function CommandPalette({
                   role="option"
                   aria-selected={index === clampedIndex}
                   type="button"
-                  className={`w-full cursor-pointer rounded-xl px-6 py-3.5 text-left text-sm transition-colors duration-[var(--motion-duration)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] ${
+                  className={`w-full cursor-pointer rounded-xl px-6 py-3.5 text-left text-sm transition-colors duration-[var(--motion-duration)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 ${
                     index === clampedIndex
                       ? "bg-[var(--color-primary-soft)]"
                       : "hover:bg-[var(--layer-2-hover-bg)]"

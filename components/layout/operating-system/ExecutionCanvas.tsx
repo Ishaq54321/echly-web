@@ -50,7 +50,7 @@ export interface ExecutionCanvasProps {
 function StatusPill({ status }: { status: FeedbackStatus }) {
   const styles: Record<FeedbackStatus, string> = {
     Open: "bg-amber-50 text-amber-800 border-amber-200",
-    "In Progress": "bg-blue-50 text-[var(--accent-operational)] border-[var(--accent-operational-border)]",
+    "In Progress": "bg-[#E9ECEB] text-[hsl(var(--text-primary-strong))] border-[#E5E7EB]",
     Blocked: "bg-red-50 text-red-700 border-red-200",
     Resolved: "bg-emerald-50 text-emerald-700 border-emerald-200",
   };
@@ -176,7 +176,7 @@ export function ExecutionCanvas({
                     titleInputRef.current?.blur();
                   }
                 }}
-                className="w-full text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] bg-white border border-[var(--layer-2-border)] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
+                className="w-full text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] bg-white border border-[var(--layer-2-border)] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-gray-300"
                 aria-label="Edit title"
               />
             ) : (
@@ -214,7 +214,7 @@ export function ExecutionCanvas({
               <button
                 type="button"
                 onClick={() => setActionsOpen((o) => !o)}
-                className="h-9 w-9 flex items-center justify-center rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+                className="h-9 w-9 flex items-center justify-center rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
                 aria-label="More actions"
                 aria-expanded={actionsOpen}
               >
@@ -304,7 +304,7 @@ export function ExecutionCanvas({
           <button
             type="button"
             onClick={() => onResolve(!item.isResolved)}
-            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] ${
+            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300 ${
               item.isResolved
                 ? "border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)]"
                 : "bg-[var(--accent-operational)] text-white border border-transparent hover:opacity-92"
@@ -316,14 +316,14 @@ export function ExecutionCanvas({
         )}
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
         >
           <UserPlus className="h-3.5 w-3.5" strokeWidth={1.5} />
           Assign
         </button>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
         >
           <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />
           Defer
@@ -332,7 +332,7 @@ export function ExecutionCanvas({
           <button
             type="button"
             onClick={onResolveAndNext}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
           >
             Resolve & Next
           </button>

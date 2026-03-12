@@ -222,7 +222,7 @@ function FolderPageContent() {
               <button
                 type="button"
                 onClick={handleCreateSession}
-                className="bg-[#155DFC] text-white rounded-full px-5 py-2 text-sm font-semibold hover:bg-[#0F4ED1] transition"
+                className="primary-cta rounded-full px-5 py-2 text-meta transition-colors"
               >
                 New Session
               </button>
@@ -254,17 +254,17 @@ function FolderPageContent() {
                 </div>
               ) : folder ? (
                 <div className="flex flex-col items-center justify-center mt-24 text-center">
-                  <Folder className="w-12 h-12 text-[#155DFC] mb-4" />
-                  <h3 className="text-lg font-semibold text-neutral-900 mb-1">
+                  <Folder className="w-12 h-12 text-[#111111] mb-4" />
+                  <h3 className="text-h3 font-semibold text-[#111111] mb-1">
                     This folder is empty
                   </h3>
-                  <p className="text-sm text-secondary mb-6 max-w-sm">
+                  <p className="text-meta text-[#111111] mb-6 max-w-sm">
                     Move sessions into this folder to organize your feedback and recordings.
                   </p>
                   <button
                     type="button"
                     onClick={() => setMoveModalOpen(true)}
-                    className="bg-[#155DFC] text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-[#0F4ED1]"
+                    className="primary-cta px-5 py-2 rounded-full text-meta"
                   >
                     Add Sessions
                   </button>

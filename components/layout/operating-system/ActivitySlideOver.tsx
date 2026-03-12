@@ -84,7 +84,7 @@ function ActivityPanelContent({
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded-md text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="p-1.5 rounded-md text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
           aria-label="Close activity panel"
         >
           <X className="h-4 w-4" strokeWidth={1.5} />

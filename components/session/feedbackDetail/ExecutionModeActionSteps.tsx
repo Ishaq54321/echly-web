@@ -26,12 +26,12 @@ export function ExecutionModeActionSteps({
       {items.map((text, i) => (
         <li
           key={`${i}-${text.slice(0, 20)}`}
-          className="flex items-baseline gap-3"
+          className="flex items-baseline"
         >
-          <span className="shrink-0 text-[14px] font-medium tabular-nums text-[hsl(var(--text-tertiary))] w-6">
+          <span className="shrink-0 text-[14px] font-semibold tabular-nums text-[#111111] mr-1.5">
             {i + 1}.
           </span>
-          <span className="text-[15px] leading-[1.6] text-[hsl(var(--text-primary-strong))]">
+          <span className="text-[14px] font-medium leading-[1.6] text-[#111111]">
             {formatActionStep(text)}
           </span>
         </li>

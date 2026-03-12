@@ -10,21 +10,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        primaryText: "#111111",
         primary: "#2A2A2A",
         active: "#6E6E6E",
         brand: {
           primary: "#111827",
-          accent: "#2563EB",
+          accent: "#9FE870",
           soft: "#F3F4F6",
         },
         accent: {
-          blue: "#2563EB",
+          blue: "#9FE870",
           purple: "#7C3AED",
           green: "#059669",
           amber: "#D97706",
         },
         semantic: {
-          system: "#1a56db",
+          system: "#5F6368",
           insight: "#7C3AED",
           success: "#0d9488",
           skipped: "#b45309",

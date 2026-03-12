@@ -40,7 +40,7 @@ export function CriticalIssuesSection({
               key={item.id}
               type="button"
               onClick={() => onView(item.sessionId)}
-              className="dashboard-card text-left w-full hover:border-[var(--layer-2-hover-border)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-1"
+              className="dashboard-card text-left w-full hover:border-[var(--layer-2-hover-border)] focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1"
             >
               <div className="text-[14px] font-semibold leading-[1.4] text-[hsl(var(--text-primary-strong))] truncate">
                 {item.title}

@@ -43,14 +43,14 @@ function OverviewSessionHeader({
         <button
           type="button"
           onClick={onCopy}
-          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
+          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 cursor-pointer"
         >
           <Share2 size={14} />
           {copied ? "Copied" : "Share"}
         </button>
         <Link
           href={`/dashboard/${sessionId}`}
-          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg bg-brand-primary text-white hover:opacity-90 transition-colors duration-200 ease-out font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
+          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg bg-brand-primary text-white hover:opacity-90 transition-colors duration-200 ease-out font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 cursor-pointer"
         >
           <LayoutPanelLeft size={14} />
           Open Feedback Board
@@ -58,7 +58,7 @@ function OverviewSessionHeader({
         <button
           type="button"
           aria-label="Settings"
-          className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-secondary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-secondary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 cursor-pointer"
         >
           <Settings size={14} />
         </button>
@@ -266,7 +266,7 @@ export default function SessionOverviewPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--canvas-base)]">
-        <p className="text-sm text-secondary">Failed to load overview.</p>
+        <p className="text-sm text-[#111111]">Failed to load overview.</p>
       </div>
     );
   }

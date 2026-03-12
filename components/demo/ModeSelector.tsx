@@ -19,14 +19,14 @@ export default function ModeSelector({ selectedMode, onSelect, disabled }: ModeS
         disabled={disabled}
         className={`rounded-xl px-3 py-2.5 flex items-center gap-2 transition-colors ${
           selectedMode === "voice"
-            ? "bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)]"
-            : "bg-white border border-gray-200 text-gray-800 hover:border-gray-300 hover:bg-gray-50"
+            ? "bg-[#9FE870] text-[#111111] shadow-[0_10px_24px_rgba(159,232,112,0.28)]"
+            : "bg-white border border-[#E3E6E5] text-[#111111] hover:border-[#DADDDD] hover:bg-[#E9ECEB]"
         }`}
       >
         <Mic className="h-4 w-4" />
         <div className="leading-tight text-left">
           <div className="text-[12px] font-semibold">Voice</div>
-          <div className={`text-[10px] ${selectedMode === "voice" ? "opacity-90" : "text-gray-500"}`}>
+          <div className={`text-[10px] ${selectedMode === "voice" ? "opacity-90" : "text-[#111111]"}`}>
             Recommended
           </div>
         </div>
@@ -37,14 +37,14 @@ export default function ModeSelector({ selectedMode, onSelect, disabled }: ModeS
         disabled={disabled}
         className={`rounded-xl px-3 py-2.5 flex items-center gap-2 transition-colors ${
           selectedMode === "write"
-            ? "bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)]"
-            : "bg-white border border-gray-200 text-gray-800 hover:border-gray-300 hover:bg-gray-50"
+            ? "bg-[#9FE870] text-[#111111] shadow-[0_10px_24px_rgba(159,232,112,0.28)]"
+            : "bg-white border border-[#E3E6E5] text-[#111111] hover:border-[#DADDDD] hover:bg-[#E9ECEB]"
         }`}
       >
         <Pencil className="h-4 w-4" />
         <div className="leading-tight text-left">
           <div className="text-[12px] font-semibold">Write</div>
-          <div className={`text-[10px] ${selectedMode === "write" ? "opacity-90" : "text-gray-500"}`}>
+          <div className={`text-[10px] ${selectedMode === "write" ? "opacity-90" : "text-[#111111]"}`}>
             Manual
           </div>
         </div>

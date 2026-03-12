@@ -35,7 +35,7 @@ export function ProductPreview() {
             ))}
           </div>
           <div className="flex-1 flex justify-center">
-            <div className="rounded-lg bg-white/5 border border-white/10 px-4 py-1.5 text-xs text-gray-500 w-3/4 max-w-[240px] text-center">
+            <div className="rounded-lg bg-white/5 border border-white/10 px-4 py-1.5 text-xs text-[#111111] w-3/4 max-w-[240px] text-center">
               app.echly.com/demo
             </div>
           </div>
@@ -117,7 +117,7 @@ function ProductPreviewAnimation({
             exit={{ opacity: 0, y: 4 }}
             transition={easeSubtle}
           >
-            <p className="text-xs text-gray-300">Fix button alignment here</p>
+            <p className="text-xs text-[#111111]">Fix button alignment here</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -136,7 +136,7 @@ function ProductPreviewAnimation({
               <div className="w-2 h-2 rounded-full bg-[#466EFF]" />
               <span className="text-xs font-medium text-white">New ticket</span>
             </div>
-            <p className="text-xs text-gray-400 mt-1">Button alignment — Feedback</p>
+            <p className="text-xs text-[#111111] mt-1">Button alignment — Feedback</p>
           </motion.div>
         )}
       </AnimatePresence>

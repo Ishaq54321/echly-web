@@ -170,7 +170,7 @@ export function DiscussionFeed({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="text-sm text-secondary">{error}</p>
+        <p className="text-sm text-[#111111]">{error}</p>
       </div>
     );
   }
@@ -179,10 +179,10 @@ export function DiscussionFeed({
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <MessageSquare className="w-12 h-12 text-neutral-300 mb-4" />
-        <h2 className="text-lg font-semibold text-neutral-900">
+        <h2 className="text-lg font-semibold text-[#111111]">
           No discussions yet
         </h2>
-        <p className="mt-2 text-sm text-secondary max-w-[280px]">
+        <p className="mt-2 text-sm text-[#111111] max-w-[280px]">
           When people comment on feedback, conversations will appear here.
         </p>
       </div>
@@ -202,24 +202,24 @@ export function DiscussionFeed({
             className={`
               w-full text-left rounded-xl border p-4 transition-all duration-200
               bg-white
-              border-neutral-200
-              hover:border-[#155DFC80]
+              border-[#E5E7EB]
+              hover:border-[#E5E7EB]
               hover:shadow-md
               hover:-translate-y-[1px]
-              ${isSelected ? "border-[#155DFC] ring-1 ring-[#155DFC40] shadow-md" : ""}
+              ${isSelected ? "border-[#E5E7EB] ring-1 ring-gray-200 shadow-md" : ""}
             `}
           >
-            <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2">
+            <h3 className="font-medium text-[#111111] text-[15px] leading-tight line-clamp-2">
               {item.title}
             </h3>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-secondary">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#111111]">
               <span>{item.sessionName ?? "Unknown Session"}</span>
               {item.commentCount != null && item.commentCount > 0 && (
                 <span>· {item.commentCount} comments</span>
               )}
             </div>
             {item.lastCommentPreview && (
-              <p className="mt-2 text-sm text-secondary line-clamp-2">
+              <p className="mt-2 text-sm text-[#111111] line-clamp-2">
                 {item.lastCommentPreview}
               </p>
             )}

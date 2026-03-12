@@ -38,7 +38,7 @@ export function ContextIntelligenceColumn({
         <button
           type="button"
           onClick={handleToggle}
-          className="flex flex-col items-center gap-1 p-2 rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="flex flex-col items-center gap-1 p-2 rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
           aria-label="Expand context panel"
         >
           <LayoutGrid className="h-5 w-5" strokeWidth={1.5} />
@@ -61,7 +61,7 @@ export function ContextIntelligenceColumn({
         <button
           type="button"
           onClick={handleToggle}
-          className="p-1 rounded text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="p-1 rounded text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
           aria-label="Collapse context panel"
         >
           <ChevronRight className="h-4 w-4" strokeWidth={1.5} />

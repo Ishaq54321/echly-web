@@ -104,10 +104,10 @@ export function SessionControlPanel({
             padding: "8px 14px",
             borderRadius: 10,
             border: "none",
-            background: "#155DFC",
-            color: "#fff",
+            background: "#9FE870",
+            color: "#111111",
             fontSize: 13,
-            fontWeight: 500,
+            fontWeight: 600,
             cursor: pausePending ? "default" : "pointer",
             opacity: pausePending ? 0.7 : 1,
           }}

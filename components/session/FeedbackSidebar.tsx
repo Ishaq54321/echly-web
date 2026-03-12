@@ -121,7 +121,7 @@ function FeedbackSidebarInner({
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
-              className="p-1.5 rounded-md cursor-pointer hover:bg-neutral-100 transition-colors duration-150"
+              className="p-1.5 rounded-md cursor-pointer hover:bg-[#E9ECEB] transition-colors duration-150"
               aria-label="Options"
             >
               <MoreHorizontal className="h-4 w-4 text-secondary" />
@@ -134,7 +134,7 @@ function FeedbackSidebarInner({
                 <button
                   type="button"
                   role="menuitem"
-                  className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                  className="w-full text-left px-4 py-2 text-[14px] text-[#6B7280] cursor-pointer hover:bg-[#E9ECEB] transition-colors duration-120"
                   onClick={() => {
                     setFilter("all");
                     setMenuOpen(false);
@@ -145,7 +145,7 @@ function FeedbackSidebarInner({
                 <button
                   type="button"
                   role="menuitem"
-                  className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                  className="w-full text-left px-4 py-2 text-[14px] text-[#6B7280] cursor-pointer hover:bg-[#E9ECEB] transition-colors duration-120"
                   onClick={() => {
                     setFilter("active");
                     setMenuOpen(false);
@@ -156,7 +156,7 @@ function FeedbackSidebarInner({
                 <button
                   type="button"
                   role="menuitem"
-                  className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                  className="w-full text-left px-4 py-2 text-[14px] text-[#6B7280] cursor-pointer hover:bg-[#E9ECEB] transition-colors duration-120"
                   onClick={() => {
                     setFilter("resolved");
                     setMenuOpen(false);
@@ -167,7 +167,7 @@ function FeedbackSidebarInner({
                 <button
                   type="button"
                   role="menuitem"
-                  className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                  className="w-full text-left px-4 py-2 text-[14px] text-[#6B7280] cursor-pointer hover:bg-[#E9ECEB] transition-colors duration-120"
                   onClick={async () => {
                     setMenuOpen(false);
                     await onMarkAllResolved?.();
@@ -210,7 +210,7 @@ function FeedbackSidebarInner({
                       onSelect(item.id);
                     }
                   }}
-                  className={`relative flex items-center gap-3 px-5 py-2.5 rounded-full transition-colors duration-[120ms] outline-none focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer ${
+                  className={`relative flex items-center gap-3 px-5 py-2.5 rounded-full transition-colors duration-[120ms] outline-none focus:outline-none focus:ring-1 focus:ring-gray-300 cursor-pointer ${
                     isActive
                       ? "text-[hsl(var(--text-primary-strong))] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                       : "text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.04]"
@@ -232,7 +232,7 @@ function FeedbackSidebarInner({
                   </span>
                   <button
                     type="button"
-                    className="opacity-0 group-hover:opacity-100 transition-colors duration-120 ease-out p-0.5 rounded-md text-meta hover:text-neutral-900 hover:bg-neutral-100 cursor-pointer border-0 bg-transparent shrink-0"
+                    className="opacity-0 group-hover:opacity-100 transition-colors duration-120 ease-out p-0.5 rounded-md text-[#6B7280] hover:text-[#111111] hover:bg-[#E9ECEB] cursor-pointer border-0 bg-transparent shrink-0"
                     onClick={(e) => e.stopPropagation()}
                     aria-label="More actions"
                   >

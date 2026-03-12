@@ -2,20 +2,10 @@
 
 import Image from "next/image";
 
-/**
- * Deterministic background color from a string (e.g. user id).
- * Same input always yields the same hue. Returns HSL string for background.
- */
-function backgroundColorFromId(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    const char = id.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash;
-  }
-  const hue = Math.abs(hash % 360);
-  return `hsl(${hue}, 55%, 42%)`;
-}
+/* Neutral avatar: no colored fills; design system token. */
+const AVATAR_BG = "#F1F3F2";
+const AVATAR_TEXT = "#111111";
+const AVATAR_BORDER = "#E3E6E5";
 
 export interface AvatarProps {
   /** If set, show image. Otherwise show initials on colored background. */
@@ -55,17 +45,16 @@ export function Avatar({
         alt=""
         width={w}
         height={w}
-        className={`rounded-full object-cover ${sizeClass} ${className}`}
+        className={`rounded-full object-cover border border-[#E3E6E5] ${sizeClass} ${className}`}
         unoptimized
       />
     );
   }
 
-  const bg = backgroundColorFromId(id);
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-full font-medium text-white ${sizeClass} ${className}`}
-      style={{ backgroundColor: bg }}
+      className={`inline-flex items-center justify-center rounded-full font-medium border border-[#E3E6E5] ${sizeClass} ${className}`}
+      style={{ backgroundColor: AVATAR_BG, color: AVATAR_TEXT }}
       aria-hidden
     >
       {initials}

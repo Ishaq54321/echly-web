@@ -62,12 +62,12 @@ export function RenameFolderModal({
       aria-labelledby="rename-folder-title"
     >
       <div
-        className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
+        className="rounded-2xl border border-[#E3E6E5] shadow-[0_2px_8px_rgba(0,0,0,0.06)] bg-[#FFFFFF] p-6 max-w-md w-full cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
           id="rename-folder-title"
-          className="text-xl font-semibold text-neutral-900 mb-4"
+          className="text-h3 font-semibold text-[#111111] mb-4"
         >
           Rename folder
         </h2>
@@ -77,12 +77,12 @@ export function RenameFolderModal({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-transparent"
+          className="w-full px-4 py-2.5 rounded-full border border-[#E3E6E5] text-[#111111] placeholder:text-[#111111] focus:outline-none focus:border-[#D1D5DB] focus:shadow-[0_0_0_3px_rgba(209,213,219,0.4)]"
           aria-label="Folder name"
           aria-invalid={!!error}
         />
         {error && (
-          <p className="mt-2 text-sm text-red-600" role="alert">
+          <p className="mt-2 text-meta text-red-600" role="alert">
             {error}
           </p>
         )}
@@ -90,7 +90,7 @@ export function RenameFolderModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 text-sm font-medium rounded-xl text-secondary hover:bg-neutral-100 transition"
+            className="px-4 py-2.5 text-meta font-medium rounded-full text-[#111111] hover:bg-[#E9ECEB] transition-colors"
           >
             Cancel
           </button>
@@ -98,7 +98,7 @@ export function RenameFolderModal({
             type="button"
             onClick={handleSave}
             disabled={value.trim() === ""}
-            className="px-4 py-2.5 text-sm font-medium rounded-xl bg-[#155DFC] text-white hover:bg-[#0F4ED1] transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="primary-cta px-4 py-2.5 text-meta rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Save
           </button>

@@ -50,29 +50,29 @@ export default function DiscussionPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20">
+      <div className="flex-1 bg-[#FFFFFF] flex flex-col w-full min-h-0 pt-20">
         <div className="w-full px-6 flex flex-1 flex-col min-h-0">
           <div className="mb-0 shrink-0">
-            <h1 className="text-3xl font-semibold text-neutral-900">Discussion</h1>
+            <h1 className="text-h2 font-semibold text-[#111111]">Discussion</h1>
             <p className="text-sm text-secondary mt-1">
               All feedback conversations across sessions
             </p>
           </div>
-          <div className="border-b border-neutral-300 mt-6 shrink-0" />
+          <div className="border-b border-[#E3E6E5] mt-6 shrink-0" />
           <div className="discussion-layout flex flex-1 min-h-0 w-full pt-0 items-stretch">
             <div
-              className="shrink-0 bg-white px-3 py-2 space-y-0.5 overflow-y-auto min-h-0"
+              className="shrink-0 bg-[#FFFFFF] px-3 py-2 space-y-0.5 overflow-y-auto min-h-0"
               style={{ flex: "0 0 260px" }}
             >
               <div className="h-10 rounded-lg skeleton" />
             </div>
             <div
-              className="shrink-0 bg-white overflow-y-auto min-h-0 px-3 py-2 border-l border-neutral-300"
+              className="shrink-0 bg-[#FFFFFF] overflow-y-auto min-h-0 px-3 py-2 border-l border-[#E3E6E5]"
               style={{ flex: `1 1 ${DEFAULT_LIST_BASIS}px`, minWidth: MIN_LIST }}
             >
               <DiscussionSkeleton />
             </div>
-            <div className="discussion-panel-right flex-1 min-w-0 bg-white flex justify-center px-4 py-4 min-h-0 overflow-hidden" />
+            <div className="discussion-panel-right flex-1 min-w-0 bg-[#FFFFFF] flex justify-center px-4 py-4 min-h-0 overflow-hidden" />
           </div>
         </div>
       </div>
@@ -81,19 +81,19 @@ export default function DiscussionPage() {
 
   if (!user) {
     return (
-      <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20">
+      <div className="flex-1 bg-[#FFFFFF] flex flex-col w-full min-h-0 pt-20">
         <div className="w-full px-6 flex flex-1 flex-col min-h-0">
           <div className="mb-0 shrink-0">
-            <h1 className="text-3xl font-semibold text-neutral-900">Discussion</h1>
+            <h1 className="text-h2 font-semibold text-[#111111]">Discussion</h1>
             <p className="text-sm text-secondary mt-1">
               All feedback conversations across sessions
             </p>
           </div>
-          <div className="border-b border-neutral-300 mt-6 shrink-0" />
+          <div className="border-b border-[#E3E6E5] mt-6 shrink-0" />
           <div className="discussion-layout flex flex-1 min-h-0 w-full pt-0 items-stretch">
-            <div className="shrink-0 bg-white px-3 py-2" style={{ flex: "0 0 260px" }} />
-            <div className="shrink-0 bg-white pl-0 pr-3 py-2 border-l border-neutral-300" style={{ flex: `1 1 ${DEFAULT_LIST_BASIS}px` }} />
-            <div className="discussion-panel-right flex-1 min-w-0 bg-white flex justify-center items-center px-4 py-4">
+            <div className="shrink-0 bg-[#FFFFFF] px-3 py-2" style={{ flex: "0 0 260px" }} />
+            <div className="shrink-0 bg-[#FFFFFF] pl-0 pr-3 py-2 border-l border-[#E3E6E5]" style={{ flex: `1 1 ${DEFAULT_LIST_BASIS}px` }} />
+            <div className="discussion-panel-right flex-1 min-w-0 bg-[#FFFFFF] flex justify-center items-center px-4 py-4">
               <p className="text-sm text-secondary font-normal">
                 Please sign in to view discussions.
               </p>
@@ -105,21 +105,21 @@ export default function DiscussionPage() {
   }
 
   return (
-    <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20">
+    <div className="flex-1 bg-[#FFFFFF] flex flex-col w-full min-h-0 pt-20">
       <div className="w-full px-6 flex flex-1 flex-col min-h-0">
         <div className="mb-0 shrink-0">
-          <h1 className="text-3xl font-semibold text-neutral-900">Discussion</h1>
+          <h1 className="text-h2 font-semibold text-[#111111]">Discussion</h1>
           <p className="text-sm text-secondary mt-1">
             All feedback conversations across sessions
           </p>
         </div>
 
-        <div className="border-b border-neutral-300 mt-6 shrink-0" />
+        <div className="border-b border-[#E3E6E5] mt-6 shrink-0" />
 
         <div className="discussion-layout flex flex-1 min-h-0 w-full pt-0 items-stretch">
           {/* LEFT: Projects — Navigation (light) */}
           <div
-            className="discussion-panel-sidebar shrink-0 bg-white px-3 py-2 space-y-0.5 overflow-y-auto min-h-0"
+            className="discussion-panel-sidebar shrink-0 bg-[#FFFFFF] px-3 py-2 space-y-0.5 overflow-y-auto min-h-0"
             style={{ flex: `0 0 ${sidebarBasis}px`, minWidth: MIN_SIDEBAR, maxWidth: MAX_SIDEBAR }}
           >
             {projects.length === 0 && isEmpty === false ? (
@@ -131,11 +131,11 @@ export default function DiscussionPage() {
                   onClick={() => setSelectedProjectId(null)}
                   className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors cursor-pointer ${
                     selectedProjectId === null
-                      ? "bg-blue-50 text-blue-700 font-semibold"
-                      : "text-secondary hover:bg-neutral-50"
+                      ? "bg-[#E9ECEB] text-[#111111] font-semibold"
+                      : "text-[#111111] hover:bg-[#E9ECEB] hover:text-[#111111]"
                   }`}
                 >
-                  <Folder className="h-4 w-4 shrink-0 text-[#155DFC]" />
+                  <Folder className={`h-4 w-4 shrink-0 ${selectedProjectId === null ? "text-[#111111]" : "text-[#111111]"}`} />
                   <span className="truncate">All projects</span>
                 </button>
                 {projects.map((proj) => {
@@ -147,11 +147,11 @@ export default function DiscussionPage() {
                       onClick={() => setSelectedProjectId(proj.id)}
                       className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors cursor-pointer ${
                         isActive
-                          ? "bg-blue-50 text-blue-700 font-semibold"
-                          : "text-secondary hover:bg-neutral-50"
+                          ? "bg-[#E9ECEB] text-[#111111] font-semibold"
+                          : "text-[#111111] hover:bg-[#E9ECEB] hover:text-[#111111]"
                       }`}
                     >
-                      <Folder className="h-4 w-4 shrink-0 text-[#155DFC]" />
+                      <Folder className={`h-4 w-4 shrink-0 ${isActive ? "text-[#111111]" : "text-[#111111]"}`} />
                       <span className="truncate">{proj.name}</span>
                     </button>
                   );
@@ -164,13 +164,13 @@ export default function DiscussionPage() {
 
           {/* MIDDLE: Discussions — static 1px grey divider; selection rail is per-row */}
           <div
-            className="discussion-panel-list shrink-0 h-full min-h-0 bg-white overflow-y-auto flex flex-col border-l border-neutral-300"
+            className="discussion-panel-list shrink-0 h-full min-h-0 bg-[#FFFFFF] overflow-y-auto flex flex-col border-l border-[#E3E6E5]"
             style={{ flex: `1 1 ${listBasis}px`, minWidth: MIN_LIST, maxWidth: MAX_LIST }}
           >
             {isEmpty === true ? (
               <div className="px-3 py-8 text-center">
-                <MessageSquareMore className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
-                <h2 className="text-lg font-semibold text-neutral-900">
+                <MessageSquareMore className="w-12 h-12 text-[#DADDDD] mx-auto mb-4" />
+                <h2 className="text-h3 font-semibold text-[#111111]">
                   No discussions yet
                 </h2>
                 <p className="mt-2 text-sm text-secondary max-w-[280px] mx-auto">
@@ -178,7 +178,7 @@ export default function DiscussionPage() {
                 </p>
                 <Link
                   href="/dashboard"
-                  className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#155DFC] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[#0F4ED1] transition"
+                  className="primary-cta mt-6 inline-flex items-center justify-center rounded-full px-5 py-2.5 text-meta transition-colors"
                 >
                   Open Sessions
                 </Link>
@@ -201,7 +201,7 @@ export default function DiscussionPage() {
 
           {/* RIGHT: Ticket workspace (strong) — left-aligned reading column */}
           <div
-            className="discussion-panel-right flex-1 min-w-0 bg-white flex py-4 min-h-0 overflow-hidden"
+            className="discussion-panel-right flex-1 min-w-0 bg-[#FFFFFF] flex py-4 min-h-0 overflow-hidden"
             style={{ flex: "2 1 auto", minWidth: MIN_RIGHT }}
           >
             <div className="w-full min-h-0 flex flex-col">

@@ -20,9 +20,9 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
         className={`
           relative inline-flex shrink-0 items-center rounded-[999px]
           h-[22px] w-[40px] transition-all duration-150 ease-in-out
-          focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30 focus-visible:ring-offset-2
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2
           disabled:opacity-50
-          ${checked ? "bg-[#2563EB]" : "bg-neutral-200"}
+          ${checked ? "bg-[#9FE870]" : "bg-neutral-200"}
           ${className}
         `.trim()}
         {...props}

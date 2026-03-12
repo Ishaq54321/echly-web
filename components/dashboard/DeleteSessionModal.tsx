@@ -60,7 +60,7 @@ export function DeleteSessionModal({
             type="button"
             onClick={onClose}
             disabled={deleting}
-            className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--layer-2-bg)] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--layer-2-bg)] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -68,7 +68,7 @@ export function DeleteSessionModal({
             type="button"
             onClick={handleConfirm}
             disabled={deleting}
-            className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(185,28,28,0.25)] hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(185,28,28,0.25)] hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {deleting ? "Deleting…" : "Delete permanently"}
           </button>

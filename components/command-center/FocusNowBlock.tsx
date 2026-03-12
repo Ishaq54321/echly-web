@@ -34,7 +34,7 @@ export function FocusNowBlock({ items, onSelect }: FocusNowBlockProps) {
             <button
               type="button"
               onClick={() => onSelect(item.id, item.sessionId)}
-              className="w-full text-left px-4 py-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-operational)]"
+              className="w-full text-left px-4 py-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-gray-300"
             >
               <span className="tabular-nums text-[hsl(var(--text-tertiary))] mr-2 text-[11px]">
                 {item.impactScore}

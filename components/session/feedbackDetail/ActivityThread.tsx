@@ -46,7 +46,7 @@ export function ActivityThread({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="py-4 rounded-lg px-2 -mx-2 hover:bg-neutral-50 transition-colors duration-150"
+            className="py-4 rounded-lg px-2 -mx-2 hover:bg-[#E9ECEB] transition-colors duration-150"
           >
             <CommentItem
               comment={comment}

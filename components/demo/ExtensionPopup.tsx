@@ -34,26 +34,26 @@ export default function ExtensionPopup({
       className="absolute right-6 top-6 w-[320px] bg-white border border-gray-200 shadow-[0_18px_60px_rgba(0,0,0,0.18)] rounded-2xl overflow-hidden cursor-default pointer-events-auto"
     >
       <div className="flex items-center justify-between px-4 pt-3">
-        <div className="flex items-center gap-2 text-gray-700">
-          <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-[#111111]">
+          <div className="h-9 w-9 rounded-xl hover:bg-[#E9ECEB] flex items-center justify-center text-[#111111] hover:text-[#111111]">
             <Home className="h-[18px] w-[18px]" />
           </div>
-          <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center">
+          <div className="h-9 w-9 rounded-xl hover:bg-[#E9ECEB] flex items-center justify-center text-[#111111] hover:text-[#111111]">
             <Moon className="h-[18px] w-[18px]" />
           </div>
-          <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center">
+          <div className="h-9 w-9 rounded-xl hover:bg-[#E9ECEB] flex items-center justify-center text-[#111111] hover:text-[#111111]">
             <Mic className="h-[18px] w-[18px]" />
           </div>
         </div>
-        <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center text-gray-500">
+        <div className="h-9 w-9 rounded-xl hover:bg-[#E9ECEB] flex items-center justify-center text-[#111111] hover:text-[#111111]">
           <X className="h-[18px] w-[18px]" />
         </div>
       </div>
 
       <div className="px-4 pb-4 pt-2">
-        <div className="text-[12px] text-gray-600">⚡ Powered by GPT-4 + Whisper</div>
+        <div className="text-[12px] text-[#111111]">⚡ Powered by GPT-4 + Whisper</div>
 
-        <div className="mt-4 text-[11px] font-semibold tracking-wide text-gray-500">
+        <div className="mt-4 text-[11px] font-semibold tracking-wide text-[#111111]">
           SELECT FEEDBACK MODE
         </div>
 
@@ -79,7 +79,7 @@ export default function ExtensionPopup({
           </button>
           <button
             type="button"
-            className="h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-semibold"
+            className="h-10 rounded-xl bg-[#E9ECEB] hover:bg-[#E9ECEB] text-[#111111] text-[12px] font-semibold"
           >
             Previous Sessions
           </button>

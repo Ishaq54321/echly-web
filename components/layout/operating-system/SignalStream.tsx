@@ -100,14 +100,14 @@ export function SignalStream({
           placeholder="Search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full h-8 px-3 text-[13px] rounded-md bg-white border border-[var(--layer-2-border)] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
+          className="w-full h-8 px-3 text-[13px] rounded-md bg-white border border-[var(--layer-2-border)] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-gray-300"
           aria-label="Search"
         />
         <div className="flex items-center justify-between gap-2">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter((e.target.value || "") as SignalStatus | "")}
-            className="h-7 px-2 text-[12px] text-[hsl(var(--text-secondary-soft))] bg-transparent border-0 rounded focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
+            className="h-7 px-2 text-[12px] text-[hsl(var(--text-secondary-soft))] bg-transparent border-0 rounded focus:outline-none focus:ring-1 focus:ring-gray-300"
             aria-label="Status filter"
           >
             <option value="">All</option>
@@ -117,7 +117,7 @@ export function SignalStream({
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SignalStreamSortBy)}
-            className="h-7 px-2 text-[12px] text-[hsl(var(--text-secondary-soft))] bg-transparent border-0 rounded focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
+            className="h-7 px-2 text-[12px] text-[hsl(var(--text-secondary-soft))] bg-transparent border-0 rounded focus:outline-none focus:ring-1 focus:ring-gray-300"
             aria-label="Sort by"
           >
             <option value="impact">Impact</option>

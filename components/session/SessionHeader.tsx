@@ -64,7 +64,7 @@ export default function SessionHeader({
         <button
           type="button"
           onClick={onCopy}
-          className="inline-flex items-center gap-2 text-[14px] px-4 py-2 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] font-medium text-[hsl(var(--text-primary-strong))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
+          className="inline-flex items-center gap-2 text-[14px] px-4 py-2 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] font-medium text-[hsl(var(--text-primary-strong))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 cursor-pointer"
         >
           <Share2 size={16} />
           {copied ? "Copied" : "Share"}

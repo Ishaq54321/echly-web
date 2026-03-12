@@ -225,7 +225,7 @@ export function GuideArrow({
           height={ARROW_SIZE}
           viewBox="0 0 24 24"
           fill="none"
-          className="text-[#4F7EFF]"
+          className="text-[#5F6368]"
           style={{
             filter: "drop-shadow(0 2px 8px rgba(79,126,255,0.4))",
           }}

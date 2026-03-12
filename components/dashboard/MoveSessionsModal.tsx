@@ -108,12 +108,12 @@ export function MoveSessionsModal({
       aria-labelledby="move-sessions-title"
     >
       <div
-        className="w-[460px] p-6 bg-white rounded-2xl shadow-xl cursor-default"
+        className="w-[460px] p-6 bg-[#FFFFFF] border border-[#E3E6E5] rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
           id="move-sessions-title"
-          className="text-lg font-semibold mb-1 text-neutral-900"
+          className="text-h3 font-semibold mb-1 text-[#111111]"
         >
           {isPickFolderMode
             ? "Move session to folder"
@@ -129,19 +129,19 @@ export function MoveSessionsModal({
                 onClick={() =>
                   setSelectedFolderId((prev) => (prev === f.id ? null : f.id))
                 }
-                className={`flex items-center gap-3 w-full px-3 py-3 rounded-lg text-left transition border ${
+                className={`flex items-center gap-3 w-full px-3 py-3 rounded-xl text-left transition border ${
                   selectedFolderId === f.id
-                    ? "border-[#155DFC] bg-[#155DFC]/5"
-                    : "border-transparent hover:bg-neutral-50"
+                    ? "border-[#E5E7EB] bg-[#E9ECEB]"
+                    : "border-transparent hover:bg-[#E9ECEB]"
                 }`}
               >
                 <input
                   type="checkbox"
                   checked={selectedFolderId === f.id}
                   onChange={() => {}}
-                  className="mt-1 rounded border-neutral-300 text-[#155DFC] focus:ring-[#155DFC]/20"
+                  className="mt-1 rounded border-[#E3E6E5] text-[#111111] focus:ring-gray-300"
                 />
-                <span className="text-sm font-medium text-neutral-900">
+                <span className="text-meta font-medium text-[#111111]">
                   {f.name}
                 </span>
               </button>
@@ -154,7 +154,7 @@ export function MoveSessionsModal({
               placeholder="Search sessions"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full border border-neutral-200 rounded-full px-4 py-2 text-sm mt-4 text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-transparent"
+              className="w-full border border-[#E3E6E5] rounded-full px-4 py-2 text-meta mt-4 text-[#111111] placeholder:text-[#111111] focus:outline-none focus:border-[#D1D5DB] focus:shadow-[0_0_0_3px_rgba(209,213,219,0.4)]"
               aria-label="Search sessions"
             />
 
@@ -170,30 +170,30 @@ export function MoveSessionsModal({
                       )
                     }
                     onChange={toggleSelectAll}
-                    className="rounded border-neutral-300 text-[#155DFC] focus:ring-[#155DFC]/20"
+                    className="rounded border-[#E3E6E5] text-[#111111] focus:ring-gray-300"
                   />
-                  <span className="text-sm text-neutral-700">Select all</span>
+                  <span className="text-meta text-[#5F6368]">Select all</span>
                 </label>
               )}
               {filteredSessions.map(({ session }) => (
                 <label
                   key={session.id}
-                  className="flex items-start gap-3 px-3 py-3 rounded-lg hover:bg-neutral-50 cursor-pointer"
+                  className="flex items-start gap-3 px-3 py-3 rounded-xl hover:bg-[#E9ECEB] cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={selectedIds.has(session.id)}
                     onChange={() => toggleSession(session.id)}
-                    className="mt-1 rounded border-neutral-300 text-[#155DFC] focus:ring-[#155DFC]/20"
+                    className="mt-1 rounded border-[#E3E6E5] text-[#111111] focus:ring-gray-300"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-[#155DFC] shrink-0" />
-                      <span className="text-sm font-medium text-neutral-900 truncate">
+                      <FileText className="w-4 h-4 text-[#111111] shrink-0" />
+                      <span className="text-meta font-medium text-[#111111] truncate">
                         {session.title}
                       </span>
                     </div>
-                    <p className="text-xs text-secondary mt-0.5">
+                    <p className="text-xs text-[#111111] mt-0.5">
                       Updated{" "}
                       {session.updatedAt
                         ? formatRelativeTime(session.updatedAt)
@@ -205,7 +205,7 @@ export function MoveSessionsModal({
             </div>
 
             {filteredSessions.length === 0 && (
-              <p className="text-sm text-secondary py-4">
+              <p className="text-sm text-[#111111] py-4">
                 {search.trim()
                   ? "No sessions match your search."
                   : "No sessions available to move."}
@@ -218,7 +218,7 @@ export function MoveSessionsModal({
           <button
             type="button"
             onClick={handleClose}
-            className="text-secondary text-sm px-4 py-2 hover:text-neutral-900 transition"
+            className="text-[#111111] text-meta px-4 py-2 hover:bg-[#E9ECEB] transition-colors"
           >
             Cancel
           </button>
@@ -226,7 +226,7 @@ export function MoveSessionsModal({
             type="button"
             onClick={handleMove}
             disabled={moveDisabled}
-            className="bg-[#155DFC] text-white px-5 py-2 rounded-full text-sm font-semibold disabled:opacity-40 hover:bg-[#0F4ED1] transition disabled:cursor-not-allowed"
+            className="primary-cta px-5 py-2 rounded-full text-meta disabled:opacity-40 transition-colors disabled:cursor-not-allowed"
           >
             Move{moveCount > 0 ? ` (${moveCount})` : ""}
           </button>

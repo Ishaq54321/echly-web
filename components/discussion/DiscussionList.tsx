@@ -172,7 +172,7 @@ export function DiscussionList({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center bg-transparent">
-        <p className="text-sm text-secondary">{error}</p>
+        <p className="text-sm text-[#6B7280]">{error}</p>
       </div>
     );
   }
@@ -181,16 +181,16 @@ export function DiscussionList({
     return (
       <div className="flex flex-col overflow-hidden bg-transparent">
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-          <MessageSquareMore className="w-12 h-12 text-neutral-300 mb-4" />
-          <h2 className="text-lg font-semibold text-neutral-900">
+          <MessageSquareMore className="w-12 h-12 text-[#6B7280] mb-4" />
+          <h2 className="text-lg font-semibold text-[#111111]">
             No discussions yet
           </h2>
-          <p className="mt-2 text-sm text-secondary max-w-[240px]">
+          <p className="mt-2 text-sm text-[#6B7280] max-w-[240px]">
             When feedback receives comments, they will appear here.
           </p>
           <Link
             href="/dashboard"
-            className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#155DFC] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[#0F4ED1] transition"
+            className="primary-cta mt-6 inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm transition"
           >
             Open Sessions
           </Link>
@@ -203,7 +203,7 @@ export function DiscussionList({
     <div className="flex flex-col overflow-hidden bg-transparent h-full">
       <div className="discussion-list-scroll flex-1 overflow-y-auto min-h-0 pl-0 pr-3 py-2">
         {filteredItems.length === 0 ? (
-          <p className="text-sm text-secondary py-4 px-2 text-center">
+          <p className="text-sm text-[#6B7280] py-4 px-2 text-center">
             No discussions match your search.
           </p>
         ) : (
@@ -231,28 +231,28 @@ export function DiscussionList({
                     }
                   }}
                   className={`ticket-item flex items-center gap-2.5 pl-3 pr-3 py-3 cursor-pointer transition-colors ${
-                    isSelected ? "selected bg-blue-50" : "hover:bg-neutral-50"
+                    isSelected ? "selected bg-[#E9ECEB]" : "hover:bg-[#E9ECEB]"
                   }`}
                 >
                   <div
-                    className="w-8 h-8 rounded-full bg-[#EEF3FF] text-[#155DFC] font-semibold text-sm flex items-center justify-center shrink-0"
+                    className="w-8 h-8 rounded-full bg-[#F1F3F2] text-[#111111] font-semibold text-sm flex items-center justify-center shrink-0 border border-[#E3E6E5]"
                     aria-hidden
                   >
                     {initial}
                   </div>
                   <div className="min-w-0 flex-1 flex flex-col gap-1.5">
                     <div className="ticket-header flex items-center justify-between gap-2">
-                      <h3 className="ticket-title font-semibold text-neutral-900 truncate text-[15px] min-w-0">
+                      <h3 className="ticket-title font-semibold text-[#111111] truncate text-[15px] min-w-0">
                         {item.title}
                       </h3>
-                      <span className="ticket-time text-xs text-meta shrink-0">
+                      <span className="ticket-time text-xs text-[#6B7280] shrink-0">
                         {timeLabel}
                       </span>
                     </div>
-                    <p className="text-sm text-secondary truncate">
+                    <p className="text-sm text-[#6B7280] truncate">
                       {sessionDisplay}
                     </p>
-                    <p className="text-xs text-meta">
+                    <p className="text-xs text-[#6B7280]">
                       {replyLabel}
                     </p>
                   </div>

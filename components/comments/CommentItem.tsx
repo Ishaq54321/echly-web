@@ -97,7 +97,7 @@ export function CommentItem({
   return (
     <div className={`flex gap-2.5 group relative ${className}`}>
       <div
-        className={`${avatarSize} shrink-0 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-secondary overflow-hidden`}
+        className={`${avatarSize} shrink-0 rounded-full bg-[#F1F3F2] border border-[#E3E6E5] flex items-center justify-center text-xs font-medium text-[#111111] overflow-hidden`}
       >
         {comment.userAvatar?.trim() ? (
           <img
@@ -112,7 +112,7 @@ export function CommentItem({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center flex-wrap gap-2">
-          <span className={`font-semibold text-neutral-900 ${size === "compact" ? "text-[13px]" : "text-[14px]"}`}>
+          <span className={`font-semibold text-[#111111] ${size === "compact" ? "text-[13px]" : "text-[14px]"}`}>
             {comment.userName ?? "User"}
           </span>
           <span className={`text-xs text-meta ${metaSize}`}>
@@ -123,7 +123,7 @@ export function CommentItem({
               <button
                 type="button"
                 onClick={() => setMenuOpen((o) => !o)}
-                className="p-1 rounded text-secondary hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+                className="p-1 rounded text-secondary hover:bg-[#E9ECEB] hover:text-[#111111] transition-colors"
                 aria-label="Comment actions"
               >
                 <MoreVertical className={size === "compact" ? "h-3.5 w-3.5" : "h-4 w-4"} strokeWidth={1.5} />
@@ -138,7 +138,7 @@ export function CommentItem({
                         setEditDraft(comment.message);
                         setMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-700 hover:bg-[#E9ECEB]"
                     >
                       <Pencil className="h-3.5 w-3.5" /> Edit
                     </button>
@@ -167,7 +167,7 @@ export function CommentItem({
             <textarea
               value={editDraft}
               onChange={(e) => setEditDraft(e.target.value)}
-              className="w-full min-h-[80px] rounded-xl border border-neutral-200 px-4 py-3 text-[14px] font-normal text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition resize-none"
+              className="w-full min-h-[80px] rounded-xl border border-neutral-200 px-4 py-3 text-[14px] font-normal text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-[#D1D5DB] transition resize-none"
               autoFocus
             />
             <div className="flex gap-2">
@@ -177,7 +177,7 @@ export function CommentItem({
                   setEditing(false);
                   setEditDraft(comment.message);
                 }}
-                className="px-3 py-2 text-sm font-medium text-neutral-700 rounded-xl border border-neutral-200 hover:bg-neutral-50"
+                className="px-3 py-2 text-sm font-medium text-neutral-700 rounded-xl border border-neutral-200 hover:bg-[#E9ECEB]"
               >
                 Cancel
               </button>
@@ -185,7 +185,7 @@ export function CommentItem({
                 type="button"
                 onClick={() => void handleSaveEdit()}
                 disabled={saving || editDraft.trim() === comment.message}
-                className="px-3 py-2 text-sm font-medium rounded-xl bg-[#155DFC] text-white hover:bg-[#0F4EDC] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="primary-cta px-3 py-2 text-sm rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? "Saving…" : "Save"}
               </button>
@@ -199,7 +199,7 @@ export function CommentItem({
           </div>
         ) : (
           <>
-            <p className={`mt-1 leading-relaxed text-secondary font-medium ${textSize} ${comment.resolved ? "opacity-75 line-through" : ""}`}>
+            <p className={`mt-1 leading-relaxed text-[#111111] font-medium ${textSize} ${comment.resolved ? "opacity-75 line-through" : ""}`}>
               {comment.message}
             </p>
             {comment.attachment && (
@@ -242,7 +242,7 @@ export function CommentItem({
             <div className="mt-4 p-3 rounded-lg border border-neutral-200 bg-neutral-50/80">
               <div className="flex gap-3">
                 <div
-                  className={`${avatarSize} shrink-0 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-secondary overflow-hidden`}
+                  className={`${avatarSize} shrink-0 rounded-full bg-[#F1F3F2] border border-[#E3E6E5] flex items-center justify-center text-xs font-medium text-[#111111] overflow-hidden`}
                 >
                   {comment.userAvatar?.trim() ? (
                     <img
@@ -274,7 +274,7 @@ export function CommentItem({
                 type="button"
                 onClick={() => setDeleteModalOpen(false)}
                 disabled={saving}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-60"
+                className="px-4 py-2.5 text-sm font-medium rounded-xl border border-neutral-300 text-neutral-700 hover:bg-[#E9ECEB] disabled:opacity-60"
               >
                 Cancel
               </button>

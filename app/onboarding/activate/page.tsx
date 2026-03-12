@@ -6,12 +6,11 @@ import {
   Globe,
   MessageSquare,
   Mic,
-  MousePointerClick,
   Pencil,
-  Puzzle,
-  Share2,
   Sparkles,
 } from "lucide-react"
+import { ActivationSteps } from "@/components/onboarding/ActivationSteps"
+import { StepIndicator } from "@/components/onboarding/StepIndicator"
 import DemoFeedbackDashboard from "../../../components/demo/DemoFeedbackDashboard"
 import { CursorAnnotation, DemoHighlight } from "@/components/demo/DemoGuide"
 import DemoArrow from "@/components/demo/DemoArrow"
@@ -288,103 +287,82 @@ export default function ActivationPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center pt-[7vh] px-6 pb-20 relative">
+    <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
       {(guidedStep === "demo_completed" || dashboardPhase === "ready") ? (
         <ReplayDemoButton onReplay={handleReplayDemo} />
       ) : null}
-      <div className="text-center max-w-3xl">
-        <h1 className="text-4xl font-semibold tracking-tight whitespace-nowrap text-gray-900">
-          You&apos;re ready to capture feedback
-        </h1>
-      </div>
 
-      <motion.div
+      <StepIndicator currentStep={2} />
+      <motion.h1
+        className="text-4xl font-semibold tracking-tight leading-tight text-[#111111] text-center mb-3 md:whitespace-nowrap"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="mt-12 w-full max-w-[920px]"
+        transition={{ duration: 0.3 }}
       >
-        {dashboardPhase === "loading" ? (
-          <div className="flex items-center justify-center h-[440px] rounded-2xl border border-gray-200 bg-white shadow-xl">
-            <div className="flex flex-col items-center gap-4">
-              <Spinner />
-              <p className="text-sm font-medium text-gray-600">Loading feedback...</p>
-            </div>
-          </div>
-        ) : dashboardPhase === "ready" ? (
-          <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl min-h-[440px]">
-            <div className="relative">
-              <DemoFeedbackDashboard />
-            </div>
-          </div>
-        ) : (
-          <BrowserDemo
-            containerRef={containerRef}
-            step={step}
-            demoStage={demoStage}
-            capturePhase={capturePhase}
-            waveformActive={waveformActive}
-            tasksStarted={tasksStarted}
-            guidedStep={guidedStep}
-            setGuidedStep={setGuidedStep}
-            demoExtensionState={demoExtensionState}
-            demoController={demoController}
-            selection={selection}
-            createSelection={createSelection}
-            cursorMode={cursorMode}
-            onModeSelect={(mode) => {
-              demoController.selectMode(mode)
-              setGuidedStep("choose_mode")
-            }}
-            onEndSession={() => {
-              setDashboardPhase("loading")
-              setPendingDemoComplete(true)
-            }}
-            isDemoReplay={guidedStep != null || dashboardPhase === "ready"}
-          />
-        )}
-      </motion.div>
-
-      {/* How Echly Works — premium step cards */}
-      <section className="max-w-[1100px] mx-auto mt-14 mb-6">
-        <h2 className="text-2xl font-semibold text-center mb-10">How Echly Works</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-7 rounded-xl border border-gray-200 bg-white transition-all hover:shadow-md hover:-translate-y-1">
-            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
-              <Puzzle className="w-5 h-5" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Install the Echly Extension</h3>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Capture feedback instantly from any website with a single click.
-            </p>
-          </div>
-          <div className="p-7 rounded-xl border border-gray-200 bg-white transition-all hover:shadow-md hover:-translate-y-1">
-            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
-              <MousePointerClick className="w-5 h-5" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Capture Feedback</h3>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Click anywhere on the page and describe issues using voice or text.
-            </p>
-          </div>
-          <div className="p-7 rounded-xl border border-gray-200 bg-white transition-all hover:shadow-md hover:-translate-y-1">
-            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
-              <Share2 className="w-5 h-5" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Share Your Session</h3>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Your feedback session is ready. Share the link with teammates or clients.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <button
-        type="button"
-        className="mt-14 h-12 px-10 rounded-full text-white font-medium bg-gradient-to-r from-[#466EFF] to-[#6A8CFF] shadow-[0_10px_30px_rgba(70,110,255,0.35)] hover:scale-[1.04] transition-all"
+        You&apos;re ready to capture feedback
+      </motion.h1>
+      <motion.p
+        className="text-lg text-[#111111] text-center mb-10"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.06 }}
       >
-        Go to dashboard
-      </button>
+        Follow these steps to get started.
+      </motion.p>
+
+      {/* Demo container — hero */}
+      <div className="relative w-full max-w-6xl mx-auto mb-12">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="relative w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden"
+        >
+          {dashboardPhase === "loading" ? (
+            <div className="flex items-center justify-center h-[440px]">
+              <div className="flex flex-col items-center gap-4">
+                <Spinner />
+                <p className="text-sm font-medium text-[#4A4A4A]">Loading feedback...</p>
+              </div>
+            </div>
+          ) : dashboardPhase === "ready" ? (
+            <div className="relative overflow-hidden min-h-[440px]">
+              <div className="relative">
+                <DemoFeedbackDashboard />
+              </div>
+            </div>
+          ) : (
+            <BrowserDemo
+              containerRef={containerRef}
+              step={step}
+              demoStage={demoStage}
+              capturePhase={capturePhase}
+              waveformActive={waveformActive}
+              tasksStarted={tasksStarted}
+              guidedStep={guidedStep}
+              setGuidedStep={setGuidedStep}
+              demoExtensionState={demoExtensionState}
+              demoController={demoController}
+              selection={selection}
+              createSelection={createSelection}
+              cursorMode={cursorMode}
+              onModeSelect={(mode) => {
+                demoController.selectMode(mode)
+                setGuidedStep("choose_mode")
+              }}
+              onEndSession={() => {
+                setDashboardPhase("loading")
+                setPendingDemoComplete(true)
+              }}
+              isDemoReplay={guidedStep != null || dashboardPhase === "ready"}
+            />
+          )}
+        </motion.div>
+      </div>
+
+      <div className="w-full max-w-6xl mx-auto mt-6">
+        <ActivationSteps />
+      </div>
     </div>
   )
 }
@@ -392,7 +370,7 @@ export default function ActivationPage() {
 function Spinner() {
   return (
     <div
-      className="w-8 h-8 rounded-full border-2 border-gray-200 border-t-blue-500 animate-spin"
+      className="w-8 h-8 rounded-full border-2 border-[#E3E6E5] border-t-[#D1D5DB] animate-spin"
       aria-hidden
     />
   )
@@ -488,14 +466,14 @@ function BrowserDemo({
     : null
 
   return (
-    <div ref={browserDemoRootRef} className="rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden relative">
+    <div ref={browserDemoRootRef} className="rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden relative">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-400 rounded-full" />
           <div className="w-3 h-3 bg-yellow-400 rounded-full" />
-          <div className="w-3 h-3 bg-green-400 rounded-full" />
+          <div className="w-3 h-3 bg-[#6B6F75] rounded-full" />
         </div>
-        <div className="ml-4 text-xs text-gray-400 select-none">example-website.com</div>
+        <div className="ml-4 text-xs text-[#111111] select-none">example-website.com</div>
         {showExtensionIconInChrome ? (
           <motion.button
             type="button"
@@ -505,8 +483,8 @@ function BrowserDemo({
             className="ml-auto h-8 w-8 rounded-lg flex items-center justify-center border pointer-events-auto"
             animate={{
               scale: [1, 1.12, 1],
-              backgroundColor: ["#E0EDFF", "#BBD1FF", "#E0EDFF"],
-              borderColor: ["#93B8FF", "#6A9AFF", "#93B8FF"],
+              backgroundColor: ["#E9ECEB", "#DADDDD", "#E9ECEB"],
+              borderColor: ["#CFEFB3", "#9FE870", "#CFEFB3"],
             }}
             transition={{
               duration: 1.8,
@@ -516,7 +494,7 @@ function BrowserDemo({
             aria-label="Open Echly extension"
           >
             <motion.span
-              animate={{ color: ["#1D4ED8", "#0F3DB8", "#1D4ED8"] }}
+              animate={{ color: ["#111111", "#6B6F75", "#111111"] }}
               transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
             >
               <Sparkles className="h-4 w-4" />
@@ -626,7 +604,7 @@ function BrowserDemo({
               animate={{ opacity: 0, scale: 1.6 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
               onAnimationComplete={() => setClickRipple(null)}
-              className="absolute left-0 top-0 z-10 pointer-events-none rounded-full bg-blue-400/50"
+              className="absolute left-0 top-0 z-10 pointer-events-none rounded-full bg-[#9FE870]/50"
               style={{
                 width: 48,
                 height: 48,
@@ -719,46 +697,46 @@ function WebsiteSkeleton() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between">
-        <div className="h-8 w-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500">
+        <div className="h-8 w-8 rounded-xl bg-[#F1F3F2] flex items-center justify-center text-[#111111]">
           <Globe className="h-4 w-4" />
         </div>
-        <div className="h-8 w-20 rounded-full bg-gray-100" />
+        <div className="h-8 w-20 rounded-full bg-[#F1F3F2]" />
       </div>
 
       <div className="mt-10">
-        <div className="text-[28px] leading-tight font-semibold text-gray-900 max-w-[620px]">
+        <div className="text-[28px] leading-tight font-semibold text-[#111111] max-w-[620px]">
           Build better products with structured feedback
         </div>
-        <div className="mt-2 text-sm text-gray-600 max-w-[640px]">
+        <div className="mt-2 text-sm text-[#4A4A4A] max-w-[640px]">
           Capture website issues instantly and convert them into actionable tickets.
         </div>
       </div>
 
       <div className="mt-8 grid grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Fast setup</div>
-          <div className="mt-1 text-xs text-gray-600">Start capturing feedback in seconds</div>
+        <div className="rounded-2xl border border-[#E3E6E5] bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-[#E9ECEB] border border-[#CFEFB3]" />
+          <div className="mt-3 font-medium text-[#111111] text-sm">Fast setup</div>
+          <div className="mt-1 text-xs text-[#4A4A4A]">Start capturing feedback in seconds</div>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Clean UI</div>
-          <div className="mt-1 text-xs text-gray-600">Simple interface designed for teams</div>
+        <div className="rounded-2xl border border-[#E3E6E5] bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-[#E9ECEB] border border-[#CFEFB3]" />
+          <div className="mt-3 font-medium text-[#111111] text-sm">Clean UI</div>
+          <div className="mt-1 text-xs text-[#4A4A4A]">Simple interface designed for teams</div>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Better feedback</div>
-          <div className="mt-1 text-xs text-gray-600">Turn comments into structured tickets automatically</div>
+        <div className="rounded-2xl border border-[#E3E6E5] bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-[#E9ECEB] border border-[#CFEFB3]" />
+          <div className="mt-3 font-medium text-[#111111] text-sm">Better feedback</div>
+          <div className="mt-1 text-xs text-[#4A4A4A]">Turn comments into structured tickets automatically</div>
         </div>
       </div>
 
       <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 flex-1">
-        <div className="h-4 bg-gray-100 rounded w-[260px]" />
+        <div className="h-4 bg-[#F1F3F2] rounded w-[260px]" />
         <div className="mt-4 space-y-3">
-          <div className="h-3 bg-gray-100 rounded w-[92%]" />
-          <div className="h-3 bg-gray-100 rounded w-[86%]" />
-          <div className="h-3 bg-gray-100 rounded w-[78%]" />
-          <div className="h-3 bg-gray-100 rounded w-[88%]" />
+          <div className="h-3 bg-[#F1F3F2] rounded w-[92%]" />
+          <div className="h-3 bg-[#F1F3F2] rounded w-[86%]" />
+          <div className="h-3 bg-[#F1F3F2] rounded w-[78%]" />
+          <div className="h-3 bg-[#F1F3F2] rounded w-[88%]" />
         </div>
       </div>
     </div>
@@ -770,14 +748,14 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500">
+          <div className="h-8 w-8 rounded-xl bg-[#F1F3F2] flex items-center justify-center text-[#111111]">
             <Globe className="h-4 w-4" />
           </div>
-          <div className="font-semibold text-gray-900">Example Website</div>
+          <div className="font-semibold text-[#111111]">Example Website</div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-8 w-20 rounded-full bg-gray-100" />
-          <div className="h-8 w-24 rounded-full bg-gray-100" />
+          <div className="h-8 w-20 rounded-full bg-[#F1F3F2]" />
+          <div className="h-8 w-24 rounded-full bg-[#F1F3F2]" />
         </div>
       </div>
 
@@ -786,11 +764,11 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
           initial={stage === "opening" ? { opacity: 0, y: 6 } : false}
           animate={stage === "opening" ? { opacity: 1, y: 0 } : false}
           transition={{ duration: 0.35, ease: "easeOut" }}
-          className="text-[28px] leading-tight font-semibold text-gray-900 max-w-[620px]"
+          className="text-[28px] leading-tight font-semibold text-[#111111] max-w-[620px]"
         >
           Build better products with structured feedback
         </motion.div>
-        <div className="mt-2 text-sm text-gray-600 max-w-[640px]">
+        <div className="mt-2 text-sm text-[#4A4A4A] max-w-[640px]">
           Capture website issues instantly and convert them into actionable tickets.
         </div>
       </div>
@@ -801,34 +779,34 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
         transition={{ duration: 0.4, ease: "easeOut", delay: 0.08 }}
         className="mt-8 grid grid-cols-3 gap-4"
       >
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Fast setup</div>
-          <div className="mt-1 text-xs text-gray-600">Start capturing feedback in seconds</div>
+        <div className="rounded-2xl border border-[#E3E6E5] bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-[#E9ECEB] border border-[#CFEFB3]" />
+          <div className="mt-3 font-medium text-[#111111] text-sm">Fast setup</div>
+          <div className="mt-1 text-xs text-[#4A4A4A]">Start capturing feedback in seconds</div>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Clean UI</div>
-          <div className="mt-1 text-xs text-gray-600">Simple interface designed for teams</div>
+        <div className="rounded-2xl border border-[#E3E6E5] bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-[#E9ECEB] border border-[#CFEFB3]" />
+          <div className="mt-3 font-medium text-[#111111] text-sm">Clean UI</div>
+          <div className="mt-1 text-xs text-[#4A4A4A]">Simple interface designed for teams</div>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Better feedback</div>
-          <div className="mt-1 text-xs text-gray-600">Turn comments into structured tickets automatically</div>
+        <div className="rounded-2xl border border-[#E3E6E5] bg-white p-4">
+          <div className="h-9 w-9 rounded-xl bg-[#E9ECEB] border border-[#CFEFB3]" />
+          <div className="mt-3 font-medium text-[#111111] text-sm">Better feedback</div>
+          <div className="mt-1 text-xs text-[#4A4A4A]">Turn comments into structured tickets automatically</div>
         </div>
       </motion.div>
 
       <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 flex-1">
-        <div className="h-4 bg-gray-100 rounded w-[260px]" />
+        <div className="h-4 bg-[#F1F3F2] rounded w-[260px]" />
         <div className="mt-4 space-y-3">
-          <div className="h-3 bg-gray-100 rounded w-[92%]" />
-          <div className="h-3 bg-gray-100 rounded w-[86%]" />
-          <div className="h-3 bg-gray-100 rounded w-[78%]" />
-          <div className="h-3 bg-gray-100 rounded w-[88%]" />
+          <div className="h-3 bg-[#F1F3F2] rounded w-[92%]" />
+          <div className="h-3 bg-[#F1F3F2] rounded w-[86%]" />
+          <div className="h-3 bg-[#F1F3F2] rounded w-[78%]" />
+          <div className="h-3 bg-[#F1F3F2] rounded w-[88%]" />
         </div>
         <div className="mt-6 grid grid-cols-2 gap-4">
-          <div className="h-16 bg-gray-100 rounded-2xl" />
-          <div className="h-16 bg-gray-100 rounded-2xl" />
+          <div className="h-16 bg-[#F1F3F2] rounded-2xl" />
+          <div className="h-16 bg-[#F1F3F2] rounded-2xl" />
         </div>
       </div>
     </div>
@@ -837,7 +815,7 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
 
 function FigmaCommentBubble() {
   return (
-    <div className="h-6 w-6 rounded-full bg-blue-600 text-white text-[12px] font-semibold flex items-center justify-center shadow-[0_10px_24px_rgba(37,99,235,0.35)]">
+    <div className="h-6 w-6 rounded-full bg-[#9FE870] text-[#111111] text-[12px] font-semibold flex items-center justify-center shadow-[0_10px_24px_rgba(159,232,112,0.35)]">
       1
     </div>
   )
@@ -865,13 +843,13 @@ function GuideCursor({
       <div className="-translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
         {cursorMode === "interactive" && !showCommentIcon && (
           <motion.div className="w-[26px] h-[26px] rounded-full bg-white border-2 border-gray-400 shadow-lg flex items-center justify-center">
-            <div className="w-2 h-2 bg-blue-500 rounded-full" />
-          </motion.div>
+<div className="w-2 h-2 bg-[#79C94E] rounded-full" />
+        </motion.div>
         )}
-        {showCommentIcon && <MessageSquare className="w-5 h-5 text-blue-500" />}
+        {showCommentIcon && <MessageSquare className="w-5 h-5 text-[#79C94E]" />}
         {cursorMode === "default" && !showCommentIcon && (
           <div className="w-[26px] h-[26px] rounded-full bg-white border-2 border-gray-400 shadow-lg flex items-center justify-center">
-            <div className="w-2 h-2 bg-blue-500 rounded-full" />
+            <div className="w-2 h-2 bg-[#79C94E] rounded-full" />
           </div>
         )}
       </div>
@@ -912,10 +890,10 @@ function OpenWebsiteSequence({
               opacity: 1,
               scale: 1,
               boxShadow: [
-                "0 0 0 0 rgba(59,130,246,0)",
-                "0 0 0 8px rgba(59,130,246,0.25)",
-                "0 0 20px 4px rgba(59,130,246,0.2)",
-                "0 0 0 8px rgba(59,130,246,0.25)",
+                "0 0 0 0 rgba(159,232,112,0)",
+                "0 0 0 8px rgba(159,232,112,0.25)",
+                "0 0 20px 4px rgba(159,232,112,0.2)",
+                "0 0 0 8px rgba(159,232,112,0.25)",
               ],
             }}
             exit={{ opacity: 0, transition: { duration: 0.16 } }}
@@ -924,7 +902,7 @@ function OpenWebsiteSequence({
               scale: { duration: 0.22, ease: "easeOut" },
               boxShadow: { duration: 1.4, repeat: Infinity, ease: "easeInOut" },
             }}
-            className="absolute pointer-events-none z-20 border-2 border-blue-500 rounded-md bg-blue-100/10 animate-pulse"
+            className="absolute pointer-events-none z-20 border-2 border-[#D1D5DB] rounded-md bg-[#E9ECEB]/50 animate-pulse"
             style={selectionRect}
           />
         ) : null}
@@ -942,7 +920,7 @@ function OpenWebsiteSequence({
             style={{ left: selectionRect.left, top: selectionRect.top }}
           >
             <div
-              className="rounded-md border border-blue-500/30 shadow-[0_18px_40px_rgba(0,0,0,0.18)] overflow-hidden"
+              className="rounded-md border border-[#E5E7EB] shadow-[0_18px_40px_rgba(0,0,0,0.18)] overflow-hidden"
               style={{ width: selectionRect.width, height: selectionRect.height }}
             >
               <div className="h-full w-full bg-white rounded-sm overflow-hidden flex flex-col">
@@ -956,13 +934,13 @@ function OpenWebsiteSequence({
                 {/* UI card preview: header + content block + highlighted CTA */}
                 <div className="flex-1 p-2 flex flex-col gap-2 min-w-0">
                   <div className="h-2 w-[70%] bg-gray-200 rounded shrink-0" />
-                  <div className="h-1.5 w-full max-w-[85%] bg-gray-100 rounded shrink-0" />
+                  <div className="h-1.5 w-full max-w-[85%] bg-[#F1F3F2] rounded shrink-0" />
                   <div className="flex-1 rounded-md border border-gray-200 bg-gray-50/60 p-2 flex flex-col gap-1.5">
                     <div className="h-2 w-12 bg-gray-200 rounded" />
-                    <div className="flex-1 rounded border-2 border-blue-500 bg-blue-50/80 flex items-center justify-center shadow-[0_0_0_2px_rgba(59,130,246,0.2)] relative">
-                      <span className="text-[8px] font-semibold text-blue-700">Get started</span>
+                    <div className="flex-1 rounded border-2 border-[#E5E7EB] bg-[#E9ECEB] flex items-center justify-center shadow-[0_0_0_2px_rgba(229,231,235,0.5)] relative">
+                      <span className="text-[8px] font-semibold text-[#111111]">Get started</span>
                     </div>
-                    <div className="h-1.5 w-14 bg-gray-100 rounded" />
+                    <div className="h-1.5 w-14 bg-[#F1F3F2] rounded" />
                   </div>
                 </div>
               </div>
@@ -1006,7 +984,7 @@ function HighlightBox({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.22 }}
-      className="absolute pointer-events-none rounded-xl border-2 border-blue-500 shadow-[0_0_0_6px_rgba(59,130,246,0.18)]"
+      className="absolute pointer-events-none rounded-xl border-2 border-[#D1D5DB] shadow-[0_0_0_6px_rgba(209,213,219,0.4)]"
       style={{ top, left, width, height }}
     />
   )
@@ -1024,8 +1002,8 @@ function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void }
       className="bg-transparent rounded-2xl overflow-hidden"
     >
       <div className="px-4 py-4">
-        <div className="font-semibold text-gray-900 text-[13px]">Write Feedback</div>
-        <div className="mt-1 text-[12px] text-gray-600">
+        <div className="font-semibold text-[#111111] text-[13px]">Write Feedback</div>
+        <div className="mt-1 text-[12px] text-[#4A4A4A]">
           Describe the issue — Echly will structure it.
         </div>
 
@@ -1034,7 +1012,7 @@ function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void }
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="e.g. The CTA button spacing looks off..."
-          className="mt-4 w-full h-24 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          className="mt-4 w-full h-24 rounded-xl border border-[#E3E6E5] bg-white px-3 py-2.5 text-[12px] text-[#111111] placeholder:text-[#111111] focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent resize-none"
           rows={4}
         />
 
@@ -1077,7 +1055,7 @@ function VoiceFeedbackPopup({
         }
         .wave-bar {
           width: 3px;
-          background: #3b82f6;
+          background: #9FE870;
           border-radius: 2px;
           animation: wave 1.1s infinite ease-in-out;
         }
@@ -1161,8 +1139,8 @@ function VoiceFeedbackPopup({
         }
       `}</style>
       <div className="px-4 py-4">
-        <div className="font-semibold text-gray-900 text-[13px]">Voice Feedback</div>
-        <div className="mt-1 text-[12px] text-gray-600">
+        <div className="font-semibold text-[#111111] text-[13px]">Voice Feedback</div>
+        <div className="mt-1 text-[12px] text-[#4A4A4A]">
           Describe the issue — Echly will structure it.
         </div>
 
@@ -1175,7 +1153,7 @@ function VoiceFeedbackPopup({
           </div>
         </div>
 
-        <div className="mt-3 text-[12px] text-gray-600">Listening...</div>
+        <div className="mt-3 text-[12px] text-[#4A4A4A]">Listening...</div>
 
         <button
           ref={finishButtonRef}
@@ -1214,7 +1192,7 @@ function ProcessingStack() {
           transition={{ delay: 0.08 * idx, duration: 0.28 }}
           className="bg-white/70 backdrop-blur border border-gray-200 shadow-[0_10px_34px_rgba(0,0,0,0.10)] rounded-2xl px-4 py-3 flex items-center justify-between"
         >
-          <span className={`text-[12px] ${idx === 0 ? "font-semibold text-gray-900" : "font-medium text-gray-800"}`}>
+          <span className={`text-[12px] ${idx === 0 ? "font-semibold text-[#111111]" : "font-medium text-[#111111]"}`}>
             {label}
           </span>
           <LoadingIndicator />
@@ -1248,7 +1226,7 @@ function ProcessingPanelCard({
     >
       <div className="rounded-2xl border border-gray-200 bg-white/80 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.16)] overflow-hidden pointer-events-auto">
         <div className="p-4">
-          <div className="font-semibold text-gray-900 text-[13px]">Processing</div>
+          <div className="font-semibold text-[#111111] text-[13px]">Processing</div>
           <div className="mt-3 space-y-2">
             {items.map((label, idx) => (
               <motion.div
@@ -1258,7 +1236,7 @@ function ProcessingPanelCard({
                 transition={{ delay: 0.08 * idx, duration: 0.28, ease: "easeOut" }}
                 className="flex items-center justify-between rounded-xl bg-white/70 backdrop-blur border border-gray-200 shadow-[0_10px_34px_rgba(0,0,0,0.10)] px-4 py-3"
               >
-                <span className={`text-[12px] ${idx === 0 ? "font-semibold text-gray-900" : "font-medium text-gray-800"}`}>
+                <span className={`text-[12px] ${idx === 0 ? "font-semibold text-[#111111]" : "font-medium text-[#111111]"}`}>
                   {label}
                 </span>
                 <LoadingIndicator />
@@ -1272,7 +1250,7 @@ function ProcessingPanelCard({
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="mt-4 overflow-hidden"
           >
-            <div className="text-[11px] font-semibold tracking-wide text-gray-500">GENERATED TASKS</div>
+            <div className="text-[11px] font-semibold tracking-wide text-[#111111]">GENERATED TASKS</div>
             <div className="mt-2 space-y-2 generated-tasks">
               {tasks.map((t, i) => (
                 <motion.div
@@ -1282,7 +1260,7 @@ function ProcessingPanelCard({
                   transition={{ duration: 0.28, ease: "easeOut", delay: i * 0.4 }}
                   className="rounded-xl bg-white/70 backdrop-blur border border-gray-200 px-3 py-2.5 shadow-[0_10px_34px_rgba(0,0,0,0.08)]"
                 >
-                  <div className="text-[12px] font-medium text-gray-900">{t.title}</div>
+                  <div className="text-[12px] font-medium text-[#111111]">{t.title}</div>
                 </motion.div>
               ))}
             </div>
@@ -1313,15 +1291,15 @@ function CollapsibleTicketGroup({
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between text-left py-1.5 px-1 rounded-lg hover:bg-gray-100/80 transition-colors"
+        className="w-full flex items-center justify-between text-left py-1.5 px-1 rounded-lg hover:bg-[#F1F3F2]/80 transition-colors"
       >
-        <span className="text-[11px] font-semibold text-gray-700">
+        <span className="text-[11px] font-semibold text-[#4A4A4A]">
           {label} ({count})
         </span>
         <motion.span
           animate={{ rotate: expanded ? 180 : 0 }}
           transition={{ duration: 0.2 }}
-          className="text-gray-400"
+          className="text-[#111111]"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="inline-block">
             <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1343,7 +1321,7 @@ function CollapsibleTicketGroup({
               transition={{ duration: 0.28, ease: "easeOut", delay: i * 0.1 }}
               className="rounded-xl bg-white/70 backdrop-blur border border-gray-200 px-3 py-2.5 shadow-[0_10px_34px_rgba(0,0,0,0.08)]"
             >
-              <div className="text-[12px] font-medium text-gray-900">{t.title}</div>
+              <div className="text-[12px] font-medium text-[#111111]">{t.title}</div>
             </motion.div>
           ))}
         </div>

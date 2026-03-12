@@ -38,7 +38,7 @@ function StatusPill({ status }: { status: FeedbackStatus }) {
   const styles: Record<FeedbackStatus, string> = {
     Open: "bg-amber-50 text-amber-800 border-amber-200",
     "In Progress":
-      "bg-blue-50 text-[var(--accent-operational)] border-[var(--accent-operational-border)]",
+      "bg-[#E9ECEB] text-[var(--accent-operational)] border-[var(--accent-operational-border)]",
     Blocked: "bg-red-50 text-red-700 border-red-200",
     Resolved: "bg-emerald-50 text-emerald-700 border-emerald-200",
   };
@@ -133,14 +133,14 @@ export function ExecutionView({
         )}
         <button
           type="button"
-          className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium border border-neutral-200 bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-neutral-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] transition-colors duration-150 cursor-pointer"
+          className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium border border-neutral-200 bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[#E9ECEB] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] transition-colors duration-150 cursor-pointer"
         >
           <UserPlus className="h-3.5 w-3.5" strokeWidth={1.5} />
           Assign
         </button>
         <button
           type="button"
-          className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium border border-neutral-200 bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-neutral-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] transition-colors duration-150 cursor-pointer"
+          className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium border border-neutral-200 bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[#E9ECEB] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] transition-colors duration-150 cursor-pointer"
         >
           <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />
           Defer
@@ -149,7 +149,7 @@ export function ExecutionView({
           <button
             type="button"
             onClick={onResolveAndNext}
-            className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium border border-neutral-200 bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-neutral-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] transition-colors duration-150 cursor-pointer"
+            className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium border border-neutral-200 bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[#E9ECEB] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] transition-colors duration-150 cursor-pointer"
           >
             Resolve &amp; Next
           </button>
@@ -161,7 +161,7 @@ export function ExecutionView({
             className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium border focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] transition-colors duration-150 ${
               isCommentMode
                 ? "border-[var(--accent-operational)] bg-[var(--accent-operational)]/10 text-[var(--accent-operational)]"
-                : "border-neutral-200 bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-neutral-50 cursor-pointer"
+                : "border-neutral-200 bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[#E9ECEB] cursor-pointer"
             }`}
           >
             <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />

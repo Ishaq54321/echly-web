@@ -89,7 +89,7 @@ export function MoveToFolderModal({
             <button
               type="button"
               onClick={() => onCreateFolder()}
-              className="bg-[#155DFC] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#0F4ED1] transition"
+              className="primary-cta px-5 py-2 rounded-lg text-sm transition"
             >
               Create folder
             </button>
@@ -104,12 +104,12 @@ export function MoveToFolderModal({
                   onClick={() => setSelected(folder.id)}
                   className={`flex items-center justify-between w-full px-3 py-2 rounded-lg border transition ${
                     selected === folder.id
-                      ? "border-[#155DFC] bg-[#155DFC]/5"
-                      : "border-neutral-200 hover:border-[#155DFC]"
+                      ? "border-[#E5E7EB] bg-[#E9ECEB]"
+                      : "border-neutral-200 hover:border-[#E5E7EB] hover:bg-[#E9ECEB]"
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <Folder className="w-4 h-4 text-[#155DFC]" />
+                    <Folder className="w-4 h-4 text-[#111111]" />
                     <span className="text-sm font-medium text-neutral-900">
                       {folder.name}
                     </span>
@@ -125,7 +125,7 @@ export function MoveToFolderModal({
               <button
                 type="button"
                 onClick={handleClose}
-                className="text-secondary hover:text-neutral-900 px-4 py-2 text-sm font-medium rounded-lg hover:bg-neutral-100 transition"
+                className="text-secondary hover:text-neutral-900 px-4 py-2 text-sm font-medium rounded-lg hover:bg-[#E9ECEB] transition"
               >
                 Cancel
               </button>
@@ -133,7 +133,7 @@ export function MoveToFolderModal({
                 type="button"
                 onClick={handleMove}
                 disabled={!selected || moving}
-                className="bg-[#155DFC] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0F4ED1] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="primary-cta px-4 py-2 rounded-lg text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {moving ? "Moving…" : "Move"}
               </button>

@@ -7,7 +7,7 @@ const ARROW_SIZE = 32
 const ARROW_SIZE_EXTENSION = 34
 const STROKE_WIDTH = 3
 const TAIL_OFFSET = 40
-const COLOR = "#2563EB"
+const COLOR = "#9FE870"
 
 export type ArrowDirection = "top" | "bottom" | "left" | "right" | "topRight"
 

@@ -186,7 +186,7 @@ export function ExecutionModeLayout({
             type="button"
             onClick={onExitExecutionMode}
             disabled={disabled}
-            className="inline-flex items-center gap-2 text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] rounded-xl px-2.5 py-2 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] rounded-xl px-2.5 py-2 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label="Exit Execution Mode"
           >
             <ArrowLeft className="h-4 w-4" strokeWidth={1.5} aria-hidden />
@@ -230,7 +230,7 @@ export function ExecutionModeLayout({
                   type="button"
                   onClick={onExpandImage}
                   disabled={disabled}
-                  className="absolute top-3 right-3 w-10 h-10 flex items-center justify-center rounded-xl bg-white/95 text-[hsl(var(--text-primary-strong))] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60"
+                  className="absolute top-3 right-3 w-10 h-10 flex items-center justify-center rounded-xl bg-white/95 text-[hsl(var(--text-primary-strong))] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 disabled:opacity-60"
                   aria-label="Zoom screenshot (Z)"
                 >
                   <ZoomIn className="h-5 w-5" strokeWidth={1.5} />
@@ -252,7 +252,7 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={onSkip}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-tertiary))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-secondary-soft))] transition-colors duration-[var(--motion-fast)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-tertiary))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-secondary-soft))] transition-colors duration-[var(--motion-fast)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <SkipForward className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Skip
@@ -261,7 +261,7 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={onNeedsClarification}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:-translate-y-px transition-[transform,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:-translate-y-px transition-[transform,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <MessageCircleQuestion className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Needs clarification
@@ -270,7 +270,7 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={onAssign}
                 disabled={disabled}
-                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:-translate-y-px transition-[transform,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] text-[14px] font-medium hover:bg-[var(--layer-2-hover-bg)] hover:-translate-y-px transition-[transform,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <UserPlus className="h-4 w-4" strokeWidth={1.5} aria-hidden />
                 Assign
@@ -279,7 +279,7 @@ export function ExecutionModeLayout({
                 type="button"
                 onClick={handleResolveAndNext}
                 disabled={disabled}
-                className="btn-primary-glow inline-flex items-center justify-center gap-2 min-w-[180px] h-12 px-8 rounded-xl bg-[var(--color-primary)] text-white text-[15px] font-semibold shadow-[0_4px_14px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 transition-[transform,box-shadow,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                className="btn-primary-glow inline-flex items-center justify-center gap-2 min-w-[180px] h-12 px-8 rounded-xl bg-[var(--color-primary)] text-white text-[15px] font-semibold shadow-[0_4px_14px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2 transition-[transform,box-shadow,background-color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
                 {isProcessing ? (
                   <>
@@ -303,7 +303,7 @@ export function ExecutionModeLayout({
                 value={quickNoteValue}
                 onChange={(e) => setQuickNoteValue(e.target.value)}
                 placeholder="Quick note…"
-                className="w-full text-[14px] px-4 py-2.5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] placeholder:text-[hsl(var(--text-tertiary))]"
+                className="w-full text-[14px] px-4 py-2.5 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 placeholder:text-[hsl(var(--text-tertiary))]"
                 autoFocus
               />
             </div>

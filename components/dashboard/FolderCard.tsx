@@ -27,7 +27,7 @@ export interface FolderCardProps {
 }
 
 const menuItemClass =
-  "w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20";
+  "w-full px-3 py-2.5 text-left text-meta font-medium rounded-xl text-[#111111] hover:bg-[#E9ECEB] transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-gray-300";
 
 export function FolderCard({
   folder,
@@ -171,8 +171,8 @@ export function FolderCard({
   return (
     <>
       <div
-        className={`flex items-center gap-3 px-4 py-3 bg-white border border-neutral-200 rounded-xl cursor-pointer transition-all duration-200 ease-out hover:bg-neutral-50 hover:!border-[#155DFC80] hover:ring-1 hover:ring-[#155DFC40] hover:shadow-md hover:-translate-y-[1px] group min-w-[200px] relative shadow-sm ${
-          isHovered ? "!border-[#155DFC80] !ring-1 !ring-[#155DFC40]" : ""
+        className={`flex items-center gap-3 px-4 py-3 bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl cursor-pointer transition-all duration-200 ease-out hover:bg-[#E9ECEB] hover:border-[#E5E7EB] group min-w-[200px] relative shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${
+          isHovered ? "" : ""
         }`}
         data-folder-id={folder.id}
         onClick={() => router.push(`/folders/${folder.id}`)}
@@ -183,18 +183,18 @@ export function FolderCard({
       >
         {draggedSessionId && isHovered && (
           <span
-            className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs bg-neutral-900 text-white px-2 py-1 rounded-md shadow pointer-events-none z-10"
+            className="absolute -top-8 left-1/2 -translate-x-1/2 text-caption bg-[#111111] text-white px-2 py-1 rounded-lg shadow pointer-events-none z-10"
             role="tooltip"
           >
             Drop to move session
           </span>
         )}
-        <Folder className="w-5 h-5 text-[#155DFC] shrink-0" />
+        <Folder className="w-5 h-5 text-[#111111] shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-neutral-900 truncate">
+          <div className="text-meta font-medium text-[#111111] truncate">
             {folder.name}
           </div>
-          <div className="text-xs text-secondary">
+          <div className="text-xs text-[#6B7280]">
             {folder.sessions.length} sessions
           </div>
         </div>
@@ -210,7 +210,7 @@ export function FolderCard({
             aria-label="Folder actions"
             aria-expanded={moreOpen}
             aria-haspopup="menu"
-            className="flex items-center justify-center h-8 w-8 rounded-lg text-meta hover:bg-neutral-200 hover:text-secondary transition opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+            className="flex items-center justify-center h-8 w-8 rounded-lg text-[#111111] hover:bg-[#E9ECEB] hover:text-[#111111] transition opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
@@ -226,7 +226,7 @@ export function FolderCard({
             data-card-actions
             role="menu"
             aria-label="Folder actions"
-            className="min-w-[160px] rounded-xl border border-neutral-200 bg-white shadow-lg py-1"
+            className="min-w-[160px] rounded-2xl border border-[#E3E6E5] bg-[#FFFFFF] shadow-[0_2px_8px_rgba(0,0,0,0.06)] py-1"
             style={{
               position: "fixed",
               top: dropdownPosition.top,
@@ -264,11 +264,11 @@ export function FolderCard({
               <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Share
             </button>
-            <div className="my-1 border-t border-neutral-200" role="separator" aria-hidden />
+            <div className="my-1 border-t border-[#E3E6E5]" role="separator" aria-hidden />
             <button
               type="button"
               onClick={handleDeleteClick}
-              className="w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-secondary hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+              className="w-full px-3 py-2.5 text-left text-meta font-medium rounded-xl text-[#111111] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
               role="menuitem"
             >
               <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />

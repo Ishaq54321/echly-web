@@ -21,21 +21,21 @@ export default function SessionControlBar({ onPause, onResume, onEnd, highlightE
       className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto"
     >
       <div className="rounded-xl border border-gray-200 bg-white/95 backdrop-blur-md shadow-[0_18px_48px_rgba(0,0,0,0.12)] px-4 py-3 flex items-center gap-3">
-        <span className="text-[12px] font-semibold text-gray-700 whitespace-nowrap">
+        <span className="text-[12px] font-semibold text-[#111111] whitespace-nowrap">
           Recording Session
         </span>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onPause}
-            className="h-8 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-[12px] font-medium"
+            className="h-8 px-3 rounded-lg bg-[#E9ECEB] hover:bg-[#E9ECEB] text-[#111111] text-[12px] font-medium"
           >
             Pause
           </button>
           <button
             type="button"
             onClick={onResume}
-            className="h-8 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-[12px] font-medium"
+            className="h-8 px-3 rounded-lg bg-[#E9ECEB] hover:bg-[#E9ECEB] text-[#111111] text-[12px] font-medium"
           >
             Resume
           </button>
