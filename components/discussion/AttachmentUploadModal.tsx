@@ -200,7 +200,7 @@ export function AttachmentUploadModal({
             <button
               type="button"
               onClick={handleClose}
-              className="p-2 rounded-lg text-secondary hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+              className="p-2 rounded-lg text-secondary hover:bg-[#E9ECEB] hover:text-[#111111] transition-colors"
               aria-label="Close"
             >
               <X className="h-5 w-5" strokeWidth={1.5} />
@@ -217,7 +217,7 @@ export function AttachmentUploadModal({
                 className={`
                   flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10
                   cursor-pointer transition-colors duration-150
-                  ${dragOver ? "border-blue-500 bg-blue-50" : "border-neutral-300 hover:border-blue-500 hover:bg-blue-50"}
+                  ${dragOver ? "border-[#E5E7EB] bg-[#E9ECEB]" : "border-neutral-300 hover:border-[#E5E7EB] hover:bg-[#E9ECEB]"}
                 `}
               >
                 <input
@@ -298,7 +298,7 @@ export function AttachmentUploadModal({
                   <div className="mt-4">
                     <div className="h-[6px] rounded-full bg-neutral-200 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                        className="h-full rounded-full bg-[#9FE870] transition-all duration-300"
                         style={{
                           width: `${uploadProgress ?? 0}%`,
                         }}
@@ -334,7 +334,7 @@ export function AttachmentUploadModal({
                 type="button"
                 onClick={handleSend}
                 disabled={uploading || !uploadedAttachment}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-[#155DFC] hover:bg-[#0F4EDC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="primary-cta px-4 py-2.5 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Send
               </button>

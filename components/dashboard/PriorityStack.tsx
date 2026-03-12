@@ -60,7 +60,7 @@ export function PriorityStack({ items, onView }: PriorityStackProps) {
               <button
                 type="button"
                 onClick={() => onView(session.id)}
-                className="w-full text-left px-4 py-3 flex items-center gap-4 hover:bg-[var(--structural-gray-ticket)] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] focus-visible:ring-inset"
+                className="w-full text-left px-4 py-3 flex items-center gap-4 hover:bg-[var(--structural-gray-ticket)] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300 focus-visible:ring-inset"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">

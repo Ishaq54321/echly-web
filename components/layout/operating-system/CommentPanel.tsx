@@ -163,7 +163,7 @@ const ThreadBlock = memo(function ThreadBlock({
                   value={replyDraft}
                   onChange={(e) => setReplyDraft(e.target.value)}
                   placeholder="Write a reply..."
-                  className="block box-border w-full max-w-full min-h-[44px] rounded-xl bg-[var(--layer-2-bg)] border border-[var(--layer-2-border)] px-3 py-2.5 text-[13px] leading-relaxed text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] resize-none transition-all duration-[var(--motion-duration)]"
+                  className="block box-border w-full max-w-full min-h-[44px] rounded-xl bg-[var(--layer-2-bg)] border border-[var(--layer-2-border)] px-3 py-2.5 text-[13px] leading-relaxed text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-2 focus:ring-gray-300 resize-none transition-all duration-[var(--motion-duration)]"
                   style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
                   autoFocus
                   onKeyDown={(e) => {
@@ -388,7 +388,7 @@ export function CommentPanel({
         <button
           type="button"
           onClick={onClose}
-          className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
+          className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 cursor-pointer"
           aria-label="Close comment panel"
         >
           <X className="h-4 w-4" strokeWidth={1.5} />

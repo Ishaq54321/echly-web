@@ -41,7 +41,7 @@ export function PriorityRadarBlock({ groups, onSelectSignal }: PriorityRadarBloc
                   <button
                     type="button"
                     onClick={() => onSelectSignal?.(s.id, s.sessionId)}
-                    className="w-full text-left text-[12px] text-[hsl(var(--text-primary-strong))] truncate hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded"
+                    className="w-full text-left text-[12px] text-[hsl(var(--text-primary-strong))] truncate hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300 rounded"
                   >
                     {s.title}
                   </button>

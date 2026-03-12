@@ -9,15 +9,10 @@ import { checkUserWorkspace } from "@/lib/auth/checkUserWorkspace";
 import { AuthCard } from "@/components/auth/AuthCard";
 
 const inputClass =
-  "w-full h-11 rounded-[10px] border border-[#E5E7EB] bg-white text-gray-900 text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]";
+  "w-full h-11 rounded-full border border-[#E3E6E5] bg-white text-[#111111] text-body pl-4 pr-4 placeholder:text-[#111111] focus:outline-none focus:border-[#D1D5DB] focus:shadow-[0_0_0_3px_rgba(209,213,219,0.4)]";
 
 const primaryButtonClass =
-  "w-full h-11 rounded-[10px] text-white font-medium text-base transition-all disabled:opacity-60 hover:brightness-105 flex items-center justify-center";
-
-const primaryButtonStyle = {
-  background: "linear-gradient(135deg,#466EFF,#5F7DFF)",
-  boxShadow: "0 10px 28px rgba(70,110,255,0.28)"
-};
+  "primary-cta w-full h-11 rounded-full text-body transition-colors disabled:opacity-60 flex items-center justify-center";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -63,65 +58,35 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#f9fafc] overflow-hidden">
+    <div className="relative min-h-screen bg-[#FFFFFF] overflow-hidden">
 
-      {/* ===== Premium SaaS Gradient Background ===== */}
-     {/* ===== Premium SaaS Gradient Background ===== */}
-<div className="absolute inset-0 -z-10 overflow-hidden">
-
-{/* Top-right brand glow */}
-<div
-  className="absolute"
-  style={{
-    top: "-15%",
-    right: "-5%",
-    width: "900px",
-    height: "900px",
-    background:
-      "radial-gradient(circle, rgba(70,110,255,0.45) 0%, rgba(70,110,255,0.22) 35%, rgba(70,110,255,0.08) 55%, transparent 70%)",
-    filter: "blur(35px)"
-  }}
-/>
-
-{/* Bottom-left supporting glow */}
-<div
-  className="absolute"
-  style={{
-    bottom: "-20%",
-    left: "-10%",
-    width: "850px",
-    height: "850px",
-    background:
-      "radial-gradient(circle, rgba(70,110,255,0.32) 0%, rgba(70,110,255,0.15) 40%, transparent 70%)",
-    filter: "blur(30px)"
-  }}
-/>
-
-{/* Center subtle glow behind hero */}
-<div
-  className="absolute"
-  style={{
-    top: "45%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    width: "700px",
-    height: "700px",
-    background:
-      "radial-gradient(circle, rgba(70,110,255,0.18) 0%, transparent 65%)",
-    filter: "blur(20px)"
-  }}
-/>
-
-{/* Grain texture for SaaS polish */}
-<div
-  className="absolute inset-0 opacity-[0.04]"
-  style={{
-    backgroundImage:
-      "url('https://grainy-gradients.vercel.app/noise.svg')"
-  }}
-/>
-
-</div>
+      {/* Soft green ambient background */}
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <div
+          className="absolute"
+          style={{
+            top: "-15%",
+            right: "-5%",
+            width: "900px",
+            height: "900px",
+            background:
+              "radial-gradient(circle, rgba(159,232,112,0.15) 0%, rgba(159,232,112,0.06) 40%, transparent 70%)",
+            filter: "blur(40px)"
+          }}
+        />
+        <div
+          className="absolute"
+          style={{
+            bottom: "-20%",
+            left: "-10%",
+            width: "850px",
+            height: "850px",
+            background:
+              "radial-gradient(circle, rgba(221,243,200,0.25) 0%, transparent 60%)",
+            filter: "blur(35px)"
+          }}
+        />
+      </div>
 
       {/* ===== Header ===== */}
       <header className="absolute top-6 left-6 z-20">
@@ -141,11 +106,11 @@ export default function LoginPage() {
 
         <div className="max-w-[980px] w-full">
 
-          <h1 className="text-[44px] font-semibold tracking-tight text-gray-900 whitespace-nowrap">
+          <h1 className="text-display font-semibold tracking-tight text-[#111111] whitespace-nowrap">
             Capture Feedback Exactly Where It Happens
           </h1>
 
-          <p className="text-lg text-gray-700 mt-3 font-medium">
+          <p className="text-body text-[#5F6368] mt-3 font-medium">
             Turn screenshots into actionable tickets for your team in seconds.
           </p>
 
@@ -154,7 +119,7 @@ export default function LoginPage() {
 
             <AuthCard>
 
-              <h2 className="text-xl font-semibold text-gray-900 text-center mb-6">
+              <h2 className="text-h3 font-semibold text-[#111111] text-center mb-6">
                 Sign in to Echly
               </h2>
 
@@ -162,7 +127,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={handleGoogle}
                 disabled={loading}
-                className="w-full h-11 rounded-[10px] border border-[#E5E7EB] bg-[#F8F9FA] text-gray-900 font-medium text-base hover:bg-[#F1F3F5] transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
+                className="w-full h-11 rounded-full border border-[#E3E6E5] bg-[#E9ECEB] text-[#111111] font-medium text-body hover:bg-[#E9ECEB] transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
               >
                 <GoogleIcon/>
                 Continue with Google
@@ -170,10 +135,10 @@ export default function LoginPage() {
 
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[#E5E7EB]" />
+                  <div className="w-full border-t border-[#E3E6E5]" />
                 </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-3 bg-white text-gray-500">OR</span>
+                <div className="relative flex justify-center text-meta">
+                  <span className="px-3 bg-[#FFFFFF] text-[#5F6368]">OR</span>
                 </div>
               </div>
 
@@ -205,18 +170,17 @@ export default function LoginPage() {
                   type="submit"
                   disabled={loading}
                   className={primaryButtonClass}
-                  style={primaryButtonStyle}
                 >
                   Sign in
                 </button>
 
               </form>
 
-              <p className="mt-6 text-center text-gray-500 text-sm">
+              <p className="mt-6 text-center text-[#5F6368] text-meta">
                 Don't have an account?{" "}
                 <Link
                   href="/signup"
-                  className="text-[#466EFF] hover:underline font-medium"
+                  className="text-[#111111] hover:underline font-medium"
                 >
                   Sign up
                 </Link>
@@ -224,7 +188,7 @@ export default function LoginPage() {
 
             </AuthCard>
 
-            <p className="text-gray-500 text-sm mt-6">
+            <p className="text-[#5F6368] text-meta mt-6">
               Trusted by teams who ship faster. Capture feedback in context and keep everyone aligned.
             </p>
 

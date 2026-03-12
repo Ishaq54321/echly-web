@@ -48,7 +48,7 @@ export function SystemOverviewBlock({ summary, onSelectSignal }: SystemOverviewB
                   <button
                     type="button"
                     onClick={() => onSelectSignal?.(item.id, item.sessionId)}
-                    className="w-full text-left text-[13px] text-[hsl(var(--text-primary-strong))] hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded px-2 py-1 -mx-2 -my-1"
+                    className="w-full text-left text-[13px] text-[hsl(var(--text-primary-strong))] hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300 rounded px-2 py-1 -mx-2 -my-1"
                   >
                     <span className="tabular-nums text-[hsl(var(--text-tertiary))] mr-2">
                       {item.impactScore}
@@ -71,7 +71,7 @@ export function SystemOverviewBlock({ summary, onSelectSignal }: SystemOverviewB
                   <button
                     type="button"
                     onClick={() => onSelectSignal?.(item.id, item.sessionId)}
-                    className="w-full text-left text-[13px] text-[hsl(var(--text-primary-strong))] hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded px-2 py-1 -mx-2 -my-1"
+                    className="w-full text-left text-[13px] text-[hsl(var(--text-primary-strong))] hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300 rounded px-2 py-1 -mx-2 -my-1"
                   >
                     <span className="text-red-600 font-medium text-[11px] uppercase mr-2">
                       {String(item.riskLevel).replace(/^./, (c) => c.toUpperCase())}

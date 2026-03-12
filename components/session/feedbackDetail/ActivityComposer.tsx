@@ -33,7 +33,7 @@ export function ActivityComposer({
         onClick={() => onSend(newMessage)}
         className={`flex-shrink-0 text-sm font-medium transition-colors duration-120 rounded-md px-2 py-1 ${
           newMessage.trim()
-            ? "text-slate-700 hover:text-slate-900 hover:bg-neutral-100 cursor-pointer"
+            ? "text-[#111111] hover:text-[#111111] hover:bg-[#E9ECEB] cursor-pointer"
             : "text-slate-300 cursor-not-allowed"
         }`}
       >

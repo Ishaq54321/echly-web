@@ -1467,7 +1467,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                   setPendingClaritySubmit(null);
                   setClarityResult(null);
                 }}
-                className="px-4 py-2 text-[13px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors cursor-pointer"
+                className="px-4 py-2 text-[13px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1475,7 +1475,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 <button
                   type="button"
                   onClick={handleClarityUseSuggestion}
-                  className="px-4 py-2 text-[13px] font-medium rounded-xl bg-[var(--color-primary)] text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors cursor-pointer"
+                  className="px-4 py-2 text-[13px] font-medium rounded-xl bg-[var(--color-primary)] text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors cursor-pointer"
                 >
                   Use Suggestion
                 </button>
@@ -1483,7 +1483,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               <button
                 type="button"
                 onClick={handleClaritySubmitAnyway}
-                className="px-4 py-2 text-[13px] font-medium rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors cursor-pointer"
+                className="px-4 py-2 text-[13px] font-medium rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors cursor-pointer"
               >
                 Submit Anyway
               </button>
@@ -1584,7 +1584,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 text-[13px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer"
+                className="px-4 py-2 text-[13px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors duration-[var(--motion-duration)] cursor-pointer"
               >
                 Cancel
               </button>

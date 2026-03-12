@@ -25,17 +25,17 @@ import {
   updateWorkspaceSettings,
 } from "@/lib/repositories/workspacesRepository";
 
-/* Premium workspace settings: wide layout, strong hierarchy */
+/* Fintech design system */
 const SETTINGS_CARD =
-  "rounded-[12px] border border-[var(--border-default)] bg-white p-[28px] transition-[border-color,box-shadow] duration-200 ease-out hover:border-neutral-300 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]";
-const CARD_GAP = "space-y-8"; /* 32px between section cards */
-const ROW_GAP = "space-y-5"; /* 20px between setting rows */
-const SECTION_TITLE = "text-[22px] font-semibold text-neutral-900"; /* H2: +2px, 600 */
-const SECTION_SUBTITLE = "text-[16px] font-semibold text-neutral-900"; /* H3 setting labels: 600 for hierarchy */
-const SECTION_DESC = "text-[14px] text-neutral-600 mt-1"; /* body, darker grey */
-const SETTING_DESC = "text-[14px] text-neutral-600 mt-0.5";
-const BTN_PRIMARY = "rounded-[8px] px-4 py-2.5 text-sm font-semibold bg-[#155DFC] text-white hover:brightness-110 hover:shadow-[0_2px_8px_rgba(21,93,252,0.35)] transition-all duration-200";
-const BTN_SECONDARY = "rounded-[8px] px-4 py-2.5 text-sm font-semibold bg-neutral-100 border border-neutral-300 text-neutral-900 hover:bg-neutral-200 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-all duration-200";
+  "rounded-2xl border border-[#E3E6E5] bg-[#FFFFFF] p-6 transition-[border-color,box-shadow] duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)]";
+const CARD_GAP = "space-y-8";
+const ROW_GAP = "space-y-5";
+const SECTION_TITLE = "text-h2 font-semibold text-[#111111]";
+const SECTION_SUBTITLE = "text-body font-semibold text-[#111111]";
+const SECTION_DESC = "text-meta text-[#6B7280] mt-1";
+const SETTING_DESC = "text-meta text-[#6B7280] mt-0.5";
+const BTN_PRIMARY = "primary-cta rounded-full px-4 py-2.5 text-meta transition-colors";
+const BTN_SECONDARY = "rounded-full px-4 py-2.5 text-meta font-semibold bg-[#DDF3C8] text-[#111111] border border-[#E3E6E5] hover:bg-[#cceeb8] transition-colors";
 
 function SectionHeader({
   title,
@@ -104,21 +104,19 @@ export default function SettingsPage() {
   }, [workspaceId]);
 
   return (
-    <div className="flex flex-1 min-h-0 bg-white overflow-auto">
-      <div className="flex-1 min-w-0 max-w-[1280px] mx-auto px-12 py-10 w-full">
-        {/* Page header — H1 */}
+    <div className="flex flex-1 min-h-0 bg-[#FFFFFF] overflow-auto">
+      <div className="flex-1 min-w-0 max-w-[1200px] mx-auto px-6 py-10 w-full">
         <header className="mb-8">
-          <h1 className="text-[28px] font-semibold tracking-tight text-neutral-900">
+          <h1 className="text-h1 font-semibold tracking-tight text-[#111111]">
             Settings
           </h1>
-          <p className="mt-1.5 text-[15px] text-neutral-600">
+          <p className="mt-1.5 text-meta text-[#6B7280]">
             Manage your workspace, notifications, and preferences.
           </p>
         </header>
 
-        {/* Tab navigation */}
         <nav
-          className="flex items-center gap-10 border-b border-[var(--border-default)] mb-8"
+          className="flex items-center gap-10 border-b border-[#E3E6E5] mb-8"
           aria-label="Settings sections"
         >
           {TABS.map(({ id, label }) => {
@@ -129,15 +127,15 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => setActiveTab(id)}
                 className={`
-                  relative pb-3 text-sm transition-colors duration-200
-                  ${isActive ? "text-[#155DFC] font-bold" : "font-medium text-[var(--text-meta)] hover:text-neutral-700"}
+                  relative pb-3 text-meta transition-colors duration-200
+                  ${isActive ? "text-[#111111] font-semibold" : "text-[#6B7280] font-medium hover:text-[#4B5563]"}
                 `}
                 aria-current={isActive ? "true" : undefined}
               >
                 {label}
                 {isActive && (
                   <span
-                    className="absolute left-0 right-0 bottom-0 h-[3px] bg-[#155DFC] rounded-full"
+                    className="absolute left-0 right-0 bottom-0 h-[3px] bg-[#D1D5DB] rounded-full"
                     aria-hidden
                   />
                 )}
@@ -239,7 +237,7 @@ function WorkspaceCard({
                 console.error("Failed to update workspace name:", e)
               );
             }}
-            className="max-w-[360px] w-full min-w-0 px-3 py-2.5 rounded-lg border border-[var(--border-default)] text-[15px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition-all duration-200 shrink-0"
+            className="max-w-[360px] w-full min-w-0 px-3 py-2.5 rounded-lg border border-[var(--border-default)] text-[15px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-[#D1D5DB] transition-all duration-200 shrink-0"
           />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-4 pt-5 border-t border-[var(--border-default)]">
@@ -391,7 +389,7 @@ function AppearanceCard({
         onClick={() => locked && onNavigateToBilling()}
         onKeyDown={(e) => e.key === "Enter" && locked && onNavigateToBilling()}
         title={locked ? UPGRADE_TOOLTIP : undefined}
-        className={`flex items-center justify-between gap-4 py-4 px-3 -mx-3 rounded-lg transition-colors duration-200 ${locked ? "cursor-pointer hover:bg-neutral-50" : ""}`}
+        className={`flex items-center justify-between gap-4 py-4 px-3 -mx-3 rounded-lg transition-colors duration-200 ${locked ? "cursor-pointer hover:bg-[#E9ECEB]" : ""}`}
       >
         <div className="min-w-0 flex-1 flex items-center gap-3 flex-wrap">
           <div>
@@ -450,7 +448,7 @@ function AppearanceCard({
                 accentColor: null,
                 removeEchlyBranding: false,
               }),
-              accentColor: v ? (appearance?.accentColor ?? "#155DFC") : null,
+              accentColor: v ? (appearance?.accentColor ?? "#9FE870") : null,
             };
             updateWorkspaceAppearance(workspaceId, next).catch((e) =>
               console.error("Failed to update appearance:", e)
@@ -508,7 +506,7 @@ function AdvancedSettingsCard({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-3 text-left rounded-lg py-2 -my-2 px-2 -mx-2 hover:bg-neutral-50/80 transition-colors duration-200"
+        className="w-full flex items-center justify-between gap-3 text-left rounded-lg py-2 -my-2 px-2 -mx-2 hover:bg-[#E9ECEB]/80 transition-colors duration-200"
         aria-expanded={open}
       >
         <span className={SECTION_TITLE}>Advanced Settings</span>
@@ -628,7 +626,7 @@ function SecurityTab({ user }: { user: { email: string | null } | null }) {
             title="Active Sessions"
             description="Devices where you're currently signed in."
           />
-          <Button variant="ghost" className="text-sm font-semibold text-[#155DFC] hover:underline shrink-0 rounded-lg px-4 py-2.5">
+          <Button variant="ghost" className="text-sm font-semibold text-[#111111] hover:underline shrink-0 rounded-lg px-4 py-2.5">
             Log out of all other sessions
           </Button>
         </div>
@@ -638,7 +636,7 @@ function SecurityTab({ user }: { user: { email: string | null } | null }) {
             return (
               <div
                 key={s.id}
-                className="flex items-center gap-3 py-3 px-3 rounded-lg border border-transparent hover:bg-neutral-50/80 hover:border-[var(--border-default)] transition-all duration-200"
+                className="flex items-center gap-3 py-3 px-3 rounded-lg border border-transparent hover:bg-[#E9ECEB]/80 hover:border-[var(--border-default)] transition-all duration-200"
               >
                 <Icon className="w-5 h-5 text-neutral-400 shrink-0" strokeWidth={1.8} />
                 <div className="flex-1 min-w-0">
@@ -646,7 +644,7 @@ function SecurityTab({ user }: { user: { email: string | null } | null }) {
                   <p className={SETTING_DESC}>{s.browser} · {s.location}</p>
                 </div>
                 {s.current && (
-                  <span className="text-xs font-semibold text-[#155DFC] shrink-0">Current</span>
+                  <span className="text-xs font-semibold text-[#111111] shrink-0">Current</span>
                 )}
               </div>
             );
@@ -659,7 +657,7 @@ function SecurityTab({ user }: { user: { email: string | null } | null }) {
         <button
           type="button"
           onClick={() => setAdvancedOpen(!advancedOpen)}
-          className="w-full flex items-center justify-between gap-3 text-left rounded-lg py-2 -my-2 px-2 -mx-2 hover:bg-neutral-50/80 transition-colors duration-200"
+          className="w-full flex items-center justify-between gap-3 text-left rounded-lg py-2 -my-2 px-2 -mx-2 hover:bg-[#E9ECEB]/80 transition-colors duration-200"
           aria-expanded={advancedOpen}
         >
           <span className={SECTION_TITLE}>Advanced Security Settings</span>
@@ -673,8 +671,8 @@ function SecurityTab({ user }: { user: { email: string | null } | null }) {
         >
           <div className="mt-4 pt-4 border-t border-[var(--border-default)] space-y-6">
             <div>
-              <h2 className="text-[18px] font-semibold text-neutral-900">Irreversible Or High Impact Actions</h2>
-              <p className="mt-1 text-[14px] text-neutral-600">Proceed With Caution</p>
+              <h2 className="text-[18px] font-semibold text-[#111111]">Irreversible Or High Impact Actions</h2>
+              <p className="mt-1 text-[14px] text-[#6B7280]">Proceed With Caution</p>
             </div>
             <div className="space-y-5">
               <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -707,7 +705,7 @@ function SecurityTab({ user }: { user: { email: string | null } | null }) {
       <Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} role="alertdialog" ariaLabelledBy="delete-workspace-title">
         <div className="p-6 max-w-md">
           <h3 id="delete-workspace-title" className="text-lg font-semibold text-neutral-900">Delete workspace?</h3>
-          <p className="mt-2 text-sm text-neutral-600">
+          <p className="mt-2 text-sm text-[#6B7280]">
             This will permanently delete the workspace and all associated data. This action cannot be undone.
           </p>
           <div className="mt-6 flex gap-3 justify-end">
@@ -776,7 +774,7 @@ function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => v
 
 /* ——— Billing tab: full SaaS pricing ——— */
 const BILLING_CONTAINER = "w-full";
-const BRAND_BLUE = "#155DFC";
+const BRAND_ACCENT = "#9FE870";
 
 const PLANS = [
   {
@@ -892,7 +890,7 @@ function CheckMarkIcon() {
   return (
     <span
       className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
-      style={{ backgroundColor: BRAND_BLUE }}
+      style={{ backgroundColor: BRAND_ACCENT }}
       aria-hidden
     >
       <Check className="h-3 w-3 text-white" strokeWidth={2.5} />
@@ -974,7 +972,7 @@ function BillingTab() {
             type="text"
             value={teamSize}
             onChange={(e) => setTeamSize(e.target.value)}
-            className="w-[60px] px-2.5 py-1.5 text-center rounded-[8px] border border-[rgba(0,0,0,0.08)] text-[15px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+            className="w-[60px] px-2.5 py-1.5 text-center rounded-[8px] border border-[rgba(0,0,0,0.08)] text-[15px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-gray-300"
           />
         </div>
         <div className="flex items-center gap-4">
@@ -986,7 +984,7 @@ function BillingTab() {
                 name="billing"
                 checked={billingPeriod === "monthly"}
                 onChange={() => setBillingPeriod("monthly")}
-                className="w-4 h-4 text-[#155DFC] focus:ring-[#155DFC]"
+                className="w-4 h-4 text-[#111111] focus:ring-gray-300"
               />
               <span className="text-[15px] font-medium text-neutral-900">Monthly</span>
             </label>
@@ -996,11 +994,11 @@ function BillingTab() {
                 name="billing"
                 checked={billingPeriod === "annual"}
                 onChange={() => setBillingPeriod("annual")}
-                className="w-4 h-4 text-[#155DFC] focus:ring-[#155DFC]"
+                className="w-4 h-4 text-[#111111] focus:ring-gray-300"
               />
               <span className="text-[15px] font-medium text-neutral-900">Annually</span>
               <span
-                className="rounded-full px-2.5 py-1 text-xs font-medium text-[#155DFC]"
+                className="rounded-full px-2.5 py-1 text-xs font-medium text-[#111111]"
                 style={{ backgroundColor: "#E0E7FF" }}
               >
                 Save up to 20%
@@ -1050,7 +1048,7 @@ function BillingTab() {
                   variant={plan.highlight ? "primary" : "secondary"}
                   className={
                     plan.highlight
-                      ? "w-full rounded-[10px] px-4 py-2.5 text-sm font-semibold bg-[#155DFC] text-white hover:brightness-110 border border-transparent"
+                      ? "primary-cta w-full rounded-[10px] px-4 py-2.5 text-sm border border-transparent"
                       : "secondary-cta w-full text-sm"
                   }
                 >

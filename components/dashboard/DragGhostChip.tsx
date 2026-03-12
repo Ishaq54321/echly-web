@@ -38,7 +38,7 @@ export function DragGhostChip({ visible, sessionTitle }: DragGhostChipProps) {
 
   return createPortal(
     <div
-      className="fixed pointer-events-none z-[9998] bg-white border border-neutral-200 rounded-lg px-3 py-2 shadow-sm text-sm text-neutral-700 whitespace-nowrap max-w-[200px] truncate"
+      className="fixed pointer-events-none z-[9998] bg-[#FFFFFF] border border-[#E3E6E5] rounded-2xl px-3 py-2 shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-meta text-[#6B7280] whitespace-nowrap max-w-[200px] truncate"
       style={{
         left: position.x + 12,
         top: position.y + 12,

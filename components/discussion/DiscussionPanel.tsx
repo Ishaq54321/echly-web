@@ -166,11 +166,11 @@ export function DiscussionPanel({
         className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-white border-l border-neutral-200 shadow-xl overflow-hidden discussion-panel-slide-in"
       >
         <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-neutral-200">
-          <h2 className="text-sm font-semibold text-neutral-900">Discussion</h2>
+          <h2 className="text-sm font-semibold text-[#111111]">Discussion</h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg text-secondary hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+            className="p-2 rounded-lg text-[#111111] hover:bg-[#E9ECEB] transition-colors"
             aria-label="Close panel"
           >
             <X className="h-4 w-4" strokeWidth={1.5} />
@@ -187,15 +187,15 @@ export function DiscussionPanel({
           ) : (
             <div className="p-6 space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-neutral-900">
+                <h3 className="text-lg font-semibold text-[#111111]">
                   {ticket.title}
                 </h3>
-                <div className="mt-1 text-sm text-secondary">
+                <div className="mt-1 text-sm text-[#111111]">
                   Session:{" "}
                   {sessionName ? (
                     <Link
                       href={`/dashboard/${ticket.sessionId}`}
-                      className="text-[#155DFC] hover:underline"
+                      className="text-[#111111] hover:underline"
                     >
                       {sessionName}
                     </Link>
@@ -206,31 +206,31 @@ export function DiscussionPanel({
               </div>
 
               <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-secondary mb-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-[#111111] mb-3">
                   Comment thread
                 </h4>
                 <div className="space-y-4">
                   {rootComments.length === 0 ? (
-                    <p className="text-sm text-secondary">No comments yet.</p>
+                    <p className="text-sm text-[#111111]">No comments yet.</p>
                   ) : (
                     rootComments.map((root) => {
                       const replies = byThread.get(root.id) ?? [];
                       return (
                         <div key={root.id} className="space-y-2">
                           <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-secondary shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-[#F1F3F2] border border-[#E3E6E5] flex items-center justify-center text-xs font-medium text-[#111111] shrink-0">
                               {root.userName?.charAt(0) ?? "?"}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 text-xs">
-                                <span className="font-medium text-neutral-900">
-                                  {root.userName ?? "User"}
-                                </span>
+<span className="font-medium text-[#111111]">
+                                {root.userName ?? "User"}
+                              </span>
                                 <span className="text-meta">
                                   {formatCommentDate(root.createdAt)}
                                 </span>
                               </div>
-                              <p className="text-sm text-neutral-700 mt-0.5">
+                              <p className="text-sm text-[#111111] mt-0.5">
                                 {root.message}
                               </p>
                               {replies.map((r) => (
@@ -239,14 +239,14 @@ export function DiscussionPanel({
                                   className="mt-3 ml-4 pl-3 border-l-2 border-neutral-200"
                                 >
                                   <div className="flex items-center gap-2 text-xs">
-                                    <span className="font-medium text-neutral-900">
-                                      {r.userName ?? "User"}
-                                    </span>
+<span className="font-medium text-[#111111]">
+                                    {r.userName ?? "User"}
+                                  </span>
                                     <span className="text-meta">
                                       {formatCommentDate(r.createdAt)}
                                     </span>
                                   </div>
-                                  <p className="text-sm text-secondary mt-0.5">
+                                  <p className="text-sm text-[#111111] mt-0.5">
                                     {r.message}
                                   </p>
                                 </div>
@@ -277,13 +277,13 @@ export function DiscussionPanel({
                     handleSendComment();
                   }
                 }}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-[#D1D5DB] transition"
               />
               <button
                 type="button"
                 onClick={handleSendComment}
                 disabled={sending || !commentDraft.trim()}
-                className="px-4 py-2.5 rounded-xl bg-[#155DFC] text-white text-sm font-medium hover:bg-[#0F4ED1] disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="primary-cta px-4 py-2.5 rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                 {sending ? "Sending…" : "Send"}
               </button>

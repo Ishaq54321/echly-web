@@ -27,8 +27,8 @@ function UITicketPreview({ ticketId }: { ticketId: string }) {
         <div className="flex-1 p-3 flex flex-col items-center justify-center gap-2 min-h-0">
           <div className="h-2.5 w-[75%] max-w-[120px] bg-gray-200 rounded shrink-0" />
           <div className="h-1.5 w-full max-w-[90%] bg-gray-100 rounded shrink-0" />
-          <div className="rounded-md border-2 border-blue-500 bg-blue-50/80 px-3 py-1.5 shadow-[0_0_0_2px_rgba(59,130,246,0.2)]">
-            <span className="text-[9px] font-semibold text-blue-700">Get started</span>
+          <div className="rounded-md border-2 border-[#9FE870] bg-[#E9ECEB] px-3 py-1.5 shadow-[0_0_0_2px_rgba(159,232,112,0.25)]">
+            <span className="text-[9px] font-semibold text-[#111111]">Get started</span>
           </div>
         </div>
       </div>
@@ -101,7 +101,7 @@ function TicketGroup({
         <motion.span
           animate={{ rotate: expanded ? 180 : 0 }}
           transition={{ duration: 0.2 }}
-          className="text-gray-400"
+          className="text-[#111111]"
         >
           <ChevronDown className="h-3.5 w-3.5" />
         </motion.span>
@@ -115,12 +115,12 @@ function TicketGroup({
               onClick={() => onSelect(ticket.id)}
               className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors ${
                 selectedId === ticket.id
-                  ? "bg-[#466EFF]/10 border border-[#466EFF]/30 text-gray-900"
-                  : "hover:bg-gray-100 text-gray-700 border border-transparent"
+                  ? "bg-[#E9ECEB] border border-[#9FE870]/40 text-[#111111]"
+                  : "hover:bg-[#E9ECEB] text-[#4A4A4A] border border-transparent"
               }`}
             >
               <div className="text-[12px] font-medium truncate">{ticket.title}</div>
-              <div className="text-[10px] text-gray-500 mt-0.5">{ticket.status}</div>
+              <div className="text-[10px] text-[#111111] mt-0.5">{ticket.status}</div>
             </button>
           ))}
         </div>
@@ -149,16 +149,16 @@ export default function DemoFeedbackDashboard() {
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-400 rounded-full" />
           <div className="w-3 h-3 bg-yellow-400 rounded-full" />
-          <div className="w-3 h-3 bg-green-400 rounded-full" />
+          <div className="w-3 h-3 bg-[#6B6F75] rounded-full" />
         </div>
-        <div className="ml-4 text-xs text-gray-400 select-none">Echly · Feedback</div>
+        <div className="ml-4 text-xs text-[#111111] select-none">Echly · Feedback</div>
       </div>
 
       <div className="flex h-[440px]">
         {/* Left sidebar - ticket list with collapsible groups */}
         <div className="w-[260px] border-r border-gray-200 bg-gray-50/60 flex flex-col">
           <div className="px-4 py-3 border-b border-gray-200">
-            <h2 className="text-[13px] font-semibold text-gray-900 flex items-center gap-2">
+            <h2 className="text-[13px] font-semibold text-[#111111] flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-[#466EFF]" />
               Tickets
             </h2>
@@ -190,21 +190,21 @@ export default function DemoFeedbackDashboard() {
           {selected ? (
             <>
               <div className="px-5 py-4 border-b border-gray-200">
-                <h3 className="text-[15px] font-semibold text-gray-900">{selected.title}</h3>
+                <h3 className="text-[15px] font-semibold text-[#111111]">{selected.title}</h3>
                 <span className="inline-block mt-1.5 text-[11px] font-medium text-[#466EFF] bg-[#466EFF]/10 px-2 py-0.5 rounded-full">
                   {selected.status}
                 </span>
               </div>
               <div className="flex-1 overflow-y-auto p-5">
                 <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold text-gray-500 mb-2">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-[#111111] mb-2">
                     <FileText className="h-3.5 w-3.5" />
                     Action Steps
                   </div>
                   <ul className="space-y-1.5">
                     {(selected.actionSteps ?? MOCK_ACTION_STEPS).map((step, i) => (
-                      <li key={i} className="text-[12px] text-gray-700 flex items-center gap-2">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#466EFF]/10 text-[10px] font-semibold text-[#466EFF]">
+                      <li key={i} className="text-[12px] text-[#4A4A4A] flex items-center gap-2">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#F1F3F2] text-[10px] font-semibold text-[#111111] border border-[#E3E6E5]">
                           {i + 1}
                         </span>
                         {step}
@@ -215,7 +215,7 @@ export default function DemoFeedbackDashboard() {
                 <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50/50 p-4">
                   <div className="h-[160px] rounded-lg bg-gradient-to-br from-gray-50 to-white border border-gray-100 p-2 flex items-center justify-center relative overflow-hidden">
                     <UITicketPreview ticketId={selected.id} />
-                    <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-blue-600 text-white text-[9px] font-semibold flex items-center justify-center shadow-sm">
+                    <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-[#9FE870] text-[#111111] text-[9px] font-semibold flex items-center justify-center shadow-sm">
                       1
                     </div>
                   </div>
@@ -223,7 +223,7 @@ export default function DemoFeedbackDashboard() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+            <div className="flex-1 flex items-center justify-center text-[#111111] text-sm">
               Select a ticket
             </div>
           )}

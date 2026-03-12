@@ -63,7 +63,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
       <div className="pt-4 pb-6 shrink-0">
         <Link
           href="/dashboard"
-          className="flex items-center justify-center w-9 h-9 rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[120ms] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="flex items-center justify-center w-9 h-9 rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[120ms] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
           aria-label="Echly home"
         >
           <Image

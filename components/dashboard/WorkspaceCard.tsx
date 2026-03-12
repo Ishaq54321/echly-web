@@ -241,7 +241,7 @@ export function WorkspaceCard({
   };
 
   const menuItemClass =
-    "w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)]";
+    "w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-gray-300";
 
   return (
     <>
@@ -258,27 +258,22 @@ export function WorkspaceCard({
           relative
           w-full
           rounded-xl
-          border border-neutral-200
-          bg-white
+          border border-[#E5E7EB]
+          bg-[#FFFFFF]
           p-5
           overflow-hidden
-          shadow-sm
-          hover:bg-neutral-50
-          hover:!border-[#155DFC80]
-          hover:ring-1
-          hover:ring-[#155DFC40]
-          hover:shadow-md
-          hover:-translate-y-[1px]
+          shadow-[0_1px_2px_rgba(0,0,0,0.05)]
+          hover:bg-[#E9ECEB]
+          hover:border-[#E5E7EB]
           transition-all
           duration-200
           ease-out
           cursor-pointer
-          focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2
+          focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2
         "
         style={{ animationDelay: `${index * 50}ms` } as React.CSSProperties}
         data-session-id={session.id}
       >
-        <div className="absolute top-0 left-0 right-0 h-[3px] bg-blue-500/70 rounded-t-xl" aria-hidden />
         {/* 3-DOTS — visible on hover; tooltip only when hover and dropdown closed */}
         <div className="absolute top-4 right-4">
           <div data-card-actions className="relative z-10 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
@@ -310,7 +305,7 @@ export function WorkspaceCard({
                 aria-label="More actions"
                 aria-expanded={moreOpen}
                 aria-haspopup="menu"
-                className="flex items-center justify-center h-10 w-10 rounded-xl text-[hsl(var(--text-tertiary))] transition-colors duration-[var(--motion-duration)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
+                className="flex items-center justify-center h-10 w-10 rounded-xl text-[hsl(var(--text-tertiary))] transition-colors duration-[var(--motion-duration)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-2 focus:ring-gray-300 cursor-pointer"
               >
                 <MoreHorizontal className="h-[16px] w-[16px] relative top-[1px] pointer-events-none" strokeWidth={1.5} aria-hidden />
               </button>
@@ -430,7 +425,7 @@ export function WorkspaceCard({
               <button
                 type="button"
                 onClick={handleDeleteClick}
-                className="w-full px-3 py-2 text-left text-[14px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)]"
+                className="w-full px-3 py-2 text-left text-[14px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                 role="menuitem"
               >
                 <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -449,9 +444,9 @@ export function WorkspaceCard({
                   flex items-center justify-center
                   w-10 h-10
                   rounded-xl
-                  bg-gradient-to-br from-blue-100 to-blue-50
-                  text-blue-600
-                  ring-1 ring-blue-200
+                  bg-[#E9ECEB]
+                  text-[#111111]
+                  ring-1 ring-[#E3E6E5]
                   shadow-inner
                   shrink-0
                 "
@@ -459,10 +454,10 @@ export function WorkspaceCard({
                 <FileText size={18} aria-hidden />
               </div>
               <div className="flex flex-col min-w-0 flex-1">
-                <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2 overflow-hidden text-ellipsis min-w-0">
+                <h3 className="font-medium text-[#111111] text-meta leading-tight line-clamp-2 overflow-hidden text-ellipsis min-w-0">
                   {session.title}
                 </h3>
-                <div className="text-xs text-meta font-medium mt-1">
+                <div className="text-xs text-[#6B7280] font-medium mt-1">
                   Updated {session.updatedAt ? formatRelativeTime(session.updatedAt) : "recently"}
                 </div>
               </div>
@@ -470,24 +465,24 @@ export function WorkspaceCard({
 
             {/* Signal pills */}
             <div className="flex items-center gap-2 mb-4">
-              <span className="px-2.5 py-1 rounded-full text-xs bg-neutral-100 text-neutral-700 tabular-nums">
+              <span className="px-2.5 py-1 rounded-full text-[13px] bg-[#F1F3F2] text-[#6B7280] tabular-nums">
                 {feedbackCount} feedback
               </span>
-              <span className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-600 tabular-nums">
+              <span className="px-2.5 py-1 rounded-full text-[13px] bg-[#DDF3C8] text-[#6B7280] tabular-nums">
                 {openCount} open
               </span>
             </div>
           </div>
 
           <div className="mt-auto">
-            <div className="h-px bg-gradient-to-r from-transparent via-neutral-200 to-transparent mb-3" />
-            <div className="flex items-center gap-4 text-secondary text-sm">
+            <div className="h-px bg-gradient-to-r from-transparent via-[#E3E6E5] to-transparent mb-3" />
+            <div className="flex items-center gap-4 text-[#6B7280] text-sm">
               <div className="flex items-center gap-1">
-                <Eye size={14} aria-hidden />
+                <Eye size={14} className="text-[#6B7280]" aria-hidden />
                 <span>{viewCount}</span>
               </div>
               <div className="flex items-center gap-1">
-                <MessageCircle size={14} aria-hidden />
+                <MessageCircle size={14} className="text-[#6B7280]" aria-hidden />
                 <span>{commentCount}</span>
               </div>
             </div>

@@ -277,13 +277,13 @@ export function DiscussionThread({
           {/* Ticket header: title (left) + View feedback ticket (right) */}
           <div className="mt-5 first:mt-0">
             <div className="ticket-header flex items-center justify-between gap-4">
-              <h2 className="ticket-title text-lg font-semibold text-neutral-900 truncate min-w-0">
+              <h2 className="ticket-title text-lg font-semibold text-[#111111] truncate min-w-0">
                 {ticket.title ?? "Untitled"}
               </h2>
               {ticket.sessionId && feedbackId ? (
                 <Link
                   href={`/dashboard/${ticket.sessionId}?ticket=${feedbackId}`}
-                  className="text-blue-600 hover:text-blue-700 font-medium inline-flex gap-1 items-center shrink-0 hover:underline"
+                  className="text-[#111111] hover:text-[#111111] font-medium inline-flex gap-1 items-center shrink-0 hover:underline"
                 >
                   View feedback ticket
                   <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
@@ -291,7 +291,7 @@ export function DiscussionThread({
               ) : null}
             </div>
             {sessionName && ticket.sessionId && (
-              <p className="text-sm text-secondary mt-1">
+              <p className="text-sm text-[#6B7280] mt-1">
                 {sessionName}
               </p>
             )}
@@ -319,7 +319,7 @@ export function DiscussionThread({
                       className="expand-button absolute top-[10px] right-[10px] w-7 h-7 rounded-md bg-white/85 flex items-center justify-center cursor-pointer border-0 shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:bg-white hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition-all duration-150"
                       aria-label="Expand screenshot"
                     >
-                      <Expand className="w-3.5 h-3.5 text-neutral-700" strokeWidth={2} />
+                      <Expand className="w-3.5 h-3.5 text-[#6B7280]" strokeWidth={2} />
                     </button>
                   </div>
                 </div>
@@ -331,7 +331,7 @@ export function DiscussionThread({
                   <p className="font-semibold text-orange-600 text-sm tracking-[0.02em] mb-2">
                     Action Steps
                   </p>
-                  <ul className="list-disc pl-[18px] leading-[1.6] text-neutral-700 space-y-1">
+                  <ul className="list-disc pl-[18px] leading-[1.6] text-[#6B7280] space-y-1">
                     {steps!.map((step, i) => (
                       <li key={i}>{step}</li>
                     ))}
@@ -393,7 +393,7 @@ export function DiscussionThread({
             {/* Composer: Avatar | Input | Attach | Send — no border under last comment */}
             <div className="pt-5">
               <div className="flex items-center gap-3">
-              <div className="w-[30px] h-[30px] rounded-full bg-[#EEF3FF] text-[#155DFC] font-semibold flex items-center justify-center shrink-0 overflow-hidden">
+              <div className="w-[30px] h-[30px] rounded-full bg-[#F1F3F2] text-[#111111] font-semibold flex items-center justify-center shrink-0 overflow-hidden border border-[#E3E6E5]">
                 {userInitial}
               </div>
               <input
@@ -407,12 +407,12 @@ export function DiscussionThread({
                     handleSendComment();
                   }
                 }}
-                className="flex-1 min-w-0 h-[44px] rounded-xl border border-neutral-200 px-4 text-[14px] font-normal text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition"
+                className="flex-1 min-w-0 h-[44px] rounded-xl border border-[#E3E6E5] px-4 text-[14px] font-normal text-[#111111] placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-[#D1D5DB] transition"
               />
               <button
                 type="button"
                 onClick={() => setAttachmentModalOpen(true)}
-                className="p-2.5 rounded-lg text-secondary hover:bg-neutral-100 hover:text-neutral-700 transition-colors shrink-0"
+                className="p-2.5 rounded-lg text-secondary hover:bg-[#E9ECEB] hover:text-[#111111] transition-colors shrink-0"
                 aria-label="Attach file"
               >
                 <Paperclip className="h-4 w-4" strokeWidth={1.5} />
@@ -421,7 +421,7 @@ export function DiscussionThread({
                 type="button"
                 onClick={handleSendComment}
                 disabled={sending || !commentDraft.trim()}
-                className="h-[40px] px-5 rounded-xl bg-[#155DFC] text-white text-sm font-medium shadow-sm hover:bg-[#0F4EDC] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 ease-out shrink-0 inline-flex items-center gap-2"
+                className="primary-cta h-[40px] px-5 rounded-xl text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 ease-out shrink-0 inline-flex items-center gap-2"
               >
                 <Send className="h-4 w-4" strokeWidth={1.5} />
                 {sending ? "Sending…" : "Send"}

@@ -17,7 +17,7 @@ export default function CommentInput({ onSend }: Props) {
   };
 
   return (
-    <div className="px-6 py-8 bg-[hsl(var(--surface-1))] border-b">
+    <div className="px-6 py-8 bg-[#FFFFFF] border-b border-[#E3E6E5]">
       <div className="flex items-center gap-3">
         <input
           type="text"
@@ -25,15 +25,12 @@ export default function CommentInput({ onSend }: Props) {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          className="focus-ring-brand flex-1 w-full rounded-3xl bg-[hsl(var(--surface-2))] border border-transparent px-5 py-3.5 text-sm outline-none
-            placeholder:text-[hsl(var(--text-muted))]
-            focus:ring-1 focus:ring-brand-accent focus:border-brand-accent
-            transition-all duration-150"
+          className="chat-input-bar flex-1 w-full text-meta text-[#111111] placeholder:text-[#111111] outline-none focus:border-[#D1D5DB] focus:shadow-[0_0_0_3px_rgba(209,213,219,0.4)] transition-all duration-150"
         />
         <button
           type="button"
           onClick={handleSend}
-          className="flex-shrink-0 p-2 rounded-md text-brand-accent hover:bg-neutral-100 transition-colors duration-120 cursor-pointer"
+          className="chat-send-btn flex-shrink-0 cursor-pointer"
           aria-label="Send comment"
         >
           <Send size={18} strokeWidth={1.5} />

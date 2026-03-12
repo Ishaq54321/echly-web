@@ -382,7 +382,7 @@ export function RegionCaptureOverlay({
             top: rect.y,
             width: Math.max(rect.w, 1),
             height: Math.max(rect.h, 1),
-            border: `2px solid ${flashBorder ? "#FFFFFF" : "#155DFC"}`,
+            border: `2px solid ${flashBorder ? "#FFFFFF" : "#9FE870"}`,
             boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)",
             pointerEvents: "none",
             zIndex: 2147483646,
@@ -430,7 +430,7 @@ export function RegionCaptureOverlay({
             disabled={confirming}
             className="echly-region-confirm-btn"
             style={{
-              background: "#155DFC",
+              background: "#9FE870",
               color: "#fff",
               fontWeight: 600,
               cursor: confirming ? "not-allowed" : "pointer",

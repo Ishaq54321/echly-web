@@ -107,7 +107,7 @@ export function ExecutionModeView({
             <button
               type="button"
               onClick={() => onResolveAndNext()}
-              className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-[var(--accent-operational)] text-white text-[13px] font-medium hover:opacity-92 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-[var(--accent-operational)] text-white text-[13px] font-medium hover:opacity-92 focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
             >
               <CheckCircle2 className="h-4 w-4" strokeWidth={1.5} />
               Done
@@ -116,7 +116,7 @@ export function ExecutionModeView({
           <button
             type="button"
             onClick={onNeedsClarification}
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[var(--layer-2-border)] bg-white text-[13px] font-medium text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[var(--layer-2-border)] bg-white text-[13px] font-medium text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
           >
             <MessageCircleQuestion className="h-4 w-4" strokeWidth={1.5} />
             Needs clarification
@@ -124,7 +124,7 @@ export function ExecutionModeView({
           <button
             type="button"
             onClick={onAssign}
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[var(--layer-2-border)] bg-white text-[13px] font-medium text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[var(--layer-2-border)] bg-white text-[13px] font-medium text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
           >
             <UserPlus className="h-4 w-4" strokeWidth={1.5} />
             Assign
@@ -132,7 +132,7 @@ export function ExecutionModeView({
           <button
             type="button"
             onClick={onSkip}
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[var(--layer-2-border)] bg-white text-[13px] font-medium text-[hsl(var(--text-tertiary))] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[var(--layer-2-border)] bg-white text-[13px] font-medium text-[hsl(var(--text-tertiary))] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
           >
             <SkipForward className="h-4 w-4" strokeWidth={1.5} />
             Skip
@@ -141,7 +141,7 @@ export function ExecutionModeView({
             <button
               type="button"
               onClick={onResolveAndNext}
-              className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[var(--accent-operational)] text-[var(--accent-operational)] text-[13px] font-medium hover:bg-[var(--accent-operational)]/8 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[#E5E7EB] text-[hsl(var(--text-primary-strong))] text-[13px] font-medium hover:bg-[#E9ECEB] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
             >
               Resolve & Next
             </button>

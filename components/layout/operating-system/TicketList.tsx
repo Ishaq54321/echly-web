@@ -181,7 +181,7 @@ function TicketListInner({
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   if (e.key === "Escape") onSessionTitleCancel?.();
                 }}
-                className="w-full text-[15px] font-semibold leading-tight text-[hsl(var(--text-primary-strong))] bg-[var(--layer-2-bg)] border border-[var(--layer-2-border)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-shadow duration-[var(--motion-duration-fast)]"
+                className="w-full text-[15px] font-semibold leading-tight text-[hsl(var(--text-primary-strong))] bg-[var(--layer-2-bg)] border border-[var(--layer-2-border)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-shadow duration-[var(--motion-duration-fast)]"
                 aria-label="Edit session title"
                 autoFocus
               />
@@ -205,7 +205,7 @@ function TicketListInner({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setSidebarMenuOpen((v) => !v); }}
-                  className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
+                  className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
                   aria-label="Session options"
                   aria-expanded={sidebarMenuOpen}
                 >
@@ -250,7 +250,7 @@ function TicketListInner({
           {meta}
         </p>
         <div className="mt-4">
-          <div className="flex items-center gap-2.5 h-10 rounded-xl bg-[var(--layer-2-bg)] border border-[var(--layer-2-border)] px-3 focus-within:border-[var(--accent-operational-border)] focus-within:ring-2 focus-within:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration-fast)]">
+          <div className="flex items-center gap-2.5 h-10 rounded-xl bg-[var(--layer-2-bg)] border border-[var(--layer-2-border)] px-3 focus-within:border-[#D1D5DB] focus-within:ring-2 focus-within:ring-gray-300 transition-all duration-[var(--motion-duration-fast)]">
             <Search className="h-4 w-4 shrink-0 text-[hsl(var(--text-tertiary))]" aria-hidden />
             <input
               type="search"
@@ -283,10 +283,10 @@ function TicketListInner({
             className="sticky top-0 z-10 flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
             aria-expanded={openExpanded}
           >
-            <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-primary-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-primary)]">
+            <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[#E7F0FF] text-[12px] font-semibold tabular-nums text-[#1D4ED8]">
               {open}
             </span>
-            <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
+            <span className="text-[12px] font-medium text-[#1D4ED8] tracking-[-0.01em]">
               Open
             </span>
             <span className="ml-auto shrink-0 text-[hsl(var(--text-tertiary))]">
@@ -329,10 +329,10 @@ function TicketListInner({
               className="sticky top-0 z-10 flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
               aria-expanded={skippedExpanded}
             >
-              <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-skipped-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-skipped)]">
+              <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[#FFF1E6] text-[12px] font-semibold tabular-nums text-[#F97316]">
                 {skipped}
               </span>
-              <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
+              <span className="text-[12px] font-medium text-[#F97316] tracking-[-0.01em]">
                 Skipped
               </span>
               <span className="ml-auto shrink-0 text-[hsl(var(--text-tertiary))]">
@@ -370,10 +370,10 @@ function TicketListInner({
             className="sticky top-0 z-10 flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
             aria-expanded={resolvedExpanded}
           >
-            <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-success-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-success)]">
+            <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[#E8F7EC] text-[12px] font-semibold tabular-nums text-[#15803D]">
               {resolved}
             </span>
-            <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
+            <span className="text-[12px] font-medium text-[#15803D] tracking-[-0.01em]">
               Resolved
             </span>
             <span className="ml-auto shrink-0 text-[hsl(var(--text-tertiary))]">

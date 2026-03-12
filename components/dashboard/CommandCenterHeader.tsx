@@ -61,7 +61,7 @@ export function CommandCenterHeader({
         <button
           type="button"
           onClick={onNewSession}
-          className="btn-primary-glow h-9 rounded-lg bg-[var(--color-primary)] text-white text-[14px] px-4 font-semibold shadow-[0_2px_8px_rgba(26,86,219,0.28)] hover:bg-[var(--color-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2 transition-[transform,box-shadow,background-color] duration-200 [transition-timing-function:var(--ease-premium)] cursor-pointer"
+          className="btn-primary-glow primary-cta h-9 rounded-lg text-[14px] px-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)] focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 transition-[transform,box-shadow,background-color] duration-200 [transition-timing-function:var(--ease-premium)] cursor-pointer"
         >
           New Session
         </button>
@@ -70,7 +70,7 @@ export function CommandCenterHeader({
           placeholder="Search sessions"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="h-9 px-3.5 min-w-[160px] rounded-lg bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] text-[14px] text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-150 ease-out"
+          className="h-9 px-3.5 min-w-[160px] rounded-lg bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] text-[14px] text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all duration-150 ease-out"
           aria-label="Search sessions"
         />
       </div>

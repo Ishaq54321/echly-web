@@ -144,16 +144,16 @@ function DashboardContent() {
   };
 
   return (
-    <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20 relative">
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 w-[560px]">
+    <div className="flex-1 bg-[#FFFFFF] flex flex-col w-full min-h-0 pt-20 relative">
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 w-[560px] max-w-[calc(100%-48px)]">
         <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-meta pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#111111] pointer-events-none" />
           <input
             type="search"
             placeholder="Search sessions"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-4 rounded-full border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+            className="w-full h-10 pl-9 pr-4 rounded-full border border-[#E3E6E5] bg-white text-[#111111] text-meta placeholder:text-[#6B7280] focus:outline-none focus:border-[#D1D5DB] focus:shadow-[0_0_0_3px_rgba(209,213,219,0.4)]"
             aria-label="Search sessions"
           />
         </div>
@@ -171,7 +171,7 @@ function DashboardContent() {
           <div className="pt-8">
             {foldersLoading ? (
               <div className="mb-8">
-                <h2 className="text-sm font-semibold text-neutral-700 mb-3">
+                <h2 className="text-meta font-semibold text-[#111111] mb-3">
                   Folders
                 </h2>
                 <div className="flex gap-4 flex-wrap">
@@ -181,9 +181,9 @@ function DashboardContent() {
               </div>
             ) : folders.length > 0 ? (
               <div className="mb-8">
-                <h2 className="text-sm font-semibold text-neutral-700 mb-3">
-                  Folders
-                </h2>
+<h2 className="text-sm font-semibold text-[#111111] mb-3">
+                Folders
+              </h2>
                 <div className="flex gap-4 flex-wrap">
                   {folders.map((folder) => (
                     <FolderCard
@@ -203,7 +203,7 @@ function DashboardContent() {
             ) : null}
 
             {(foldersLoading || folders.length > 0) && (
-              <h2 className="text-sm font-semibold text-neutral-700 mb-3">
+                <h2 className="text-meta font-semibold text-[#111111] mb-3">
                 Sessions
               </h2>
             )}
@@ -229,7 +229,7 @@ function DashboardContent() {
                     ))}
                   </div>
                   {filteredSessions.length === 0 && (
-                    <p className="text-[14px] text-[hsl(var(--text-tertiary))] py-8">
+                    <p className="text-meta text-[#6B7280] py-8">
                       {search.trim()
                         ? "No sessions match your search."
                         : viewMode === "archived"

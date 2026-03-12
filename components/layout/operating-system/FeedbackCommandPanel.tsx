@@ -180,7 +180,7 @@ export function FeedbackCommandPanel({
             placeholder="Search issues…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-8 pl-8 pr-3 text-[13px] rounded-md bg-white border border-[var(--layer-2-border)] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)] transition-[box-shadow] duration-120"
+            className="w-full h-8 pl-8 pr-3 text-[13px] rounded-md bg-white border border-[var(--layer-2-border)] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-gray-300 transition-[box-shadow] duration-120"
             aria-label="Search issues"
           />
         </div>
@@ -348,13 +348,13 @@ export function FeedbackCommandPanel({
                   tabIndex={isSelected ? 0 : -1}
                   className={`group flex items-start gap-2 px-2 py-2 cursor-pointer border-l-2 transition-colors duration-120 ${
                     isSelected
-                      ? "border-l-[var(--accent-operational)] bg-white shadow-[var(--elevation-1)]"
+                      ? "border-l-[#D1D5DB] bg-white shadow-[var(--elevation-1)]"
                       : "border-l-transparent hover:bg-black/[0.02]"
                   }`}
                 >
                   <button
                     type="button"
-                    className="shrink-0 mt-0.5 p-0.5 rounded text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.04] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+                    className="shrink-0 mt-0.5 p-0.5 rounded text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.04] focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300"
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleSelect(item.id);

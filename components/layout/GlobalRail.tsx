@@ -54,14 +54,14 @@ export default function GlobalRail() {
     <>
     <div className="relative flex flex-col h-full min-h-0 shrink-0" ref={sidebarRef}>
       <aside
-        className="w-16 border-r border-neutral-200 flex flex-col items-center py-4 bg-white h-screen shrink-0 min-h-0"
+        className="w-16 border-r border-[#E3E6E5] flex flex-col items-center py-4 bg-[#FFFFFF] h-screen shrink-0 min-h-0"
         aria-label="Global navigation"
       >
         {/* Logo block */}
         <div className="flex items-center justify-center h-16">
           <Link
             href="/dashboard"
-            className="relative w-10 h-10 bg-[#155DFC] rounded-md flex items-center justify-center overflow-hidden"
+            className="relative w-10 h-10 bg-[#9FE870] rounded-xl flex items-center justify-center overflow-hidden"
             aria-label="Echly home"
           >
             <Image
@@ -77,14 +77,14 @@ export default function GlobalRail() {
         <button
           type="button"
           onClick={() => setWorkspacePopoverOpen((v) => !v)}
-          className="flex items-center justify-center w-10 h-10 rounded-md text-neutral-900 hover:bg-neutral-100 transition"
+          className="flex items-center justify-center w-10 h-10 rounded-xl text-[#111111] hover:bg-[#E9ECEB] hover:text-[#111111] transition-colors"
           aria-label="Invite teammate"
           aria-expanded={workspacePopoverOpen}
         >
           <UserPlus className="w-[22px] h-[22px] stroke-[1.8]" />
         </button>
 
-        <div className="w-8 h-px bg-neutral-200 my-1" aria-hidden />
+        <div className="w-8 h-px bg-[#E3E6E5] my-1" aria-hidden />
 
         <nav className="flex flex-col gap-3 mt-5 flex-1 min-h-0 items-center" aria-label="Main">
           {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
@@ -93,10 +93,10 @@ export default function GlobalRail() {
               <div key={label} className="relative group">
                 <Link
                   href={href}
-                  className={`flex items-center justify-center w-10 h-10 rounded-md transition ${
+                  className={`flex items-center justify-center w-10 h-10 rounded-xl transition-colors ${
                     active
-                      ? "bg-[#EAF1FF] text-[#155DFC]"
-                      : "text-neutral-900 hover:bg-neutral-100"
+                      ? "bg-[#E9ECEB] text-[#111111] font-semibold"
+                      : "text-[#111111] hover:bg-[#E9ECEB] hover:text-[#111111]"
                   }`}
                   aria-label={label}
                   aria-current={active ? "page" : undefined}
@@ -104,7 +104,7 @@ export default function GlobalRail() {
                   <Icon className="w-[22px] h-[22px] stroke-[1.8]" />
                 </Link>
                 <span
-                  className="absolute left-full ml-3 px-2 py-1 text-xs rounded-md bg-white border border-neutral-200 shadow-[0_1px_2px_rgba(0,0,0,0.06)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-10"
+                  className="absolute left-full ml-3 px-2 py-1 text-caption rounded-lg bg-[#FFFFFF] border border-[#E3E6E5] shadow-[0_1px_3px_rgba(0,0,0,0.05)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-10"
                   role="tooltip"
                 >
                   {label}
@@ -118,7 +118,7 @@ export default function GlobalRail() {
       {/* Workspace popover (anchored to invite button) */}
       {workspacePopoverOpen && (
         <div
-          className="absolute left-16 top-[5.5rem] w-64 rounded-xl border border-neutral-200 bg-white shadow-lg p-4 z-50"
+          className="absolute left-16 top-[5.5rem] w-64 rounded-2xl border border-[#E3E6E5] bg-[#FFFFFF] shadow-[0_2px_8px_rgba(0,0,0,0.06)] p-4 z-50"
           role="dialog"
           aria-label="Workspace"
         >
@@ -126,13 +126,13 @@ export default function GlobalRail() {
             <img
               src={user?.photoURL || "/avatar-placeholder.png"}
               alt=""
-              className="w-10 h-10 rounded-full object-cover border border-neutral-200"
+              className="w-10 h-10 rounded-full object-cover border border-[#E3E6E5]"
             />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-neutral-900 truncate">
+              <p className="text-meta font-medium text-[#111111] truncate">
                 {WORKSPACE_NAME}
               </p>
-              <p className="text-xs text-secondary">1 member</p>
+              <p className="text-caption text-[#5F6368]">1 member</p>
             </div>
           </div>
           <button
@@ -141,7 +141,7 @@ export default function GlobalRail() {
               setWorkspacePopoverOpen(false);
               setInviteModalOpen(true);
             }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium text-neutral-900 bg-neutral-50 hover:bg-blue-50 hover:text-blue-600 transition"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-full text-meta font-medium text-[#111111] bg-[#DDF3C8] hover:bg-[#cceeb8] transition-colors"
           >
             <UserPlus size={18} strokeWidth={1.8} />
             Invite teammates
@@ -154,19 +154,19 @@ export default function GlobalRail() {
       {/* Invite modal */}
       {inviteModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 cursor-pointer"
           onClick={() => setInviteModalOpen(false)}
           role="dialog"
           aria-modal="true"
           aria-labelledby="invite-modal-title"
         >
           <div
-            className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
+            className="rounded-2xl border border-[#E3E6E5] shadow-[0_2px_8px_rgba(0,0,0,0.06)] bg-[#FFFFFF] p-6 max-w-md w-full cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <h2
               id="invite-modal-title"
-              className="text-[20px] font-semibold leading-tight text-neutral-900"
+              className="text-h3 font-semibold leading-tight text-[#111111]"
             >
               Invite your coworkers
             </h2>
@@ -179,24 +179,23 @@ export default function GlobalRail() {
               placeholder="email@example.com"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              className="mt-4 w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="mt-4 w-full px-4 py-2.5 rounded-full border border-[#E3E6E5] text-[#111111] placeholder:text-[#111111] focus:outline-none focus:border-[#D1D5DB] focus:shadow-[0_0_0_3px_rgba(209,213,219,0.4)]"
             />
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setInviteModalOpen(false)}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl text-secondary hover:bg-neutral-100 transition"
+                className="px-4 py-2.5 text-meta font-medium rounded-full text-[#111111] hover:bg-[#E9ECEB] transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  // Placeholder: send invite
                   setInviteModalOpen(false);
                   setInviteEmail("");
                 }}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
+                className="primary-cta px-4 py-2.5 text-meta rounded-full transition-colors"
               >
                 Send Invites
               </button>

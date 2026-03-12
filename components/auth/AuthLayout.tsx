@@ -5,15 +5,12 @@ import { ReactNode } from "react";
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div
-      className="min-h-screen w-full flex items-center justify-center relative overflow-hidden"
-      style={{
-        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-      }}
+      className="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-[#FFFFFF]"
     >
       <div
         className="absolute inset-0 pointer-events-none z-0"
         style={{
-          background: "radial-gradient(circle at 50% 0%, rgba(70,110,255,0.08), transparent 60%)",
+          background: "radial-gradient(circle at 50% 0%, rgba(159,232,112,0.12), transparent 60%)",
         }}
       />
       <div

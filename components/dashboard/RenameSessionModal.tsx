@@ -89,7 +89,7 @@ export function RenameSessionModal({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={saving}
-          className="mt-4 w-full h-11 px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-2-bg)] text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] disabled:opacity-60"
+          className="mt-4 w-full h-11 px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-2-bg)] text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all duration-[var(--motion-duration)] disabled:opacity-60"
           aria-label="Session title"
           aria-invalid={!!error}
           aria-describedby={error ? "rename-error" : undefined}
@@ -104,7 +104,7 @@ export function RenameSessionModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--layer-2-bg)] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--layer-2-bg)] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -112,7 +112,7 @@ export function RenameSessionModal({
             type="button"
             onClick={handleSave}
             disabled={saving || value.trim() === ""}
-            className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-primary)] text-white shadow-[0_2px_8px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="primary-cta px-4 py-2.5 text-[14px] rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {saving ? "Saving…" : "Save"}
           </button>
