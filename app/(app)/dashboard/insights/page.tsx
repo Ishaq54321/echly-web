@@ -4,6 +4,28 @@ import React, { useEffect, useState } from "react";
 import { Ticket, MessageCircle, Layers, CheckCircle, Sparkles } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
+import dynamic from "next/dynamic";
+
+const ActivityTrendChart = dynamic(
+  () => import("@/components/insights/ActivityTrendChart").then(m => m.ActivityTrendChart),
+  { ssr: false }
+);
+const IssueTypeDonutChart = dynamic(
+  () => import("@/components/insights/IssueTypeDonutChart").then(m => m.IssueTypeDonutChart),
+  { ssr: false }
+);
+const MostActiveSessionsBarChart = dynamic(
+  () => import("@/components/insights/MostActiveSessionsBarChart").then(m => m.MostActiveSessionsBarChart),
+  { ssr: false }
+);
+const ResponseSpeedTrendChart = dynamic(
+  () => import("@/components/insights/ResponseSpeedTrendChart").then(m => m.ResponseSpeedTrendChart),
+  { ssr: false }
+);
+const FeedbackHeatmap = dynamic(
+  () => import("@/components/insights/FeedbackHeatmap").then(m => m.FeedbackHeatmap),
+  { ssr: false }
+);
 
 interface MostCommentedSession {
   sessionId: string;
@@ -40,6 +62,35 @@ interface AnalyticsWindow {
   timeSavedHours: number;
 }
 
+interface ActivityPoint {
+  date: string;
+  issues: number;
+  replies: number;
+}
+
+interface IssueTypeSlice {
+  type: string;
+  count: number;
+  percentage: number;
+}
+
+interface ActiveSessionPoint {
+  sessionId: string;
+  sessionName: string;
+  issues: number;
+}
+
+interface ResponseSpeedPoint {
+  week: string;
+  averageFirstReplyMs: number;
+}
+
+interface FeedbackHeatmapBin {
+  dayOfWeek: number;
+  hourOfDay: number;
+  count: number;
+}
+
 interface InsightsApiResponse {
   lifetime: AnalyticsWindow;
   last30Days: AnalyticsWindow;
@@ -49,6 +100,12 @@ interface InsightsApiResponse {
   responseSpeed: ResponseSpeed;
   mostActiveSession: MostActiveSession | null;
   timeSaved: TimeSaved;
+  issuesPerDay: ActivityPoint[];
+  repliesPerDay: ActivityPoint[];
+  issueTypeDistribution: IssueTypeSlice[];
+  mostActiveSessions: ActiveSessionPoint[];
+  responseSpeedTrend: ResponseSpeedPoint[];
+  feedbackHeatmap: FeedbackHeatmapBin[];
 }
 
 function SkeletonCard({ className }: { className?: string }) {
@@ -171,6 +228,11 @@ export default function InsightsPage() {
     responseSpeed,
     mostActiveSession,
     timeSaved,
+    issuesPerDay,
+    issueTypeDistribution,
+    mostActiveSessions,
+    responseSpeedTrend,
+    feedbackHeatmap,
   } = data;
 
   const ticketCount = lifetime?.issuesCaptured ?? 0;
@@ -211,7 +273,7 @@ export default function InsightsPage() {
           </div>
         </div>
 
-        {/* Key metrics row */}
+        {/* Hero metrics row */}
         <section className="grid grid-cols-4 gap-4">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-200 bg-blue-50 hover:shadow-lg transition flex items-center gap-3">
             <div className="w-11 h-11 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
@@ -251,64 +313,77 @@ export default function InsightsPage() {
           </div>
         </section>
 
-        {/* Activity insights */}
+        {/* Activity trend */}
+        <section className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-neutral-900">Activity trend</h3>
+            <p className="text-xs text-secondary">Issues captured and replies made over time</p>
+          </div>
+          {!loading && data && <ActivityTrendChart data={issuesPerDay} />}
+        </section>
+
+        {/* Distribution + sessions grid */}
         <section className="grid grid-cols-2 gap-6">
-          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3">
-            <h3 className="text-sm font-semibold text-neutral-900 mb-4">Most Commented Sessions</h3>
-            <ul className="text-sm text-neutral-700">
-              {mostCommentedSessions.length === 0 ? (
-                <li className="py-2 px-3 text-secondary">No sessions with comments yet.</li>
-              ) : (
-                mostCommentedSessions.map((s, i) => (
-                  <li key={s.sessionId} className="flex items-center gap-3 py-2 px-3 rounded-md hover:bg-neutral-50 transition">
-                    <span className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 text-xs font-semibold flex items-center justify-center shrink-0">
-                      {i + 1}
-                    </span>
-                    {s.sessionName}
-                  </li>
-                ))
-              )}
-            </ul>
+          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-4">
+            <h3 className="text-sm font-semibold text-neutral-900">Feedback type distribution</h3>
+            <p className="text-xs text-secondary mb-1">
+              How feedback is distributed across issue types
+            </p>
+            {!loading && data && (
+              <IssueTypeDonutChart data={issueTypeDistribution} />
+            )}
           </div>
-          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3">
-            <h3 className="text-sm font-semibold text-neutral-900 mb-4">Most Reported Issue Type</h3>
-            <ul className="text-sm text-neutral-700">
-              {mostReportedIssueTypes.length === 0 ? (
-                <li className="py-2 px-3 text-secondary">No issue types yet.</li>
-              ) : (
-                mostReportedIssueTypes.map((type, i) => (
-                  <li key={type.type} className="flex items-center gap-3 py-2 px-3 rounded-md hover:bg-neutral-50 transition">
-                    <span className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 text-xs font-semibold flex items-center justify-center shrink-0">
-                      {i + 1}
-                    </span>
-                    {type.type}
-                  </li>
-                ))
-              )}
-            </ul>
+
+          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-neutral-900">Most active sessions</h3>
+              <p className="text-xs text-secondary">
+                Top sessions by number of issues
+              </p>
+            </div>
+            {!loading && data && (
+              <MostActiveSessionsBarChart data={mostActiveSessions} />
+            )}
           </div>
-          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3 col-span-2">
-            <h3 className="text-sm font-semibold text-neutral-900 mb-4">Team Response Speed</h3>
-            <div className="grid grid-cols-2 gap-6">
+        </section>
+
+        {/* Response speed + most active session summary */}
+        <section className="grid grid-cols-2 gap-6">
+          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-4 col-span-2">
+            <div className="flex items-center justify-between mb-2">
               <div>
-                <p className="text-xs text-secondary">Average first reply</p>
-                <p className="text-xl font-semibold text-neutral-900 mt-0.5">{responseSpeed.averageFirstReply}</p>
-                <p className="text-xs text-secondary mt-1">Typical response speed</p>
+                <h3 className="text-sm font-semibold text-neutral-900">Team response speed</h3>
+                <p className="text-xs text-secondary">Average first reply over time</p>
               </div>
-              <div>
-                <p className="text-xs text-secondary">Average resolution time</p>
-                <p className="text-xl font-semibold text-neutral-900 mt-0.5">{responseSpeed.averageResolutionTime}</p>
-                <p className="text-xs text-secondary mt-1">Time to close discussions</p>
+              <div className="flex gap-6 text-xs text-secondary">
+                <div>
+                  <p className="font-medium text-neutral-900 text-sm">
+                    {responseSpeed.averageFirstReply}
+                  </p>
+                  <p>Current average first reply</p>
+                </div>
+                <div>
+                  <p className="font-medium text-neutral-900 text-sm">
+                    {responseSpeed.averageResolutionTime}
+                  </p>
+                  <p>Average resolution time</p>
+                </div>
               </div>
             </div>
+            {!loading && data && (
+              <ResponseSpeedTrendChart data={responseSpeedTrend} />
+            )}
           </div>
+
           <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3 col-span-2">
-            <h3 className="text-sm font-semibold text-neutral-900 mb-4">Most Active Session</h3>
+            <h3 className="text-sm font-semibold text-neutral-900 mb-2">
+              Most active session (summary)
+            </h3>
             {mostActiveSession ? (
               <>
                 <p className="text-lg font-semibold text-neutral-900">{mostActiveSession.sessionName}</p>
-                <div className="border-t border-neutral-200 mt-4 pt-3" aria-hidden />
-                <div className="flex gap-6 mt-3 text-sm text-secondary">
+                <div className="border-t border-neutral-200 mt-3 pt-3" aria-hidden />
+                <div className="flex gap-6 mt-1 text-sm text-secondary">
                   <span>{mostActiveSession.issues} issues</span>
                   <span>{mostActiveSession.replies} replies</span>
                   <span>{mostActiveSession.collaborators} collaborators</span>
@@ -318,6 +393,19 @@ export default function InsightsPage() {
               <p className="text-secondary">No session data yet.</p>
             )}
           </div>
+        </section>
+
+        {/* Optional: Feedback time heatmap */}
+        <section className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-neutral-900">Feedback activity heatmap</h3>
+              <p className="text-xs text-secondary">
+                When feedback tends to be captured across the week
+              </p>
+            </div>
+          </div>
+          {!loading && data && <FeedbackHeatmap data={feedbackHeatmap} />}
         </section>
       </div>
     </div>

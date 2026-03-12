@@ -64,6 +64,41 @@ export interface TimeSaved {
   formatted: string;
 }
 
+export interface ActivityPoint {
+  /** ISO date string (YYYY-MM-DD) for the day bucket. */
+  date: string;
+  issues: number;
+  replies: number;
+}
+
+export interface IssueTypeSlice {
+  type: string;
+  count: number;
+  /** Percentage of total issues for this slice (0–100). */
+  percentage: number;
+}
+
+export interface ActiveSessionPoint {
+  sessionId: string;
+  sessionName: string;
+  issues: number;
+}
+
+export interface ResponseSpeedPoint {
+  /** ISO week label, e.g. 2026-W10. */
+  week: string;
+  /** Average first reply time in milliseconds for the bucket. */
+  averageFirstReplyMs: number;
+}
+
+export interface FeedbackHeatmapBin {
+  /** 0–6, where 0 = Sunday, 6 = Saturday. */
+  dayOfWeek: number;
+  /** 0–23 hour of day (user local time). */
+  hourOfDay: number;
+  count: number;
+}
+
 export interface AnalyticsWindow {
   issuesCaptured: number;
   repliesMade: number;
@@ -81,6 +116,18 @@ export interface InsightsData {
   mostActiveSession: MostActiveSession | null;
   /** Lifetime, formatted for the Insights hero card. */
   timeSaved: TimeSaved;
+  /** Daily trend of issues and replies over the last 30 days. */
+  issuesPerDay: ActivityPoint[];
+  /** Daily trend of replies over the last 30 days (alias for convenience). */
+  repliesPerDay: ActivityPoint[];
+  /** Issue types enriched with percentage of total, for donut charts. */
+  issueTypeDistribution: IssueTypeSlice[];
+  /** Top sessions by raw issue count for bar charts. */
+  mostActiveSessions: ActiveSessionPoint[];
+  /** Weekly buckets of response speed, for trend charting. */
+  responseSpeedTrend: ResponseSpeedPoint[];
+  /** Heatmap-style counts of feedback volume by day-of-week and hour-of-day. */
+  feedbackHeatmap: FeedbackHeatmapBin[];
 }
 
 async function safeCount(queryRef: Query): Promise<number> {
@@ -127,6 +174,12 @@ function createDefaultInsights(): InsightsData {
       minutes: 0,
       formatted: "0m",
     },
+    issuesPerDay: [],
+    repliesPerDay: [],
+    issueTypeDistribution: [],
+    mostActiveSessions: [],
+    responseSpeedTrend: [],
+    feedbackHeatmap: [],
   };
 }
 
@@ -323,6 +376,18 @@ export async function computeInsights(userId: string): Promise<InsightsData> {
       .sort((a, b) => b.count - a.count)
       .slice(0, 4);
 
+    const totalIssueCount = Array.from(typeCount.values()).reduce(
+      (sum, c) => sum + c,
+      0
+    );
+    const issueTypeDistribution: IssueTypeSlice[] = Array.from(
+      typeCount.entries()
+    ).map(([type, count]) => ({
+      type,
+      count,
+      percentage: totalIssueCount > 0 ? (count / totalIssueCount) * 100 : 0,
+    }));
+
     const commentsByFeedbackId = new Map<string, { createdAt: number }[]>();
     commentsSnap.docs.forEach((docSnap: any) => {
       const d = docSnap.data?.() ?? {};
@@ -345,6 +410,10 @@ export async function computeInsights(userId: string): Promise<InsightsData> {
 
     let firstReplySum = 0;
     let firstReplyCount = 0;
+    const firstReplyByWeek = new Map<
+      string,
+      { sumMs: number; count: number }
+    >();
     for (const [fid, comments] of commentsByFeedbackId as Map<
       string,
       { createdAt: number }[]
@@ -358,8 +427,23 @@ export async function computeInsights(userId: string): Promise<InsightsData> {
         (fb as { createdAt?: TimestampLike }).createdAt ?? null
       );
       if (feedbackCreated <= 0) continue;
-      firstReplySum += firstComment.createdAt - feedbackCreated;
+      const delta = firstComment.createdAt - feedbackCreated;
+      firstReplySum += delta;
       firstReplyCount += 1;
+
+      const createdDate = new Date(feedbackCreated);
+      const year = createdDate.getUTCFullYear();
+      const firstJan = new Date(Date.UTC(year, 0, 1));
+      const dayMs = 24 * 60 * 60 * 1000;
+      const week = Math.ceil(
+        ((createdDate.getTime() - firstJan.getTime()) / dayMs + firstJan.getUTCDay() + 1) /
+          7
+      );
+      const weekKey = `${year}-W${String(week).padStart(2, "0")}`;
+      const bucket = firstReplyByWeek.get(weekKey) ?? { sumMs: 0, count: 0 };
+      bucket.sumMs += delta;
+      bucket.count += 1;
+      firstReplyByWeek.set(weekKey, bucket);
     }
     const averageFirstReplyMs =
       firstReplyCount > 0 ? firstReplySum / firstReplyCount : 0;
@@ -382,6 +466,15 @@ export async function computeInsights(userId: string): Promise<InsightsData> {
       averageResolutionTime: formatDuration(averageResolutionMs),
     };
 
+    const responseSpeedTrend: ResponseSpeedPoint[] = Array.from(
+      firstReplyByWeek.entries()
+    )
+      .map(([week, { sumMs, count }]) => ({
+        week,
+        averageFirstReplyMs: count > 0 ? sumMs / count : 0,
+      }))
+      .sort((a, b) => (a.week < b.week ? -1 : a.week > b.week ? 1 : 0));
+
     const issuesBySession = new Map<string, number>();
     for (const f of feedback) {
       issuesBySession.set(
@@ -389,9 +482,10 @@ export async function computeInsights(userId: string): Promise<InsightsData> {
         (issuesBySession.get(f.sessionId) ?? 0) + 1
       );
     }
-    const topSessionEntry = Array.from(issuesBySession.entries()).sort(
+    const issuesBySessionEntries = Array.from(issuesBySession.entries()).sort(
       (a, b) => b[1] - a[1]
-    )[0];
+    );
+    const topSessionEntry = issuesBySessionEntries[0];
 
     let mostActiveSession: MostActiveSession | null = null;
     if (topSessionEntry) {
@@ -412,6 +506,86 @@ export async function computeInsights(userId: string): Promise<InsightsData> {
         collaborators: collaboratorsSet.size,
       };
     }
+
+    const mostActiveSessions: ActiveSessionPoint[] = issuesBySessionEntries
+      .slice(0, 5)
+      .map(([sessionId, issues]) => ({
+        sessionId,
+        sessionName: sessionIdToName.get(sessionId) ?? "Unknown Session",
+        issues,
+      }));
+
+    const issuesByDay = new Map<string, { issues: number; replies: number }>();
+    const repliesByDay = new Map<string, number>();
+
+    const feedbackHeatmapAccumulator = new Map<
+      string,
+      { dayOfWeek: number; hourOfDay: number; count: number }
+    >();
+
+    feedback.forEach((f: {
+      createdAt: TimestampLike;
+    }) => {
+      const createdMs = toMs(f.createdAt);
+      if (!createdMs) return;
+      const d = new Date(createdMs);
+      const dateKey = d.toISOString().slice(0, 10);
+      const bucket = issuesByDay.get(dateKey) ?? { issues: 0, replies: 0 };
+      bucket.issues += 1;
+      issuesByDay.set(dateKey, bucket);
+
+      const dayOfWeek = d.getDay();
+      const hourOfDay = d.getHours();
+      const heatKey = `${dayOfWeek}-${hourOfDay}`;
+      const heatBucket =
+        feedbackHeatmapAccumulator.get(heatKey) ?? {
+          dayOfWeek,
+          hourOfDay,
+          count: 0,
+        };
+      heatBucket.count += 1;
+      feedbackHeatmapAccumulator.set(heatKey, heatBucket);
+    });
+
+    commentsSnap.docs.forEach((docSnap: any) => {
+      const d = docSnap.data?.() ?? {};
+      const created = toMs((d as { createdAt?: TimestampLike }).createdAt);
+      if (!created) return;
+      const dateKey = new Date(created).toISOString().slice(0, 10);
+      repliesByDay.set(dateKey, (repliesByDay.get(dateKey) ?? 0) + 1);
+      const dt = new Date(created);
+      const dayOfWeek = dt.getDay();
+      const hourOfDay = dt.getHours();
+      const heatKey = `${dayOfWeek}-${hourOfDay}`;
+      const heatBucket =
+        feedbackHeatmapAccumulator.get(heatKey) ?? {
+          dayOfWeek,
+          hourOfDay,
+          count: 0,
+        };
+      heatBucket.count += 1;
+      feedbackHeatmapAccumulator.set(heatKey, heatBucket);
+    });
+
+    const issuesPerDay: ActivityPoint[] = Array.from(
+      issuesByDay.entries()
+    )
+      .map(([date, { issues }]) => ({
+        date,
+        issues,
+        replies: repliesByDay.get(date) ?? 0,
+      }))
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+    const repliesPerDay: ActivityPoint[] = issuesPerDay.map((p) => ({
+      date: p.date,
+      issues: p.issues,
+      replies: p.replies,
+    }));
+
+    const feedbackHeatmap: FeedbackHeatmapBin[] = Array.from(
+      feedbackHeatmapAccumulator.values()
+    );
 
     const lifetimeHoursWhole = Math.floor(lifetimeTimeSavedMinutes / 60);
     const lifetimeMinsRemainder = lifetimeTimeSavedMinutes % 60;
@@ -442,6 +616,12 @@ export async function computeInsights(userId: string): Promise<InsightsData> {
         minutes: lifetimeTimeSavedMinutes,
         formatted: timeSavedFormatted,
       },
+      issuesPerDay,
+      repliesPerDay,
+      issueTypeDistribution,
+      mostActiveSessions,
+      responseSpeedTrend,
+      feedbackHeatmap,
     };
   } catch (error) {
     console.error("computeInsights failed:", error);
