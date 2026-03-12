@@ -33,10 +33,16 @@ interface TimeSaved {
   formatted: string;
 }
 
-interface InsightsApiResponse {
-  ticketsCaptured: number;
+interface AnalyticsWindow {
+  issuesCaptured: number;
   repliesMade: number;
   sessionsReviewed: number;
+  timeSavedHours: number;
+}
+
+interface InsightsApiResponse {
+  lifetime: AnalyticsWindow;
+  last30Days: AnalyticsWindow;
   resolvedDiscussions: number;
   mostCommentedSessions: MostCommentedSession[];
   mostReportedIssueTypes: MostReportedIssueType[];
@@ -158,9 +164,7 @@ export default function InsightsPage() {
   }
 
   const {
-    ticketsCaptured: ticketCount,
-    repliesMade: replyCount,
-    sessionsReviewed: sessionCount,
+    lifetime,
     resolvedDiscussions: resolvedCount,
     mostCommentedSessions,
     mostReportedIssueTypes,
@@ -168,6 +172,10 @@ export default function InsightsPage() {
     mostActiveSession,
     timeSaved,
   } = data;
+
+  const ticketCount = lifetime?.issuesCaptured ?? 0;
+  const replyCount = lifetime?.repliesMade ?? 0;
+  const sessionCount = lifetime?.sessionsReviewed ?? 0;
 
   return (
     <div className="flex flex-1 min-h-0 flex-col w-full bg-[var(--canvas-base)] overflow-auto">
