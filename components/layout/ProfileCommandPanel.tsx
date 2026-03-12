@@ -47,8 +47,8 @@
  export interface ProfileCommandPanelProps {
    open: boolean;
    onClose: () => void;
-   user: User | null;
-   anchorRef: RefObject<HTMLElement | null>;
+   user?: User | null;
+   anchorRef?: RefObject<HTMLElement | null>;
  }
 
  export function ProfileCommandPanel({
@@ -64,19 +64,34 @@
    const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
    useEffect(() => {
-     if (!open || !anchorRef?.current) {
+     if (!open) {
        setPosition(null);
        setMounted(false);
        return;
      }
-     const el = anchorRef.current;
-     const rect = el.getBoundingClientRect();
-     const panelWidth = PANEL_WIDTH;
-     const gap = 6;
-     setPosition({
-       top: rect.bottom + gap,
-       left: Math.max(8, rect.right - panelWidth),
-     });
+
+     // If we have an anchor element, position relative to it.
+     if (anchorRef?.current) {
+       const el = anchorRef.current;
+       const rect = el.getBoundingClientRect();
+       const panelWidth = PANEL_WIDTH;
+       const gap = 6;
+       setPosition({
+         top: rect.bottom + gap,
+         left: Math.max(8, rect.right - panelWidth),
+       });
+     } else {
+       // Fallback: pin to top-right of viewport when no anchorRef is provided.
+       const margin = 16;
+       const panelWidth = PANEL_WIDTH;
+       const viewportWidth =
+         typeof window !== "undefined" ? window.innerWidth : panelWidth + margin * 2;
+       setPosition({
+         top: margin + 40,
+         left: Math.max(8, viewportWidth - panelWidth - margin),
+       });
+     }
+
      const t = requestAnimationFrame(() => {
        requestAnimationFrame(() => setMounted(true));
      });
