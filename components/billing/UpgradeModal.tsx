@@ -1,10 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "lucide-react";
-import { authFetch } from "@/lib/authFetch";
+import { useBillingUsage } from "@/lib/hooks/useBillingUsage";
 
 export interface UpgradeModalProps {
   open: boolean;
@@ -39,33 +38,15 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
   const currentPlan = currentPlanFromUpgrade(upgradePlan);
   const currentPlanLabel = PLAN_LABEL[currentPlan] ?? currentPlan;
 
-  const [usage, setUsage] = useState<{
-    sessionsCreated: number;
-    maxSessions: number | null;
-  } | null>(null);
+  const { data: usageData } = useBillingUsage({ enabled: open });
 
-  useEffect(() => {
-    if (!open) return;
-
-    let cancelled = false;
-
-    authFetch("/api/billing/usage")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return;
-
-        setUsage({
-          sessionsCreated: data.usage?.sessionsCreated ?? 0,
-          maxSessions: data.limits?.maxSessions ?? null,
-        });
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-      setUsage(null);
-    };
-  }, [open]);
+  const usage = usageData
+    ? {
+        activeSessions: usageData.usage?.activeSessions ?? 0,
+        sessionsCreated: usageData.usage?.sessionsCreated ?? 0,
+        maxSessions: usageData.limits?.maxSessions ?? null,
+      }
+    : null;
 
   const ctaLabel =
     currentPlan === "starter"
@@ -79,13 +60,18 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
     router.push("/settings?tab=billing");
   };
 
-  const sessionsUsed = usage?.sessionsCreated ?? 0;
-  const sessionsMax = usage?.maxSessions ?? 3;
+  const sessionsUsed = usage?.activeSessions ?? 0;
+  const sessionsMax = usage?.maxSessions ?? null;
 
   const progressPct =
-    sessionsMax > 0 ? Math.min(100, (sessionsUsed / sessionsMax) * 100) : 0;
+    sessionsMax != null && sessionsMax > 0
+      ? Math.min(100, (sessionsUsed / sessionsMax) * 100)
+      : 0;
 
-  const isFull = sessionsMax > 0 && sessionsUsed >= sessionsMax;
+  const isFull =
+    sessionsMax != null && sessionsMax > 0 && sessionsUsed >= sessionsMax;
+  const isOverLimit =
+    sessionsMax != null && sessionsMax > 0 && sessionsUsed > sessionsMax;
 
   return (
     <AnimatePresence>
@@ -137,17 +123,20 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
               id="upgrade-modal-title"
               className="mt-4 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl"
             >
-              You've reached the {currentPlanLabel.toLowerCase()} workspace limit
+              {isOverLimit
+                ? "You have exceeded your plan limit."
+                : `You've reached the ${currentPlanLabel.toLowerCase()} workspace limit`}
             </h2>
 
             {/* Description */}
             <p className="mt-2 text-[15px] leading-relaxed text-neutral-700">
-              Create unlimited feedback sessions, collaborate with your team,
-              and unlock deeper insights by upgrading your workspace.
+              {isOverLimit
+                ? "Existing sessions remain available. Delete sessions or upgrade to create new ones."
+                : "Create unlimited feedback sessions, collaborate with your team, and unlock deeper insights by upgrading your workspace."}
             </p>
 
             {/* Usage */}
-            {usage != null && sessionsMax > 0 && (
+            {usage != null && sessionsMax != null && sessionsMax > 0 && (
               <div className="mt-5">
 
                 <div className="flex items-baseline justify-between text-sm">

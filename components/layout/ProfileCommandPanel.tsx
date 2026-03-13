@@ -9,6 +9,7 @@ import type { User } from "firebase/auth";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
+import { useBillingUsage } from "@/lib/hooks/useBillingUsage";
 import CountUp from "react-countup";
 
 const PANEL_WIDTH = 520;
@@ -25,11 +26,6 @@ interface InsightsApiResponse {
   last30Days: AnalyticsWindow;
 }
 
-interface BillingUsageResponse {
-  plan: string;
-  usage: { sessionsCreated: number; members?: number };
-  limits: { maxSessions: number | null; maxMembers?: number | null };
-}
 
 const RIGHT_COLUMN_SECTIONS = [
   {
@@ -70,7 +66,7 @@ export function ProfileCommandPanel({
   const [analytics, setAnalytics] = useState<InsightsApiResponse | null>(null);
   const [, setAnalyticsLoading] = useState(false);
   const [hasAnimatedMetrics, setHasAnimatedMetrics] = useState(false);
-  const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(null);
+  const { data: billingUsage } = useBillingUsage();
 
   useEffect(() => {
     if (!open || !anchorRef?.current) {
@@ -130,21 +126,6 @@ export function ProfileCommandPanel({
 
     return () => {
       cancelled = true;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    authFetch("/api/billing/usage")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: BillingUsageResponse | null) => {
-        if (!cancelled && data) setBillingUsage(data);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-      setBillingUsage(null);
     };
   }, [open]);
 
@@ -438,11 +419,19 @@ export function ProfileCommandPanel({
                   Upgrade plan
                 </span>
                 <p className="font-semibold text-[14px] text-neutral-700 mt-0 mb-0.5">
-                  Current plan: {billingUsage ? (billingUsage.plan.charAt(0).toUpperCase() + billingUsage.plan.slice(1)) : "Free"}
+                  Current plan:{" "}
+                  {billingUsage
+                    ? billingUsage.plan.charAt(0).toUpperCase() +
+                      billingUsage.plan.slice(1)
+                    : "Free"}
                 </p>
                 <p className="font-semibold text-[14px] text-neutral-700 mt-0 mb-0.5">
                   {billingUsage
-                    ? `${billingUsage.usage.sessionsCreated} / ${billingUsage.limits.maxSessions ?? "—"} sessions used`
+                    ? `${billingUsage.usage.sessionsCreated} / ${
+                        billingUsage.limits.maxSessions == null
+                          ? "Unlimited"
+                          : billingUsage.limits.maxSessions
+                      } sessions used`
                     : "— sessions used"}
                 </p>
                 <Link

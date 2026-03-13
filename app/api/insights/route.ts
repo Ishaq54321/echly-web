@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { computeInsights } from "@/lib/analytics/computeInsights";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
-import { getWorkspaceEntitlements } from "@/lib/billing/getWorkspaceEntitlements";
-import { planRequiredBody } from "@/lib/billing/planLimitResponse";
-import { UPGRADE_PLAN } from "@/lib/billing/plans";
-import type { PlanId } from "@/lib/billing/plans";
 
 /**
  * GET /api/insights
- * Returns analytics for the authenticated user (from Firestore).
- * Requires insightsAccess entitlement (paid plans).
+ * Returns analytics for the authenticated user: lifetime and last-30-days metrics,
+ * activity trends, issue type distribution, response speed, and heatmap data.
+ * Queries Firestore collections: feedback, comments, sessions (filtered by userId).
  */
 export async function GET(req: Request) {
   let user;
@@ -21,18 +16,14 @@ export async function GET(req: Request) {
     return res as Response;
   }
 
-  const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-  const workspace = await getWorkspace(workspaceId);
-  if (workspace) {
-    const entitlements = getWorkspaceEntitlements(workspace);
-    if (!entitlements.insightsAccess) {
-      const plan = (workspace.billing?.plan ?? "free") as PlanId;
-      const upgradePlan = UPGRADE_PLAN[plan] ?? "starter";
-      return NextResponse.json(planRequiredBody(upgradePlan), { status: 403 });
-    }
+  try {
+    const data = await computeInsights(user.uid);
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error("GET /api/insights:", err);
+    return NextResponse.json(
+      { error: "Failed to load insights" },
+      { status: 500 }
+    );
   }
-
-  const data = await computeInsights(user.uid);
-  // Always return both lifetime and last30Days windows, plus additional insights.
-  return NextResponse.json(data);
 }

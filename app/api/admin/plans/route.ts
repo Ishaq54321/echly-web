@@ -4,16 +4,14 @@ import { db } from "@/lib/firebase";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { logAdminAction } from "@/lib/admin/adminLogs";
 import type { PlanDoc } from "@/lib/admin/types";
-import { PLANS as CODE_PLANS, type PlanId } from "@/lib/billing/plans";
+import {
+  PLANS as CODE_PLANS,
+  type PlanId,
+  DEFAULT_PRICES,
+} from "@/lib/billing/plans";
+import { invalidatePlanCatalogCache } from "@/lib/billing/getPlanCatalog";
 
 const PLANS_COLLECTION = "plans";
-
-const DEFAULT_PRICES: Record<PlanId, { priceMonthly: number; priceYearly: number }> = {
-  free: { priceMonthly: 0, priceYearly: 0 },
-  starter: { priceMonthly: 19, priceYearly: 190 },
-  business: { priceMonthly: 99, priceYearly: 990 },
-  enterprise: { priceMonthly: 299, priceYearly: 2990 },
-};
 
 export type PlanWithId = PlanDoc & { id: string };
 
@@ -103,6 +101,7 @@ export async function PATCH(req: Request) {
       action: "plans.update",
       metadata: { planId: id, updates: payload },
     });
+    invalidatePlanCatalogCache();
     return NextResponse.json({ success: true, id });
   } catch (err) {
     console.error("PATCH /api/admin/plans:", err);

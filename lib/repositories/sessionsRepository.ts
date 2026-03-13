@@ -61,16 +61,36 @@ export async function createSessionRepo(
 }
 
 /**
- * Returns the number of sessions in a workspace (all, including archived).
- * Used for billing/plan limit checks.
+ * Returns the number of *active* sessions in a workspace.
+ * Excludes archived sessions so that plan limits apply only to active sessions.
+ * Permanently deleted sessions are naturally excluded because their documents
+ * are removed from Firestore.
+ * Used only to enforce maxSessions at creation (POST /api/sessions). Must never
+ * be used to delete or prune sessions when the limit is reduced.
  */
 export async function getWorkspaceSessionCountRepo(workspaceId: string): Promise<number> {
-  const q = query(
+  const baseQuery = query(
     collection(db, "sessions"),
     where("workspaceId", "==", workspaceId)
   );
-  const snap = await getCountFromServer(q);
-  return snap.data().count;
+
+  // Count all sessions for the workspace and subtract archived ones to derive
+  // the active session count. This avoids relying on archived:false, which
+  // would exclude older documents that predate the archived field.
+  const [allSnap, archivedSnap] = await Promise.all([
+    getCountFromServer(baseQuery),
+    getCountFromServer(
+      query(
+        collection(db, "sessions"),
+        where("workspaceId", "==", workspaceId),
+        where("archived", "==", true)
+      )
+    ),
+  ]);
+
+  const total = allSnap.data().count;
+  const archived = archivedSnap.data().count;
+  return Math.max(0, total - archived);
 }
 
 /**

@@ -12,15 +12,6 @@ export interface PlanDoc {
 }
 
 /**
- * Firestore document for feature flag (collection: featureFlags).
- */
-export interface FeatureFlagDoc {
-  name: string;
-  enabledGlobally: boolean;
-  enabledForWorkspaces: string[]; // workspace IDs where flag is enabled (when not global)
-}
-
-/**
  * Admin action log (collection: adminLogs).
  */
 export interface AdminLogDoc {

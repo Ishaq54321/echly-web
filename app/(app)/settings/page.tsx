@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState, Fragment } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Monitor,
   Laptop,
@@ -11,7 +11,9 @@ import {
   Check,
   Minus,
 } from "lucide-react";
+import { authFetch } from "@/lib/authFetch";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
+import { usePlanCatalog } from "@/lib/hooks/usePlanCatalog";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Switch } from "@/components/ui/Switch";
@@ -797,17 +799,34 @@ function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => v
   );
 }
 
-/* ——— Billing tab: full SaaS pricing ——— */
+/* ——— Billing tab: full SaaS pricing, backed by /api/plans/catalog ——— */
 const BILLING_CONTAINER = "w-full";
 const BRAND_BLUE = "#155DFC";
 
-const PLANS = [
-  {
-    id: "free",
+type CatalogPlan = {
+  id: "free" | "starter" | "business" | "enterprise";
+  name: string;
+  priceMonthly: number;
+  priceYearly: number;
+  maxSessions: number | null;
+  maxMembers: number | null;
+  insightsEnabled: boolean;
+};
+
+type DisplayPlan = {
+  id: CatalogPlan["id"];
+  title: string;
+  monthlyPrice: number | null;
+  features: string[];
+  cta: string;
+  highlight: boolean;
+  badge: string | null;
+};
+
+const PLAN_DISPLAY_META: Record<CatalogPlan["id"], Omit<DisplayPlan, "id" | "monthlyPrice">> = {
+  free: {
     title: "Free",
-    monthlyPrice: 0,
     features: [
-      "3 feedback sessions",
       "Basic collaboration",
       "Manual action steps",
       "Limited AI summaries",
@@ -816,12 +835,9 @@ const PLANS = [
     highlight: false,
     badge: null,
   },
-  {
-    id: "starter",
+  starter: {
     title: "Starter",
-    monthlyPrice: 12,
     features: [
-      "20 feedback sessions",
       "AI action steps",
       "Team collaboration",
       "Basic integrations",
@@ -830,12 +846,9 @@ const PLANS = [
     highlight: false,
     badge: null,
   },
-  {
-    id: "business",
+  business: {
     title: "Business",
-    monthlyPrice: 29,
     features: [
-      "Unlimited feedback sessions",
       "Advanced AI insights",
       "Full integrations",
       "Team workspace",
@@ -845,12 +858,9 @@ const PLANS = [
     highlight: true,
     badge: "Most Popular",
   },
-  {
-    id: "enterprise",
+  enterprise: {
     title: "Enterprise",
-    monthlyPrice: null,
     features: [
-      "Unlimited everything",
       "SSO",
       "Audit logs",
       "Advanced security",
@@ -860,13 +870,22 @@ const PLANS = [
     highlight: false,
     badge: null,
   },
-] as const;
+};
 
-const COMPARISON_SECTIONS: { section: string; rows: { feature: string; free: boolean | string; starter: boolean | string; business: boolean | string; enterprise: boolean | string }[] }[] = [
+const COMPARISON_SECTIONS: {
+  section: string;
+  rows: {
+    feature: string;
+    free: boolean | string;
+    starter: boolean | string;
+    business: boolean | string;
+    enterprise: boolean | string;
+  }[];
+}[] = [
   {
     section: "FEEDBACK CAPTURE",
     rows: [
-      { feature: "Feedback sessions", free: "3", starter: "20", business: "Unlimited", enterprise: "Unlimited" },
+      { feature: "Feedback sessions", free: "", starter: "", business: "", enterprise: "" },
       { feature: "Feedback widget", free: true, starter: true, business: true, enterprise: true },
       { feature: "Session management", free: true, starter: true, business: true, enterprise: true },
     ],
@@ -923,10 +942,42 @@ function CheckMarkIcon() {
   );
 }
 
+function BillingSkeleton() {
+  return (
+    <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
+      <header className="billing-container text-center" style={{ marginBottom: 32 }}>
+        <div className="h-12 w-[480px] max-w-full mx-auto rounded-lg bg-neutral-100 animate-pulse" style={{ marginBottom: 24 }} />
+      </header>
+      <div className="billing-container flex flex-wrap items-center justify-center gap-8" style={{ marginBottom: 32 }}>
+        <div className="h-9 w-32 rounded-lg bg-neutral-100 animate-pulse" />
+        <div className="h-9 w-48 rounded-lg bg-neutral-100 animate-pulse" />
+      </div>
+      <div className="billing-container">
+        <section className="billing-pricing-grid mb-[72px] items-stretch">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="billing-card">
+              <div className="h-6 w-24 rounded bg-neutral-100 animate-pulse" />
+              <div className="mt-4 h-8 w-16 rounded bg-neutral-100 animate-pulse" />
+              <ul className="plan-features flex-1 mt-4 space-y-3">
+                {[1, 2, 3, 4].map((j) => (
+                  <li key={j} className="h-4 rounded bg-neutral-50 animate-pulse" />
+                ))}
+              </ul>
+              <div className="mt-6 h-10 w-full rounded-lg bg-neutral-100 animate-pulse" />
+            </div>
+          ))}
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function BillingTab() {
+  const router = useRouter();
   const [billingPeriod, setBillingPeriod] = useState<"annual" | "monthly">("monthly");
   const [teamSize, setTeamSize] = useState("1");
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
+  const { plans, loading } = usePlanCatalog();
 
   const teamSizeNumber = useMemo(() => {
     const n = Number.parseInt(teamSize, 10);
@@ -934,45 +985,84 @@ function BillingTab() {
     return n;
   }, [teamSize]);
 
-  const annualDiscount = 0.2;
-
   const displayPlans = useMemo(() => {
-    return PLANS.map((plan) => {
-      if (plan.monthlyPrice === null) {
-        return {
-          ...plan,
+    if (!plans || plans.length === 0) return [];
+    const byId = plans.reduce<Record<CatalogPlan["id"], CatalogPlan>>((acc, p) => {
+      acc[p.id] = p;
+      return acc;
+    }, {} as Record<CatalogPlan["id"], CatalogPlan>);
+    const result: (DisplayPlan & {
+      priceAmount: string;
+      priceSuffix: string;
+      priceSubLabel: string | null;
+    })[] = [];
+    for (const plan of plans) {
+      const meta = PLAN_DISPLAY_META[plan.id];
+      const isEnterprise = plan.id === "enterprise";
+      const monthlyPrice = isEnterprise ? null : plan.priceMonthly;
+      const yearlyPrice = isEnterprise ? null : plan.priceYearly;
+
+      const limitFeatures: string[] = [];
+      const sessionsLabel =
+        plan.maxSessions == null
+          ? "Unlimited feedback sessions"
+          : `${plan.maxSessions} feedback sessions`;
+      limitFeatures.push(sessionsLabel);
+
+      const features = [...limitFeatures, ...meta.features];
+
+      if (monthlyPrice == null) {
+        result.push({
+          id: plan.id,
+          title: plan.name || meta.title,
+          monthlyPrice: null,
+          features,
+          cta: meta.cta,
+          highlight: meta.highlight,
+          badge: meta.badge,
           priceAmount: "Custom",
           priceSuffix: "",
-          priceSubLabel: null as string | null,
-        };
+          priceSubLabel: null,
+        });
+        continue;
       }
 
-      const baseMonthly = plan.monthlyPrice * teamSizeNumber;
+      const isAnnual = billingPeriod === "annual";
+      // Annual pricing from Firestore only: use plan.priceYearly. No derivation from monthly.
+      const amount =
+        isAnnual && yearlyPrice != null
+          ? plan.priceYearly * teamSizeNumber
+          : plan.priceMonthly * teamSizeNumber;
+      const suffix = isAnnual && yearlyPrice != null ? "/ year" : "/ month";
+      const subLabel = isAnnual && yearlyPrice != null ? "Billed annually" : null;
 
-      if (billingPeriod === "monthly") {
-        return {
-          ...plan,
-          priceAmount: `$${baseMonthly.toFixed(0)}`,
-          priceSuffix: "/ month",
-          priceSubLabel: null as string | null,
-        };
-      }
+      result.push({
+        id: plan.id,
+        title: plan.name || meta.title,
+        monthlyPrice: plan.priceMonthly,
+        features,
+        cta: meta.cta,
+        highlight: meta.highlight,
+        badge: meta.badge,
+        priceAmount: `$${amount.toFixed(0)}`,
+        priceSuffix: suffix,
+        priceSubLabel: subLabel,
+      });
+    }
+    return result;
+  }, [plans, teamSizeNumber, billingPeriod]);
 
-      // Annual: show discounted effective monthly, billed annually.
-      const effectiveMonthly = baseMonthly * (1 - annualDiscount);
-      const monthlyDisplay =
-        Math.round(effectiveMonthly * 100) % 100 === 0
-          ? effectiveMonthly.toFixed(0)
-          : effectiveMonthly.toFixed(2);
+  if (loading) {
+    return <BillingSkeleton />;
+  }
 
-      return {
-        ...plan,
-        priceAmount: `$${monthlyDisplay}`,
-        priceSuffix: "/ month",
-        priceSubLabel: "billed annually",
-      };
-    });
-  }, [billingPeriod, teamSizeNumber]);
+  if (!plans || plans.length === 0) {
+    return (
+      <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
+        <p className="text-center text-neutral-600">Unable to load plans. Please try again later.</p>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
@@ -1022,12 +1112,6 @@ function BillingTab() {
                 className="w-4 h-4 text-[#155DFC] focus:ring-[#155DFC]"
               />
               <span className="text-[15px] font-medium text-neutral-900">Annually</span>
-              <span
-                className="rounded-full px-2.5 py-1 text-xs font-medium text-[#155DFC]"
-                style={{ backgroundColor: "#E0E7FF" }}
-              >
-                Save up to 20%
-              </span>
             </label>
           </div>
         </div>
@@ -1076,6 +1160,14 @@ function BillingTab() {
                       ? "w-full rounded-[10px] px-4 py-2.5 text-sm font-semibold bg-[#155DFC] text-white hover:brightness-110 border border-transparent"
                       : "secondary-cta w-full text-sm"
                   }
+                  onClick={() => {
+                    const cycle = billingPeriod === "annual" ? "annual" : "monthly";
+                    if (plan.id === "enterprise") {
+                      router.push(`/settings?tab=billing&plan=enterprise&cycle=${cycle}`);
+                      return;
+                    }
+                    router.push(`/settings?tab=billing&plan=${plan.id}&cycle=${cycle}`);
+                  }}
                 >
                   {plan.cta}
                 </Button>
@@ -1111,23 +1203,47 @@ function BillingTab() {
                         className={rowIdx % 2 === 1 ? "bg-[#FBFBFB]" : ""}
                         style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}
                       >
-                        <td className="py-3 px-4 text-[15px] text-neutral-700">{row.feature}</td>
-                        {(["free", "starter", "business", "enterprise"] as const).map((col) => {
-                          const v = row[col];
-                          return (
-                            <td key={col} className="py-3 px-4 text-[15px] text-neutral-600 align-middle">
-                              {v === true ? (
-                                <span className="inline-flex items-center">
-                                  <CheckMarkIcon />
-                                </span>
-                              ) : v === false ? (
-                                <Minus className="w-5 h-5 text-neutral-300 inline" strokeWidth={2} aria-hidden />
-                              ) : (
-                                <span>{v}</span>
-                              )}
-                            </td>
-                          );
-                        })}
+                        <td className="py-3 px-4 text-[15px] text-neutral-700">
+                          {row.feature}
+                        </td>
+                        {(["free", "starter", "business", "enterprise"] as const).map(
+                          (col) => {
+                            let v = row[col];
+                            const plan = plans?.find((p) => p.id === col) ?? null;
+
+                            if (row.feature === "Feedback sessions" && plan) {
+                              v =
+                                plan.maxSessions == null
+                                  ? "Unlimited"
+                                  : String(plan.maxSessions);
+                            }
+
+                            if (row.feature === "Advanced AI insights" && plan) {
+                              v = !!plan.insightsEnabled;
+                            }
+
+                            return (
+                              <td
+                                key={col}
+                                className="py-3 px-4 text-[15px] text-neutral-600 align-middle"
+                              >
+                                {v === true ? (
+                                  <span className="inline-flex items-center">
+                                    <CheckMarkIcon />
+                                  </span>
+                                ) : v === false ? (
+                                  <Minus
+                                    className="w-5 h-5 text-neutral-300 inline"
+                                    strokeWidth={2}
+                                    aria-hidden
+                                  />
+                                ) : (
+                                  <span>{v}</span>
+                                )}
+                              </td>
+                            );
+                          }
+                        )}
                       </tr>
                     ))}
                   </Fragment>

@@ -10,6 +10,13 @@ export interface PlanConfig {
   insightsAccess: boolean;
 }
 
+export const DEFAULT_PRICES: Record<PlanId, { priceMonthly: number; priceYearly: number }> = {
+  free: { priceMonthly: 0, priceYearly: 0 },
+  starter: { priceMonthly: 19, priceYearly: 190 },
+  business: { priceMonthly: 99, priceYearly: 990 },
+  enterprise: { priceMonthly: 299, priceYearly: 2990 },
+};
+
 export const PLANS: Record<PlanId, PlanConfig> = {
   free: {
     maxSessions: 3,

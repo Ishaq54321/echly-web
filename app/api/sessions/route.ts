@@ -13,6 +13,8 @@ import { getWorkspace } from "@/lib/repositories/workspacesRepository";
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
 
+export const dynamic = "force-dynamic";
+
 /** GET /api/sessions — list sessions for the authenticated user. */
 export async function GET(req: Request) {
   const start = Date.now();
@@ -46,7 +48,10 @@ export async function GET(req: Request) {
   }
 }
 
-/** POST /api/sessions — create a new session. Returns { success: true, session: { id } }. */
+/**
+ * POST /api/sessions — create a new session. Returns { success: true, session: { id } }.
+ * Session limit is enforced ONLY here (at creation). Reducing maxSessions never deletes existing sessions.
+ */
 export async function POST(req: Request) {
   let user;
   try {
@@ -58,9 +63,18 @@ export async function POST(req: Request) {
     const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
     const workspace = await getWorkspace(workspaceId);
     if (workspace) {
+      const suspended =
+        typeof workspace.billing === "object" &&
+        (workspace.billing as { suspended?: boolean }).suspended === true;
+      if (suspended) {
+        return NextResponse.json(
+          { error: "WORKSPACE_SUSPENDED", message: "Workspace suspended. Contact support." },
+          { status: 403 }
+        );
+      }
       const currentSessionCount = await getWorkspaceSessionCountRepo(workspaceId);
       try {
-        checkPlanLimit({
+        await checkPlanLimit({
           workspace,
           metric: "maxSessions",
           currentUsage: currentSessionCount,

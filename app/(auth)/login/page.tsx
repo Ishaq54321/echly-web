@@ -36,8 +36,15 @@ export default function LoginPage() {
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
     }
-    catch(e){
-      setError(e instanceof Error ? e.message : "Sign in failed");
+    catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (
+        err?.code === "auth/popup-closed-by-user" ||
+        err?.code === "auth/cancelled-popup-request"
+      ) {
+        return;
+      }
+      setError(err?.message ?? (e instanceof Error ? e.message : "Sign in failed"));
     }
     finally{
       setLoading(false);

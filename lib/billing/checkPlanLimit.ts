@@ -13,13 +13,14 @@ export interface PlanLimitError extends Error {
 /**
  * Checks that current usage does not exceed the plan limit for the given metric.
  * If exceeded, throws an error with code PLAN_LIMIT_REACHED and upgradePlan.
+ * Used only to block NEW creation (e.g. POST /api/sessions). Never used to delete or prune existing resources.
  */
-export function checkPlanLimit(params: {
+export async function checkPlanLimit(params: {
   workspace: Workspace;
   metric: PlanLimitMetric;
   currentUsage: number;
-}): void {
-  const entitlements = getWorkspaceEntitlements(params.workspace);
+}): Promise<void> {
+  const entitlements = await getWorkspaceEntitlements(params.workspace);
   const limit = entitlements[params.metric];
   if (limit == null) return; // unlimited
   if (params.currentUsage < limit) return;
@@ -34,8 +35,8 @@ export function checkPlanLimit(params: {
   };
 
   const err = new Error(messages[params.metric]) as PlanLimitError;
-  err.code = "PLAN_LIMIT_REACHED";
-  err.metric = params.metric;
-  err.upgradePlan = upgradePlan;
+  (err as PlanLimitError).code = "PLAN_LIMIT_REACHED";
+  (err as PlanLimitError).metric = params.metric;
+  (err as PlanLimitError).upgradePlan = upgradePlan;
   throw err;
 }

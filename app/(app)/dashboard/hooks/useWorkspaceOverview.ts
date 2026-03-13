@@ -106,10 +106,27 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       if (!user) return;
       const res = await authFetch("/api/sessions", { method: "POST" });
       const data = await res.json().catch(() => ({}));
-      if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
+      if (res.status === 403) {
+        if (data.error === "PLAN_LIMIT_REACHED") {
+          onPlanLimitReached?.({
+            message: data.message ?? "You've reached your plan limit.",
+            upgradePlan: data.upgradePlan ?? "starter",
+          });
+          return;
+        }
+        if (data.error === "WORKSPACE_SUSPENDED") {
+          onPlanLimitReached?.({
+            message: data.message ?? "Workspace suspended. Contact support.",
+            upgradePlan: null,
+          });
+          return;
+        }
+        // Generic 403 or empty/unparseable body — still show user feedback
         onPlanLimitReached?.({
-          message: data.message ?? "You've reached your plan limit.",
-          upgradePlan: data.upgradePlan ?? "starter",
+          message:
+            (data && typeof data.message === "string" && data.message) ||
+            "You don't have permission to create a session.",
+          upgradePlan: data?.upgradePlan ?? null,
         });
         return;
       }

@@ -12,6 +12,7 @@ import { db } from "@/lib/firebase";
 import type { Workspace, WorkspaceDoc } from "@/lib/domain/workspace";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 import { PLANS, type PlanId } from "@/lib/billing/plans";
+import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 
 /** Used by onboarding: create a new workspace and return its id (caller must update user.workspaceId). */
 export async function createWorkspaceRepo(params: {
@@ -136,8 +137,9 @@ export async function updateWorkspaceSettings(
 }
 
 /**
- * Updates workspace plan and syncs plan-derived entitlements from PLANS. Used by admin and dev testing.
+ * Updates workspace plan and syncs plan-derived entitlements from the plan catalog. Used by admin and dev testing.
  * Preserves existing entitlements.brandingControls and entitlements.integrations.
+ * Does NOT delete or prune existing sessions when maxSessions is reduced; limits apply only to creating new sessions.
  */
 export async function updateWorkspacePlanRepo(
   workspaceId: string,
@@ -146,7 +148,20 @@ export async function updateWorkspacePlanRepo(
   const ref = doc(db, "workspaces", workspaceId);
   const snap = await getDoc(ref);
   const existing = snap.exists() ? (snap.data() as { entitlements?: WorkspaceDoc["entitlements"] }).entitlements : undefined;
-  const planConfig = PLANS[newPlan] ?? PLANS.free;
+  let planConfig = PLANS[newPlan] ?? PLANS.free;
+
+  try {
+    const catalog = await getPlanCatalog();
+    const entry = catalog[newPlan] ?? catalog.free;
+    planConfig = {
+      maxSessions: entry.maxSessions,
+      maxMembers: entry.maxMembers,
+      insightsAccess: entry.insightsEnabled,
+    };
+  } catch {
+    // Safety fallback: stick with PLANS defaults if catalog lookup fails.
+  }
+
   await updateDoc(ref, {
     "billing.plan": newPlan,
     entitlements: {

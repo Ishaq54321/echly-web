@@ -3,20 +3,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  CreditCard,
-  Users,
-  BarChart3,
-  Flag,
-} from "lucide-react";
+import { LayoutDashboard, CreditCard, Users, BarChart3 } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/admin/plans", icon: CreditCard, label: "Plans" },
   { href: "/admin/customers", icon: Users, label: "Customers" },
   { href: "/admin/usage", icon: BarChart3, label: "Usage" },
-  { href: "/admin/features", icon: Flag, label: "Feature Flags" },
 ] as const;
 
 function isActive(href: string, pathname: string): boolean {

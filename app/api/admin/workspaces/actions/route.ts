@@ -76,6 +76,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
+    // override_session_limit: only updates entitlements. Never deletes existing sessions.
+    // Session limit is enforced only when creating NEW sessions (POST /api/sessions).
     if (action === "override_session_limit") {
       const sessionLimit = body.sessionLimit === undefined ? null : (typeof body.sessionLimit === "number" ? body.sessionLimit : null);
       await updateDoc(ref, {

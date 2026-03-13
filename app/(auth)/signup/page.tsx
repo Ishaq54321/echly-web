@@ -35,8 +35,15 @@ export default function SignupPage() {
       const user = await signInWithGoogle();
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign up failed");
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (
+        err?.code === "auth/popup-closed-by-user" ||
+        err?.code === "auth/cancelled-popup-request"
+      ) {
+        return;
+      }
+      setError(err?.message ?? (e instanceof Error ? e.message : "Sign up failed"));
     } finally {
       setLoading(false);
     }

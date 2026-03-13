@@ -1,19 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { authFetch } from "@/lib/authFetch";
+import { useBillingUsage } from "@/lib/hooks/useBillingUsage";
 
-export interface BillingUsage {
-  plan: string;
-  usage: {
-    sessionsCreated: number;
-    members: number;
-  };
-  limits: {
-    maxSessions: number | null;
-    maxMembers: number | null;
-  };
-}
+export type { BillingUsageData as BillingUsage } from "@/lib/hooks/useBillingUsage";
 
 const PLAN_LABEL: Record<string, string> = {
   free: "Free",
@@ -65,30 +54,7 @@ function MeterRow({
 }
 
 export function UsageMeter() {
-  const [data, setData] = useState<BillingUsage | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    authFetch("/api/billing/usage")
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to load usage");
-        return res.json();
-      })
-      .then((json) => {
-        if (!cancelled) setData(json);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Error");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data, loading, error } = useBillingUsage();
 
   if (loading) {
     return (
@@ -122,12 +88,12 @@ export function UsageMeter() {
       <div className="space-y-3">
         <MeterRow
           label="Sessions used"
-          used={data.usage.sessionsCreated}
+          used={data.usage.activeSessions ?? data.usage.sessionsCreated ?? 0}
           limit={data.limits.maxSessions}
         />
         <MeterRow
           label="Members"
-          used={data.usage.members}
+          used={data.usage.members ?? 0}
           limit={data.limits.maxMembers}
         />
       </div>
