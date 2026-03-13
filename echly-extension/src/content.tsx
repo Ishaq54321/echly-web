@@ -63,6 +63,22 @@ type GlobalUIState = {
   captureMode: "voice" | "text";
 };
 
+/** Prevent overwriting a valid pointer list with empty when session has not changed (Pause → Minimize → Resume). */
+function mergeWithPointerProtection(
+  prev: GlobalUIState | null | undefined,
+  next: GlobalUIState
+): GlobalUIState {
+  if (
+    prev?.sessionId != null &&
+    prev.sessionId === next?.sessionId &&
+    (prev?.pointers?.length ?? 0) > 0 &&
+    (!next?.pointers || next.pointers.length === 0)
+  ) {
+    return { ...next, pointers: prev.pointers };
+  }
+  return next;
+}
+
 /** Generate a unique id for a feedback job (used for concurrent job queue). */
 function createUniqueId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID
@@ -174,7 +190,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   React.useEffect(() => {
     const applyGlobalState = (state: GlobalUIState) => {
       setHostVisibility(getShouldShowTray(state));
-      setGlobalState(state);
+      setGlobalState((prev) => mergeWithPointerProtection(prev, state));
     };
     (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (state: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__ = applyGlobalState;
     return () => {
@@ -182,14 +198,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     };
   }, []);
 
-  /* Global UI state: always overwrite from background. No debounce or ignore; pointers come from background. */
+  /* Global UI state: always overwrite from background; protect pointers when session unchanged (Pause → Minimize → Resume). */
   React.useEffect(() => {
     const handler = (e: CustomEvent<{ state: GlobalUIState }>) => {
       const s = e.detail?.state;
       if (!s) return;
       echlyLog("CONTENT", "global state received", s);
       setHostVisibility(getShouldShowTray(s));
-      setGlobalState(s);
+      setGlobalState((prev) => mergeWithPointerProtection(prev, s));
     };
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
@@ -200,9 +216,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_GLOBAL_STATE" },
       (response: GlobalStateResponse) => {
-        if (response?.state) {
-          setHostVisibility(getShouldShowTray(response.state));
-          setGlobalState(response.state);
+        const state = response?.state;
+        if (state) {
+          setHostVisibility(getShouldShowTray(state));
+          setGlobalState((prev) => mergeWithPointerProtection(prev, state));
         }
       }
     );
@@ -219,7 +236,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             const normalized = normalizeGlobalState(response.state);
             if (normalized) {
               setHostVisibility(getShouldShowTray(normalized));
-              setGlobalState(normalized);
+              setGlobalState((prev) => mergeWithPointerProtection(prev, normalized));
             }
           }
         }

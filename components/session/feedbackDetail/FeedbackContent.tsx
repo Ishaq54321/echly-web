@@ -93,9 +93,9 @@ export function FeedbackContent({
 
   return (
     <>
-      {item.screenshotUrl && (
-        <Section title="Attachments">
-          {sendPinComment != null ? (
+      <Section title="Attachments">
+        {item.screenshotUrl ? (
+          sendPinComment != null ? (
             <ScreenshotWithPins
               screenshotUrl={item.screenshotUrl}
               onExpand={onExpandImage}
@@ -117,9 +117,13 @@ export function FeedbackContent({
               screenshotUrl={item.screenshotUrl}
               onExpand={onExpandImage}
             />
-          )}
-        </Section>
-      )}
+          )
+        ) : (
+          <div className="echly-screenshot-placeholder">
+            <div className="echly-screenshot-loading-bar" />
+          </div>
+        )}
+      </Section>
       {item.suggestion != null && item.suggestion !== "" && (
         <SuggestionSection suggestion={item.suggestion} />
       )}

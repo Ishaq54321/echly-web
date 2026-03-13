@@ -12,6 +12,8 @@ interface TicketItemProps {
   impactLabel?: string | null;
   active?: boolean;
   onSelect: (id: string) => void;
+  /** When true, applies a brief highlight animation (new ticket from realtime). */
+  isNewTicket?: boolean;
 }
 
 function TicketItemInner({
@@ -20,6 +22,7 @@ function TicketItemInner({
   impactLabel,
   active,
   onSelect,
+  isNewTicket = false,
 }: TicketItemProps) {
   const handleClick = () => {
     onSelect(id);
@@ -30,11 +33,11 @@ function TicketItemInner({
       type="button"
       onClick={handleClick}
       data-ticket-id={id}
-      className={`sidebar-row-interactive group relative flex w-full items-center gap-2 px-3 py-2.5 rounded-xl text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] ${
+      className={`sidebar-row-interactive group relative flex w-full items-center gap-2 px-3 py-2.5 rounded-xl text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] ${
         active
           ? "bg-[var(--layer-2-hover-bg)]"
           : ""
-      }`}
+      } ${isNewTicket ? "echly-new-ticket-highlight" : ""}`}
       aria-current={active ? "true" : undefined}
     >
       <span className="relative min-w-0 flex-1 truncate text-[13px] leading-[1.4] py-0.5">

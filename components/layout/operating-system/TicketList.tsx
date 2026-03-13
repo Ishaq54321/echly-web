@@ -26,6 +26,8 @@ export interface TicketListProps {
   items: Feedback[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** When set, the ticket with this id shows a brief highlight animation (new ticket from realtime). */
+  newTicketId?: string | null;
   loadingMore?: boolean;
   hasMore?: boolean;
   hasReachedLimit?: boolean;
@@ -59,6 +61,7 @@ function TicketListInner({
   items,
   selectedId,
   onSelect,
+  newTicketId = null,
   loadingMore = false,
   hasMore = false,
   hasReachedLimit = false,
@@ -309,6 +312,7 @@ function TicketListInner({
                   index={idx + 1}
                   active={item.id === selectedId}
                   onSelect={onSelect}
+                  isNewTicket={item.id === newTicketId}
                 />
               ))}
               {openItems.length === 0 && (
@@ -355,6 +359,7 @@ function TicketListInner({
                     index={openItems.length + idx + 1}
                     active={item.id === selectedId}
                     onSelect={onSelect}
+                    isNewTicket={item.id === newTicketId}
                   />
                 ))}
               </div>
@@ -396,6 +401,7 @@ function TicketListInner({
                   index={openItems.length + skippedItems.length + idx + 1}
                   active={item.id === selectedId}
                   onSelect={onSelect}
+                  isNewTicket={item.id === newTicketId}
                 />
               ))}
               {resolvedItems.length === 0 && !loadingMore && (

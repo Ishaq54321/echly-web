@@ -214,8 +214,8 @@ export function ExecutionModeLayout({
             {item.title}
           </h1>
 
-          {hasScreenshot && (
-            <div className="w-full mb-10 flex justify-center">
+          <div className="w-full mb-10 flex justify-center">
+            {hasScreenshot ? (
               <div className="relative w-full max-w-[920px] aspect-video max-h-[400px] rounded-[var(--radius-xl)] overflow-hidden shadow-[var(--shadow-level-3)] border border-[var(--card-border)] transition-transform duration-200 hover:scale-[1.01] group">
                 <Image
                   src={item.screenshotUrl!}
@@ -236,8 +236,12 @@ export function ExecutionModeLayout({
                   <ZoomIn className="h-5 w-5" strokeWidth={1.5} />
                 </button>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="echly-screenshot-placeholder w-full max-w-[920px]">
+                <div className="echly-screenshot-loading-bar" />
+              </div>
+            )}
+          </div>
 
           {hasActionSteps ? (
             <div className="w-full max-w-[920px] mb-10 px-0 py-1">

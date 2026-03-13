@@ -162,10 +162,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [userName, setUserName] = useState<string>("");
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
+  const [newTicketId, setNewTicketId] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
-  /** Detail panel: always from DB (GET /api/tickets/:id). Do not use memory state. */
-  const [detailTicket, setDetailTicket] = useState<TicketFromApi | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
 
   const { user: authUser, loading: authLoading } = useAuthGuard({ router });
 
@@ -192,7 +191,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     hasReachedLimit: feedbackReachedLimit,
     loadingMore: feedbackLoadingMore,
     loadMoreRef: feedbackLoadMoreRef,
-  } = useSessionFeedbackPaginated(feedbackSessionId, listScrollRef, listScrollReady);
+  } = useSessionFeedbackPaginated(
+    feedbackSessionId,
+    listScrollRef,
+    listScrollReady,
+    (newestTicketId) => {
+      setSelectedId(newestTicketId);
+      setNewTicketId(newestTicketId);
+    }
+  );
 
   /** Open tickets only; used for Execution Mode queue and progress. */
   const openFeedback = useMemo(
@@ -203,7 +210,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [executionMode, setExecutionMode] = useState(false);
   const [executionStreak, setExecutionStreak] = useState(0);
-  const [preloadedNextTicket, setPreloadedNextTicket] = useState<TicketFromApi | null>(null);
   const [isCommentMode, setIsCommentMode] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -289,6 +295,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       };
       setFeedback((prev) => [newItem, ...prev]);
       setSelectedId(ticket.id);
+      setNewTicketId(ticket.id);
       setFeedbackTotal((c) => c + 1);
       setFeedbackActiveCount((c) => c + 1);
     };
@@ -353,36 +360,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
   }, [feedback, selectedId, ticketIdFromUrl]);
 
-  /* ================= FETCH DETAIL FROM DB (single source of truth) ================= */
-
-  const fetchDetailTicket = useCallback(async (id: string) => {
-    setDetailLoading(true);
-    try {
-      const res = await authFetch(`/api/tickets/${id}`);
-      const data = (await res.json()) as {
-        success?: boolean;
-        ticket?: TicketFromApi;
-      };
-      if (data.success && data.ticket) {
-        setDetailTicket(data.ticket);
-      } else {
-        setDetailTicket(null);
-      }
-    } catch {
-      setDetailTicket(null);
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
-
+  // Clear new-ticket highlight after animation completes (1.2s).
   useEffect(() => {
-    if (!selectedId) {
-      setDetailTicket(null);
-      return;
-    }
-    if (detailTicket?.id === selectedId) return;
-    fetchDetailTicket(selectedId);
-  }, [selectedId, fetchDetailTicket, detailTicket?.id]);
+    if (!newTicketId) return;
+    const timeout = setTimeout(() => setNewTicketId(null), 1200);
+    return () => clearTimeout(timeout);
+  }, [newTicketId]);
 
   /* In Execution Mode, ensure selection is an open ticket (open-only queue). */
   useEffect(() => {
@@ -397,58 +380,33 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
   }, [executionMode, openFeedback, feedback, selectedId]);
 
-  /* Preload next ticket in Execution Mode for instant transition */
-  useEffect(() => {
-    if (!executionMode || feedback.length === 0) return;
-    setPreloadedNextTicket(null);
-  }, [selectedId, executionMode, feedback.length]);
-
-  /* Preload next *open* ticket in Execution Mode (open-only queue). */
-  useEffect(() => {
-    if (!executionMode || openFeedback.length === 0) return;
-    const openIdx = openFeedback.findIndex((f) => f.id === selectedId);
-    const nextOpen = openFeedback[openIdx + 1];
-    const nextId = nextOpen?.id;
-    if (!nextId) return;
-    let cancelled = false;
-    authFetch(`/api/tickets/${nextId}`)
-      .then((res) => res.json())
-      .then((data: { success?: boolean; ticket?: TicketFromApi }) => {
-        if (cancelled || !data.success || !data.ticket) return;
-        setPreloadedNextTicket(data.ticket);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [executionMode, selectedId, openFeedback]);
-
-  /* ================= SELECTED ITEM WITH INDEX (from DB) ================= */
+  /* ================= SELECTED ITEM (derived from feedback list) ================= */
 
   const selectedIndex = feedback.findIndex((f) => f.id === selectedId);
   const selectedIndexInOpen = openFeedback.findIndex((f) => f.id === selectedId);
   const executionModeTotal = feedbackActiveCount > 0 ? feedbackActiveCount : openFeedback.length;
 
-  const selectedItem =
-    detailTicket != null
-      ? {
-          ...detailTicket,
-          index:
-            executionMode && openFeedback.length > 0
-              ? selectedIndexInOpen !== -1
-                ? selectedIndexInOpen + 1
-                : 1
-              : selectedIndex !== -1
-                ? selectedIndex + 1
-                : 1,
-          total:
-            executionMode && openFeedback.length > 0
-              ? executionModeTotal
-              : feedbackTotal > 0
-                ? feedbackTotal
-                : feedback.length || 1,
-        }
-      : null;
+  const selectedItem = (() => {
+    const ticket = feedback.find((t) => t.id === selectedId) ?? null;
+    if (!ticket) return null;
+    return {
+      ...ticket,
+      index:
+        executionMode && openFeedback.length > 0
+          ? selectedIndexInOpen !== -1
+            ? selectedIndexInOpen + 1
+            : 1
+          : selectedIndex !== -1
+            ? selectedIndex + 1
+            : 1,
+      total:
+        executionMode && openFeedback.length > 0
+          ? executionModeTotal
+          : feedbackTotal > 0
+            ? feedbackTotal
+            : feedback.length || 1,
+    };
+  })();
 
   const {
     comments,
@@ -476,8 +434,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const saveTitle = async (newTitle: string): Promise<void> => {
     if (!selectedId || newTitle.trim() === "") return;
     const trimmed = newTitle.trim();
-    const previousTitle = detailTicket?.title;
-    setDetailTicket((t) => (t ? { ...t, title: trimmed } : null));
+    const previousTitle = selectedItem?.title;
     setFeedback((prev) =>
       prev.map((item) =>
         item.id === selectedId ? { ...item, title: trimmed } : item
@@ -494,13 +451,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         ticket?: TicketFromApi;
       };
       if (data.success && data.ticket) {
-        setDetailTicket(data.ticket);
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === selectedId ? { ...item, ...data.ticket } : item
+          )
+        );
         broadcastTicketUpdated(data.ticket);
       }
     } catch {
-      setDetailTicket((t) =>
-        t ? { ...t, title: previousTitle ?? trimmed } : null
-      );
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId
@@ -515,8 +473,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const saveActionSteps = async (actionSteps: string[]) => {
     if (!selectedId) return;
-    const previous = detailTicket?.actionSteps ?? null;
-    setDetailTicket((t) => (t ? { ...t, actionSteps } : null));
+    const previous = selectedItem?.actionSteps ?? null;
     setFeedback((prev) =>
       prev.map((item) =>
         item.id === selectedId ? { ...item, actionSteps } : item
@@ -533,11 +490,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         ticket?: TicketFromApi;
       };
       if (data.success && data.ticket) {
-        setDetailTicket(data.ticket);
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === selectedId ? { ...item, ...data.ticket } : item
+          )
+        );
         broadcastTicketUpdated(data.ticket);
       }
     } catch {
-      setDetailTicket((t) => (t ? { ...t, actionSteps: previous } : null));
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId ? { ...item, actionSteps: previous } : item
@@ -549,8 +509,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const saveTags = async (suggestedTags: string[]) => {
     if (!selectedId) return;
     const nextTags = Array.isArray(suggestedTags) ? suggestedTags : null;
-    const previous = detailTicket?.suggestedTags ?? null;
-    setDetailTicket((t) => (t ? { ...t, suggestedTags: nextTags } : null));
+    const previous = selectedItem?.suggestedTags ?? null;
     setFeedback((prev) =>
       prev.map((item) =>
         item.id === selectedId ? { ...item, suggestedTags: nextTags } : item
@@ -567,11 +526,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         ticket?: TicketFromApi;
       };
       if (data.success && data.ticket) {
-        setDetailTicket(data.ticket);
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === selectedId ? { ...item, ...data.ticket } : item
+          )
+        );
         broadcastTicketUpdated(data.ticket);
       }
     } catch {
-      setDetailTicket((t) => (t ? { ...t, suggestedTags: previous } : null));
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId ? { ...item, suggestedTags: previous } : item
@@ -582,8 +544,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const saveResolved = async (isResolved: boolean) => {
     if (!selectedId) return;
-    const previousResolved = Boolean(detailTicket?.isResolved);
-    setDetailTicket((t) => (t ? { ...t, isResolved } : null));
+    const previousResolved = Boolean(selectedItem?.isResolved);
     setFeedback((prev) =>
       prev.map((item) =>
         item.id === selectedId ? { ...item, isResolved } : item
@@ -609,11 +570,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         ticket?: TicketFromApi;
       };
       if (data.success && data.ticket) {
-        setDetailTicket(data.ticket);
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === selectedId ? { ...item, ...data.ticket } : item
+          )
+        );
         broadcastTicketUpdated(data.ticket);
       }
     } catch {
-      setDetailTicket((t) => (t ? { ...t, isResolved: previousResolved } : null));
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId
@@ -640,10 +604,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (openIdx === -1) return;
     const nextOpen = openFeedback[openIdx + 1] ?? openFeedback[0];
     if (nextOpen && nextOpen.id !== selectedId) {
-      if (preloadedNextTicket?.id === nextOpen.id) {
-        setDetailTicket(preloadedNextTicket);
-        setPreloadedNextTicket(null);
-      }
       setSelectedId(nextOpen.id);
       setExecutionStreak((s) => s + 1);
     }
@@ -663,18 +623,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     );
     setFeedbackActiveCount((c) => Math.max(0, c - 1));
     setFeedbackSkippedCount((c) => c + 1);
-    if (detailTicket?.id === selectedId) {
-      setDetailTicket((t) => (t ? { ...t, isSkipped: true, isResolved: false } : null));
-    }
     setSelectedId(nextOpenId ?? null);
-    if (nextOpenId && preloadedNextTicket?.id === nextOpenId) {
-      setDetailTicket(preloadedNextTicket);
-      setPreloadedNextTicket(null);
-    } else if (nextOpenId) {
-      fetchDetailTicket(nextOpenId);
-    } else {
-      setDetailTicket(null);
-    }
 
     try {
       await authFetch(`/api/tickets/${selectedId}`, {
@@ -691,10 +640,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setFeedbackActiveCount((c) => c + 1);
       setFeedbackSkippedCount((c) => Math.max(0, c - 1));
       setSelectedId(selectedId);
-      if (detailTicket?.id === selectedId) {
-        setDetailTicket((t) => (t ? { ...t, isSkipped: false } : null));
-      }
-      fetchDetailTicket(selectedId);
     }
   };
 
@@ -778,16 +723,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
       )
     );
-    if (detailTicket && selectedId) {
-      setDetailTicket((t) => (t ? { ...t, isResolved: true } : null));
-    }
     const activeCountBefore = active.length;
     setFeedbackActiveCount((c) => Math.max(0, c - activeCountBefore));
     setFeedbackResolvedCount((c) => c + activeCountBefore);
   }, [
     feedback,
-    detailTicket,
-    selectedId,
     setFeedback,
     setFeedbackActiveCount,
     setFeedbackResolvedCount,
@@ -818,16 +758,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           : item
       )
     );
-    if (detailTicket && selectedId) {
-      setDetailTicket((t) => (t ? { ...t, isResolved: false } : null));
-    }
     const resolvedCountBefore = resolved.length;
     setFeedbackResolvedCount((c) => Math.max(0, c - resolvedCountBefore));
     setFeedbackActiveCount((c) => c + resolvedCountBefore);
   }, [
     feedback,
-    detailTicket,
-    selectedId,
     setFeedback,
     setFeedbackActiveCount,
     setFeedbackResolvedCount,
@@ -1157,7 +1092,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     } else {
       setFeedbackActiveCount((c) => Math.max(0, c - 1));
     }
-    setDetailTicket(null);
     setSelectedId(nextSelected);
     setShowDeleteModal(false);
     try {
@@ -1171,7 +1105,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       if (wasResolved) setFeedbackResolvedCount((c) => c + 1);
       else setFeedbackActiveCount((c) => c + 1);
       setSelectedId(selectedId);
-      if (selectedId) fetchDetailTicket(selectedId);
     }
   };
 
@@ -1276,15 +1209,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (feedbackLoading) {
       return <FeedbackPremiumLoader />;
     }
-    if (detailLoading && selectedId) {
-      return (
-        <div className="py-12">
-          <p className="text-[13px] text-[hsl(var(--text-tertiary))]">
-            Loading…
-          </p>
-        </div>
-      );
-    }
     if (feedback.length === 0) {
       return (
         <div className="mt-16">
@@ -1357,6 +1281,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             items={feedback}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            newTicketId={newTicketId}
             loadingMore={feedbackLoadingMore}
             hasMore={hasMoreFeedback}
             hasReachedLimit={feedbackReachedLimit}
@@ -1529,6 +1454,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 setSelectedId(id);
                 setIsTicketNavigatorOpen(false);
               }}
+              newTicketId={newTicketId}
               loadingMore={feedbackLoadingMore}
               hasMore={hasMoreFeedback}
               hasReachedLimit={feedbackReachedLimit}

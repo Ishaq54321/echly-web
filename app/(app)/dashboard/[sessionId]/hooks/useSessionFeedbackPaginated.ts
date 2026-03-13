@@ -2,7 +2,10 @@
 
 import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { onSnapshot, collection, query, where, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import type { Feedback } from "@/lib/domain/feedback";
+import type { Timestamp, DocumentSnapshot } from "firebase/firestore";
 
 const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 150;
@@ -37,6 +40,50 @@ export interface UseSessionFeedbackPaginatedResult {
 
 const SCROLL_THRESHOLD_PX = 120;
 
+/** Maps a Firestore doc to domain Feedback (same shape as feedbackRepository). */
+function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback {
+  const data = docSnap.data() ?? {};
+  const status = (data.status ?? "open") as string;
+  const isResolved =
+    data.isResolved === true ||
+    status === "resolved" ||
+    status === "done";
+  const isSkipped = status === "skipped";
+  return {
+    id: docSnap.id,
+    workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : undefined,
+    sessionId: data.sessionId as string,
+    userId: data.userId as string,
+    title: (data.title as string) ?? "",
+    description: (data.description as string) ?? "",
+    suggestion: (data.suggestion as string) ?? "",
+    type: (data.type as string) ?? "Feedback",
+    isResolved,
+    isSkipped: isSkipped || undefined,
+    createdAt: (data.createdAt ?? null) as Timestamp | null,
+    contextSummary: (data.contextSummary as string | null) ?? null,
+    actionSteps: (data.actionSteps ?? data.actionItems ?? null) as string[] | null,
+    suggestedTags: (data.suggestedTags as string[] | null) ?? null,
+    url: (data.url as string | null) ?? null,
+    viewportWidth: (data.viewportWidth as number | null) ?? null,
+    viewportHeight: (data.viewportHeight as number | null) ?? null,
+    userAgent: (data.userAgent as string | null) ?? null,
+    clientTimestamp: (data.clientTimestamp as number | null) ?? null,
+    screenshotUrl: (data.screenshotUrl as string | null) ?? null,
+    clarityScore: (data.clarityScore as number | null) ?? null,
+    clarityStatus: (() => {
+      const s = data.clarityStatus;
+      return s === "clear" || s === "needs_improvement" || s === "unclear" ? s : null;
+    })(),
+    clarityIssues: (data.clarityIssues as string[] | null) ?? null,
+    clarityConfidence: (data.clarityConfidence as number | null) ?? null,
+    clarityCheckedAt: (data.clarityCheckedAt as Timestamp | null) ?? null,
+    commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
+    lastCommentPreview: typeof data.lastCommentPreview === "string" ? data.lastCommentPreview : undefined,
+    lastCommentAt: (data.lastCommentAt ?? null) as Timestamp | null,
+  };
+}
+
 /**
  * Infinite scroll: first page only on mount; next pages only when user scrolls near bottom.
  * Uses scroll-container ref to avoid triggering load on initial paint.
@@ -45,7 +92,8 @@ const SCROLL_THRESHOLD_PX = 120;
 export function useSessionFeedbackPaginated(
   sessionId: string | undefined,
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>,
-  scrollReady?: number
+  scrollReady?: number,
+  onNewTicketFromRealtime?: (newestTicketId: string) => void
 ): UseSessionFeedbackPaginatedResult {
   const [items, setItems] = useState<Feedback[]>([]);
   const [total, setTotal] = useState<number>(0);
@@ -59,6 +107,11 @@ export function useSessionFeedbackPaginated(
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [userHasScrolledList, setUserHasScrolledList] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  /** Track previous snapshot size so we can detect new tickets and auto-select the newest. */
+  const previousFeedbackCountRef = useRef(0);
+  const onNewTicketFromRealtimeRef = useRef(onNewTicketFromRealtime);
+  onNewTicketFromRealtimeRef.current = onNewTicketFromRealtime;
 
   const hasReachedLimit = items.length >= FEEDBACK_LOAD_CAP;
 
@@ -220,6 +273,76 @@ export function useSessionFeedbackPaginated(
     return () => {
       cancelled = true;
     };
+  }, [sessionId]);
+
+  // Realtime: subscribe to feedback for this session so new tickets (extension or dashboard) appear without refresh.
+  // Merges snapshot into current list (new items prepended, existing updated) and updates counts; keeps API pagination.
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const feedbackRef = collection(db, "feedback");
+    const feedbackQuery = query(
+      feedbackRef,
+      where("sessionId", "==", sessionId),
+      limit(FEEDBACK_LOAD_CAP)
+    );
+
+    const unsubscribe = onSnapshot(feedbackQuery, (snapshot) => {
+      // Use full snapshot for counts and "newest ticket" detection
+      const snapshotList = snapshot.docs
+        .map((d) => mapDocToFeedback(d))
+        .sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() ?? a.clientTimestamp ?? 0;
+          const tb = b.createdAt?.toMillis?.() ?? b.clientTimestamp ?? 0;
+          return tb - ta;
+        });
+      const totalCount = snapshotList.length;
+      const open = snapshotList.filter((f) => !f.isResolved && !f.isSkipped).length;
+      const resolved = snapshotList.filter((f) => f.isResolved).length;
+      const skipped = snapshotList.filter((f) => f.isSkipped).length;
+      setTotal(totalCount);
+      setActiveCount(open);
+      setResolvedCount(resolved);
+      setSkippedCount(skipped);
+
+      if (totalCount > previousFeedbackCountRef.current && snapshotList.length > 0) {
+        const newestTicketId = snapshotList[0].id;
+        onNewTicketFromRealtimeRef.current?.(newestTicketId);
+      }
+      previousFeedbackCountRef.current = totalCount;
+
+      // Process doc changes so "modified" (e.g. screenshotUrl added) updates existing ticket in state
+      const changes = snapshot.docChanges();
+      setItems((prev) => {
+        let next = [...prev];
+        for (const change of changes) {
+          const feedback = mapDocToFeedback(change.doc);
+          if (change.type === "added") {
+            const idx = next.findIndex((t) => t.id === feedback.id);
+            if (idx >= 0) {
+              next[idx] = feedback; // already in list (e.g. from API), update in place
+            } else {
+              next.push(feedback);
+            }
+          } else if (change.type === "modified") {
+            next = next.map((t) => (t.id === feedback.id ? feedback : t));
+          } else if (change.type === "removed") {
+            next = next.filter((t) => t.id !== feedback.id);
+          }
+        }
+        return next.sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() ?? a.clientTimestamp ?? 0;
+          const tb = b.createdAt?.toMillis?.() ?? b.clientTimestamp ?? 0;
+          return tb - ta;
+        });
+      });
+
+      if (!stateRef.current.initialLoadDone) {
+        setInitialLoadDone(true);
+      }
+    });
+
+    return () => unsubscribe();
   }, [sessionId]);
 
   const refetchFirstPage = useCallback(async () => {
