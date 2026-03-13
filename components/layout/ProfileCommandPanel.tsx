@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
+import Link from "next/link";
 import { Clock, Info, MessageCircle, Sparkles } from "lucide-react";
 import type { User } from "firebase/auth";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
+import CountUp from "react-countup";
 
 const PANEL_WIDTH = 520;
 
@@ -23,12 +25,17 @@ interface InsightsApiResponse {
   last30Days: AnalyticsWindow;
 }
 
+interface BillingUsageResponse {
+  plan: string;
+  usage: { sessionsCreated: number; members?: number };
+  limits: { maxSessions: number | null; maxMembers?: number | null };
+}
+
 const RIGHT_COLUMN_SECTIONS = [
   {
     title: "Account",
     items: [
       { label: "Billing", href: "#" },
-      { label: "Upgrade plan", href: "#" },
     ],
   },
   {
@@ -61,7 +68,9 @@ export function ProfileCommandPanel({
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const [mounted, setMounted] = useState(false);
   const [analytics, setAnalytics] = useState<InsightsApiResponse | null>(null);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [, setAnalyticsLoading] = useState(false);
+  const [hasAnimatedMetrics, setHasAnimatedMetrics] = useState(false);
+  const [billingUsage, setBillingUsage] = useState<BillingUsageResponse | null>(null);
 
   useEffect(() => {
     if (!open || !anchorRef?.current) {
@@ -124,6 +133,21 @@ export function ProfileCommandPanel({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    authFetch("/api/billing/usage")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: BillingUsageResponse | null) => {
+        if (!cancelled && data) setBillingUsage(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      setBillingUsage(null);
+    };
+  }, [open]);
+
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
   };
@@ -143,40 +167,31 @@ export function ProfileCommandPanel({
   const last30Issues = last30?.issuesCaptured ?? 0;
   const last30Replies = last30?.repliesMade ?? 0;
   const last30TimeSavedHours = last30?.timeSavedHours ?? 0;
-  const last30TimeSavedDisplay = `${Math.round(last30TimeSavedHours) || 0}h`;
+  const last30TimeSavedRounded = Math.round(last30TimeSavedHours);
 
   const IMPACT_STATS = [
     {
+      key: "timeSaved" as const,
       label: "Time saved reviewing feedback",
-      value: last30TimeSavedDisplay,
-      trend: "+23%",
-      trendUp: true,
       context: "last 30 days",
       bg: "#ECFDF5",
       textColor: "#065F46",
-      trendColor: "#059669",
       Icon: Clock,
     },
     {
+      key: "issuesCaptured" as const,
       label: "Issues captured",
-      value: String(last30Issues),
-      trend: "+12%",
-      trendUp: true,
       context: "last 30 days",
       bg: "#EFF6FF",
       textColor: "#1E3A8A",
-      trendColor: "#2563EB",
       Icon: Info,
     },
     {
+      key: "repliesMade" as const,
       label: "Replies made",
-      value: String(last30Replies),
-      trend: "-5%",
-      trendUp: false,
       context: "last 30 days",
       bg: "#FFF7ED",
       textColor: "#7C2D12",
-      trendColor: "#EA580C",
       Icon: MessageCircle,
     },
   ];
@@ -226,9 +241,71 @@ export function ProfileCommandPanel({
               <div className="flex flex-col" style={{ gap: 14 }}>
                 {IMPACT_STATS.map((stat) => {
                   const Icon = stat.Icon;
+
+                  const renderMetricValue = () => {
+                    if (stat.key === "timeSaved") {
+                      if (analytics && !hasAnimatedMetrics) {
+                        return (
+                          <CountUp
+                            start={0}
+                            end={last30TimeSavedRounded}
+                            duration={1}
+                            separator=","
+                            onEnd={() => setHasAnimatedMetrics(true)}
+                          >
+                            {({ countUpRef }) => (
+                              <>
+                                <span ref={countUpRef} />
+                                {"h"}
+                              </>
+                            )}
+                          </CountUp>
+                        );
+                      }
+                      return (
+                        <>
+                          {last30TimeSavedRounded}
+                          {"h"}
+                        </>
+                      );
+                    }
+
+                    if (stat.key === "issuesCaptured") {
+                      if (analytics && !hasAnimatedMetrics) {
+                        return (
+                          <CountUp
+                            start={0}
+                            end={last30Issues}
+                            duration={1}
+                            separator=","
+                            onEnd={() => setHasAnimatedMetrics(true)}
+                          />
+                        );
+                      }
+                      return last30Issues.toLocaleString();
+                    }
+
+                    if (stat.key === "repliesMade") {
+                      if (analytics && !hasAnimatedMetrics) {
+                        return (
+                          <CountUp
+                            start={0}
+                            end={last30Replies}
+                            duration={1}
+                            separator=","
+                            onEnd={() => setHasAnimatedMetrics(true)}
+                          />
+                        );
+                      }
+                      return last30Replies.toLocaleString();
+                    }
+
+                    return null;
+                  };
+
                   return (
                     <div
-                      key={`${stat.label}-${stat.value}`}
+                      key={stat.key}
                       className="transition-[transform,box-shadow] duration-[120ms] ease-out hover:translate-y-[-1px] hover:shadow-[0_6px_16px_rgba(0,0,0,0.05)]"
                       style={{
                         background: stat.bg,
@@ -260,19 +337,10 @@ export function ProfileCommandPanel({
                           {stat.label}
                         </p>
                       </div>
-                      {/* Row 2: metric value + trend */}
+                      {/* Row 2: metric value */}
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                         <span style={{ fontSize: 22, fontWeight: 600, color: stat.textColor }}>
-                          {stat.value}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 500,
-                            color: stat.trendColor,
-                          }}
-                        >
-                          {stat.trend}
+                          {renderMetricValue()}
                         </span>
                       </div>
                       {/* Row 3: context line */}
@@ -335,7 +403,7 @@ export function ProfileCommandPanel({
 
             {/* Right column — profile header + account navigation */}
             <div className="flex flex-col min-w-0">
-              {/* Profile header — top of right column */}
+              {/* Profile header */}
               <div className="flex items-start gap-3 mb-4">
                 <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[#E7E7E7] bg-[#F5F5F5]">
                   <Image
@@ -362,6 +430,29 @@ export function ProfileCommandPanel({
                     Edit profile
                   </button>
                 </div>
+              </div>
+
+              {/* Upgrade plan — usage and CTA */}
+              <div className="mb-4 pb-4 border-b border-[#EAEAEA] font-medium">
+                <span className="text-blue-600 font-semibold text-[15px] block mb-1.5">
+                  Upgrade plan
+                </span>
+                <p className="font-semibold text-[14px] text-neutral-700 mt-0 mb-0.5">
+                  Current plan: {billingUsage ? (billingUsage.plan.charAt(0).toUpperCase() + billingUsage.plan.slice(1)) : "Free"}
+                </p>
+                <p className="font-semibold text-[14px] text-neutral-700 mt-0 mb-0.5">
+                  {billingUsage
+                    ? `${billingUsage.usage.sessionsCreated} / ${billingUsage.limits.maxSessions ?? "—"} sessions used`
+                    : "— sessions used"}
+                </p>
+                <Link
+                  href="/settings?tab=billing"
+                  onClick={onClose}
+                  style={{ fontSize: 12, fontWeight: 500, marginTop: 4 }}
+                  className="block text-[#155DFC] hover:underline"
+                >
+                  View plans →
+                </Link>
               </div>
 
               {RIGHT_COLUMN_SECTIONS.map((section) => (

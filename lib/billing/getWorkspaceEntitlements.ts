@@ -14,7 +14,6 @@ export function getWorkspaceEntitlements(workspace: Workspace): WorkspaceEntitle
   return {
     maxSessions: stored?.maxSessions ?? fromPlan.maxSessions,
     maxMembers: stored?.maxMembers ?? fromPlan.maxMembers,
-    maxFeedbackPerSession: stored?.maxFeedbackPerSession ?? fromPlan.maxFeedbackPerSession,
     insightsAccess: stored?.insightsAccess ?? fromPlan.insightsAccess,
   };
 }

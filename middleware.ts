@@ -8,8 +8,16 @@ const corsHeaders = {
 };
 
 export function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // Admin routes: access control is enforced in app/admin/layout.tsx via /api/admin/me (user.isAdmin).
+  // Middleware cannot read Firestore, so we only pass through here.
+  if (pathname.startsWith("/admin")) {
+    return NextResponse.next();
+  }
+
   // Only apply to /api/* routes; leave all other routes unchanged
-  if (!request.nextUrl.pathname.startsWith("/api/")) {
+  if (!pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
 
@@ -33,5 +41,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: ["/api/:path*", "/admin", "/admin/:path*"],
 };

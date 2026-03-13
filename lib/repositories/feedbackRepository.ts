@@ -286,82 +286,81 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
 
 /**
  * Fetches one page of feedback for a session using cursor pagination.
- * Composite index required: feedback (sessionId ASC, createdAt DESC).
- * Cost protection: never fetches unbounded; use limit + startAfter only.
+ * Composite index required: feedback (sessionId ASC, status ASC, createdAt DESC).
  */
 export async function getSessionFeedbackPageRepo(
   sessionId: string,
-  pageSize: number = FEEDBACK_PAGE_SIZE_DEFAULT,
-  startAfterDoc?: FeedbackPageCursor | null
+  opts: {
+    status?: "open" | "resolved" | "skipped" | "all";
+    limit?: number;
+    cursor?: FeedbackPageCursor | null;
+  } = {}
 ): Promise<FeedbackPageResult> {
+  const status = opts.status ?? "all";
+  const pageSize = opts.limit ?? FEEDBACK_PAGE_SIZE_DEFAULT;
   assertQueryLimit(pageSize, "getSessionFeedbackPageRepo");
+
   const coll = collection(db, "feedback");
-  const q =
-    startAfterDoc != null
-      ? query(
-          coll,
-          where("sessionId", "==", sessionId),
-          orderBy("createdAt", "desc"),
-          limit(pageSize),
-          startAfter(startAfterDoc)
-        )
-      : query(
-          coll,
-          where("sessionId", "==", sessionId),
-          orderBy("createdAt", "desc"),
-          limit(pageSize)
-        );
-  const start = Date.now();
+  const baseConstraints = [
+    where("sessionId", "==", sessionId),
+    orderBy("status", "asc"),
+    orderBy("createdAt", "desc"),
+  ];
+
+  const constraintsBase =
+    status === "all"
+      ? baseConstraints
+      : [where("status", "==", status), ...baseConstraints];
+
+  const q = query(
+    coll,
+    ...constraintsBase,
+    ...(opts.cursor ? [startAfter(opts.cursor)] : []),
+    limit(pageSize + 1)
+  );
   const snapshot = await getDocs(q);
-  const duration = Date.now() - start;
-  console.log(`[FIRESTORE] query duration: ${duration}ms`);
-  const docs = snapshot.docs;
-  const feedback = docs.map(docToFeedback);
+  const docs = snapshot.docs.map(docToFeedback);
+  const hasMore = docs.length > pageSize;
+  const feedback = hasMore ? docs.slice(0, pageSize) : docs;
   const lastVisibleDoc =
-    docs.length > 0 ? (docs[docs.length - 1] as FeedbackPageCursor) : null;
-  const hasMore = docs.length === pageSize;
+    hasMore && snapshot.docs.length > 0
+      ? (snapshot.docs[snapshot.docs.length - 1] as FeedbackPageCursor)
+      : null;
+
   return { feedback, lastVisibleDoc, hasMore };
 }
 
-/** Cursor-based page for API: cursor is last document ID (opaque string). Returns nextCursor as last doc id or null. */
+/**
+ * String-cursor wrapper around getSessionFeedbackPageRepo.
+ * Used by API routes so cursors can be serialized as simple strings.
+ */
 export async function getSessionFeedbackPageWithStringCursorRepo(
   sessionId: string,
-  pageSize: number = FEEDBACK_PAGE_SIZE_DEFAULT,
-  cursorDocId?: string | null
+  limit: number,
+  cursor?: string
 ): Promise<{ feedback: Feedback[]; nextCursor: string | null; hasMore: boolean }> {
-  assertQueryLimit(pageSize, "getSessionFeedbackPageWithStringCursorRepo");
-  const coll = collection(db, "feedback");
-  let startAfterDoc: QueryDocumentSnapshot | null = null;
-  if (cursorDocId && cursorDocId.trim() !== "") {
-    const cursorStart = Date.now();
-    const cursorSnap = await getDoc(doc(db, "feedback", cursorDocId));
-    console.log(`[FIRESTORE] query duration: ${Date.now() - cursorStart}ms`);
-    if (cursorSnap.exists()) startAfterDoc = cursorSnap as QueryDocumentSnapshot;
-  }
-  const q =
-    startAfterDoc != null
-      ? query(
-          coll,
-          where("sessionId", "==", sessionId),
-          orderBy("createdAt", "desc"),
-          limit(pageSize),
-          startAfter(startAfterDoc)
-        )
-      : query(
-          coll,
-          where("sessionId", "==", sessionId),
-          orderBy("createdAt", "desc"),
-          limit(pageSize)
-        );
-  const start = Date.now();
-  const snapshot = await getDocs(q);
-  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
-  const docs = snapshot.docs;
-  const feedback = docs.map(docToFeedback);
-  const lastDoc = docs.length > 0 ? docs[docs.length - 1] : null;
-  const nextCursor = lastDoc ? lastDoc.id : null;
-  const hasMore = docs.length === pageSize;
-  return { feedback, nextCursor, hasMore };
+  const trimmed = cursor?.trim();
+  const cursorSnap =
+    trimmed && trimmed.length > 0
+      ? await getDoc(doc(db, "feedback", trimmed))
+      : null;
+
+  const { feedback, lastVisibleDoc, hasMore } = await getSessionFeedbackPageRepo(
+    sessionId,
+    {
+      status: "all",
+      limit,
+      cursor: cursorSnap && cursorSnap.exists()
+        ? (cursorSnap as QueryDocumentSnapshot)
+        : null,
+    }
+  );
+
+  return {
+    feedback,
+    nextCursor: lastVisibleDoc ? lastVisibleDoc.id : null,
+    hasMore,
+  };
 }
 
 /** Total count of feedback for a session (for sidebar display). */
@@ -665,4 +664,3 @@ export async function getFeedbackByIdsRepo(
     .filter((s) => s.exists())
     .map((s) => docToFeedback(s as QueryDocumentSnapshot));
 }
-

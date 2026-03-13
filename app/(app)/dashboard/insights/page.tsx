@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Ticket, MessageCircle, Layers, CheckCircle, Sparkles } from "lucide-react";
+import { Ticket, MessageCircle, Layers, CheckCircle } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import dynamic from "next/dynamic";
@@ -41,13 +41,6 @@ interface MostReportedIssueType {
 interface ResponseSpeed {
   averageFirstReply: string;
   averageResolutionTime: string;
-}
-
-interface MostActiveSession {
-  sessionName: string;
-  issues: number;
-  replies: number;
-  collaborators: number;
 }
 
 interface TimeSaved {
@@ -98,7 +91,6 @@ interface InsightsApiResponse {
   mostCommentedSessions: MostCommentedSession[];
   mostReportedIssueTypes: MostReportedIssueType[];
   responseSpeed: ResponseSpeed;
-  mostActiveSession: MostActiveSession | null;
   timeSaved: TimeSaved;
   issuesPerDay: ActivityPoint[];
   repliesPerDay: ActivityPoint[];
@@ -170,7 +162,7 @@ export default function InsightsPage() {
             <div className="h-7 w-32 bg-neutral-200 rounded animate-pulse" />
             <div className="h-4 w-64 bg-neutral-100 rounded mt-2 animate-pulse" />
           </header>
-          <SkeletonCard className="min-h-[110px]" />
+          <SkeletonCard className="min-h-[72px]" />
           <section className="grid grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <MetricCardSkeleton key={i} />
@@ -203,7 +195,7 @@ export default function InsightsPage() {
               Product value and activity across your feedback.
             </p>
           </header>
-          <SkeletonCard className="min-h-[110px]" />
+          <SkeletonCard className="min-h-[72px]" />
           <section className="grid grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <MetricCardSkeleton key={i} />
@@ -226,7 +218,6 @@ export default function InsightsPage() {
     mostCommentedSessions,
     mostReportedIssueTypes,
     responseSpeed,
-    mostActiveSession,
     timeSaved,
     issuesPerDay,
     issueTypeDistribution,
@@ -252,62 +243,72 @@ export default function InsightsPage() {
         </header>
 
         {/* Hero insight panel — time saved from lifetime tickets */}
-        <div className="bg-white border border-neutral-200 rounded-xl px-10 py-7 shadow-sm flex items-center gap-5 min-h-[110px] hover:shadow-md transition-shadow duration-200">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-            <Sparkles className="text-blue-600 w-5 h-5" strokeWidth={1.5} />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <p className="text-xs uppercase tracking-wide text-secondary">
-              Time saved reviewing feedback
-            </p>
-            <h2 className="text-3xl font-semibold tracking-tight text-neutral-900">
-              {timeSaved.formatted} saved
-            </h2>
-            <div className="flex gap-5 mt-2 text-sm text-secondary">
-              <span>{ticketCount} issues captured</span>
-              <span>•</span>
-              <span>{replyCount} replies</span>
-              <span>•</span>
-              <span>{resolvedCount} discussions resolved</span>
+        <div className="insights-hero-card-wrapper w-full">
+          <div className="insights-hero-card rounded-xl border px-6 py-3 flex items-center gap-5">
+            <div className="flex items-center justify-center shrink-0 w-24 h-24">
+              <img
+                src="/illustrations/time-saved.png"
+                alt="Time saved illustration"
+                className="w-24 h-24 object-contain"
+              />
+            </div>
+            <div className="min-w-0 flex flex-col space-y-1">
+              <p className="text-sm text-secondary uppercase tracking-wide">
+                Time saved reviewing feedback
+              </p>
+              <p className="text-4xl font-semibold tracking-tight text-neutral-900">
+                {timeSaved.formatted} saved
+              </p>
+              <p className="text-sm text-secondary">
+                {ticketCount} issues captured • {replyCount} replies • {resolvedCount} discussions resolved
+              </p>
             </div>
           </div>
         </div>
 
         {/* Hero metrics row */}
         <section className="grid grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-200 bg-blue-50 hover:shadow-lg transition flex items-center gap-3">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-200 bg-blue-50 hover:shadow-lg transition flex items-start gap-3">
             <div className="w-11 h-11 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
               <Ticket className="w-4 h-4" strokeWidth={1.5} />
             </div>
             <div className="min-w-0">
-              <p className="text-4xl font-semibold text-neutral-900">{ticketCount}</p>
+              <p className="text-4xl font-semibold text-neutral-900 flex items-baseline">
+                {ticketCount}
+              </p>
               <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Visual feedback captured</p>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-200 bg-purple-50 hover:shadow-lg transition flex items-center gap-3">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-200 bg-purple-50 hover:shadow-lg transition flex items-start gap-3">
             <div className="w-11 h-11 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 shrink-0">
               <MessageCircle className="w-4 h-4" strokeWidth={1.5} />
             </div>
             <div className="min-w-0">
-              <p className="text-4xl font-semibold text-neutral-900">{replyCount}</p>
+              <p className="text-4xl font-semibold text-neutral-900 flex items-baseline">
+                {replyCount}
+              </p>
               <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Replies made</p>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-indigo-200 bg-indigo-50 hover:shadow-lg transition flex items-center gap-3">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-indigo-200 bg-indigo-50 hover:shadow-lg transition flex items-start gap-3">
             <div className="w-11 h-11 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
               <Layers className="w-4 h-4" strokeWidth={1.5} />
             </div>
             <div className="min-w-0">
-              <p className="text-4xl font-semibold text-neutral-900">{sessionCount}</p>
+              <p className="text-4xl font-semibold text-neutral-900 flex items-baseline">
+                {sessionCount}
+              </p>
               <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Sessions reviewed</p>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-green-200 bg-green-50 hover:shadow-lg transition flex items-center gap-3">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-green-200 bg-green-50 hover:shadow-lg transition flex items-start gap-3">
             <div className="w-11 h-11 rounded-lg bg-green-100 flex items-center justify-center text-green-600 shrink-0">
               <CheckCircle className="w-4 h-4" strokeWidth={1.5} />
             </div>
             <div className="min-w-0">
-              <p className="text-4xl font-semibold text-neutral-900">{resolvedCount}</p>
+              <p className="text-4xl font-semibold text-neutral-900 flex items-baseline">
+                {resolvedCount}
+              </p>
               <p className="text-xs uppercase tracking-wide font-medium text-secondary mt-1">Discussions resolved</p>
             </div>
           </div>
@@ -347,7 +348,7 @@ export default function InsightsPage() {
           </div>
         </section>
 
-        {/* Response speed + most active session summary */}
+        {/* Response speed */}
         <section className="grid grid-cols-2 gap-6">
           <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-4 col-span-2">
             <div className="flex items-center justify-between mb-2">
@@ -372,25 +373,6 @@ export default function InsightsPage() {
             </div>
             {!loading && data && (
               <ResponseSpeedTrendChart data={responseSpeedTrend} />
-            )}
-          </div>
-
-          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-3 col-span-2">
-            <h3 className="text-sm font-semibold text-neutral-900 mb-2">
-              Most active session (summary)
-            </h3>
-            {mostActiveSession ? (
-              <>
-                <p className="text-lg font-semibold text-neutral-900">{mostActiveSession.sessionName}</p>
-                <div className="border-t border-neutral-200 mt-3 pt-3" aria-hidden />
-                <div className="flex gap-6 mt-1 text-sm text-secondary">
-                  <span>{mostActiveSession.issues} issues</span>
-                  <span>{mostActiveSession.replies} replies</span>
-                  <span>{mostActiveSession.collaborators} collaborators</span>
-                </div>
-              </>
-            ) : (
-              <p className="text-secondary">No session data yet.</p>
             )}
           </div>
         </section>

@@ -3,13 +3,18 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
-import { clearAuthTokenCache } from "@/lib/authFetch";
+import { clearAuthTokenCache, authFetch } from "@/lib/authFetch";
 import { onAuthStateChanged } from "firebase/auth";
-import { createSession, getWorkspaceSessions, getUserSessions } from "@/lib/sessions";
+import { getWorkspaceSessions, getUserSessions } from "@/lib/sessions";
 import { getSessionFeedbackCounts } from "@/lib/feedback";
 import type { Session } from "@/lib/domain/session";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+
+export interface PlanLimitReachedPayload {
+  message: string;
+  upgradePlan: string | null;
+}
 
 const SESSION_LIMIT = 50;
 
@@ -96,21 +101,29 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
     counts: sessionCounts[session.id] ?? { open: 0, resolved: 0 },
   }));
 
-  const handleCreateSession = useCallback(async () => {
-    if (!user) return;
-    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const parts = (auth.currentUser?.displayName || "User").trim().split(/\s+/);
-    const firstName = parts[0] || "User";
-    const lastName = parts.slice(1).join(" ") || "";
-    const createdBy = {
-      id: user.uid,
-      firstName,
-      lastName,
-      avatarUrl: auth.currentUser?.photoURL ?? undefined,
-    };
-    const sessionId = await createSession(workspaceId, user.uid, createdBy);
-    router.push(`/dashboard/${sessionId}`);
-  }, [user, router]);
+  const handleCreateSession = useCallback(
+    async (onPlanLimitReached?: (payload: PlanLimitReachedPayload) => void) => {
+      if (!user) return;
+      const res = await authFetch("/api/sessions", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
+        onPlanLimitReached?.({
+          message: data.message ?? "You've reached your plan limit.",
+          upgradePlan: data.upgradePlan ?? "starter",
+        });
+        return;
+      }
+      if (!res.ok) {
+        console.error("Create session failed:", res.status, data);
+        return;
+      }
+      const sessionId = data.session?.id;
+      if (sessionId) {
+        router.push(`/dashboard/${sessionId}`);
+      }
+    },
+    [user, router]
+  );
 
   const updateSession = useCallback((sessionId: string, patch: Partial<Session>) => {
     setSessions((prev) =>

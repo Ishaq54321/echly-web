@@ -110,3 +110,22 @@ export async function ensureUserWorkspaceLinkRepo(user: User): Promise<{ workspa
   });
 }
 
+export interface UserDoc {
+  uid: string;
+  name?: string | null;
+  email?: string | null;
+  photoURL?: string | null;
+  workspaceId?: string | null;
+  isAdmin?: boolean;
+  [key: string]: unknown;
+}
+
+/** Fetch a user document by id from Firestore users/{uid}. Returns null if missing. */
+export async function getUserByIdRepo(uid: string): Promise<UserDoc | null> {
+  const snap = await getDoc(doc(db, "users", uid));
+  if (!snap.exists()) return null;
+  const data = snap.data() as UserDoc;
+  return { ...data, uid: data.uid ?? uid };
+}
+
+

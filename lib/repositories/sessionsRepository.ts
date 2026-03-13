@@ -25,15 +25,17 @@ import { deleteAllFeedbackForSessionRepo } from "@/lib/repositories/feedbackRepo
 type SessionDoc = Omit<Session, "id"> & { createdAt?: Timestamp | null; updatedAt?: Timestamp | null };
 
 /**
- * Creates a single new session. Only writes ONE document; never modifies
- * existing session documents. Sets createdBy, viewCount, commentCount.
+ * Creates a single new session and increments workspace usage in one transaction.
+ * Only writes ONE session document; never modifies existing session documents.
  */
 export async function createSessionRepo(
   workspaceId: string,
   userId: string,
   createdBy?: SessionCreatedBy | null
 ): Promise<string> {
-  const docRef = await addDoc(collection(db, "sessions"), {
+  const sessionRef = doc(collection(db, "sessions"));
+  const workspaceRef = doc(db, "workspaces", workspaceId);
+  const sessionData = {
     workspaceId,
     userId,
     title: "Untitled Session",
@@ -45,9 +47,17 @@ export async function createSessionRepo(
     openCount: 0,
     resolvedCount: 0,
     feedbackCount: 0,
+  };
+
+  await runTransaction(db, async (tx) => {
+    tx.set(sessionRef, sessionData);
+    tx.update(workspaceRef, {
+      "usage.sessionsCreated": increment(1),
+      updatedAt: serverTimestamp(),
+    });
   });
 
-  return docRef.id;
+  return sessionRef.id;
 }
 
 /**

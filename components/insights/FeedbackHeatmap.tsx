@@ -24,6 +24,9 @@ export function FeedbackHeatmap({
 }: {
   data: FeedbackHeatmapBin[];
 }) {
+  const tooltipFontFamily =
+    "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
   if (!data || data.length === 0) {
     return (
       <p className="text-sm text-secondary">
@@ -43,10 +46,18 @@ export function FeedbackHeatmap({
   const cellWidth = 18;
   const cellHeight = 14;
 
+  const getFillForCount = (count: number): string => {
+    if (count <= 0) return "transparent";
+    if (count <= 1) return "#DBEAFE";
+    if (count <= 3) return "#93C5FD";
+    if (count <= 5) return "#2563EB";
+    return "#2563EB";
+  };
+
   return (
-    <div className="w-full h-64">
+    <div className="w-full h-[220px] flex items-center justify-center">
       <ResponsiveContainer width="100%" height="100%">
-        <ScatterChart margin={{ top: 20, right: 16, bottom: 10, left: 40 }}>
+        <ScatterChart margin={{ top: 20, right: 24, bottom: 10, left: 48 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
           <XAxis
             type="number"
@@ -67,11 +78,53 @@ export function FeedbackHeatmap({
           />
           <ZAxis type="number" dataKey="z" range={[0, 400]} />
           <Tooltip
-            cursor={{ stroke: "#9CA3AF", strokeWidth: 1 }}
-            formatter={(value: any, _name, props: any) => {
-              const hour = props?.payload?.x ?? 0;
-              const day = props?.payload?.y ?? 0;
-              return [`${value} issues`, `${DAYS[day]} ${hour}:00`];
+            wrapperStyle={{ zIndex: 9999 }}
+            cursor={{ stroke: "#9CA3AF", strokeWidth: 1, fill: "transparent" }}
+            labelFormatter={() => ""}
+            content={(tooltipProps: any) => {
+              const { active, payload } = tooltipProps;
+              if (!active || !payload || payload.length === 0) return null;
+              const item = payload[0];
+              const hour = item.payload?.x ?? 0;
+              const day = item.payload?.y ?? 0;
+              const count = item.value as number;
+              return (
+                <div
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid #E5E7EB",
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                    boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+                    fontFamily: tooltipFontFamily,
+                    fontSize: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      marginBottom: 4,
+                      color: "#6B7280",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {DAYS[day]} {hour}:00
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
+                    <span
+                      style={{ color: "#4B5563", fontWeight: 500 }}
+                    >{`Issues`}</span>
+                    <span style={{ color: "#111827", fontWeight: 600 }}>
+                      {count}
+                    </span>
+                  </div>
+                </div>
+              );
             }}
           />
           <Scatter
@@ -86,13 +139,16 @@ export function FeedbackHeatmap({
                   y={(props.cy as number) - cellHeight / 2}
                   width={cellWidth}
                   height={cellHeight}
-                  fill="#155DFC"
-                  fillOpacity={opacity}
+                  fill={getFillForCount(props.z as number)}
+                  fillOpacity={intensity === 0 ? 0 : 1}
                   rx={2}
                   ry={2}
                 />
               );
             }}
+            isAnimationActive
+            animationDuration={800}
+            animationEasing="ease-out"
           />
         </ScatterChart>
       </ResponsiveContainer>

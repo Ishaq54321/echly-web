@@ -16,6 +16,7 @@ import { MoveSessionsModal } from "@/components/dashboard/MoveSessionsModal";
 import { DragSessionProvider, useDragSession } from "@/components/dashboard/context/DragSessionContext";
 import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
 import { DragGhostChip } from "@/components/dashboard/DragGhostChip";
+import { UpgradeModal } from "@/components/billing/UpgradeModal";
 
 export interface DashboardFolder {
   id: string;
@@ -58,6 +59,8 @@ function DashboardContent() {
   const [foldersLoading, setFoldersLoading] = useState(true);
   const [moveModalFolder, setMoveModalFolder] = useState<DashboardFolder | null>(null);
   const [moveToFolderSessionId, setMoveToFolderSessionId] = useState<string | null>(null);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradePayload, setUpgradePayload] = useState<{ message: string; upgradePlan: string | null } | null>(null);
 
   const loadFolders = async () => {
     setFoldersLoading(true);
@@ -164,7 +167,12 @@ function DashboardContent() {
           onTabChange={setViewMode}
           sessionCount={sessions.length}
           onNewFolder={createFolder}
-          onNewSession={handleCreateSession}
+          onNewSession={() =>
+            handleCreateSession((p) => {
+              setUpgradePayload(p);
+              setUpgradeModalOpen(true);
+            })
+          }
         />
 
         <main className="flex-1">
@@ -263,6 +271,16 @@ function DashboardContent() {
           setMoveModalFolder(null);
           setMoveToFolderSessionId(null);
         }}
+      />
+
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onClose={() => {
+          setUpgradeModalOpen(false);
+          setUpgradePayload(null);
+        }}
+        message={upgradePayload?.message}
+        upgradePlan={upgradePayload?.upgradePlan ?? null}
       />
 
       <DragGhostChip

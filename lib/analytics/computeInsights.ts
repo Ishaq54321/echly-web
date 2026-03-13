@@ -52,13 +52,6 @@ export interface ResponseSpeed {
   averageResolutionTime: string;
 }
 
-export interface MostActiveSession {
-  sessionName: string;
-  issues: number;
-  replies: number;
-  collaborators: number;
-}
-
 export interface TimeSaved {
   minutes: number;
   formatted: string;
@@ -113,7 +106,6 @@ export interface InsightsData {
   mostCommentedSessions: MostCommentedSession[];
   mostReportedIssueTypes: MostReportedIssueType[];
   responseSpeed: ResponseSpeed;
-  mostActiveSession: MostActiveSession | null;
   /** Lifetime, formatted for the Insights hero card. */
   timeSaved: TimeSaved;
   /** Daily trend of issues and replies over the last 30 days. */
@@ -169,7 +161,6 @@ function createDefaultInsights(): InsightsData {
       averageFirstReply: "—",
       averageResolutionTime: "—",
     },
-    mostActiveSession: null,
     timeSaved: {
       minutes: 0,
       formatted: "0m",
@@ -485,28 +476,6 @@ export async function computeInsights(userId: string): Promise<InsightsData> {
     const issuesBySessionEntries = Array.from(issuesBySession.entries()).sort(
       (a, b) => b[1] - a[1]
     );
-    const topSessionEntry = issuesBySessionEntries[0];
-
-    let mostActiveSession: MostActiveSession | null = null;
-    if (topSessionEntry) {
-      const [sessionId, issues] = topSessionEntry;
-      const sessionName = sessionIdToName.get(sessionId) ?? "Unknown Session";
-      const replies = commentCountBySession.get(sessionId) ?? 0;
-      const collaboratorsSet = new Set<string>();
-      commentsSnap.docs.forEach((docSnap: any) => {
-        const d = docSnap.data?.() ?? {};
-        if ((d.sessionId as string) === sessionId) {
-          collaboratorsSet.add((d.userId as string) ?? "");
-        }
-      });
-      mostActiveSession = {
-        sessionName,
-        issues,
-        replies,
-        collaborators: collaboratorsSet.size,
-      };
-    }
-
     const mostActiveSessions: ActiveSessionPoint[] = issuesBySessionEntries
       .slice(0, 5)
       .map(([sessionId, issues]) => ({
@@ -611,7 +580,6 @@ export async function computeInsights(userId: string): Promise<InsightsData> {
       mostCommentedSessions,
       mostReportedIssueTypes,
       responseSpeed,
-      mostActiveSession,
       timeSaved: {
         minutes: lifetimeTimeSavedMinutes,
         formatted: timeSavedFormatted,

@@ -51,15 +51,25 @@ export interface Workspace {
     plan: WorkspacePlan;
     billingCycle: WorkspaceBillingCycle;
     seats: number;
-    stripeCustomerId: string | null;
-    stripeSubscriptionId: string | null;
+    stripeCustomerId?: string | null;
+    stripeSubscriptionId?: string | null;
   };
 
+  /** Plan-derived limits. Stored so they can be overridden; defaults from PLANS[plan]. */
   entitlements: {
     brandingControls: boolean;
     integrations: boolean;
-    /** When true, workspace can access Insights. Derived from plan if missing. */
     insightsAccess?: boolean;
+    maxSessions?: number | null;
+    maxMembers?: number | null;
+    maxFeedbackPerSession?: number | null;
+  };
+
+  /** Counters for billing/limits. Incremented in transactions. */
+  usage: {
+    sessionsCreated: number;
+    feedbackCreated: number;
+    members: number;
   };
 }
 
@@ -116,6 +126,13 @@ export function defaultWorkspaceDoc(params: {
       brandingControls: false,
       integrations: false,
       insightsAccess: PLANS.free.insightsAccess,
+      maxSessions: PLANS.free.maxSessions,
+      maxMembers: PLANS.free.maxMembers,
+    },
+    usage: {
+      sessionsCreated: 0,
+      feedbackCreated: 0,
+      members: 1,
     },
   };
 }

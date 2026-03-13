@@ -616,6 +616,33 @@ textarea:focus-visible {
   border: 2px solid transparent;
 }
 
+/* ======================================
+   INSIGHTS — HERO CARD GRADIENT
+   Subtle premium treatment for time-saved card
+====================================== */
+
+.insights-hero-card-wrapper {
+  border-radius: 16px;
+  padding: 1.5px;
+  background: linear-gradient(135deg, #3B82F6, #8B5CF6, #06B6D4);
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.04),
+    0 4px 12px rgba(15, 23, 42, 0.05);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.insights-hero-card-wrapper:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 16px 32px rgba(15, 23, 42, 0.08),
+    0 6px 18px rgba(15, 23, 42, 0.05);
+}
+
+.insights-hero-card {
+  background: #ffffff;
+  border-radius: 14px;
+}
+
 .secondary-cta {
   background: #EEF4FF;
   color: #1F5EFF;
@@ -3569,5 +3596,12 @@ textarea:focus-visible {
 .demo-container,
 .demo-container * {
   cursor: none !important;
+}
+
+/* Upgrade modal hero illustration — large visual, not constrained */
+.upgrade-illustration {
+  width: 180px;
+  max-width: 100%;
+  height: auto;
 }
 

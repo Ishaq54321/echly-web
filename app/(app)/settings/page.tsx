@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, Fragment } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, Fragment } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Monitor,
   Laptop,
@@ -61,12 +62,20 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-export default function SettingsPage() {
+function SettingsPageInner() {
   const { user } = useAuthGuard();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>("general");
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loadingWorkspace, setLoadingWorkspace] = useState(true);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "billing" && TABS.some((t) => t.id === "billing")) {
+      setActiveTab("billing");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,6 +171,20 @@ export default function SettingsPage() {
         {activeTab === "billing" && <BillingTab />}
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center bg-white">
+          <div className="text-sm text-neutral-500">Loading settings…</div>
+        </div>
+      }
+    >
+      <SettingsPageInner />
+    </Suspense>
   );
 }
 

@@ -7,16 +7,12 @@ import {
   getFeedbackByIdRepo,
   getSessionFeedbackPageWithStringCursorRepo,
   getSessionFeedbackCountsRepo,
-  getSessionFeedbackTotalCountRepo,
   getWorkspaceFeedbackAllRepo,
   getWorkspaceFeedbackWithCommentsRepo,
   getUserFeedbackAllRepo,
   getUserFeedbackWithCommentsRepo,
 } from "@/lib/repositories/feedbackRepository";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
-import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
-import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
 import { log } from "@/lib/utils/logger";
 import { updateScreenshotAttachedRepo } from "@/lib/repositories/screenshotsRepository";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
@@ -273,23 +269,6 @@ export async function POST(req: Request) {
   }
 
   const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-  const workspace = await getWorkspace(workspaceId);
-  if (workspace) {
-    const feedbackCountInSession = await getSessionFeedbackTotalCountRepo(sessionId);
-    try {
-      checkPlanLimit({
-        workspace,
-        metric: "maxFeedbackPerSession",
-        currentUsage: feedbackCountInSession,
-      });
-    } catch (limitErr) {
-      const planErr = limitErr as PlanLimitError;
-      if (planErr.code === "PLAN_LIMIT_REACHED") {
-        return NextResponse.json(planLimitReachedBody(planErr), { status: 403 });
-      }
-      throw limitErr;
-    }
-  }
 
   const meta = body.metadata;
 

@@ -58,12 +58,12 @@ export async function POST(req: Request) {
     const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
     const workspace = await getWorkspace(workspaceId);
     if (workspace) {
-      const sessionCount = await getWorkspaceSessionCountRepo(workspaceId);
+      const currentSessionCount = await getWorkspaceSessionCountRepo(workspaceId);
       try {
         checkPlanLimit({
           workspace,
           metric: "maxSessions",
-          currentUsage: sessionCount,
+          currentUsage: currentSessionCount,
         });
       } catch (limitErr) {
         const planErr = limitErr as PlanLimitError;

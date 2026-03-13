@@ -11,6 +11,7 @@ import {
 import { db } from "@/lib/firebase";
 import type { Workspace, WorkspaceDoc } from "@/lib/domain/workspace";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
+import { PLANS, type PlanId } from "@/lib/billing/plans";
 
 /** Used by onboarding: create a new workspace and return its id (caller must update user.workspaceId). */
 export async function createWorkspaceRepo(params: {
@@ -126,10 +127,35 @@ export async function updateWorkspaceSettings(
       | "integrations"
       | "billing"
       | "entitlements"
+      | "usage"
     >
   >
 ): Promise<void> {
   const payload: Record<string, unknown> = { ...updates, updatedAt: serverTimestamp() };
   await updateDoc(doc(db, "workspaces", workspaceId), payload);
+}
+
+/**
+ * Updates workspace plan and syncs plan-derived entitlements from PLANS. Used by admin and dev testing.
+ * Preserves existing entitlements.brandingControls and entitlements.integrations.
+ */
+export async function updateWorkspacePlanRepo(
+  workspaceId: string,
+  newPlan: PlanId
+): Promise<void> {
+  const ref = doc(db, "workspaces", workspaceId);
+  const snap = await getDoc(ref);
+  const existing = snap.exists() ? (snap.data() as { entitlements?: WorkspaceDoc["entitlements"] }).entitlements : undefined;
+  const planConfig = PLANS[newPlan] ?? PLANS.free;
+  await updateDoc(ref, {
+    "billing.plan": newPlan,
+    entitlements: {
+      ...(existing && typeof existing === "object" ? existing : {}),
+      maxSessions: planConfig.maxSessions,
+      maxMembers: planConfig.maxMembers,
+      insightsAccess: planConfig.insightsAccess,
+    },
+    updatedAt: serverTimestamp(),
+  });
 }
 

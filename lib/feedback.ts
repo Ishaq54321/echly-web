@@ -78,7 +78,11 @@ export async function getSessionFeedbackPage(
   pageSize: number = 20,
   cursor?: FeedbackPageCursor | null
 ): Promise<FeedbackPageResult> {
-  return getSessionFeedbackPageRepo(sessionId, pageSize, cursor ?? undefined);
+  return getSessionFeedbackPageRepo(sessionId, {
+    limit: pageSize,
+    cursor: cursor ?? null,
+    status: "all",
+  });
 }
 
 /** First page only; for callers that need a single batch (e.g. CaptureWidget). Cost protection: always limited. */
@@ -86,7 +90,10 @@ export async function getSessionFeedback(
   sessionId: string,
   max: number = 50
 ): Promise<Feedback[]> {
-  const { feedback } = await getSessionFeedbackPageRepo(sessionId, max);
+  const { feedback } = await getSessionFeedbackPageRepo(sessionId, {
+    limit: max,
+    status: "all",
+  });
   return feedback;
 }
 

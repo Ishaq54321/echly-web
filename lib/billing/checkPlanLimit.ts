@@ -2,7 +2,7 @@ import type { Workspace } from "@/lib/domain/workspace";
 import { getWorkspaceEntitlements } from "./getWorkspaceEntitlements";
 import { UPGRADE_PLAN, type PlanId } from "./plans";
 
-export type PlanLimitMetric = "maxSessions" | "maxMembers" | "maxFeedbackPerSession";
+export type PlanLimitMetric = "maxSessions" | "maxMembers";
 
 export interface PlanLimitError extends Error {
   code: "PLAN_LIMIT_REACHED";
@@ -31,7 +31,6 @@ export function checkPlanLimit(params: {
   const messages: Record<PlanLimitMetric, string> = {
     maxSessions: `Session limit reached for ${planLabel} plan`,
     maxMembers: `Member limit reached for ${planLabel} plan`,
-    maxFeedbackPerSession: `Feedback per session limit reached for ${planLabel} plan`,
   };
 
   const err = new Error(messages[params.metric]) as PlanLimitError;
