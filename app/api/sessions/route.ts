@@ -10,6 +10,7 @@ import {
 import { log } from "@/lib/utils/logger";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
 
@@ -28,6 +29,8 @@ export async function GET(req: Request) {
 
   try {
     const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
     const workspaceSessions = await getWorkspaceSessionsRepo(workspaceId, 100);
     const sessions =
       workspaceSessions.length > 0
@@ -39,6 +42,9 @@ export async function GET(req: Request) {
       sessions: sessions.map((s) => serializeSession(s)),
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+    }
     console.error("GET /api/sessions:", err);
     log("[API] GET /api/sessions duration (error):", Date.now() - start);
     return NextResponse.json(
@@ -62,16 +68,8 @@ export async function POST(req: Request) {
   try {
     const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
     const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
     if (workspace) {
-      const suspended =
-        typeof workspace.billing === "object" &&
-        (workspace.billing as { suspended?: boolean }).suspended === true;
-      if (suspended) {
-        return NextResponse.json(
-          { error: "WORKSPACE_SUSPENDED", message: "Workspace suspended. Contact support." },
-          { status: 403 }
-        );
-      }
       const currentSessionCount = await getWorkspaceSessionCountRepo(workspaceId);
       try {
         await checkPlanLimit({
@@ -90,6 +88,9 @@ export async function POST(req: Request) {
     const id = await createSessionRepo(workspaceId, user.uid, null);
     return NextResponse.json({ success: true, session: { id } });
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+    }
     console.error("POST /api/sessions:", err);
     return NextResponse.json(
       { success: false, error: "Failed to create session" },

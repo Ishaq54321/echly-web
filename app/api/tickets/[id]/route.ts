@@ -7,7 +7,10 @@ import {
   updateFeedbackResolveAndSessionCountersRepo,
   deleteFeedbackWithSessionCountersRepo,
 } from "@/lib/repositories/feedbackRepository";
-import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
+import { getSessionByIdRepo, updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { log } from "@/lib/utils/logger";
 
 /** GET /api/tickets/:id — return single ticket (feedback) from DB. */
@@ -44,12 +47,32 @@ export async function GET(
         { status: 403 }
       );
     }
+    const session = await getSessionByIdRepo(ticket.sessionId);
+    const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+    const workspace = await getWorkspace(workspaceId);
+    try {
+      assertWorkspaceActive(workspace);
+    } catch (err) {
+      if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+        return NextResponse.json(
+          { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+          { status: 403 }
+        );
+      }
+      throw err;
+    }
     log("[API] GET /api/tickets/[id] duration:", Date.now() - start);
     return NextResponse.json({
       success: true,
       ticket: serializeTicket(ticket),
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
     console.error("GET /api/tickets/[id]:", err);
     log("[API] GET /api/tickets/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
@@ -111,6 +134,20 @@ export async function PATCH(
       { status: 403 }
     );
   }
+  const session = await getSessionByIdRepo(existingForOwnership.sessionId);
+  const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+  const workspace = await getWorkspace(workspaceId);
+  try {
+    assertWorkspaceActive(workspace);
+  } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
+    throw err;
+  }
   const updates: Parameters<typeof updateFeedbackRepo>[1] = {};
   if (typeof body.title === "string") updates.title = body.title;
   if (typeof body.description === "string") updates.description = body.description;
@@ -167,6 +204,12 @@ export async function PATCH(
       ticket: serializeTicket(updated),
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
     console.error("PATCH /api/tickets/[id]:", err);
     log("[API] PATCH /api/tickets/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
@@ -211,11 +254,31 @@ export async function DELETE(
         { status: 403 }
       );
     }
+    const session = await getSessionByIdRepo(existingForOwnership.sessionId);
+    const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+    const workspace = await getWorkspace(workspaceId);
+    try {
+      assertWorkspaceActive(workspace);
+    } catch (err) {
+      if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+        return NextResponse.json(
+          { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+          { status: 403 }
+        );
+      }
+      throw err;
+    }
 
     await deleteFeedbackWithSessionCountersRepo(id);
     log("[API] DELETE /api/tickets/[id] duration:", Date.now() - start);
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
     console.error("DELETE /api/tickets/[id]:", err);
     log("[API] DELETE /api/tickets/[id] duration (error):", Date.now() - start);
     return NextResponse.json(

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { computeInsights } from "@/lib/analytics/computeInsights";
 
 /**
@@ -17,9 +20,15 @@ export async function GET(req: Request) {
   }
 
   try {
+    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
     const data = await computeInsights(user.uid);
     return NextResponse.json(data);
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+    }
     console.error("GET /api/insights:", err);
     return NextResponse.json(
       { error: "Failed to load insights" },

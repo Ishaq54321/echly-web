@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository";
 import { getWorkspaceEntitlements } from "@/lib/billing/getWorkspaceEntitlements";
 import { getWorkspacePlanState } from "@/lib/billing/getWorkspacePlanState";
@@ -43,15 +44,7 @@ export async function GET(req: Request) {
       return NextResponse.json(SAFE_FALLBACK);
     }
 
-    const suspended =
-      typeof workspace.billing === "object" &&
-      (workspace.billing as { suspended?: boolean }).suspended === true;
-    if (suspended) {
-      return NextResponse.json(
-        { error: "WORKSPACE_SUSPENDED", message: "Workspace suspended. Contact support." },
-        { status: 403 }
-      );
-    }
+    assertWorkspaceActive(workspace);
 
     // Optional: use centralized plan resolver for canonical plan/limits/usage
     const planState = await getWorkspacePlanState(workspaceId);
@@ -92,7 +85,10 @@ export async function GET(req: Request) {
       },
       limits,
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+    }
     return NextResponse.json(SAFE_FALLBACK);
   }
 }

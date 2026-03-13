@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, CreditCard, Users, BarChart3 } from "lucide-react";
+import { ToastProvider } from "@/components/dashboard/context/ToastContext";
 
 const NAV_ITEMS = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
@@ -80,7 +81,7 @@ export default function AdminLayout({
         </div>
       </aside>
       <main className="flex-1 min-w-0 overflow-auto">
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </main>
     </div>
   );

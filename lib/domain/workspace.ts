@@ -53,6 +53,8 @@ export interface Workspace {
     seats: number;
     stripeCustomerId?: string | null;
     stripeSubscriptionId?: string | null;
+    /** Set by admin; when true, workspace cannot use the app. */
+    suspended?: boolean;
   };
 
   /** Plan-derived limits. Stored so they can be overridden; defaults from PLANS[plan]. */

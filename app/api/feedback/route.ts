@@ -13,6 +13,8 @@ import {
   getUserFeedbackWithCommentsRepo,
 } from "@/lib/repositories/feedbackRepository";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { log } from "@/lib/utils/logger";
 import { updateScreenshotAttachedRepo } from "@/lib/repositories/screenshotsRepository";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
@@ -60,6 +62,8 @@ export async function GET(req: Request) {
     const conversationsOnly = searchParams.get("conversationsOnly") === "true";
     try {
       const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+      const workspace = await getWorkspace(workspaceId);
+      assertWorkspaceActive(workspace);
       const workspaceFeedback = conversationsOnly
         ? await getWorkspaceFeedbackWithCommentsRepo(workspaceId, limit)
         : await getWorkspaceFeedbackAllRepo(workspaceId, limit);
@@ -96,6 +100,9 @@ export async function GET(req: Request) {
         hasMore: false,
       });
     } catch (err) {
+      if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+        return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+      }
       console.error("GET /api/feedback (all):", err);
       log("[API] GET /api/feedback (all) duration (error):", Date.now() - start);
       return NextResponse.json(
@@ -122,6 +129,17 @@ export async function GET(req: Request) {
         { status: 403 }
       );
     }
+  }
+
+  const sessionWorkspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+  try {
+    const workspace = await getWorkspace(sessionWorkspaceId);
+    assertWorkspaceActive(workspace);
+  } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+    }
+    throw err;
   }
 
   try {
@@ -165,6 +183,9 @@ export async function GET(req: Request) {
       ...(typeof skippedCount === "number" && { skippedCount }),
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+    }
     console.error("GET /api/feedback:", err);
     log("[API] GET /api/feedback duration (error):", Date.now() - start);
     return NextResponse.json(
@@ -269,6 +290,18 @@ export async function POST(req: Request) {
   }
 
   const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+  try {
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
+  } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
+    throw err;
+  }
 
   const meta = body.metadata;
 
@@ -338,6 +371,12 @@ export async function POST(req: Request) {
       ticket: serializeTicket(created),
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
     console.error("POST /api/feedback:", err);
     log("[API] POST /api/feedback duration (error):", Date.now() - start);
     return NextResponse.json(

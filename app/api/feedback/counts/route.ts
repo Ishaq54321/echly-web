@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { getSessionFeedbackCountsRepo } from "@/lib/repositories/feedbackRepository";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 
 /**
  * GET /api/feedback/counts?sessionId=ID
@@ -39,6 +42,17 @@ export async function GET(req: Request) {
     );
   }
 
+  const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+  try {
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
+  } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+    }
+    throw err;
+  }
+
   try {
     const hasCounters =
       typeof session.openCount === "number" &&
@@ -59,6 +73,9 @@ export async function GET(req: Request) {
     const total = openCount + resolvedCount + skippedCount;
     return NextResponse.json({ total, openCount, resolvedCount, skippedCount });
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+    }
     console.error("GET /api/feedback/counts:", err);
     return NextResponse.json(
       { error: "Server error" },

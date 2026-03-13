@@ -10,17 +10,17 @@ import type { PlanId } from "@/lib/billing/plans";
 const VALID_PLANS: PlanId[] = ["free", "starter", "business", "enterprise"];
 
 type Action =
-  | "upgrade"
-  | "downgrade"
+  | "set_plan"
   | "grant_unlimited_sessions"
   | "override_session_limit"
   | "reset_usage"
-  | "suspend";
+  | "suspend"
+  | "resume";
 
 /**
  * POST /api/admin/workspaces/actions
  * Body: { workspaceId: string, action: Action, ...actionParams }
- * Admin actions: upgrade, downgrade, grant_unlimited_sessions, override_session_limit, reset_usage, suspend.
+ * Admin actions: set_plan, grant_unlimited_sessions, override_session_limit, reset_usage, suspend, resume.
  */
 export async function POST(req: Request) {
   let admin;
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   let body: {
     workspaceId?: string;
     action?: Action;
-    newPlan?: string;
+    plan?: string;
     sessionLimit?: number | null;
   };
   try {
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   if (!workspaceId) {
     return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
   }
-  if (!action || !["upgrade", "downgrade", "grant_unlimited_sessions", "override_session_limit", "reset_usage", "suspend"].includes(action)) {
+  if (!action || !["set_plan", "grant_unlimited_sessions", "override_session_limit", "reset_usage", "suspend", "resume"].includes(action)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
@@ -57,14 +57,14 @@ export async function POST(req: Request) {
   const ref = doc(db, "workspaces", workspaceId);
 
   try {
-    if (action === "upgrade" || action === "downgrade") {
-      const newPlan = (typeof body.newPlan === "string" ? body.newPlan.trim().toLowerCase() : "") as PlanId;
-      if (!VALID_PLANS.includes(newPlan)) {
-        return NextResponse.json({ error: "newPlan must be one of: free, starter, business, enterprise" }, { status: 400 });
+    if (action === "set_plan") {
+      const plan = (typeof body.plan === "string" ? body.plan.trim().toLowerCase() : "") as PlanId;
+      if (!VALID_PLANS.includes(plan)) {
+        return NextResponse.json({ error: "plan must be one of: free, starter, business, enterprise" }, { status: 400 });
       }
-      await updateWorkspacePlanRepo(workspaceId, newPlan);
-      await logAdminAction({ adminId: admin.uid, action: `workspace.${action}`, workspaceId, metadata: { newPlan } });
-      return NextResponse.json({ success: true, plan: newPlan });
+      await updateWorkspacePlanRepo(workspaceId, plan);
+      await logAdminAction({ adminId: admin.uid, action: "workspace.set_plan", workspaceId, metadata: { plan } });
+      return NextResponse.json({ success: true, plan });
     }
 
     if (action === "grant_unlimited_sessions") {
@@ -104,6 +104,15 @@ export async function POST(req: Request) {
         updatedAt: serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.suspend", workspaceId });
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "resume") {
+      await updateDoc(ref, {
+        "billing.suspended": false,
+        updatedAt: serverTimestamp(),
+      });
+      await logAdminAction({ adminId: admin.uid, action: "workspace.resume", workspaceId });
       return NextResponse.json({ success: true });
     }
 

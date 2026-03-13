@@ -7,6 +7,9 @@ import {
   updateSessionArchivedRepo,
   updateSessionTitleRepo,
 } from "@/lib/repositories/sessionsRepository";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { log } from "@/lib/utils/logger";
 
 type PatchBody = { title?: string; archived?: boolean };
@@ -32,6 +35,19 @@ export async function GET(
   }
   if (session.userId !== user.uid) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
+  const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+  try {
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
+  } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
+    throw err;
   }
   return NextResponse.json({
     success: true,
@@ -82,6 +98,19 @@ export async function PATCH(
       { status: 403 }
     );
   }
+  const workspaceId = existing.workspaceId ?? existing.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+  try {
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
+  } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
+    throw err;
+  }
 
   const hasTitle = typeof body.title === "string" && body.title.trim() !== "";
   const hasArchived = typeof body.archived === "boolean";
@@ -113,6 +142,12 @@ export async function PATCH(
       session: serializeSession(updated),
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
     console.error("PATCH /api/sessions/[id]:", err);
     log("[API] PATCH /api/sessions/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
@@ -155,11 +190,30 @@ export async function DELETE(
       { status: 403 }
     );
   }
+  const workspaceId = existing.workspaceId ?? existing.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+  try {
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
+  } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
+    throw err;
+  }
   try {
     await deleteSessionRepo(id);
     log("[API] DELETE /api/sessions/[id] duration:", Date.now() - start);
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return NextResponse.json(
+        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
+        { status: 403 }
+      );
+    }
     console.error("DELETE /api/sessions/[id]:", err);
     log("[API] DELETE /api/sessions/[id] duration (error):", Date.now() - start);
     return NextResponse.json(

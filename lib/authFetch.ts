@@ -97,6 +97,17 @@ export async function authFetch(
       signal: signal ?? restInit.signal,
     });
     if (timeoutId) clearTimeout(timeoutId);
+    if (res.status === 403 && typeof window !== "undefined") {
+      res
+        .clone()
+        .json()
+        .then((data: { error?: string }) => {
+          if (data?.error === "WORKSPACE_SUSPENDED") {
+            window.location.href = "/workspace-suspended";
+          }
+        })
+        .catch(() => {});
+    }
     return res;
   } catch (err) {
     if (timeoutId) clearTimeout(timeoutId);
