@@ -1,24 +1,18 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
-import { requireAdmin } from "@/lib/server/requireAdmin";
+import { requireAdmin } from "@/lib/server/adminAuth";
 
 /**
  * GET /api/admin/me
  * Returns { isAdmin: boolean }. Used by admin layout to gate access.
+ * Uses same admin auth as other admin APIs; returns 200 { isAdmin: false } when not admin.
  */
 export async function GET(req: Request) {
-  let uid: string;
   try {
-    const decoded = await requireAuth(req);
-    uid = decoded.uid;
-  } catch (res) {
-    return res as Response;
-  }
-
-  try {
-    await requireAdmin(uid);
+    await requireAdmin(req);
     return NextResponse.json({ isAdmin: true });
-  } catch {
-    return NextResponse.json({ isAdmin: false });
+  } catch (e) {
+    const res = e as Response;
+    if (res?.status === 403) return NextResponse.json({ isAdmin: false });
+    return res;
   }
 }

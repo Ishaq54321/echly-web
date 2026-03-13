@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
-import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
+import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository";
 import { getWorkspaceEntitlements } from "@/lib/billing/getWorkspaceEntitlements";
 import { getWorkspacePlanState } from "@/lib/billing/getWorkspacePlanState";
@@ -37,14 +36,11 @@ export async function GET(req: Request) {
   }
 
   try {
-    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const workspace = await getWorkspace(workspaceId);
+    const { workspaceId, workspace } = await resolveWorkspaceForUser(user.uid);
 
     if (!workspace) {
       return NextResponse.json(SAFE_FALLBACK);
     }
-
-    assertWorkspaceActive(workspace);
 
     // Optional: use centralized plan resolver for canonical plan/limits/usage
     const planState = await getWorkspacePlanState(workspaceId);

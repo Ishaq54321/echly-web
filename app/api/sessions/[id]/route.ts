@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { Session } from "@/lib/domain/session";
 import { requireAuth } from "@/lib/server/auth";
 import {
   deleteSessionRepo,
@@ -7,9 +6,10 @@ import {
   updateSessionArchivedRepo,
   updateSessionTitleRepo,
 } from "@/lib/repositories/sessionsRepository";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
-import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
+import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { serializeSession } from "@/lib/server/serializeSession";
 import { log } from "@/lib/utils/logger";
 
 type PatchBody = { title?: string; archived?: boolean };
@@ -38,8 +38,7 @@ export async function GET(
   }
   const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
   try {
-    const workspace = await getWorkspace(workspaceId);
-    assertWorkspaceActive(workspace);
+    await resolveWorkspaceById(workspaceId);
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(
@@ -100,8 +99,7 @@ export async function PATCH(
   }
   const workspaceId = existing.workspaceId ?? existing.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
   try {
-    const workspace = await getWorkspace(workspaceId);
-    assertWorkspaceActive(workspace);
+    await resolveWorkspaceById(workspaceId);
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(
@@ -192,8 +190,7 @@ export async function DELETE(
   }
   const workspaceId = existing.workspaceId ?? existing.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
   try {
-    const workspace = await getWorkspace(workspaceId);
-    assertWorkspaceActive(workspace);
+    await resolveWorkspaceById(workspaceId);
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(
@@ -221,17 +218,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
-
-function serializeSession(session: Session): Record<string, unknown> {
-  const out = { ...session } as Record<string, unknown>;
-  const createdAt = session.createdAt as { toDate?: () => Date } | null | undefined;
-  if (createdAt != null && typeof createdAt.toDate === "function") {
-    out.createdAt = createdAt.toDate().toISOString();
-  }
-  const updatedAt = session.updatedAt as { toDate?: () => Date } | null | undefined;
-  if (updatedAt != null && typeof updatedAt.toDate === "function") {
-    out.updatedAt = updatedAt.toDate().toISOString();
-  }
-  return out;
 }

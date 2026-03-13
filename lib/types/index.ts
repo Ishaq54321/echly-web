@@ -10,7 +10,7 @@ export interface DecodedIdToken {
   [key: string]: unknown;
 }
 
-/** Express Request extended with authenticated user (for verifyFirebaseToken). */
+/** Express Request extended with authenticated user (for server middleware). */
 export interface RequestWithUser extends Request {
   user: DecodedIdToken;
 }

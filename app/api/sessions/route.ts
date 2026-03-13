@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { Session } from "@/lib/domain/session";
 import { requireAuth } from "@/lib/server/auth";
 import {
   getUserSessionsRepo,
@@ -8,9 +7,9 @@ import {
   getWorkspaceSessionCountRepo,
 } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
-import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
+import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { serializeSession } from "@/lib/server/serializeSession";
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
 
@@ -28,9 +27,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const workspace = await getWorkspace(workspaceId);
-    assertWorkspaceActive(workspace);
+    const { workspaceId, workspace } = await resolveWorkspaceForUser(user.uid);
     const workspaceSessions = await getWorkspaceSessionsRepo(workspaceId, 100);
     const sessions =
       workspaceSessions.length > 0
@@ -66,9 +63,7 @@ export async function POST(req: Request) {
     return res as Response;
   }
   try {
-    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const workspace = await getWorkspace(workspaceId);
-    assertWorkspaceActive(workspace);
+    const { workspaceId, workspace } = await resolveWorkspaceForUser(user.uid);
     if (workspace) {
       const currentSessionCount = await getWorkspaceSessionCountRepo(workspaceId);
       try {
@@ -97,17 +92,4 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-}
-
-function serializeSession(session: Session): Record<string, unknown> {
-  const out = { ...session } as Record<string, unknown>;
-  const createdAt = session.createdAt as { toDate?: () => Date } | null | undefined;
-  if (createdAt != null && typeof createdAt.toDate === "function") {
-    out.createdAt = createdAt.toDate().toISOString();
-  }
-  const updatedAt = session.updatedAt as { toDate?: () => Date } | null | undefined;
-  if (updatedAt != null && typeof updatedAt.toDate === "function") {
-    out.updatedAt = updatedAt.toDate().toISOString();
-  }
-  return out;
 }

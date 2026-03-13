@@ -8,9 +8,9 @@ import {
   deleteFeedbackWithSessionCountersRepo,
 } from "@/lib/repositories/feedbackRepository";
 import { getSessionByIdRepo, updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
-import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
+import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { log } from "@/lib/utils/logger";
 
 /** GET /api/tickets/:id — return single ticket (feedback) from DB. */
@@ -49,9 +49,8 @@ export async function GET(
     }
     const session = await getSessionByIdRepo(ticket.sessionId);
     const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const workspace = await getWorkspace(workspaceId);
     try {
-      assertWorkspaceActive(workspace);
+      await resolveWorkspaceById(workspaceId);
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
         return NextResponse.json(
@@ -136,9 +135,8 @@ export async function PATCH(
   }
   const session = await getSessionByIdRepo(existingForOwnership.sessionId);
   const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-  const workspace = await getWorkspace(workspaceId);
   try {
-    assertWorkspaceActive(workspace);
+    await resolveWorkspaceById(workspaceId);
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(
@@ -256,9 +254,8 @@ export async function DELETE(
     }
     const session = await getSessionByIdRepo(existingForOwnership.sessionId);
     const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const workspace = await getWorkspace(workspaceId);
     try {
-      assertWorkspaceActive(workspace);
+      await resolveWorkspaceById(workspaceId);
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
         return NextResponse.json(

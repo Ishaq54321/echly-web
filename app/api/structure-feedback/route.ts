@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { requireAuth } from "@/lib/server/auth";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
-import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
+import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { echlyDebug } from "@/lib/utils/logger";
 import { runFeedbackPipeline } from "@/lib/ai/runFeedbackPipeline";
 
@@ -76,9 +75,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   try {
-    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const workspace = await getWorkspace(workspaceId);
-    assertWorkspaceActive(workspace);
+    await resolveWorkspaceForUser(user.uid);
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });

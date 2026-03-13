@@ -24,19 +24,23 @@ export async function GET(req: Request) {
   }
   try {
     const workspacesSnap = await getDocs(collection(db, "workspaces"));
+    const docs = workspacesSnap.docs;
     let freeWorkspaces = 0;
     let paidWorkspaces = 0;
     let totalFeedbackCaptured = 0;
-    let totalSessions = 0;
 
-    for (const d of workspacesSnap.docs) {
+    for (const d of docs) {
       const data = d.data();
       const plan = data.billing?.plan ?? "free";
       if (plan === "free") freeWorkspaces++;
       else paidWorkspaces++;
       totalFeedbackCaptured += data.usage?.feedbackCreated ?? 0;
-      totalSessions += await getWorkspaceSessionCountRepo(d.id);
     }
+
+    const sessionCounts = await Promise.all(
+      docs.map((d) => getWorkspaceSessionCountRepo(d.id))
+    );
+    const totalSessions = sessionCounts.reduce((a, b) => a + b, 0);
 
     const stats: UsageStats = {
       totalWorkspaces: workspacesSnap.size,

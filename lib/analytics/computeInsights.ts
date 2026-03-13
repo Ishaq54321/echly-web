@@ -17,13 +17,13 @@ const TIME_SAVED_PER_TICKET_MINUTES = 5;
 const METRICS_WINDOW_DAYS = 30;
 
 /** Max feedback docs to fetch for aggregations (grouping by session/type). */
-const FEEDBACK_QUERY_LIMIT = 2000;
+const FEEDBACK_QUERY_LIMIT = 500;
 
 /** Max comments to fetch for reply count and first-reply timing. */
-const COMMENTS_QUERY_LIMIT = 3000;
+const COMMENTS_QUERY_LIMIT = 1000;
 
 /** Max sessions to count as "sessions reviewed". */
-const SESSIONS_QUERY_LIMIT = 500;
+const SESSIONS_QUERY_LIMIT = 200;
 
 type TimestampLike = { toDate?: () => Date } | null | undefined;
 

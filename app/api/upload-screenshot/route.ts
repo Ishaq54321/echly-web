@@ -3,9 +3,9 @@ import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { requireAuth } from "@/lib/server/auth";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
-import { assertWorkspaceActive, WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
+import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import {
   createScreenshotRepoSync,
   getScreenshotByIdRepo,
@@ -62,9 +62,8 @@ export async function POST(req: Request) {
     }
 
     const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const workspace = await getWorkspace(workspaceId);
     try {
-      assertWorkspaceActive(workspace);
+      await resolveWorkspaceById(workspaceId);
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
         return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
