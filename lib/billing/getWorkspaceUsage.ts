@@ -1,0 +1,30 @@
+import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository";
+import { getWorkspaceFeedbackCountRepo } from "@/lib/repositories/feedbackRepository";
+
+export interface WorkspaceUsage {
+  sessionCount: number;
+  feedbackCount: number;
+  memberCount: number;
+}
+
+/**
+ * Returns current usage counts for a workspace. Used for limit checks and billing.
+ */
+export async function getWorkspaceUsage(workspaceId: string): Promise<WorkspaceUsage | null> {
+  const workspace = await getWorkspace(workspaceId);
+  if (!workspace) return null;
+
+  const [sessionCount, feedbackCount] = await Promise.all([
+    getWorkspaceSessionCountRepo(workspaceId),
+    getWorkspaceFeedbackCountRepo(workspaceId),
+  ]);
+
+  const memberCount = Array.isArray(workspace.members) ? workspace.members.length : 0;
+
+  return {
+    sessionCount,
+    feedbackCount,
+    memberCount,
+  };
+}

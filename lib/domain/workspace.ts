@@ -1,4 +1,5 @@
 import type { Timestamp } from "firebase/firestore";
+import { PLANS } from "@/lib/billing/plans";
 
 export type WorkspacePlan = "free" | "starter" | "business" | "enterprise";
 export type WorkspaceBillingCycle = "monthly" | "annual";
@@ -57,6 +58,8 @@ export interface Workspace {
   entitlements: {
     brandingControls: boolean;
     integrations: boolean;
+    /** When true, workspace can access Insights. Derived from plan if missing. */
+    insightsAccess?: boolean;
   };
 }
 
@@ -112,6 +115,7 @@ export function defaultWorkspaceDoc(params: {
     entitlements: {
       brandingControls: false,
       integrations: false,
+      insightsAccess: PLANS.free.insightsAccess,
     },
   };
 }

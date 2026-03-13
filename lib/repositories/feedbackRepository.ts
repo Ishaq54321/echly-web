@@ -467,6 +467,18 @@ export async function getSessionFeedbackTotalCountRepo(
   return snap.data().count;
 }
 
+/**
+ * Returns the total number of feedback items in a workspace. Used for usage/billing.
+ */
+export async function getWorkspaceFeedbackCountRepo(workspaceId: string): Promise<number> {
+  const q = query(
+    collection(db, "feedback"),
+    where("workspaceId", "==", workspaceId)
+  );
+  const snap = await getCountFromServer(q);
+  return snap.data().count;
+}
+
 const DELETE_SESSION_FEEDBACK_LIMIT = 500;
 
 /**

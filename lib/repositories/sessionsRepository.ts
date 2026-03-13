@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getCountFromServer,
   getDoc,
   getDocs,
   limit,
@@ -47,6 +48,19 @@ export async function createSessionRepo(
   });
 
   return docRef.id;
+}
+
+/**
+ * Returns the number of sessions in a workspace (all, including archived).
+ * Used for billing/plan limit checks.
+ */
+export async function getWorkspaceSessionCountRepo(workspaceId: string): Promise<number> {
+  const q = query(
+    collection(db, "sessions"),
+    where("workspaceId", "==", workspaceId)
+  );
+  const snap = await getCountFromServer(q);
+  return snap.data().count;
 }
 
 /**

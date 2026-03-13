@@ -5,9 +5,13 @@ import {
   getUserSessionsRepo,
   createSessionRepo,
   getWorkspaceSessionsRepo,
+  getWorkspaceSessionCountRepo,
 } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
+import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
 
 /** GET /api/sessions — list sessions for the authenticated user. */
 export async function GET(req: Request) {
@@ -52,6 +56,23 @@ export async function POST(req: Request) {
   }
   try {
     const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+    const workspace = await getWorkspace(workspaceId);
+    if (workspace) {
+      const sessionCount = await getWorkspaceSessionCountRepo(workspaceId);
+      try {
+        checkPlanLimit({
+          workspace,
+          metric: "maxSessions",
+          currentUsage: sessionCount,
+        });
+      } catch (limitErr) {
+        const planErr = limitErr as PlanLimitError;
+        if (planErr.code === "PLAN_LIMIT_REACHED") {
+          return NextResponse.json(planLimitReachedBody(planErr), { status: 403 });
+        }
+        throw limitErr;
+      }
+    }
     const id = await createSessionRepo(workspaceId, user.uid, null);
     return NextResponse.json({ success: true, session: { id } });
   } catch (err) {
