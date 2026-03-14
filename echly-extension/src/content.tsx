@@ -1226,15 +1226,86 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     }
   }, [isEditingFeedback]);
 
-  if (!authChecked) {
-    return null;
-  }
+  /* Tray renders immediately; auth runs in background. When not authenticated, show login UI inside tray. */
+  const pending = extensionClarityPending;
 
   if (!user) {
-    return null;
+    return (
+      <>
+        {globalState.visible && (
+          <>
+            {!globalState.expanded && (
+              <div className="echly-floating-trigger-wrapper">
+                <button
+                  type="button"
+                  onClick={onExpandRequest}
+                  className={launcherLogoUrl ? "echly-floating-trigger echly-launcher" : "echly-floating-trigger"}
+                  aria-label="Open Echly"
+                >
+                  {launcherLogoUrl ? (
+                    <img src={launcherLogoUrl} className="echly-launcher-logo" alt="Echly" />
+                  ) : (
+                    "Echly"
+                  )}
+                </button>
+              </div>
+            )}
+            {globalState.expanded && (
+              <div className="echly-sidebar-container" style={{ position: "fixed", bottom: 24, right: 24, zIndex: 2147483647 }}>
+                <div
+                  className="echly-sidebar-inner"
+                  style={{
+                    minWidth: 320,
+                    maxWidth: 420,
+                    borderRadius: 16,
+                    overflow: "hidden",
+                    boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+                    background: theme === "dark" ? "rgba(20,22,28,0.96)" : "rgba(255,255,255,0.98)",
+                    border: theme === "dark" ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.08)",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: theme === "dark" ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.08)" }}>
+                    <span style={{ fontWeight: 600, fontSize: 15, color: theme === "dark" ? "#F3F4F6" : "#111" }}>Echly</span>
+                    <button
+                      type="button"
+                      onClick={onCollapseRequest}
+                      aria-label="Close"
+                      style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: theme === "dark" ? "#9CA3AF" : "#6B7280", fontSize: 18 }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div style={{ padding: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+                    <p style={{ margin: 0, fontSize: 14, color: theme === "dark" ? "#9CA3AF" : "#6B7280", textAlign: "center" }}>
+                      Sign in to capture feedback and manage sessions.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={requestOpenLoginPage}
+                      style={{
+                        background: "#3B82F6",
+                        color: "white",
+                        border: "none",
+                        borderRadius: 10,
+                        padding: "10px 20px",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Sign in
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </>
+    );
   }
-
-  const pending = extensionClarityPending;
 
   return (
     <>

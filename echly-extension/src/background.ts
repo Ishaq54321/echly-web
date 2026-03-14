@@ -9,6 +9,7 @@ const API_BASE = "http://localhost:3000";
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 const DASHBOARD_ORIGINS = ["http://localhost:3000", "https://echly-web.vercel.app"];
+const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
 const TOKEN_REQUEST_TIMEOUT_MS = 2000;
 const SESSION_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
@@ -461,37 +462,34 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
-
-/**
- * Validate session in background after tray is already shown. Uses session cache to avoid
- * unnecessary token checks; if not authenticated, opens login tab.
- */
-async function validateSessionInBackground(tab: chrome.tabs.Tab | undefined): Promise<void> {
-  if (
-    sessionCache.authenticated &&
-    Date.now() - sessionCache.checkedAt < SESSION_CACHE_TTL_MS
-  ) {
-    return;
-  }
-  const session = await checkBackendSession();
-  sessionCache = {
-    authenticated: session.authenticated,
-    checkedAt: Date.now(),
-  };
-  if (!session.authenticated) {
-    const loginUrl = `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${encodeURIComponent(tab?.url ?? "")}`;
-    chrome.tabs.create({ url: loginUrl });
-  }
-}
-
-/** Extension icon click: show tray instantly, then validate session in background. */
-chrome.action.onClicked.addListener(async (tab) => {
+/** Extension icon click: open tray immediately; auth runs in background and does not block UI. */
+chrome.action.onClicked.addListener((_tab) => {
   globalUIState.visible = true;
   globalUIState.expanded = true;
-  await persistUIState();
-  await broadcastUIState();
-  validateSessionInBackground(tab);
+  persistUIState();
+  broadcastUIState();
+
+  checkBackendSession()
+    .then((session) => {
+      sessionCache = {
+        authenticated: session.authenticated,
+        checkedAt: Date.now(),
+      };
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.id) {
+            chrome.tabs
+              .sendMessage(tab.id, {
+                type: "ECHLY_AUTH_STATE_UPDATED",
+                authenticated: session.authenticated,
+                user: session.user ?? null,
+              })
+              .catch(() => {});
+          }
+        });
+      });
+    })
+    .catch(() => {});
 });
 
 chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
