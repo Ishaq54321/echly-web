@@ -50,8 +50,16 @@ function LoginContent() {
 
     try{
       const user = await signInWithGoogle();
-      if (isExtension && returnUrl && safeRedirectToReturnUrl(returnUrl)) {
-        return;
+      if (isExtension && returnUrl) {
+        if (typeof window !== "undefined") {
+          if (window.chrome?.runtime?.sendMessage) {
+            try {
+              window.chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" });
+            } catch {}
+          }
+          window.postMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" }, window.location.origin);
+        }
+        if (safeRedirectToReturnUrl(returnUrl)) return;
       }
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
@@ -78,8 +86,16 @@ function LoginContent() {
 
     try{
       const user = await signInWithEmailPassword(email,password);
-      if (isExtension && returnUrl && safeRedirectToReturnUrl(returnUrl)) {
-        return;
+      if (isExtension && returnUrl) {
+        if (typeof window !== "undefined") {
+          if (window.chrome?.runtime?.sendMessage) {
+            try {
+              window.chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" });
+            } catch {}
+          }
+          window.postMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" }, window.location.origin);
+        }
+        if (safeRedirectToReturnUrl(returnUrl)) return;
       }
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");

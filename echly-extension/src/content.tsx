@@ -1,7 +1,7 @@
 /**
  * Content script: ultra-thin UI layer. Auto-injected via manifest on all URLs.
  * Single mount, visibility controlled by background (ECHLY_VISIBILITY). No blocking overlays.
- * Auth in popup only; unauthenticated = minimal disabled state with "Sign in from extension" tooltip.
+ * Auth in popup only; unauthenticated = minimal disabled state with Sign in button.
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -329,6 +329,47 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         setAuthChecked(true);
       }
     );
+  }, []);
+
+  React.useEffect(() => {
+    const listener = (msg: { type?: string; authenticated?: boolean; user?: AuthUser | null }) => {
+      if (msg?.type !== "ECHLY_AUTH_STATE_UPDATED") return;
+      if (msg.authenticated && msg.user?.uid) {
+        setUser({
+          uid: msg.user.uid,
+          name: msg.user.name ?? null,
+          email: msg.user.email ?? null,
+          photoURL: msg.user.photoURL ?? null,
+        });
+      } else {
+        setUser(null);
+      }
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    return () => {
+      chrome.runtime.onMessage.removeListener(listener);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        chrome.runtime.sendMessage({ type: "ECHLY_GET_AUTH_STATE" }, (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
+          if (response?.authenticated && response.user?.uid) {
+            setUser({
+              uid: response.user.uid,
+              name: response.user.name ?? null,
+              email: response.user.email ?? null,
+              photoURL: response.user.photoURL ?? null,
+            });
+          } else {
+            setUser(null);
+          }
+        });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
   const handleComplete = React.useCallback(
@@ -1177,32 +1218,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   }
 
   if (!user) {
-    return (
-      <div style={{ pointerEvents: "auto" }}>
-        <button
-          type="button"
-          title="Sign in from extension"
-          onClick={requestOpenLoginPage}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            padding: "10px 20px",
-            borderRadius: "20px",
-            border: "1px solid rgba(0,0,0,0.08)",
-            background: "#fff",
-            color: "#6b7280",
-            fontSize: "14px",
-            fontWeight: 600,
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-          }}
-        >
-          <img src={logoUrl} alt="" width={22} height={22} style={{ display: "block" }} />
-          Sign in from extension
-        </button>
-      </div>
-    );
+    return null;
   }
 
   const pending = extensionClarityPending;
@@ -1630,8 +1646,21 @@ function injectPageTokenBridge(): void {
   document.documentElement.appendChild(script);
 }
 
+/** Forward login completion signal from page (postMessage) to background so auth refreshes after redirect. */
+function ensureLoginCompleteForwarder(): void {
+  const win = window as Window & { __ECHLY_LOGIN_FORWARDER__?: boolean };
+  if (win.__ECHLY_LOGIN_FORWARDER__) return;
+  win.__ECHLY_LOGIN_FORWARDER__ = true;
+  window.addEventListener("message", (event: MessageEvent) => {
+    if (event.data?.type !== "ECHLY_EXTENSION_LOGIN_COMPLETE") return;
+    if (!DASHBOARD_ORIGINS.includes(event.origin)) return;
+    chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" }).catch(() => {});
+  });
+}
+
 function main(): void {
   injectPageTokenBridge();
+  ensureLoginCompleteForwarder();
   let host = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
   if (!host) {
     host = document.createElement("div");

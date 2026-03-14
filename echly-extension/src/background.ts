@@ -355,6 +355,29 @@ function broadcastUIState(): void {
   });
 }
 
+/** After login completion (signal from login page), re-validate session and push auth state to all tabs. */
+async function refreshExtensionAuth(): Promise<void> {
+  try {
+    const session = await checkBackendSession();
+    sessionCache = {
+      authenticated: session.authenticated,
+      checkedAt: Date.now(),
+    };
+    chrome.tabs.query({}, (tabs) => {
+      for (const tab of tabs) {
+        if (!tab.id) continue;
+        chrome.tabs
+          .sendMessage(tab.id, {
+            type: "ECHLY_AUTH_STATE_UPDATED",
+            authenticated: session.authenticated,
+            user: session.user ?? null,
+          })
+          .catch(() => {});
+      }
+    });
+  } catch {}
+}
+
 /** When user switches tabs, push current session state to that tab so every tab receives state when focused. */
 chrome.tabs.onActivated.addListener((activeInfo) => {
   const tabId = activeInfo.tabId;
@@ -402,27 +425,21 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
 
-/** Extension icon click: use session cache when valid to open tray instantly; otherwise validate and update cache. */
+/** Extension icon click: always re-check session so login is detected immediately after login. */
 chrome.action.onClicked.addListener(async (tab) => {
-  const cacheValid =
-    sessionCache.authenticated &&
-    Date.now() - sessionCache.checkedAt < SESSION_CACHE_TTL_MS;
-
-  if (!cacheValid) {
-    const session = await checkBackendSession();
-    sessionCache = {
-      authenticated: session.authenticated,
-      checkedAt: Date.now(),
-    };
-    if (!session.authenticated) {
-      clearAuthState();
-      const returnUrl = typeof tab?.url === "string" ? encodeURIComponent(tab.url) : "";
-      const loginUrl = returnUrl
-        ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
-        : `${ECHLY_LOGIN_BASE}?extension=true`;
-      chrome.tabs.create({ url: loginUrl });
-      return;
-    }
+  const session = await checkBackendSession();
+  sessionCache = {
+    authenticated: session.authenticated,
+    checkedAt: Date.now(),
+  };
+  if (!session.authenticated) {
+    clearAuthState();
+    const returnUrl = typeof tab?.url === "string" ? encodeURIComponent(tab.url) : "";
+    const loginUrl = returnUrl
+      ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
+      : `${ECHLY_LOGIN_BASE}?extension=true`;
+    chrome.tabs.create({ url: loginUrl });
+    return;
   }
 
   globalUIState.visible = !globalUIState.visible;
@@ -431,6 +448,12 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
   await persistUIState();
   broadcastUIState();
+});
+
+chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
+  if (msg?.type === "ECHLY_EXTENSION_LOGIN_COMPLETE") {
+    refreshExtensionAuth();
+  }
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
