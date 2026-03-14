@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -291,10 +291,31 @@ function DashboardContent() {
   );
 }
 
+function DashboardReturnUrlHandler() {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const returnUrl = searchParams.get("returnUrl");
+    if (!returnUrl) return;
+    try {
+      const decoded = decodeURIComponent(returnUrl);
+      const u = new URL(decoded);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        window.open(decoded);
+      }
+    } catch {
+      /* ignore invalid returnUrl */
+    }
+  }, [searchParams]);
+  return null;
+}
+
 export default function DashboardPage() {
   return (
     <ToastProvider>
       <DragSessionProvider>
+        <Suspense fallback={null}>
+          <DashboardReturnUrlHandler />
+        </Suspense>
         <DashboardContent />
       </DragSessionProvider>
     </ToastProvider>
