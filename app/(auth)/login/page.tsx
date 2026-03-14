@@ -33,19 +33,18 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect authenticated users. When extension=true, send tokens to extension then redirect to dashboard.
+  // Redirect authenticated users. When extension=true, send tokens via postMessage (content script bridges to extension) then redirect.
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        if (isExtension && typeof window.chrome?.runtime?.sendMessage === "function") {
+        if (isExtension) {
           try {
             const idToken = await user.getIdToken();
             const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
-            window.chrome.runtime.sendMessage({
-              type: "ECHLY_EXTENSION_AUTH_SUCCESS",
-              idToken,
-              refreshToken,
-            });
+            window.postMessage(
+              { type: "ECHLY_PAGE_LOGIN_SUCCESS", idToken, refreshToken },
+              "*"
+            );
           } catch {
             /* ignore */
           }
@@ -88,15 +87,10 @@ function LoginContent() {
       if (isExtension) {
         const idToken = await user.getIdToken();
         const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
-        if (typeof window.chrome?.runtime?.sendMessage === "function") {
-          try {
-            window.chrome.runtime.sendMessage({
-              type: "ECHLY_EXTENSION_AUTH_SUCCESS",
-              idToken,
-              refreshToken,
-            });
-          } catch {}
-        }
+        window.postMessage(
+          { type: "ECHLY_PAGE_LOGIN_SUCCESS", idToken, refreshToken },
+          "*"
+        );
         window.location.href = "/dashboard";
         return;
       }
@@ -128,15 +122,10 @@ function LoginContent() {
       if (isExtension) {
         const idToken = await user.getIdToken();
         const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
-        if (typeof window.chrome?.runtime?.sendMessage === "function") {
-          try {
-            window.chrome.runtime.sendMessage({
-              type: "ECHLY_EXTENSION_AUTH_SUCCESS",
-              idToken,
-              refreshToken,
-            });
-          } catch {}
-        }
+        window.postMessage(
+          { type: "ECHLY_PAGE_LOGIN_SUCCESS", idToken, refreshToken },
+          "*"
+        );
         window.location.href = "/dashboard";
         return;
       }

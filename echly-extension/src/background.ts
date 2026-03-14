@@ -407,6 +407,63 @@ function broadcastUIState(): void {
   });
 }
 
+/**
+ * After tokens are in storage: validate with /api/auth/session, then if authenticated
+ * set tray visible/expanded, broadcast, and switch back to origin tab.
+ */
+async function validateSessionAndOpenTray(): Promise<{ success: boolean }> {
+  let token: string;
+  try {
+    token = await getValidToken();
+  } catch {
+    clearAuthState();
+    return { success: false };
+  }
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401 || res.status === 403) {
+      clearAuthState();
+      return { success: false };
+    }
+    if (!res.ok) return { success: false };
+    const data = (await res.json()) as {
+      authenticated?: boolean;
+      user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null };
+    };
+    if (data.authenticated !== true) return { success: false };
+
+    sessionCache = { authenticated: true, checkedAt: Date.now() };
+    globalUIState.user = data.user ?? null;
+    globalUIState.visible = true;
+    globalUIState.expanded = true;
+    persistUIState();
+    broadcastUIState();
+
+    if (originTabId != null) {
+      try {
+        await chrome.tabs.update(originTabId, { active: true });
+      } catch {
+        if (ECHLY_DEBUG) console.debug("[EXTENSION] could not switch to origin tab", originTabId);
+      }
+    }
+    if (loginTabId != null) {
+      try {
+        const t = await chrome.tabs.get(loginTabId);
+        if (t?.url?.includes("/login")) chrome.tabs.remove(loginTabId);
+      } catch {
+        /* tab may already be closed or invalid */
+      }
+      loginTabId = null;
+    }
+    return { success: true };
+  } catch {
+    clearAuthState();
+    return { success: false };
+  }
+}
+
 /** When user switches tabs, push current session state to that tab so every tab receives state when focused. */
 chrome.tabs.onActivated.addListener((activeInfo) => {
   const tabId = activeInfo.tabId;
@@ -509,7 +566,7 @@ chrome.action.onClicked.addListener((tab) => {
   })();
 });
 
-/** Login page sends tokens after Firebase login; we store them, validate, switch to origin tab, open tray. */
+/** Login page sends tokens via content script (postMessage bridge). We store them, validate session, open tray, switch to origin tab. */
 chrome.runtime.onMessage.addListener((msg: { type?: string; idToken?: string; refreshToken?: string }, _sender, sendResponse) => {
   if (msg?.type !== "ECHLY_EXTENSION_AUTH_SUCCESS") return;
   const idToken = msg.idToken;
@@ -531,40 +588,8 @@ chrome.runtime.onMessage.addListener((msg: { type?: string; idToken?: string; re
           () => resolve()
         );
       });
-
-      const res = await fetch(`${API_BASE}/api/auth/session`, {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      if (!res.ok || res.status === 401 || res.status === 403) {
-        clearAuthState();
-        sendResponse?.({ success: false });
-        return;
-      }
-      const data = (await res.json()) as { authenticated?: boolean; user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null } };
-      sessionCache = { authenticated: data.authenticated === true, checkedAt: Date.now() };
-      globalUIState.user = data.user ?? null;
-      globalUIState.visible = true;
-      globalUIState.expanded = true;
-      persistUIState();
-      broadcastUIState();
-
-      if (originTabId != null) {
-        try {
-          await chrome.tabs.update(originTabId, { active: true });
-        } catch {
-          if (ECHLY_DEBUG) console.debug("[EXTENSION] could not switch to origin tab", originTabId);
-        }
-      }
-      if (loginTabId != null) {
-        try {
-          const t = await chrome.tabs.get(loginTabId);
-          if (t?.url?.includes("/login")) chrome.tabs.remove(loginTabId);
-        } catch {
-          /* tab may already be closed or invalid */
-        }
-        loginTabId = null;
-      }
-      sendResponse?.({ success: true });
+      const result = await validateSessionAndOpenTray();
+      sendResponse?.(result.success ? { success: true } : { success: false });
     } catch (e) {
       if (ECHLY_DEBUG) console.debug("[EXTENSION] auth success handler error", e);
       clearAuthState();

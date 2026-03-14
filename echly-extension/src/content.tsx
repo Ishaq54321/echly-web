@@ -1647,9 +1647,20 @@ function ensureLoginCompleteForwarder(): void {
   if (win.__ECHLY_LOGIN_FORWARDER__) return;
   win.__ECHLY_LOGIN_FORWARDER__ = true;
   window.addEventListener("message", (event: MessageEvent) => {
-    if (event.data?.type !== "ECHLY_EXTENSION_LOGIN_COMPLETE") return;
-    if (!DASHBOARD_ORIGINS.includes(event.origin)) return;
-    chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" }).catch(() => {});
+    if (!event.data) return;
+    if (event.data.type === "ECHLY_PAGE_LOGIN_SUCCESS") {
+      if (!DASHBOARD_ORIGINS.includes(event.origin)) return;
+      chrome.runtime.sendMessage({
+        type: "ECHLY_EXTENSION_AUTH_SUCCESS",
+        idToken: event.data.idToken,
+        refreshToken: event.data.refreshToken,
+      }).catch(() => {});
+      return;
+    }
+    if (event.data?.type === "ECHLY_EXTENSION_LOGIN_COMPLETE") {
+      if (!DASHBOARD_ORIGINS.includes(event.origin)) return;
+      chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" }).catch(() => {});
+    }
   });
 }
 
