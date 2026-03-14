@@ -203,10 +203,14 @@ function clearSessionCache(): void {
   globalUIState.user = null;
 }
 
-/** Clear legacy auth state from storage (removes only legacy keys if present). */
+/** Clear legacy auth state from storage (removes only legacy keys if present). Also closes tray and broadcasts. */
 function clearAuthState(): void {
   clearSessionCache();
+  globalUIState.visible = false;
+  globalUIState.expanded = false;
   chrome.storage.local.remove([...AUTH_STORAGE_KEYS_LEGACY]);
+  persistUIState();
+  broadcastUIState();
 }
 
 /**
@@ -375,7 +379,7 @@ function broadcastUIState(): void {
   });
 }
 
-/** After login completion: update sessionCache only. No new tabs, no broadcast auth requests. */
+/** After login completion: update sessionCache and global UI state, then broadcast. */
 async function refreshExtensionAuth(): Promise<void> {
   try {
     const session = await checkBackendSession();
@@ -383,6 +387,10 @@ async function refreshExtensionAuth(): Promise<void> {
       authenticated: session.authenticated,
       checkedAt: Date.now(),
     };
+    if (session.authenticated) {
+      globalUIState.user = session.user ?? null;
+      broadcastUIState();
+    }
   } catch {}
 }
 
