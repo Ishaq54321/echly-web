@@ -27,7 +27,8 @@ let loginTabId: number | null = null;
 let authCheckInProgress = false;
 
 /**
- * Open login tab: reuse existing tab with /login or /dashboard, or create new one.
+ * Open login tab: reuse only an existing tab whose URL contains "/login".
+ * Dashboard tabs are never reused so the extension always opens the login page when unauthenticated.
  * Sets loginTabId and returns the tab id.
  */
 function openOrFocusLoginTab(loginUrl: string): Promise<number> {
@@ -37,7 +38,7 @@ function openOrFocusLoginTab(loginUrl: string): Promise<number> {
         (t) =>
           t.id != null &&
           typeof t.url === "string" &&
-          (t.url.includes("/login") || t.url.includes("/dashboard"))
+          t.url.includes("/login")
       );
       if (existing?.id != null) {
         const id = existing.id;
@@ -519,12 +520,13 @@ chrome.runtime.onInstalled.addListener(() => {
   prewarmSessionFromStorage();
 });
 
-/** Extension icon click: store origin tab; use session cache (30s) for instant tray, else validate then open tray or login. */
+/** Extension icon click: store origin tab; use session cache (30s) for instant tray, else validate then open tray or login. Never opens or focuses dashboard. */
 chrome.action.onClicked.addListener((tab) => {
   if (authCheckInProgress) return;
   originTabId = tab?.id ?? null;
 
   if (sessionCache.authenticated === true && Date.now() - sessionCache.checkedAt < SESSION_CACHE_TTL_MS) {
+    console.log("[ECHLY AUTH] opening tray");
     globalUIState.visible = true;
     globalUIState.expanded = true;
     persistUIState();
@@ -537,15 +539,18 @@ chrome.action.onClicked.addListener((tab) => {
     try {
       const session = await checkBackendSession();
       sessionCache = { authenticated: session.authenticated, checkedAt: Date.now() };
+      console.log("[ECHLY AUTH] session authenticated:", session.authenticated);
 
       if (session.authenticated === true) {
         globalUIState.user = session.user ?? null;
+        console.log("[ECHLY AUTH] opening tray");
         globalUIState.visible = true;
         globalUIState.expanded = true;
         persistUIState();
         broadcastUIState();
       } else {
         globalUIState.user = null;
+        console.log("[ECHLY AUTH] opening login tab");
         const returnUrl = typeof tab?.url === "string" ? tab.url : "";
         const loginUrl =
           ECHLY_LOGIN_BASE +
@@ -554,6 +559,7 @@ chrome.action.onClicked.addListener((tab) => {
         await openOrFocusLoginTab(loginUrl);
       }
     } catch {
+      console.log("[ECHLY AUTH] opening login tab");
       const returnUrl = typeof tab?.url === "string" ? tab.url : "";
       const loginUrl =
         ECHLY_LOGIN_BASE +
