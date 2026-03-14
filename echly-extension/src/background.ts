@@ -9,7 +9,7 @@ const API_BASE = "http://localhost:3000";
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 const DASHBOARD_ORIGINS = ["http://localhost:3000", "https://echly-web.vercel.app"];
-const TOKEN_REQUEST_TIMEOUT_MS = 6000;
+const TOKEN_REQUEST_TIMEOUT_MS = 2000;
 const SESSION_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
 /** In-memory session cache for instant tray open. Not persisted; TTL 30s. */
@@ -243,7 +243,8 @@ async function prewarmAuthSession(): Promise<void> {
 
 /**
  * Request a fresh Firebase ID token from a dashboard tab's page (via content script).
- * Tries active tab first, then any tab with dashboard origin. Returns null if none.
+ * Tries active tab first, then any tab with dashboard origin. If no dashboard tab exists,
+ * opens dashboard silently in background, waits briefly, then retries (stops login loop).
  */
 async function getTokenFromPage(): Promise<string | null> {
   const tryTab = (tabId: number): Promise<string | null> =>
@@ -262,6 +263,16 @@ async function getTokenFromPage(): Promise<string | null> {
   const tabs = await new Promise<chrome.tabs.Tab[]>((resolve) => {
     chrome.tabs.query({}, (t) => resolve(t));
   });
+  const hasDashboardTab = () =>
+    tabs.some((t) => {
+      if (!t.url) return false;
+      try {
+        return DASHBOARD_ORIGINS.includes(new URL(t.url).origin);
+      } catch {
+        return false;
+      }
+    });
+
   const activeTab = tabs.find((t) => t.active);
   if (activeTab?.id) {
     const token = await tryTab(activeTab.id);
@@ -277,6 +288,33 @@ async function getTokenFromPage(): Promise<string | null> {
     }
     const token = await tryTab(tab.id);
     if (token) return token;
+  }
+
+  /* No dashboard tab: open dashboard silently in background, wait, then retry (stops login loop). */
+  if (!hasDashboardTab()) {
+    const ECHLY_LOGIN_BASE_FOR_DASHBOARD = "https://echly-web.vercel.app";
+    await new Promise<void>((resolve) => {
+      chrome.tabs.create(
+        { url: `${ECHLY_LOGIN_BASE_FOR_DASHBOARD}/dashboard`, active: false },
+        () => {
+          setTimeout(resolve, 800);
+        }
+      );
+    });
+    const tabsAfter = await new Promise<chrome.tabs.Tab[]>((resolve) => {
+      chrome.tabs.query({}, (t) => resolve(t));
+    });
+    for (const tab of tabsAfter) {
+      if (!tab.id || !tab.url) continue;
+      try {
+        const u = new URL(tab.url);
+        if (!DASHBOARD_ORIGINS.includes(u.origin)) continue;
+      } catch {
+        continue;
+      }
+      const token = await tryTab(tab.id);
+      if (token) return token;
+    }
   }
   return null;
 }
@@ -425,44 +463,48 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
 
-/** Extension icon click: always re-check session so login is detected immediately after login. */
-chrome.action.onClicked.addListener(async (tab) => {
+/**
+ * Validate session in background after tray is already shown. Uses session cache to avoid
+ * unnecessary token checks; if not authenticated, opens login tab.
+ */
+async function validateSessionInBackground(tab: chrome.tabs.Tab | undefined): Promise<void> {
+  if (
+    sessionCache.authenticated &&
+    Date.now() - sessionCache.checkedAt < SESSION_CACHE_TTL_MS
+  ) {
+    return;
+  }
   const session = await checkBackendSession();
   sessionCache = {
     authenticated: session.authenticated,
     checkedAt: Date.now(),
   };
   if (!session.authenticated) {
-    clearAuthState();
-    const returnUrl = typeof tab?.url === "string" ? encodeURIComponent(tab.url) : "";
-    const loginUrl = returnUrl
-      ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
-      : `${ECHLY_LOGIN_BASE}?extension=true`;
+    const loginUrl = `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${encodeURIComponent(tab?.url ?? "")}`;
     chrome.tabs.create({ url: loginUrl });
-    return;
   }
+}
 
-  globalUIState.visible = !globalUIState.visible;
-  if (globalUIState.visible) {
-    globalUIState.expanded = false;
-  }
+/** Extension icon click: show tray instantly, then validate session in background. */
+chrome.action.onClicked.addListener(async (tab) => {
+  globalUIState.visible = true;
+  globalUIState.expanded = true;
   await persistUIState();
-  broadcastUIState();
+  await broadcastUIState();
+  validateSessionInBackground(tab);
 });
 
 chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
   if (msg?.type === "ECHLY_EXTENSION_LOGIN_COMPLETE") {
-    refreshExtensionAuth();
+    refreshExtensionAuth(); /* Runs checkBackendSession then broadcasts ECHLY_AUTH_STATE_UPDATED to all tabs. */
   }
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   echlyLog("MESSAGE", "received", request.type);
   if (request.type === "ECHLY_TOGGLE_VISIBILITY") {
-    globalUIState.visible = !globalUIState.visible;
-    if (globalUIState.visible) {
-      globalUIState.expanded = false;
-    }
+    globalUIState.visible = true;
+    globalUIState.expanded = true;
     broadcastUIState();
     sendResponse({ success: true });
     return true;

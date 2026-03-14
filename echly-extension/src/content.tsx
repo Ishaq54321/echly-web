@@ -331,6 +331,19 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     );
   }, []);
 
+  /* When tray becomes visible, request auth again so UI shows correct user state. */
+  React.useEffect(() => {
+    if (!globalState.visible) return;
+    chrome.runtime.sendMessage(
+      { type: "ECHLY_GET_AUTH_STATE" },
+      (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
+        if (response?.authenticated && response.user?.uid) {
+          setUser({ uid: response.user.uid, name: response.user.name ?? null, email: response.user.email ?? null, photoURL: response.user.photoURL ?? null });
+        }
+      }
+    );
+  }, [globalState.visible]);
+
   React.useEffect(() => {
     const listener = (msg: { type?: string; authenticated?: boolean; user?: AuthUser | null }) => {
       if (msg?.type !== "ECHLY_AUTH_STATE_UPDATED") return;

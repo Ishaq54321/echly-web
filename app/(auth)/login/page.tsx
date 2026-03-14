@@ -50,16 +50,14 @@ function LoginContent() {
 
     try{
       const user = await signInWithGoogle();
-      if (isExtension && returnUrl) {
-        if (typeof window !== "undefined") {
-          if (window.chrome?.runtime?.sendMessage) {
-            try {
-              window.chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" });
-            } catch {}
-          }
-          window.postMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" }, window.location.origin);
+      if (isExtension) {
+        if (window.chrome?.runtime?.sendMessage) {
+          try {
+            window.chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" });
+          } catch {}
         }
-        if (safeRedirectToReturnUrl(returnUrl)) return;
+        window.location.href = "/dashboard";
+        return;
       }
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
@@ -86,16 +84,14 @@ function LoginContent() {
 
     try{
       const user = await signInWithEmailPassword(email,password);
-      if (isExtension && returnUrl) {
-        if (typeof window !== "undefined") {
-          if (window.chrome?.runtime?.sendMessage) {
-            try {
-              window.chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" });
-            } catch {}
-          }
-          window.postMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" }, window.location.origin);
+      if (isExtension) {
+        if (window.chrome?.runtime?.sendMessage) {
+          try {
+            window.chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" });
+          } catch {}
         }
-        if (safeRedirectToReturnUrl(returnUrl)) return;
+        window.location.href = "/dashboard";
+        return;
       }
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");

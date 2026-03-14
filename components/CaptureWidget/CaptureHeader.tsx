@@ -135,9 +135,7 @@ export default function CaptureHeader({
             className={`echly-header-home-wrap${theme === "dark" ? " dark" : ""}`}
             style={{ cursor: "pointer" }}
             onClick={() => {
-              if (typeof chrome !== "undefined" && chrome.tabs?.create) {
-                chrome.tabs.create({ url: "https://echly-web.vercel.app/dashboard" });
-              }
+              window.open("https://echly-web.vercel.app/dashboard", "_blank");
             }}
             aria-label="Open Echly dashboard"
           >

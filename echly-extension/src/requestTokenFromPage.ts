@@ -12,8 +12,8 @@ import {
   ECHLY_EXTENSION_SOURCE,
 } from "./secureBridgeChannel";
 
-const TOKEN_REQUEST_TIMEOUT_MS = 5000;
-const HANDSHAKE_TIMEOUT_MS = 3000;
+const HANDSHAKE_TIMEOUT_MS = 1500;
+const TOKEN_REQUEST_TIMEOUT_MS = 2000;
 
 export async function requestTokenFromPage(): Promise<string | null> {
   let channel: string;
