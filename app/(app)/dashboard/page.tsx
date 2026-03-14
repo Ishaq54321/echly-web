@@ -296,6 +296,7 @@ function DashboardReturnUrlHandler() {
   useEffect(() => {
     const returnUrl = searchParams.get("returnUrl");
     if (!returnUrl) return;
+    if (searchParams.get("extension")) return;
     try {
       const decoded = decodeURIComponent(returnUrl);
       const u = new URL(decoded);

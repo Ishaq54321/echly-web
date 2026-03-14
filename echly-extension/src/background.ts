@@ -5,7 +5,10 @@
 import { ECHLY_DEBUG, warn } from "../../lib/utils/logger";
 import { echlyLog } from "../../lib/debug/echlyLogger";
 
-const API_BASE = "http://localhost:3000";
+const API_BASE =
+  typeof process !== "undefined" && process.env?.NODE_ENV === "development"
+    ? "http://localhost:3000"
+    : "https://echly-web.vercel.app";
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
@@ -17,8 +20,41 @@ const FIREBASE_API_KEY = "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM";
 /** Tab ID of the tab where the user clicked the extension icon (for post-login switch-back). */
 let originTabId: number | null = null;
 
+/** Tab ID of the login tab we opened or reused (closed after successful auth if still on /login). */
+let loginTabId: number | null = null;
+
 /** Guard to prevent concurrent auth checks (Loom-style single authority). */
 let authCheckInProgress = false;
+
+/**
+ * Open login tab: reuse existing tab with /login or /dashboard, or create new one.
+ * Sets loginTabId and returns the tab id.
+ */
+function openOrFocusLoginTab(loginUrl: string): Promise<number> {
+  return new Promise((resolve) => {
+    chrome.tabs.query({}, (tabs) => {
+      const existing = tabs.find(
+        (t) =>
+          t.id != null &&
+          typeof t.url === "string" &&
+          (t.url.includes("/login") || t.url.includes("/dashboard"))
+      );
+      if (existing?.id != null) {
+        const id = existing.id;
+        chrome.tabs.update(id, { active: true }, () => {
+          loginTabId = id;
+          resolve(id);
+        });
+        return;
+      }
+      chrome.tabs.create({ url: loginUrl }, (created) => {
+        const id = created?.id ?? 0;
+        loginTabId = id || null;
+        resolve(id);
+      });
+    });
+  });
+}
 
 /** In-memory session cache for instant tray open. Not persisted; TTL 30s. */
 let sessionCache: { authenticated: boolean; checkedAt: number } = {
@@ -458,7 +494,7 @@ chrome.action.onClicked.addListener((tab) => {
           ECHLY_LOGIN_BASE +
           "?extension=true" +
           (returnUrl ? "&returnUrl=" + encodeURIComponent(returnUrl) : "");
-        chrome.tabs.create({ url: loginUrl });
+        await openOrFocusLoginTab(loginUrl);
       }
     } catch {
       const returnUrl = typeof tab?.url === "string" ? tab.url : "";
@@ -466,7 +502,7 @@ chrome.action.onClicked.addListener((tab) => {
         ECHLY_LOGIN_BASE +
         "?extension=true" +
         (returnUrl ? "&returnUrl=" + encodeURIComponent(returnUrl) : "");
-      chrome.tabs.create({ url: loginUrl });
+      await openOrFocusLoginTab(loginUrl);
     } finally {
       authCheckInProgress = false;
     }
@@ -518,6 +554,15 @@ chrome.runtime.onMessage.addListener((msg: { type?: string; idToken?: string; re
         } catch {
           if (ECHLY_DEBUG) console.debug("[EXTENSION] could not switch to origin tab", originTabId);
         }
+      }
+      if (loginTabId != null) {
+        try {
+          const t = await chrome.tabs.get(loginTabId);
+          if (t?.url?.includes("/login")) chrome.tabs.remove(loginTabId);
+        } catch {
+          /* tab may already be closed or invalid */
+        }
+        loginTabId = null;
       }
       sendResponse?.({ success: true });
     } catch (e) {
@@ -780,9 +825,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const loginUrl = returnUrl
       ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
       : `${ECHLY_LOGIN_BASE}?extension=true`;
-    chrome.tabs.create({ url: loginUrl });
-    sendResponse({ ok: true });
-    return false;
+    openOrFocusLoginTab(loginUrl).then(() => sendResponse({ ok: true }));
+    return true;
   }
 
   /* Extension relies on dashboard login; in-extension OAuth disabled. Open login page instead. */
@@ -791,9 +835,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const loginUrl = returnUrl
       ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
       : `${ECHLY_LOGIN_BASE}?extension=true`;
-    chrome.tabs.create({ url: loginUrl });
-    sendResponse({ success: false, error: "Use dashboard login" });
-    return false;
+    openOrFocusLoginTab(loginUrl).then(() => sendResponse({ success: false, error: "Use dashboard login" }));
+    return true;
   }
 
   if (request.type === "START_RECORDING") {
