@@ -2328,6 +2328,38 @@ textarea:focus-visible {
   flex-shrink: 0;
   margin-top: 14px;
 }
+.echly-command-actions--loading {
+  justify-content: center;
+  align-items: center;
+  min-height: 48px;
+}
+.echly-footer-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.echly-footer-loading .echly-spinner {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+  flex-shrink: 0;
+}
+.echly-footer-loading-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.echly-footer-btn-spinner-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.echly-footer-btn-spinner-wrap .echly-spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
 .echly-start-session-btn,
 .echly-previous-session-btn {
   flex: 1;

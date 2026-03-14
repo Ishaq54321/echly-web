@@ -53,8 +53,11 @@ export default function CaptureWidget({
   launcherLogoUrl,
   sessionTitleProp,
   onSessionTitleChange: onSessionTitleChangeProp,
+  startSessionLoading = false,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
+  /** Extension: when true, Previous Sessions button shows spinner (modal opening / session list loading). */
+  const [sessionSwitchLoading, setSessionSwitchLoading] = useState(false);
   /** Extension: when true, show command screen (mode cards + footer). False when viewing a session (e.g. after Open Previous or when paused). */
   const [showCommandScreen, setShowCommandScreen] = useState(true);
   const [sessionTitle, setSessionTitle] = useState("Untitled Session");
@@ -160,6 +163,11 @@ export default function CaptureWidget({
     }
   }, [loadSessionWithPointers?.sessionId]);
 
+  /** Clear Previous Sessions button loading once modal is open (session list is shown). */
+  useEffect(() => {
+    if (resumeModalOpen) setSessionSwitchLoading(false);
+  }, [resumeModalOpen]);
+
   React.useEffect(() => {
     if (!widgetToggleRef) return;
     widgetToggleRef.current = handlers.toggleOpen;
@@ -169,6 +177,7 @@ export default function CaptureWidget({
   }, [handlers, widgetToggleRef]);
 
   const handlePreviousSessions = React.useCallback(() => {
+    setSessionSwitchLoading(true);
     setResumeModalOpen(true);
   }, []);
 
@@ -199,12 +208,16 @@ export default function CaptureWidget({
       {extensionMode && fetchSessions && onPreviousSessionSelect && (
         <ResumeSessionModal
           open={resumeModalOpen}
-          onClose={() => setResumeModalOpen(false)}
+          onClose={() => {
+            setResumeModalOpen(false);
+            setSessionSwitchLoading(false);
+          }}
           fetchSessions={fetchSessions}
           onSelectSession={(sessionId) => {
             setShowCommandScreen(false);
             onPreviousSessionSelect(sessionId);
             setResumeModalOpen(false);
+            setSessionSwitchLoading(false);
           }}
           theme={theme}
         />
@@ -450,6 +463,9 @@ export default function CaptureWidget({
                   }
                   hasActiveSession={hasStoredSession}
                   captureDisabled={captureDisabled}
+                  sessionLoading={sessionLoading}
+                  startSessionLoading={startSessionLoading}
+                  sessionSwitchLoading={sessionSwitchLoading}
                 />
                 </>
               )}

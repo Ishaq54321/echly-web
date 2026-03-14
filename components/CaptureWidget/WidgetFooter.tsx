@@ -11,7 +11,19 @@ type WidgetFooterProps = {
   onOpenPreviousSession?: () => void;
   hasActiveSession?: boolean;
   captureDisabled?: boolean;
+  /** When true (extension), show loading spinner instead of Start / Previous Session buttons */
+  sessionLoading?: boolean;
+  /** When true, Start Session button shows spinner and is disabled */
+  startSessionLoading?: boolean;
+  /** When true, Previous Sessions button shows spinner and is disabled */
+  sessionSwitchLoading?: boolean;
 };
+
+const ButtonSpinner = () => (
+  <div className="echly-footer-btn-spinner-wrap" aria-hidden>
+    <span className="echly-spinner" />
+  </div>
+);
 
 export default function WidgetFooter({
   isIdle,
@@ -21,29 +33,46 @@ export default function WidgetFooter({
   onOpenPreviousSession,
   hasActiveSession = false,
   captureDisabled = false,
+  sessionLoading = false,
+  startSessionLoading = false,
+  sessionSwitchLoading = false,
 }: WidgetFooterProps) {
   const effectivelyDisabled = !isIdle || captureDisabled;
 
   if (extensionMode) {
+    if (sessionLoading) {
+      return (
+        <div className="echly-command-actions echly-command-actions--loading" aria-busy="true" aria-live="polite">
+          <div className="echly-footer-loading">
+            <span className="echly-spinner" aria-hidden />
+            <span className="echly-footer-loading-text">Loading session...</span>
+          </div>
+        </div>
+      );
+    }
+    const startDisabled = effectivelyDisabled || startSessionLoading;
+    const previousDisabled = effectivelyDisabled || sessionSwitchLoading;
     return (
       <div className="echly-command-actions">
         <button
           type="button"
-          onClick={effectivelyDisabled ? undefined : onStartSession}
-          disabled={effectivelyDisabled}
+          onClick={startDisabled ? undefined : onStartSession}
+          disabled={startDisabled}
           className="echly-start-session-btn"
           aria-label="Start Session"
+          aria-busy={startSessionLoading}
         >
-          Start Session
+          {startSessionLoading ? <ButtonSpinner /> : "Start Session"}
         </button>
         <button
           type="button"
-          onClick={effectivelyDisabled ? undefined : onOpenPreviousSession}
-          disabled={effectivelyDisabled}
+          onClick={previousDisabled ? undefined : onOpenPreviousSession}
+          disabled={previousDisabled}
           className="echly-previous-session-btn"
           aria-label="Previous Sessions"
+          aria-busy={sessionSwitchLoading}
         >
-          Previous Sessions
+          {sessionSwitchLoading ? <ButtonSpinner /> : "Previous Sessions"}
         </button>
       </div>
     );

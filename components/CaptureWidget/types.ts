@@ -113,6 +113,8 @@ export type CaptureWidgetProps = {
   pointers?: StructuredFeedback[];
   /** Extension: true while loading a previous session's feedback; show spinner instead of empty state. */
   sessionLoading?: boolean;
+  /** Extension: true while Start Session request is in progress; show spinner on Start Session button. */
+  startSessionLoading?: boolean;
   /** Extension: session title from globalUIState. When provided, overrides internal sessionTitle for display. */
   sessionTitleProp?: string | null;
   /** Extension: when session title is saved in tray. When provided, called instead of internal setSessionTitle (enables PATCH + broadcast). */

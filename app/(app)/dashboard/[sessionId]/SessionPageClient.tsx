@@ -25,6 +25,8 @@ import {
   ExecutionModeLayout,
   CommentPanel,
 } from "@/components/layout/operating-system";
+import type { FeedbackItemShape } from "@/components/session/feedbackDetail/types";
+import type { Timestamp } from "firebase/firestore";
 
 /** Ticket shape returned by structure-feedback API. */
 type StructureFeedbackTicket = {
@@ -113,6 +115,25 @@ type TicketFromApi = {
   screenshotUrl?: string | null;
   [key: string]: unknown;
 };
+
+/** Normalize Feedback (Firestore Timestamps) to FeedbackItemShape (ISO strings) for UI components. */
+function toFeedbackItemShape(
+  item: (Feedback & { index: number; total: number }) | null
+): (FeedbackItemShape & { index: number; total: number }) | null {
+  if (!item) return null;
+  const toIso = (t: Timestamp | null | undefined): string | null => {
+    if (t == null) return null;
+    const d = typeof (t as Timestamp).toDate === "function" ? (t as Timestamp).toDate() : null;
+    return d ? d.toISOString() : null;
+  };
+  return {
+    ...item,
+    createdAt: toIso(item.createdAt ?? undefined) ?? undefined,
+    updatedAt: toIso((item as { updatedAt?: Timestamp | null }).updatedAt) ?? undefined,
+    index: item.index,
+    total: item.total,
+  };
+}
 
 function SessionPageSkeleton() {
   return (
@@ -1172,7 +1193,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       <>
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <ExecutionModeLayout
-            item={selectedItem}
+            item={toFeedbackItemShape(selectedItem)}
             onExitExecutionMode={() => setExecutionMode(false)}
             onSkip={handleExecutionSkip}
             onNeedsClarification={() => {
@@ -1223,7 +1244,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
     return (
       <ExecutionView
-        item={selectedItem}
+        item={toFeedbackItemShape(selectedItem)}
         onSaveTitle={saveTitle}
         onResolvedChange={saveResolved}
         onSaveActionSteps={saveActionSteps}

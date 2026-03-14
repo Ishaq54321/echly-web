@@ -3,11 +3,7 @@
   "name": "Echly",
   "version": "1.0",
   "description": "Capture screenshots and submit feedback",
-  "permissions": ["identity", "storage", "activeTab", "tabs"],
-  "oauth2": {
-    "client_id": "609478020649-qqaun85ai4tg4t7du7f99ar11ihu4ekn.apps.googleusercontent.com",
-    "scopes": ["profile", "email"]
-  },
+  "permissions": ["storage", "activeTab", "tabs"],
   "host_permissions": [
     "<all_urls>",
     "http://localhost:3000/*",
@@ -18,7 +14,19 @@
     "https://www.googleapis.com/*",
     "https://apis.google.com/*"
   ],
-  "action":{"default_popup":"popup.html"},
+  "icons": {
+    "16": "assets/icon16.png",
+    "32": "assets/icon32.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png",
+      "48": "assets/icon48.png"
+    }
+  },
   "background": {
     "service_worker": "background.js"
   },
@@ -41,6 +49,13 @@
         "fonts/PlusJakartaSans-Bold.woff2"
       ],
       "matches": ["<all_urls>"]
+    },
+    {
+      "resources": ["pageTokenBridge.js"],
+      "matches": [
+        "https://echly-web.vercel.app/*",
+        "http://localhost:3000/*"
+      ]
     }
   ]
 }

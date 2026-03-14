@@ -49,19 +49,6 @@ function makeAliasPlugin(useContentAuthFetch = false) {
 }
 
 await esbuild.build({
-  entryPoints: [path.join(extDir, "src", "popup.tsx")],
-  bundle: true,
-  outfile: path.join(extDir, "popup.js"),
-  platform: "browser",
-  target: "es2020",
-  minify: true,
-  sourcemap: false,
-  loader: { ".css": "empty" },
-  plugins: [makeAliasPlugin(false)],
-  absWorkingDir: root,
-});
-
-await esbuild.build({
   entryPoints: [path.join(extDir, "src", "content.tsx")],
   bundle: true,
   outfile: path.join(extDir, "content.js"),
@@ -84,3 +71,10 @@ await esbuild.build({
   sourcemap: false,
   absWorkingDir: root,
 });
+
+// Copy page-context token bridge (plain JS, not bundled) so content script can inject it
+const bridgeSrc = path.join(extDir, "src", "pageTokenBridge.js");
+const bridgeDest = path.join(extDir, "pageTokenBridge.js");
+if (fs.existsSync(bridgeSrc)) {
+  fs.copyFileSync(bridgeSrc, bridgeDest);
+}

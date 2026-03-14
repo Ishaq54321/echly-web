@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { signInWithGoogle, signInWithEmailPassword } from "../../../lib/auth/authActions";
@@ -19,13 +19,30 @@ const primaryButtonStyle = {
   boxShadow: "0 10px 28px rgba(70,110,255,0.28)"
 };
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isExtension = searchParams.get("extension") === "true";
+  const returnUrl = searchParams.get("returnUrl") ?? null;
 
   const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState<string|null>(null);
+
+  const safeRedirectToReturnUrl = (url: string) => {
+    try {
+      const decoded = decodeURIComponent(url);
+      const u = new URL(decoded);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        window.location.href = decoded;
+        return true;
+      }
+    } catch {
+      /* ignore invalid URL */
+    }
+    return false;
+  };
 
   const handleGoogle = async () => {
     setError(null);
@@ -33,6 +50,9 @@ export default function LoginPage() {
 
     try{
       const user = await signInWithGoogle();
+      if (isExtension && returnUrl && safeRedirectToReturnUrl(returnUrl)) {
+        return;
+      }
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
     }
@@ -58,6 +78,9 @@ export default function LoginPage() {
 
     try{
       const user = await signInWithEmailPassword(email,password);
+      if (isExtension && returnUrl && safeRedirectToReturnUrl(returnUrl)) {
+        return;
+      }
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
     }
@@ -242,6 +265,18 @@ export default function LoginPage() {
       </main>
 
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#f9fafc] flex items-center justify-center">
+        <div className="animate-pulse text-gray-500">Loading…</div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }
 

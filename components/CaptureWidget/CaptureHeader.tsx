@@ -133,9 +133,10 @@ export default function CaptureHeader({
           <button
             type="button"
             className={`echly-header-home-wrap${theme === "dark" ? " dark" : ""}`}
+            style={{ cursor: "pointer" }}
             onClick={() => {
               if (typeof chrome !== "undefined" && chrome.tabs?.create) {
-                chrome.tabs.create({ url: "https://app.echly.com/dashboard" });
+                chrome.tabs.create({ url: "https://echly-web.vercel.app/dashboard" });
               }
             }}
             aria-label="Open Echly dashboard"

@@ -1,32 +1,24 @@
 /**
- * Extension background (service worker). Centralizes auth + token handling.
- * Content scripts request tokens and auth state via messages.
+ * Extension background (service worker). Stateless auth: token is requested from
+ * the dashboard page via content script (postMessage), never stored.
  */
-import { firebaseConfig } from "../../lib/firebase/config";
 import { ECHLY_DEBUG, warn } from "../../lib/utils/logger";
 import { echlyLog } from "../../lib/debug/echlyLogger";
 
 const API_BASE = "http://localhost:3000";
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
-const IDP_API_KEY = firebaseConfig.apiKey;
+
+const DASHBOARD_ORIGINS = ["http://localhost:3000", "https://echly-web.vercel.app"];
+const TOKEN_REQUEST_TIMEOUT_MS = 6000;
+const SESSION_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+
+/** In-memory session cache for instant tray open. Not persisted; TTL 30s. */
+let sessionCache: { authenticated: boolean; checkedAt: number } = {
+  authenticated: false,
+  checkedAt: 0,
+};
 
 let activeSessionId: string | null = null;
-
-type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
-type TokenState = {
-  idToken: string | null;
-  refreshToken: string | null;
-  /** Epoch ms when token expires (best-effort). */
-  expiresAtMs: number;
-  user: StoredUser | null;
-};
-
-let tokenState: TokenState = {
-  idToken: null,
-  refreshToken: null,
-  expiresAtMs: 0,
-  user: null,
-};
 
 /** Minimal ticket shape for global tray; matches StructuredFeedback. */
 type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string };
@@ -107,11 +99,27 @@ function persistSessionLifecycleState(): void {
   });
 }
 
+/** Persist tray visibility so background remains source of truth across restarts. */
+function persistUIState(): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.local.set(
+      { trayVisible: globalUIState.visible, trayExpanded: globalUIState.expanded },
+      () => resolve()
+    );
+  });
+}
+
 async function initializeSessionState(): Promise<void> {
   return new Promise<void>((resolve) => {
     chrome.storage.local.get(
-      ["activeSessionId", "sessionModeActive", "sessionPaused"],
-      (result: { activeSessionId?: string; sessionModeActive?: boolean; sessionPaused?: boolean }) => {
+      ["activeSessionId", "sessionModeActive", "sessionPaused", "trayVisible", "trayExpanded"],
+      (result: {
+        activeSessionId?: string;
+        sessionModeActive?: boolean;
+        sessionPaused?: boolean;
+        trayVisible?: boolean;
+        trayExpanded?: boolean;
+      }) => {
         activeSessionId =
           typeof result.activeSessionId === "string"
             ? result.activeSessionId
@@ -120,6 +128,8 @@ async function initializeSessionState(): Promise<void> {
         globalUIState.sessionId = activeSessionId;
         globalUIState.sessionModeActive = result.sessionModeActive === true;
         globalUIState.sessionPaused = result.sessionPaused === true;
+        globalUIState.visible = result.trayVisible === true;
+        globalUIState.expanded = result.trayExpanded === true;
 
         const shouldReloadPointers =
           globalUIState.sessionModeActive === true && activeSessionId != null;
@@ -132,8 +142,18 @@ async function initializeSessionState(): Promise<void> {
                 { headers: { Authorization: `Bearer ${token}` } }
               )
             )
-            .then((res) => res.json())
-            .then((json: { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> }) => {
+            .then((res) => {
+              if (res.status === 401 || res.status === 403) {
+                clearAuthState();
+                globalUIState.pointers = [];
+                broadcastUIState();
+                resolve();
+                return null;
+              }
+              return res.json();
+            })
+            .then((json: { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> } | null) => {
+              if (json === null) return;
               globalUIState.pointers = (json.feedback ?? []).map((f) => ({
                 id: f.id,
                 title: f.title ?? "",
@@ -160,129 +180,164 @@ async function initializeSessionState(): Promise<void> {
   broadcastUIState();
 })();
 
-type StoredAuthResult = {
-  auth_idToken?: string;
-  auth_refreshToken?: string;
-  auth_expiresAtMs?: number;
-  auth_user?: unknown;
-};
-function isStoredUser(v: unknown): v is StoredUser {
-  if (!v || typeof v !== "object") return false;
-  const o = v as Record<string, unknown>;
-  return (
-    typeof o.uid === "string" &&
-    (o.name === null || typeof o.name === "string") &&
-    (o.email === null || typeof o.email === "string") &&
-    (o.photoURL === null || typeof o.photoURL === "string")
-  );
-}
-chrome.storage.local.get(
-  ["auth_idToken", "auth_refreshToken", "auth_expiresAtMs", "auth_user"],
-  (result: StoredAuthResult) => {
-    tokenState.idToken = typeof result.auth_idToken === "string" ? result.auth_idToken : null;
-    tokenState.refreshToken = typeof result.auth_refreshToken === "string" ? result.auth_refreshToken : null;
-    tokenState.expiresAtMs = typeof result.auth_expiresAtMs === "number" ? result.auth_expiresAtMs : 0;
-    tokenState.user = isStoredUser(result.auth_user) ? result.auth_user : null;
-  }
-);
+/**
+ * Legacy auth keys — cleanup only. Extension is stateless and must NEVER write these again.
+ * clearAuthState() removes them if present from older installs.
+ */
+const AUTH_STORAGE_KEYS_LEGACY = [
+  "auth_idToken",
+  "auth_refreshToken",
+  "auth_expiresAtMs",
+  "auth_user",
+] as const;
 
-function setTokenState(next: Partial<TokenState>): void {
-  tokenState = { ...tokenState, ...next };
-  chrome.storage.local.set({
-    auth_idToken: tokenState.idToken,
-    auth_refreshToken: tokenState.refreshToken,
-    auth_expiresAtMs: tokenState.expiresAtMs,
-    auth_user: tokenState.user,
+/** Clear in-memory session cache (e.g. on 401). */
+function clearSessionCache(): void {
+  sessionCache = { authenticated: false, checkedAt: 0 };
+}
+
+/** Clear legacy auth state from storage (removes only legacy keys if present). */
+function clearAuthState(): void {
+  clearSessionCache();
+  chrome.storage.local.remove([...AUTH_STORAGE_KEYS_LEGACY]);
+}
+
+/**
+ * Pre-warm auth session: if a dashboard tab exists, get token and validate with backend,
+ * then update sessionCache. No-op if no dashboard tab. Improves perceived launch time on icon click.
+ */
+async function prewarmAuthSession(): Promise<void> {
+  const tabs = await new Promise<chrome.tabs.Tab[]>((resolve) => {
+    chrome.tabs.query({}, (t) => resolve(t));
   });
-}
+  const dashboardTab = tabs.find((t) => {
+    if (!t.url) return false;
+    try {
+      return DASHBOARD_ORIGINS.includes(new URL(t.url).origin);
+    } catch {
+      return false;
+    }
+  });
+  if (!dashboardTab?.id) return;
 
-function parseHashParam(urlStr: string, key: string): string | null {
+  const token = await getTokenFromPage();
+  if (!token) return;
+
   try {
-    const u = new URL(urlStr);
-    const hash = u.hash.startsWith("#") ? u.hash.slice(1) : u.hash;
-    const params = new URLSearchParams(hash);
-    return params.get(key);
+    const res = await fetch(`${API_BASE}/api/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      sessionCache = { authenticated: false, checkedAt: Date.now() };
+      return;
+    }
+    const data = (await res.json()) as { authenticated?: boolean };
+    sessionCache = {
+      authenticated: data.authenticated === true,
+      checkedAt: Date.now(),
+    };
   } catch {
-    return null;
+    sessionCache = { authenticated: false, checkedAt: Date.now() };
   }
 }
 
-async function exchangeGoogleIdToken(googleIdToken: string): Promise<{
-  idToken: string;
-  refreshToken: string;
-  expiresInSec: number;
-  user: StoredUser;
-}> {
-  const body = {
-    postBody: `id_token=${encodeURIComponent(googleIdToken)}&providerId=google.com`,
-    requestUri: "http://localhost",
-    returnIdpCredential: true,
-    returnSecureToken: true,
-  };
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${IDP_API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+/**
+ * Request a fresh Firebase ID token from a dashboard tab's page (via content script).
+ * Tries active tab first, then any tab with dashboard origin. Returns null if none.
+ */
+async function getTokenFromPage(): Promise<string | null> {
+  const tryTab = (tabId: number): Promise<string | null> =>
+    new Promise((resolve) => {
+      const timeout = setTimeout(() => resolve(null), TOKEN_REQUEST_TIMEOUT_MS);
+      chrome.tabs.sendMessage(tabId, { type: "ECHLY_GET_TOKEN_FROM_PAGE" }, (response: { token?: string | null } | undefined) => {
+        clearTimeout(timeout);
+        if (chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
+        resolve(typeof response?.token === "string" ? response.token : null);
+      });
+    });
+
+  const tabs = await new Promise<chrome.tabs.Tab[]>((resolve) => {
+    chrome.tabs.query({}, (t) => resolve(t));
   });
-  const raw = await res.text();
-  if (!res.ok) throw new Error(`Token exchange failed: ${res.status} ${raw}`);
-  const data = JSON.parse(raw) as {
-    idToken?: string;
-    refreshToken?: string;
-    expiresIn?: string;
-    localId?: string;
-    displayName?: string;
-    email?: string;
-    photoUrl?: string;
-  };
-  if (!data.idToken || !data.refreshToken || !data.localId) throw new Error(`Token exchange missing fields: ${raw}`);
-  const expiresInSec = Number.parseInt(data.expiresIn ?? "3600", 10);
-  return {
-    idToken: data.idToken,
-    refreshToken: data.refreshToken,
-    expiresInSec: Number.isFinite(expiresInSec) ? expiresInSec : 3600,
-    user: {
-      uid: data.localId,
-      name: data.displayName ?? null,
-      email: data.email ?? null,
-      photoURL: data.photoUrl ?? null,
-    },
-  };
+  const activeTab = tabs.find((t) => t.active);
+  if (activeTab?.id) {
+    const token = await tryTab(activeTab.id);
+    if (token) return token;
+  }
+  for (const tab of tabs) {
+    if (!tab.id || !tab.url) continue;
+    try {
+      const u = new URL(tab.url);
+      if (!DASHBOARD_ORIGINS.includes(u.origin)) continue;
+    } catch {
+      continue;
+    }
+    const token = await tryTab(tab.id);
+    if (token) return token;
+  }
+  return null;
 }
 
-async function refreshIdToken(refreshToken: string): Promise<{ idToken: string; refreshToken: string; expiresInSec: number }> {
-  const body = new URLSearchParams();
-  body.set("grant_type", "refresh_token");
-  body.set("refresh_token", refreshToken);
-  const res = await fetch(`https://securetoken.googleapis.com/v1/token?key=${IDP_API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  const raw = await res.text();
-  if (!res.ok) throw new Error(`Token refresh failed: ${res.status} ${raw}`);
-  const data = JSON.parse(raw) as { id_token?: string; refresh_token?: string; expires_in?: string };
-  if (!data.id_token || !data.refresh_token) throw new Error(`Token refresh missing fields: ${raw}`);
-  const expiresInSec = Number.parseInt(data.expires_in ?? "3600", 10);
-  return {
-    idToken: data.id_token,
-    refreshToken: data.refresh_token,
-    expiresInSec: Number.isFinite(expiresInSec) ? expiresInSec : 3600,
-  };
-}
-
+/**
+ * Get a valid token from the page; throws NOT_AUTHENTICATED if user not signed in on dashboard.
+ */
 async function getValidToken(): Promise<string> {
-  const now = Date.now();
-  // Small skew so we don't race expiry.
-  if (tokenState.idToken && now < tokenState.expiresAtMs - 30_000) return tokenState.idToken;
-  if (!tokenState.refreshToken) throw new Error("NOT_AUTHENTICATED");
-  const refreshed = await refreshIdToken(tokenState.refreshToken);
-  setTokenState({
-    idToken: refreshed.idToken,
-    refreshToken: refreshed.refreshToken,
-    expiresAtMs: Date.now() + refreshed.expiresInSec * 1000,
-  });
-  return refreshed.idToken;
+  const token = await getTokenFromPage();
+  if (!token) throw new Error("NOT_AUTHENTICATED");
+  return token;
+}
+
+/**
+ * Backend session check: single source of truth. Uses GET /api/auth/session with Bearer token.
+ * If not ok or no token, clears extension auth and returns { authenticated: false }.
+ */
+async function checkBackendSession(): Promise<{
+  authenticated: boolean;
+  user?: { uid: string };
+}> {
+  let token: string;
+  try {
+    token = await getValidToken();
+  } catch {
+    clearAuthState();
+    return { authenticated: false };
+  }
+  if (!token) {
+    clearAuthState();
+    return { authenticated: false };
+  }
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      clearAuthState();
+      return { authenticated: false };
+    }
+    return await res.json();
+  } catch {
+    clearAuthState();
+    return { authenticated: false };
+  }
+}
+
+/**
+ * Verify the session with the Echly backend. Returns false if backend returns 401 or 403.
+ * @deprecated Prefer checkBackendSession() for single source of truth.
+ */
+async function validateSessionWithBackend(token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401 || res.status === 403) return false;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function broadcastUIState(): void {
@@ -323,6 +378,59 @@ chrome.tabs.onCreated.addListener((tab) => {
     .catch((e) => {
       if (ECHLY_DEBUG) console.debug("ECHLY tab creation sync failed", e);
     });
+});
+
+/** Pre-warm session on extension start so first click can open tray instantly. */
+chrome.runtime.onStartup.addListener(() => {
+  prewarmAuthSession();
+});
+
+/** Pre-warm session on install/update so session is ready when user opens dashboard. */
+chrome.runtime.onInstalled.addListener(() => {
+  prewarmAuthSession();
+});
+
+/** When a dashboard tab finishes loading, pre-warm session so it stays warm while dashboard is open. */
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete" || !tab.url) return;
+  try {
+    if (DASHBOARD_ORIGINS.includes(new URL(tab.url).origin)) prewarmAuthSession();
+  } catch {
+    // ignore invalid URLs
+  }
+});
+
+const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
+
+/** Extension icon click: use session cache when valid to open tray instantly; otherwise validate and update cache. */
+chrome.action.onClicked.addListener(async (tab) => {
+  const cacheValid =
+    sessionCache.authenticated &&
+    Date.now() - sessionCache.checkedAt < SESSION_CACHE_TTL_MS;
+
+  if (!cacheValid) {
+    const session = await checkBackendSession();
+    sessionCache = {
+      authenticated: session.authenticated,
+      checkedAt: Date.now(),
+    };
+    if (!session.authenticated) {
+      clearAuthState();
+      const returnUrl = typeof tab?.url === "string" ? encodeURIComponent(tab.url) : "";
+      const loginUrl = returnUrl
+        ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
+        : `${ECHLY_LOGIN_BASE}?extension=true`;
+      chrome.tabs.create({ url: loginUrl });
+      return;
+    }
+  }
+
+  globalUIState.visible = !globalUIState.visible;
+  if (globalUIState.visible) {
+    globalUIState.expanded = false;
+  }
+  await persistUIState();
+  broadcastUIState();
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -445,6 +553,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }),
           fetch(`${API_BASE}/api/sessions`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
+        if (feedbackRes.status === 401 || feedbackRes.status === 403 || sessionsRes.status === 401 || sessionsRes.status === 403) {
+          clearAuthState();
+        }
         const feedbackJson = (await feedbackRes.json()) as { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> };
         globalUIState.pointers = (feedbackJson.feedback ?? []).map((f) => ({
           id: f.id,
@@ -558,63 +669,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_GET_AUTH_STATE") {
-    sendResponse({
-      authenticated: !!tokenState.refreshToken,
-      user: tokenState.user,
-    });
+    (async () => {
+      const session = await checkBackendSession();
+      sendResponse({
+        authenticated: session.authenticated,
+        user: session.authenticated && session.user ? session.user : null,
+      });
+    })();
     return true;
   }
 
   if (request.type === "ECHLY_OPEN_POPUP") {
-    chrome.tabs.create({ url: chrome.runtime.getURL("popup.html") });
+    const returnUrl = typeof sender.tab?.url === "string" ? encodeURIComponent(sender.tab.url) : "";
+    const loginUrl = returnUrl
+      ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
+      : `${ECHLY_LOGIN_BASE}?extension=true`;
+    chrome.tabs.create({ url: loginUrl });
     sendResponse({ ok: true });
     return false;
   }
 
+  /* Extension relies on dashboard login; in-extension OAuth disabled. Open login page instead. */
   if (request.type === "ECHLY_SIGN_IN" || request.type === "ECHLY_START_LOGIN" || request.type === "LOGIN") {
-    const redirectUri = chrome.identity.getRedirectURL();
-    const webClientId = "609478020649-0k5ec22m3lvgmcs2icsc6pmabndu85td.apps.googleusercontent.com";
-    const authUrl =
-      "https://accounts.google.com/o/oauth2/v2/auth" +
-      `?client_id=${encodeURIComponent(webClientId)}` +
-      "&response_type=id_token" +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-      "&scope=openid%20email%20profile" +
-      `&nonce=${encodeURIComponent(crypto.randomUUID())}`;
-
-    chrome.identity.launchWebAuthFlow(
-      { url: authUrl, interactive: true },
-      async (responseUrl?: string) => {
-        if (chrome.runtime.lastError || !responseUrl) {
-          sendResponse({
-            success: false,
-            error: chrome.runtime.lastError?.message ?? "Auth flow failed",
-          });
-          return;
-        }
-        try {
-          const googleIdToken = parseHashParam(responseUrl, "id_token");
-          if (!googleIdToken) {
-            sendResponse({ success: false, error: "No ID token in response" });
-            return;
-          }
-          const exchanged = await exchangeGoogleIdToken(googleIdToken);
-          setTokenState({
-            idToken: exchanged.idToken,
-            refreshToken: exchanged.refreshToken,
-            expiresAtMs: Date.now() + exchanged.expiresInSec * 1000,
-            user: exchanged.user,
-          });
-          sendResponse({
-            success: true,
-            user: exchanged.user,
-          });
-        } catch (err) {
-          sendResponse({ success: false, error: String(err) });
-        }
-      }
-    );
-    return true;
+    const returnUrl = typeof sender.tab?.url === "string" ? encodeURIComponent(sender.tab.url) : "";
+    const loginUrl = returnUrl
+      ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
+      : `${ECHLY_LOGIN_BASE}?extension=true`;
+    chrome.tabs.create({ url: loginUrl });
+    sendResponse({ success: false, error: "Use dashboard login" });
+    return false;
   }
 
   if (request.type === "START_RECORDING") {
@@ -680,6 +763,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }),
         });
 
+        if (res.status === 401 || res.status === 403) clearAuthState();
         const data = (await res.json()) as { url?: string; error?: string };
 
         if (!res.ok) {
@@ -736,6 +820,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           body: JSON.stringify(structurePayload),
         });
 
+        if (structureRes.status === 401 || structureRes.status === 403) clearAuthState();
         const structureText = await structureRes.text();
         if (!structureRes.ok) {
           console.error("[STRUCTURE FAILED RAW]", structureRes.status, structureText);
@@ -792,6 +877,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(body),
           });
+          if (feedbackRes.status === 401 || feedbackRes.status === 403) clearAuthState();
           const raw = await feedbackRes.text();
 
           if (!feedbackRes.ok) {
@@ -885,6 +971,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           headers: h,
           body: body ?? undefined,
         });
+        if (res.status === 401 || res.status === 403) clearAuthState();
         const text = await res.text();
         const out: Record<string, string> = {};
         res.headers.forEach((v, k) => {

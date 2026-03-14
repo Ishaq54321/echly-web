@@ -6,6 +6,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { apiFetch } from "./contentAuthFetch";
+import { requestTokenFromPage } from "./requestTokenFromPage";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
@@ -86,8 +87,8 @@ function createUniqueId(): string {
     : `job-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-/** Ask background to open popup (e.g. in a new tab) so user can sign in. */
-function requestOpenPopup(): void {
+/** Ask background to open login page in a new tab (Loom-style flow) so user can sign in. */
+function requestOpenLoginPage(): void {
   chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {});
 }
 
@@ -114,6 +115,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [sessionMessage, setSessionMessage] = React.useState<string | null>(null);
   const [authChecked, setAuthChecked] = React.useState(false);
   const [theme, setTheme] = React.useState<"dark" | "light">(initialTheme);
+  /** Local loading flag set immediately on Start/Previous Session click; cleared when globalState.sessionLoading becomes false. */
+  const [sessionLoadingOverride, setSessionLoadingOverride] = React.useState(false);
+  /** True while Start Session request is in progress; cleared when globalState.sessionId is set. */
+  const [startSessionLoading, setStartSessionLoading] = React.useState(false);
   const [globalState, setGlobalState] = React.useState<GlobalUIState>({
     visible: false,
     expanded: false,
@@ -197,6 +202,16 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       delete (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (state: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__;
     };
   }, []);
+
+  /* Clear local session loading override when background reports loading finished. */
+  React.useEffect(() => {
+    if (globalState.sessionLoading === false) setSessionLoadingOverride(false);
+  }, [globalState.sessionLoading]);
+
+  /* Clear Start Session button loading when we have a session id. */
+  React.useEffect(() => {
+    if (globalState.sessionId) setStartSessionLoading(false);
+  }, [globalState.sessionId]);
 
   /* Global UI state: always overwrite from background; protect pointers when session unchanged (Pause → Minimize → Resume). */
   React.useEffect(() => {
@@ -795,11 +810,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   }, []);
 
   const onActiveSessionChange = React.useCallback((newSessionId: string) => {
+    setSessionLoadingOverride(true);
     chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {});
   }, []);
 
   const onPreviousSessionSelect = React.useCallback(
     async (sessionId: string, _options?: { enterCaptureImmediately?: boolean }) => {
+      setSessionLoadingOverride(true);
       chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {});
       chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
       try {
@@ -1165,7 +1182,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         <button
           type="button"
           title="Sign in from extension"
-          onClick={requestOpenPopup}
+          onClick={requestOpenLoginPage}
           style={{
             display: "flex",
             alignItems: "center",
@@ -1371,7 +1388,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         hasPreviousSessions={hasPreviousSessions}
         onPreviousSessionSelect={onPreviousSessionSelect}
         pointers={globalState.pointers ?? []}
-        sessionLoading={globalState.sessionLoading ?? false}
+        sessionLoading={sessionLoadingOverride || (globalState.sessionLoading ?? false)}
+        startSessionLoading={startSessionLoading}
         sessionTitleProp={globalState.sessionTitle ?? undefined}
         onSessionTitleChange={onSessionTitleChange}
         isProcessingFeedback={isProcessingFeedback}
@@ -1381,7 +1399,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         onActiveSessionChange={onActiveSessionChange}
         globalSessionModeActive={globalState.sessionModeActive ?? false}
         globalSessionPaused={globalState.sessionPaused ?? false}
-        onSessionModeStart={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {})}
+        onSessionModeStart={() => {
+          setStartSessionLoading(true);
+          chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {
+            setStartSessionLoading(false);
+          });
+        }}
         onSessionModePause={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {})}
         onSessionModeResume={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {})}
         onSessionActivity={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch(() => {})}
@@ -1528,7 +1551,13 @@ function ensureMessageListener(host: HTMLDivElement): void {
   const win = window as Window & { __ECHLY_MESSAGE_LISTENER__?: boolean };
   if (win.__ECHLY_MESSAGE_LISTENER__) return;
   win.__ECHLY_MESSAGE_LISTENER__ = true;
-  chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; description: string; type?: string }; sessionId?: string }) => {
+  chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; description: string; type?: string }; sessionId?: string }, _sender, sendResponse) => {
+    if (msg.type === "ECHLY_GET_TOKEN_FROM_PAGE") {
+      requestTokenFromPage()
+        .then((token) => sendResponse({ token }))
+        .catch(() => sendResponse({ token: null }));
+      return true;
+    }
     if (msg.type === "ECHLY_FEEDBACK_CREATED" && msg.ticket && msg.sessionId) {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_FEEDBACK_CREATED" });
       window.dispatchEvent(new CustomEvent("ECHLY_FEEDBACK_CREATED", { detail: { ticket: msg.ticket, sessionId: msg.sessionId } }));
@@ -1588,7 +1617,21 @@ function ensureScrollDebugListeners(): void {
  * Single mount: create host once, mount React once, default hidden.
  * Visibility via ECHLY_VISIBILITY from background. No re-mount, no injection logic.
  */
+/** Dashboard origins where the token bridge is allowed to run. */
+const DASHBOARD_ORIGINS = ["https://echly-web.vercel.app", "http://localhost:3000"];
+
+/** Inject page-context token bridge only on dashboard. Extension content script runs on all URLs; bridge runs only on dashboard. */
+function injectPageTokenBridge(): void {
+  const origin = window.location.origin;
+  if (!DASHBOARD_ORIGINS.includes(origin)) return;
+  const script = document.createElement("script");
+  script.src = chrome.runtime.getURL("pageTokenBridge.js");
+  script.onload = () => script.remove();
+  document.documentElement.appendChild(script);
+}
+
 function main(): void {
+  injectPageTokenBridge();
   let host = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
   if (!host) {
     host = document.createElement("div");
