@@ -1,9 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { signInWithGoogle, signInWithEmailPassword } from "../../../lib/auth/authActions";
 import { checkUserWorkspace } from "@/lib/auth/checkUserWorkspace";
 import { AuthCard } from "@/components/auth/AuthCard";
@@ -25,10 +27,28 @@ function LoginContent() {
   const isExtension = searchParams.get("extension") === "true";
   const returnUrl = searchParams.get("returnUrl") ?? null;
 
-  const [email,setEmail]=useState("");
-  const [password,setPassword]=useState("");
-  const [loading,setLoading]=useState(false);
-  const [error,setError]=useState<string|null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Redirect authenticated users immediately; preserve extension params
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const params = new URLSearchParams();
+        if (isExtension) params.set("extension", "true");
+        if (returnUrl) params.set("returnUrl", returnUrl);
+        const qs = params.toString();
+        const dashboardUrl = qs ? `/dashboard?${qs}` : "/dashboard";
+        window.location.href = dashboardUrl;
+        return;
+      }
+      setAuthChecked(true);
+    });
+    return () => unsub();
+  }, [isExtension, returnUrl]);
 
   const safeRedirectToReturnUrl = (url: string) => {
     try {
@@ -56,7 +76,10 @@ function LoginContent() {
             window.chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" });
           } catch {}
         }
-        window.location.href = "/dashboard";
+        const params = new URLSearchParams();
+        params.set("extension", "true");
+        if (returnUrl) params.set("returnUrl", returnUrl);
+        window.location.href = `/dashboard?${params.toString()}`;
         return;
       }
       const dest = await checkUserWorkspace(user.uid);
@@ -90,7 +113,10 @@ function LoginContent() {
             window.chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" });
           } catch {}
         }
-        window.location.href = "/dashboard";
+        const params = new URLSearchParams();
+        params.set("extension", "true");
+        if (returnUrl) params.set("returnUrl", returnUrl);
+        window.location.href = `/dashboard?${params.toString()}`;
         return;
       }
       const dest = await checkUserWorkspace(user.uid);
@@ -103,6 +129,15 @@ function LoginContent() {
       setLoading(false);
     }
   };
+
+  // Do not show login UI until we've confirmed user is not authenticated
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-[#f9fafc] flex items-center justify-center">
+        <div className="animate-pulse text-gray-500">Loading…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-[#f9fafc] overflow-hidden">
