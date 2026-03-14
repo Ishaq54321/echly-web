@@ -33,10 +33,25 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect authenticated users immediately; preserve extension params
+  // Redirect authenticated users. When extension=true, send tokens to extension then redirect to dashboard.
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        if (isExtension && typeof window.chrome?.runtime?.sendMessage === "function") {
+          try {
+            const idToken = await user.getIdToken();
+            const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
+            window.chrome.runtime.sendMessage({
+              type: "ECHLY_EXTENSION_AUTH_SUCCESS",
+              idToken,
+              refreshToken,
+            });
+          } catch {
+            /* ignore */
+          }
+          window.location.href = "/dashboard";
+          return;
+        }
         const params = new URLSearchParams();
         if (isExtension) params.set("extension", "true");
         if (returnUrl) params.set("returnUrl", returnUrl);
@@ -71,15 +86,18 @@ function LoginContent() {
     try{
       const user = await signInWithGoogle();
       if (isExtension) {
-        if (window.chrome?.runtime?.sendMessage) {
+        const idToken = await user.getIdToken();
+        const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
+        if (typeof window.chrome?.runtime?.sendMessage === "function") {
           try {
-            window.chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" });
+            window.chrome.runtime.sendMessage({
+              type: "ECHLY_EXTENSION_AUTH_SUCCESS",
+              idToken,
+              refreshToken,
+            });
           } catch {}
         }
-        const params = new URLSearchParams();
-        params.set("extension", "true");
-        if (returnUrl) params.set("returnUrl", returnUrl);
-        window.location.href = `/dashboard?${params.toString()}`;
+        window.location.href = "/dashboard";
         return;
       }
       const dest = await checkUserWorkspace(user.uid);
@@ -108,15 +126,18 @@ function LoginContent() {
     try{
       const user = await signInWithEmailPassword(email,password);
       if (isExtension) {
-        if (window.chrome?.runtime?.sendMessage) {
+        const idToken = await user.getIdToken();
+        const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
+        if (typeof window.chrome?.runtime?.sendMessage === "function") {
           try {
-            window.chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" });
+            window.chrome.runtime.sendMessage({
+              type: "ECHLY_EXTENSION_AUTH_SUCCESS",
+              idToken,
+              refreshToken,
+            });
           } catch {}
         }
-        const params = new URLSearchParams();
-        params.set("extension", "true");
-        if (returnUrl) params.set("returnUrl", returnUrl);
-        window.location.href = `/dashboard?${params.toString()}`;
+        window.location.href = "/dashboard";
         return;
       }
       const dest = await checkUserWorkspace(user.uid);

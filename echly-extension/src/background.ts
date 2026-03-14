@@ -1,6 +1,6 @@
 /**
- * Extension background (service worker). Stateless auth: token is requested from
- * the dashboard page via content script (postMessage), never stored.
+ * Extension background (service worker). Auth uses tokens stored in extension
+ * storage (from login page). No dependency on dashboard tab for tokens.
  */
 import { ECHLY_DEBUG, warn } from "../../lib/utils/logger";
 import { echlyLog } from "../../lib/debug/echlyLogger";
@@ -8,10 +8,14 @@ import { echlyLog } from "../../lib/debug/echlyLogger";
 const API_BASE = "http://localhost:3000";
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
-const DASHBOARD_ORIGINS = ["http://localhost:3000", "https://echly-web.vercel.app"];
 const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
-const TOKEN_REQUEST_TIMEOUT_MS = 2000;
-const SESSION_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+const SESSION_CACHE_TTL_MS = 30 * 1000; // 30 seconds — use cache if validated within this window
+const TOKEN_MAX_AGE_MS = 50 * 60 * 1000; // 50 minutes — refresh ID token before expiry
+const FIREBASE_REFRESH_URL = "https://securetoken.googleapis.com/v1/token";
+const FIREBASE_API_KEY = "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM";
+
+/** Tab ID of the tab where the user clicked the extension icon (for post-login switch-back). */
+let originTabId: number | null = null;
 
 /** Guard to prevent concurrent auth checks (Loom-style single authority). */
 let authCheckInProgress = false;
@@ -169,6 +173,7 @@ async function initializeSessionState(): Promise<void> {
               resolve();
             })
             .catch(() => {
+              clearAuthState();
               globalUIState.pointers = [];
               broadcastUIState();
               resolve();
@@ -186,9 +191,11 @@ async function initializeSessionState(): Promise<void> {
   broadcastUIState();
 })();
 
+/** Extension-stored auth tokens (set on login success, cleared on logout/401). */
+const ECHLY_TOKEN_KEYS = ["echlyIdToken", "echlyRefreshToken", "echlyTokenTime"] as const;
+
 /**
- * Legacy auth keys — cleanup only. Extension is stateless and must NEVER write these again.
- * clearAuthState() removes them if present from older installs.
+ * Legacy auth keys — cleanup only. clearAuthState() removes them if present from older installs.
  */
 const AUTH_STORAGE_KEYS_LEGACY = [
   "auth_idToken",
@@ -203,124 +210,107 @@ function clearSessionCache(): void {
   globalUIState.user = null;
 }
 
-/** Clear legacy auth state from storage (removes only legacy keys if present). Also closes tray and broadcasts. */
+/** Clear auth state: tokens, legacy keys, session cache; close tray and broadcast. */
 function clearAuthState(): void {
   clearSessionCache();
   globalUIState.visible = false;
   globalUIState.expanded = false;
-  chrome.storage.local.remove([...AUTH_STORAGE_KEYS_LEGACY]);
+  chrome.storage.local.remove([...ECHLY_TOKEN_KEYS, ...AUTH_STORAGE_KEYS_LEGACY]);
   persistUIState();
   broadcastUIState();
 }
 
-/**
- * Pre-warm auth session: if a dashboard tab exists, get token and validate with backend,
- * then update sessionCache. No-op if no dashboard tab. Improves perceived launch time on icon click.
- */
-async function prewarmAuthSession(): Promise<void> {
-  const tabs = await new Promise<chrome.tabs.Tab[]>((resolve) => {
-    chrome.tabs.query({}, (t) => resolve(t));
-  });
-  const dashboardTab = tabs.find((t) => {
-    if (!t.url) return false;
-    try {
-      return DASHBOARD_ORIGINS.includes(new URL(t.url).origin);
-    } catch {
-      return false;
-    }
-  });
-  if (!dashboardTab?.id) return;
-
-  const token = await getTokenFromPage();
-  if (!token) return;
-
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/session`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      sessionCache = { authenticated: false, checkedAt: Date.now() };
-      return;
-    }
-    const data = (await res.json()) as { authenticated?: boolean };
-    sessionCache = {
-      authenticated: data.authenticated === true,
-      checkedAt: Date.now(),
-    };
-  } catch {
-    sessionCache = { authenticated: false, checkedAt: Date.now() };
-  }
-}
-
-/**
- * Request a fresh Firebase ID token from a dashboard tab's page (via content script).
- * Tries active tab first, then any tab with dashboard origin. If no dashboard tab exists,
- * opens dashboard silently in background, waits briefly, then retries (stops login loop).
- */
-async function getTokenFromPage(): Promise<string | null> {
-  const tryTab = (tabId: number): Promise<string | null> =>
-    new Promise((resolve) => {
-      const timeout = setTimeout(() => resolve(null), TOKEN_REQUEST_TIMEOUT_MS);
-      chrome.tabs.sendMessage(tabId, { type: "ECHLY_GET_TOKEN_FROM_PAGE" }, (response: { token?: string | null } | undefined) => {
-        clearTimeout(timeout);
-        if (chrome.runtime.lastError) {
-          resolve(null);
+/** Get stored tokens from extension storage. Returns null if any key is missing. */
+function getStoredTokens(): Promise<{ idToken: string; refreshToken: string; tokenTime: number } | null> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(
+      ["echlyIdToken", "echlyRefreshToken", "echlyTokenTime"],
+      (result: { echlyIdToken?: string; echlyRefreshToken?: string; echlyTokenTime?: number }) => {
+        const idToken = result.echlyIdToken;
+        const refreshToken = result.echlyRefreshToken;
+        const tokenTime = result.echlyTokenTime;
+        if (
+          typeof idToken === "string" &&
+          idToken.length > 0 &&
+          typeof refreshToken === "string" &&
+          refreshToken.length > 0 &&
+          typeof tokenTime === "number"
+        ) {
+          resolve({ idToken, refreshToken, tokenTime });
           return;
         }
-        resolve(typeof response?.token === "string" ? response.token : null);
-      });
-    });
-
-  const tabs = await new Promise<chrome.tabs.Tab[]>((resolve) => {
-    chrome.tabs.query({}, (t) => resolve(t));
-  });
-  const hasDashboardTab = () =>
-    tabs.some((t) => {
-      if (!t.url) return false;
-      try {
-        return DASHBOARD_ORIGINS.includes(new URL(t.url).origin);
-      } catch {
-        return false;
+        resolve(null);
       }
-    });
-
-  const activeTab = tabs.find((t) => t.active);
-  if (activeTab?.id) {
-    const token = await tryTab(activeTab.id);
-    if (token) return token;
-  }
-  for (const tab of tabs) {
-    if (!tab.id || !tab.url) continue;
-    try {
-      const u = new URL(tab.url);
-      if (!DASHBOARD_ORIGINS.includes(u.origin)) continue;
-    } catch {
-      continue;
-    }
-    const token = await tryTab(tab.id);
-    if (token) return token;
-  }
-
-  /* Extension must NEVER create dashboard tabs automatically. Dashboard only via login redirect. */
-  return null;
+    );
+  });
 }
 
 /**
- * Get a valid token from the page; throws NOT_AUTHENTICATED if user not signed in on dashboard.
+ * Refresh ID token using Firebase securetoken endpoint. Updates storage with new tokens.
+ * Throws on network error or invalid response; on failure caller should clear tokens.
+ */
+async function refreshIdToken(): Promise<string> {
+  const stored = await getStoredTokens();
+  if (!stored?.refreshToken) throw new Error("NOT_AUTHENTICATED");
+
+  const url = `${FIREBASE_REFRESH_URL}?key=${encodeURIComponent(FIREBASE_API_KEY)}`;
+  const body = `grant_type=refresh_token&refresh_token=${encodeURIComponent(stored.refreshToken)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    if (ECHLY_DEBUG) console.debug("[EXTENSION] refresh failed", res.status, text);
+    throw new Error("NOT_AUTHENTICATED");
+  }
+
+  const data = (await res.json()) as {
+    id_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+  };
+  const newIdToken = data.id_token;
+  const newRefreshToken = data.refresh_token ?? stored.refreshToken;
+  if (!newIdToken) throw new Error("NOT_AUTHENTICATED");
+
+  await new Promise<void>((resolve) => {
+    chrome.storage.local.set(
+      {
+        echlyIdToken: newIdToken,
+        echlyRefreshToken: newRefreshToken,
+        echlyTokenTime: Date.now(),
+      },
+      () => resolve()
+    );
+  });
+  return newIdToken;
+}
+
+/**
+ * Get a valid ID token: from storage, refresh if older than 50 minutes.
+ * Throws NOT_AUTHENTICATED if no tokens or refresh fails.
  */
 async function getValidToken(): Promise<string> {
-  const token = await getTokenFromPage();
-  if (!token) throw new Error("NOT_AUTHENTICATED");
-  return token;
+  const stored = await getStoredTokens();
+  if (!stored) throw new Error("NOT_AUTHENTICATED");
+
+  const age = Date.now() - stored.tokenTime;
+  if (age > TOKEN_MAX_AGE_MS) {
+    return refreshIdToken();
+  }
+  return stored.idToken;
 }
 
 /**
  * Backend session check: single source of truth. Uses GET /api/auth/session with Bearer token.
- * If not ok or no token, clears extension auth and returns { authenticated: false }.
+ * If 401/403 or no token/refresh failure, clears stored tokens and returns { authenticated: false }.
  */
 async function checkBackendSession(): Promise<{
   authenticated: boolean;
-  user?: { uid: string };
+  user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null };
 }> {
   let token: string;
   try {
@@ -329,19 +319,21 @@ async function checkBackendSession(): Promise<{
     clearAuthState();
     return { authenticated: false };
   }
-  if (!token) {
-    clearAuthState();
-    return { authenticated: false };
-  }
   try {
     const res = await fetch(`${API_BASE}/api/auth/session`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
       clearAuthState();
       return { authenticated: false };
     }
-    return await res.json();
+    if (!res.ok) {
+      return { authenticated: false };
+    }
+    return (await res.json()) as {
+      authenticated: boolean;
+      user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null };
+    };
   } catch {
     clearAuthState();
     return { authenticated: false };
@@ -379,21 +371,6 @@ function broadcastUIState(): void {
   });
 }
 
-/** After login completion: update sessionCache and global UI state, then broadcast. */
-async function refreshExtensionAuth(): Promise<void> {
-  try {
-    const session = await checkBackendSession();
-    sessionCache = {
-      authenticated: session.authenticated,
-      checkedAt: Date.now(),
-    };
-    if (session.authenticated) {
-      globalUIState.user = session.user ?? null;
-      broadcastUIState();
-    }
-  } catch {}
-}
-
 /** When user switches tabs, push current session state to that tab so every tab receives state when focused. */
 chrome.tabs.onActivated.addListener((activeInfo) => {
   const tabId = activeInfo.tabId;
@@ -419,31 +396,50 @@ chrome.tabs.onCreated.addListener((tab) => {
     });
 });
 
-/** Pre-warm session on extension start so first click can open tray instantly. */
-chrome.runtime.onStartup.addListener(() => {
-  prewarmAuthSession();
-});
-
-/** Pre-warm session on install/update so session is ready when user opens dashboard. */
-chrome.runtime.onInstalled.addListener(() => {
-  prewarmAuthSession();
-});
-
-/** When a dashboard tab finishes loading, pre-warm session so it stays warm while dashboard is open. */
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status !== "complete" || !tab.url) return;
+/** Pre-warm session cache on startup: validate stored token so first icon click can open tray instantly. */
+async function prewarmSessionFromStorage(): Promise<void> {
   try {
-    if (DASHBOARD_ORIGINS.includes(new URL(tab.url).origin)) prewarmAuthSession();
+    const token = await getValidToken();
+    if (!token) return;
+    const res = await fetch(`${API_BASE}/api/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { authenticated?: boolean };
+      sessionCache = {
+        authenticated: data.authenticated === true,
+        checkedAt: Date.now(),
+      };
+    } else {
+      sessionCache = { authenticated: false, checkedAt: Date.now() };
+    }
   } catch {
-    // ignore invalid URLs
+    sessionCache = { authenticated: false, checkedAt: Date.now() };
   }
+}
+
+chrome.runtime.onStartup.addListener(() => {
+  prewarmSessionFromStorage();
 });
 
-/** Extension icon click: Loom-style — check auth first; open tray only if authenticated, else open login tab. */
+chrome.runtime.onInstalled.addListener(() => {
+  prewarmSessionFromStorage();
+});
+
+/** Extension icon click: store origin tab; use session cache (30s) for instant tray, else validate then open tray or login. */
 chrome.action.onClicked.addListener((tab) => {
   if (authCheckInProgress) return;
-  authCheckInProgress = true;
+  originTabId = tab?.id ?? null;
 
+  if (sessionCache.authenticated === true && Date.now() - sessionCache.checkedAt < SESSION_CACHE_TTL_MS) {
+    globalUIState.visible = true;
+    globalUIState.expanded = true;
+    persistUIState();
+    broadcastUIState();
+    return;
+  }
+
+  authCheckInProgress = true;
   (async () => {
     try {
       const session = await checkBackendSession();
@@ -477,10 +473,60 @@ chrome.action.onClicked.addListener((tab) => {
   })();
 });
 
-chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
-  if (msg?.type === "ECHLY_EXTENSION_LOGIN_COMPLETE") {
-    refreshExtensionAuth(); /* Runs checkBackendSession then broadcasts ECHLY_AUTH_STATE_UPDATED to all tabs. */
+/** Login page sends tokens after Firebase login; we store them, validate, switch to origin tab, open tray. */
+chrome.runtime.onMessage.addListener((msg: { type?: string; idToken?: string; refreshToken?: string }, _sender, sendResponse) => {
+  if (msg?.type !== "ECHLY_EXTENSION_AUTH_SUCCESS") return;
+  const idToken = msg.idToken;
+  const refreshToken = msg.refreshToken;
+  if (typeof idToken !== "string" || idToken.length === 0 || typeof refreshToken !== "string" || refreshToken.length === 0) {
+    sendResponse?.({ success: false, error: "Missing tokens" });
+    return;
   }
+
+  (async () => {
+    try {
+      await new Promise<void>((resolve) => {
+        chrome.storage.local.set(
+          {
+            echlyIdToken: idToken,
+            echlyRefreshToken: refreshToken,
+            echlyTokenTime: Date.now(),
+          },
+          () => resolve()
+        );
+      });
+
+      const res = await fetch(`${API_BASE}/api/auth/session`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (!res.ok || res.status === 401 || res.status === 403) {
+        clearAuthState();
+        sendResponse?.({ success: false });
+        return;
+      }
+      const data = (await res.json()) as { authenticated?: boolean; user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null } };
+      sessionCache = { authenticated: data.authenticated === true, checkedAt: Date.now() };
+      globalUIState.user = data.user ?? null;
+      globalUIState.visible = true;
+      globalUIState.expanded = true;
+      persistUIState();
+      broadcastUIState();
+
+      if (originTabId != null) {
+        try {
+          await chrome.tabs.update(originTabId, { active: true });
+        } catch {
+          if (ECHLY_DEBUG) console.debug("[EXTENSION] could not switch to origin tab", originTabId);
+        }
+      }
+      sendResponse?.({ success: true });
+    } catch (e) {
+      if (ECHLY_DEBUG) console.debug("[EXTENSION] auth success handler error", e);
+      clearAuthState();
+      sendResponse?.({ success: false });
+    }
+  })();
+  return true;
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -616,6 +662,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           globalUIState.sessionTitle = match?.title ?? null;
         }
       } catch {
+        clearAuthState();
         globalUIState.pointers = [];
       }
       globalUIState.sessionLoading = false;
@@ -709,7 +756,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         const token = await getValidToken();
         sendResponse({ token });
-      } catch (error) {
+      } catch {
+        clearAuthState();
         sendResponse({ error: "NOT_AUTHENTICATED" });
       }
     })();
@@ -822,6 +870,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ url: data.url });
       } catch (err) {
         console.error("ECHLY_UPLOAD_SCREENSHOT error:", err);
+        clearAuthState();
         sendResponse({ error: String(err) });
       }
     })();
@@ -992,6 +1041,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       } catch (error) {
         console.error("ECHLY_PROCESS_FEEDBACK error:", error);
+        clearAuthState();
         sendResponse({
           success: false,
           error: String(error),
@@ -1029,6 +1079,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const isAuth = message === "NOT_AUTHENTICATED" || message.includes("NOT_AUTHENTICATED");
+        if (isAuth) clearAuthState();
         sendResponse({
           ok: false,
           status: isAuth ? 401 : 0,
