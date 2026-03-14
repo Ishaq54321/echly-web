@@ -62,6 +62,7 @@ type GlobalUIState = {
   sessionLoading: boolean;
   pointers: StructuredFeedback[];
   captureMode: "voice" | "text";
+  user?: AuthUser | null;
 };
 
 /** Prevent overwriting a valid pointer list with empty when session has not changed (Pause → Minimize → Resume). */
@@ -130,6 +131,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     sessionLoading: false,
     pointers: [],
     captureMode: "voice",
+    user: null,
   });
   const [widgetResetKey, setWidgetResetKey] = React.useState(0);
   const [hasPreviousSessions, setHasPreviousSessions] = React.useState(false);
@@ -191,11 +193,24 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return () => window.removeEventListener("ECHLY_RESET_WIDGET", handler as EventListener);
   }, []);
 
-  /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). No local source of truth. */
+  /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). Auth never requested by content. */
   React.useEffect(() => {
     const applyGlobalState = (state: GlobalUIState) => {
       setHostVisibility(getShouldShowTray(state));
       setGlobalState((prev) => mergeWithPointerProtection(prev, state));
+      if (state.user !== undefined) {
+        setUser(
+          state.user && state.user.uid
+            ? {
+                uid: state.user.uid,
+                name: state.user.name ?? null,
+                email: state.user.email ?? null,
+                photoURL: state.user.photoURL ?? null,
+              }
+            : null
+        );
+      }
+      setAuthChecked(true);
     };
     (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (state: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__ = applyGlobalState;
     return () => {
@@ -213,7 +228,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     if (globalState.sessionId) setStartSessionLoading(false);
   }, [globalState.sessionId]);
 
-  /* Global UI state: always overwrite from background; protect pointers when session unchanged (Pause → Minimize → Resume). */
+  /* Global UI state: always overwrite from background; auth comes from state only (no ECHLY_GET_AUTH_STATE). */
   React.useEffect(() => {
     const handler = (e: CustomEvent<{ state: GlobalUIState }>) => {
       const s = e.detail?.state;
@@ -221,12 +236,20 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       echlyLog("CONTENT", "global state received", s);
       setHostVisibility(getShouldShowTray(s));
       setGlobalState((prev) => mergeWithPointerProtection(prev, s));
+      if (s.user !== undefined) {
+        setUser(
+          s.user && s.user.uid
+            ? { uid: s.user.uid, name: s.user.name ?? null, email: s.user.email ?? null, photoURL: s.user.photoURL ?? null }
+            : null
+        );
+      }
+      setAuthChecked(true);
     };
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
   }, []);
 
-  /* Hydrate from background on mount so already-open tabs join active sessions without refresh. */
+  /* Hydrate from background on mount (global state only; no auth request). */
   React.useEffect(() => {
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_GLOBAL_STATE" },
@@ -235,12 +258,20 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         if (state) {
           setHostVisibility(getShouldShowTray(state));
           setGlobalState((prev) => mergeWithPointerProtection(prev, state));
+          if (state.user !== undefined) {
+            setUser(
+              state.user && state.user.uid
+                ? { uid: state.user.uid, name: state.user.name ?? null, email: state.user.email ?? null, photoURL: state.user.photoURL ?? null }
+                : null
+            );
+          }
+          setAuthChecked(true);
         }
       }
     );
   }, []);
 
-  /* Hard resync when tab becomes visible so session end is never missed (background push is unreliable). */
+  /* Resync global state when tab becomes visible (ECHLY_GET_GLOBAL_STATE only; no auth request). */
   React.useEffect(() => {
     const handler = () => {
       if (document.hidden) return;
@@ -252,6 +283,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             if (normalized) {
               setHostVisibility(getShouldShowTray(normalized));
               setGlobalState((prev) => mergeWithPointerProtection(prev, normalized));
+              if (normalized.user !== undefined) {
+                setUser(
+                  normalized.user && normalized.user.uid
+                    ? { uid: normalized.user.uid, name: normalized.user.name ?? null, email: normalized.user.email ?? null, photoURL: normalized.user.photoURL ?? null }
+                    : null
+                );
+              }
+              setAuthChecked(true);
             }
           }
         }
@@ -312,38 +351,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     applyThemeToRoot(widgetRoot, next);
   }, [theme, widgetRoot]);
 
-  React.useEffect(() => {
-    chrome.runtime.sendMessage(
-      { type: "ECHLY_GET_AUTH_STATE" },
-      (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
-        if (response?.authenticated && response.user?.uid) {
-          setUser({
-            uid: response.user.uid,
-            name: response.user.name ?? null,
-            email: response.user.email ?? null,
-            photoURL: response.user.photoURL ?? null,
-          });
-        } else {
-          setUser(null);
-        }
-        setAuthChecked(true);
-      }
-    );
-  }, []);
-
-  /* When tray becomes visible, request auth again so UI shows correct user state. */
-  React.useEffect(() => {
-    if (!globalState.visible) return;
-    chrome.runtime.sendMessage(
-      { type: "ECHLY_GET_AUTH_STATE" },
-      (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
-        if (response?.authenticated && response.user?.uid) {
-          setUser({ uid: response.user.uid, name: response.user.name ?? null, email: response.user.email ?? null, photoURL: response.user.photoURL ?? null });
-        }
-      }
-    );
-  }, [globalState.visible]);
-
+  /* Auth state: only from ECHLY_AUTH_STATE_UPDATED or globalState.user (background is sole authority). */
   React.useEffect(() => {
     const listener = (msg: { type?: string; authenticated?: boolean; user?: AuthUser | null }) => {
       if (msg?.type !== "ECHLY_AUTH_STATE_UPDATED") return;
@@ -362,27 +370,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return () => {
       chrome.runtime.onMessage.removeListener(listener);
     };
-  }, []);
-
-  React.useEffect(() => {
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        chrome.runtime.sendMessage({ type: "ECHLY_GET_AUTH_STATE" }, (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
-          if (response?.authenticated && response.user?.uid) {
-            setUser({
-              uid: response.user.uid,
-              name: response.user.name ?? null,
-              email: response.user.email ?? null,
-              photoURL: response.user.photoURL ?? null,
-            });
-          } else {
-            setUser(null);
-          }
-        });
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
   const handleComplete = React.useCallback(
@@ -1607,6 +1594,7 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     sessionLoading: state.sessionLoading ?? false,
     pointers: Array.isArray(state.pointers) ? state.pointers : [],
     captureMode: state.captureMode === "text" ? "text" : "voice",
+    user: state.user !== undefined ? state.user : null,
   };
 }
 

@@ -13,6 +13,9 @@ const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
 const TOKEN_REQUEST_TIMEOUT_MS = 2000;
 const SESSION_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
+/** Guard to prevent concurrent auth checks (Loom-style single authority). */
+let authCheckInProgress = false;
+
 /** In-memory session cache for instant tray open. Not persisted; TTL 30s. */
 let sessionCache: { authenticated: boolean; checkedAt: number } = {
   authenticated: false,
@@ -35,6 +38,7 @@ let globalUIState: {
   sessionLoading: boolean;
   pointers: StructuredFeedback[];
   captureMode: "voice" | "text";
+  user: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null } | null;
 } = {
   visible: false,
   expanded: false,
@@ -46,6 +50,7 @@ let globalUIState: {
   sessionLoading: false,
   pointers: [],
   captureMode: "voice",
+  user: null,
 };
 
 /** 30-minute safety timeout: session ends after this much inactivity. */
@@ -195,6 +200,7 @@ const AUTH_STORAGE_KEYS_LEGACY = [
 /** Clear in-memory session cache (e.g. on 401). */
 function clearSessionCache(): void {
   sessionCache = { authenticated: false, checkedAt: 0 };
+  globalUIState.user = null;
 }
 
 /** Clear legacy auth state from storage (removes only legacy keys if present). */
@@ -291,32 +297,7 @@ async function getTokenFromPage(): Promise<string | null> {
     if (token) return token;
   }
 
-  /* No dashboard tab: open dashboard silently in background, wait, then retry (stops login loop). */
-  if (!hasDashboardTab()) {
-    const ECHLY_LOGIN_BASE_FOR_DASHBOARD = "https://echly-web.vercel.app";
-    await new Promise<void>((resolve) => {
-      chrome.tabs.create(
-        { url: `${ECHLY_LOGIN_BASE_FOR_DASHBOARD}/dashboard`, active: false },
-        () => {
-          setTimeout(resolve, 800);
-        }
-      );
-    });
-    const tabsAfter = await new Promise<chrome.tabs.Tab[]>((resolve) => {
-      chrome.tabs.query({}, (t) => resolve(t));
-    });
-    for (const tab of tabsAfter) {
-      if (!tab.id || !tab.url) continue;
-      try {
-        const u = new URL(tab.url);
-        if (!DASHBOARD_ORIGINS.includes(u.origin)) continue;
-      } catch {
-        continue;
-      }
-      const token = await tryTab(tab.id);
-      if (token) return token;
-    }
-  }
+  /* Extension must NEVER create dashboard tabs automatically. Dashboard only via login redirect. */
   return null;
 }
 
@@ -394,7 +375,7 @@ function broadcastUIState(): void {
   });
 }
 
-/** After login completion (signal from login page), re-validate session and push auth state to all tabs. */
+/** After login completion: update sessionCache only. No new tabs, no broadcast auth requests. */
 async function refreshExtensionAuth(): Promise<void> {
   try {
     const session = await checkBackendSession();
@@ -402,18 +383,6 @@ async function refreshExtensionAuth(): Promise<void> {
       authenticated: session.authenticated,
       checkedAt: Date.now(),
     };
-    chrome.tabs.query({}, (tabs) => {
-      for (const tab of tabs) {
-        if (!tab.id) continue;
-        chrome.tabs
-          .sendMessage(tab.id, {
-            type: "ECHLY_AUTH_STATE_UPDATED",
-            authenticated: session.authenticated,
-            user: session.user ?? null,
-          })
-          .catch(() => {});
-      }
-    });
   } catch {}
 }
 
@@ -462,34 +431,42 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-/** Extension icon click: open tray immediately; auth runs in background and does not block UI. */
-chrome.action.onClicked.addListener((_tab) => {
-  globalUIState.visible = true;
-  globalUIState.expanded = true;
-  persistUIState();
-  broadcastUIState();
+/** Extension icon click: Loom-style — check auth first; open tray only if authenticated, else open login tab. */
+chrome.action.onClicked.addListener((tab) => {
+  if (authCheckInProgress) return;
+  authCheckInProgress = true;
 
-  checkBackendSession()
-    .then((session) => {
-      sessionCache = {
-        authenticated: session.authenticated,
-        checkedAt: Date.now(),
-      };
-      chrome.tabs.query({}, (tabs) => {
-        tabs.forEach((tab) => {
-          if (tab.id) {
-            chrome.tabs
-              .sendMessage(tab.id, {
-                type: "ECHLY_AUTH_STATE_UPDATED",
-                authenticated: session.authenticated,
-                user: session.user ?? null,
-              })
-              .catch(() => {});
-          }
-        });
-      });
-    })
-    .catch(() => {});
+  (async () => {
+    try {
+      const session = await checkBackendSession();
+      sessionCache = { authenticated: session.authenticated, checkedAt: Date.now() };
+
+      if (session.authenticated === true) {
+        globalUIState.user = session.user ?? null;
+        globalUIState.visible = true;
+        globalUIState.expanded = true;
+        persistUIState();
+        broadcastUIState();
+      } else {
+        globalUIState.user = null;
+        const returnUrl = typeof tab?.url === "string" ? tab.url : "";
+        const loginUrl =
+          ECHLY_LOGIN_BASE +
+          "?extension=true" +
+          (returnUrl ? "&returnUrl=" + encodeURIComponent(returnUrl) : "");
+        chrome.tabs.create({ url: loginUrl });
+      }
+    } catch {
+      const returnUrl = typeof tab?.url === "string" ? tab.url : "";
+      const loginUrl =
+        ECHLY_LOGIN_BASE +
+        "?extension=true" +
+        (returnUrl ? "&returnUrl=" + encodeURIComponent(returnUrl) : "");
+      chrome.tabs.create({ url: loginUrl });
+    } finally {
+      authCheckInProgress = false;
+    }
+  })();
 });
 
 chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
