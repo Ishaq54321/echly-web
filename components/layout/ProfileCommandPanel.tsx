@@ -133,8 +133,22 @@ export function ProfileCommandPanel({
     if (e.target === e.currentTarget) onClose();
   };
 
-  const handleSignOut = () => {
-    signOut(auth);
+  const handleSignOut = async () => {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const token = await user.getIdToken();
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+    } catch (err) {
+      console.error("Logout revoke failed", err);
+    }
+    await signOut(auth);
     onClose();
   };
 

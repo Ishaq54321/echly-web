@@ -1,10 +1,4 @@
-import { jwtVerify, createRemoteJWKSet } from "jose";
-
-const PROJECT_ID = "echly-b74cc"; // use your real Firebase project id
-
-const JWKS = createRemoteJWKSet(
-  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
-);
+import { getAdminAuth } from "@/lib/server/firebaseAdmin";
 
 export interface DecodedIdToken {
   uid: string;
@@ -12,14 +6,8 @@ export interface DecodedIdToken {
 }
 
 export async function verifyIdToken(token: string): Promise<DecodedIdToken> {
-  const { payload } = await jwtVerify(token, JWKS, {
-    issuer: `https://securetoken.google.com/${PROJECT_ID}`,
-    audience: PROJECT_ID,
-  });
-  return {
-    uid: (payload.sub ?? payload.user_id) as string,
-    ...payload,
-  };
+  const decoded = await getAdminAuth().verifyIdToken(token, true);
+  return { ...decoded, uid: decoded.uid } as DecodedIdToken;
 }
 
 export async function requireAuth(request: Request): Promise<DecodedIdToken> {

@@ -4,7 +4,10 @@
  */
 import { ECHLY_DEBUG } from "../../lib/utils/logger";
 
-const API_BASE = "http://localhost:3000";
+const API_BASE =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3000"
+    : "https://echly-web.vercel.app";
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 export function clearAuthTokenCache(): void {

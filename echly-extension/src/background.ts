@@ -12,7 +12,7 @@ const API_BASE =
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
-const SESSION_CACHE_TTL_MS = 30 * 1000; // 30 seconds — use cache if validated within this window
+const SESSION_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes — use cache if validated within this window
 const TOKEN_MAX_AGE_MS = 50 * 60 * 1000; // 50 minutes — refresh ID token before expiry
 const FIREBASE_REFRESH_URL = "https://securetoken.googleapis.com/v1/token";
 const FIREBASE_API_KEY = "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM";
@@ -210,7 +210,7 @@ async function initializeSessionState(): Promise<void> {
               resolve();
             })
             .catch(() => {
-              clearAuthState();
+              console.warn("[ECHLY AUTH] transient error, not clearing auth");
               globalUIState.pointers = [];
               broadcastUIState();
               resolve();
@@ -353,7 +353,6 @@ async function checkBackendSession(): Promise<{
   try {
     token = await getValidToken();
   } catch {
-    clearAuthState();
     return { authenticated: false };
   }
   try {
@@ -372,7 +371,7 @@ async function checkBackendSession(): Promise<{
       user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null };
     };
   } catch {
-    clearAuthState();
+    console.warn("[ECHLY AUTH] transient error, not clearing auth");
     return { authenticated: false };
   }
 }
@@ -395,15 +394,26 @@ async function validateSessionWithBackend(token: string): Promise<boolean> {
 
 function broadcastUIState(): void {
   echlyLog("BACKGROUND", "broadcast global state", globalUIState);
+  const payload = { type: "ECHLY_GLOBAL_STATE" as const, state: globalUIState };
   chrome.tabs.query({}, (tabs) => {
-    tabs.forEach((tab) => {
-      if (tab.id) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (activeTabs) => {
+      const activeTabId = activeTabs[0]?.id ?? null;
+      tabs.forEach((tab) => {
+        if (!tab.id) return;
+        const isActiveTab = tab.id === activeTabId;
         chrome.tabs
-          .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
+          .sendMessage(tab.id, payload)
           .catch(() => {
             if (ECHLY_DEBUG) console.debug("ECHLY broadcast skipped tab", tab.id);
+            if (isActiveTab) {
+              setTimeout(() => {
+                chrome.tabs.sendMessage(tab.id!, payload).catch(() => {
+                  if (ECHLY_DEBUG) console.debug("ECHLY broadcast retry skipped tab", tab.id);
+                });
+              }, 50);
+            }
           });
-      }
+      });
     });
   });
 }
@@ -417,7 +427,6 @@ async function validateSessionAndOpenTray(): Promise<{ success: boolean }> {
   try {
     token = await getValidToken();
   } catch {
-    clearAuthState();
     return { success: false };
   }
   try {
@@ -460,7 +469,7 @@ async function validateSessionAndOpenTray(): Promise<{ success: boolean }> {
     }
     return { success: true };
   } catch {
-    clearAuthState();
+    console.warn("[ECHLY AUTH] transient error, not clearing auth");
     return { success: false };
   }
 }
@@ -522,15 +531,48 @@ chrome.runtime.onInstalled.addListener(() => {
 
 /** Extension icon click: store origin tab; use session cache (30s) for instant tray, else validate then open tray or login. Never opens or focuses dashboard. */
 chrome.action.onClicked.addListener((tab) => {
+  console.log("[ECHLY CLICK] icon clicked");
+  console.log("[ECHLY CLICK] session cache", sessionCache);
   if (authCheckInProgress) return;
   originTabId = tab?.id ?? null;
 
   if (sessionCache.authenticated === true && Date.now() - sessionCache.checkedAt < SESSION_CACHE_TTL_MS) {
-    console.log("[ECHLY AUTH] opening tray");
-    globalUIState.visible = true;
-    globalUIState.expanded = true;
+    // Open tray instantly
+    if (globalUIState.visible === true) {
+      globalUIState.visible = false;
+      globalUIState.expanded = false;
+    } else {
+      globalUIState.visible = true;
+      globalUIState.expanded = true;
+    }
+
     persistUIState();
     broadcastUIState();
+
+    // Background session validation (Loom style)
+    checkBackendSession()
+      .then((session) => {
+        sessionCache = { authenticated: session.authenticated, checkedAt: Date.now() };
+
+        if (!session.authenticated) {
+          clearAuthState();
+
+          // Close tray
+          globalUIState.visible = false;
+          globalUIState.expanded = false;
+
+          persistUIState();
+          broadcastUIState();
+
+          // Open login page
+          const loginUrl = ECHLY_LOGIN_BASE + "?extension=true";
+          openOrFocusLoginTab(loginUrl);
+        }
+      })
+      .catch(() => {
+        console.warn("[ECHLY AUTH] background validation failed");
+      });
+
     return;
   }
 
@@ -543,9 +585,13 @@ chrome.action.onClicked.addListener((tab) => {
 
       if (session.authenticated === true) {
         globalUIState.user = session.user ?? null;
-        console.log("[ECHLY AUTH] opening tray");
-        globalUIState.visible = true;
-        globalUIState.expanded = true;
+        if (globalUIState.visible === true) {
+          globalUIState.visible = false;
+          globalUIState.expanded = false;
+        } else {
+          globalUIState.visible = true;
+          globalUIState.expanded = true;
+        }
         persistUIState();
         broadcastUIState();
       } else {
@@ -572,40 +618,39 @@ chrome.action.onClicked.addListener((tab) => {
   })();
 });
 
-/** Login page sends tokens via content script (postMessage bridge). We store them, validate session, open tray, switch to origin tab. */
-chrome.runtime.onMessage.addListener((msg: { type?: string; idToken?: string; refreshToken?: string }, _sender, sendResponse) => {
-  if (msg?.type !== "ECHLY_EXTENSION_AUTH_SUCCESS") return;
-  const idToken = msg.idToken;
-  const refreshToken = msg.refreshToken;
-  if (typeof idToken !== "string" || idToken.length === 0 || typeof refreshToken !== "string" || refreshToken.length === 0) {
-    sendResponse?.({ success: false, error: "Missing tokens" });
-    return;
+/** Single message listener: auth success from login page + all other extension messages. */
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  /* Login page sends tokens via content script (postMessage bridge). Store them, validate session, open tray, switch to origin tab. */
+  if (request?.type === "ECHLY_EXTENSION_AUTH_SUCCESS") {
+    const idToken = (request as { idToken?: string }).idToken;
+    const refreshToken = (request as { refreshToken?: string }).refreshToken;
+    if (typeof idToken !== "string" || idToken.length === 0 || typeof refreshToken !== "string" || refreshToken.length === 0) {
+      sendResponse?.({ success: false, error: "Missing tokens" });
+      return true;
+    }
+    (async () => {
+      try {
+        await new Promise<void>((resolve) => {
+          chrome.storage.local.set(
+            {
+              echlyIdToken: idToken,
+              echlyRefreshToken: refreshToken,
+              echlyTokenTime: Date.now(),
+            },
+            () => resolve()
+          );
+        });
+        const result = await validateSessionAndOpenTray();
+        sendResponse?.(result.success ? { success: true } : { success: false });
+      } catch (e) {
+        if (ECHLY_DEBUG) console.debug("[EXTENSION] auth success handler error", e);
+        console.warn("[ECHLY AUTH] transient error, not clearing auth");
+        sendResponse?.({ success: false });
+      }
+    })();
+    return true;
   }
 
-  (async () => {
-    try {
-      await new Promise<void>((resolve) => {
-        chrome.storage.local.set(
-          {
-            echlyIdToken: idToken,
-            echlyRefreshToken: refreshToken,
-            echlyTokenTime: Date.now(),
-          },
-          () => resolve()
-        );
-      });
-      const result = await validateSessionAndOpenTray();
-      sendResponse?.(result.success ? { success: true } : { success: false });
-    } catch (e) {
-      if (ECHLY_DEBUG) console.debug("[EXTENSION] auth success handler error", e);
-      clearAuthState();
-      sendResponse?.({ success: false });
-    }
-  })();
-  return true;
-});
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   echlyLog("MESSAGE", "received", request.type);
   if (request.type === "ECHLY_TOGGLE_VISIBILITY") {
     globalUIState.visible = true;
@@ -738,7 +783,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           globalUIState.sessionTitle = match?.title ?? null;
         }
       } catch {
-        clearAuthState();
+        console.warn("[ECHLY AUTH] transient error, not clearing auth");
         globalUIState.pointers = [];
       }
       globalUIState.sessionLoading = false;
@@ -833,7 +878,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const token = await getValidToken();
         sendResponse({ token });
       } catch {
-        clearAuthState();
+        console.warn("[ECHLY AUTH] transient error, not clearing auth");
         sendResponse({ error: "NOT_AUTHENTICATED" });
       }
     })();
@@ -944,7 +989,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ url: data.url });
       } catch (err) {
         console.error("ECHLY_UPLOAD_SCREENSHOT error:", err);
-        clearAuthState();
+        console.warn("[ECHLY AUTH] transient error, not clearing auth");
         sendResponse({ error: String(err) });
       }
     })();
@@ -1115,7 +1160,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       } catch (error) {
         console.error("ECHLY_PROCESS_FEEDBACK error:", error);
-        clearAuthState();
+        console.warn("[ECHLY AUTH] transient error, not clearing auth");
         sendResponse({
           success: false,
           error: String(error),

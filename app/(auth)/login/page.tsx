@@ -43,7 +43,7 @@ function LoginContent() {
             const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
             window.postMessage(
               { type: "ECHLY_PAGE_LOGIN_SUCCESS", idToken, refreshToken },
-              "*"
+              window.location.origin
             );
           } catch {
             /* ignore */
@@ -89,7 +89,7 @@ function LoginContent() {
         const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
         window.postMessage(
           { type: "ECHLY_PAGE_LOGIN_SUCCESS", idToken, refreshToken },
-          "*"
+          window.location.origin
         );
         window.location.href = "/dashboard";
         return;
@@ -124,7 +124,7 @@ function LoginContent() {
         const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
         window.postMessage(
           { type: "ECHLY_PAGE_LOGIN_SUCCESS", idToken, refreshToken },
-          "*"
+          window.location.origin
         );
         window.location.href = "/dashboard";
         return;

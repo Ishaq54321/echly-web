@@ -18,7 +18,10 @@ const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
 const THEME_STORAGE_KEY = "widget-theme";
 /** App origin for opening dashboard (same as API base). */
-const APP_ORIGIN = "http://localhost:3000";
+const APP_ORIGIN =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3000"
+    : "https://echly-web.vercel.app";
 
 function getPreferredTheme(): "dark" | "light" {
   try {
