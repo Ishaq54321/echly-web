@@ -1589,10 +1589,14 @@ function ensureMessageListener(host: HTMLDivElement): void {
     if (!h) return;
     if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
       const state = msg.state;
+
       setHostVisibility(state.visible === true);
-      (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(state);
-      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
-      window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } }));
+
+      (window as Window & {
+        __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void
+      }).__ECHLY_APPLY_GLOBAL_STATE__?.(state);
+
+      echlyLog("CONTENT", "global state applied");
     }
     if (msg.type === "ECHLY_TOGGLE") {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_TOGGLE_WIDGET" });
@@ -1609,8 +1613,9 @@ function ensureMessageListener(host: HTMLDivElement): void {
           const normalized = normalizeGlobalState(response.state);
           if (normalized) {
             if (normalized.visible === true) setHostVisibility(true);
-            (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
-            window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
+            (window as Window & {
+              __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void
+            }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
           }
         }
       });
