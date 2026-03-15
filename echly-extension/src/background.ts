@@ -22,23 +22,28 @@ let originTabId: number | null = null;
 /** Tab ID of the login tab we opened or reused (closed after successful auth if still on /login). */
 let loginTabId: number | null = null;
 
-/** Guard to prevent concurrent token fetch on double-click. */
-let tokenFetchInProgress = false;
+/** Tab ID of the persistent dashboard tab used to broker extension token (session cookie). */
+let dashboardTabId: number | null = null;
+
+/** Tab ID of the hidden auth broker tab (extension-auth page). Closed after token is received. */
+let authBrokerTabId: number | null = null;
+
+const ECHLY_EXTENSION_AUTH_ORIGIN = "https://echly-web.vercel.app";
+
+/** Debug log labels for extension auth flow. */
+const ECHLY_LOG_BROKER_TAB_OPENED = "ECHLY_BROKER_TAB_OPENED";
+const ECHLY_LOG_EXTENSION_TOKEN_RECEIVED = "ECHLY_EXTENSION_TOKEN_RECEIVED";
+const ECHLY_LOG_TRAY_OPENED = "ECHLY_TRAY_OPENED";
+const ECHLY_LOG_LOGOUT_SYNC = "ECHLY_LOGOUT_SYNC";
 
 /**
- * Open login tab: reuse only an existing tab whose URL contains "/login".
- * Dashboard tabs are never reused so the extension always opens the login page when unauthenticated.
- * Sets loginTabId and returns the tab id.
+ * Open login tab: reuse existing tab on login URL to avoid duplicate dashboard tabs.
+ * Uses url pattern so we only focus a tab that is already on /login.
  */
 function openOrFocusLoginTab(loginUrl: string): Promise<number> {
   return new Promise((resolve) => {
-    chrome.tabs.query({}, (tabs) => {
-      const existing = tabs.find(
-        (t) =>
-          t.id != null &&
-          typeof t.url === "string" &&
-          t.url.includes("/login")
-      );
+    chrome.tabs.query({ url: "*://echly-web.vercel.app/login*" }, (tabs) => {
+      const existing = tabs.find((t) => t.id != null);
       if (existing?.id != null) {
         const id = existing.id;
         chrome.tabs.update(id, { active: true }, () => {
@@ -54,6 +59,32 @@ function openOrFocusLoginTab(loginUrl: string): Promise<number> {
       });
     });
   });
+}
+
+/** True if we have an in-memory extension token (validity confirmed on next API 401). */
+function hasValidToken(): boolean {
+  return Boolean(extensionAccessToken);
+}
+
+/** Show tray (visible + expanded), persist and broadcast. */
+function openTray(): void {
+  if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_TRAY_OPENED);
+  echlyLog("BACKGROUND", ECHLY_LOG_TRAY_OPENED);
+  globalUIState.visible = true;
+  globalUIState.expanded = true;
+  persistUIState();
+  broadcastUIState();
+}
+
+/** Open hidden broker tab to obtain token via dashboard cookie. Token comes back via postMessage → content → background. */
+async function openAuthBrokerTab(): Promise<void> {
+  if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_BROKER_TAB_OPENED);
+  echlyLog("BACKGROUND", ECHLY_LOG_BROKER_TAB_OPENED);
+  const tab = await chrome.tabs.create({
+    url: `${ECHLY_EXTENSION_AUTH_ORIGIN}/extension-auth`,
+    active: false,
+  });
+  authBrokerTabId = tab.id ?? null;
 }
 
 let activeSessionId: string | null = null;
@@ -243,82 +274,65 @@ function clearAuthState(): void {
 }
 
 /**
- * Get a tab ID that is on the dashboard origin (so content script can request token from page context).
+ * Find an existing tab that is on the dashboard origin (echly-web.vercel.app).
+ * Sets dashboardTabId and returns the tab, or null if none.
  */
-function getDashboardTabId(): Promise<number | null> {
-  return new Promise((resolve) => {
-    const origin = new URL(API_BASE).origin;
-    chrome.tabs.query({}, (tabs) => {
-      const dashboard = tabs.find(
-        (t) =>
-          t.id != null &&
-          typeof t.url === "string" &&
-          (t.url.startsWith(origin + "/") || t.url === origin + "" || t.url === origin)
-      );
-      resolve(dashboard?.id ?? null);
-    });
+async function findDashboardTab(): Promise<chrome.tabs.Tab | null> {
+  const tabs = await chrome.tabs.query({});
+  for (const tab of tabs) {
+    if (!tab.url) continue;
+    if (tab.url.startsWith("https://echly-web.vercel.app")) {
+      dashboardTabId = tab.id ?? null;
+      return tab;
+    }
+  }
+  return null;
+}
+
+/**
+ * Ensure a dashboard tab exists: reuse cached tab if still valid, else find existing, else create one (background, not active).
+ * Prevents opening multiple dashboard tabs.
+ */
+async function ensureDashboardTab(): Promise<chrome.tabs.Tab> {
+  if (dashboardTabId) {
+    try {
+      const tab = await chrome.tabs.get(dashboardTabId);
+      if (tab) return tab;
+    } catch {
+      dashboardTabId = null;
+    }
+  }
+  const existing = await findDashboardTab();
+  if (existing) return existing;
+  const tab = await chrome.tabs.create({
+    url: "https://echly-web.vercel.app/dashboard",
+    active: false,
   });
+  dashboardTabId = tab.id ?? null;
+  return tab;
 }
 
 /**
- * Request extension token via content script → page bridge so the dashboard page sends __session cookie.
- * Tab must be a dashboard tab (page has EchlyExtensionTokenProvider). Throws NOT_AUTHENTICATED if no token.
+ * Get a valid extension access token from memory only. Token is obtained via broker tab (dashboard page fetches with cookie).
+ * Throws NOT_AUTHENTICATED if not in memory.
  */
-async function fetchExtensionTokenFromTab(tabId: number): Promise<{ token: string; uid: string }> {
-  const response = await chrome.tabs.sendMessage(tabId, {
-    type: "ECHLY_REQUEST_EXTENSION_TOKEN",
-  });
-
-  if (!response?.token) {
-    openOrFocusLoginTab(`${ECHLY_LOGIN_BASE}?extension=true`);
-    throw new Error("NOT_AUTHENTICATED");
-  }
-
-  const uid = typeof response.uid === "string" ? response.uid : "";
-  return { token: response.token, uid };
+async function getValidToken(): Promise<string> {
+  if (extensionAccessToken) return extensionAccessToken;
+  throw new Error("NOT_AUTHENTICATED");
 }
 
 /**
- * Get a valid extension access token: from memory or by requesting from dashboard tab (page-context cookie).
- * Throws NOT_AUTHENTICATED if not logged in or no dashboard tab available.
+ * Auth check: in-memory token only. No session API; validity relies on 401 from API calls.
  */
-async function getValidToken(tabId?: number): Promise<string> {
-  if (extensionAccessToken) {
-    return extensionAccessToken;
-  }
-  const targetTabId = tabId ?? (await getDashboardTabId());
-  if (!targetTabId) {
-    throw new Error("NOT_AUTHENTICATED");
-  }
-  const { token, uid } = await fetchExtensionTokenFromTab(targetTabId);
-  extensionAccessToken = token;
-  globalUIState.user = { uid, name: null, email: null, photoURL: null };
-  return token;
-}
-
-/**
- * Auth check via dashboard tab token request (page context sends cookie).
- * Returns { authenticated, user } or clears state and returns not authenticated.
- */
-async function checkAuthWithExtensionToken(tabId?: number): Promise<{
+async function checkAuthWithExtensionToken(): Promise<{
   authenticated: boolean;
   user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null } | null;
 }> {
-  try {
-    const targetTabId = tabId ?? (await getDashboardTabId());
-    if (!targetTabId) {
-      clearAuthState();
-      return { authenticated: false, user: null };
-    }
-    const { token, uid } = await fetchExtensionTokenFromTab(targetTabId);
-    extensionAccessToken = token;
-    const user = { uid, name: null as string | null, email: null as string | null, photoURL: null as string | null };
-    globalUIState.user = user;
-    return { authenticated: true, user };
-  } catch {
-    clearAuthState();
-    return { authenticated: false, user: null };
+  if (extensionAccessToken && globalUIState.user) {
+    return { authenticated: true, user: globalUIState.user };
   }
+  clearAuthState();
+  return { authenticated: false, user: null };
 }
 
 function broadcastUIState(): void {
@@ -372,44 +386,60 @@ chrome.tabs.onCreated.addListener((tab) => {
     });
 });
 
-/** Extension icon click: open tray immediately, then API call with extension token; if 401, open login. */
+/** When the dashboard tab is closed, clear cached id so next token request can find or create one. */
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (tabId === dashboardTabId) dashboardTabId = null;
+  if (tabId === authBrokerTabId) authBrokerTabId = null;
+});
+
+/** Extension icon click: if valid token open tray; else open hidden broker tab (token → postMessage → we open tray). Do NOT open login from here. */
 chrome.action.onClicked.addListener((tab) => {
-  if (tokenFetchInProgress) return;
   originTabId = tab?.id ?? null;
 
-  // Open tray immediately (toggle if already visible)
-  if (globalUIState.visible === true) {
-    globalUIState.visible = false;
-    globalUIState.expanded = false;
-  } else {
-    globalUIState.visible = true;
-    globalUIState.expanded = true;
-  }
-  persistUIState();
-  broadcastUIState();
-
-  tokenFetchInProgress = true;
-  (async () => {
-    try {
-      await getValidToken(tab?.id);
-      broadcastUIState();
-    } catch {
-      clearAuthState();
-      const returnUrl = typeof tab?.url === "string" ? tab.url : "";
-      const loginUrl =
-        ECHLY_LOGIN_BASE +
-        "?extension=true" +
-        (returnUrl ? "&returnUrl=" + encodeURIComponent(returnUrl) : "");
-      await openOrFocusLoginTab(loginUrl);
-    } finally {
-      tokenFetchInProgress = false;
+  if (hasValidToken()) {
+    if (globalUIState.visible === true) {
+      globalUIState.visible = false;
+      globalUIState.expanded = false;
+    } else {
+      openTray();
     }
-  })();
+    persistUIState();
+    broadcastUIState();
+    return;
+  }
+
+  openAuthBrokerTab();
 });
 
 /** Single message listener for extension messages. */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   echlyLog("MESSAGE", "received", request.type);
+
+  if (request.type === "ECHLY_EXTENSION_TOKEN") {
+    const token = (request as { token?: string }).token;
+    const uid = (request as { uid?: string }).uid;
+    if (token && uid) {
+      if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_EXTENSION_TOKEN_RECEIVED);
+      echlyLog("BACKGROUND", ECHLY_LOG_EXTENSION_TOKEN_RECEIVED);
+      extensionAccessToken = token;
+      globalUIState.user = { uid, name: null, email: null, photoURL: null };
+      if (authBrokerTabId != null) {
+        chrome.tabs.remove(authBrokerTabId).catch(() => {});
+        authBrokerTabId = null;
+      }
+      openTray();
+    }
+    return false;
+  }
+
+  if (request.type === "ECHLY_DASHBOARD_LOGOUT") {
+    if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_LOGOUT_SYNC);
+    echlyLog("BACKGROUND", ECHLY_LOG_LOGOUT_SYNC);
+    clearAuthState();
+    extensionAccessToken = null;
+    return false;
+  }
+
   if (request.type === "ECHLY_TOGGLE_VISIBILITY") {
     globalUIState.visible = true;
     globalUIState.expanded = true;
@@ -519,7 +549,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
       try {
-        const token = await getValidToken(sender.tab?.id);
+        const token = await getValidToken();
         const [feedbackRes, sessionsRes] = await Promise.all([
           fetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=200`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -633,7 +663,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_GET_TOKEN") {
     (async () => {
       try {
-        const token = await getValidToken(sender.tab?.id);
+        const token = await getValidToken();
         sendResponse({ token });
       } catch {
         console.warn("[ECHLY AUTH] transient error, not clearing auth");
@@ -645,7 +675,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_GET_AUTH_STATE") {
     (async () => {
-      const session = await checkAuthWithExtensionToken(sender.tab?.id);
+      const session = await checkAuthWithExtensionToken();
       sendResponse({
         authenticated: session.authenticated,
         user: session.authenticated && session.user ? session.user : null,
@@ -721,7 +751,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           screenshotId: string;
         };
 
-        const token = await getValidToken(sender.tab?.id);
+        const token = await getValidToken();
 
         const res = await fetch(`${API_BASE}/api/upload-screenshot`, {
           method: "POST",
@@ -783,7 +813,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     (async () => {
       try {
-        const token = await getValidToken(sender.tab?.id);
+        const token = await getValidToken();
         const screenshotUrl: string | null = payload.screenshotUrl ?? null;
         const screenshotId: string | null = payload.screenshotId ?? null;
 
@@ -938,7 +968,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
     (async () => {
       try {
-        const resolvedToken = token ?? (await getValidToken(sender.tab?.id));
+        const resolvedToken = token ?? (await getValidToken());
         const h = { ...headers };
         if (resolvedToken) h["Authorization"] = `Bearer ${resolvedToken}`;
         const res = await fetch(url, {

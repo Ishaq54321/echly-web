@@ -142,6 +142,9 @@ export function ProfileCommandPanel({
     } catch (err) {
       console.error("Logout revoke failed", err);
     }
+    if (typeof window !== "undefined") {
+      window.postMessage({ type: "ECHLY_DASHBOARD_LOGOUT" }, "*");
+    }
     await signOut(auth);
     onClose();
   };

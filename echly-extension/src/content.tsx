@@ -23,6 +23,9 @@ const APP_ORIGIN =
     ? "http://localhost:3000"
     : "https://echly-web.vercel.app";
 
+/** Allowed origin for extension token / logout messages from dashboard (broker page or logout). */
+const ECHLY_DASHBOARD_ORIGIN = "https://echly-web.vercel.app";
+
 function getPreferredTheme(): "dark" | "light" {
   try {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
@@ -1567,6 +1570,10 @@ function ensureMessageListener(host: HTMLDivElement): void {
   win.__ECHLY_MESSAGE_LISTENER__ = true;
   chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; description: string; type?: string }; sessionId?: string }, _sender, sendResponse) => {
     if (msg.type === "ECHLY_REQUEST_EXTENSION_TOKEN") {
+      if (!location.origin.includes("echly-web.vercel.app")) {
+        sendResponse({ token: null });
+        return true;
+      }
       requestExtensionTokenFromPage()
         .then((result) => sendResponse({ token: result.token, uid: result.uid }))
         .catch(() => sendResponse({ token: null }));
@@ -1616,6 +1623,26 @@ function ensureMessageListener(host: HTMLDivElement): void {
   });
 }
 
+/** Bridge: broker page (extension-auth) posts ECHLY_EXTENSION_TOKEN; we forward to background. Only accept from dashboard origin. */
+function ensureBrokerAndLogoutBridge(): void {
+  const win = window as Window & { __ECHLY_BROKER_BRIDGE__?: boolean };
+  if (win.__ECHLY_BROKER_BRIDGE__) return;
+  win.__ECHLY_BROKER_BRIDGE__ = true;
+  window.addEventListener("message", (event: MessageEvent) => {
+    if (event.origin !== ECHLY_DASHBOARD_ORIGIN) return;
+    if (event.data?.type === "ECHLY_EXTENSION_TOKEN") {
+      chrome.runtime.sendMessage({
+        type: "ECHLY_EXTENSION_TOKEN",
+        token: event.data.token,
+        uid: event.data.uid,
+      }).catch(() => {});
+    }
+    if (event.data?.type === "ECHLY_DASHBOARD_LOGOUT") {
+      chrome.runtime.sendMessage({ type: "ECHLY_DASHBOARD_LOGOUT" }).catch(() => {});
+    }
+  });
+}
+
 /** Debug: passive wheel + scroll listeners to verify events reach the page (never block scroll). */
 function ensureScrollDebugListeners(): void {
   const win = window as Window & { __ECHLY_SCROLL_DEBUG__?: boolean };
@@ -1656,6 +1683,7 @@ function main(): void {
   }
 
   ensureMessageListener(host);
+  ensureBrokerAndLogoutBridge();
   syncInitialGlobalState(host);
   ensureVisibilityStateRefresh();
   ensureScrollDebugListeners();
