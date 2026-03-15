@@ -1,11 +1,10 @@
 /**
- * API client for production backend.
- * Automatically attaches Authorization: Bearer <firebase-id-token> to every request.
+ * API client for extension. Proxies all requests through background (echly-api).
+ * Background attaches Authorization: Bearer <extensionToken> from POST /api/extension/session.
  */
 import { ECHLY_DEBUG } from "../../lib/utils/logger";
-import { auth } from "./firebase";
+import { API_BASE } from "../config";
 
-const API_BASE = "http://localhost:3000";
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 export { API_BASE };
@@ -16,10 +15,8 @@ export type ApiFetchOptions = RequestInit & {
 };
 
 /**
- * Fetch helper that:
- * - Calls API_BASE (e.g. http://localhost:3000 for debugging)
- * - Attaches Authorization: Bearer <firebase-id-token> from auth.currentUser.getIdToken()
- * - Throws if not logged in (unless skipAuth: true)
+ * Fetch helper: sends request to background via echly-api message.
+ * Background adds Bearer token. No Firebase.
  */
 export async function apiFetch(
   path: string,
@@ -34,18 +31,28 @@ export async function apiFetch(
         ? Object.fromEntries(headers)
         : { ...headers };
 
-  if (!skipAuth) {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error("Not signed in. Sign in with Google to use this feature.");
-    }
-    const token = await user.getIdToken();
-    headersRecord["Authorization"] = `Bearer ${token}`;
-  }
-
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
-  return fetch(url, {
-    ...rest,
-    headers: headersRecord,
+  const method = (rest.method as string) || "GET";
+  const body = rest.body ?? null;
+
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      { type: "echly-api", url, method, headers: headersRecord, body },
+      (response: { ok?: boolean; status?: number; headers?: Record<string, string>; body?: string } | undefined) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (!response) {
+          reject(new Error("No response from background"));
+          return;
+        }
+        const res = new Response(response.body ?? "", {
+          status: response.status ?? 0,
+          headers: response.headers ? new Headers(response.headers) : undefined,
+        });
+        resolve(res);
+      }
+    );
   });
 }

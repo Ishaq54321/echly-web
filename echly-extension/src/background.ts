@@ -1,32 +1,42 @@
 /**
  * Extension background (service worker). Centralizes auth + token handling.
- * Content scripts request tokens and auth state via messages.
+ * Uses backend session: POST /api/extension/session (credentials: include) for extensionToken.
+ * Content scripts never hold tokens; all API requests go through background with Bearer token.
  */
-import { firebaseConfig } from "../../lib/firebase/config";
 import { ECHLY_DEBUG, warn } from "../../lib/utils/logger";
 import { echlyLog } from "../../lib/debug/echlyLogger";
+import { setExtensionToken, apiFetch } from "../utils/apiFetch";
+import { API_BASE, WEB_APP_URL } from "../config";
 
-const API_BASE = "http://localhost:3000";
+const LOGIN_URL = `${WEB_APP_URL}/login`;
+console.log("ECHLY background script loaded");
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
-const IDP_API_KEY = firebaseConfig.apiKey;
+
+chrome.action.onClicked.addListener(() => {
+  openWidgetInActiveTab();
+});
+
+type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
+
+/** Global message-router API: single source for extension token, user, capture mode (used by message handler). */
+const sw = globalThis as typeof globalThis & {
+  extensionToken: string | null;
+  currentUser: StoredUser | null;
+  captureMode: "voice" | "text";
+};
+sw.extensionToken = null;
+sw.currentUser = null;
+sw.captureMode = "voice";
 
 let activeSessionId: string | null = null;
 
-type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
-type TokenState = {
-  idToken: string | null;
-  refreshToken: string | null;
-  /** Epoch ms when token expires (best-effort). */
-  expiresAtMs: number;
-  user: StoredUser | null;
-};
+/** In-memory extension token from POST /api/extension/session. Cleared on 401. */
+let extensionToken: string | null = null;
+/** Cached user from last successful session response; used for ECHLY_GET_AUTH_STATE. */
+let cachedSessionUser: StoredUser | null = null;
 
-let tokenState: TokenState = {
-  idToken: null,
-  refreshToken: null,
-  expiresAtMs: 0,
-  user: null,
-};
+/** Global lock: only one ECHLY_PROCESS_FEEDBACK pipeline at a time to avoid ECONNRESET. */
+let aiProcessing = false;
 
 /** Minimal ticket shape for global tray; matches StructuredFeedback. */
 type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string };
@@ -126,10 +136,9 @@ async function initializeSessionState(): Promise<void> {
 
         if (shouldReloadPointers) {
           getValidToken()
-            .then((token) =>
-              fetch(
-                `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId!)}&limit=200`,
-                { headers: { Authorization: `Bearer ${token}` } }
+            .then(() =>
+              apiFetch(
+                `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId!)}&limit=200`
               )
             )
             .then((res) => res.json())
@@ -160,129 +169,82 @@ async function initializeSessionState(): Promise<void> {
   broadcastUIState();
 })();
 
-type StoredAuthResult = {
-  auth_idToken?: string;
-  auth_refreshToken?: string;
-  auth_expiresAtMs?: number;
-  auth_user?: unknown;
-};
-function isStoredUser(v: unknown): v is StoredUser {
-  if (!v || typeof v !== "object") return false;
-  const o = v as Record<string, unknown>;
-  return (
-    typeof o.uid === "string" &&
-    (o.name === null || typeof o.name === "string") &&
-    (o.email === null || typeof o.email === "string") &&
-    (o.photoURL === null || typeof o.photoURL === "string")
-  );
-}
-chrome.storage.local.get(
-  ["auth_idToken", "auth_refreshToken", "auth_expiresAtMs", "auth_user"],
-  (result: StoredAuthResult) => {
-    tokenState.idToken = typeof result.auth_idToken === "string" ? result.auth_idToken : null;
-    tokenState.refreshToken = typeof result.auth_refreshToken === "string" ? result.auth_refreshToken : null;
-    tokenState.expiresAtMs = typeof result.auth_expiresAtMs === "number" ? result.auth_expiresAtMs : 0;
-    tokenState.user = isStoredUser(result.auth_user) ? result.auth_user : null;
-  }
-);
-
-function setTokenState(next: Partial<TokenState>): void {
-  tokenState = { ...tokenState, ...next };
-  chrome.storage.local.set({
-    auth_idToken: tokenState.idToken,
-    auth_refreshToken: tokenState.refreshToken,
-    auth_expiresAtMs: tokenState.expiresAtMs,
-    auth_user: tokenState.user,
-  });
-}
-
-function parseHashParam(urlStr: string, key: string): string | null {
-  try {
-    const u = new URL(urlStr);
-    const hash = u.hash.startsWith("#") ? u.hash.slice(1) : u.hash;
-    const params = new URLSearchParams(hash);
-    return params.get(key);
-  } catch {
-    return null;
-  }
-}
-
-async function exchangeGoogleIdToken(googleIdToken: string): Promise<{
-  idToken: string;
-  refreshToken: string;
-  expiresInSec: number;
-  user: StoredUser;
-}> {
-  const body = {
-    postBody: `id_token=${encodeURIComponent(googleIdToken)}&providerId=google.com`,
-    requestUri: "http://localhost",
-    returnIdpCredential: true,
-    returnSecureToken: true,
-  };
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${IDP_API_KEY}`, {
+/**
+ * Fetch extension token from backend. Uses echly_session cookie (credentials: include).
+ * On 401 opens dashboard login and throws.
+ */
+async function getExtensionToken(): Promise<string> {
+  console.log("Requesting extension session...");
+  const response = await fetch(`${API_BASE}/api/extension/session`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    credentials: "include",
   });
-  const raw = await res.text();
-  if (!res.ok) throw new Error(`Token exchange failed: ${res.status} ${raw}`);
-  const data = JSON.parse(raw) as {
-    idToken?: string;
-    refreshToken?: string;
-    expiresIn?: string;
-    localId?: string;
-    displayName?: string;
-    email?: string;
-    photoUrl?: string;
-  };
-  if (!data.idToken || !data.refreshToken || !data.localId) throw new Error(`Token exchange missing fields: ${raw}`);
-  const expiresInSec = Number.parseInt(data.expiresIn ?? "3600", 10);
-  return {
-    idToken: data.idToken,
-    refreshToken: data.refreshToken,
-    expiresInSec: Number.isFinite(expiresInSec) ? expiresInSec : 3600,
-    user: {
-      uid: data.localId,
-      name: data.displayName ?? null,
-      email: data.email ?? null,
-      photoURL: data.photoUrl ?? null,
-    },
-  };
+
+  if (response.status === 401) {
+    extensionToken = null;
+    setExtensionToken(null);
+    cachedSessionUser = null;
+    sw.extensionToken = null;
+    sw.currentUser = null;
+    chrome.tabs.create({ url: LOGIN_URL });
+    throw new Error("NOT_AUTHENTICATED");
+  }
+
+  if (!response.ok) {
+    throw new Error("Extension session failed");
+  }
+
+  const data = (await response.json()) as { extensionToken?: string; user?: { uid?: string; email?: string | null } };
+  const token = data.extensionToken;
+  console.log("Extension token received", data.extensionToken);
+  if (!token) throw new Error("Extension session failed");
+
+  setExtensionToken(token);
+  sw.extensionToken = token;
+
+  if (data.user?.uid) {
+    cachedSessionUser = {
+      uid: data.user.uid,
+      name: null,
+      email: data.user.email ?? null,
+      photoURL: null,
+    };
+    sw.currentUser = cachedSessionUser;
+  }
+
+  return token;
 }
 
-async function refreshIdToken(refreshToken: string): Promise<{ idToken: string; refreshToken: string; expiresInSec: number }> {
-  const body = new URLSearchParams();
-  body.set("grant_type", "refresh_token");
-  body.set("refresh_token", refreshToken);
-  const res = await fetch(`https://securetoken.googleapis.com/v1/token?key=${IDP_API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  const raw = await res.text();
-  if (!res.ok) throw new Error(`Token refresh failed: ${res.status} ${raw}`);
-  const data = JSON.parse(raw) as { id_token?: string; refresh_token?: string; expires_in?: string };
-  if (!data.id_token || !data.refresh_token) throw new Error(`Token refresh missing fields: ${raw}`);
-  const expiresInSec = Number.parseInt(data.expires_in ?? "3600", 10);
-  return {
-    idToken: data.id_token,
-    refreshToken: data.refresh_token,
-    expiresInSec: Number.isFinite(expiresInSec) ? expiresInSec : 3600,
-  };
-}
-
+/** Returns valid extension token; fetches and caches if missing. Throws NOT_AUTHENTICATED on 401. */
 async function getValidToken(): Promise<string> {
-  const now = Date.now();
-  // Small skew so we don't race expiry.
-  if (tokenState.idToken && now < tokenState.expiresAtMs - 30_000) return tokenState.idToken;
-  if (!tokenState.refreshToken) throw new Error("NOT_AUTHENTICATED");
-  const refreshed = await refreshIdToken(tokenState.refreshToken);
-  setTokenState({
-    idToken: refreshed.idToken,
-    refreshToken: refreshed.refreshToken,
-    expiresAtMs: Date.now() + refreshed.expiresInSec * 1000,
-  });
-  return refreshed.idToken;
+  if (extensionToken) return extensionToken;
+  extensionToken = await getExtensionToken();
+  return extensionToken;
+}
+
+/**
+ * Lazy auth hydration for popup: ensure currentUser/token are set from dashboard cookie
+ * so ECHLY_GET_AUTH_STATE can return authenticated: true without requiring dashboard tab.
+ */
+async function hydrateAuthState(): Promise<boolean> {
+  console.log("[ECHLY] Checking auth state");
+  console.log("[ECHLY] currentUser:", sw.currentUser ?? "null");
+
+  if (sw.currentUser && sw.extensionToken) {
+    return true;
+  }
+
+  try {
+    const token = await getValidToken();
+    if (token) {
+      console.log("[ECHLY] Token fetched:", !!sw.extensionToken);
+      return true;
+    }
+  } catch (err) {
+    console.debug("[ECHLY] auth hydration failed", err);
+  }
+
+  return false;
 }
 
 function broadcastUIState(): void {
@@ -297,6 +259,21 @@ function broadcastUIState(): void {
           });
       }
     });
+  });
+}
+
+/** Deterministic open: set visible + expanded and notify active tab (icon click or popup). */
+function openWidgetInActiveTab(): void {
+  globalUIState.visible = true;
+  globalUIState.expanded = true;
+  broadcastUIState();
+  console.log("[ECHLY BG] broadcasted global UI state", globalUIState);
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    console.log("[ECHLY BG] active tab:", tabs[0]?.id);
+    if (tabs[0]?.id) {
+      console.log("[ECHLY BG] sending OPEN_WIDGET to tab");
+      chrome.tabs.sendMessage(tabs[0].id, { type: "ECHLY_OPEN_WIDGET" }).catch(() => {});
+    }
   });
 }
 
@@ -326,20 +303,44 @@ chrome.tabs.onCreated.addListener((tab) => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log("[ECHLY] message received:", request.type);
   echlyLog("MESSAGE", "received", request.type);
-  if (request.type === "ECHLY_TOGGLE_VISIBILITY") {
-    globalUIState.visible = !globalUIState.visible;
-    if (globalUIState.visible) {
-      globalUIState.expanded = false;
-    }
-    broadcastUIState();
-    sendResponse({ success: true });
-    return true;
+
+  if (request.type === "ECHLY_START_SESSION") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: "ECHLY_START_SESSION" }).catch(() => {});
+      }
+    });
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" }).catch(() => {});
+      }
+    });
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_OPEN_WIDGET") {
+    console.log("[ECHLY BG] OPEN_WIDGET received");
+    openWidgetInActiveTab();
+    sendResponse({ ok: true });
+    return false;
   }
 
   if (request.type === "ECHLY_EXPAND_WIDGET") {
     globalUIState.expanded = true;
     broadcastUIState();
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: "ECHLY_WIDGET_EXPAND" }).catch(() => {});
+      }
+    });
     sendResponse({ ok: true });
     return false;
   }
@@ -347,6 +348,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_COLLAPSE_WIDGET") {
     globalUIState.expanded = false;
     broadcastUIState();
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: "ECHLY_WIDGET_COLLAPSE" }).catch(() => {});
+      }
+    });
     sendResponse({ ok: true });
     return false;
   }
@@ -377,10 +383,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const mode = (request as { mode?: "voice" | "text" }).mode;
     if (mode === "voice" || mode === "text") {
       globalUIState.captureMode = mode;
+      sw.captureMode = mode;
+      console.log("[ECHLY] capture mode:", mode);
       broadcastUIState();
     }
-    sendResponse({ ok: true });
-    return false;
+    sendResponse({ success: true });
+    return true;
   }
 
   if (request.type === "ECHLY_SESSION_UPDATED") {
@@ -438,12 +446,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
       try {
-        const token = await getValidToken();
+        await getValidToken();
         const [feedbackRes, sessionsRes] = await Promise.all([
-          fetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=200`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API_BASE}/api/sessions`, { headers: { Authorization: `Bearer ${token}` } }),
+          apiFetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=200`),
+          apiFetch(`${API_BASE}/api/sessions`),
         ]);
         const feedbackJson = (await feedbackRes.json()) as { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> };
         globalUIState.pointers = (feedbackJson.feedback ?? []).map((f) => ({
@@ -557,11 +563,50 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === "ECHLY_GET_EXTENSION_TOKEN") {
+    (async () => {
+      try {
+        const token = await getValidToken();
+        sw.extensionToken = token;
+        sendResponse({ token });
+      } catch {
+        sendResponse({ token: sw.extensionToken ?? null });
+      }
+    })();
+    return true;
+  }
+
+  if (request.type === "ECHLY_SET_EXTENSION_TOKEN") {
+    const { extensionToken: tok, user: u } = request as {
+      extensionToken?: string;
+      user?: { uid?: string; email?: string | null };
+    };
+    if (tok) {
+      extensionToken = tok;
+      setExtensionToken(tok);
+      sw.extensionToken = tok;
+      if (u?.uid) {
+        cachedSessionUser = {
+          uid: u.uid,
+          name: null,
+          email: u.email ?? null,
+          photoURL: null,
+        };
+        sw.currentUser = cachedSessionUser;
+      }
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+
   if (request.type === "ECHLY_GET_AUTH_STATE") {
-    sendResponse({
-      authenticated: !!tokenState.refreshToken,
-      user: tokenState.user,
-    });
+    (async () => {
+      const authenticated = await hydrateAuthState();
+      sendResponse({
+        authenticated,
+        user: sw.currentUser ?? null,
+      });
+    })();
     return true;
   }
 
@@ -572,48 +617,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_SIGN_IN" || request.type === "ECHLY_START_LOGIN" || request.type === "LOGIN") {
-    const redirectUri = chrome.identity.getRedirectURL();
-    const webClientId = "609478020649-0k5ec22m3lvgmcs2icsc6pmabndu85td.apps.googleusercontent.com";
-    const authUrl =
-      "https://accounts.google.com/o/oauth2/v2/auth" +
-      `?client_id=${encodeURIComponent(webClientId)}` +
-      "&response_type=id_token" +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-      "&scope=openid%20email%20profile" +
-      `&nonce=${encodeURIComponent(crypto.randomUUID())}`;
-
-    chrome.identity.launchWebAuthFlow(
-      { url: authUrl, interactive: true },
-      async (responseUrl?: string) => {
-        if (chrome.runtime.lastError || !responseUrl) {
-          sendResponse({
-            success: false,
-            error: chrome.runtime.lastError?.message ?? "Auth flow failed",
-          });
-          return;
-        }
-        try {
-          const googleIdToken = parseHashParam(responseUrl, "id_token");
-          if (!googleIdToken) {
-            sendResponse({ success: false, error: "No ID token in response" });
-            return;
-          }
-          const exchanged = await exchangeGoogleIdToken(googleIdToken);
-          setTokenState({
-            idToken: exchanged.idToken,
-            refreshToken: exchanged.refreshToken,
-            expiresAtMs: Date.now() + exchanged.expiresInSec * 1000,
-            user: exchanged.user,
-          });
-          sendResponse({
-            success: true,
-            user: exchanged.user,
-          });
-        } catch (err) {
-          sendResponse({ success: false, error: String(err) });
-        }
-      }
-    );
+    chrome.tabs.create({ url: LOGIN_URL });
+    sendResponse({ success: true });
     return true;
   }
 
@@ -665,14 +670,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           screenshotId: string;
         };
 
-        const token = await getValidToken();
+        await getValidToken();
 
-        const res = await fetch(`${API_BASE}/api/upload-screenshot`, {
+        const res = await apiFetch(`${API_BASE}/api/upload-screenshot`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify({
             screenshotId,
             imageDataUrl,
@@ -697,6 +698,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_PROCESS_FEEDBACK") {
+    if (aiProcessing) {
+      console.warn("[ECHLY] AI already processing, skipping duplicate");
+      sendResponse({ success: false, error: "AI already processing" });
+      return false;
+    }
+    aiProcessing = true;
+
     const payload = request.payload as {
       transcript: string;
       screenshotUrl: string | null;
@@ -716,6 +724,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       console.error("[ECHLY_PROCESS_FEEDBACK] sessionId is null/empty:", sessionId);
     }
     if (!transcript?.trim() || !sessionId) {
+      aiProcessing = false;
       warn("[Echly BG] Invalid payload: missing transcript or sessionId", {
         hasTranscript: !!transcript?.trim(),
         hasSessionId: !!sessionId,
@@ -725,24 +734,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     (async () => {
       try {
-        const token = await getValidToken();
+        await getValidToken();
         const screenshotUrl: string | null = payload.screenshotUrl ?? null;
         const screenshotId: string | null = payload.screenshotId ?? null;
 
+        console.log("[ECHLY AI] Starting structure step");
         const structurePayload = context ? { transcript, context } : { transcript };
-        const structureRes = await fetch(`${API_BASE}/api/structure-feedback`, {
+        const structureRes = await apiFetch(`${API_BASE}/api/structure-feedback`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify(structurePayload),
         });
 
-        const structureText = await structureRes.text();
         if (!structureRes.ok) {
-          console.error("[STRUCTURE FAILED RAW]", structureRes.status, structureText);
+          const raw = await structureRes.text();
+          console.error("[STRUCTURE FAILED RAW]", structureRes.status, raw);
           sendResponse({ success: false, error: "Structure fetch failed" });
           return;
         }
-        const data = JSON.parse(structureText) as {
+        const data = (await structureRes.json()) as {
           success?: boolean;
           tickets?: Array<{
             title?: string;
@@ -752,6 +761,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }>;
           error?: string;
         };
+        console.log("[ECHLY AI] structure parsed:", data);
+        if (!data || typeof data !== "object") {
+          console.error("[ECHLY AI] Invalid structure response", data);
+          sendResponse({ success: false, error: "Invalid AI response" });
+          return;
+        }
         if (!data.success) {
           sendResponse({
             success: false,
@@ -787,9 +802,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             metadata: { clientTimestamp: Date.now() },
           };
 
-          const feedbackRes = await fetch(`${API_BASE}/api/feedback`, {
+          console.log("[ECHLY AI] Creating feedback ticket");
+          const feedbackRes = await apiFetch(`${API_BASE}/api/feedback`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(body),
           });
           const raw = await feedbackRes.text();
@@ -832,6 +847,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         }
         if (firstCreated) {
+          console.log("[ECHLY AI] Ticket created successfully");
           const pointer: StructuredFeedback = {
             id: firstCreated.id,
             title: firstCreated.title,
@@ -862,13 +878,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           success: false,
           error: String(error),
         });
+      } finally {
+        aiProcessing = false;
       }
     })();
     return true;
   }
 
   if (request.type === "echly-api") {
-    const { url, method, headers, body, token } = request as {
+    const { url, method, headers, body } = request as {
       url: string;
       method?: string;
       headers?: Record<string, string>;
@@ -877,12 +895,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
     (async () => {
       try {
-        const resolvedToken = token ?? (await getValidToken());
-        const h = { ...headers };
-        if (resolvedToken) h["Authorization"] = `Bearer ${resolvedToken}`;
-        const res = await fetch(url, {
+        await getValidToken();
+        console.log("API request using extension token");
+        const res = await apiFetch(url, {
           method: method || "GET",
-          headers: h,
+          headers: headers ?? {},
           body: body ?? undefined,
         });
         const text = await res.text();

@@ -34,7 +34,7 @@ function makeAliasPlugin(useContentAuthFetch = false) {
         return { path: path.resolve(resolved) };
       });
       build.onResolve({ filter: /^@\/lib\/firebase$/ }, () => ({
-        path: path.resolve(extDir, "src", "firebase.ts"),
+        path: path.resolve(extDir, "stubs", "firebase.ts"),
       }));
       build.onResolve({ filter: /^next\/image$/ }, () => ({
         path: path.resolve(extDir, "stubs", "next-image.tsx"),
@@ -48,6 +48,12 @@ function makeAliasPlugin(useContentAuthFetch = false) {
   };
 }
 
+const nodeEnv = process.env.NODE_ENV || "production";
+
+const define = {
+  "process.env.NODE_ENV": JSON.stringify(nodeEnv),
+};
+
 await esbuild.build({
   entryPoints: [path.join(extDir, "src", "popup.tsx")],
   bundle: true,
@@ -58,19 +64,27 @@ await esbuild.build({
   sourcemap: false,
   loader: { ".css": "empty" },
   plugins: [makeAliasPlugin(false)],
+  define,
   absWorkingDir: root,
 });
 
 await esbuild.build({
   entryPoints: [path.join(extDir, "src", "content.tsx")],
   bundle: true,
+  format: "iife",
   outfile: path.join(extDir, "content.js"),
   platform: "browser",
-  target: "es2020",
-  minify: true,
-  sourcemap: false,
-  loader: { ".css": "empty" },
+  target: "chrome110",
+  minify: false,
+  treeShaking: false,
+  sourcemap: true,
+  loader: {
+    ".tsx": "tsx",
+    ".ts": "ts",
+    ".css": "empty",
+  },
   plugins: [makeAliasPlugin(true)],
+  define,
   absWorkingDir: root,
 });
 
@@ -82,5 +96,18 @@ await esbuild.build({
   target: "es2020",
   minify: true,
   sourcemap: false,
+  define,
+  absWorkingDir: root,
+});
+
+await esbuild.build({
+  entryPoints: [path.join(extDir, "src", "sessionRelay.ts")],
+  bundle: true,
+  outfile: path.join(extDir, "sessionRelay.js"),
+  platform: "browser",
+  target: "es2020",
+  minify: true,
+  sourcemap: false,
+  define,
   absWorkingDir: root,
 });

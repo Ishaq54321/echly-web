@@ -12,12 +12,13 @@ import CaptureWidget from "@/components/CaptureWidget";
 import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/components/CaptureWidget/types";
 import { ECHLY_DEBUG, log } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
+import { API_BASE } from "../config";
 
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
 const THEME_STORAGE_KEY = "widget-theme";
 /** App origin for opening dashboard (same as API base). */
-const APP_ORIGIN = "http://localhost:3000";
+const APP_ORIGIN = API_BASE;
 
 function getPreferredTheme(): "dark" | "light" {
   try {
@@ -37,6 +38,7 @@ function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
 }
 
 function setHostVisibility(visible: boolean): void {
+  console.log("[ECHLY CONTENT] tray visibility:", visible);
   const host = document.getElementById(SHADOW_HOST_ID);
   if (host) {
     (host as HTMLDivElement).style.display = visible ? "block" : "none";
@@ -128,6 +130,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   });
   const [widgetResetKey, setWidgetResetKey] = React.useState(0);
   const [hasPreviousSessions, setHasPreviousSessions] = React.useState(false);
+  const [openResumeModalFromMessage, setOpenResumeModalFromMessage] = React.useState(false);
   const effectiveSessionId = globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
 
@@ -265,6 +268,38 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     };
   }, [globalState.visible]);
 
+  /* Extension: when background forwards ECHLY_START_SESSION to this tab, run start-session flow. */
+  React.useEffect(() => {
+    const handler = () => {
+      createSession().then((session) => {
+        if (session?.id) {
+          onActiveSessionChange(session.id);
+          chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
+          onExpandRequest();
+        }
+      });
+    };
+    window.addEventListener("ECHLY_START_SESSION_REQUEST", handler);
+    return () => window.removeEventListener("ECHLY_START_SESSION_REQUEST", handler);
+  }, [createSession, onActiveSessionChange, onExpandRequest]);
+
+  /* Extension: when background forwards ECHLY_OPEN_PREVIOUS_SESSIONS to this tab, open the resume modal. */
+  React.useEffect(() => {
+    const handler = () => setOpenResumeModalFromMessage(true);
+    window.addEventListener("ECHLY_OPEN_PREVIOUS_SESSIONS", handler);
+    return () => window.removeEventListener("ECHLY_OPEN_PREVIOUS_SESSIONS", handler);
+  }, []);
+
+  /* Extension: open widget (icon or popup) → request expand so background keeps state in sync. */
+  React.useEffect(() => {
+    const handler = () => {
+      console.log("[ECHLY CONTENT] OPEN_WIDGET event received in DOM");
+      chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {});
+    };
+    window.addEventListener("ECHLY_OPEN_WIDGET", handler);
+    return () => window.removeEventListener("ECHLY_OPEN_WIDGET", handler);
+  }, []);
+
   const onRecordingChange = React.useCallback((recording: boolean) => {
     if (recording) {
       chrome.runtime.sendMessage(
@@ -284,9 +319,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     }
   }, []);
 
-  const onExpandRequest = React.useCallback(() => {
+  function onExpandRequest() {
     chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {});
-  }, []);
+  }
   const onCollapseRequest = React.useCallback(() => {
     chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {});
   }, []);
@@ -779,7 +814,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return sessions;
   }, []);
 
-  const createSession = React.useCallback(async (): Promise<{ id: string } | null> => {
+  async function createSession(): Promise<{ id: string } | null> {
     if (ECHLY_DEBUG) console.log("[Echly] Creating session");
     try {
       const res = await apiFetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
@@ -792,11 +827,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       console.error("[Echly] Failed to create session:", err);
       return null;
     }
-  }, []);
+  }
 
-  const onActiveSessionChange = React.useCallback((newSessionId: string) => {
+  function onActiveSessionChange(newSessionId: string) {
     chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {});
-  }, []);
+  }
 
   const onPreviousSessionSelect = React.useCallback(
     async (sessionId: string, _options?: { enterCaptureImmediately?: boolean }) => {
@@ -1403,6 +1438,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }}
         captureRootParent={widgetRoot}
         launcherLogoUrl={launcherLogoUrl}
+        openResumeModal={openResumeModalFromMessage}
+        onResumeModalClose={() => setOpenResumeModalFromMessage(false)}
       />
     </>
   );
@@ -1463,6 +1500,7 @@ function mountReactApp(host: HTMLDivElement): void {
   container.setAttribute("data-theme", initialTheme);
   shadowRoot.appendChild(container);
 
+  console.log("[ECHLY CONTENT] mounting widget root");
   const reactRoot = createRoot(container);
   reactRoot.render(<ContentApp widgetRoot={container} initialTheme={initialTheme} />);
 }
@@ -1529,10 +1567,19 @@ function ensureMessageListener(host: HTMLDivElement): void {
   if (win.__ECHLY_MESSAGE_LISTENER__) return;
   win.__ECHLY_MESSAGE_LISTENER__ = true;
   chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; description: string; type?: string }; sessionId?: string }) => {
+    console.log("[ECHLY CONTENT] message received:", msg.type);
+    if (msg.type === "ECHLY_OPEN_WIDGET") console.log("[ECHLY CONTENT] OPEN_WIDGET (message)");
+    if (msg.type === "ECHLY_GLOBAL_STATE") console.log("[ECHLY CONTENT] ECHLY_GLOBAL_STATE (message)");
+    if (msg.type === "ECHLY_START_SESSION") console.log("[ECHLY CONTENT] ECHLY_START_SESSION (message)");
+    if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") console.log("[ECHLY CONTENT] ECHLY_OPEN_PREVIOUS_SESSIONS (message)");
     if (msg.type === "ECHLY_FEEDBACK_CREATED" && msg.ticket && msg.sessionId) {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_FEEDBACK_CREATED" });
       window.dispatchEvent(new CustomEvent("ECHLY_FEEDBACK_CREATED", { detail: { ticket: msg.ticket, sessionId: msg.sessionId } }));
       return;
+    }
+    if (msg.type === "ECHLY_OPEN_WIDGET") {
+      console.log("[ECHLY CONTENT] OPEN_WIDGET event dispatching");
+      window.dispatchEvent(new CustomEvent("ECHLY_OPEN_WIDGET"));
     }
     const h = document.getElementById(SHADOW_HOST_ID);
     if (!h) return;
@@ -1550,6 +1597,14 @@ function ensureMessageListener(host: HTMLDivElement): void {
     if (msg.type === "ECHLY_RESET_WIDGET") {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_RESET_WIDGET" });
       window.dispatchEvent(new CustomEvent("ECHLY_RESET_WIDGET"));
+    }
+    if (msg.type === "ECHLY_START_SESSION") {
+      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_START_SESSION" });
+      window.dispatchEvent(new CustomEvent("ECHLY_START_SESSION_REQUEST"));
+    }
+    if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
+      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
+      window.dispatchEvent(new CustomEvent("ECHLY_OPEN_PREVIOUS_SESSIONS"));
     }
     /* Tab activation resync: always fetch and apply state; never debounce or skip. */
     if (msg.type === "ECHLY_SESSION_STATE_SYNC") {

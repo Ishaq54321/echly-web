@@ -1,0 +1,1 @@
+"use strict";(()=>{var n="http://localhost:3000";(function(){fetch(`${n}/api/extension/session`,{method:"POST",credentials:"include"}).then(e=>e.ok?e.json():Promise.reject(new Error("Session failed"))).then(e=>{e.extensionToken&&chrome.runtime.sendMessage({type:"ECHLY_SET_EXTENSION_TOKEN",extensionToken:e.extensionToken,user:e.user}).catch(()=>{})}).catch(()=>{})})();})();

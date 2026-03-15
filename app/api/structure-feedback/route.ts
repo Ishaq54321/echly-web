@@ -1,14 +1,25 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { requireAuth } from "@/lib/server/auth";
 import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { echlyDebug } from "@/lib/utils/logger";
 import { runFeedbackPipeline } from "@/lib/ai/runFeedbackPipeline";
+import { corsHeaders } from "@/lib/server/cors";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+export async function OPTIONS(req: NextRequest) {
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders(req),
+  });
+}
+
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
+  return new OpenAI({ apiKey });
+}
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
@@ -57,20 +68,28 @@ type StructureResponse = {
  * Capture layer: accepts transcript + context (visibleText, nearbyText, domPath, elements, viewport, etc.).
  * All processing is delegated to the central pipeline (lib/ai/runFeedbackPipeline).
  */
-export async function POST(req: Request): Promise<Response> {
+export async function POST(req: NextRequest): Promise<Response> {
   const stableFailure = (error: string): NextResponse<StructureResponse> =>
-    NextResponse.json({ success: false, tickets: [], error }, { status: 200 });
+    NextResponse.json(
+      { success: false, tickets: [], error },
+      { status: 200, headers: corsHeaders(req) }
+    );
 
   let user;
   try {
     user = await requireAuth(req);
   } catch (res) {
-    return res as Response;
+    const errRes = res as Response;
+    return new NextResponse(errRes.body, {
+      status: errRes.status,
+      statusText: errRes.statusText,
+      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
+    });
   }
   if (!checkRateLimit(user.uid)) {
     return NextResponse.json(
       { success: false, tickets: [], error: "Rate limit exceeded. Try again later." },
-      { status: 429 }
+      { status: 429, headers: corsHeaders(req) }
     );
   }
 
@@ -78,15 +97,21 @@ export async function POST(req: Request): Promise<Response> {
     await resolveWorkspaceForUser(user.uid);
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
+        status: 403,
+        headers: corsHeaders(req),
+      });
     }
     throw err;
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  let client: OpenAI;
+  try {
+    client = getOpenAIClient();
+  } catch {
     return NextResponse.json(
       { success: false, tickets: [], error: "Missing OpenAI API key" },
-      { status: 200 }
+      { status: 200, headers: corsHeaders(req) }
     );
   }
 
@@ -104,7 +129,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!transcript || typeof transcript !== "string") {
     return NextResponse.json(
       { success: false, tickets: [], error: "No valid transcript provided" },
-      { status: 200 }
+      { status: 200, headers: corsHeaders(req) }
     );
   }
 
@@ -117,12 +142,23 @@ export async function POST(req: Request): Promise<Response> {
 
     echlyDebug("PIPELINE RESULT", { success: result.success, ticketCount: result.tickets?.length ?? 0 });
 
-    return NextResponse.json(result as StructureResponse, { status: 200 });
+    console.log("STRUCTURE API RESPONSE:", result);
+
+    return NextResponse.json(
+      {
+        success: result.success,
+        tickets: result.tickets ?? [],
+      },
+      {
+        status: 200,
+        headers: corsHeaders(req),
+      }
+    );
   } catch (err) {
     console.error("STRUCTURING ERROR:", err);
     return NextResponse.json(
-      { success: false, tickets: [], error: "Structuring failed" },
-      { status: 200 }
+      { success: false, tickets: [], error: "AI pipeline failed" },
+      { status: 500, headers: corsHeaders(req) }
     );
   }
 }

@@ -1,3 +1,5 @@
+import type { Timestamp } from "firebase/firestore";
+
 /** Minimal feedback item shape used by UI subcomponents. */
 export interface FeedbackItemShape {
   id: string;
@@ -12,8 +14,8 @@ export interface FeedbackItemShape {
   contextSummary?: string | null;
   actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
-  /** ISO date string from API (audit trail). */
-  createdAt?: string | null;
-  /** ISO date string from API when available. */
-  updatedAt?: string | null;
+  /** ISO date string from API or Firestore Timestamp (audit trail). */
+  createdAt?: string | Timestamp | null;
+  /** ISO date string from API or Firestore Timestamp when available. */
+  updatedAt?: string | Timestamp | null;
 }

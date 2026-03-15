@@ -153,6 +153,10 @@ export type CaptureWidgetProps = {
   feedbackJobs?: FeedbackJob[];
   /** Extension: URL for the launcher logo (minimized state). When set with extensionMode, launcher shows logo instead of text. */
   launcherLogoUrl?: string;
+  /** Extension: when true (e.g. from ECHLY_OPEN_PREVIOUS_SESSIONS message), open the Previous Sessions modal. */
+  openResumeModal?: boolean;
+  /** Extension: called when the resume/previous-sessions modal is closed so parent can clear openResumeModal. */
+  onResumeModalClose?: () => void;
 };
 
 /** One feedback job in the pipeline (processing or failed). Completed jobs are removed and the ticket appears in pointers. */

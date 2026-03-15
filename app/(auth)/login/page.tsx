@@ -19,6 +19,23 @@ const primaryButtonStyle = {
   boxShadow: "0 10px 28px rgba(70,110,255,0.28)"
 };
 
+/** Call POST /api/auth/session to create server session cookie. Does not block on failure. */
+async function createSessionCookie(user: { getIdToken: () => Promise<string> }) {
+  try {
+    const idToken = await user.getIdToken();
+    const res = await fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+      credentials: "include",
+    });
+    console.log("Session API response", res.status);
+    if (!res.ok) throw new Error("Session API failed");
+  } catch (e) {
+    console.error("Session creation failed", e);
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -33,6 +50,7 @@ export default function LoginPage() {
 
     try{
       const user = await signInWithGoogle();
+      await createSessionCookie(user);
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
     }
@@ -58,6 +76,7 @@ export default function LoginPage() {
 
     try{
       const user = await signInWithEmailPassword(email,password);
+      await createSessionCookie(user);
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
     }

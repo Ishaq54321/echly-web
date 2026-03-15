@@ -37,8 +37,8 @@ function startLogin(): Promise<{ success: boolean; error?: string }> {
   });
 }
 
-function toggleVisibility(): void {
-  chrome.runtime.sendMessage({ type: "ECHLY_TOGGLE_VISIBILITY" }).catch(() => {});
+function openWidget(): void {
+  chrome.runtime.sendMessage({ type: "ECHLY_OPEN_WIDGET" }).catch(() => {});
 }
 
 function GoogleLogoIcon() {
@@ -63,7 +63,7 @@ function PopupApp() {
       setAuthenticated(auth);
       setAuthChecked(true);
       if (auth) {
-        toggleVisibility();
+        openWidget();
         window.close();
       }
     });
@@ -76,7 +76,7 @@ function PopupApp() {
       .then(({ success, error }) => {
         setLoginLoading(false);
         if (success) {
-          toggleVisibility();
+          openWidget();
           window.close();
           return;
         }

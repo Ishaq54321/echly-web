@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { requireAuth } from "@/lib/server/auth";
@@ -10,6 +11,14 @@ import {
   createScreenshotRepoSync,
   getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
+import { corsHeaders } from "@/lib/server/cors";
+
+export async function OPTIONS(req: NextRequest) {
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders(req),
+  });
+}
 
 /**
  * POST /api/upload-screenshot
@@ -18,13 +27,18 @@ import {
  * When feedback is created with this screenshotId, the record is updated to ATTACHED.
  * TEMP screenshots never attached are cleaned up by a scheduled job.
  */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     let user;
     try {
       user = await requireAuth(req);
     } catch (res) {
-      return res as Response;
+      const errRes = res as Response;
+      return new NextResponse(errRes.body, {
+        status: errRes.status,
+        statusText: errRes.statusText,
+        headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
+      });
     }
 
     const body = await req.json();
@@ -40,7 +54,7 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json(
         { error: "Missing required fields: screenshotId, imageDataUrl, sessionId" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(req) }
       );
     }
 
@@ -51,13 +65,13 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json(
         { error: "Session not found" },
-        { status: 404 }
+        { status: 404, headers: corsHeaders(req) }
       );
     }
     if (session.userId !== user.uid) {
       return NextResponse.json(
         { error: "Forbidden" },
-        { status: 403 }
+        { status: 403, headers: corsHeaders(req) }
       );
     }
 
@@ -66,7 +80,10 @@ export async function POST(req: Request) {
       await resolveWorkspaceById(workspaceId);
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-        return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+        return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
+          status: 403,
+          headers: corsHeaders(req),
+        });
       }
       throw err;
     }
@@ -89,15 +106,18 @@ export async function POST(req: Request) {
     const uploadDuration = Date.now() - uploadStart;
     console.log(`[UPLOAD] screenshot upload duration: ${uploadDuration}ms`);
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ url }, { headers: corsHeaders(req) });
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
+        status: 403,
+        headers: corsHeaders(req),
+      });
     }
     console.error("upload-screenshot error:", err);
     return NextResponse.json(
       { error: "Upload failed" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(req) }
     );
   }
 }

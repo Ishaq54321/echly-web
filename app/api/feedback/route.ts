@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
 import { requireAuth } from "@/lib/server/auth";
 import { serializeTicket } from "@/lib/server/serializeFeedback";
@@ -19,6 +20,14 @@ import { log } from "@/lib/utils/logger";
 import { updateScreenshotAttachedRepo } from "@/lib/repositories/screenshotsRepository";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { corsHeaders } from "@/lib/server/cors";
+
+export async function OPTIONS(req: NextRequest) {
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders(req),
+  });
+}
 
 function serializeFeedback(item: Feedback): Record<string, unknown> {
   const out = { ...item } as Record<string, unknown>;
@@ -41,14 +50,19 @@ function serializeFeedback(item: Feedback): Record<string, unknown> {
  * GET /api/feedback?sessionId=ID&cursor=XYZ&limit=20
  * Returns { feedback: [], nextCursor: string | null, hasMore: boolean }
  */
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const start = Date.now();
   log("[API] GET /api/feedback start");
   let user;
   try {
     user = await requireAuth(req);
   } catch (res) {
-    return res as Response;
+    const errRes = res as Response;
+    return new NextResponse(errRes.body, {
+      status: errRes.status,
+      statusText: errRes.statusText,
+      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
+    });
   }
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId");
@@ -92,20 +106,26 @@ export async function GET(req: Request) {
         });
       }
       log("[API] GET /api/feedback (all) duration:", Date.now() - start);
-      return NextResponse.json({
-        feedback: enriched,
-        nextCursor: null,
-        hasMore: false,
-      });
+      return NextResponse.json(
+        {
+          feedback: enriched,
+          nextCursor: null,
+          hasMore: false,
+        },
+        { headers: corsHeaders(req) }
+      );
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-        return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+        return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
+          status: 403,
+          headers: corsHeaders(req),
+        });
       }
       console.error("GET /api/feedback (all):", err);
       log("[API] GET /api/feedback (all) duration (error):", Date.now() - start);
       return NextResponse.json(
         { error: "Server error" },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(req) }
       );
     }
   }
@@ -114,7 +134,7 @@ export async function GET(req: Request) {
   if (!session) {
     return NextResponse.json(
       { error: "Not found" },
-      { status: 404 }
+      { status: 404, headers: corsHeaders(req) }
     );
   }
   if (session.userId !== user.uid) {
@@ -124,7 +144,7 @@ export async function GET(req: Request) {
     if (!ok) {
       return NextResponse.json(
         { error: "Forbidden" },
-        { status: 403 }
+        { status: 403, headers: corsHeaders(req) }
       );
     }
   }
@@ -134,7 +154,10 @@ export async function GET(req: Request) {
     await resolveWorkspaceById(sessionWorkspaceId);
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
+        status: 403,
+        headers: corsHeaders(req),
+      });
     }
     throw err;
   }
@@ -170,37 +193,48 @@ export async function GET(req: Request) {
     const { feedback, nextCursor, hasMore } = pageResult;
 
     log("[API] GET /api/feedback duration:", Date.now() - start);
-    return NextResponse.json({
-      feedback: feedback.map(serializeFeedback),
-      nextCursor,
-      hasMore,
-      ...(typeof total === "number" && { total }),
-      ...(typeof activeCount === "number" && { activeCount }),
-      ...(typeof resolvedCount === "number" && { resolvedCount }),
-      ...(typeof skippedCount === "number" && { skippedCount }),
-    });
+    return NextResponse.json(
+      {
+        feedback: feedback.map(serializeFeedback),
+        nextCursor,
+        hasMore,
+        ...(typeof total === "number" && { total }),
+        ...(typeof activeCount === "number" && { activeCount }),
+        ...(typeof resolvedCount === "number" && { resolvedCount }),
+        ...(typeof skippedCount === "number" && { skippedCount }),
+      },
+      { headers: corsHeaders(req) }
+    );
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });
+      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
+        status: 403,
+        headers: corsHeaders(req),
+      });
     }
     console.error("GET /api/feedback:", err);
     log("[API] GET /api/feedback duration (error):", Date.now() - start);
     return NextResponse.json(
       { error: "Server error" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(req) }
     );
   }
 }
 
 /** POST /api/feedback — create feedback (ticket) for a session. Returns same shape as GET /api/tickets/:id. */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const start = Date.now();
   log("[API] POST /api/feedback start");
   let user;
   try {
     user = await requireAuth(req);
   } catch (res) {
-    return res as Response;
+    const errRes = res as Response;
+    return new NextResponse(errRes.body, {
+      status: errRes.status,
+      statusText: errRes.statusText,
+      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
+    });
   }
 
   let body: {
@@ -238,7 +272,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json(
       { success: false, error: "Invalid JSON body" },
-      { status: 400 }
+      { status: 400, headers: corsHeaders(req) }
     );
   }
 
@@ -247,7 +281,7 @@ export async function POST(req: Request) {
   if (!sessionId) {
     return NextResponse.json(
       { success: false, error: "sessionId is required" },
-      { status: 400 }
+      { status: 400, headers: corsHeaders(req) }
     );
   }
   const actionSteps =
@@ -263,7 +297,7 @@ export async function POST(req: Request) {
   if (!title) {
     return NextResponse.json(
       { success: false, error: "title is required (or provide actionSteps)" },
-      { status: 400 }
+      { status: 400, headers: corsHeaders(req) }
     );
   }
 
@@ -271,7 +305,7 @@ export async function POST(req: Request) {
   if (!session) {
     return NextResponse.json(
       { success: false, error: "Session not found" },
-      { status: 404 }
+      { status: 404, headers: corsHeaders(req) }
     );
   }
   if (session.userId !== user.uid) {
@@ -281,7 +315,7 @@ export async function POST(req: Request) {
     if (!ok) {
       return NextResponse.json(
         { success: false, error: "Forbidden" },
-        { status: 403 }
+        { status: 403, headers: corsHeaders(req) }
       );
     }
   }
@@ -293,7 +327,7 @@ export async function POST(req: Request) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(
         { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-        { status: 403 }
+        { status: 403, headers: corsHeaders(req) }
       );
     }
     throw err;
@@ -357,27 +391,30 @@ export async function POST(req: Request) {
     if (!created) {
       return NextResponse.json(
         { success: false, error: "Feedback created but could not be read" },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(req) }
       );
     }
 
     log("[API] POST /api/feedback duration:", Date.now() - start);
-    return NextResponse.json({
-      success: true,
-      ticket: serializeTicket(created),
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        ticket: serializeTicket(created),
+      },
+      { headers: corsHeaders(req) }
+    );
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(
         { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-        { status: 403 }
+        { status: 403, headers: corsHeaders(req) }
       );
     }
     console.error("POST /api/feedback:", err);
     log("[API] POST /api/feedback duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Server error" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(req) }
     );
   }
 }

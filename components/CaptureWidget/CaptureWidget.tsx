@@ -53,8 +53,11 @@ export default function CaptureWidget({
   launcherLogoUrl,
   sessionTitleProp,
   onSessionTitleChange: onSessionTitleChangeProp,
+  openResumeModal: openResumeModalProp,
+  onResumeModalClose,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
+  const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
   /** Extension: when true, show command screen (mode cards + footer). False when viewing a session (e.g. after Open Previous or when paused). */
   const [showCommandScreen, setShowCommandScreen] = useState(true);
   const [sessionTitle, setSessionTitle] = useState("Untitled Session");
@@ -169,7 +172,11 @@ export default function CaptureWidget({
   }, [handlers, widgetToggleRef]);
 
   const handlePreviousSessions = React.useCallback(() => {
-    setResumeModalOpen(true);
+    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({ type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
+    } else {
+      setResumeModalOpen(true);
+    }
   }, []);
 
   function setMode(mode: "voice" | "text") {
@@ -198,8 +205,11 @@ export default function CaptureWidget({
     <>
       {extensionMode && fetchSessions && onPreviousSessionSelect && (
         <ResumeSessionModal
-          open={resumeModalOpen}
-          onClose={() => setResumeModalOpen(false)}
+          open={showResumeModal}
+          onClose={() => {
+            setResumeModalOpen(false);
+            onResumeModalClose?.();
+          }}
           fetchSessions={fetchSessions}
           onSelectSession={(sessionId) => {
             setShowCommandScreen(false);
@@ -442,7 +452,15 @@ export default function CaptureWidget({
                   isIdle={true}
                   onAddFeedback={handlers.handleAddFeedback}
                   extensionMode={extensionMode}
-                  onStartSession={extensionMode ? handlers.startSession : undefined}
+                  onStartSession={
+                      extensionMode
+                        ? () => {
+                            if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+                              chrome.runtime.sendMessage({ type: "ECHLY_START_SESSION" });
+                            }
+                          }
+                        : handlers.startSession
+                    }
                   onOpenPreviousSession={
                     extensionMode && showPreviousButton && fetchSessions && onPreviousSessionSelect
                       ? handlePreviousSessions
