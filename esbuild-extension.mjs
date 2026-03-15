@@ -28,22 +28,23 @@ function makeAliasPlugin(useContentAuthFetch = false) {
   return {
     name: "alias",
     setup(build) {
-      build.onResolve({ filter: /^@\// }, (args) => {
-        const sub = args.path.slice(2);
-        const resolved = resolveFilePath(root, sub);
-        return { path: path.resolve(resolved) };
-      });
+      // Specific aliases must run before the generic @/ resolver so they take precedence.
       build.onResolve({ filter: /^@\/lib\/firebase$/ }, () => ({
         path: path.resolve(extDir, "stubs", "firebase.ts"),
-      }));
-      build.onResolve({ filter: /^next\/image$/ }, () => ({
-        path: path.resolve(extDir, "stubs", "next-image.tsx"),
       }));
       if (useContentAuthFetch) {
         build.onResolve({ filter: /^@\/lib\/authFetch$/ }, () => ({
           path: path.resolve(extDir, "src", "contentAuthFetch.ts"),
         }));
       }
+      build.onResolve({ filter: /^next\/image$/ }, () => ({
+        path: path.resolve(extDir, "stubs", "next-image.tsx"),
+      }));
+      build.onResolve({ filter: /^@\// }, (args) => {
+        const sub = args.path.slice(2);
+        const resolved = resolveFilePath(root, sub);
+        return { path: path.resolve(resolved) };
+      });
     },
   };
 }

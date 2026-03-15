@@ -4,7 +4,6 @@ import { authFetch } from "@/lib/authFetch";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { playDoneClick } from "@/lib/playDoneClick";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getSessionFeedback } from "@/lib/feedback";
 import type {
   StructuredFeedback,
   Recording,
@@ -144,6 +143,7 @@ export function useCaptureWidget({
   onSessionActivity,
   captureMode = "voice",
   selectedMicrophoneId,
+  onDevicesEnumerated,
   captureRootParent,
 }: CaptureWidgetProps) {
   if (ECHLY_DEBUG) console.count("useCaptureWidget render");
@@ -515,13 +515,23 @@ export function useCaptureWidget({
     if (extensionMode) return;
     if (!sessionId) return;
     const loadFeedback = async () => {
-      const existing = await getSessionFeedback(sessionId);
+      const res = await authFetch(
+        `/api/feedback?sessionId=${sessionId}&limit=200`
+      );
+      const data = await res.json();
+      const existing = (data?.feedback ?? []) as Array<{
+        id: string;
+        title?: string;
+        actionSteps?: string[];
+        description?: string;
+        type?: string;
+      }>;
       setPointers(
         existing.map((item) => ({
           id: item.id,
-          title: item.title,
+          title: item.title ?? "",
           actionSteps: item.actionSteps ?? (item.description ? item.description.split("\n") : []),
-          type: item.type,
+          type: item.type ?? "bug",
         }))
       );
     };
@@ -628,6 +638,14 @@ export function useCaptureWidget({
     hasReceivedFirstTranscriptRef.current = false;
     if (ECHLY_DEBUG) console.log("[VOICE] UI recording started", startTime);
     try {
+      // Enumerate devices only when user starts voice (user gesture); avoids permission popup on page load.
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const inputs = devices.filter((d) => d.kind === "audioinput");
+      const deviceList = inputs.map((d) => ({
+        deviceId: d.deviceId,
+        label: d.label || `Microphone ${inputs.indexOf(d) + 1}`,
+      }));
+      onDevicesEnumerated?.(deviceList);
       const audioConstraints: boolean | MediaTrackConstraints = selectedMicrophoneId
         ? { deviceId: { exact: selectedMicrophoneId } }
         : true;
@@ -658,7 +676,7 @@ export function useCaptureWidget({
       removeCaptureRoot();
       restoreWidget();
     }
-  }, [selectedMicrophoneId]);
+  }, [selectedMicrophoneId, onDevicesEnumerated]);
 
   const finishListening = useCallback(async () => {
     echlyLog("RECORDING", "finish requested");

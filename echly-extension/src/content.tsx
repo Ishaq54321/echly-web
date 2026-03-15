@@ -1,18 +1,23 @@
 /**
- * Content script: ultra-thin UI layer. Auto-injected via manifest on all URLs.
+ * Content script: ultra-thin UI layer. Injected on demand when user clicks extension icon (Loom-style).
  * Single mount, visibility controlled by background (ECHLY_VISIBILITY). No blocking overlays.
  * Auth in popup only; unauthenticated = minimal disabled state with "Sign in from extension" tooltip.
  */
+declare global {
+  interface Window {
+    __ECHLY_WIDGET_LOADED__?: boolean;
+  }
+}
+
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { apiFetch } from "./contentAuthFetch";
+import { apiFetch, API_BASE } from "./api";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
 import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/components/CaptureWidget/types";
 import { ECHLY_DEBUG, log } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
-import { API_BASE } from "../config";
 
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
@@ -39,10 +44,17 @@ function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
 
 function setHostVisibility(visible: boolean): void {
   console.log("[ECHLY CONTENT] tray visibility:", visible);
-  const host = document.getElementById(SHADOW_HOST_ID);
+  const host = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
   if (host) {
-    (host as HTMLDivElement).style.display = visible ? "block" : "none";
+    host.style.display = visible ? "block" : "none";
+    host.style.pointerEvents = visible ? "auto" : "none";
+    host.style.visibility = visible ? "visible" : "hidden";
   }
+}
+
+/** Apply tray visibility from global state. Visibility follows global extension state on all tabs. */
+function setHostVisibilityFromState(state: GlobalUIState): void {
+  setHostVisibility(getShouldShowTray(state));
 }
 
 /** Tray remains visible when session is active or paused; hide only when session ends. */
@@ -192,7 +204,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). No local source of truth. */
   React.useEffect(() => {
     const applyGlobalState = (state: GlobalUIState) => {
-      setHostVisibility(getShouldShowTray(state));
+      setHostVisibilityFromState(state);
       setGlobalState((prev) => mergeWithPointerProtection(prev, state));
     };
     (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (state: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__ = applyGlobalState;
@@ -207,21 +219,20 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       const s = e.detail?.state;
       if (!s) return;
       echlyLog("CONTENT", "global state received", s);
-      setHostVisibility(getShouldShowTray(s));
+      setHostVisibilityFromState(s);
       setGlobalState((prev) => mergeWithPointerProtection(prev, s));
     };
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
   }, []);
 
-  /* Hydrate from background on mount so already-open tabs join active sessions without refresh. */
+  /* Hydrate from background on mount so already-open tabs join active sessions; visibility is applied when state is received. */
   React.useEffect(() => {
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_GLOBAL_STATE" },
       (response: GlobalStateResponse) => {
         const state = response?.state;
         if (state) {
-          setHostVisibility(getShouldShowTray(state));
           setGlobalState((prev) => mergeWithPointerProtection(prev, state));
         }
       }
@@ -238,7 +249,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           if (response?.state) {
             const normalized = normalizeGlobalState(response.state);
             if (normalized) {
-              setHostVisibility(getShouldShowTray(normalized));
+              setHostVisibilityFromState(normalized);
               setGlobalState((prev) => mergeWithPointerProtection(prev, normalized));
             }
           }
@@ -1532,14 +1543,13 @@ function dispatchGlobalState(state: GlobalUIState): void {
   );
 }
 
-/** Request initial global state from background. Restores visibility, expanded, recording, session mode on load/refresh. */
+/** Request initial global state from background; visibility is applied via setHostVisibilityFromState when state is received. */
 function syncInitialGlobalState(host: HTMLDivElement): void {
   chrome.runtime.sendMessage(
     { type: "ECHLY_GET_GLOBAL_STATE" },
     (response: GlobalStateResponse) => {
       const normalized = normalizeGlobalState(response?.state);
       if (!normalized) return;
-      host.style.display = getShouldShowTray(normalized) ? "block" : "none";
       dispatchGlobalState(normalized);
     }
   );
@@ -1554,7 +1564,7 @@ function ensureVisibilityStateRefresh(): void {
       (response: GlobalStateResponse) => {
         const normalized = normalizeGlobalState(response?.state);
         if (!normalized) return;
-        setHostVisibility(getShouldShowTray(normalized));
+        setHostVisibilityFromState(normalized);
         dispatchGlobalState(normalized);
       }
     );
@@ -1579,13 +1589,14 @@ function ensureMessageListener(host: HTMLDivElement): void {
     }
     if (msg.type === "ECHLY_OPEN_WIDGET") {
       console.log("[ECHLY CONTENT] OPEN_WIDGET event dispatching");
+      setHostVisibility(true);
       window.dispatchEvent(new CustomEvent("ECHLY_OPEN_WIDGET"));
     }
     const h = document.getElementById(SHADOW_HOST_ID);
     if (!h) return;
     if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
       const state = msg.state;
-      setHostVisibility(getShouldShowTray(state));
+      setHostVisibilityFromState(state);
       (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(state);
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
       window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } }));
@@ -1612,7 +1623,7 @@ function ensureMessageListener(host: HTMLDivElement): void {
         if (response?.state) {
           const normalized = normalizeGlobalState(response.state);
           if (normalized) {
-            setHostVisibility(getShouldShowTray(normalized));
+            setHostVisibilityFromState(normalized);
             (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
             window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
           }
@@ -1639,11 +1650,31 @@ function ensureScrollDebugListeners(): void {
   );
 }
 
+function waitForBody(cb: () => void) {
+  if (document.body) {
+    cb();
+    return;
+  }
+
+  const observer = new MutationObserver(() => {
+    if (document.body) {
+      observer.disconnect();
+      cb();
+    }
+  });
+
+  observer.observe(document.documentElement, { childList: true });
+}
+
 /**
  * Single mount: create host once, mount React once, default hidden.
  * Visibility via ECHLY_VISIBILITY from background. No re-mount, no injection logic.
+ * Host is mounted only after document.body exists so the tray stays visible on all tabs.
  */
 function main(): void {
+  if (window.__ECHLY_WIDGET_LOADED__) return;
+  window.__ECHLY_WIDGET_LOADED__ = true;
+
   let host = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
   if (!host) {
     host = document.createElement("div");
@@ -1655,14 +1686,33 @@ function main(): void {
     host.style.width = "auto";
     host.style.height = "auto";
     host.style.zIndex = "2147483647";
-    host.style.pointerEvents = "auto";
     host.style.display = "none";
-    document.documentElement.appendChild(host);
-    mountReactApp(host);
-  }
+    host.style.pointerEvents = "none";
+    host.style.visibility = "hidden";
 
-  ensureMessageListener(host);
-  syncInitialGlobalState(host);
+    waitForBody(() => {
+      document.body.appendChild(host!);
+      mountReactApp(host!);
+      ensureMessageListener(host!);
+      /* Force state sync after mount so tray appears on every page when global state is visible. */
+      chrome.runtime.sendMessage(
+        { type: "ECHLY_GET_GLOBAL_STATE" },
+        (response: GlobalStateResponse) => {
+          const state = response?.state;
+          if (!state) return;
+          const normalized = normalizeGlobalState(state);
+          if (!normalized) return;
+          setHostVisibilityFromState(normalized);
+          window.dispatchEvent(
+            new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } })
+          );
+        }
+      );
+    });
+  } else {
+    ensureMessageListener(host);
+    syncInitialGlobalState(host);
+  }
   ensureVisibilityStateRefresh();
   ensureScrollDebugListeners();
 }

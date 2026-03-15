@@ -94,6 +94,12 @@ export default function CaptureWidget({
     onSessionActivity,
     captureMode,
     selectedMicrophoneId: selectedMicrophone || undefined,
+    onDevicesEnumerated: extensionMode
+      ? (devices) => {
+          setMicrophones(devices);
+          if (devices.length && !selectedMicrophone) setSelectedMicrophone(devices[0].deviceId || "");
+        }
+      : undefined,
     captureRootParent,
   });
 
@@ -184,22 +190,6 @@ export default function CaptureWidget({
       chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode });
     }
   }
-
-  useEffect(() => {
-    if (!extensionMode) return;
-    let cancelled = false;
-    navigator.mediaDevices
-      .enumerateDevices()
-      .then((devices) => {
-        if (cancelled) return;
-        const inputs = devices.filter((d) => d.kind === "audioinput");
-        setMicrophones(inputs.map((d) => ({ deviceId: d.deviceId, label: d.label || `Microphone ${inputs.indexOf(d) + 1}` })));
-        if (inputs.length && !selectedMicrophone) setSelectedMicrophone(inputs[0].deviceId || "");
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [extensionMode]);
-
 
   return (
     <>

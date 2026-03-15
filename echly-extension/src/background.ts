@@ -13,7 +13,7 @@ console.log("ECHLY background script loaded");
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 chrome.action.onClicked.addListener(() => {
-  openWidgetInActiveTab();
+  void openWidgetInActiveTab();
 });
 
 type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
@@ -262,34 +262,83 @@ function broadcastUIState(): void {
   });
 }
 
-/** Deterministic open: set visible + expanded and notify active tab (icon click or popup). */
-function openWidgetInActiveTab(): void {
+/**
+ * Ensure content script is loaded in the given tab (inject via scripting API if not).
+ * Prevents duplicate injection by checking window.__ECHLY_WIDGET_LOADED__ in the tab.
+ * Returns true if content script is present (or was just injected), false if injection failed (e.g. restricted URL).
+ */
+async function ensureContentScriptInjected(tabId: number): Promise<boolean> {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => (window as Window & { __ECHLY_WIDGET_LOADED__?: boolean }).__ECHLY_WIDGET_LOADED__ === true,
+    });
+    if (results?.[0]?.result === true) return true;
+  } catch {
+    // Page may not allow script execution (e.g. chrome://) or script not loaded yet
+  }
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content.js"],
+    });
+    return true;
+  } catch (e) {
+    console.warn("[ECHLY] Failed to inject content script", e);
+    return false;
+  }
+}
+
+/** Deterministic open: set echlyActive, inject content script if needed, then set visible + expanded and notify active tab (icon click or popup). */
+async function openWidgetInActiveTab(): Promise<void> {
+  await chrome.storage.local.set({ echlyActive: true });
   globalUIState.visible = true;
   globalUIState.expanded = true;
   broadcastUIState();
   console.log("[ECHLY BG] broadcasted global UI state", globalUIState);
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    console.log("[ECHLY BG] active tab:", tabs[0]?.id);
-    if (tabs[0]?.id) {
-      console.log("[ECHLY BG] sending OPEN_WIDGET to tab");
-      chrome.tabs.sendMessage(tabs[0].id, { type: "ECHLY_OPEN_WIDGET" }).catch(() => {});
-    }
-  });
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  const injected = await ensureContentScriptInjected(tab.id);
+  if (!injected) {
+    console.warn("[ECHLY BG] could not inject into active tab");
+    return;
+  }
+  console.log("[ECHLY BG] sending OPEN_WIDGET to tab", tab.id);
+  chrome.tabs.sendMessage(tab.id, { type: "ECHLY_OPEN_WIDGET" }).catch(() => {});
 }
 
-/** When user switches tabs, push current session state to that tab so every tab receives state when focused. */
-chrome.tabs.onActivated.addListener((activeInfo) => {
-  const tabId = activeInfo.tabId;
-  chrome.tabs
-    .sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
-    .catch((e) => {
-      if (ECHLY_DEBUG) console.debug("ECHLY tab activation sync failed", e);
-    });
-  chrome.tabs
-    .sendMessage(tabId, { type: "ECHLY_SESSION_STATE_SYNC" })
-    .catch((e) => {
-      if (ECHLY_DEBUG) console.debug("ECHLY session state sync failed for tab", tabId, e);
-    });
+/** Loom-style: when user switches tabs and Echly is active, inject content script so widget appears on every tab. */
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  const { echlyActive } = await chrome.storage.local.get("echlyActive");
+  if (!echlyActive) return;
+  try {
+    await ensureContentScriptInjected(activeInfo.tabId);
+    chrome.tabs
+      .sendMessage(activeInfo.tabId, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
+      .catch((e) => {
+        if (ECHLY_DEBUG) console.debug("ECHLY tab activation sync failed", e);
+      });
+    chrome.tabs
+      .sendMessage(activeInfo.tabId, { type: "ECHLY_SESSION_STATE_SYNC" })
+      .catch((e) => {
+        if (ECHLY_DEBUG) console.debug("ECHLY session state sync failed for tab", activeInfo.tabId, e);
+      });
+  } catch (e) {
+    if (ECHLY_DEBUG) console.debug("ECHLY onActivated inject/sync failed", e);
+  }
+});
+
+/** Loom-style: when a page finishes loading and Echly is active, inject content script so widget appears. */
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
+  if (changeInfo.status !== "complete") return;
+  const { echlyActive } = await chrome.storage.local.get("echlyActive");
+  if (!echlyActive) return;
+  try {
+    await ensureContentScriptInjected(tabId);
+    chrome.tabs.sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: globalUIState }).catch(() => {});
+  } catch (e) {
+    if (ECHLY_DEBUG) console.debug("ECHLY onUpdated inject failed", tabId, e);
+  }
 });
 
 /** When a new tab is created, push current session state. Fails silently if content script not yet injected. */
@@ -328,9 +377,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_OPEN_WIDGET") {
     console.log("[ECHLY BG] OPEN_WIDGET received");
-    openWidgetInActiveTab();
-    sendResponse({ ok: true });
-    return false;
+    openWidgetInActiveTab()
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: false }));
+    return true; // keep channel open for async sendResponse
   }
 
   if (request.type === "ECHLY_EXPAND_WIDGET") {

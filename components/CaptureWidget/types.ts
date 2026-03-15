@@ -145,6 +145,8 @@ export type CaptureWidgetProps = {
   captureMode?: "voice" | "text";
   /** Optional preferred microphone deviceId for voice capture (from enumerateDevices). */
   selectedMicrophoneId?: string;
+  /** Called when devices are enumerated at start of voice recording (user-initiated). Use to populate microphone list. */
+  onDevicesEnumerated?: (devices: Array<{ deviceId: string; label: string }>) => void;
   /** When set (e.g. extension shadow root container), capture root is appended here so it receives shadow DOM styles; otherwise appended to document.body. */
   captureRootParent?: HTMLElement | null;
   /** When true, show a loading indicator above the feedback tray while a ticket is being processed (e.g. after submit). */
