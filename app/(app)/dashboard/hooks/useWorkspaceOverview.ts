@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
-import { clearAuthTokenCache, authFetch } from "@/lib/authFetch";
+import { authFetch } from "@/lib/authFetch";
 import { onAuthStateChanged } from "firebase/auth";
 import { getWorkspaceSessions, getUserSessions } from "@/lib/sessions";
 import { getSessionFeedbackCounts } from "@/lib/feedback";
@@ -76,7 +76,6 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
-        clearAuthTokenCache();
         router.push("/login");
         return;
       }

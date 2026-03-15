@@ -135,16 +135,10 @@ export function ProfileCommandPanel({
 
   const handleSignOut = async () => {
     try {
-      const user = auth.currentUser;
-      if (user) {
-        const token = await user.getIdToken();
-        await fetch("/api/auth/logout", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      }
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
     } catch (err) {
       console.error("Logout revoke failed", err);
     }

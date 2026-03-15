@@ -94,6 +94,12 @@ function LoginContent() {
         window.location.href = "/dashboard";
         return;
       }
+      const idToken = await user.getIdToken();
+      await fetch("/api/auth/sessionLogin", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+        credentials: "include",
+      });
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
     }
@@ -129,6 +135,12 @@ function LoginContent() {
         window.location.href = "/dashboard";
         return;
       }
+      const idToken = await user.getIdToken();
+      await fetch("/api/auth/sessionLogin", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+        credentials: "include",
+      });
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
     }

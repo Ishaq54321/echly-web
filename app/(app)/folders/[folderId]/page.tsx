@@ -6,7 +6,6 @@ import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, onSnapshot } from "fir
 import { db } from "@/lib/firebase";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { clearAuthTokenCache } from "@/lib/authFetch";
 import { createSession } from "@/lib/sessions";
 import { getSessionFeedbackCounts } from "@/lib/feedback";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
@@ -103,7 +102,6 @@ function FolderPageContent() {
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
-        clearAuthTokenCache();
         router.push("/login");
         return;
       }

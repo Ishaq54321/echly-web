@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { clearAuthTokenCache } from "@/lib/authFetch";
 import { ensureUserWorkspaceLinkRepo } from "@/lib/repositories/usersRepository";
 
 type UseAuthGuardOptions = {
@@ -38,7 +37,6 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): {
         });
       }
       if (currentUser == null && router) {
-        clearAuthTokenCache();
         if (useReplace) {
           router.replace("/login");
         } else {

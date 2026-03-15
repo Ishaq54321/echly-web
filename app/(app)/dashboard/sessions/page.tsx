@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { collection, getDocs } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { clearAuthTokenCache } from "@/lib/authFetch";
 import { getWorkspaceSessions, getUserSessions } from "@/lib/sessions";
 import { getSessionFeedbackCounts } from "@/lib/feedback";
 import { Search, Folder } from "lucide-react";
@@ -101,7 +100,6 @@ export default function SessionsPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
-        clearAuthTokenCache();
         router.push("/login");
         return;
       }
