@@ -197,7 +197,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). Auth never requested by content. */
   React.useEffect(() => {
     const applyGlobalState = (state: GlobalUIState) => {
-      setHostVisibility(getShouldShowTray(state));
+      setHostVisibility(state.visible === true);
       setGlobalState((prev) => mergeWithPointerProtection(prev, state));
       if (state.user !== undefined) {
         setUser(
@@ -236,7 +236,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       if (!s) return;
       echlyLog("CONTENT", "global state received", s);
       setGlobalState((prev) => mergeWithPointerProtection(prev, s));
-      setHostVisibility(getShouldShowTray(s));
+      setHostVisibility(s.visible === true);
       if (s.user !== undefined) {
         setUser(
           s.user && s.user.uid
@@ -250,14 +250,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
   }, []);
 
-  /* Hydrate from background on mount (global state only; no auth request). */
+  /* Hydrate from background on mount (global state only; no auth request). Never hide from GET response to avoid stale response overwriting a recent broadcast. */
   React.useEffect(() => {
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_GLOBAL_STATE" },
       (response: GlobalStateResponse) => {
         const state = response?.state;
         if (state) {
-          setHostVisibility(getShouldShowTray(state));
+          if (state.visible === true) setHostVisibility(true);
           setGlobalState((prev) => mergeWithPointerProtection(prev, state));
           if (state.user !== undefined) {
             setUser(
@@ -272,7 +272,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     );
   }, []);
 
-  /* Resync global state when tab becomes visible (ECHLY_GET_GLOBAL_STATE only; no auth request). */
+  /* Resync global state when tab becomes visible (ECHLY_GET_GLOBAL_STATE only; no auth request). Never hide from GET response to avoid stale response overwriting broadcast. */
   React.useEffect(() => {
     const handler = () => {
       if (document.hidden) return;
@@ -282,7 +282,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           if (response?.state) {
             const normalized = normalizeGlobalState(response.state);
             if (normalized) {
-              setHostVisibility(getShouldShowTray(normalized));
+              if (normalized.visible === true) setHostVisibility(true);
               setGlobalState((prev) => mergeWithPointerProtection(prev, normalized));
               if (normalized.user !== undefined) {
                 setUser(
@@ -1529,20 +1529,20 @@ function dispatchGlobalState(state: GlobalUIState): void {
   );
 }
 
-/** Request initial global state from background. Restores visibility, expanded, recording, session mode on load/refresh. */
+/** Request initial global state from background. Restores visibility, expanded, recording, session mode on load/refresh. Only show from GET response; never hide to avoid stale response overwriting a recent broadcast. */
 function syncInitialGlobalState(host: HTMLDivElement): void {
   chrome.runtime.sendMessage(
     { type: "ECHLY_GET_GLOBAL_STATE" },
     (response: GlobalStateResponse) => {
       const normalized = normalizeGlobalState(response?.state);
       if (!normalized) return;
-      host.style.display = getShouldShowTray(normalized) ? "block" : "none";
+      if (normalized.visible === true) host.style.display = "block";
       dispatchGlobalState(normalized);
     }
   );
 }
 
-/** When tab becomes visible, refresh global state from background so we never rely on a missed broadcast. */
+/** When tab becomes visible, refresh global state from background so we never rely on a missed broadcast. Never hide from GET response to avoid stale overwriting broadcast. */
 function ensureVisibilityStateRefresh(): void {
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;
@@ -1551,7 +1551,7 @@ function ensureVisibilityStateRefresh(): void {
       (response: GlobalStateResponse) => {
         const normalized = normalizeGlobalState(response?.state);
         if (!normalized) return;
-        setHostVisibility(getShouldShowTray(normalized));
+        if (normalized.visible === true) setHostVisibility(true);
         dispatchGlobalState(normalized);
       }
     );
@@ -1589,7 +1589,7 @@ function ensureMessageListener(host: HTMLDivElement): void {
     if (!h) return;
     if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
       const state = msg.state;
-      setHostVisibility(getShouldShowTray(state));
+      setHostVisibility(state.visible === true);
       (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(state);
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
       window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } }));
@@ -1602,13 +1602,13 @@ function ensureMessageListener(host: HTMLDivElement): void {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_RESET_WIDGET" });
       window.dispatchEvent(new CustomEvent("ECHLY_RESET_WIDGET"));
     }
-    /* Tab activation resync: always fetch and apply state; never debounce or skip. */
+    /* Tab activation resync: always fetch and apply state; never debounce or skip. Never hide from GET response to avoid stale overwriting broadcast. */
     if (msg.type === "ECHLY_SESSION_STATE_SYNC") {
       chrome.runtime.sendMessage({ type: "ECHLY_GET_GLOBAL_STATE" }, (response: GlobalStateResponse) => {
         if (response?.state) {
           const normalized = normalizeGlobalState(response.state);
           if (normalized) {
-            setHostVisibility(getShouldShowTray(normalized));
+            if (normalized.visible === true) setHostVisibility(true);
             (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
             window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
           }

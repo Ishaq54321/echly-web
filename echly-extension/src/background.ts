@@ -13,8 +13,16 @@ if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
 
-/** In-memory extension access token (short-lived, from GET /api/auth/extensionToken). Not persisted. */
+/** In-memory extension access token (short-lived, from GET /api/auth/extensionToken). Persisted in chrome.storage.local. */
 let extensionAccessToken: string | null = null;
+
+async function restoreExtensionToken() {
+  const data = await chrome.storage.local.get("echly_extension_token");
+
+  if (typeof data?.echly_extension_token === "string") {
+    extensionAccessToken = data.echly_extension_token;
+  }
+}
 
 /** Tab ID of the tab where the user clicked the extension icon (for post-login switch-back). */
 let originTabId: number | null = null;
@@ -272,6 +280,7 @@ async function initializeSessionState(): Promise<void> {
 }
 
 (async () => {
+  await restoreExtensionToken();
   await initializeSessionState();
   broadcastUIState();
 })();
@@ -289,6 +298,9 @@ const AUTH_STORAGE_KEYS_LEGACY = [
 /** Clear auth state: in-memory token, legacy storage keys; close tray and broadcast. */
 function clearAuthState(): void {
   extensionAccessToken = null;
+
+  chrome.storage.local.remove("echly_extension_token");
+
   globalUIState.user = null;
   globalUIState.visible = false;
   globalUIState.expanded = false;
@@ -466,6 +478,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_LOGIN_SUCCESS);
       echlyLog("BACKGROUND", ECHLY_LOG_LOGIN_SUCCESS);
       extensionAccessToken = idToken;
+
+      chrome.storage.local.set({
+        echly_extension_token: idToken,
+      });
+
       globalUIState.user = {
         uid,
         name: payload.name ?? null,
@@ -504,6 +521,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_EXTENSION_TOKEN_RECEIVED);
       echlyLog("BACKGROUND", ECHLY_LOG_EXTENSION_TOKEN_RECEIVED);
       extensionAccessToken = token;
+
+      chrome.storage.local.set({
+        echly_extension_token: token,
+      });
+
       globalUIState.user = { uid, name: null, email: null, photoURL: null };
       if (authBrokerTabId != null) {
         chrome.tabs.remove(authBrokerTabId).catch(() => {});
