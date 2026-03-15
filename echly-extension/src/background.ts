@@ -66,13 +66,32 @@ function openOrFocusLoginTab(loginUrl: string): Promise<number> {
   });
 }
 
+/**
+ * Open login page once: if a tab is already on /login, focus it; otherwise create one.
+ * Prevents multiple login tabs (no second tab).
+ */
+async function openLoginOnce(loginUrl: string): Promise<number> {
+  const tabs = await chrome.tabs.query({ url: "*://echly-web.vercel.app/login*" });
+  const existing = tabs.find((t) => t.id != null);
+  if (existing?.id != null) {
+    await chrome.tabs.update(existing.id, { active: true });
+    loginTabId = existing.id;
+    return existing.id;
+  }
+  const created = await chrome.tabs.create({ url: loginUrl });
+  const id = created?.id ?? 0;
+  loginTabId = id || null;
+  return id;
+}
+
 /** True if we have an in-memory extension token (validity confirmed on next API 401). */
 function hasValidToken(): boolean {
   return Boolean(extensionAccessToken);
 }
 
-/** Show tray (visible + expanded), persist and broadcast. */
+/** Show tray (visible + expanded), persist and broadcast. Only updates UI state; no auth. */
 function openTray(): void {
+  console.log("ECHLY TRAY OPEN");
   if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_TRAY_OPEN);
   echlyLog("BACKGROUND", ECHLY_LOG_TRAY_OPEN);
   globalUIState.visible = true;
@@ -398,36 +417,39 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabId === loginTabId) loginTabId = null;
 });
 
-/** Extension icon click: if valid token open tray; else open login page (Loom-style). Only one login tab; after login we return to origin tab, close login tab, open tray. */
-chrome.action.onClicked.addListener((tab) => {
+/** Extension icon click: auth check first, then open tray only if token valid; else open login once. Tray never opens before auth completes. */
+chrome.action.onClicked.addListener(async (tab) => {
+  console.log("ECHLY CLICK");
   if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_CLICK);
   echlyLog("BACKGROUND", ECHLY_LOG_CLICK);
 
   originTabId = tab?.id ?? null;
 
-  if (hasValidToken()) {
+  try {
+    const token = await getValidToken();
+    if (!token) throw new Error("NO_TOKEN");
+    console.log("ECHLY TOKEN VALID");
     if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_TOKEN_FOUND);
     echlyLog("BACKGROUND", ECHLY_LOG_TOKEN_FOUND);
     if (globalUIState.visible === true) {
       globalUIState.visible = false;
       globalUIState.expanded = false;
+      persistUIState();
+      broadcastUIState();
     } else {
       openTray();
     }
-    persistUIState();
-    broadcastUIState();
-    return;
+  } catch {
+    if (globalUIState.visible) return;
+    console.log("ECHLY LOGIN REQUIRED");
+    if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_LOGIN_REQUIRED);
+    echlyLog("BACKGROUND", ECHLY_LOG_LOGIN_REQUIRED);
+    const loginUrl =
+      ECHLY_LOGIN_BASE +
+      "?extension=true" +
+      (tab?.url ? "&returnUrl=" + encodeURIComponent(tab.url) : "");
+    await openLoginOnce(loginUrl);
   }
-
-  if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_LOGIN_REQUIRED);
-  echlyLog("BACKGROUND", ECHLY_LOG_LOGIN_REQUIRED);
-  const returnUrl = typeof tab?.url === "string" ? encodeURIComponent(tab.url) : "";
-  const loginUrl = returnUrl
-    ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
-    : `${ECHLY_LOGIN_BASE}?extension=true`;
-  openOrFocusLoginTab(loginUrl).then((id) => {
-    loginTabId = id || null;
-  });
 });
 
 /** Single message listener for extension messages. */
