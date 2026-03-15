@@ -34,5 +34,47 @@ export function EchlyExtensionTokenProvider() {
     return () => window.removeEventListener("message", handler);
   }, []);
 
+  /* Cookie-bridge: extension content script requests token; we fetch in page context so __session cookie is sent. */
+  useEffect(() => {
+    async function handler(event: MessageEvent) {
+      if (event.data?.type !== "ECHLY_EXTENSION_TOKEN_REQUEST") return;
+
+      const id = event.data.id;
+
+      try {
+        const res = await fetch("/api/auth/extensionToken", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (!res.ok) throw new Error("UNAUTH");
+
+        const data = await res.json();
+
+        window.postMessage(
+          {
+            type: "ECHLY_EXTENSION_TOKEN_RESPONSE",
+            id,
+            token: data.token,
+            uid: data.uid,
+          },
+          "*"
+        );
+      } catch {
+        window.postMessage(
+          {
+            type: "ECHLY_EXTENSION_TOKEN_RESPONSE",
+            id,
+            token: null,
+          },
+          "*"
+        );
+      }
+    }
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
   return null;
 }

@@ -242,58 +242,75 @@ function clearAuthState(): void {
   broadcastUIState();
 }
 
-const EXTENSION_TOKEN_URL = `${API_BASE}/api/auth/extensionToken`;
-
 /**
- * Fetch short-lived extension token from backend using dashboard session cookie.
- * Uses credentials: 'include' so the browser sends the __session cookie for the API origin.
- * On 401, opens login page and throws NOT_AUTHENTICATED.
+ * Get a tab ID that is on the dashboard origin (so content script can request token from page context).
  */
-async function fetchExtensionToken(): Promise<{ token: string; uid: string }> {
-  const res = await fetch(EXTENSION_TOKEN_URL, {
-    method: "GET",
-    credentials: "include",
+function getDashboardTabId(): Promise<number | null> {
+  return new Promise((resolve) => {
+    const origin = new URL(API_BASE).origin;
+    chrome.tabs.query({}, (tabs) => {
+      const dashboard = tabs.find(
+        (t) =>
+          t.id != null &&
+          typeof t.url === "string" &&
+          (t.url.startsWith(origin + "/") || t.url === origin + "" || t.url === origin)
+      );
+      resolve(dashboard?.id ?? null);
+    });
   });
-  if (res.status === 401 || res.status === 403) {
-    openOrFocusLoginTab(`${ECHLY_LOGIN_BASE}?extension=true`);
-    throw new Error("NOT_AUTHENTICATED");
-  }
-  if (!res.ok) {
-    throw new Error("NOT_AUTHENTICATED");
-  }
-  const data = (await res.json()) as { token?: string; uid?: string };
-  const token = data.token;
-  const uid = data.uid;
-  if (typeof token !== "string" || !token || typeof uid !== "string" || !uid) {
-    throw new Error("NOT_AUTHENTICATED");
-  }
-  return { token, uid };
 }
 
 /**
- * Get a valid extension access token: from memory or by fetching from backend (session cookie).
- * Throws NOT_AUTHENTICATED if not logged in (401 from extensionToken).
+ * Request extension token via content script → page bridge so the dashboard page sends __session cookie.
+ * Tab must be a dashboard tab (page has EchlyExtensionTokenProvider). Throws NOT_AUTHENTICATED if no token.
  */
-async function getValidToken(): Promise<string> {
+async function fetchExtensionTokenFromTab(tabId: number): Promise<{ token: string; uid: string }> {
+  const response = await chrome.tabs.sendMessage(tabId, {
+    type: "ECHLY_REQUEST_EXTENSION_TOKEN",
+  });
+
+  if (!response?.token) {
+    openOrFocusLoginTab(`${ECHLY_LOGIN_BASE}?extension=true`);
+    throw new Error("NOT_AUTHENTICATED");
+  }
+
+  const uid = typeof response.uid === "string" ? response.uid : "";
+  return { token: response.token, uid };
+}
+
+/**
+ * Get a valid extension access token: from memory or by requesting from dashboard tab (page-context cookie).
+ * Throws NOT_AUTHENTICATED if not logged in or no dashboard tab available.
+ */
+async function getValidToken(tabId?: number): Promise<string> {
   if (extensionAccessToken) {
     return extensionAccessToken;
   }
-  const { token, uid } = await fetchExtensionToken();
+  const targetTabId = tabId ?? (await getDashboardTabId());
+  if (!targetTabId) {
+    throw new Error("NOT_AUTHENTICATED");
+  }
+  const { token, uid } = await fetchExtensionTokenFromTab(targetTabId);
   extensionAccessToken = token;
   globalUIState.user = { uid, name: null, email: null, photoURL: null };
   return token;
 }
 
 /**
- * Auth check using GET /api/auth/extensionToken (credentials: include).
- * Returns { authenticated, user } or clears state and returns not authenticated on 401.
+ * Auth check via dashboard tab token request (page context sends cookie).
+ * Returns { authenticated, user } or clears state and returns not authenticated.
  */
-async function checkAuthWithExtensionToken(): Promise<{
+async function checkAuthWithExtensionToken(tabId?: number): Promise<{
   authenticated: boolean;
   user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null } | null;
 }> {
   try {
-    const { token, uid } = await fetchExtensionToken();
+    const targetTabId = tabId ?? (await getDashboardTabId());
+    if (!targetTabId) {
+      clearAuthState();
+      return { authenticated: false, user: null };
+    }
+    const { token, uid } = await fetchExtensionTokenFromTab(targetTabId);
     extensionAccessToken = token;
     const user = { uid, name: null as string | null, email: null as string | null, photoURL: null as string | null };
     globalUIState.user = user;
@@ -374,7 +391,7 @@ chrome.action.onClicked.addListener((tab) => {
   tokenFetchInProgress = true;
   (async () => {
     try {
-      await getValidToken();
+      await getValidToken(tab?.id);
       broadcastUIState();
     } catch {
       clearAuthState();
@@ -502,7 +519,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
       try {
-        const token = await getValidToken();
+        const token = await getValidToken(sender.tab?.id);
         const [feedbackRes, sessionsRes] = await Promise.all([
           fetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=200`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -616,7 +633,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_GET_TOKEN") {
     (async () => {
       try {
-        const token = await getValidToken();
+        const token = await getValidToken(sender.tab?.id);
         sendResponse({ token });
       } catch {
         console.warn("[ECHLY AUTH] transient error, not clearing auth");
@@ -628,7 +645,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_GET_AUTH_STATE") {
     (async () => {
-      const session = await checkAuthWithExtensionToken();
+      const session = await checkAuthWithExtensionToken(sender.tab?.id);
       sendResponse({
         authenticated: session.authenticated,
         user: session.authenticated && session.user ? session.user : null,
@@ -704,7 +721,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           screenshotId: string;
         };
 
-        const token = await getValidToken();
+        const token = await getValidToken(sender.tab?.id);
 
         const res = await fetch(`${API_BASE}/api/upload-screenshot`, {
           method: "POST",
@@ -766,7 +783,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     (async () => {
       try {
-        const token = await getValidToken();
+        const token = await getValidToken(sender.tab?.id);
         const screenshotUrl: string | null = payload.screenshotUrl ?? null;
         const screenshotId: string | null = payload.screenshotId ?? null;
 
@@ -921,7 +938,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
     (async () => {
       try {
-        const resolvedToken = token ?? (await getValidToken());
+        const resolvedToken = token ?? (await getValidToken(sender.tab?.id));
         const h = { ...headers };
         if (resolvedToken) h["Authorization"] = `Bearer ${resolvedToken}`;
         const res = await fetch(url, {

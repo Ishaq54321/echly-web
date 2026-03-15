@@ -5,6 +5,7 @@
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { requestExtensionTokenFromPage } from "./requestExtensionTokenFromPage";
 import { apiFetch } from "./contentAuthFetch";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
@@ -1565,6 +1566,12 @@ function ensureMessageListener(host: HTMLDivElement): void {
   if (win.__ECHLY_MESSAGE_LISTENER__) return;
   win.__ECHLY_MESSAGE_LISTENER__ = true;
   chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; description: string; type?: string }; sessionId?: string }, _sender, sendResponse) => {
+    if (msg.type === "ECHLY_REQUEST_EXTENSION_TOKEN") {
+      requestExtensionTokenFromPage()
+        .then((result) => sendResponse({ token: result.token, uid: result.uid }))
+        .catch(() => sendResponse({ token: null }));
+      return true;
+    }
     if (msg.type === "ECHLY_GET_TOKEN_FROM_PAGE") {
       chrome.runtime.sendMessage({ type: "ECHLY_GET_TOKEN" }, (response: { token?: string; error?: string }) => {
         sendResponse(response?.token != null ? { token: response.token } : { token: null });
