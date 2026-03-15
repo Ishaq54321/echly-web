@@ -50,9 +50,9 @@ function setHostVisibility(visible: boolean): void {
   }
 }
 
-/** Tray remains visible when session is active or paused; hide only when session ends. */
+/** Tray visibility is controlled only by background; content never overrides. */
 function getShouldShowTray(state: GlobalUIState): boolean {
-  return state.visible === true || state.sessionModeActive === true || state.sessionPaused === true;
+  return state.visible === true;
 }
 
 type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
@@ -92,11 +92,6 @@ function createUniqueId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `job-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-}
-
-/** Ask background to open login page in a new tab (Loom-style flow) so user can sign in. */
-function requestOpenLoginPage(): void {
-  chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {});
 }
 
 /** Notify background when content creates a ticket via apiFetch so globalUIState.pointers stays in sync. */
@@ -234,14 +229,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     if (globalState.sessionId) setStartSessionLoading(false);
   }, [globalState.sessionId]);
 
-  /* Global UI state: always overwrite from background; auth comes from state only (no ECHLY_GET_AUTH_STATE). */
+  /* Global UI state: render exactly what background sends; no local override of visibility. */
   React.useEffect(() => {
     const handler = (e: CustomEvent<{ state: GlobalUIState }>) => {
       const s = e.detail?.state;
       if (!s) return;
       echlyLog("CONTENT", "global state received", s);
-      setHostVisibility(getShouldShowTray(s));
       setGlobalState((prev) => mergeWithPointerProtection(prev, s));
+      setHostVisibility(getShouldShowTray(s));
       if (s.user !== undefined) {
         setUser(
           s.user && s.user.uid

@@ -355,7 +355,14 @@ async function checkAuthWithExtensionToken(): Promise<{
   if (extensionAccessToken && globalUIState.user) {
     return { authenticated: true, user: globalUIState.user };
   }
-  clearAuthState();
+
+  /*
+   * Do NOT clear auth here.
+   *
+   * Auth state must not be destroyed by passive checks.
+   * Only API 401 responses or explicit logout should clear auth.
+   */
+
   return { authenticated: false, user: null };
 }
 
@@ -762,22 +769,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_OPEN_POPUP") {
-    const returnUrl = typeof sender.tab?.url === "string" ? encodeURIComponent(sender.tab.url) : "";
-    const loginUrl = returnUrl
-      ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
-      : `${ECHLY_LOGIN_BASE}?extension=true`;
-    openOrFocusLoginTab(loginUrl).then(() => sendResponse({ ok: true }));
-    return true;
+    console.log("ECHLY POPUP REQUEST IGNORED");
+    sendResponse({ ok: false });
+    return false;
   }
 
-  /* Extension relies on dashboard login; in-extension OAuth disabled. Open login page instead. */
-  if (request.type === "ECHLY_SIGN_IN" || request.type === "ECHLY_START_LOGIN" || request.type === "LOGIN") {
-    const returnUrl = typeof sender.tab?.url === "string" ? encodeURIComponent(sender.tab.url) : "";
-    const loginUrl = returnUrl
-      ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
-      : `${ECHLY_LOGIN_BASE}?extension=true`;
-    openOrFocusLoginTab(loginUrl).then(() => sendResponse({ success: false, error: "Use dashboard login" }));
-    return true;
+  if (request.type === "ECHLY_SIGN_IN" ||
+      request.type === "ECHLY_START_LOGIN" ||
+      request.type === "LOGIN") {
+    console.log("ECHLY LOGIN REQUEST IGNORED");
+    sendResponse({ success: false });
+    return false;
   }
 
   if (request.type === "START_RECORDING") {
