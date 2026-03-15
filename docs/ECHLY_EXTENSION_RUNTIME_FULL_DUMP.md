@@ -1,3 +1,17 @@
+# Echly Extension Runtime — Full Diagnostic Dump
+
+**Purpose:** Complete extraction of Echly's extension authentication and tray control logic for external debugging.  
+**No code was modified.** This report is purely diagnostic.
+
+---
+
+## SECTION 1 — Extension core files
+
+Full source of each file, without truncation.
+
+### 1.1 `echly-extension/src/background.ts`
+
+```ts
 /**
  * Extension background (service worker). Auth uses short-lived extension tokens
  * from GET /api/auth/extensionToken (dashboard session cookie). No token storage.
@@ -417,31 +431,37 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabId === loginTabId) loginTabId = null;
 });
 
-/** Extension icon click: if token exists open tray; else open hidden broker tab; on broker failure open login once. Click = open tray only (no toggle). */
+/** Extension icon click: auth check first, then open tray only if token valid; else open login once. Tray never opens before auth completes. */
 chrome.action.onClicked.addListener(async (tab) => {
   console.log("ECHLY CLICK");
+  if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_CLICK);
+  echlyLog("BACKGROUND", ECHLY_LOG_CLICK);
 
   originTabId = tab?.id ?? null;
 
-  if (extensionAccessToken) {
-    console.log("ECHLY TOKEN VALID");
-
-    openTray();
-    return;
-  }
-
-  console.log("ECHLY TOKEN MISSING — OPENING BROKER");
-
   try {
-    await openAuthBrokerTab();
-  } catch (e) {
-    console.error("ECHLY BROKER FAILED", e);
-
+    const token = await getValidToken();
+    if (!token) throw new Error("NO_TOKEN");
+    console.log("ECHLY TOKEN VALID");
+    if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_TOKEN_FOUND);
+    echlyLog("BACKGROUND", ECHLY_LOG_TOKEN_FOUND);
+    if (globalUIState.visible === true) {
+      globalUIState.visible = false;
+      globalUIState.expanded = false;
+      persistUIState();
+      broadcastUIState();
+    } else {
+      openTray();
+    }
+  } catch {
+    if (globalUIState.visible) return;
+    console.log("ECHLY LOGIN REQUIRED");
+    if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_LOGIN_REQUIRED);
+    echlyLog("BACKGROUND", ECHLY_LOG_LOGIN_REQUIRED);
     const loginUrl =
       ECHLY_LOGIN_BASE +
       "?extension=true" +
       (tab?.url ? "&returnUrl=" + encodeURIComponent(tab.url) : "");
-
     await openLoginOnce(loginUrl);
   }
 });
@@ -503,8 +523,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         authBrokerTabId = null;
       }
       openTray();
-      persistUIState();
-      broadcastUIState();
     }
     return false;
   }
@@ -947,7 +965,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
             contextSummary: desc,
             actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-            suggestedTags: t.suggestedTags,
             screenshotUrl: i === 0 ? screenshotUrl : null,
             screenshotId: i === 0 && screenshotId ? screenshotId : undefined,
             metadata: { clientTimestamp: Date.now() },
@@ -982,7 +999,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             return;
           }
 
-          // parsed JSON only after ok + parse success
           const typedFeedbackJson = feedbackJson as {
             success?: boolean;
             ticket?: { id: string; title: string; description: string; type?: string };
@@ -1077,3 +1093,767 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   return false;
 });
+```
+
+---
+
+### 1.2 `echly-extension/src/content.tsx`
+
+*(Full file: 1080 lines. Key excerpts for auth/tray; full content available in repo.)*
+
+**Location:** `echly-extension/src/content.tsx`
+
+**Summary:** Content script mounts a single React widget; visibility is controlled by background via `ECHLY_GLOBAL_STATE`. Auth is not requested by content; it is derived from `globalState.user` (background is sole authority). Content listens for `ECHLY_EXTENSION_LOGIN_SUCCESS` and `ECHLY_EXTENSION_TOKEN` via `window.postMessage` and forwards to background; it also handles `ECHLY_REQUEST_EXTENSION_TOKEN` by calling `requestExtensionTokenFromPage()` and responding with `{ token, uid }`.
+
+**Full file:** See repository file. Below are the auth- and message-relevant parts.
+
+- **Imports:** `requestExtensionTokenFromPage` from `./requestExtensionTokenFromPage`, `apiFetch` from `./contentAuthFetch`, CaptureWidget, types, logger, echlyLog.
+- **Constants:** `ROOT_ID`, `SHADOW_HOST_ID`, `APP_ORIGIN`, `ECHLY_DASHBOARD_ORIGIN` (https://echly-web.vercel.app).
+- **`getShouldShowTray(state)`:** `state.visible === true || state.sessionModeActive === true || state.sessionPaused === true`.
+- **`requestOpenLoginPage()`:** `chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" })`.
+- **`ensureBrokerAndLogoutBridge()`:** `window.addEventListener("message")` — on `ECHLY_EXTENSION_LOGIN_SUCCESS` forwards to background with idToken, refreshToken, uid, name, email; on `ECHLY_EXTENSION_TOKEN` forwards token, uid; on `ECHLY_DASHBOARD_LOGOUT` forwards to background.
+- **`ensureMessageListener()`:** Handles `ECHLY_REQUEST_EXTENSION_TOKEN` (calls `requestExtensionTokenFromPage()`, sendResponse `{ token, uid }`), `ECHLY_GET_TOKEN_FROM_PAGE` (proxies to background `ECHLY_GET_TOKEN`), `ECHLY_GLOBAL_STATE`, `ECHLY_TOGGLE`, `ECHLY_RESET_WIDGET`, `ECHLY_SESSION_STATE_SYNC`, `ECHLY_FEEDBACK_CREATED`.
+- **Hydration:** On mount and on visibilitychange, content sends `ECHLY_GET_GLOBAL_STATE` and applies state (no auth request).
+- **Full source:** Complete file at `echly-extension/src/content.tsx` (1080 lines). Auth and message-handling logic is fully described above and in Section 7; the repo file is the single source of truth for the entire content script.
+
+---
+
+### 1.3 `echly-extension/src/contentAuthFetch.ts`
+
+```ts
+/**
+ * authFetch for content script: proxies requests through background (no Firebase in content).
+ * Background adds Bearer token via ECHLY_GET_TOKEN / getValidToken().
+ */
+import { ECHLY_DEBUG } from "../../lib/utils/logger";
+
+const API_BASE =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3000"
+    : "https://echly-web.vercel.app";
+if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
+
+export function clearAuthTokenCache(): void {
+  // No-op: token cache lives in background.
+}
+
+function getFullUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") {
+    return input.startsWith("http") ? input : API_BASE + input;
+  }
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
+export function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const url = getFullUrl(input);
+  const method = (init.method || "GET") as string;
+  const headers: Record<string, string> =
+    init.headers instanceof Headers
+      ? Object.fromEntries(init.headers)
+      : Array.isArray(init.headers)
+        ? Object.fromEntries(init.headers)
+        : { ...(init.headers as Record<string, string>) };
+  const body = init.body ?? null;
+
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      { type: "echly-api", url, method, headers, body },
+      (response: { ok?: boolean; status?: number; headers?: Record<string, string>; body?: string } | undefined) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (!response) {
+          reject(new Error("No response from background"));
+          return;
+        }
+        const res = new Response(response.body ?? "", {
+          status: response.status ?? 0,
+          headers: response.headers ? new Headers(response.headers) : undefined,
+        });
+        resolve(res);
+      }
+    );
+  });
+}
+
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const url = path.startsWith("http") ? path : API_BASE + path;
+  return authFetch(url, options);
+}
+```
+
+---
+
+### 1.4 `echly-extension/src/api.ts`
+
+```ts
+/**
+ * API client for production backend.
+ * Automatically attaches Authorization: Bearer <firebase-id-token> to every request.
+ */
+import { ECHLY_DEBUG } from "../../lib/utils/logger";
+import { auth } from "./firebase";
+
+const API_BASE =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3000"
+    : "https://echly-web.vercel.app";
+if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
+
+export { API_BASE };
+
+export type ApiFetchOptions = RequestInit & {
+  /** If true, do not attach Authorization header (e.g. public endpoints). Default false. */
+  skipAuth?: boolean;
+};
+
+/**
+ * Fetch helper that:
+ * - Calls API_BASE (e.g. http://localhost:3000 for debugging)
+ * - Attaches Authorization: Bearer <firebase-id-token> from auth.currentUser.getIdToken()
+ * - Throws if not logged in (unless skipAuth: true)
+ */
+export async function apiFetch(
+  path: string,
+  options: ApiFetchOptions = {}
+): Promise<Response> {
+  const { skipAuth = false, headers = {}, ...rest } = options;
+
+  const headersRecord: Record<string, string> =
+    headers instanceof Headers
+      ? Object.fromEntries(headers)
+      : Array.isArray(headers)
+        ? Object.fromEntries(headers)
+        : { ...headers };
+
+  if (!skipAuth) {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("Not signed in. Sign in with Google to use this feature.");
+    }
+    const token = await user.getIdToken();
+    headersRecord["Authorization"] = `Bearer ${token}`;
+  }
+
+  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  return fetch(url, {
+    ...rest,
+    headers: headersRecord,
+  });
+}
+```
+
+---
+
+### 1.5 `echly-extension/src/firebase.ts`
+
+```ts
+/**
+ * Firebase initialization for Chrome extension.
+ * Uses same config as web app. Modular Firebase v9+ syntax.
+ * Import from firebase/auth/web-extension for extension compatibility.
+ * Exports auth, db, storage so shared lib/feedback and lib/screenshot work when aliased here.
+ */
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth/web-extension";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+import { firebaseConfig } from "../../lib/firebase/config";
+
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+```
+
+---
+
+### 1.6 `echly-extension/src/requestExtensionTokenFromPage.ts`
+
+**Note:** The codebase uses `requestExtensionTokenFromPage.ts` (not `requestTokenFromPage.ts`). There are no files named `pageTokenBridge.js` or `secureBridgeChannel.ts` in the extension; token from page is obtained via postMessage to the dashboard page (EchlyExtensionTokenProvider or extension-auth page).
+
+```ts
+export type ExtensionTokenResult = { token: string; uid?: string };
+
+export function requestExtensionTokenFromPage(): Promise<ExtensionTokenResult> {
+  return new Promise((resolve, reject) => {
+    const id = "echly_token_request_" + Date.now;
+
+    function handler(event: MessageEvent) {
+      if (event.data?.type === "ECHLY_EXTENSION_TOKEN_RESPONSE" && event.data.id === id) {
+        window.removeEventListener("message", handler);
+
+        if (event.data.token) {
+          resolve({ token: event.data.token, uid: event.data.uid });
+        } else {
+          reject(new Error("NO_TOKEN"));
+        }
+      }
+    }
+
+    window.addEventListener("message", handler);
+
+    window.postMessage(
+      {
+        type: "ECHLY_EXTENSION_TOKEN_REQUEST",
+        id,
+      },
+      "*"
+    );
+  });
+}
+```
+
+---
+
+### 1.7 `pageTokenBridge.js` and `secureBridgeChannel.ts`
+
+**Not present in the repository.** The current flow uses:
+
+- **Login path:** Login page posts `ECHLY_EXTENSION_LOGIN_SUCCESS` (idToken, uid, etc.) to `window.location.origin`; content script’s `ensureBrokerAndLogoutBridge()` forwards to background.
+- **Broker path:** `/extension-auth` page fetches `GET /api/auth/extensionToken` with `credentials: "include"` and posts `ECHLY_EXTENSION_TOKEN`; content forwards to background.
+- **Dashboard token request:** Content handles `ECHLY_REQUEST_EXTENSION_TOKEN` by calling `requestExtensionTokenFromPage()`, which posts `ECHLY_EXTENSION_TOKEN_REQUEST`; the dashboard page (EchlyExtensionTokenProvider) fetches `/api/auth/extensionToken` and replies with `ECHLY_EXTENSION_TOKEN_RESPONSE` (id, token, uid).
+
+No separate `pageTokenBridge.js` or `secureBridgeChannel.ts` files exist in `echly-extension/src/`.
+
+---
+
+## SECTION 2 — Manifest
+
+### 2.1 `echly-extension/manifest.json`
+
+```json
+{
+  "manifest_version": 3,
+  "name": "Echly",
+  "version": "1.0",
+  "description": "Capture screenshots and submit feedback",
+  "permissions": ["storage", "activeTab", "tabs"],
+  "host_permissions": [
+    "<all_urls>",
+    "http://localhost:3000/*",
+    "https://echly-web.vercel.app/*",
+    "https://*.firebaseapp.com/*",
+    "https://www.gstatic.com/*",
+    "https://securetoken.googleapis.com/*",
+    "https://www.googleapis.com/*",
+    "https://apis.google.com/*"
+  ],
+  "icons": { "16": "assets/icon16.png", "32": "assets/icon32.png", "48": "assets/icon48.png", "128": "assets/icon128.png" },
+  "action": {
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png",
+      "48": "assets/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "popup.css",
+        "assets/Echly_logo.svg",
+        "assets/Echly_logo_launcher.svg",
+        "fonts/PlusJakartaSans-*.woff2"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
+```
+
+**Implications:**
+
+- **Content script domains:** `matches: ["<all_urls>"]` — content runs on all URLs.
+- **Permissions:** `storage`, `activeTab`, `tabs`.
+- **Background:** Service worker `background.js` (no popup; icon click handled by `chrome.action.onClicked`).
+
+---
+
+## SECTION 3 — Click handler
+
+### 3.1 `chrome.action.onClicked` — entire handler
+
+**Location:** `echly-extension/src/background.ts` (single listener)
+
+```ts
+chrome.action.onClicked.addListener(async (tab) => {
+  console.log("ECHLY CLICK");
+  if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_CLICK);
+  echlyLog("BACKGROUND", ECHLY_LOG_CLICK);
+
+  originTabId = tab?.id ?? null;
+
+  try {
+    const token = await getValidToken();
+    if (!token) throw new Error("NO_TOKEN");
+    console.log("ECHLY TOKEN VALID");
+    if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_TOKEN_FOUND);
+    echlyLog("BACKGROUND", ECHLY_LOG_TOKEN_FOUND);
+    if (globalUIState.visible === true) {
+      globalUIState.visible = false;
+      globalUIState.expanded = false;
+      persistUIState();
+      broadcastUIState();
+    } else {
+      openTray();
+    }
+  } catch {
+    if (globalUIState.visible) return;
+    console.log("ECHLY LOGIN REQUIRED");
+    if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_LOGIN_REQUIRED);
+    echlyLog("BACKGROUND", ECHLY_LOG_LOGIN_REQUIRED);
+    const loginUrl =
+      ECHLY_LOGIN_BASE +
+      "?extension=true" +
+      (tab?.url ? "&returnUrl=" + encodeURIComponent(tab.url) : "");
+    await openLoginOnce(loginUrl);
+  }
+});
+```
+
+### 3.2 Functions used by the click handler
+
+- **`getValidToken()`:** Returns `extensionAccessToken` or throws `NOT_AUTHENTICATED`. No storage, no `/api/auth/session` in this path.
+- **`openTray()`:** Sets `globalUIState.visible = true`, `globalUIState.expanded = true`, then `persistUIState()` and `broadcastUIState()`.
+- **`persistUIState()`:** `chrome.storage.local.set({ trayVisible: globalUIState.visible, trayExpanded: globalUIState.expanded })`.
+- **`broadcastUIState()`:** Sends `{ type: "ECHLY_GLOBAL_STATE", state: globalUIState }` to all tabs (with retry for active tab).
+- **`openLoginOnce(loginUrl)`:** Queries tabs with `url: "*://echly-web.vercel.app/login*"`; if one exists, focuses it and sets `loginTabId`; otherwise `chrome.tabs.create({ url: loginUrl })`.
+
+---
+
+## SECTION 4 — Tray control
+
+### 4.1 Variables
+
+- **`globalUIState`** (object):  
+  `visible`, `expanded`, `isRecording`, `sessionId`, `sessionTitle`, `sessionModeActive`, `sessionPaused`, `sessionLoading`, `pointers`, `captureMode`, `user`.  
+  Tray visibility is driven by `visible`; expand/collapse by `expanded`. Persisted keys: `trayVisible`, `trayExpanded` (see below).
+
+- **`trayVisible` / `trayExpanded`:** Not separate variables; they are the keys used in `chrome.storage.local` to persist `globalUIState.visible` and `globalUIState.expanded`.
+
+### 4.2 Functions
+
+- **`openTray()`:** Sets `globalUIState.visible = true`, `globalUIState.expanded = true`, then `persistUIState()`, `broadcastUIState()`.
+- **`persistUIState()`:** `chrome.storage.local.set({ trayVisible: globalUIState.visible, trayExpanded: globalUIState.expanded })`.
+- **`broadcastUIState()`:** Sends `{ type: "ECHLY_GLOBAL_STATE", state: globalUIState }` to every tab (with 50ms retry for active tab on first send failure).
+- **Click handler tray toggle:** If token valid and tray currently visible, it sets `globalUIState.visible = false`, `globalUIState.expanded = false`, then `persistUIState()` and `broadcastUIState()`; otherwise it calls `openTray()`.
+
+**Tray flash analysis:** Tray visibility can change when: (1) click with valid token toggles visible/expanded and broadcasts; (2) `initializeSessionState()` runs on startup and restores `trayVisible`/`trayExpanded` then broadcasts; (3) any handler that calls `openTray()` or clears tray (e.g. `clearAuthState()`) and then broadcasts. A brief flash can occur if content applies an old state then receives a new broadcast, or if multiple broadcasts happen in quick succession (e.g. after login: openTray → persistUIState → broadcastUIState, and tab switch/activation also sends state).
+
+---
+
+## SECTION 5 — Token system
+
+### 5.1 Variables
+
+- **`extensionAccessToken`:** In-memory only; holds the extension JWT or Firebase ID token. Set when receiving `ECHLY_EXTENSION_LOGIN_SUCCESS` (idToken) or `ECHLY_EXTENSION_TOKEN` (token from broker). Cleared by `clearAuthState()`. Not persisted.
+- **`tokenState`:** Does not exist in the current codebase. Auth is represented by `extensionAccessToken` + `globalUIState.user`.
+
+### 5.2 Implementations
+
+- **`getValidToken()`:** Returns `extensionAccessToken` if set; otherwise throws `Error("NOT_AUTHENTICATED")`. No fetch, no storage read.
+- **`checkAuthWithExtensionToken()`:** If `extensionAccessToken && globalUIState.user`, returns `{ authenticated: true, user: globalUIState.user }`; else calls `clearAuthState()` and returns `{ authenticated: false, user: null }`.
+- **`clearAuthState()`:** Sets `extensionAccessToken = null`, `globalUIState.user = null`, `globalUIState.visible = false`, `globalUIState.expanded = false`, `chrome.storage.local.remove(AUTH_STORAGE_KEYS_LEGACY)`, then `persistUIState()` and `broadcastUIState()`.
+- **`validateSessionWithBackend(token)`:** Not present. Session validity is inferred from 401/403 on API calls (e.g. `echly-api`, feedback, upload), which trigger `clearAuthState()`.
+- **`refreshIdToken()`:** Not present. Token is either from login postMessage or from broker/extension-auth page; no refresh in background.
+
+---
+
+## SECTION 6 — Login tab logic
+
+### 6.1 `openOrFocusLoginTab(loginUrl: string): Promise<number>`
+
+```ts
+function openOrFocusLoginTab(loginUrl: string): Promise<number> {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ url: "*://echly-web.vercel.app/login*" }, (tabs) => {
+      const existing = tabs.find((t) => t.id != null);
+      if (existing?.id != null) {
+        const id = existing.id;
+        chrome.tabs.update(id, { active: true }, () => {
+          loginTabId = id;
+          resolve(id);
+        });
+        return;
+      }
+      chrome.tabs.create({ url: loginUrl }, (created) => {
+        const id = created?.id ?? 0;
+        loginTabId = id || null;
+        resolve(id);
+      });
+    });
+  });
+}
+```
+
+### 6.2 `openLoginOnce(loginUrl: string): Promise<number>`
+
+```ts
+async function openLoginOnce(loginUrl: string): Promise<number> {
+  const tabs = await chrome.tabs.query({ url: "*://echly-web.vercel.app/login*" });
+  const existing = tabs.find((t) => t.id != null);
+  if (existing?.id != null) {
+    await chrome.tabs.update(existing.id, { active: true });
+    loginTabId = existing.id;
+    return existing.id;
+  }
+  const created = await chrome.tabs.create({ url: loginUrl });
+  const id = created?.id ?? 0;
+  loginTabId = id || null;
+  return id;
+}
+```
+
+### 6.3 Tab API usage in background
+
+- **`chrome.tabs.query`:**  
+  - `{ url: "*://echly-web.vercel.app/login*" }` in `openOrFocusLoginTab` and `openLoginOnce`.  
+  - `{}` in `broadcastUIState`, `endSessionFromIdle`, `ECHLY_SESSION_MODE_END`, `ECHLY_PROCESS_FEEDBACK` (to broadcast to all tabs).  
+  - `{ active: true, currentWindow: true }` inside `broadcastUIState` to get active tab for retry.
+- **`chrome.tabs.create`:**  
+  - Login: `chrome.tabs.create({ url: loginUrl })` in `openOrFocusLoginTab` / `openLoginOnce`.  
+  - Broker: `chrome.tabs.create({ url: ECHLY_EXTENSION_AUTH_ORIGIN + "/extension-auth", active: false })` in `openAuthBrokerTab`.  
+  - Dashboard: `chrome.tabs.create({ url: "https://echly-web.vercel.app/dashboard", active: false })` in `ensureDashboardTab`.  
+  - Generic: `chrome.tabs.create({ url })` in `ECHLY_OPEN_TAB` handler.
+- **`chrome.tabs.update`:**  
+  - Focus login tab: `chrome.tabs.update(id, { active: true })` in `openOrFocusLoginTab` / `openLoginOnce`.  
+  - Switch back after login: `chrome.tabs.update(originTabId, { active: true })` in `ECHLY_EXTENSION_LOGIN_SUCCESS`.
+- **`chrome.tabs.get`:** Used to check if login tab is still on `/login` before closing it after login success.
+- **`chrome.tabs.remove`:** Close login tab (if still on /login) after login success; close auth broker tab after receiving `ECHLY_EXTENSION_TOKEN`.
+
+Duplicate dashboard behavior is avoided by reusing an existing tab on `*://echly-web.vercel.app/login*` when opening login, and by reusing/finding a dashboard tab in `ensureDashboardTab` before creating a new one.
+
+---
+
+## SECTION 7 — Message bridge
+
+### 7.1 `chrome.runtime.sendMessage` (senders)
+
+- **Content → background:**  
+  `ECHLY_OPEN_POPUP`, `ECHLY_FEEDBACK_CREATED`, `ECHLY_EXTENSION_LOGIN_SUCCESS`, `ECHLY_EXTENSION_TOKEN`, `ECHLY_DASHBOARD_LOGOUT`, `ECHLY_GET_GLOBAL_STATE`, `ECHLY_SET_ACTIVE_SESSION`, `ECHLY_SESSION_MODE_START`, `ECHLY_OPEN_TAB`, `ECHLY_SESSION_MODE_END`, `ECHLY_EXPAND_WIDGET`, `ECHLY_COLLAPSE_WIDGET`, `ECHLY_SESSION_UPDATED`, `ECHLY_TICKET_UPDATED`, `ECHLY_PROCESS_FEEDBACK`, `ECHLY_SESSION_MODE_PAUSE/RESUME/ACTIVITY`, `START_RECORDING`, `STOP_RECORDING`, `echly-api`, `ECHLY_GET_TOKEN`, `ECHLY_GET_AUTH_STATE`, etc.
+- **Background → content:**  
+  `chrome.tabs.sendMessage(tabId, payload)` for `ECHLY_GLOBAL_STATE`, `ECHLY_SESSION_STATE_SYNC`, `ECHLY_RESET_WIDGET`, `ECHLY_FEEDBACK_CREATED`.
+
+### 7.2 `chrome.runtime.onMessage` — background handler (message types)
+
+Single listener in `background.ts`; handles (among others):
+
+- **ECHLY_EXTENSION_LOGIN_SUCCESS** — Store idToken in `extensionAccessToken`, set `globalUIState.user`, focus `originTabId`, close login tab if still on /login, `openTray()`, persist and broadcast.
+- **ECHLY_EXTENSION_TOKEN** — Store token and uid, close auth broker tab, `openTray()`.
+- **ECHLY_DASHBOARD_LOGOUT** — `clearAuthState()`, `extensionAccessToken = null`.
+- **ECHLY_GET_AUTH_STATE** — Async: `checkAuthWithExtensionToken()`, sendResponse `{ authenticated, user }`.
+- **ECHLY_OPEN_POPUP** — `openOrFocusLoginTab(loginUrl)` with optional returnUrl.
+- **ECHLY_SIGN_IN / ECHLY_START_LOGIN / LOGIN** — Same: `openOrFocusLoginTab(loginUrl)`, sendResponse `{ success: false, error: "Use dashboard login" }`.
+- **ECHLY_GET_GLOBAL_STATE** — sendResponse `{ state: { ...globalUIState } }`.
+- **ECHLY_GET_TOKEN** — Async: `getValidToken()`, sendResponse `{ token }` or `{ error: "NOT_AUTHENTICATED" }`.
+- **echly-api** — Proxy fetch; token from payload or `getValidToken()`; on 401/403 call `clearAuthState()`.
+- Plus: ECHLY_TOGGLE_VISIBILITY, ECHLY_EXPAND_WIDGET, ECHLY_COLLAPSE_WIDGET, ECHLY_FEEDBACK_CREATED, ECHLY_SET_CAPTURE_MODE, ECHLY_SESSION_UPDATED, ECHLY_TICKET_UPDATED, ECHLY_SET_ACTIVE_SESSION, ECHLY_OPEN_TAB, ECHLY_SESSION_MODE_*, START_RECORDING, STOP_RECORDING, CAPTURE_TAB, ECHLY_UPLOAD_SCREENSHOT, ECHLY_PROCESS_FEEDBACK.
+
+### 7.3 `window.postMessage` (page ↔ content)
+
+- **Login page → content:**  
+  `ECHLY_EXTENSION_LOGIN_SUCCESS` with `idToken`, `refreshToken`, `uid`, `name`, `email` to `window.location.origin`. Content’s `ensureBrokerAndLogoutBridge()` forwards to background.
+- **Extension-auth page → content:**  
+  `ECHLY_EXTENSION_TOKEN` with `token`, `uid` to `"*"`. Content forwards to background.
+- **Dashboard (EchlyExtensionTokenProvider):**  
+  Listens for `ECHLY_EXTENSION_TOKEN_REQUEST`; fetches `/api/auth/extensionToken` (credentials: include); replies `ECHLY_EXTENSION_TOKEN_RESPONSE` with `id`, `token`, `uid`.
+- **Content → page:**  
+  `ECHLY_EXTENSION_TOKEN_REQUEST` with `id` (from `requestExtensionTokenFromPage()`).  
+  Content listens for `ECHLY_EXTENSION_TOKEN_RESPONSE` with matching `id` and resolves with `{ token, uid }`.
+
+### 7.4 Important message types (summary)
+
+| Type | Direction | Purpose |
+|------|-----------|--------|
+| ECHLY_EXTENSION_LOGIN_SUCCESS | Page → content → background | Login page sends idToken/uid; background stores token, opens tray, closes login tab. |
+| ECHLY_EXTENSION_TOKEN | Page → content → background | Broker/dashboard sends extension JWT; background stores token, opens tray. |
+| ECHLY_PAGE_LOGIN_SUCCESS | Not used in codebase | (Legacy name; actual type is ECHLY_EXTENSION_LOGIN_SUCCESS.) |
+| ECHLY_GET_AUTH_STATE | Any → background | Background replies with `checkAuthWithExtensionToken()`. |
+| ECHLY_OPEN_POPUP | Content → background | Open/focus login tab (with returnUrl). |
+| ECHLY_SIGN_IN / ECHLY_START_LOGIN / LOGIN | Content → background | Same as ECHLY_OPEN_POPUP. |
+| ECHLY_GLOBAL_STATE | Background → content | Push tray/session state to tabs. |
+| ECHLY_REQUEST_EXTENSION_TOKEN | Background → content | Content calls requestExtensionTokenFromPage(), responds with token/uid. |
+| ECHLY_EXTENSION_TOKEN_REQUEST | Content → page | Request token; page replies with ECHLY_EXTENSION_TOKEN_RESPONSE. |
+
+---
+
+## SECTION 8 — Dashboard login page
+
+### 8.1 `app/(auth)/login/page.tsx` — token send logic
+
+**Extension flow:** When `isExtension` (search param `extension=true`), the login page sends tokens to the extension via `window.postMessage(..., window.location.origin)` so the content script (same origin) can receive and forward to background.
+
+**1) onAuthStateChanged (useEffect):**
+
+```ts
+if (user) {
+  if (isExtension) {
+    try {
+      const idToken = await user.getIdToken();
+      const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
+      window.postMessage(
+        {
+          type: "ECHLY_EXTENSION_LOGIN_SUCCESS",
+          idToken,
+          refreshToken,
+          uid: user.uid,
+          name: user.displayName ?? null,
+          email: user.email ?? null,
+        },
+        window.location.origin
+      );
+    } catch { /* ignore */ }
+    window.location.href = "/dashboard";
+    return;
+  }
+  // ... non-extension redirect
+}
+```
+
+**2) handleGoogle (Google sign-in):**
+
+```ts
+if (isExtension) {
+  const idToken = await user.getIdToken();
+  const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
+  window.postMessage(
+    {
+      type: "ECHLY_EXTENSION_LOGIN_SUCCESS",
+      idToken,
+      refreshToken,
+      uid: user.uid,
+      name: user.displayName ?? null,
+      email: user.email ?? null,
+    },
+    window.location.origin
+  );
+  window.location.href = "/dashboard";
+  return;
+}
+```
+
+**3) handleEmail (email/password sign-in):**
+
+Same pattern: if `isExtension`, post `ECHLY_EXTENSION_LOGIN_SUCCESS` with idToken, refreshToken, uid, name, email to `window.location.origin`, then `window.location.href = "/dashboard"`.
+
+So the login page does not call `/api/auth/extensionToken`; it sends the Firebase idToken (and refreshToken, uid, name, email) via postMessage. The extension stores that idToken in memory and uses it as the Bearer token until a 401/403 triggers `clearAuthState()`.
+
+---
+
+## SECTION 9 — Backend token endpoint
+
+### 9.1 `app/api/auth/extensionToken/route.ts`
+
+```ts
+import { requireAuth } from "@/lib/server/auth";
+import { SignJWT } from "jose";
+
+/**
+ * GET /api/auth/extensionToken
+ * Issues a short-lived access token for the extension.
+ * Requires dashboard session cookie (credentials: 'include' from extension).
+ * Does not accept Bearer auth — session cookie only.
+ */
+export async function GET(req: Request) {
+  const user = await requireAuth(req);
+
+  const secret = process.env.EXTENSION_TOKEN_SECRET;
+  if (!secret) {
+    console.error("EXTENSION_TOKEN_SECRET is not set");
+    return new Response(
+      JSON.stringify({ error: "Server configuration error" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  const token = await new SignJWT({
+    uid: user.uid,
+    type: "extension",
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("15m")
+    .sign(new TextEncoder().encode(secret));
+
+  return Response.json({ token, uid: user.uid });
+}
+```
+
+**Behavior:** Requires a valid session via `requireAuth(req)` (session cookie or Bearer). Uses `EXTENSION_TOKEN_SECRET` to sign a 15-minute JWT with `uid` and `type: "extension"`. Returns `{ token, uid }`. Used by the extension-auth page and by EchlyExtensionTokenProvider (dashboard) when the extension requests a token from a page that can send cookies.
+
+---
+
+## SECTION 10 — Network calls
+
+### 10.1 `/api/auth/extensionToken`
+
+- **Extension background:** Does not call this directly. Token is obtained either (1) from the login page via postMessage (Firebase idToken), or (2) from the extension-auth page or dashboard page that call this endpoint with `credentials: "include"` and then post the token to the extension.
+- **app/extension-auth/page.tsx:**  
+  `fetch("/api/auth/extensionToken", { credentials: "include" })` — on success posts `ECHLY_EXTENSION_TOKEN` with `data.token`, `data.uid`; on 401 or !res.ok redirects to login.
+- **components/EchlyExtensionTokenProvider.tsx:**  
+  `fetch("/api/auth/extensionToken", { method: "GET", credentials: "include" })` — on success posts `ECHLY_EXTENSION_TOKEN_RESPONSE` with `id`, `data.token`, `data.uid`; on failure posts with `token: null`.
+
+### 10.2 `/api/auth/session`
+
+- **Extension:** The current extension code does not call `GET /api/auth/session`. Auth is in-memory only; validity is inferred from 401/403 on API calls (echly-api, feedback, sessions, upload-screenshot, structure-feedback), which trigger `clearAuthState()`.
+- **App (login page):** Uses `POST /api/auth/sessionLogin` (not GET /api/auth/session) for non-extension login to set the session cookie.
+
+---
+
+## SECTION 11 — Runtime flow diagrams
+
+### 11.1 Extension click flow
+
+```
+User clicks extension icon
+         ↓
+chrome.action.onClicked
+         ↓
+originTabId = tab.id
+         ↓
+getValidToken()
+         ↓
+  ┌─────┴─────┐
+  │            │
+  ▼            ▼
+Token         No token
+  │            │
+  ▼            ▼
+If tray       if (globalUIState.visible) return;
+visible?      else:
+  │            ▼
+  ├─ yes →    openLoginOnce(loginUrl)
+  │   set visible=false, expanded=false
+  │   persistUIState(); broadcastUIState()
+  │            ↓
+  └─ no  →    chrome.tabs.query(login URL)
+  openTray()       ↓
+  persistUIState()   existing tab? → chrome.tabs.update(active: true)
+  broadcastUIState()   else → chrome.tabs.create(loginUrl)
+```
+
+### 11.2 Login return flow (Loom-style)
+
+```
+User on login page (extension=true)
+         ↓
+Sign in (Google or email)
+         ↓
+user.getIdToken() (+ refreshToken, uid, name, email)
+         ↓
+window.postMessage(ECHLY_EXTENSION_LOGIN_SUCCESS, origin)
+         ↓
+Content script (ensureBrokerAndLogoutBridge) receives message
+         ↓
+chrome.runtime.sendMessage(ECHLY_EXTENSION_LOGIN_SUCCESS)
+         ↓
+Background: extensionAccessToken = idToken, globalUIState.user = { uid, name, email }
+         ↓
+chrome.tabs.update(originTabId, { active: true })
+         ↓
+If loginTabId and tab still on /login → chrome.tabs.remove(loginTabId)
+         ↓
+openTray() → persistUIState() → broadcastUIState()
+         ↓
+Login page: window.location.href = "/dashboard"
+```
+
+### 11.3 Broker tab flow (extension-auth page)
+
+```
+Background opens /extension-auth (optional path; not used in click flow by default)
+         ↓
+Page: fetch("/api/auth/extensionToken", { credentials: "include" })
+         ↓
+Backend: requireAuth(req) (session cookie) → SignJWT 15m → { token, uid }
+         ↓
+Page: window.postMessage(ECHLY_EXTENSION_TOKEN, { token, uid }, "*")
+         ↓
+Content script forwards to background
+         ↓
+Background: extensionAccessToken = token, globalUIState.user = { uid }; close broker tab; openTray()
+```
+
+---
+
+## SECTION 12 — Token storage
+
+### 12.1 `chrome.storage.local` usage in extension
+
+All usages are in `echly-extension/src/background.ts`:
+
+1. **Write — tray state**  
+   `chrome.storage.local.set({ trayVisible: globalUIState.visible, trayExpanded: globalUIState.expanded })`  
+   In: `persistUIState()`.
+
+2. **Write — session lifecycle**  
+   `chrome.storage.local.set({ activeSessionId: null, sessionModeActive: false, sessionPaused: false })`  
+   In: `endSessionFromIdle()`, `ECHLY_SESSION_MODE_END` handler.
+
+3. **Write — session lifecycle**  
+   `chrome.storage.local.set({ activeSessionId, sessionModeActive: globalUIState.sessionModeActive, sessionPaused: globalUIState.sessionPaused })`  
+   In: `persistSessionLifecycleState()`.
+
+4. **Read**  
+   `chrome.storage.local.get(["activeSessionId", "sessionModeActive", "sessionPaused", "trayVisible", "trayExpanded"], callback)`  
+   In: `initializeSessionState()`.
+
+5. **Remove (legacy auth keys)**  
+   `chrome.storage.local.remove([...AUTH_STORAGE_KEYS_LEGACY])`  
+   In: `clearAuthState()`.  
+   Keys: `auth_idToken`, `auth_refreshToken`, `auth_expiresAtMs`, `auth_user`.
+
+6. **Write — active session**  
+   `chrome.storage.local.set({ activeSessionId: sessionId, sessionModeActive: true, sessionPaused: false })`  
+   In: `ECHLY_SET_ACTIVE_SESSION` handler.
+
+7. **Write — session end**  
+   `chrome.storage.local.set({ activeSessionId: null, sessionModeActive: false, sessionPaused: false })`  
+   In: `ECHLY_SESSION_MODE_END` handler.
+
+### 12.2 Keys used
+
+| Key | Purpose |
+|-----|--------|
+| trayVisible | Persisted tray visibility (globalUIState.visible). |
+| trayExpanded | Persisted tray expanded state (globalUIState.expanded). |
+| activeSessionId | Current session id; null when no session. |
+| sessionModeActive | Whether session mode is active. |
+| sessionPaused | Whether session is paused. |
+| auth_idToken | Legacy; removed by clearAuthState(). |
+| auth_refreshToken | Legacy; removed by clearAuthState(). |
+| auth_expiresAtMs | Legacy; removed by clearAuthState(). |
+| auth_user | Legacy; removed by clearAuthState(). |
+
+**Note:** The extension does not persist the current access token. `extensionAccessToken` is in-memory only and is lost on service worker restart until the user logs in again or a broker/page provides a new token.
+
+---
+
+## SECTION 13 — Debug trace (suggested)
+
+**No code was modified.** For external debugging of the tray flash and auth flow, the following logs can be added temporarily to `background.ts` (e.g. at the start of the click listener and after state changes):
+
+```ts
+// At start of chrome.action.onClicked listener (after originTabId assignment):
+console.log("ECHLY CLICK");
+console.log("ECHLY TOKEN STATE", extensionAccessToken ? "(present)" : "(null)");
+console.log("ECHLY TRAY STATE", { visible: globalUIState.visible, expanded: globalUIState.expanded });
+```
+
+**Note:** The codebase already logs `"ECHLY CLICK"` and conditionally `"ECHLY TOKEN VALID"` / `"ECHLY LOGIN REQUIRED"`. Adding the two lines above would make token presence and tray state visible in the service worker console (chrome://extensions → background page / Inspect service worker) to help reproduce the tray flash bug.
+
+---
+
+*End of diagnostic report. No production code was changed.*
