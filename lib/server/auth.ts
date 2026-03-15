@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
 import { getAdminAuth } from "@/lib/server/firebaseAdmin";
 
 export interface DecodedIdToken {
@@ -11,6 +12,25 @@ export async function verifyIdToken(token: string): Promise<DecodedIdToken> {
   return { ...decoded, uid: decoded.uid } as DecodedIdToken;
 }
 
+/** Verify short-lived extension JWT issued by GET /api/auth/extensionToken. */
+export async function verifyExtensionToken(
+  token: string
+): Promise<DecodedIdToken> {
+  const secret = process.env.EXTENSION_TOKEN_SECRET;
+  if (!secret) {
+    throw new Error("EXTENSION_TOKEN_SECRET is not set");
+  }
+  const { payload } = await jwtVerify(
+    token,
+    new TextEncoder().encode(secret)
+  );
+  const uid = payload.uid;
+  if (typeof uid !== "string") {
+    throw new Error("Invalid extension token payload");
+  }
+  return { uid, ...payload } as DecodedIdToken;
+}
+
 export async function requireAuth(request: Request): Promise<DecodedIdToken> {
   const authHeader = request.headers.get("Authorization");
 
@@ -18,12 +38,16 @@ export async function requireAuth(request: Request): Promise<DecodedIdToken> {
     const token = authHeader.split("Bearer ")[1];
     try {
       return await verifyIdToken(token);
-    } catch (error) {
-      console.error("Token verification failed:", error);
-      throw new Response(
-        JSON.stringify({ error: "Unauthorized - Invalid token" }),
-        { status: 401 }
-      );
+    } catch {
+      try {
+        return await verifyExtensionToken(token);
+      } catch (error) {
+        console.error("Token verification failed:", error);
+        throw new Response(
+          JSON.stringify({ error: "Unauthorized - Invalid token" }),
+          { status: 401 }
+        );
+      }
     }
   }
 

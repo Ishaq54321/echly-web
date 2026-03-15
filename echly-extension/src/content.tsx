@@ -6,7 +6,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { apiFetch } from "./contentAuthFetch";
-import { requestTokenFromPage } from "./requestTokenFromPage";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/components/CaptureWidget";
@@ -1567,9 +1566,9 @@ function ensureMessageListener(host: HTMLDivElement): void {
   win.__ECHLY_MESSAGE_LISTENER__ = true;
   chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; description: string; type?: string }; sessionId?: string }, _sender, sendResponse) => {
     if (msg.type === "ECHLY_GET_TOKEN_FROM_PAGE") {
-      requestTokenFromPage()
-        .then((token) => sendResponse({ token }))
-        .catch(() => sendResponse({ token: null }));
+      chrome.runtime.sendMessage({ type: "ECHLY_GET_TOKEN" }, (response: { token?: string; error?: string }) => {
+        sendResponse(response?.token != null ? { token: response.token } : { token: null });
+      });
       return true;
     }
     if (msg.type === "ECHLY_FEEDBACK_CREATED" && msg.ticket && msg.sessionId) {
@@ -1631,45 +1630,7 @@ function ensureScrollDebugListeners(): void {
  * Single mount: create host once, mount React once, default hidden.
  * Visibility via ECHLY_VISIBILITY from background. No re-mount, no injection logic.
  */
-/** Dashboard origins where the token bridge is allowed to run. */
-const DASHBOARD_ORIGINS = ["https://echly-web.vercel.app", "http://localhost:3000"];
-
-/** Inject page-context token bridge only on dashboard. Extension content script runs on all URLs; bridge runs only on dashboard. */
-function injectPageTokenBridge(): void {
-  const origin = window.location.origin;
-  if (!DASHBOARD_ORIGINS.includes(origin)) return;
-  const script = document.createElement("script");
-  script.src = chrome.runtime.getURL("pageTokenBridge.js");
-  script.onload = () => script.remove();
-  document.documentElement.appendChild(script);
-}
-
-/** Forward login completion signal from page (postMessage) to background so auth refreshes after redirect. */
-function ensureLoginCompleteForwarder(): void {
-  const win = window as Window & { __ECHLY_LOGIN_FORWARDER__?: boolean };
-  if (win.__ECHLY_LOGIN_FORWARDER__) return;
-  win.__ECHLY_LOGIN_FORWARDER__ = true;
-  window.addEventListener("message", (event: MessageEvent) => {
-    if (!event.data) return;
-    if (event.data.type === "ECHLY_PAGE_LOGIN_SUCCESS") {
-      if (!DASHBOARD_ORIGINS.includes(event.origin)) return;
-      chrome.runtime.sendMessage({
-        type: "ECHLY_EXTENSION_AUTH_SUCCESS",
-        idToken: event.data.idToken,
-        refreshToken: event.data.refreshToken,
-      }).catch(() => {});
-      return;
-    }
-    if (event.data?.type === "ECHLY_EXTENSION_LOGIN_COMPLETE") {
-      if (!DASHBOARD_ORIGINS.includes(event.origin)) return;
-      chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_COMPLETE" }).catch(() => {});
-    }
-  });
-}
-
 function main(): void {
-  injectPageTokenBridge();
-  ensureLoginCompleteForwarder();
   let host = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
   if (!host) {
     host = document.createElement("div");

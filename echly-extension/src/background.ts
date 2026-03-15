@@ -1,6 +1,6 @@
 /**
- * Extension background (service worker). Auth uses tokens stored in extension
- * storage (from login page). No dependency on dashboard tab for tokens.
+ * Extension background (service worker). Auth uses short-lived extension tokens
+ * from GET /api/auth/extensionToken (dashboard session cookie). No token storage.
  */
 import { ECHLY_DEBUG, warn } from "../../lib/utils/logger";
 import { echlyLog } from "../../lib/debug/echlyLogger";
@@ -12,10 +12,9 @@ const API_BASE =
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 const ECHLY_LOGIN_BASE = "https://echly-web.vercel.app/login";
-const SESSION_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes — use cache if validated within this window
-const TOKEN_MAX_AGE_MS = 50 * 60 * 1000; // 50 minutes — refresh ID token before expiry
-const FIREBASE_REFRESH_URL = "https://securetoken.googleapis.com/v1/token";
-const FIREBASE_API_KEY = "AIzaSyBgQxRYAksD35D6m1OEPjSnfiOLxUABqnM";
+
+/** In-memory extension access token (short-lived, from GET /api/auth/extensionToken). Not persisted. */
+let extensionAccessToken: string | null = null;
 
 /** Tab ID of the tab where the user clicked the extension icon (for post-login switch-back). */
 let originTabId: number | null = null;
@@ -23,8 +22,8 @@ let originTabId: number | null = null;
 /** Tab ID of the login tab we opened or reused (closed after successful auth if still on /login). */
 let loginTabId: number | null = null;
 
-/** Guard to prevent concurrent auth checks (Loom-style single authority). */
-let authCheckInProgress = false;
+/** Guard to prevent concurrent token fetch on double-click. */
+let tokenFetchInProgress = false;
 
 /**
  * Open login tab: reuse only an existing tab whose URL contains "/login".
@@ -56,12 +55,6 @@ function openOrFocusLoginTab(loginUrl: string): Promise<number> {
     });
   });
 }
-
-/** In-memory session cache for instant tray open. Not persisted; TTL 30s. */
-let sessionCache: { authenticated: boolean; checkedAt: number } = {
-  authenticated: false,
-  checkedAt: 0,
-};
 
 let activeSessionId: string | null = null;
 
@@ -228,9 +221,6 @@ async function initializeSessionState(): Promise<void> {
   broadcastUIState();
 })();
 
-/** Extension-stored auth tokens (set on login success, cleared on logout/401). */
-const ECHLY_TOKEN_KEYS = ["echlyIdToken", "echlyRefreshToken", "echlyTokenTime"] as const;
-
 /**
  * Legacy auth keys — cleanup only. clearAuthState() removes them if present from older installs.
  */
@@ -241,154 +231,76 @@ const AUTH_STORAGE_KEYS_LEGACY = [
   "auth_user",
 ] as const;
 
-/** Clear in-memory session cache (e.g. on 401). */
-function clearSessionCache(): void {
-  sessionCache = { authenticated: false, checkedAt: 0 };
-  globalUIState.user = null;
-}
-
-/** Clear auth state: tokens, legacy keys, session cache; close tray and broadcast. */
+/** Clear auth state: in-memory token, legacy storage keys; close tray and broadcast. */
 function clearAuthState(): void {
-  clearSessionCache();
+  extensionAccessToken = null;
+  globalUIState.user = null;
   globalUIState.visible = false;
   globalUIState.expanded = false;
-  chrome.storage.local.remove([...ECHLY_TOKEN_KEYS, ...AUTH_STORAGE_KEYS_LEGACY]);
+  chrome.storage.local.remove([...AUTH_STORAGE_KEYS_LEGACY]);
   persistUIState();
   broadcastUIState();
 }
 
-/** Get stored tokens from extension storage. Returns null if any key is missing. */
-function getStoredTokens(): Promise<{ idToken: string; refreshToken: string; tokenTime: number } | null> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(
-      ["echlyIdToken", "echlyRefreshToken", "echlyTokenTime"],
-      (result: { echlyIdToken?: string; echlyRefreshToken?: string; echlyTokenTime?: number }) => {
-        const idToken = result.echlyIdToken;
-        const refreshToken = result.echlyRefreshToken;
-        const tokenTime = result.echlyTokenTime;
-        if (
-          typeof idToken === "string" &&
-          idToken.length > 0 &&
-          typeof refreshToken === "string" &&
-          refreshToken.length > 0 &&
-          typeof tokenTime === "number"
-        ) {
-          resolve({ idToken, refreshToken, tokenTime });
-          return;
-        }
-        resolve(null);
-      }
-    );
-  });
-}
+const EXTENSION_TOKEN_URL = `${API_BASE}/api/auth/extensionToken`;
 
 /**
- * Refresh ID token using Firebase securetoken endpoint. Updates storage with new tokens.
- * Throws on network error or invalid response; on failure caller should clear tokens.
+ * Fetch short-lived extension token from backend using dashboard session cookie.
+ * Uses credentials: 'include' so the browser sends the __session cookie for the API origin.
+ * On 401, opens login page and throws NOT_AUTHENTICATED.
  */
-async function refreshIdToken(): Promise<string> {
-  const stored = await getStoredTokens();
-  if (!stored?.refreshToken) throw new Error("NOT_AUTHENTICATED");
-
-  const url = `${FIREBASE_REFRESH_URL}?key=${encodeURIComponent(FIREBASE_API_KEY)}`;
-  const body = `grant_type=refresh_token&refresh_token=${encodeURIComponent(stored.refreshToken)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
+async function fetchExtensionToken(): Promise<{ token: string; uid: string }> {
+  const res = await fetch(EXTENSION_TOKEN_URL, {
+    method: "GET",
+    credentials: "include",
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    if (ECHLY_DEBUG) console.debug("[EXTENSION] refresh failed", res.status, text);
+  if (res.status === 401 || res.status === 403) {
+    openOrFocusLoginTab(`${ECHLY_LOGIN_BASE}?extension=true`);
     throw new Error("NOT_AUTHENTICATED");
   }
-
-  const data = (await res.json()) as {
-    id_token?: string;
-    refresh_token?: string;
-    expires_in?: number;
-  };
-  const newIdToken = data.id_token;
-  const newRefreshToken = data.refresh_token ?? stored.refreshToken;
-  if (!newIdToken) throw new Error("NOT_AUTHENTICATED");
-
-  await new Promise<void>((resolve) => {
-    chrome.storage.local.set(
-      {
-        echlyIdToken: newIdToken,
-        echlyRefreshToken: newRefreshToken,
-        echlyTokenTime: Date.now(),
-      },
-      () => resolve()
-    );
-  });
-  return newIdToken;
+  if (!res.ok) {
+    throw new Error("NOT_AUTHENTICATED");
+  }
+  const data = (await res.json()) as { token?: string; uid?: string };
+  const token = data.token;
+  const uid = data.uid;
+  if (typeof token !== "string" || !token || typeof uid !== "string" || !uid) {
+    throw new Error("NOT_AUTHENTICATED");
+  }
+  return { token, uid };
 }
 
 /**
- * Get a valid ID token: from storage, refresh if older than 50 minutes.
- * Throws NOT_AUTHENTICATED if no tokens or refresh fails.
+ * Get a valid extension access token: from memory or by fetching from backend (session cookie).
+ * Throws NOT_AUTHENTICATED if not logged in (401 from extensionToken).
  */
 async function getValidToken(): Promise<string> {
-  const stored = await getStoredTokens();
-  if (!stored) throw new Error("NOT_AUTHENTICATED");
-
-  const age = Date.now() - stored.tokenTime;
-  if (age > TOKEN_MAX_AGE_MS) {
-    return refreshIdToken();
+  if (extensionAccessToken) {
+    return extensionAccessToken;
   }
-  return stored.idToken;
+  const { token, uid } = await fetchExtensionToken();
+  extensionAccessToken = token;
+  globalUIState.user = { uid, name: null, email: null, photoURL: null };
+  return token;
 }
 
 /**
- * Backend session check: single source of truth. Uses GET /api/auth/session with Bearer token.
- * If 401/403 or no token/refresh failure, clears stored tokens and returns { authenticated: false }.
+ * Auth check using GET /api/auth/extensionToken (credentials: include).
+ * Returns { authenticated, user } or clears state and returns not authenticated on 401.
  */
-async function checkBackendSession(): Promise<{
+async function checkAuthWithExtensionToken(): Promise<{
   authenticated: boolean;
-  user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null };
+  user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null } | null;
 }> {
-  let token: string;
   try {
-    token = await getValidToken();
+    const { token, uid } = await fetchExtensionToken();
+    extensionAccessToken = token;
+    const user = { uid, name: null as string | null, email: null as string | null, photoURL: null as string | null };
+    globalUIState.user = user;
+    return { authenticated: true, user };
   } catch {
-    return { authenticated: false };
-  }
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/session`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.status === 401 || res.status === 403) {
-      clearAuthState();
-      return { authenticated: false };
-    }
-    if (!res.ok) {
-      return { authenticated: false };
-    }
-    return (await res.json()) as {
-      authenticated: boolean;
-      user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null };
-    };
-  } catch {
-    console.warn("[ECHLY AUTH] transient error, not clearing auth");
-    return { authenticated: false };
-  }
-}
-
-/**
- * Verify the session with the Echly backend. Returns false if backend returns 401 or 403.
- * @deprecated Prefer checkBackendSession() for single source of truth.
- */
-async function validateSessionWithBackend(token: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/session`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.status === 401 || res.status === 403) return false;
-    return true;
-  } catch {
-    return false;
+    clearAuthState();
+    return { authenticated: false, user: null };
   }
 }
 
@@ -418,62 +330,6 @@ function broadcastUIState(): void {
   });
 }
 
-/**
- * After tokens are in storage: validate with /api/auth/session, then if authenticated
- * set tray visible/expanded, broadcast, and switch back to origin tab.
- */
-async function validateSessionAndOpenTray(): Promise<{ success: boolean }> {
-  let token: string;
-  try {
-    token = await getValidToken();
-  } catch {
-    return { success: false };
-  }
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/session`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.status === 401 || res.status === 403) {
-      clearAuthState();
-      return { success: false };
-    }
-    if (!res.ok) return { success: false };
-    const data = (await res.json()) as {
-      authenticated?: boolean;
-      user?: { uid: string; name?: string | null; email?: string | null; photoURL?: string | null };
-    };
-    if (data.authenticated !== true) return { success: false };
-
-    sessionCache = { authenticated: true, checkedAt: Date.now() };
-    globalUIState.user = data.user ?? null;
-    globalUIState.visible = true;
-    globalUIState.expanded = true;
-    persistUIState();
-    broadcastUIState();
-
-    if (originTabId != null) {
-      try {
-        await chrome.tabs.update(originTabId, { active: true });
-      } catch {
-        if (ECHLY_DEBUG) console.debug("[EXTENSION] could not switch to origin tab", originTabId);
-      }
-    }
-    if (loginTabId != null) {
-      try {
-        const t = await chrome.tabs.get(loginTabId);
-        if (t?.url?.includes("/login")) chrome.tabs.remove(loginTabId);
-      } catch {
-        /* tab may already be closed or invalid */
-      }
-      loginTabId = null;
-    }
-    return { success: true };
-  } catch {
-    console.warn("[ECHLY AUTH] transient error, not clearing auth");
-    return { success: false };
-  }
-}
-
 /** When user switches tabs, push current session state to that tab so every tab receives state when focused. */
 chrome.tabs.onActivated.addListener((activeInfo) => {
   const tabId = activeInfo.tabId;
@@ -499,113 +355,29 @@ chrome.tabs.onCreated.addListener((tab) => {
     });
 });
 
-/** Pre-warm session cache on startup: validate stored token so first icon click can open tray instantly. */
-async function prewarmSessionFromStorage(): Promise<void> {
-  try {
-    const token = await getValidToken();
-    if (!token) return;
-    const res = await fetch(`${API_BASE}/api/auth/session`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const data = (await res.json()) as { authenticated?: boolean };
-      sessionCache = {
-        authenticated: data.authenticated === true,
-        checkedAt: Date.now(),
-      };
-    } else {
-      sessionCache = { authenticated: false, checkedAt: Date.now() };
-    }
-  } catch {
-    sessionCache = { authenticated: false, checkedAt: Date.now() };
-  }
-}
-
-chrome.runtime.onStartup.addListener(() => {
-  prewarmSessionFromStorage();
-});
-
-chrome.runtime.onInstalled.addListener(() => {
-  prewarmSessionFromStorage();
-});
-
-/** Extension icon click: store origin tab; use session cache (30s) for instant tray, else validate then open tray or login. Never opens or focuses dashboard. */
+/** Extension icon click: open tray immediately, then API call with extension token; if 401, open login. */
 chrome.action.onClicked.addListener((tab) => {
-  console.log("[ECHLY CLICK] icon clicked");
-  console.log("[ECHLY CLICK] session cache", sessionCache);
-  if (authCheckInProgress) return;
+  if (tokenFetchInProgress) return;
   originTabId = tab?.id ?? null;
 
-  if (sessionCache.authenticated === true && Date.now() - sessionCache.checkedAt < SESSION_CACHE_TTL_MS) {
-    // Open tray instantly
-    if (globalUIState.visible === true) {
-      globalUIState.visible = false;
-      globalUIState.expanded = false;
-    } else {
-      globalUIState.visible = true;
-      globalUIState.expanded = true;
-    }
-
-    persistUIState();
-    broadcastUIState();
-
-    // Background session validation (Loom style)
-    checkBackendSession()
-      .then((session) => {
-        sessionCache = { authenticated: session.authenticated, checkedAt: Date.now() };
-
-        if (!session.authenticated) {
-          clearAuthState();
-
-          // Close tray
-          globalUIState.visible = false;
-          globalUIState.expanded = false;
-
-          persistUIState();
-          broadcastUIState();
-
-          // Open login page
-          const loginUrl = ECHLY_LOGIN_BASE + "?extension=true";
-          openOrFocusLoginTab(loginUrl);
-        }
-      })
-      .catch(() => {
-        console.warn("[ECHLY AUTH] background validation failed");
-      });
-
-    return;
+  // Open tray immediately (toggle if already visible)
+  if (globalUIState.visible === true) {
+    globalUIState.visible = false;
+    globalUIState.expanded = false;
+  } else {
+    globalUIState.visible = true;
+    globalUIState.expanded = true;
   }
+  persistUIState();
+  broadcastUIState();
 
-  authCheckInProgress = true;
+  tokenFetchInProgress = true;
   (async () => {
     try {
-      const session = await checkBackendSession();
-      sessionCache = { authenticated: session.authenticated, checkedAt: Date.now() };
-      console.log("[ECHLY AUTH] session authenticated:", session.authenticated);
-
-      if (session.authenticated === true) {
-        globalUIState.user = session.user ?? null;
-        if (globalUIState.visible === true) {
-          globalUIState.visible = false;
-          globalUIState.expanded = false;
-        } else {
-          globalUIState.visible = true;
-          globalUIState.expanded = true;
-        }
-        persistUIState();
-        broadcastUIState();
-      } else {
-        globalUIState.user = null;
-        console.log("[ECHLY AUTH] opening login tab");
-        const returnUrl = typeof tab?.url === "string" ? tab.url : "";
-        const loginUrl =
-          ECHLY_LOGIN_BASE +
-          "?extension=true" +
-          (returnUrl ? "&returnUrl=" + encodeURIComponent(returnUrl) : "");
-        await openOrFocusLoginTab(loginUrl);
-      }
+      await getValidToken();
+      broadcastUIState();
     } catch {
-      console.log("[ECHLY AUTH] opening login tab");
+      clearAuthState();
       const returnUrl = typeof tab?.url === "string" ? tab.url : "";
       const loginUrl =
         ECHLY_LOGIN_BASE +
@@ -613,44 +385,13 @@ chrome.action.onClicked.addListener((tab) => {
         (returnUrl ? "&returnUrl=" + encodeURIComponent(returnUrl) : "");
       await openOrFocusLoginTab(loginUrl);
     } finally {
-      authCheckInProgress = false;
+      tokenFetchInProgress = false;
     }
   })();
 });
 
-/** Single message listener: auth success from login page + all other extension messages. */
+/** Single message listener for extension messages. */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  /* Login page sends tokens via content script (postMessage bridge). Store them, validate session, open tray, switch to origin tab. */
-  if (request?.type === "ECHLY_EXTENSION_AUTH_SUCCESS") {
-    const idToken = (request as { idToken?: string }).idToken;
-    const refreshToken = (request as { refreshToken?: string }).refreshToken;
-    if (typeof idToken !== "string" || idToken.length === 0 || typeof refreshToken !== "string" || refreshToken.length === 0) {
-      sendResponse?.({ success: false, error: "Missing tokens" });
-      return true;
-    }
-    (async () => {
-      try {
-        await new Promise<void>((resolve) => {
-          chrome.storage.local.set(
-            {
-              echlyIdToken: idToken,
-              echlyRefreshToken: refreshToken,
-              echlyTokenTime: Date.now(),
-            },
-            () => resolve()
-          );
-        });
-        const result = await validateSessionAndOpenTray();
-        sendResponse?.(result.success ? { success: true } : { success: false });
-      } catch (e) {
-        if (ECHLY_DEBUG) console.debug("[EXTENSION] auth success handler error", e);
-        console.warn("[ECHLY AUTH] transient error, not clearing auth");
-        sendResponse?.({ success: false });
-      }
-    })();
-    return true;
-  }
-
   echlyLog("MESSAGE", "received", request.type);
   if (request.type === "ECHLY_TOGGLE_VISIBILITY") {
     globalUIState.visible = true;
@@ -887,7 +628,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_GET_AUTH_STATE") {
     (async () => {
-      const session = await checkBackendSession();
+      const session = await checkAuthWithExtensionToken();
       sendResponse({
         authenticated: session.authenticated,
         user: session.authenticated && session.user ? session.user : null,

@@ -49,13 +49,6 @@
         "fonts/PlusJakartaSans-Bold.woff2"
       ],
       "matches": ["<all_urls>"]
-    },
-    {
-      "resources": ["pageTokenBridge.js"],
-      "matches": [
-        "https://echly-web.vercel.app/*",
-        "http://localhost:3000/*"
-      ]
     }
   ]
 }

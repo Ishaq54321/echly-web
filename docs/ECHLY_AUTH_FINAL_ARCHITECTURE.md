@@ -1,131 +1,96 @@
-# Echly Authentication — Final Production Architecture
+# Echly Authentication — Final Architecture
 
-This document describes the production-grade authentication stabilization system: Firebase Admin verification, refresh token revocation, and extension–dashboard logout synchronization.
-
----
-
-## 1. Firebase Admin verification
-
-**Before:** The backend verified Firebase ID tokens using the `jose` library and a remote JWKS (public keys only). Tokens were checked for signature and claims but **not** for revocation. A user who logged out on the dashboard could still use the same ID token from the extension until it expired (e.g. ~1 hour).
-
-**After:** The backend uses the **Firebase Admin SDK** (`firebase-admin`) with a **service account** to verify tokens:
-
-- **File:** `lib/server/firebaseAdmin.ts`  
-  - Initializes the Admin app once with `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` from environment.
-  - Exports `adminAuth` from `firebase-admin/auth`.
-
-- **File:** `lib/server/auth.ts`  
-  - `verifyIdToken(token)` calls `adminAuth.verifyIdToken(token, true)`.
-  - The second argument `true` enables **revoked token detection**: if refresh tokens for that user have been revoked, verification fails and the backend returns 401.
-
-**Security improvements:**
-
-- Server-side verification with the project’s private credential (not just public JWKS).
-- Revocation is enforced: after logout, no existing or refreshed ID token for that user is accepted.
-- Single source of truth for “is this token still valid?” on the server.
+This document describes the production authentication system after cleanup of legacy Firebase token storage and session checks. Behavior is unchanged; obsolete code has been removed.
 
 ---
 
-## 2. Refresh token revocation
+## 1. Overview
 
-**Mechanism:** When the user logs out on the dashboard, the client calls the new **logout API** before signing out of Firebase in the client.
-
-- **Endpoint:** `POST /api/auth/logout`
-- **File:** `app/api/auth/logout/route.ts`
-- **Behavior:**
-  1. Uses `requireAuth(req)` to validate the current ID token (and thus get the user’s `uid`).
-  2. Calls `adminAuth.revokeRefreshTokens(user.uid)`.
-  3. Returns 200 on success; 401 if the request is unauthenticated.
-
-**Effect of `revokeRefreshTokens(uid)`:**
-
-- Firebase invalidates **all refresh tokens** for that user.
-- Any existing ID token for that user is considered revoked once revocation is checked (`verifyIdToken(..., true)`).
-- New ID tokens cannot be obtained because refresh no longer works.
-- The extension’s stored refresh token becomes useless; the next backend call with any ID token (existing or refreshed) will get 401 after verification.
+| Client | Auth mechanism | Backend verification |
+|--------|----------------|----------------------|
+| **Dashboard** | Session cookie (`__session`) | `requireAuth(req)` — cookie or Bearer |
+| **Extension** | Short-lived extension token | `requireAuth(req)` — Bearer (extension or Firebase ID token) |
+| **Backend** | Hybrid: cookie first, then Bearer (Firebase or extension JWT) | `lib/server/auth.ts` |
+| **Public API** | API key (where applicable) | Per-route |
 
 ---
 
-## 3. Dashboard logout flow
+## 2. Dashboard → Cookie Auth
 
-**File:** `components/layout/ProfileCommandPanel.tsx`
-
-**Updated `handleSignOut`:**
-
-1. If there is a current Firebase user, get an ID token with `user.getIdToken()`.
-2. Call `POST /api/auth/logout` with `Authorization: Bearer <token>` (so the server can identify the user and revoke refresh tokens).
-3. Ignore logout API errors in the UI (log to console) so the user can always sign out locally.
-4. Call `signOut(auth)` to clear the Firebase client state and close the panel.
-
-Result: **revoke first, then client sign-out**. The server revokes refresh tokens for that user so the extension cannot obtain or use valid tokens after dashboard logout.
+- User signs in on the dashboard (e.g. Firebase Auth).
+- Backend sets a **session cookie** (`__session`) via Firebase Admin `createSessionCookie()` (or equivalent).
+- All dashboard requests use **credentials: 'include'** so the cookie is sent.
+- **`requireAuth(request)`** in `lib/server/auth.ts` reads the cookie via `cookies().get('__session')` and verifies it with `getAdminAuth().verifySessionCookie()`.
+- No Bearer token is required for the dashboard when the cookie is present.
 
 ---
 
-## 4. Extension logout synchronization
+## 3. Extension → Extension Token
 
-**No change to extension architecture.** The extension already treats 401/403 from the backend as “not authenticated” and clears local auth state.
+- The extension **does not store** Firebase ID or refresh tokens. No `echlyIdToken`, `echlyRefreshToken`, or `echlyTokenTime`.
+- When the extension needs to call the API, it obtains a **short-lived extension token** from the backend:
+  - **GET /api/auth/extensionToken** with **credentials: 'include'** (so the browser sends the dashboard session cookie for the API origin).
+  - The backend requires a valid session (cookie) and issues a signed JWT with `uid` and `type: "extension"` (e.g. 15-minute expiry).
+  - Response: `{ token, uid }`.
+- The extension keeps the token **in memory only** (`extensionAccessToken`). No persistence.
+- All extension API calls use **Authorization: Bearer &lt;extension token&gt;**.
+- **If GET /api/auth/extensionToken returns 401**, the extension clears auth state and opens the login page.
 
-**Relevant logic in `echly-extension/src/background.ts`:**
+**Extension click flow (simplified):**
 
-- **`checkBackendSession()`**  
-  Calls `GET /api/auth/session` with the stored token. If the response is **401 or 403**, it calls `clearAuthState()` and returns `{ authenticated: false }`.
+1. User clicks extension icon.
+2. Tray opens **immediately** (no background auth validation).
+3. Extension calls GET /api/auth/extensionToken (or uses cached in-memory token for other API calls).
+4. If 401 → clear auth, open login page.
 
-- **`clearAuthState()`**  
-  Clears session cache, removes stored tokens (e.g. `echlyIdToken`, `echlyRefreshToken`, `echlyTokenTime`), closes the tray, and broadcasts state so the UI shows unauthenticated.
-
-**Flow after dashboard logout:**
-
-1. User logs out on the dashboard → logout API revokes refresh tokens.
-2. Extension still has old tokens in storage and may have a short-lived session cache.
-3. On next use (e.g. icon click), the extension calls `checkBackendSession()` → `GET /api/auth/session` with the stored token.
-4. Backend runs `verifyIdToken(token, true)` → revocation check fails → 401.
-5. Extension receives 401 → `clearAuthState()` → tray closes, login page opens.
-6. Extension no longer accesses APIs until the user logs in again (e.g. via login page).
-
-So **extension logout is driven by the backend response**, not by a separate channel. No new extension architecture is required; only the backend had to become revocation-aware.
+No pre-warm or session cache; no `/api/auth/session` usage.
 
 ---
 
-## 5. Security improvements summary
+## 4. Backend → Hybrid Verification
 
-| Area | Before | After |
-|------|--------|--------|
-| Token verification | JWKS only (signature + claims) | Firebase Admin with revocation check |
-| Logout scope | Client-only (dashboard) | Server revokes all refresh tokens for user |
-| Extension after dashboard logout | Could still use tokens until expiry | Next API call gets 401 → extension clears auth |
-| Credential handling | Public keys only | Service account server-side (env vars) |
+**File:** `lib/server/auth.ts`
 
----
+- **`requireAuth(request)`** (used by protected API routes):
+  1. If **Authorization: Bearer &lt;token&gt;** is present:
+     - Tries **Firebase ID token** via `verifyIdToken(token)` (Firebase Admin, revocation check).
+     - If that fails, tries **extension JWT** via `verifyExtensionToken(token)` (signed with `EXTENSION_TOKEN_SECRET`).
+  2. If no Bearer token, reads **session cookie** `__session` and verifies with `verifySessionCookie()`.
+  3. If none valid → 401.
 
-## 6. Environment variables (Firebase Admin)
-
-Add to `.env.local` (and configure in your deployment environment):
-
-```env
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_CLIENT_EMAIL=your-service-account-client-email
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-```
-
-**How to obtain:**
-
-1. Firebase Console → Project Settings → Service Accounts.
-2. Generate new private key (JSON).
-3. From the JSON: use `project_id`, `client_email`, and `private_key`.  
-   For `FIREBASE_PRIVATE_KEY`, keep the key as a single string with `\n` for newlines (as in the JSON); `lib/server/firebaseAdmin.ts` replaces `\\n` with real newlines for the SDK.
+- **`verifyIdToken(token)`** — Firebase Admin; remains for integrations and admin tools.
+- **`requireAuth(req)`** — used by dashboard (cookie) and extension (Bearer extension token) and any Firebase Bearer callers.
 
 ---
 
-## 7. Full logout flow (test checklist)
+## 5. Public API → API Key
 
-Expected sequence:
+Where the product exposes a public or partner API, authentication is via **API key** (or other scheme) as defined per route. Not covered in this doc; no change in this cleanup.
 
-1. Log in on the dashboard.
-2. Open the extension (tray opens, authenticated).
-3. Log out on the dashboard (Profile → Sign out).
-4. Click the extension again.
-5. Backend validates token with revocation → returns 401.
-6. Extension runs `clearAuthState()` and opens the login page.
-7. Extension no longer accesses APIs until the user logs in again.
+---
 
-This gives **instant logout semantics** across dashboard and extension while keeping the existing extension design and a single source of truth (backend + Firebase Admin) for token validity and revocation.
+## 6. What Was Removed (No Behavior Change)
+
+- **Extension:** References to `echlyIdToken`, `echlyRefreshToken`, `echlyTokenTime`; functions `getStoredTokens()`, `refreshIdToken()`; constants `TOKEN_MAX_AGE_MS`, `FIREBASE_REFRESH_URL`, `FIREBASE_API_KEY` (already absent).
+- **Extension:** All use of **GET /api/auth/session** and **checkBackendSession()** / **validateSessionWithBackend()**. Replaced with **GET /api/auth/extensionToken**; 401 → redirect to login.
+- **Extension:** Login bridge events **ECHLY_PAGE_LOGIN_SUCCESS**, **ECHLY_EXTENSION_AUTH_SUCCESS** and their handlers; token bridge files (pageTokenBridge, requestTokenFromPage, secureBridgeChannel — already removed).
+- **Extension:** Background auth validation and session cache; click flow is now: open tray → API call with extension token → if 401 open login.
+
+---
+
+## 7. What Remains (Unchanged)
+
+- **`verifyIdToken()`** and **`requireAuth()`** in `lib/server/auth.ts` — still used for dashboard cookie, extension token, and Firebase Bearer.
+- **GET /api/auth/session** — still exists for any non-extension caller that wants session info with a Bearer token; extension no longer calls it.
+- **POST /api/auth/logout** and refresh token revocation — unchanged; extension learns about logout via 401 when using an invalid or revoked token.
+
+---
+
+## 8. Summary
+
+- **Dashboard:** Cookie-based auth; `requireAuth` uses session cookie.
+- **Extension:** Short-lived extension token from GET /api/auth/extensionToken (cookie-backed); in-memory only; 401 → login.
+- **Backend:** Hybrid verification (cookie, Firebase ID token, extension JWT) in `requireAuth()`.
+- **Public API:** API key or per-route scheme.
+
+Legacy token storage and session-check paths have been removed from the extension; the final architecture is as above.

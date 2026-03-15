@@ -72,9 +72,4 @@ await esbuild.build({
   absWorkingDir: root,
 });
 
-// Copy page-context token bridge (plain JS, not bundled) so content script can inject it
-const bridgeSrc = path.join(extDir, "src", "pageTokenBridge.js");
-const bridgeDest = path.join(extDir, "pageTokenBridge.js");
-if (fs.existsSync(bridgeSrc)) {
-  fs.copyFileSync(bridgeSrc, bridgeDest);
-}
+// Extension token bridge removed; auth uses short-lived token from GET /api/auth/extensionToken
