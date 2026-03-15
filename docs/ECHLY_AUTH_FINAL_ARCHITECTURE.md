@@ -1,96 +1,144 @@
-# Echly Authentication — Final Architecture
+# Echly Authentication — Final Stabilized Architecture (Loom-Style)
 
-This document describes the production authentication system after cleanup of legacy Firebase token storage and session checks. Behavior is unchanged; obsolete code has been removed.
-
----
-
-## 1. Overview
-
-| Client | Auth mechanism | Backend verification |
-|--------|----------------|----------------------|
-| **Dashboard** | Session cookie (`__session`) | `requireAuth(req)` — cookie or Bearer |
-| **Extension** | Short-lived extension token | `requireAuth(req)` — Bearer (extension or Firebase ID token) |
-| **Backend** | Hybrid: cookie first, then Bearer (Firebase or extension JWT) | `lib/server/auth.ts` |
-| **Public API** | API key (where applicable) | Per-route |
+This document describes the **stabilized** extension authentication flow implemented to fix the broken behavior (repeated dashboard/login tabs, tray never opening). The flow is **Loom-style**: click extension → if not authenticated, open login page → after login, token is handed off to the extension → return to original tab, close login tab, open tray.
 
 ---
 
-## 2. Dashboard → Cookie Auth
+## 1. New Flow Diagram
 
-- User signs in on the dashboard (e.g. Firebase Auth).
-- Backend sets a **session cookie** (`__session`) via Firebase Admin `createSessionCookie()` (or equivalent).
-- All dashboard requests use **credentials: 'include'** so the cookie is sent.
-- **`requireAuth(request)`** in `lib/server/auth.ts` reads the cookie via `cookies().get('__session')` and verifies it with `getAdminAuth().verifySessionCookie()`.
-- No Bearer token is required for the dashboard when the cookie is present.
+```
+User clicks extension icon
+         │
+         ▼
+   ECHLY_CLICK (log)
+         │
+         ▼
+   Check token in memory (extensionAccessToken)
+         │
+    ┌────┴────┐
+    │         │
+    ▼         ▼
+ Valid     Not valid
+    │         │
+    │         ▼
+    │    ECHLY_LOGIN_REQUIRED (log)
+    │         │
+    │         ▼
+    │    chrome.tabs.query({ url: "*://echly-web.vercel.app/login*" })
+    │         │
+    │    ┌────┴────┐
+    │    │         │
+    │    ▼         ▼
+    │  Exists   No tab
+    │    │         │
+    │    ▼         ▼
+    │  Focus    Create tab → /login?extension=true
+    │  that tab      │
+    │    │         │
+    │    └────┬────┘
+    │         │
+    │    loginTabId = tab id
+    │    (user signs in on login page)
+    │         │
+    │         ▼
+    │    Login page: Firebase sign-in
+    │         │
+    │         ▼
+    │    window.postMessage({
+    │      type: "ECHLY_EXTENSION_LOGIN_SUCCESS",
+    │      idToken, refreshToken, uid, name, email
+    │    }, origin)
+    │         │
+    │         ▼
+    │    Content script (dashboard origin) receives message
+    │         │
+    │         ▼
+    │    chrome.runtime.sendMessage(ECHLY_EXTENSION_LOGIN_SUCCESS, …)
+    │         │
+    ▼         ▼
+ ECHLY_TOKEN_FOUND    Background receives ECHLY_EXTENSION_LOGIN_SUCCESS
+    │         │
+    ▼         ▼
+ Toggle tray   ECHLY_LOGIN_SUCCESS (log)
+ or open tray        │
+    │                ▼
+    │         extensionAccessToken = idToken
+    │         globalUIState.user = { uid, name, email }
+    │                │
+    │                ▼
+    │         chrome.tabs.update(originTabId, { active: true })
+    │                │
+    │                ▼
+    │         If loginTabId and tab.url includes "/login"
+    │            → chrome.tabs.remove(loginTabId)
+    │         loginTabId = null
+    │                │
+    │                ▼
+    │         ECHLY_TRAY_OPEN (log)
+    │         openTray() → persistUIState(), broadcastUIState()
+    │
+    └────────────────────────────────────────────────────
+                              │
+                              ▼
+                    Tray visible on current tab
+```
 
 ---
 
-## 3. Extension → Extension Token
+## 2. Token Lifecycle
 
-- The extension **does not store** Firebase ID or refresh tokens. No `echlyIdToken`, `echlyRefreshToken`, or `echlyTokenTime`.
-- When the extension needs to call the API, it obtains a **short-lived extension token** from the backend:
-  - **GET /api/auth/extensionToken** with **credentials: 'include'** (so the browser sends the dashboard session cookie for the API origin).
-  - The backend requires a valid session (cookie) and issues a signed JWT with `uid` and `type: "extension"` (e.g. 15-minute expiry).
-  - Response: `{ token, uid }`.
-- The extension keeps the token **in memory only** (`extensionAccessToken`). No persistence.
-- All extension API calls use **Authorization: Bearer &lt;extension token&gt;**.
-- **If GET /api/auth/extensionToken returns 401**, the extension clears auth state and opens the login page.
+| Phase | Where | What |
+|-------|--------|-----|
+| **No auth** | Background | `extensionAccessToken = null`. Click → open login tab. |
+| **Login** | Login page (dashboard) | User signs in with Firebase (Google or email). Page gets `user`, `idToken`, `refreshToken`. |
+| **Handoff** | Login page → Content → Background | `window.postMessage(ECHLY_EXTENSION_LOGIN_SUCCESS, { idToken, refreshToken, uid, name, email })`. Content script (only on dashboard origin) forwards via `chrome.runtime.sendMessage`. |
+| **Storage** | Background | `extensionAccessToken = idToken` (in memory only). `globalUIState.user` set from payload. No persistence to `chrome.storage` for the token. |
+| **Usage** | All API calls | Content uses `apiFetch` → background `echly-api` handler → `getValidToken()` returns `extensionAccessToken` → `Authorization: Bearer <idToken>`. Backend `requireAuth()` accepts Firebase ID token via `verifyIdToken()`. |
+| **Invalidation** | On 401/403 | Any API response 401/403 → `clearAuthState()` in background: `extensionAccessToken = null`, tray hidden, broadcast. Next click → login required again. |
+| **Logout** | Dashboard | Dashboard can post `ECHLY_DASHBOARD_LOGOUT`; content forwards; background runs `clearAuthState()`. |
 
-**Extension click flow (simplified):**
-
-1. User clicks extension icon.
-2. Tray opens **immediately** (no background auth validation).
-3. Extension calls GET /api/auth/extensionToken (or uses cached in-memory token for other API calls).
-4. If 401 → clear auth, open login page.
-
-No pre-warm or session cache; no `/api/auth/session` usage.
+- **No `/api/auth/session`** — The extension does not call GET `/api/auth/session`. Validity is “we have a token in memory”; real validity is confirmed when an API returns 401/403 and we clear auth.
+- **Single login tab** — Before opening login, we `chrome.tabs.query({ url: "*://echly-web.vercel.app/login*" })`. If a tab exists, we focus it; otherwise we create one. Only one login tab is used.
+- **Return to origin tab** — After login success we activate `originTabId` (the tab where the user clicked the icon), close the login tab if it’s still on `/login`, then open the tray so the user lands back where they started with the tray open.
 
 ---
 
-## 4. Backend → Hybrid Verification
+## 3. Changed Files
 
-**File:** `lib/server/auth.ts`
-
-- **`requireAuth(request)`** (used by protected API routes):
-  1. If **Authorization: Bearer &lt;token&gt;** is present:
-     - Tries **Firebase ID token** via `verifyIdToken(token)` (Firebase Admin, revocation check).
-     - If that fails, tries **extension JWT** via `verifyExtensionToken(token)` (signed with `EXTENSION_TOKEN_SECRET`).
-  2. If no Bearer token, reads **session cookie** `__session` and verifies with `verifySessionCookie()`.
-  3. If none valid → 401.
-
-- **`verifyIdToken(token)`** — Firebase Admin; remains for integrations and admin tools.
-- **`requireAuth(req)`** — used by dashboard (cookie) and extension (Bearer extension token) and any Firebase Bearer callers.
+| File | Changes |
+|------|--------|
+| **echly-extension/src/background.ts** | (1) Click: if no token → open login tab via `openOrFocusLoginTab(loginUrl)` (no broker tab). (2) Store `originTabId` and `loginTabId`. (3) New message handler `ECHLY_EXTENSION_LOGIN_SUCCESS`: set `extensionAccessToken = idToken`, set `globalUIState.user`, switch to `originTabId`, close login tab if still on `/login`, call `openTray()`, `persistUIState()`, `broadcastUIState()`. (4) Debug logs: `ECHLY_CLICK`, `ECHLY_TOKEN_FOUND`, `ECHLY_LOGIN_REQUIRED`, `ECHLY_LOGIN_SUCCESS`, `ECHLY_TRAY_OPEN`. (5) `chrome.tabs.onRemoved`: clear `loginTabId` when that tab is removed. |
+| **app/(auth)/login/page.tsx** | All postMessage after Firebase sign-in now use `type: "ECHLY_EXTENSION_LOGIN_SUCCESS"` with `idToken`, `refreshToken`, `uid`, `name`, `email` (origin: `window.location.origin`). Applied in `onAuthStateChanged`, `handleGoogle`, and `handleEmail`. |
+| **echly-extension/src/content.tsx** | In `ensureBrokerAndLogoutBridge()`: added listener for `event.data?.type === "ECHLY_EXTENSION_LOGIN_SUCCESS"` (origin check: dashboard). Forwards to background via `chrome.runtime.sendMessage({ type: "ECHLY_EXTENSION_LOGIN_SUCCESS", idToken, refreshToken, uid, name, email })`. |
 
 ---
 
-## 5. Public API → API Key
+## 4. Unchanged / Still Used
 
-Where the product exposes a public or partner API, authentication is via **API key** (or other scheme) as defined per route. Not covered in this doc; no change in this cleanup.
-
----
-
-## 6. What Was Removed (No Behavior Change)
-
-- **Extension:** References to `echlyIdToken`, `echlyRefreshToken`, `echlyTokenTime`; functions `getStoredTokens()`, `refreshIdToken()`; constants `TOKEN_MAX_AGE_MS`, `FIREBASE_REFRESH_URL`, `FIREBASE_API_KEY` (already absent).
-- **Extension:** All use of **GET /api/auth/session** and **checkBackendSession()** / **validateSessionWithBackend()**. Replaced with **GET /api/auth/extensionToken**; 401 → redirect to login.
-- **Extension:** Login bridge events **ECHLY_PAGE_LOGIN_SUCCESS**, **ECHLY_EXTENSION_AUTH_SUCCESS** and their handlers; token bridge files (pageTokenBridge, requestTokenFromPage, secureBridgeChannel — already removed).
-- **Extension:** Background auth validation and session cache; click flow is now: open tray → API call with extension token → if 401 open login.
+- **Backend** — `lib/server/auth.ts` `requireAuth()`: accepts Bearer Firebase ID token via `verifyIdToken()`. No change; extension sends `idToken` as Bearer.
+- **Extension token path** — `ECHLY_EXTENSION_TOKEN` (from extension-auth broker page) still supported: if a dashboard tab with cookie already exists, broker can send extension token; we keep that path for optional reuse. Primary path for “not logged in” is now login page → `ECHLY_EXTENSION_LOGIN_SUCCESS`.
+- **Tray visibility** — `openTray()` sets `globalUIState.visible = true`, `expanded = true`, then `persistUIState()` and `broadcastUIState()` so all tabs get the tray state.
+- **Legacy storage cleanup** — `clearAuthState()` still removes legacy keys (`auth_idToken`, etc.) from `chrome.storage.local`; token itself remains in-memory only.
 
 ---
 
-## 7. What Remains (Unchanged)
+## 5. Debug Logs (Labels)
 
-- **`verifyIdToken()`** and **`requireAuth()`** in `lib/server/auth.ts` — still used for dashboard cookie, extension token, and Firebase Bearer.
-- **GET /api/auth/session** — still exists for any non-extension caller that wants session info with a Bearer token; extension no longer calls it.
-- **POST /api/auth/logout** and refresh token revocation — unchanged; extension learns about logout via 401 when using an invalid or revoked token.
+| Label | When |
+|-------|------|
+| `ECHLY_CLICK` | User clicked the extension icon. |
+| `ECHLY_TOKEN_FOUND` | In-memory token present; tray toggled or opened. |
+| `ECHLY_LOGIN_REQUIRED` | No token; opening or focusing login tab. |
+| `ECHLY_LOGIN_SUCCESS` | Background received `ECHLY_EXTENSION_LOGIN_SUCCESS` and stored token. |
+| `ECHLY_TRAY_OPEN` | `openTray()` called (persist + broadcast). |
 
 ---
 
-## 8. Summary
+## 6. Summary
 
-- **Dashboard:** Cookie-based auth; `requireAuth` uses session cookie.
-- **Extension:** Short-lived extension token from GET /api/auth/extensionToken (cookie-backed); in-memory only; 401 → login.
-- **Backend:** Hybrid verification (cookie, Firebase ID token, extension JWT) in `requireAuth()`.
-- **Public API:** API key or per-route scheme.
-
-Legacy token storage and session-check paths have been removed from the extension; the final architecture is as above.
+- **Click** → Check token in memory → **Valid**: open/toggle tray. **Invalid**: open or focus single login tab.
+- **Login page** → After Firebase sign-in, post `ECHLY_EXTENSION_LOGIN_SUCCESS` with `idToken`, `refreshToken`, `uid`, `name`, `email`.
+- **Content script** → On dashboard origin, forward that message to the background.
+- **Background** → Store token in memory, switch to origin tab, close login tab, open tray, persist and broadcast UI state.
+- **No `/api/auth/session`**; validity is “token in memory” and 401/403 on API calls clear auth.
+- **Single login tab** enforced by querying for existing login URL and focusing before creating.

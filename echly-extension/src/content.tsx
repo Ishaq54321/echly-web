@@ -1623,13 +1623,24 @@ function ensureMessageListener(host: HTMLDivElement): void {
   });
 }
 
-/** Bridge: broker page (extension-auth) posts ECHLY_EXTENSION_TOKEN; we forward to background. Only accept from dashboard origin. */
+/** Bridge: login page posts ECHLY_EXTENSION_LOGIN_SUCCESS; broker page posts ECHLY_EXTENSION_TOKEN; we forward to background. Only accept from dashboard origin. */
 function ensureBrokerAndLogoutBridge(): void {
   const win = window as Window & { __ECHLY_BROKER_BRIDGE__?: boolean };
   if (win.__ECHLY_BROKER_BRIDGE__) return;
   win.__ECHLY_BROKER_BRIDGE__ = true;
   window.addEventListener("message", (event: MessageEvent) => {
     if (event.origin !== ECHLY_DASHBOARD_ORIGIN) return;
+    /* Loom-style login: login page sends token after Firebase sign-in; content forwards to background. */
+    if (event.data?.type === "ECHLY_EXTENSION_LOGIN_SUCCESS") {
+      chrome.runtime.sendMessage({
+        type: "ECHLY_EXTENSION_LOGIN_SUCCESS",
+        idToken: event.data.idToken,
+        refreshToken: event.data.refreshToken,
+        uid: event.data.uid,
+        name: event.data.name ?? null,
+        email: event.data.email ?? null,
+      }).catch(() => {});
+    }
     if (event.data?.type === "ECHLY_EXTENSION_TOKEN") {
       chrome.runtime.sendMessage({
         type: "ECHLY_EXTENSION_TOKEN",

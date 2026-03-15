@@ -42,7 +42,14 @@ function LoginContent() {
             const idToken = await user.getIdToken();
             const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
             window.postMessage(
-              { type: "ECHLY_PAGE_LOGIN_SUCCESS", idToken, refreshToken },
+              {
+                type: "ECHLY_EXTENSION_LOGIN_SUCCESS",
+                idToken,
+                refreshToken,
+                uid: user.uid,
+                name: user.displayName ?? null,
+                email: user.email ?? null,
+              },
               window.location.origin
             );
           } catch {
@@ -88,7 +95,14 @@ function LoginContent() {
         const idToken = await user.getIdToken();
         const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
         window.postMessage(
-          { type: "ECHLY_PAGE_LOGIN_SUCCESS", idToken, refreshToken },
+          {
+            type: "ECHLY_EXTENSION_LOGIN_SUCCESS",
+            idToken,
+            refreshToken,
+            uid: user.uid,
+            name: user.displayName ?? null,
+            email: user.email ?? null,
+          },
           window.location.origin
         );
         window.location.href = "/dashboard";
@@ -129,7 +143,14 @@ function LoginContent() {
         const idToken = await user.getIdToken();
         const refreshToken = (user as { refreshToken?: string }).refreshToken ?? "";
         window.postMessage(
-          { type: "ECHLY_PAGE_LOGIN_SUCCESS", idToken, refreshToken },
+          {
+            type: "ECHLY_EXTENSION_LOGIN_SUCCESS",
+            idToken,
+            refreshToken,
+            uid: user.uid,
+            name: user.displayName ?? null,
+            email: user.email ?? null,
+          },
           window.location.origin
         );
         window.location.href = "/dashboard";

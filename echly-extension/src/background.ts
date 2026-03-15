@@ -31,6 +31,11 @@ let authBrokerTabId: number | null = null;
 const ECHLY_EXTENSION_AUTH_ORIGIN = "https://echly-web.vercel.app";
 
 /** Debug log labels for extension auth flow. */
+const ECHLY_LOG_CLICK = "ECHLY_CLICK";
+const ECHLY_LOG_TOKEN_FOUND = "ECHLY_TOKEN_FOUND";
+const ECHLY_LOG_LOGIN_REQUIRED = "ECHLY_LOGIN_REQUIRED";
+const ECHLY_LOG_LOGIN_SUCCESS = "ECHLY_LOGIN_SUCCESS";
+const ECHLY_LOG_TRAY_OPEN = "ECHLY_TRAY_OPEN";
 const ECHLY_LOG_BROKER_TAB_OPENED = "ECHLY_BROKER_TAB_OPENED";
 const ECHLY_LOG_EXTENSION_TOKEN_RECEIVED = "ECHLY_EXTENSION_TOKEN_RECEIVED";
 const ECHLY_LOG_TRAY_OPENED = "ECHLY_TRAY_OPENED";
@@ -68,8 +73,8 @@ function hasValidToken(): boolean {
 
 /** Show tray (visible + expanded), persist and broadcast. */
 function openTray(): void {
-  if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_TRAY_OPENED);
-  echlyLog("BACKGROUND", ECHLY_LOG_TRAY_OPENED);
+  if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_TRAY_OPEN);
+  echlyLog("BACKGROUND", ECHLY_LOG_TRAY_OPEN);
   globalUIState.visible = true;
   globalUIState.expanded = true;
   persistUIState();
@@ -386,17 +391,23 @@ chrome.tabs.onCreated.addListener((tab) => {
     });
 });
 
-/** When the dashboard tab is closed, clear cached id so next token request can find or create one. */
+/** When the dashboard or login tab is closed, clear cached id. */
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabId === dashboardTabId) dashboardTabId = null;
   if (tabId === authBrokerTabId) authBrokerTabId = null;
+  if (tabId === loginTabId) loginTabId = null;
 });
 
-/** Extension icon click: if valid token open tray; else open hidden broker tab (token → postMessage → we open tray). Do NOT open login from here. */
+/** Extension icon click: if valid token open tray; else open login page (Loom-style). Only one login tab; after login we return to origin tab, close login tab, open tray. */
 chrome.action.onClicked.addListener((tab) => {
+  if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_CLICK);
+  echlyLog("BACKGROUND", ECHLY_LOG_CLICK);
+
   originTabId = tab?.id ?? null;
 
   if (hasValidToken()) {
+    if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_TOKEN_FOUND);
+    echlyLog("BACKGROUND", ECHLY_LOG_TOKEN_FOUND);
     if (globalUIState.visible === true) {
       globalUIState.visible = false;
       globalUIState.expanded = false;
@@ -408,12 +419,60 @@ chrome.action.onClicked.addListener((tab) => {
     return;
   }
 
-  openAuthBrokerTab();
+  if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_LOGIN_REQUIRED);
+  echlyLog("BACKGROUND", ECHLY_LOG_LOGIN_REQUIRED);
+  const returnUrl = typeof tab?.url === "string" ? encodeURIComponent(tab.url) : "";
+  const loginUrl = returnUrl
+    ? `${ECHLY_LOGIN_BASE}?extension=true&returnUrl=${returnUrl}`
+    : `${ECHLY_LOGIN_BASE}?extension=true`;
+  openOrFocusLoginTab(loginUrl).then((id) => {
+    loginTabId = id || null;
+  });
 });
 
 /** Single message listener for extension messages. */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   echlyLog("MESSAGE", "received", request.type);
+
+  /* Loom-style login: login page posts ECHLY_EXTENSION_LOGIN_SUCCESS; content forwards here. Store token in memory, return to origin tab, close login tab, open tray. */
+  if (request.type === "ECHLY_EXTENSION_LOGIN_SUCCESS") {
+    const payload = request as { idToken?: string; refreshToken?: string; uid?: string; name?: string | null; email?: string | null };
+    const idToken = payload.idToken;
+    const uid = payload.uid;
+    if (idToken && uid) {
+      if (ECHLY_DEBUG) console.log("[ECHLY]", ECHLY_LOG_LOGIN_SUCCESS);
+      echlyLog("BACKGROUND", ECHLY_LOG_LOGIN_SUCCESS);
+      extensionAccessToken = idToken;
+      globalUIState.user = {
+        uid,
+        name: payload.name ?? null,
+        email: payload.email ?? null,
+        photoURL: null,
+      };
+      /* Return to tab where user clicked the extension. */
+      if (originTabId != null) {
+        chrome.tabs.update(originTabId, { active: true }).catch(() => {});
+      }
+      /* Close login tab if still on /login. */
+      if (loginTabId != null) {
+        chrome.tabs.get(loginTabId).then(
+          (t) => {
+            if (t?.url?.includes("/login")) {
+              chrome.tabs.remove(loginTabId!).catch(() => {});
+            }
+            loginTabId = null;
+          },
+          () => {
+            loginTabId = null;
+          }
+        );
+      }
+      openTray();
+      persistUIState();
+      broadcastUIState();
+    }
+    return false;
+  }
 
   if (request.type === "ECHLY_EXTENSION_TOKEN") {
     const token = (request as { token?: string }).token;
