@@ -9,11 +9,19 @@ import { setExtensionToken, apiFetch } from "../utils/apiFetch";
 import { API_BASE, WEB_APP_URL } from "../config";
 
 const LOGIN_URL = `${WEB_APP_URL}/login`;
+const EXTENSION_AUTH_URL = `${WEB_APP_URL}/extension-auth`;
+/** Extension token TTL from backend is 15m; treat as valid for 14 min to avoid edge expiry. */
+const EXTENSION_TOKEN_TTL_MS = 14 * 60 * 1000;
+
 console.log("ECHLY background script loaded");
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 chrome.action.onClicked.addListener(() => {
-  void openWidgetInActiveTab();
+  // Store original tab before any auth logic so we inject widget there after auth completes.
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]?.id) sw.lastUserTabId = tabs[0].id;
+    void openWidgetInActiveTab();
+  });
 });
 
 type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
@@ -23,17 +31,31 @@ const sw = globalThis as typeof globalThis & {
   extensionToken: string | null;
   currentUser: StoredUser | null;
   captureMode: "voice" | "text";
+  /** Tab where user clicked the extension icon; used to inject widget after auth broker flow. */
+  lastUserTabId: number | null;
 };
 sw.extensionToken = null;
 sw.currentUser = null;
 sw.captureMode = "voice";
+sw.lastUserTabId = null;
 
 let activeSessionId: string | null = null;
 
-/** In-memory extension token from POST /api/extension/session. Cleared on 401. */
+/** In-memory extension token (from auth broker page). Never stored in chrome.storage or localStorage. */
 let extensionToken: string | null = null;
+/** When the in-memory token expires (timestamp). */
+let extensionTokenExpiresAt: number | null = null;
 /** Cached user from last successful session response; used for ECHLY_GET_AUTH_STATE. */
 let cachedSessionUser: StoredUser | null = null;
+/** Only one token request at a time; shared promise so concurrent callers get the same /extension-auth flow. */
+let tokenRequestPromise: Promise<string> | null = null;
+/** Resolver for the pending getExtensionToken() when waiting for broker tab. */
+let tokenBrokerResolve: ((token: string) => void) | null = null;
+let tokenBrokerReject: ((err: Error) => void) | null = null;
+let authBrokerTabId: number | null = null;
+/** Guard: prevent opening multiple /extension-auth tabs; track until broker resolves. */
+let authTabOpen = false;
+let brokerPromise: Promise<string> | null = null;
 
 /** Global lock: only one ECHLY_PROCESS_FEEDBACK pipeline at a time to avoid ECONNRESET. */
 let aiProcessing = false;
@@ -170,56 +192,74 @@ async function initializeSessionState(): Promise<void> {
 })();
 
 /**
- * Fetch extension token from backend. Uses echly_session cookie (credentials: include).
- * On 401 opens dashboard login and throws.
+ * Loom-style auth broker: get extension token from the web dashboard session.
+ * 1. If a valid token exists in memory and is not expired, return it.
+ * 2. Otherwise open a hidden tab to /extension-auth (dashboard checks auth and POSTs for token).
+ * 3. The page postMessages the token; sessionRelay content script forwards it here.
+ * 4. We store the token in memory, then return it. Tab is closed by the page or by us.
+ * The extension never stores or manages user login credentials.
  */
 async function getExtensionToken(): Promise<string> {
-  console.log("Requesting extension session...");
-  const response = await fetch(`${API_BASE}/api/extension/session`, {
-    method: "POST",
-    credentials: "include",
+  const now = Date.now();
+  if (
+    extensionToken &&
+    extensionTokenExpiresAt != null &&
+    now < extensionTokenExpiresAt
+  ) {
+    return extensionToken;
+  }
+
+  if (authTabOpen && brokerPromise != null) {
+    return brokerPromise;
+  }
+
+  authTabOpen = true;
+  brokerPromise = new Promise<string>((resolve, reject) => {
+    tokenBrokerResolve = resolve;
+    tokenBrokerReject = reject;
+
+    chrome.tabs.create({ url: EXTENSION_AUTH_URL }, (tab) => {
+      if (chrome.runtime.lastError) {
+        authTabOpen = false;
+        brokerPromise = null;
+        tokenBrokerResolve = null;
+        tokenBrokerReject = null;
+        reject(new Error("NOT_AUTHENTICATED"));
+        return;
+      }
+      authBrokerTabId = tab?.id ?? null;
+    });
   });
 
-  if (response.status === 401) {
-    extensionToken = null;
-    setExtensionToken(null);
-    cachedSessionUser = null;
-    sw.extensionToken = null;
-    sw.currentUser = null;
-    chrome.tabs.create({ url: LOGIN_URL });
-    throw new Error("NOT_AUTHENTICATED");
-  }
-
-  if (!response.ok) {
-    throw new Error("Extension session failed");
-  }
-
-  const data = (await response.json()) as { extensionToken?: string; user?: { uid?: string; email?: string | null } };
-  const token = data.extensionToken;
-  console.log("Extension token received", data.extensionToken);
-  if (!token) throw new Error("Extension session failed");
-
-  setExtensionToken(token);
-  sw.extensionToken = token;
-
-  if (data.user?.uid) {
-    cachedSessionUser = {
-      uid: data.user.uid,
-      name: null,
-      email: data.user.email ?? null,
-      photoURL: null,
-    };
-    sw.currentUser = cachedSessionUser;
-  }
-
-  return token;
+  return brokerPromise;
 }
 
-/** Returns valid extension token; fetches and caches if missing. Throws NOT_AUTHENTICATED on 401. */
+/** Returns valid extension token; uses cache if not expired, else auth broker. Throws NOT_AUTHENTICATED on failure. Only one token request runs at a time (token broker lock). */
 async function getValidToken(): Promise<string> {
-  if (extensionToken) return extensionToken;
-  extensionToken = await getExtensionToken();
-  return extensionToken;
+  const now = Date.now();
+  if (
+    extensionToken &&
+    extensionTokenExpiresAt != null &&
+    now < extensionTokenExpiresAt
+  ) {
+    return extensionToken;
+  }
+  if (tokenRequestPromise) {
+    return tokenRequestPromise;
+  }
+  extensionToken = null;
+  extensionTokenExpiresAt = null;
+  tokenRequestPromise = new Promise<string>(async (resolve, reject) => {
+    try {
+      const token = await getExtensionToken();
+      resolve(token);
+    } catch (err) {
+      reject(err);
+    } finally {
+      tokenRequestPromise = null;
+    }
+  });
+  return tokenRequestPromise;
 }
 
 /**
@@ -289,22 +329,22 @@ async function ensureContentScriptInjected(tabId: number): Promise<boolean> {
   }
 }
 
-/** Deterministic open: set echlyActive, inject content script if needed, then set visible + expanded and notify active tab (icon click or popup). */
+/** Deterministic open: set echlyActive, inject content script if needed, then set visible + expanded and notify the tab (lastUserTabId from icon click, so widget appears where user clicked). */
 async function openWidgetInActiveTab(): Promise<void> {
   await chrome.storage.local.set({ echlyActive: true });
   globalUIState.visible = true;
   globalUIState.expanded = true;
   broadcastUIState();
   console.log("[ECHLY BG] broadcasted global UI state", globalUIState);
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return;
-  const injected = await ensureContentScriptInjected(tab.id);
+  const tabId = sw.lastUserTabId;
+  if (!tabId) return;
+  const injected = await ensureContentScriptInjected(tabId);
   if (!injected) {
-    console.warn("[ECHLY BG] could not inject into active tab");
+    console.warn("[ECHLY BG] could not inject into tab", tabId);
     return;
   }
-  console.log("[ECHLY BG] sending OPEN_WIDGET to tab", tab.id);
-  chrome.tabs.sendMessage(tab.id, { type: "ECHLY_OPEN_WIDGET" }).catch(() => {});
+  console.log("[ECHLY BG] sending OPEN_WIDGET to tab", tabId);
+  chrome.tabs.sendMessage(tabId, { type: "ECHLY_OPEN_WIDGET" }).catch(() => {});
 }
 
 /** Loom-style: when user switches tabs and Echly is active, inject content script so widget appears on every tab. */
@@ -351,9 +391,55 @@ chrome.tabs.onCreated.addListener((tab) => {
     });
 });
 
+/** If the auth broker tab is closed before sending the token, reject the pending promise. */
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (tabId === authBrokerTabId) {
+    authBrokerTabId = null;
+    authTabOpen = false;
+    brokerPromise = null;
+    if (tokenBrokerReject) {
+      tokenBrokerReject(new Error("NOT_AUTHENTICATED"));
+      tokenBrokerResolve = null;
+      tokenBrokerReject = null;
+    }
+  }
+});
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("[ECHLY] message received:", request.type);
   echlyLog("MESSAGE", "received", request.type);
+
+  if (request.type === "ECHLY_EXTENSION_TOKEN") {
+    const token = (request as { token?: string; user?: { uid: string; email?: string | null } }).token;
+    const user = (request as { token?: string; user?: { uid: string; email?: string | null } }).user;
+    if (typeof token === "string" && token.length > 0) {
+      extensionToken = token;
+      extensionTokenExpiresAt = Date.now() + EXTENSION_TOKEN_TTL_MS;
+      setExtensionToken(token);
+      sw.extensionToken = token;
+      if (user?.uid) {
+        sw.currentUser = {
+          uid: user.uid,
+          name: null,
+          email: user.email ?? null,
+          photoURL: null,
+        };
+        cachedSessionUser = sw.currentUser;
+      }
+      if (tokenBrokerResolve) {
+        tokenBrokerResolve(token);
+        tokenBrokerResolve = null;
+        tokenBrokerReject = null;
+      }
+      authTabOpen = false;
+      brokerPromise = null;
+      if (authBrokerTabId != null) {
+        chrome.tabs.remove(authBrokerTabId).catch(() => {});
+        authBrokerTabId = null;
+      }
+    }
+    return false;
+  }
 
   if (request.type === "ECHLY_START_SESSION") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -645,6 +731,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sw.currentUser = cachedSessionUser;
       }
     }
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_AUTH_INVALID") {
+    extensionToken = null;
+    extensionTokenExpiresAt = null;
+    sw.extensionToken = null;
+    sw.currentUser = null;
+    setExtensionToken(null);
     sendResponse({ ok: true });
     return false;
   }

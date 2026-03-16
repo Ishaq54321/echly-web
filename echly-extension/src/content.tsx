@@ -343,7 +343,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     applyThemeToRoot(widgetRoot, next);
   }, [theme, widgetRoot]);
 
+  /* Auth only when widget is opened (Loom-style). Do NOT trigger auth on content script mount. */
   React.useEffect(() => {
+    if (!globalState.visible) return;
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_AUTH_STATE" },
       (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
@@ -360,7 +362,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         setAuthChecked(true);
       }
     );
-  }, []);
+  }, [globalState.visible]);
 
   const handleComplete = React.useCallback(
     async (

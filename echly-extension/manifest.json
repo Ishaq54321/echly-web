@@ -6,7 +6,18 @@
   "permissions": ["storage", "activeTab", "tabs", "scripting"],
   "host_permissions": [
     "<all_urls>",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://localhost:3000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/extension-auth*",
+        "https://localhost:3000/extension-auth*"
+      ],
+      "js": ["sessionRelay.js"],
+      "run_at": "document_start"
+    }
   ],
   "action": { "default_popup": "popup.html" },
   "background": {

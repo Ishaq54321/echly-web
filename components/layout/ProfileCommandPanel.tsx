@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Clock, Info, MessageCircle, Sparkles } from "lucide-react";
 import type { User } from "firebase/auth";
 import { signOut } from "firebase/auth";
@@ -60,6 +61,7 @@ export function ProfileCommandPanel({
   user,
   anchorRef,
 }: ProfileCommandPanelProps) {
+  const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -133,9 +135,11 @@ export function ProfileCommandPanel({
     if (e.target === e.currentTarget) onClose();
   };
 
-  const handleSignOut = () => {
-    signOut(auth);
+  const handleSignOut = async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    await signOut(auth);
     onClose();
+    router.push("/login");
   };
 
   const displayName =

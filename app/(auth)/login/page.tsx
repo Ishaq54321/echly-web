@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { signInWithGoogle, signInWithEmailPassword } from "../../../lib/auth/authActions";
 import { checkUserWorkspace } from "@/lib/auth/checkUserWorkspace";
 import { AuthCard } from "@/components/auth/AuthCard";
+
+/** Safe return path after login: only relative paths starting with /. Used by extension-auth broker. */
+function getReturnPath(searchParams: ReturnType<typeof useSearchParams>): string | null {
+  const returnUrl = searchParams.get("returnUrl");
+  if (typeof returnUrl !== "string" || !returnUrl.startsWith("/")) return null;
+  return returnUrl;
+}
 
 const inputClass =
   "w-full h-11 rounded-[10px] border border-[#E5E7EB] bg-white text-gray-900 text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]";
@@ -36,8 +43,9 @@ async function createSessionCookie(user: { getIdToken: () => Promise<string> }) 
   }
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
@@ -51,6 +59,11 @@ export default function LoginPage() {
     try{
       const user = await signInWithGoogle();
       await createSessionCookie(user);
+      const returnPath = getReturnPath(searchParams);
+      if (returnPath) {
+        router.replace(returnPath);
+        return;
+      }
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
     }
@@ -77,6 +90,11 @@ export default function LoginPage() {
     try{
       const user = await signInWithEmailPassword(email,password);
       await createSessionCookie(user);
+      const returnPath = getReturnPath(searchParams);
+      if (returnPath) {
+        router.replace(returnPath);
+        return;
+      }
       const dest = await checkUserWorkspace(user.uid);
       router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
     }
@@ -261,6 +279,18 @@ export default function LoginPage() {
       </main>
 
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="relative min-h-screen bg-[#f9fafc] flex items-center justify-center">
+        <div className="animate-pulse text-gray-500">Loading…</div>
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   );
 }
 

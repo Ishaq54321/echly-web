@@ -40336,6 +40336,7 @@
       applyThemeToRoot(widgetRoot, next);
     }, [theme, widgetRoot]);
     import_react17.default.useEffect(() => {
+      if (!globalState.visible) return;
       chrome.runtime.sendMessage(
         { type: "ECHLY_GET_AUTH_STATE" },
         (response) => {
@@ -40352,7 +40353,7 @@
           setAuthChecked(true);
         }
       );
-    }, []);
+    }, [globalState.visible]);
     const handleComplete = import_react17.default.useCallback(
       async (transcript, screenshot, callbacks, context, options) => {
         echlyLog("PIPELINE", "start");

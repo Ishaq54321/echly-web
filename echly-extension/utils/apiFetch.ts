@@ -9,7 +9,7 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
     throw new Error("Extension token missing");
   }
 
-  return fetch(url, {
+  const response = await fetch(url, {
     ...options,
     credentials: "include",
     headers: {
@@ -18,4 +18,14 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
       ...(options.headers || {}),
     },
   });
+
+  if (response.status === 401) {
+    extensionToken = null;
+    setExtensionToken(null);
+    chrome.runtime.sendMessage({ type: "ECHLY_AUTH_INVALID" });
+    console.log("[ECHLY] Auth expired or user logged out");
+    throw new Error("NOT_AUTHENTICATED");
+  }
+
+  return response;
 }
