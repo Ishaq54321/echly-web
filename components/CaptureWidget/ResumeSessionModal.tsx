@@ -21,6 +21,10 @@ export type ResumeSessionModalProps = {
   onSelectSession: (sessionId: string) => void;
   /** Theme for modal (dark/light). Defaults to "dark". */
   theme?: "dark" | "light";
+  /** Extension: run before loading sessions. If returns false, show login-required UI and do not call fetchSessions. */
+  checkAuth?: () => Promise<boolean>;
+  /** Extension: called when user clicks "Open Login" in login-required state. */
+  onOpenLogin?: () => void;
 };
 
 type FilterKey = "today" | "7days" | "30days" | "all";
@@ -68,12 +72,15 @@ export function ResumeSessionModal({
   fetchSessions,
   onSelectSession,
   theme = "dark",
+  checkAuth,
+  onOpenLogin,
 }: ResumeSessionModalProps) {
   const [sessions, setSessions] = useState<SessionOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [loginRequired, setLoginRequired] = useState(false);
   const isLight = theme === "light";
 
   useEffect(() => {
@@ -81,15 +88,34 @@ export function ResumeSessionModal({
     setSearch("");
     setFilter("all");
     setError(null);
-    setLoading(true);
-    fetchSessions()
-      .then((list) => {
-        if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", list);
-        setSessions(list);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load sessions"))
-      .finally(() => setLoading(false));
-  }, [open, fetchSessions]);
+    setLoginRequired(false);
+    if (checkAuth) {
+      setLoading(true);
+      checkAuth()
+        .then((valid) => {
+          if (!valid) {
+            setLoginRequired(true);
+            setLoading(false);
+            return;
+          }
+          return fetchSessions().then((list) => {
+            if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", list);
+            setSessions(list);
+          });
+        })
+        .catch((_err) => setLoginRequired(true))
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(true);
+      fetchSessions()
+        .then((list) => {
+          if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", list);
+          setSessions(list);
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : "Failed to load sessions"))
+        .finally(() => setLoading(false));
+    }
+  }, [open, fetchSessions, checkAuth]);
 
   const filtered = useMemo(() => {
     let list = filterSessions(sessions, filter);
@@ -175,55 +201,107 @@ export function ResumeSessionModal({
           <h2
             id="resume-session-modal-title"
             style={{
-              margin: "0 0 16px",
+              margin: loginRequired ? 0 : "0 0 16px",
               fontSize: 18,
               fontWeight: 600,
               color: isLight ? "#1F2937" : "#F3F4F6",
             }}
           >
-            Resume Feedback Session
+            {loginRequired ? "Previous Sessions" : "Resume Feedback Session"}
           </h2>
-          <input
-            type="search"
-            placeholder="Search sessions"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search sessions"
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)",
-              background: isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.06)",
-              color: isLight ? "#1F2937" : "#F3F4F6",
-              fontSize: 14,
-            }}
-          />
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-            {FILTER_ORDER.map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setFilter(key)}
+          {!loginRequired && (
+            <>
+              <input
+                type="search"
+                placeholder="Search sessions"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search sessions"
                 style={{
-                  padding: "8px 12px",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "10px 12px",
                   borderRadius: 10,
-                  border: filter === key ? "1px solid rgba(59,130,246,.45)" : "1px solid transparent",
-                  background: filter === key ? "rgba(59,130,246,.18)" : isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)",
-                  color: filter === key ? "#60A5FA" : isLight ? "#1F2937" : "#F3F4F6",
-                  fontSize: 12,
-                  fontWeight: 500,
+                  border: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)",
+                  background: isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.06)",
+                  color: isLight ? "#1F2937" : "#F3F4F6",
+                  fontSize: 14,
+                }}
+              />
+              <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                {FILTER_ORDER.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFilter(key)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 10,
+                      border: filter === key ? "1px solid rgba(59,130,246,.45)" : "1px solid transparent",
+                      background: filter === key ? "rgba(59,130,246,.18)" : isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)",
+                      color: filter === key ? "#60A5FA" : isLight ? "#1F2937" : "#F3F4F6",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {FILTER_LABELS[key]}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <div style={{ flex: 1, overflow: "auto", minHeight: 200, maxHeight: 360 }}>
+          {loginRequired && onOpenLogin && (
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 32,
+              minHeight: 240,
+              textAlign: "center",
+            }}>
+              <span style={{ fontSize: 40, marginBottom: 16 }} aria-hidden>🔒</span>
+              <h3 style={{
+                margin: "0 0 8px",
+                fontSize: 18,
+                fontWeight: 600,
+                color: isLight ? "#1F2937" : "#F3F4F6",
+              }}>
+                Sign in to continue
+              </h3>
+              <p style={{
+                margin: "0 0 20px",
+                fontSize: 14,
+                color: isLight ? "rgba(0,0,0,.6)" : "#A1A1AA",
+                maxWidth: 320,
+              }}>
+                To view your previous sessions, please sign in to your Echly dashboard.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenLogin();
+                  onClose();
+                }}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#3B82F6",
+                  color: "white",
+                  fontSize: 14,
+                  fontWeight: 600,
                   cursor: "pointer",
                 }}
               >
-                {FILTER_LABELS[key]}
+                Open Login
               </button>
-            ))}
-          </div>
-        </div>
-        <div style={{ flex: 1, overflow: "auto", minHeight: 200, maxHeight: 360 }}>
-          {loading && (
+            </div>
+          )}
+          {!loginRequired && loading && (
             <div style={{
               padding: 24,
               textAlign: "center",
@@ -233,12 +311,12 @@ export function ResumeSessionModal({
               Loading sessions…
             </div>
           )}
-          {error && (
+          {!loginRequired && error && (
             <div style={{ padding: 24, color: "#EF4444", fontSize: 14 }}>
               {error}
             </div>
           )}
-          {!loading && !error && filtered.length === 0 && (
+          {!loginRequired && !loading && !error && filtered.length === 0 && (
             <div style={{
               padding: 24,
               textAlign: "center",
@@ -248,7 +326,7 @@ export function ResumeSessionModal({
               No sessions match.
             </div>
           )}
-          {!loading && !error && filtered.length > 0 && (
+          {!loginRequired && !loading && !error && filtered.length > 0 && (
             <ul style={{ listStyle: "none", margin: 0, padding: 12 }}>
               {filtered.map((s) => (
                 <li key={s.id} style={{ marginBottom: 4 }}>

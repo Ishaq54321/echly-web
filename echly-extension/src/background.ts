@@ -55,10 +55,7 @@ chrome.action.onClicked.addListener(() => {
       sw.currentUser = null;
       setExtensionToken(null);
       if (await focusExistingAuthTabIfOpen()) return;
-      authTabOpen = true;
-      chrome.tabs.create({ url: EXTENSION_AUTH_URL }, (tab) => {
-        if (tab?.id) authBrokerTabId = tab.id;
-      });
+      void getExtensionToken().catch(() => {});
       return;
     }
 
@@ -302,6 +299,15 @@ async function getExtensionToken(): Promise<string> {
     return extensionToken;
   }
 
+  if (await focusExistingAuthTabIfOpen()) {
+    if (brokerPromise != null) return brokerPromise;
+    brokerPromise = new Promise<string>((resolve, reject) => {
+      tokenBrokerResolve = resolve;
+      tokenBrokerReject = reject;
+    });
+    return brokerPromise;
+  }
+
   if (authTabOpen && brokerPromise != null) {
     return brokerPromise;
   }
@@ -364,7 +370,7 @@ async function getValidToken(): Promise<string> {
 }
 
 /**
- * Lazy auth hydration for popup: ensure currentUser/token are set from dashboard cookie
+ * Lazy auth hydration: ensure currentUser/token are set from dashboard cookie
  * so ECHLY_GET_AUTH_STATE can return authenticated: true without requiring dashboard tab.
  */
 async function hydrateAuthState(): Promise<boolean> {
@@ -584,10 +590,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ ok: false, redirectToLogin: true });
           return;
         }
-        authTabOpen = true;
-        chrome.tabs.create({ url: EXTENSION_AUTH_URL }, (tab) => {
-          if (tab?.id) authBrokerTabId = tab.id;
-        });
+        void getExtensionToken().catch(() => {});
         sendResponse({ ok: false, redirectToLogin: true });
         return;
       }
@@ -785,6 +788,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === "ECHLY_OPEN_DASHBOARD") {
+    chrome.tabs.create({ url: `${WEB_APP_URL}/dashboard` });
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.type === "ECHLY_OPEN_BILLING") {
+    chrome.tabs.create({ url: `${WEB_APP_URL}/settings/billing` });
+    sendResponse({ success: true });
+    return true;
+  }
+
   if (request.type === "ECHLY_SESSION_MODE_START") {
     echlyLog("BACKGROUND", "session start broadcast");
     globalUIState.sessionModeActive = true;
@@ -925,10 +940,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === "ECHLY_VERIFY_DASHBOARD_SESSION") {
+    (async () => {
+      const valid = await verifyDashboardSession();
+      sendResponse({ valid });
+    })();
+    return true;
+  }
+
   if (request.type === "ECHLY_OPEN_POPUP") {
-    chrome.tabs.create({ url: chrome.runtime.getURL("popup.html") });
-    sendResponse({ ok: true });
-    return false;
+    (async () => {
+      if (await focusExistingAuthTabIfOpen()) {
+        sendResponse({ ok: true });
+        return;
+      }
+      void getExtensionToken().catch(() => {});
+      sendResponse({ ok: true });
+    })();
+    return true;
   }
 
   if (request.type === "ECHLY_SIGN_IN" || request.type === "ECHLY_START_LOGIN" || request.type === "LOGIN") {
@@ -943,10 +972,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ ok: true });
         return;
       }
-      authTabOpen = true;
-      chrome.tabs.create({ url: EXTENSION_AUTH_URL }, (tab) => {
-        if (tab?.id) authBrokerTabId = tab.id;
-      });
+      void getExtensionToken().catch(() => {});
       sendResponse({ ok: true });
     })();
     return true; // keep channel open for async sendResponse

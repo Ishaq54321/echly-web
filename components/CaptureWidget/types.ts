@@ -121,8 +121,10 @@ export type CaptureWidgetProps = {
   onSessionLoaded?: () => void;
   /** Called when user ends the feedback session (e.g. to clear resume override in extension). */
   onSessionEnd?: () => void;
-  /** Extension: create a new session (POST /api/sessions). Returns { id } so widget can set it as active. */
-  onCreateSession?: () => Promise<{ id: string } | null>;
+  /** Extension: create a new session (POST /api/sessions). Returns { id } or limit object when 403 PLAN_LIMIT_REACHED. */
+  onCreateSession?: () => Promise<
+    { id: string } | { limitReached: true; message: string; upgradePlan: unknown } | null
+  >;
   /** Extension: notify parent that active session changed (e.g. after start or resume). Parent sets storage and passes new sessionId. */
   onActiveSessionChange?: (sessionId: string) => void;
   /** Extension: global session mode from background (ECHLY_GLOBAL_STATE). When true, overlay activates in this tab. */
@@ -161,6 +163,12 @@ export type CaptureWidgetProps = {
   onResumeModalClose?: () => void;
   /** Extension: auth guard. Returns true if authenticated, false if login was triggered. Call before Start Session to open auth broker when logged out. */
   ensureAuthenticated?: () => Promise<boolean>;
+  /** Extension: verify dashboard session before loading previous sessions list. If false, modal shows login-required UI and does not call /api/sessions. */
+  verifySessionBeforeSessions?: () => Promise<boolean>;
+  /** Extension: open login (auth broker). Called when user clicks "Open Login" in Previous Sessions when not authenticated. */
+  onTriggerLogin?: () => void;
+  /** Extension: when set (POST /api/sessions returned 403 PLAN_LIMIT_REACHED), show upgrade view instead of session controls. */
+  sessionLimitReached?: { message: string; upgradePlan: unknown } | null;
 };
 
 /** One feedback job in the pipeline (processing or failed). Completed jobs are removed and the ticket appears in pointers. */

@@ -42,6 +42,8 @@ type CaptureHeaderProps = {
     clearPointers?: () => void;
   };
   onShowCommandScreen?: () => void;
+  /** When true, show only the close button (e.g. session limit upgrade view). */
+  showOnlyClose?: boolean;
 };
 
 export default function CaptureHeader({
@@ -59,6 +61,7 @@ export default function CaptureHeader({
   onCaptureModeToggle,
   handlers,
   onShowCommandScreen,
+  showOnlyClose = false,
 }: CaptureHeaderProps) {
   const [localTitle, setLocalTitle] = useState(sessionTitle);
   const [isEditing, setIsEditing] = useState(false);
@@ -92,7 +95,7 @@ export default function CaptureHeader({
   return (
     <div className="echly-sidebar-header echly-session-header">
       <div className="echly-sidebar-header-left">
-        {showSessionTitle ? (
+        {showOnlyClose ? null : showSessionTitle ? (
           <>
             <div className="echly-session-title-wrapper">
               {isEditing ? (
@@ -134,8 +137,8 @@ export default function CaptureHeader({
             type="button"
             className={`echly-header-home-wrap${theme === "dark" ? " dark" : ""}`}
             onClick={() => {
-              if (typeof chrome !== "undefined" && chrome.tabs?.create) {
-                chrome.tabs.create({ url: "https://app.echly.com/dashboard" });
+              if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+                chrome.runtime.sendMessage({ type: "ECHLY_OPEN_DASHBOARD" }).catch(() => {});
               }
             }}
             aria-label="Open Echly dashboard"
@@ -154,7 +157,7 @@ export default function CaptureHeader({
         )}
       </div>
       <div className="echly-header-actions echly-session-icons">
-        {onThemeToggle && (
+        {!showOnlyClose && onThemeToggle && (
           <button
             type="button"
             id="theme-toggle"
@@ -166,7 +169,7 @@ export default function CaptureHeader({
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
           </button>
         )}
-        {onCaptureModeToggle && (
+        {!showOnlyClose && onCaptureModeToggle && (
           <button
             type="button"
             className="echly-header-mode-toggle"

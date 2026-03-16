@@ -1068,7 +1068,7 @@ export function useCaptureWidget({
     if (extensionMode && onCreateSession && onActiveSessionChange) {
       if (ensureAuthenticated && !(await ensureAuthenticated())) return;
       const session = await onCreateSession();
-      if (!session?.id) return;
+      if (!session || "limitReached" in session) return;
       onActiveSessionChange(session.id);
       setPointers([]);
       onSessionModeStart?.();

@@ -56,20 +56,6 @@ const define = {
 };
 
 await esbuild.build({
-  entryPoints: [path.join(extDir, "src", "popup.tsx")],
-  bundle: true,
-  outfile: path.join(extDir, "popup.js"),
-  platform: "browser",
-  target: "es2020",
-  minify: true,
-  sourcemap: false,
-  loader: { ".css": "empty" },
-  plugins: [makeAliasPlugin(false)],
-  define,
-  absWorkingDir: root,
-});
-
-await esbuild.build({
   entryPoints: [path.join(extDir, "src", "content.tsx")],
   bundle: true,
   format: "iife",

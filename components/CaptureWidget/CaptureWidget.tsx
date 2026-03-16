@@ -9,6 +9,7 @@ import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
 import { ResumeSessionModal } from "./ResumeSessionModal";
 import { MicrophonePanel } from "./MicrophonePanel";
+import { SessionLimitReachedView } from "./SessionLimitReachedView";
 import type { CaptureWidgetProps, CaptureState } from "./types";
 
 const CAPTURE_FLOW_STATES: CaptureState[] = ["focus_mode", "region_selecting", "voice_listening", "processing"];
@@ -56,6 +57,9 @@ export default function CaptureWidget({
   onSessionTitleChange: onSessionTitleChangeProp,
   openResumeModal: openResumeModalProp,
   onResumeModalClose,
+  verifySessionBeforeSessions,
+  onTriggerLogin,
+  sessionLimitReached,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
@@ -209,6 +213,8 @@ export default function CaptureWidget({
             setResumeModalOpen(false);
           }}
           theme={theme}
+          checkAuth={verifySessionBeforeSessions}
+          onOpenLogin={onTriggerLogin}
         />
       )}
       {/* Capture layer: portaled into #echly-capture-root. Never inside sidebar. */}
@@ -310,20 +316,45 @@ export default function CaptureWidget({
             <div className="echly-sidebar-surface" data-theme={theme}>
               <CaptureHeader
                 onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
-                showSessionTitle={hasTickets || sessionModeActive || sessionLoading}
+                showSessionTitle={!sessionLimitReached && (hasTickets || sessionModeActive || sessionLoading)}
                 sessionTitle={sessionTitleProp ?? sessionTitle ?? "Untitled Session"}
                 onSessionTitleChange={onSessionTitleChangeProp ?? setSessionTitle}
                 openTicketCount={openTicketsCount}
                 title={undefined}
                 summary={summary}
-                showHomeButton={extensionMode}
+                showHomeButton={extensionMode && !sessionLimitReached}
                 theme={theme}
-                onThemeToggle={onThemeToggle}
+                onThemeToggle={sessionLimitReached ? undefined : onThemeToggle}
                 captureMode={captureMode}
-                onCaptureModeToggle={extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : undefined}
+                onCaptureModeToggle={sessionLimitReached ? undefined : (extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : undefined)}
                 onShowCommandScreen={() => setShowCommandScreen(true)}
+                showOnlyClose={Boolean(sessionLimitReached)}
               />
 
+              {sessionLimitReached ? (
+                <div className="echly-sidebar-body echly-limit-reached-body">
+                  <SessionLimitReachedView
+                    maxSessions={
+                      sessionLimitReached.upgradePlan != null &&
+                      typeof (sessionLimitReached.upgradePlan as { maxSessions?: number }).maxSessions === "number"
+                        ? (sessionLimitReached.upgradePlan as { maxSessions: number }).maxSessions
+                        : undefined
+                    }
+                    message={sessionLimitReached.message}
+                    onUpgrade={() => {
+                      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+                        chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {});
+                      }
+                    }}
+                    onDeleteOldSessions={
+                      extensionMode && typeof chrome !== "undefined" && chrome.runtime?.sendMessage
+                        ? () => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_DASHBOARD" }).catch(() => {})
+                        : undefined
+                    }
+                    theme={theme}
+                  />
+                </div>
+              ) : (
               <div
                 ref={listScrollRef}
                 className="echly-sidebar-body"
@@ -436,8 +467,9 @@ export default function CaptureWidget({
                   </div>
                 )}
               </div>
+              )}
 
-              {showHomeScreen && (
+              {!sessionLimitReached && showHomeScreen && (
                 <>
                   <div className="echly-command-divider" aria-hidden />
                   <WidgetFooter
@@ -470,3 +502,4 @@ export default function CaptureWidget({
     </>
   );
 }
+

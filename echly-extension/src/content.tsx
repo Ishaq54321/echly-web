@@ -1,7 +1,7 @@
 /**
  * Content script: ultra-thin UI layer. Injected on demand when user clicks extension icon (Loom-style).
  * Single mount, visibility controlled by background (ECHLY_VISIBILITY). No blocking overlays.
- * Auth in popup only; unauthenticated = minimal disabled state with "Sign in from extension" tooltip.
+ * Auth via /extension-auth broker; unauthenticated = no widget UI (no floating sign-in banner).
  */
 declare global {
   interface Window {
@@ -100,11 +100,6 @@ function createUniqueId(): string {
     : `job-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-/** Ask background to open popup (e.g. in a new tab) so user can sign in. */
-function requestOpenPopup(): void {
-  chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {});
-}
-
 /**
  * Auth guard: if user is not authenticated, open auth broker and return false; otherwise return true.
  * Use before Start Session or before opening Previous Sessions to unify Loom-style behavior.
@@ -163,6 +158,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [widgetResetKey, setWidgetResetKey] = React.useState(0);
   const [hasPreviousSessions, setHasPreviousSessions] = React.useState(false);
   const [openResumeModalFromMessage, setOpenResumeModalFromMessage] = React.useState(false);
+  /** When POST /api/sessions returns 403 PLAN_LIMIT_REACHED, show upgrade view in tray. */
+  const [sessionLimitReached, setSessionLimitReached] = React.useState<{
+    message: string;
+    upgradePlan: unknown;
+  } | null>(null);
   const effectiveSessionId = globalState.sessionId;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
 
@@ -191,10 +191,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [isProcessingFeedback, setIsProcessingFeedback] = React.useState(false);
   /** Job queue for concurrent feedback captures; each job shows its own Processing/failed card in the tray. */
   const [feedbackJobs, setFeedbackJobs] = React.useState<FeedbackJob[]>([]);
-  const logoUrl =
-    typeof chrome !== "undefined" && chrome.runtime?.getURL
-      ? chrome.runtime.getURL("assets/Echly_logo.svg")
-      : "/Echly_logo.svg";
   const launcherLogoUrl =
     typeof chrome !== "undefined" && chrome.runtime?.getURL
       ? chrome.runtime.getURL("assets/Echly_logo_launcher.svg")
@@ -302,10 +298,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   /* Extension: when background forwards ECHLY_START_SESSION to this tab, run start-session flow. */
   React.useEffect(() => {
     const handler = () => {
-      createSession().then((session) => {
-        if (session?.id) {
-          onActiveSessionChange(session.id);
+      createSession().then((result) => {
+        if (result && "id" in result && result.id) {
+          onActiveSessionChange(result.id);
           chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
+          onExpandRequest();
+          setSessionLimitReached(null);
+        } else if (result && "limitReached" in result && result.limitReached) {
+          setSessionLimitReached({ message: result.message, upgradePlan: result.upgradePlan });
           onExpandRequest();
         }
       });
@@ -354,6 +354,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {});
   }
   const onCollapseRequest = React.useCallback(() => {
+    setSessionLimitReached(null);
     chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {});
   }, []);
 
@@ -847,15 +848,29 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return sessions;
   }, []);
 
-  async function createSession(): Promise<{ id: string } | null> {
+  async function createSession(): Promise<
+    { id: string } | { limitReached: true; message: string; upgradePlan: unknown } | null
+  > {
     if (ECHLY_DEBUG) console.log("[Echly] Creating session");
     try {
       const res = await apiFetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      const json = (await res.json()) as { success?: boolean; session?: { id: string } };
-      if (ECHLY_DEBUG) console.log("[Echly] Create session response:", { ok: res.ok, status: res.status, success: json.success, sessionId: json.session?.id });
-      if (!res.ok || !json.success || !json.session?.id) return null;
-      const session = { id: json.session.id };
-      return session;
+      const data = (await res.json()) as {
+        success?: boolean;
+        session?: { id: string };
+        error?: string;
+        message?: string;
+        upgradePlan?: unknown;
+      };
+      if (ECHLY_DEBUG) console.log("[Echly] Create session response:", { ok: res.ok, status: res.status, success: data.success, sessionId: data.session?.id, error: data.error });
+      if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
+        return {
+          limitReached: true,
+          message: data.message ?? "You've reached your session limit.",
+          upgradePlan: data.upgradePlan,
+        };
+      }
+      if (!res.ok || !data.success || !data.session?.id) return null;
+      return { id: data.session.id };
     } catch (err) {
       console.error("[Echly] Failed to create session:", err);
       return null;
@@ -885,6 +900,21 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     },
     []
   );
+
+  const verifySessionBeforeSessions = React.useCallback(() => {
+    return new Promise<boolean>((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: "ECHLY_VERIFY_DASHBOARD_SESSION" },
+        (response: { valid?: boolean } | undefined) => {
+          resolve(response?.valid === true);
+        }
+      );
+    });
+  }, []);
+
+  const onTriggerLogin = React.useCallback(() => {
+    chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {});
+  }, []);
 
   const submitPendingFeedback = React.useCallback(
     async (pending: ExtensionClarityPending) => {
@@ -1228,32 +1258,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   }
 
   if (!user) {
-    return (
-      <div style={{ pointerEvents: "auto" }}>
-        <button
-          type="button"
-          title="Sign in from extension"
-          onClick={requestOpenPopup}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            padding: "10px 20px",
-            borderRadius: "20px",
-            border: "1px solid rgba(0,0,0,0.08)",
-            background: "#fff",
-            color: "#6b7280",
-            fontSize: "14px",
-            fontWeight: 600,
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-          }}
-        >
-          <img src={logoUrl} alt="" width={22} height={22} style={{ display: "block" }} />
-          Sign in from extension
-        </button>
-      </div>
-    );
+    return null;
   }
 
   const pending = extensionClarityPending;
@@ -1448,6 +1453,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         onCreateSession={createSession}
         onActiveSessionChange={onActiveSessionChange}
         ensureAuthenticated={ensureAuthenticated}
+        verifySessionBeforeSessions={verifySessionBeforeSessions}
+        onTriggerLogin={onTriggerLogin}
         globalSessionModeActive={globalState.sessionModeActive ?? false}
         globalSessionPaused={globalState.sessionPaused ?? false}
         onSessionModeStart={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {})}
@@ -1474,6 +1481,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         launcherLogoUrl={launcherLogoUrl}
         openResumeModal={openResumeModalFromMessage}
         onResumeModalClose={() => setOpenResumeModalFromMessage(false)}
+        sessionLimitReached={sessionLimitReached}
       />
     </>
   );
