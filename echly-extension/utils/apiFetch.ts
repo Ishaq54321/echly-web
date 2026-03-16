@@ -20,10 +20,10 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
   });
 
   if (response.status === 401) {
+    console.log("[ECHLY] Auth invalid — clearing extension state");
     extensionToken = null;
     setExtensionToken(null);
     chrome.runtime.sendMessage({ type: "ECHLY_AUTH_INVALID" });
-    console.log("[ECHLY] Auth expired or user logged out");
     throw new Error("NOT_AUTHENTICATED");
   }
 

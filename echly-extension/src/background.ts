@@ -16,10 +16,37 @@ const EXTENSION_TOKEN_TTL_MS = 14 * 60 * 1000;
 console.log("ECHLY background script loaded");
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
+/** Verify dashboard session (cookie) is still valid. Does not use extension token. */
+async function verifyDashboardSession(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/extension/session`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (res.status === 401) return false;
+    return true;
+  } catch (err) {
+    console.warn("[ECHLY] Session verification failed", err);
+    return false;
+  }
+}
+
 chrome.action.onClicked.addListener(() => {
-  // Store original tab before any auth logic so we inject widget there after auth completes.
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
     if (tabs[0]?.id) sw.lastUserTabId = tabs[0].id;
+
+    const sessionValid = await verifyDashboardSession();
+    if (!sessionValid) {
+      extensionToken = null;
+      extensionTokenExpiresAt = null;
+      sw.currentUser = null;
+      setExtensionToken(null);
+      if (authTabOpen) return;
+      authTabOpen = true;
+      chrome.tabs.create({ url: EXTENSION_AUTH_URL });
+      return;
+    }
+
     void openWidgetInActiveTab();
   });
 });
@@ -234,7 +261,7 @@ async function getExtensionToken(): Promise<string> {
   return brokerPromise;
 }
 
-/** Returns valid extension token; uses cache if not expired, else auth broker. Throws NOT_AUTHENTICATED on failure. Only one token request runs at a time (token broker lock). */
+/** Returns valid extension token; uses cache if not expired and dashboard session valid, else auth broker. Throws NOT_AUTHENTICATED on failure. Only one token request runs at a time (token broker lock). */
 async function getValidToken(): Promise<string> {
   const now = Date.now();
   if (
@@ -242,7 +269,15 @@ async function getValidToken(): Promise<string> {
     extensionTokenExpiresAt != null &&
     now < extensionTokenExpiresAt
   ) {
-    return extensionToken;
+    const sessionOk = await verifyDashboardSession();
+    if (!sessionOk) {
+      extensionToken = null;
+      extensionTokenExpiresAt = null;
+      setExtensionToken(null);
+      // fall through to get new token via broker
+    } else {
+      return extensionToken;
+    }
   }
   if (tokenRequestPromise) {
     return tokenRequestPromise;
@@ -740,6 +775,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     extensionTokenExpiresAt = null;
     sw.extensionToken = null;
     sw.currentUser = null;
+    cachedSessionUser = null;
     setExtensionToken(null);
     sendResponse({ ok: true });
     return false;
