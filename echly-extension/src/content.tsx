@@ -19,6 +19,19 @@ import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/componen
 import { ECHLY_DEBUG, log } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 
+let echlyEventDispatcher: ((type: string) => void) | null = null;
+
+if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
+    if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
+      console.log("[ECHLY CONTENT] received ECHLY_OPEN_PREVIOUS_SESSIONS");
+      if (echlyEventDispatcher) {
+        echlyEventDispatcher("ECHLY_OPEN_PREVIOUS_SESSIONS");
+      }
+    }
+  });
+}
+
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
 const THEME_STORAGE_KEY = "widget-theme";
@@ -195,6 +208,18 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     typeof chrome !== "undefined" && chrome.runtime?.getURL
       ? chrome.runtime.getURL("assets/Echly_logo_launcher.svg")
       : "/Echly_logo_launcher.svg";
+
+  React.useEffect(() => {
+    echlyEventDispatcher = (type) => {
+      if (type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
+        setOpenResumeModalFromMessage(true);
+      }
+    };
+
+    return () => {
+      echlyEventDispatcher = null;
+    };
+  }, []);
 
   React.useEffect(() => {
     const toggleHandler = () => {

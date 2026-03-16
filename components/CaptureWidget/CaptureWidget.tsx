@@ -185,6 +185,8 @@ export default function CaptureWidget({
 
   const handlePreviousSessions = React.useCallback(() => {
     if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+      // Background will send ECHLY_OPEN_PREVIOUS_SESSIONS to the content script;
+      // the content script's global listener will dispatch to React via echlyEventDispatcher.
       chrome.runtime.sendMessage({ type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
     } else {
       setResumeModalOpen(true);

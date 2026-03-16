@@ -10,7 +10,9 @@ import { listenToWorkspace } from "@/lib/repositories/workspacesRepository";
 export interface BillingUsageData {
   plan: string;
   usage: {
+    /** Active (non-archived, non-deleted) sessions — use this for plan limit display (X / Y sessions used). */
     activeSessions?: number;
+    /** Lifetime sessions created (for analytics only). Do not use for limit display. */
     sessionsCreated: number;
     members?: number;
   };

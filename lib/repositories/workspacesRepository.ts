@@ -11,8 +11,7 @@ import {
 import { db } from "@/lib/firebase";
 import type { Workspace, WorkspaceDoc } from "@/lib/domain/workspace";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
-import { PLANS, type PlanId } from "@/lib/billing/plans";
-import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
+import type { PlanId } from "@/lib/billing/plans";
 
 /** Used by onboarding: create a new workspace and return its id (caller must update user.workspaceId). */
 export async function createWorkspaceRepo(params: {
@@ -137,39 +136,16 @@ export async function updateWorkspaceSettings(
 }
 
 /**
- * Updates workspace plan and syncs plan-derived entitlements from the plan catalog. Used by admin and dev testing.
- * Preserves existing entitlements.brandingControls and entitlements.integrations.
- * Does NOT delete or prune existing sessions when maxSessions is reduced; limits apply only to creating new sessions.
+ * Updates workspace billing plan only. Does not write plan-derived limits into entitlements;
+ * effective limits are always catalog[plan] unless workspace has an explicit override.
  */
 export async function updateWorkspacePlanRepo(
   workspaceId: string,
   newPlan: PlanId
 ): Promise<void> {
   const ref = doc(db, "workspaces", workspaceId);
-  const snap = await getDoc(ref);
-  const existing = snap.exists() ? (snap.data() as { entitlements?: WorkspaceDoc["entitlements"] }).entitlements : undefined;
-  let planConfig = PLANS[newPlan] ?? PLANS.free;
-
-  try {
-    const catalog = await getPlanCatalog();
-    const entry = catalog[newPlan] ?? catalog.free;
-    planConfig = {
-      maxSessions: entry.maxSessions,
-      maxMembers: entry.maxMembers,
-      insightsAccess: entry.insightsEnabled,
-    };
-  } catch {
-    // Safety fallback: stick with PLANS defaults if catalog lookup fails.
-  }
-
   await updateDoc(ref, {
     "billing.plan": newPlan,
-    entitlements: {
-      ...(existing && typeof existing === "object" ? existing : {}),
-      maxSessions: planConfig.maxSessions,
-      maxMembers: planConfig.maxMembers,
-      insightsAccess: planConfig.insightsAccess,
-    },
     updatedAt: serverTimestamp(),
   });
 }

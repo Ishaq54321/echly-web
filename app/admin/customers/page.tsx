@@ -25,6 +25,19 @@ export default function AdminCustomersPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [overrideLimit, setOverrideLimit] = useState<string>("");
   const [newPlan, setNewPlan] = useState<string>("");
+  /** Sync override input when selected workspace changes. Input = overrideLimit ?? planLimitSessions */
+  useEffect(() => {
+    if (!selected) return;
+    const planDefault = selected.planLimitSessions;
+    const override = selected.overrideLimit;
+    if (override === undefined) {
+      setOverrideLimit(planDefault != null ? String(planDefault) : "");
+    } else if (override === null) {
+      setOverrideLimit("");
+    } else {
+      setOverrideLimit(String(override));
+    }
+  }, [selected?.id, selected?.overrideLimit, selected?.planLimitSessions]);
   const [confirm, setConfirm] = useState<{
     title: string;
     message: string;
@@ -97,13 +110,6 @@ export default function AdminCustomersPage() {
   };
 
   const closeConfirm = () => setConfirm(null);
-
-  const handleResetUsage = (row: WorkspaceRow) => {
-    openConfirm("Reset usage?", "This will reset session and feedback usage counters for this workspace.", () => {
-      runAction(row.id, "reset_usage", {}, "Usage reset");
-      closeConfirm();
-    });
-  };
 
   const handleSuspend = (row: WorkspaceRow) => {
     openConfirm("Suspend workspace?", "Are you sure you want to suspend this workspace? Users will not be able to use the app.", () => {
@@ -298,6 +304,12 @@ export default function AdminCustomersPage() {
                 <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">
                   Limits
                 </h3>
+                <p className="text-xs text-neutral-600 mb-2">
+                  Plan default:{" "}
+                  {selected.planLimitSessions != null
+                    ? `${selected.planLimitSessions} sessions`
+                    : "Unlimited"}
+                </p>
                 <label className="block text-xs font-medium text-neutral-500 mb-1">
                   Override session limit
                 </label>
@@ -305,21 +317,46 @@ export default function AdminCustomersPage() {
                   type="text"
                   value={overrideLimit}
                   onChange={(e) => setOverrideLimit(e.target.value)}
-                  placeholder="e.g. 100 or empty for unlimited"
+                  placeholder={
+                    selected.planLimitSessions != null
+                      ? `e.g. ${selected.planLimitSessions} or empty for plan default`
+                      : "Empty = plan default (unlimited)"
+                  }
                   disabled={actionLoading}
                   className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm mb-2 disabled:opacity-60"
                 />
-                <div className="flex gap-2">
+                {/* Status: Custom limit | Unlimited | Using plan default */}
+                <p className="text-xs text-neutral-500 mb-2">
+                  {selected.overrideLimit !== undefined ? (
+                    selected.overrideLimit === null ? (
+                      "Unlimited"
+                    ) : (
+                      "Custom limit"
+                    )
+                  ) : (
+                    "Using plan default"
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      runAction(
-                        selected.id,
-                        "override_session_limit",
-                        { sessionLimit: overrideLimit === "" ? null : parseInt(overrideLimit, 10) },
-                        "Limit updated"
-                      )
-                    }
+                    onClick={() => {
+                      if (overrideLimit.trim() === "") {
+                        runAction(selected.id, "remove_session_override", {}, "Override removed");
+                      } else {
+                        const value = parseInt(overrideLimit, 10);
+                        if (!Number.isNaN(value) && value >= 0) {
+                          runAction(
+                            selected.id,
+                            "override_session_limit",
+                            { sessionLimit: value },
+                            "Limit updated"
+                          );
+                        } else {
+                          showToast("Enter a valid number");
+                        }
+                      }
+                    }}
                     disabled={actionLoading}
                     className="rounded-lg px-3 py-2 text-sm font-medium bg-neutral-100 text-neutral-800 hover:bg-neutral-200 disabled:opacity-60"
                   >
@@ -335,6 +372,18 @@ export default function AdminCustomersPage() {
                   >
                     {actionLoading ? "Updating…" : "Grant unlimited"}
                   </button>
+                  {selected.overrideLimit !== undefined && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        runAction(selected.id, "remove_session_override", {}, "Override removed")
+                      }
+                      disabled={actionLoading}
+                      className="rounded-lg px-3 py-2 text-sm font-medium bg-neutral-100 text-neutral-800 hover:bg-neutral-200 disabled:opacity-60"
+                    >
+                      {actionLoading ? "Updating…" : "Remove override"}
+                    </button>
+                  )}
                 </div>
               </section>
 
@@ -344,14 +393,6 @@ export default function AdminCustomersPage() {
                   Danger Zone
                 </h3>
                 <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => handleResetUsage(selected)}
-                    disabled={actionLoading}
-                    className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 disabled:opacity-60"
-                  >
-                    {actionLoading ? "Updating…" : "Reset usage"}
-                  </button>
                   {suspended ? (
                     <button
                       type="button"

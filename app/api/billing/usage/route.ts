@@ -5,7 +5,6 @@ import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive
 import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository";
 import { getWorkspaceEntitlements } from "@/lib/billing/getWorkspaceEntitlements";
 import { getWorkspacePlanState } from "@/lib/billing/getWorkspacePlanState";
-import { PLANS } from "@/lib/billing/plans";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +16,8 @@ const SAFE_FALLBACK = {
     members: 1,
   },
   limits: {
-    maxSessions: PLANS.free.maxSessions,
-    maxMembers: PLANS.free.maxMembers,
+    maxSessions: null,
+    maxMembers: null,
   },
 };
 
@@ -42,7 +41,7 @@ export async function GET(req: Request) {
       return NextResponse.json(SAFE_FALLBACK);
     }
 
-    // Optional: use centralized plan resolver for canonical plan/limits/usage
+    // Plan state uses getWorkspaceEntitlements (catalog + overrides only), so admin plan changes show immediately
     const planState = await getWorkspacePlanState(workspaceId);
     if (planState) {
       return NextResponse.json({
@@ -63,8 +62,8 @@ export async function GET(req: Request) {
     const activeSessionCount = await getWorkspaceSessionCountRepo(workspaceId);
     const entitlements = await getWorkspaceEntitlements(workspace);
     const limits = {
-      maxSessions: entitlements.maxSessions ?? PLANS.free.maxSessions,
-      maxMembers: entitlements.maxMembers ?? PLANS.free.maxMembers,
+      maxSessions: entitlements.maxSessions,
+      maxMembers: entitlements.maxMembers,
     };
 
     return NextResponse.json({

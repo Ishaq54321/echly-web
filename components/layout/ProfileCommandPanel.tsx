@@ -431,7 +431,7 @@ export function ProfileCommandPanel({
                 </p>
                 <p className="font-semibold text-[14px] text-neutral-700 mt-0 mb-0.5">
                   {billingUsage
-                    ? `${billingUsage.usage.sessionsCreated} / ${
+                    ? `${billingUsage.usage.activeSessions ?? 0} / ${
                         billingUsage.limits.maxSessions == null
                           ? "Unlimited"
                           : billingUsage.limits.maxSessions

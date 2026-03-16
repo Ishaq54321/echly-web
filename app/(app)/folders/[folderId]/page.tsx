@@ -6,11 +6,9 @@ import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, onSnapshot } from "fir
 import { db } from "@/lib/firebase";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { clearAuthTokenCache } from "@/lib/authFetch";
-import { createSession } from "@/lib/sessions";
+import { clearAuthTokenCache, authFetch } from "@/lib/authFetch";
 import { getSessionFeedbackCounts } from "@/lib/feedback";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import type { Session } from "@/lib/domain/session";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
@@ -20,6 +18,7 @@ import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { MoveSessionsModal } from "@/components/dashboard/MoveSessionsModal";
 import SessionsGridSkeleton from "@/components/skeleton/SessionsGridSkeleton";
 import { DragSessionProvider } from "@/components/dashboard/context/DragSessionContext";
+import { UpgradeModal } from "@/components/billing/UpgradeModal";
 
 interface FolderData {
   id: string;
@@ -65,6 +64,11 @@ function FolderPageContent() {
   const [sessions, setSessions] = useState<SessionWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradePayload, setUpgradePayload] = useState<{
+    message: string;
+    upgradePlan: string | null;
+  } | null>(null);
   const { sessions: allSessions } = useWorkspaceOverview("all");
   const sessionsNotInFolder = useMemo(
     () =>
@@ -138,19 +142,44 @@ function FolderPageContent() {
   const handleCreateSession = useCallback(async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
-    const workspaceId = (await getUserWorkspaceIdRepo(currentUser.uid)) ?? currentUser.uid;
 
-    const parts = (currentUser.displayName || "User").trim().split(/\s+/);
-    const firstName = parts[0] || "User";
-    const lastName = parts.slice(1).join(" ") || "";
-    const createdBy = {
-      id: currentUser.uid,
-      firstName,
-      lastName,
-      avatarUrl: currentUser.photoURL ?? undefined,
-    };
+    const res = await authFetch("/api/sessions", { method: "POST" });
+    const data = await res.json().catch(() => ({}));
 
-    const sessionId = await createSession(workspaceId, currentUser.uid, createdBy);
+    if (res.status === 403) {
+      if (data.error === "PLAN_LIMIT_REACHED") {
+        setUpgradePayload({
+          message: data.message ?? "You've reached your plan limit.",
+          upgradePlan: data.upgradePlan ?? "starter",
+        });
+        setUpgradeModalOpen(true);
+        return;
+      }
+      if (data.error === "WORKSPACE_SUSPENDED") {
+        setUpgradePayload({
+          message: data.message ?? "Workspace suspended. Contact support.",
+          upgradePlan: null,
+        });
+        setUpgradeModalOpen(true);
+        return;
+      }
+      setUpgradePayload({
+        message:
+          (data && typeof data.message === "string" && data.message) ||
+          "You don't have permission to create a session.",
+        upgradePlan: data?.upgradePlan ?? null,
+      });
+      setUpgradeModalOpen(true);
+      return;
+    }
+
+    if (!res.ok) {
+      console.error("Create session failed:", res.status, data);
+      return;
+    }
+
+    const sessionId = data.session?.id;
+    if (!sessionId) return;
 
     if (folderId) {
       const { updateDoc, arrayUnion } = await import("firebase/firestore");
@@ -287,6 +316,16 @@ function FolderPageContent() {
           await loadFolder();
           setMoveModalOpen(false);
         }}
+      />
+
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onClose={() => {
+          setUpgradeModalOpen(false);
+          setUpgradePayload(null);
+        }}
+        message={upgradePayload?.message}
+        upgradePlan={upgradePayload?.upgradePlan ?? null}
       />
     </div>
   );

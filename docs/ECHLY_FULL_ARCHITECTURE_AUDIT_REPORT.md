@@ -255,7 +255,7 @@
 - **GET /api/admin/me** — Auth + isAdmin check (requireAdmin(uid)).
 - **GET/PATCH /api/admin/plans** — List/update plan documents; PATCH merges into Firestore and logs to adminLogs, invalidates plan cache.
 - **GET /api/admin/workspaces** — All workspaces with owner email/name and session count per workspace.
-- **POST /api/admin/workspaces/actions** — set_plan, grant_unlimited_sessions, override_session_limit, reset_usage, suspend, resume.
+- **POST /api/admin/workspaces/actions** — set_plan, grant_unlimited_sessions, override_session_limit, suspend, resume.
 - **POST /api/admin/update-plan** — Owner-only plan change (workspace.ownerId === user.uid); calls updateWorkspacePlanRepo.
 - **GET /api/admin/usage** — Aggregate: totalWorkspaces, free/paid counts, totalSessions, totalFeedbackCaptured (iterates all workspaces, calls getWorkspaceSessionCountRepo per workspace).
 
@@ -279,7 +279,6 @@
 
 - **set_plan / update-plan:** Change billing.plan and sync entitlements → session limit and billing/usage reflect new plan.
 - **override_session_limit / grant_unlimited_sessions:** Change entitlements only → immediate effect on limit checks and billing API.
-- **reset_usage:** Zeroes usage counters (sessionsCreated, feedbackCreated); does not delete sessions.
 - **suspend / resume:** Product APIs and UI treat workspace as blocked or allowed.
 
 ---

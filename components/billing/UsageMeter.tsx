@@ -88,7 +88,7 @@ export function UsageMeter() {
       <div className="space-y-3">
         <MeterRow
           label="Sessions used"
-          used={data.usage.activeSessions ?? data.usage.sessionsCreated ?? 0}
+          used={data.usage.activeSessions ?? 0}
           limit={data.limits.maxSessions}
         />
         <MeterRow

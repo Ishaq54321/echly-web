@@ -40283,6 +40283,17 @@
   // echly-extension/src/content.tsx
   var import_react18 = __toESM(require_react());
   var import_client = __toESM(require_client());
+  var echlyEventDispatcher = null;
+  if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
+        console.log("[ECHLY CONTENT] received ECHLY_OPEN_PREVIOUS_SESSIONS");
+        if (echlyEventDispatcher) {
+          echlyEventDispatcher("ECHLY_OPEN_PREVIOUS_SESSIONS");
+        }
+      }
+    });
+  }
   var ROOT_ID = "echly-root";
   var SHADOW_HOST_ID3 = "echly-shadow-host";
   var THEME_STORAGE_KEY = "widget-theme";
@@ -40388,6 +40399,16 @@
     const [isProcessingFeedback, setIsProcessingFeedback] = import_react18.default.useState(false);
     const [feedbackJobs, setFeedbackJobs] = import_react18.default.useState([]);
     const launcherLogoUrl = typeof chrome !== "undefined" && chrome.runtime?.getURL ? chrome.runtime.getURL("assets/Echly_logo_launcher.svg") : "/Echly_logo_launcher.svg";
+    import_react18.default.useEffect(() => {
+      echlyEventDispatcher = (type) => {
+        if (type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
+          setOpenResumeModalFromMessage(true);
+        }
+      };
+      return () => {
+        echlyEventDispatcher = null;
+      };
+    }, []);
     import_react18.default.useEffect(() => {
       const toggleHandler = () => {
         widgetToggleRef.current?.();

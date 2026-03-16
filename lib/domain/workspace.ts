@@ -1,5 +1,4 @@
 import type { Timestamp } from "firebase/firestore";
-import { PLANS } from "@/lib/billing/plans";
 
 export type WorkspacePlan = "free" | "starter" | "business" | "enterprise";
 export type WorkspaceBillingCycle = "monthly" | "annual";
@@ -57,12 +56,15 @@ export interface Workspace {
     suspended?: boolean;
   };
 
-  /** Plan-derived limits. Stored so they can be overridden; defaults from PLANS[plan]. */
+  /** Only explicit overrides. Plan-derived limits come from plan catalog; missing = use catalog. */
   entitlements: {
     brandingControls: boolean;
     integrations: boolean;
+    /** Override only; if absent, use catalog[plan].insightsEnabled */
     insightsAccess?: boolean;
+    /** Override only; if absent, use catalog[plan].maxSessions */
     maxSessions?: number | null;
+    /** Override only; if absent, use catalog[plan].maxMembers */
     maxMembers?: number | null;
     maxFeedbackPerSession?: number | null;
   };
@@ -127,9 +129,7 @@ export function defaultWorkspaceDoc(params: {
     entitlements: {
       brandingControls: false,
       integrations: false,
-      insightsAccess: PLANS.free.insightsAccess,
-      maxSessions: PLANS.free.maxSessions,
-      maxMembers: PLANS.free.maxMembers,
+      // Do not set maxSessions, maxMembers, insightsAccess — plan catalog is source of truth
     },
     usage: {
       sessionsCreated: 0,

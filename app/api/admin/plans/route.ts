@@ -9,8 +9,6 @@ import {
   type PlanId,
   DEFAULT_PRICES,
 } from "@/lib/billing/plans";
-import { invalidatePlanCatalogCache } from "@/lib/billing/getPlanCatalog";
-
 const PLANS_COLLECTION = "plans";
 
 export type PlanWithId = PlanDoc & { id: string };
@@ -101,7 +99,6 @@ export async function PATCH(req: Request) {
       action: "plans.update",
       metadata: { planId: id, updates: payload },
     });
-    invalidatePlanCatalogCache();
     return NextResponse.json({ success: true, id });
   } catch (err) {
     console.error("PATCH /api/admin/plans:", err);

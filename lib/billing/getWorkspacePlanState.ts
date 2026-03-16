@@ -1,5 +1,6 @@
 import { getWorkspace } from "@/lib/repositories/workspacesRepository";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
+import { getWorkspaceEntitlements } from "@/lib/billing/getWorkspaceEntitlements";
 import { getWorkspaceUsage } from "@/lib/billing/getWorkspaceUsage";
 import type { PlanId } from "@/lib/billing/plans";
 
@@ -25,8 +26,8 @@ export type WorkspacePlanState = {
 
 /**
  * Central plan resolver: returns the current plan state of a workspace including
- * pricing, limits, usage, and permissions. Use this as the canonical source
- * for plan-derived data. Does not modify session limit enforcement.
+ * pricing, limits, usage, and permissions. Limits come from getWorkspaceEntitlements
+ * (catalog + override-only), so admin plan changes apply immediately in the dashboard.
  */
 export async function getWorkspacePlanState(
   workspaceId: string
@@ -35,16 +36,15 @@ export async function getWorkspacePlanState(
   if (!workspace) return null;
 
   const catalog = await getPlanCatalog();
+  const entitlements = await getWorkspaceEntitlements(workspace);
   const usageResult = await getWorkspaceUsage(workspaceId);
 
   const planId = (workspace.billing?.plan ?? "free") as PlanId;
   const plan = catalog[planId] ?? catalog.free;
 
   const limits = {
-    maxSessions:
-      workspace.entitlements?.maxSessions ?? plan.maxSessions ?? null,
-    maxMembers:
-      workspace.entitlements?.maxMembers ?? plan.maxMembers ?? null,
+    maxSessions: entitlements.maxSessions ?? null,
+    maxMembers: entitlements.maxMembers ?? null,
   };
 
   const sessions = usageResult?.sessionCount ?? 0;

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, deleteField } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { logAdminAction } from "@/lib/admin/adminLogs";
@@ -13,14 +13,14 @@ type Action =
   | "set_plan"
   | "grant_unlimited_sessions"
   | "override_session_limit"
-  | "reset_usage"
+  | "remove_session_override"
   | "suspend"
   | "resume";
 
 /**
  * POST /api/admin/workspaces/actions
  * Body: { workspaceId: string, action: Action, ...actionParams }
- * Admin actions: set_plan, grant_unlimited_sessions, override_session_limit, reset_usage, suspend, resume.
+ * Admin actions: set_plan, grant_unlimited_sessions, override_session_limit, remove_session_override, suspend, resume.
  */
 export async function POST(req: Request) {
   let admin;
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   if (!workspaceId) {
     return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
   }
-  if (!action || !["set_plan", "grant_unlimited_sessions", "override_session_limit", "reset_usage", "suspend", "resume"].includes(action)) {
+  if (!action || !["set_plan", "grant_unlimited_sessions", "override_session_limit", "remove_session_override", "suspend", "resume"].includes(action)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
@@ -88,13 +88,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
-    if (action === "reset_usage") {
+    if (action === "remove_session_override") {
       await updateDoc(ref, {
-        "usage.sessionsCreated": 0,
-        "usage.feedbackCreated": 0,
+        "entitlements.maxSessions": deleteField(),
         updatedAt: serverTimestamp(),
       });
-      await logAdminAction({ adminId: admin.uid, action: "workspace.reset_usage", workspaceId });
+      await logAdminAction({ adminId: admin.uid, action: "workspace.remove_session_override", workspaceId });
       return NextResponse.json({ success: true });
     }
 

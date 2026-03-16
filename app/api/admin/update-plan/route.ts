@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository";
 import { updateWorkspacePlanRepo } from "@/lib/repositories/workspacesRepository";
+import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 import type { PlanId } from "@/lib/billing/plans";
-import { PLANS } from "@/lib/billing/plans";
 
 const VALID_PLANS: PlanId[] = ["free", "starter", "business", "enterprise"];
 
 /**
  * POST /api/admin/update-plan
  * Body: { workspaceId: string, newPlan: PlanId }
- * Updates workspace.billing.plan and workspace.entitlements from PLANS[newPlan].
+ * Updates workspace.billing.plan. Limits come from plan catalog (source of truth).
  * Only allowed if the authenticated user is the workspace owner.
  */
 export async function POST(req: Request) {
@@ -65,10 +65,16 @@ export async function POST(req: Request) {
 
   try {
     await updateWorkspacePlanRepo(workspaceId, newPlan as PlanId);
+    const catalog = await getPlanCatalog();
+    const entry = catalog[newPlan as PlanId] ?? catalog.free;
     return NextResponse.json({
       success: true,
       plan: newPlan,
-      limits: PLANS[newPlan as PlanId],
+      limits: {
+        maxSessions: entry.maxSessions,
+        maxMembers: entry.maxMembers,
+        insightsAccess: entry.insightsEnabled,
+      },
     });
   } catch (err) {
     console.error("POST /api/admin/update-plan:", err);

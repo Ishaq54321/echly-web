@@ -27,6 +27,9 @@ type SessionDoc = Omit<Session, "id"> & { createdAt?: Timestamp | null; updatedA
 /**
  * Creates a single new session and increments workspace usage in one transaction.
  * Only writes ONE session document; never modifies existing session documents.
+ *
+ * SERVER-ONLY: Import and use only from API routes (e.g. POST /api/sessions).
+ * Client code must create sessions via POST /api/sessions so plan limits are enforced.
  */
 export async function createSessionRepo(
   workspaceId: string,

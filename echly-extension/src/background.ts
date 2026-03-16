@@ -87,8 +87,6 @@ let extensionToken: string | null = null;
 let extensionTokenExpiresAt: number | null = null;
 /** Cached user from last successful session response; used for ECHLY_GET_AUTH_STATE. */
 let cachedSessionUser: StoredUser | null = null;
-/** Only one token request at a time; shared promise so concurrent callers get the same /extension-auth flow. */
-let tokenRequestPromise: Promise<string> | null = null;
 /** Resolver for the pending getExtensionToken() when waiting for broker tab. */
 let tokenBrokerResolve: ((token: string) => void) | null = null;
 let tokenBrokerReject: ((err: Error) => void) | null = null;
@@ -333,65 +331,61 @@ async function getExtensionToken(): Promise<string> {
   return brokerPromise;
 }
 
-/** Returns valid extension token; uses cache if not expired and dashboard session valid, else auth broker. Throws NOT_AUTHENTICATED on failure. Only one token request runs at a time (token broker lock). */
+/** Returns valid extension token from cache if not expired and dashboard session valid. Throws NOT_AUTHENTICATED if no valid token. Never opens /extension-auth. */
 async function getValidToken(): Promise<string> {
   const now = Date.now();
+
   if (
     extensionToken &&
     extensionTokenExpiresAt != null &&
     now < extensionTokenExpiresAt
   ) {
     const sessionOk = await verifyDashboardSession();
+
     if (!sessionOk) {
       extensionToken = null;
       extensionTokenExpiresAt = null;
       setExtensionToken(null);
-      // fall through to get new token via broker
-    } else {
-      return extensionToken;
+      throw new Error("NOT_AUTHENTICATED");
     }
+
+    return extensionToken;
   }
-  if (tokenRequestPromise) {
-    return tokenRequestPromise;
-  }
-  extensionToken = null;
-  extensionTokenExpiresAt = null;
-  tokenRequestPromise = new Promise<string>(async (resolve, reject) => {
-    try {
-      const token = await getExtensionToken();
-      resolve(token);
-    } catch (err) {
-      reject(err);
-    } finally {
-      tokenRequestPromise = null;
-    }
-  });
-  return tokenRequestPromise;
+
+  throw new Error("NOT_AUTHENTICATED");
 }
 
 /**
- * Lazy auth hydration: ensure currentUser/token are set from dashboard cookie
- * so ECHLY_GET_AUTH_STATE can return authenticated: true without requiring dashboard tab.
+ * Verify dashboard session only. Never requests tokens or opens login.
+ * Used by ECHLY_GET_AUTH_STATE to report authenticated state from in-memory user/token or session cookie.
  */
 async function hydrateAuthState(): Promise<boolean> {
-  console.log("[ECHLY] Checking auth state");
-  console.log("[ECHLY] currentUser:", sw.currentUser ?? "null");
-
+  // Already authenticated in memory
   if (sw.currentUser && sw.extensionToken) {
     return true;
   }
 
-  try {
-    const token = await getValidToken();
-    if (token) {
-      console.log("[ECHLY] Token fetched:", !!sw.extensionToken);
-      return true;
-    }
-  } catch (err) {
-    console.debug("[ECHLY] auth hydration failed", err);
+  // Verify dashboard session cookie
+  const sessionValid = await verifyDashboardSession();
+
+  // If no dashboard session exists, clear auth state
+  if (!sessionValid) {
+    extensionToken = null;
+    extensionTokenExpiresAt = null;
+    sw.extensionToken = null;
+    sw.currentUser = null;
+    cachedSessionUser = null;
+    setExtensionToken(null);
+    return false;
   }
 
-  return false;
+  // Dashboard session exists — obtain extension token silently
+  try {
+    const token = await getExtensionToken();
+    return !!token;
+  } catch {
+    return false;
+  }
 }
 
 function broadcastUIState(): void {

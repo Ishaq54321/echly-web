@@ -1,7 +1,6 @@
 export type { Session, SessionCreatedBy } from "@/lib/domain/session";
-import type { Session, SessionCreatedBy } from "@/lib/domain/session";
+import type { Session } from "@/lib/domain/session";
 import {
-  createSessionRepo,
   deleteSessionRepo,
   getSessionByIdRepo,
   getUserSessionsRepo,
@@ -11,21 +10,10 @@ import {
   recordSessionViewIfNewRepo,
 } from "@/lib/repositories/sessionsRepository";
 
-/* ================================
-   SESSION TYPE
-================================ */
-
-/* ================================
-   CREATE SESSION
-================================ */
-
-export async function createSession(
-  workspaceId: string,
-  userId: string,
-  createdBy?: SessionCreatedBy | null
-): Promise<string> {
-  return await createSessionRepo(workspaceId, userId, createdBy);
-}
+/**
+ * Session creation is only allowed via POST /api/sessions (plan limits enforced there).
+ * Do not add a createSession() helper here; clients must call the API.
+ */
 
 /* ================================
    RECORD SESSION VIEW (Loom-style)
