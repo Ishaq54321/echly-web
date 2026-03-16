@@ -436,22 +436,38 @@ async function ensureContentScriptInjected(tabId: number): Promise<boolean> {
   }
 }
 
-/** Deterministic open: set echlyActive, inject content script if needed, then set visible + expanded and notify the tab (lastUserTabId from icon click, so widget appears where user clicked). */
 async function openWidgetInActiveTab(): Promise<void> {
   await chrome.storage.local.set({ echlyActive: true });
+
   globalUIState.visible = true;
   globalUIState.expanded = true;
+
   broadcastUIState();
-  console.log("[ECHLY BG] broadcasted global UI state", globalUIState);
-  const tabId = sw.lastUserTabId;
-  if (!tabId) return;
-  const injected = await ensureContentScriptInjected(tabId);
-  if (!injected) {
-    console.warn("[ECHLY BG] could not inject into tab", tabId);
+
+  const tabs = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  const tabId = tabs[0]?.id;
+
+  if (!tabId) {
+    console.warn("[ECHLY BG] No active tab found");
     return;
   }
-  console.log("[ECHLY BG] sending OPEN_WIDGET to tab", tabId);
-  chrome.tabs.sendMessage(tabId, { type: "ECHLY_OPEN_WIDGET" }).catch(() => {});
+
+  const injected = await ensureContentScriptInjected(tabId);
+
+  if (!injected) {
+    console.warn("[ECHLY BG] Could not inject widget into tab", tabId);
+    return;
+  }
+
+  chrome.tabs
+    .sendMessage(tabId, {
+      type: "ECHLY_OPEN_WIDGET",
+    })
+    .catch(() => {});
 }
 
 /** Loom-style: when user switches tabs and Echly is active, inject content script so widget appears on every tab. */

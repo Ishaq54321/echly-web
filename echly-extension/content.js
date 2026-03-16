@@ -37680,7 +37680,7 @@
       if (extensionMode && onCreateSession && onActiveSessionChange) {
         if (ensureAuthenticated2 && !await ensureAuthenticated2()) return;
         const session = await onCreateSession();
-        if (!session?.id) return;
+        if (!session || "limitReached" in session) return;
         onActiveSessionChange(session.id);
         setPointers([]);
         onSessionModeStart?.();
@@ -39761,99 +39761,101 @@
     );
   }
 
-  // components/CaptureWidget/SessionLimitReachedView.tsx
+  // components/CaptureWidget/SessionLimitUpgradeView.tsx
   var import_jsx_runtime12 = __toESM(require_jsx_runtime());
-  function SessionLimitIllustration() {
+  function SessionLimitUpgradeView({
+    limitMessage,
+    onUpgrade
+  }) {
+    const description = limitMessage?.trim() || "Your current plan allows a limited number of sessions.";
+    const imageSrc = chrome.runtime.getURL(
+      "assets/feedback-tray-session-limit.png"
+    );
     return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
-      "svg",
+      "div",
       {
-        width: "96",
-        height: "96",
-        viewBox: "0 0 96 96",
-        fill: "none",
-        xmlns: "http://www.w3.org/2000/svg",
-        className: "echly-limit-illustration",
-        "aria-hidden": true,
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          textAlign: "center",
+          padding: "12px 8px",
+          maxWidth: 320,
+          margin: "0 auto"
+        },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-            "ellipse",
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { marginBottom: 24 }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+            "img",
             {
-              cx: "48",
-              cy: "48",
-              rx: "40",
-              ry: "40",
-              fill: "none",
-              stroke: "#1775E0",
-              strokeWidth: "1",
-              strokeOpacity: "0.4"
+              src: imageSrc,
+              alt: "Session limit reached",
+              style: {
+                width: 120,
+                height: 120,
+                objectFit: "contain"
+              }
+            }
+          ) }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+            "h2",
+            {
+              style: {
+                fontSize: 20,
+                fontWeight: 600,
+                marginBottom: 12,
+                color: "#111827"
+              },
+              children: "You\u2019ve reached your session limit"
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+            "p",
+            {
+              style: {
+                fontSize: 14,
+                lineHeight: "1.6",
+                color: "#6B7280",
+                marginBottom: 28,
+                maxWidth: 260
+              },
+              children: [
+                description,
+                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("br", {}),
+                "Upgrade your plan to keep capturing feedback without limits."
+              ]
             }
           ),
           /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-            "ellipse",
+            "button",
             {
-              cx: "48",
-              cy: "48",
-              rx: "26",
-              ry: "26",
-              fill: "none",
-              stroke: "#1775E0",
-              strokeWidth: "1",
-              strokeOpacity: "0.25"
+              type: "button",
+              onClick: onUpgrade,
+              style: {
+                width: "100%",
+                maxWidth: 260,
+                height: 44,
+                borderRadius: 12,
+                border: "none",
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: "pointer",
+                color: "#fff",
+                background: "linear-gradient(135deg,#2563EB,#3B82F6)",
+                boxShadow: "0 6px 18px rgba(37,99,235,0.35)",
+                transition: "transform 0.08s ease, box-shadow 0.08s ease"
+              },
+              onMouseDown: (e) => {
+                e.currentTarget.style.transform = "scale(0.97)";
+              },
+              onMouseUp: (e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              },
+              children: "Upgrade Plan"
             }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("circle", { cx: "48", cy: "48", r: "2", fill: "#1775E0", fillOpacity: "0.8" }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("circle", { cx: "88", cy: "48", r: "2", fill: "#1775E0", fillOpacity: "0.9" })
+          )
         ]
       }
     );
-  }
-  function parseSessionLimitFromMessage(message) {
-    if (!message || typeof message !== "string") return void 0;
-    const match = message.match(/(\d+)\s*session|maximum\s*(?:of\s*)?(\d+)|limit\s*(?:of\s*)?(\d+)/i);
-    if (match) {
-      const n = parseInt(match[1] ?? match[2] ?? match[3] ?? "", 10);
-      return Number.isFinite(n) ? n : void 0;
-    }
-    return void 0;
-  }
-  function SessionLimitReachedView({
-    maxSessions: maxSessionsProp,
-    message,
-    onUpgrade,
-    onDeleteOldSessions,
-    theme = "dark"
-  }) {
-    const maxSessions = maxSessionsProp ?? parseSessionLimitFromMessage(message);
-    const limitLine = maxSessions != null ? `Your current plan allows up to ${maxSessions} session${maxSessions === 1 ? "" : "s"}.` : message ?? "Your current plan has a session limit.";
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "echly-limit-reached-view", "data-theme": theme, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "echly-limit-reached-illustration-wrap", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(SessionLimitIllustration, {}) }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h2", { className: "echly-limit-reached-title", children: "You've reached your session limit" }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("p", { className: "echly-limit-reached-description", children: [
-        limitLine,
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("br", {}),
-        "Upgrade your plan to keep capturing feedback, or delete older sessions to free up space."
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-        "button",
-        {
-          type: "button",
-          className: "echly-limit-reached-upgrade-btn",
-          onClick: onUpgrade,
-          "aria-label": "Upgrade plan",
-          children: "Upgrade Plan"
-        }
-      ),
-      onDeleteOldSessions && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-        "button",
-        {
-          type: "button",
-          className: "echly-limit-reached-secondary-link",
-          onClick: onDeleteOldSessions,
-          "aria-label": "Delete old sessions",
-          children: "Delete old sessions"
-        }
-      )
-    ] });
   }
 
   // components/CaptureWidget/CaptureWidget.tsx
@@ -40146,20 +40148,17 @@
                     showOnlyClose: Boolean(sessionLimitReached)
                   }
                 ),
-                sessionLimitReached ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "echly-sidebar-body echly-limit-reached-body", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-                  SessionLimitReachedView,
+                sessionLimitReached ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "echly-sidebar-body echly-upgrade-card-body", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+                  SessionLimitUpgradeView,
                   {
-                    maxSessions: sessionLimitReached.upgradePlan != null && typeof sessionLimitReached.upgradePlan.maxSessions === "number" ? sessionLimitReached.upgradePlan.maxSessions : void 0,
-                    message: sessionLimitReached.message,
+                    limitMessage: sessionLimitReached.message,
+                    upgradePlan: sessionLimitReached.upgradePlan,
                     onUpgrade: () => {
                       if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
                         chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {
                         });
                       }
-                    },
-                    onDeleteOldSessions: extensionMode && typeof chrome !== "undefined" && chrome.runtime?.sendMessage ? () => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_DASHBOARD" }).catch(() => {
-                    }) : void 0,
-                    theme
+                    }
                   }
                 ) }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
                   "div",

@@ -9,7 +9,7 @@ import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
 import { ResumeSessionModal } from "./ResumeSessionModal";
 import { MicrophonePanel } from "./MicrophonePanel";
-import { SessionLimitReachedView } from "./SessionLimitReachedView";
+import { SessionLimitUpgradeView } from "./SessionLimitUpgradeView";
 import type { CaptureWidgetProps, CaptureState } from "./types";
 
 const CAPTURE_FLOW_STATES: CaptureState[] = ["focus_mode", "region_selecting", "voice_listening", "processing"];
@@ -332,26 +332,15 @@ export default function CaptureWidget({
               />
 
               {sessionLimitReached ? (
-                <div className="echly-sidebar-body echly-limit-reached-body">
-                  <SessionLimitReachedView
-                    maxSessions={
-                      sessionLimitReached.upgradePlan != null &&
-                      typeof (sessionLimitReached.upgradePlan as { maxSessions?: number }).maxSessions === "number"
-                        ? (sessionLimitReached.upgradePlan as { maxSessions: number }).maxSessions
-                        : undefined
-                    }
-                    message={sessionLimitReached.message}
+                <div className="echly-sidebar-body echly-upgrade-card-body">
+                  <SessionLimitUpgradeView
+                    limitMessage={sessionLimitReached.message}
+                    upgradePlan={sessionLimitReached.upgradePlan}
                     onUpgrade={() => {
                       if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
                         chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {});
                       }
                     }}
-                    onDeleteOldSessions={
-                      extensionMode && typeof chrome !== "undefined" && chrome.runtime?.sendMessage
-                        ? () => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_DASHBOARD" }).catch(() => {})
-                        : undefined
-                    }
-                    theme={theme}
                   />
                 </div>
               ) : (
