@@ -38463,10 +38463,12 @@
     extensionMode = false,
     onStartSession,
     onOpenPreviousSession,
+    openingPrevious = false,
     hasActiveSession = false,
     captureDisabled = false
   }) {
     const effectivelyDisabled = !isIdle || captureDisabled;
+    const previousDisabled = effectivelyDisabled || openingPrevious;
     if (extensionMode) {
       return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "echly-command-actions", children: [
         /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
@@ -38484,11 +38486,12 @@
           "button",
           {
             type: "button",
-            onClick: effectivelyDisabled ? void 0 : onOpenPreviousSession,
-            disabled: effectivelyDisabled,
+            onClick: previousDisabled ? void 0 : onOpenPreviousSession,
+            disabled: previousDisabled,
             className: "echly-previous-session-btn",
-            "aria-label": "Previous Sessions",
-            children: "Previous Sessions"
+            "aria-label": openingPrevious ? "Opening previous sessions" : "Previous Sessions",
+            "aria-busy": openingPrevious,
+            children: openingPrevious ? "Opening..." : "Previous Sessions"
           }
         )
       ] });
@@ -39803,7 +39806,7 @@
                 fontSize: 20,
                 fontWeight: 600,
                 marginBottom: 12,
-                color: "#111827"
+                color: "var(--text-primary)"
               },
               children: "You\u2019ve reached your session limit"
             }
@@ -39814,7 +39817,7 @@
               style: {
                 fontSize: 14,
                 lineHeight: "1.6",
-                color: "#6B7280",
+                color: "var(--text-secondary)",
                 marginBottom: 28,
                 maxWidth: 260
               },
@@ -39839,8 +39842,8 @@
                 fontWeight: 600,
                 fontSize: 14,
                 cursor: "pointer",
-                color: "#fff",
-                background: "linear-gradient(135deg,#2563EB,#3B82F6)",
+                color: "var(--button-primary-text)",
+                background: "var(--button-primary-bg)",
                 boxShadow: "0 6px 18px rgba(37,99,235,0.35)",
                 transition: "transform 0.08s ease, box-shadow 0.08s ease"
               },
@@ -39909,6 +39912,7 @@
     sessionLimitReached
   }) {
     const [resumeModalOpen, setResumeModalOpen] = (0, import_react17.useState)(false);
+    const [openingPrevious, setOpeningPrevious] = (0, import_react17.useState)(false);
     const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
     const [showCommandScreen, setShowCommandScreen] = (0, import_react17.useState)(true);
     const [sessionTitle, setSessionTitle] = (0, import_react17.useState)("Untitled Session");
@@ -40009,12 +40013,16 @@
       };
     }, [handlers, widgetToggleRef]);
     const handlePreviousSessions = import_react17.default.useCallback(() => {
+      if (openingPrevious) return;
+      setOpeningPrevious(true);
+      setResumeModalOpen(true);
       if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
         chrome.runtime.sendMessage({ type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
-      } else {
-        setResumeModalOpen(true);
       }
-    }, []);
+    }, [openingPrevious]);
+    (0, import_react17.useEffect)(() => {
+      if (showResumeModal) setOpeningPrevious(false);
+    }, [showResumeModal]);
     function setMode(mode) {
       if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
         chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode });
@@ -40267,6 +40275,7 @@
                         }
                       } : handlers.startSession,
                       onOpenPreviousSession: extensionMode && showPreviousButton && fetchSessions && onPreviousSessionSelect ? handlePreviousSessions : void 0,
+                      openingPrevious,
                       hasActiveSession: hasStoredSession,
                       captureDisabled
                     }

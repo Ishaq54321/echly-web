@@ -62,6 +62,7 @@ export default function CaptureWidget({
   sessionLimitReached,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
+  const [openingPrevious, setOpeningPrevious] = useState(false);
   const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
   /** Extension: when true, show command screen (mode cards + footer). False when viewing a session (e.g. after Open Previous or when paused). */
   const [showCommandScreen, setShowCommandScreen] = useState(true);
@@ -184,14 +185,18 @@ export default function CaptureWidget({
   }, [handlers, widgetToggleRef]);
 
   const handlePreviousSessions = React.useCallback(() => {
+    if (openingPrevious) return;
+    setOpeningPrevious(true);
+    setResumeModalOpen(true);
     if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
-      // Background will send ECHLY_OPEN_PREVIOUS_SESSIONS to the content script;
-      // the content script's global listener will dispatch to React via echlyEventDispatcher.
       chrome.runtime.sendMessage({ type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
-    } else {
-      setResumeModalOpen(true);
     }
-  }, []);
+  }, [openingPrevious]);
+
+  /** Reset loading state when modal is open (whether opened locally or via message). */
+  useEffect(() => {
+    if (showResumeModal) setOpeningPrevious(false);
+  }, [showResumeModal]);
 
   function setMode(mode: "voice" | "text") {
     if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
@@ -481,6 +486,7 @@ export default function CaptureWidget({
                       ? handlePreviousSessions
                       : undefined
                   }
+                  openingPrevious={openingPrevious}
                   hasActiveSession={hasStoredSession}
                   captureDisabled={captureDisabled}
                 />

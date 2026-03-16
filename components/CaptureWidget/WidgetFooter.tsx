@@ -9,6 +9,8 @@ type WidgetFooterProps = {
   extensionMode?: boolean;
   onStartSession?: () => void;
   onOpenPreviousSession?: () => void;
+  /** When true, Previous Sessions button shows "Opening..." and is disabled */
+  openingPrevious?: boolean;
   hasActiveSession?: boolean;
   captureDisabled?: boolean;
 };
@@ -19,10 +21,12 @@ export default function WidgetFooter({
   extensionMode = false,
   onStartSession,
   onOpenPreviousSession,
+  openingPrevious = false,
   hasActiveSession = false,
   captureDisabled = false,
 }: WidgetFooterProps) {
   const effectivelyDisabled = !isIdle || captureDisabled;
+  const previousDisabled = effectivelyDisabled || openingPrevious;
 
   if (extensionMode) {
     return (
@@ -38,12 +42,13 @@ export default function WidgetFooter({
         </button>
         <button
           type="button"
-          onClick={effectivelyDisabled ? undefined : onOpenPreviousSession}
-          disabled={effectivelyDisabled}
+          onClick={previousDisabled ? undefined : onOpenPreviousSession}
+          disabled={previousDisabled}
           className="echly-previous-session-btn"
-          aria-label="Previous Sessions"
+          aria-label={openingPrevious ? "Opening previous sessions" : "Previous Sessions"}
+          aria-busy={openingPrevious}
         >
-          Previous Sessions
+          {openingPrevious ? "Opening..." : "Previous Sessions"}
         </button>
       </div>
     );

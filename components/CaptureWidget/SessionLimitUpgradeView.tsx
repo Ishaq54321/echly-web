@@ -43,24 +43,24 @@ export function SessionLimitUpgradeView({
         />
       </div>
 
-      {/* Title */}
+      {/* Title — extension theme: --text-primary */}
       <h2
         style={{
           fontSize: 20,
           fontWeight: 600,
           marginBottom: 12,
-          color: "#111827",
+          color: "var(--text-primary)",
         }}
       >
         You’ve reached your session limit
       </h2>
 
-      {/* Description */}
+      {/* Description — extension theme: --text-secondary */}
       <p
         style={{
           fontSize: 14,
           lineHeight: "1.6",
-          color: "#6B7280",
+          color: "var(--text-secondary)",
           marginBottom: 28,
           maxWidth: 260,
         }}
@@ -70,7 +70,7 @@ export function SessionLimitUpgradeView({
         Upgrade your plan to keep capturing feedback without limits.
       </p>
 
-      {/* Upgrade Button */}
+      {/* Upgrade Button — extension primary button tokens */}
       <button
         type="button"
         onClick={onUpgrade}
@@ -83,8 +83,8 @@ export function SessionLimitUpgradeView({
           fontWeight: 600,
           fontSize: 14,
           cursor: "pointer",
-          color: "#fff",
-          background: "linear-gradient(135deg,#2563EB,#3B82F6)",
+          color: "var(--button-primary-text)",
+          background: "var(--button-primary-bg)",
           boxShadow: "0 6px 18px rgba(37,99,235,0.35)",
           transition: "transform 0.08s ease, box-shadow 0.08s ease",
         }}
