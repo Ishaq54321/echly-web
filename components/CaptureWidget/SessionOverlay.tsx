@@ -7,7 +7,7 @@ import { attachClickCapture, detachClickCapture } from "./session/clickCapture";
 import { SessionControlPanel } from "./SessionControlPanel";
 import { VoiceCapturePanel } from "./VoiceCapturePanel";
 import { TextFeedbackPanel } from "./TextFeedbackPanel";
-import type { CaptureContext, SessionFeedbackPending } from "./types";
+import type { CaptureContext, SessionFeedbackPending } from "@/lib/capture-engine/core/types";
 
 function createCommentCursor() {
   const svg = [

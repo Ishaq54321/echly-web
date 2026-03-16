@@ -14,8 +14,9 @@ import { createRoot } from "react-dom/client";
 import { apiFetch, API_BASE } from "./api";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
-import CaptureWidget from "@/components/CaptureWidget";
-import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/components/CaptureWidget/types";
+import CaptureWidget from "@/lib/capture-engine/core/CaptureWidget";
+import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/lib/capture-engine/core/types";
+import { ExtensionCaptureEnvironment } from "@/lib/capture-engine/ExtensionCaptureEnvironment";
 import { ECHLY_DEBUG, log } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 
@@ -902,6 +903,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     }
   }
 
+  const environment = new ExtensionCaptureEnvironment({
+    createSession,
+    authenticatedFetch: apiFetch,
+    notifyFeedbackCreated,
+  });
+
   function onActiveSessionChange(newSessionId: string) {
     chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {});
   }
@@ -1507,6 +1514,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         openResumeModal={openResumeModalFromMessage}
         onResumeModalClose={() => setOpenResumeModalFromMessage(false)}
         sessionLimitReached={sessionLimitReached}
+        environment={environment}
       />
     </>
   );

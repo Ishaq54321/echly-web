@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { buildCaptureContext, isEchlyElement } from "@/lib/captureContext";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { playShutterSound } from "@/lib/playShutterSound";
-import type { CaptureContext } from "./types";
+import type { CaptureContext } from "@/lib/capture-engine/core/types";
 
 const MIN_SIZE = 24;
 const ECHLY_EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)";

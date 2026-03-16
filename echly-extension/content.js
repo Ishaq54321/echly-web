@@ -13847,7 +13847,7 @@
   });
 
   // echly-extension/src/content.tsx
-  var import_jsx_runtime14 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime11 = __toESM(require_jsx_runtime());
 
   // lib/utils/logger.ts
   var _nodeDev = typeof process !== "undefined" && false;
@@ -13952,9 +13952,6 @@
       return "";
     }
   }
-
-  // components/CaptureWidget/CaptureWidget.tsx
-  var import_jsx_runtime13 = __toESM(require_jsx_runtime());
 
   // node_modules/lucide-react/dist/esm/icons/index.js
   var icons_exports = {};
@@ -36227,7 +36224,6 @@
   }
 
   // components/CaptureWidget/RegionCaptureOverlay.tsx
-  var import_jsx_runtime = __toESM(require_jsx_runtime());
   var import_react3 = __toESM(require_react());
   var MIN_SIZE = 24;
   var ECHLY_EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)";
@@ -36473,7 +36469,7 @@
     const showReleased = releasedRect !== null;
     const hasSelection = showSelection && selectionRect || showReleased && releasedRect;
     const rect = showReleased ? releasedRect : selectionRect;
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+    return /* @__PURE__ */ import_react3.default.createElement(
       "div",
       {
         id: "echly-overlay",
@@ -36486,123 +36482,119 @@
           inset: 0,
           zIndex: 2147483647,
           userSelect: "none"
+        }
+      },
+      /* @__PURE__ */ import_react3.default.createElement(
+        "div",
+        {
+          className: "echly-region-overlay-dim",
+          style: {
+            position: "fixed",
+            inset: 0,
+            background: hasSelection ? "transparent" : "rgba(0,0,0,0.4)",
+            pointerEvents: releasedRect ? "none" : "auto",
+            cursor: "crosshair",
+            zIndex: 2147483646,
+            transition: `background 180ms ${ECHLY_EASE}`
+          },
+          onMouseDown,
+          onMouseMove,
+          onMouseUp,
+          onMouseLeave: () => {
+            if (!startRef.current || releasedRect) return;
+            setSelectionRect(null);
+            startRef.current = null;
+            selectionRectRef.current = null;
+          }
+        }
+      ),
+      /* @__PURE__ */ import_react3.default.createElement(
+        "div",
+        {
+          className: "echly-region-hint",
+          style: {
+            position: "fixed",
+            left: "50%",
+            top: 24,
+            transform: "translateX(-50%)",
+            zIndex: 2147483647,
+            pointerEvents: "none",
+            opacity: releasedRect ? 0 : 1,
+            transition: `opacity 180ms ${ECHLY_EASE}`
+          }
         },
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "div",
-            {
-              className: "echly-region-overlay-dim",
-              style: {
-                position: "fixed",
-                inset: 0,
-                background: hasSelection ? "transparent" : "rgba(0,0,0,0.4)",
-                pointerEvents: releasedRect ? "none" : "auto",
-                cursor: "crosshair",
-                zIndex: 2147483646,
-                transition: `background 180ms ${ECHLY_EASE}`
-              },
-              onMouseDown,
-              onMouseMove,
-              onMouseUp,
-              onMouseLeave: () => {
-                if (!startRef.current || releasedRect) return;
-                setSelectionRect(null);
-                startRef.current = null;
-                selectionRectRef.current = null;
-              }
+        "Drag to capture area \u2014 ESC to cancel"
+      ),
+      hasSelection && rect && /* @__PURE__ */ import_react3.default.createElement(
+        "div",
+        {
+          className: "echly-region-cutout",
+          style: {
+            position: "fixed",
+            left: rect.x,
+            top: rect.y,
+            width: Math.max(rect.w, 1),
+            height: Math.max(rect.h, 1),
+            border: `2px solid ${flashBorder ? "#FFFFFF" : "#155DFC"}`,
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)",
+            pointerEvents: "none",
+            zIndex: 2147483646,
+            borderRadius: 14,
+            transition: flashBorder ? "none" : `border-color 150ms ${ECHLY_EASE}`
+          }
+        }
+      ),
+      showReleased && releasedRect && /* @__PURE__ */ import_react3.default.createElement(
+        "div",
+        {
+          className: "echly-region-confirm-bar",
+          style: {
+            position: "fixed",
+            left: releasedRect.x + releasedRect.w / 2,
+            bottom: Math.max(12, releasedRect.y + releasedRect.h - 48),
+            transform: "translate(-50%, 100%)",
+            display: "flex",
+            pointerEvents: "auto",
+            background: "rgba(20,22,28,0.92)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            zIndex: 2147483647,
+            animation: `echly-confirm-bar-in 220ms ${ECHLY_EASE} forwards`
+          }
+        },
+        /* @__PURE__ */ import_react3.default.createElement(
+          "button",
+          {
+            type: "button",
+            onClick: handleRetake,
+            className: "echly-region-confirm-btn",
+            style: {
+              background: "rgba(255,255,255,0.08)",
+              color: "rgba(255,255,255,0.9)",
+              cursor: "pointer"
             }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "div",
-            {
-              className: "echly-region-hint",
-              style: {
-                position: "fixed",
-                left: "50%",
-                top: 24,
-                transform: "translateX(-50%)",
-                zIndex: 2147483647,
-                pointerEvents: "none",
-                opacity: releasedRect ? 0 : 1,
-                transition: `opacity 180ms ${ECHLY_EASE}`
-              },
-              children: "Drag to capture area \u2014 ESC to cancel"
+          },
+          "Retake"
+        ),
+        /* @__PURE__ */ import_react3.default.createElement(
+          "button",
+          {
+            type: "button",
+            onClick: () => performCapture(releasedRect),
+            disabled: confirming,
+            className: "echly-region-confirm-btn",
+            style: {
+              background: "#155DFC",
+              color: "#fff",
+              fontWeight: 600,
+              cursor: confirming ? "not-allowed" : "pointer"
             }
-          ),
-          hasSelection && rect && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "div",
-            {
-              className: "echly-region-cutout",
-              style: {
-                position: "fixed",
-                left: rect.x,
-                top: rect.y,
-                width: Math.max(rect.w, 1),
-                height: Math.max(rect.h, 1),
-                border: `2px solid ${flashBorder ? "#FFFFFF" : "#155DFC"}`,
-                boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)",
-                pointerEvents: "none",
-                zIndex: 2147483646,
-                borderRadius: 14,
-                transition: flashBorder ? "none" : `border-color 150ms ${ECHLY_EASE}`
-              }
-            }
-          ),
-          showReleased && releasedRect && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-            "div",
-            {
-              className: "echly-region-confirm-bar",
-              style: {
-                position: "fixed",
-                left: releasedRect.x + releasedRect.w / 2,
-                bottom: Math.max(12, releasedRect.y + releasedRect.h - 48),
-                transform: "translate(-50%, 100%)",
-                display: "flex",
-                pointerEvents: "auto",
-                background: "rgba(20,22,28,0.92)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-                zIndex: 2147483647,
-                animation: `echly-confirm-bar-in 220ms ${ECHLY_EASE} forwards`
-              },
-              children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                  "button",
-                  {
-                    type: "button",
-                    onClick: handleRetake,
-                    className: "echly-region-confirm-btn",
-                    style: {
-                      background: "rgba(255,255,255,0.08)",
-                      color: "rgba(255,255,255,0.9)",
-                      cursor: "pointer"
-                    },
-                    children: "Retake"
-                  }
-                ),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                  "button",
-                  {
-                    type: "button",
-                    onClick: () => performCapture(releasedRect),
-                    disabled: confirming,
-                    className: "echly-region-confirm-btn",
-                    style: {
-                      background: "#155DFC",
-                      color: "#fff",
-                      fontWeight: 600,
-                      cursor: confirming ? "not-allowed" : "pointer"
-                    },
-                    children: "Speak feedback"
-                  }
-                )
-              ]
-            }
-          )
-        ]
-      }
+          },
+          "Speak feedback"
+        )
+      )
     );
   }
 
@@ -36792,7 +36784,7 @@
     }
   }
 
-  // components/CaptureWidget/hooks/useCaptureWidget.ts
+  // lib/capture-engine/core/hooks/useCaptureWidget.ts
   var import_react4 = __toESM(require_react());
   var SAFE_MARGIN = 24;
   var ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
@@ -36862,7 +36854,8 @@
     captureMode = "voice",
     selectedMicrophoneId,
     onDevicesEnumerated,
-    captureRootParent
+    captureRootParent,
+    environment
   }) {
     if (ECHLY_DEBUG) console.count("useCaptureWidget render");
     if (typeof window !== "undefined" && !window.__ECHLY_CAPTURE_STATE__) {
@@ -37615,6 +37608,9 @@
       [onUpdate]
     );
     const getFullTabImage = (0, import_react4.useCallback)(() => {
+      if (environment) {
+        return captureTabWithoutOverlay(() => environment.captureTabScreenshot());
+      }
       if (typeof chrome !== "undefined" && chrome.runtime?.id) {
         return captureTabWithoutOverlay(
           () => new Promise((resolve, reject) => {
@@ -37632,7 +37628,7 @@
         );
       }
       return Promise.resolve(null);
-    }, []);
+    }, [environment]);
     const captureScreenshot2 = (0, import_react4.useCallback)(async () => {
       if (typeof chrome !== "undefined" && chrome.runtime?.id) {
         return getFullTabImage();
@@ -37677,7 +37673,15 @@
       echlyLog("SESSION", "start");
       if (ECHLY_DEBUG) console.log("[Echly] Start New Feedback Session clicked");
       logSession("start");
-      if (extensionMode && onCreateSession && onActiveSessionChange) {
+      if (environment) {
+        if (ensureAuthenticated2 && !await ensureAuthenticated2()) return;
+        const session = await environment.createSession();
+        if (!session || "limitReached" in session) return;
+        environment.setActiveSession(session.id);
+        setPointers([]);
+        environment.startSessionMode();
+        onSessionViewRequested?.();
+      } else if (extensionMode && onCreateSession && onActiveSessionChange) {
         if (ensureAuthenticated2 && !await ensureAuthenticated2()) return;
         const session = await onCreateSession();
         if (!session || "limitReached" in session) return;
@@ -37691,7 +37695,7 @@
       setSessionFeedbackSaving(false);
       setPausePending(false);
       setEndPending(false);
-    }, [extensionMode, onCreateSession, onActiveSessionChange, ensureAuthenticated2, onSessionModeStart, onSessionViewRequested, globalSessionModeActive]);
+    }, [environment, extensionMode, onCreateSession, onActiveSessionChange, ensureAuthenticated2, onSessionModeStart, onSessionViewRequested, globalSessionModeActive]);
     const pauseSession = (0, import_react4.useCallback)(() => {
       if (!sessionModeRef.current && !globalSessionModeActive || sessionPausedRef.current || pausePending || endPending) {
         return;
@@ -38155,14 +38159,14 @@
     };
   }
 
-  // components/CaptureWidget/CaptureHeader.tsx
-  var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  // lib/capture-engine/core/CaptureHeader.tsx
+  var import_jsx_runtime = __toESM(require_jsx_runtime());
   var import_react5 = __toESM(require_react());
-  var SunIcon = () => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("circle", { cx: "12", cy: "12", r: "4" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" })
+  var SunIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", { cx: "12", cy: "12", r: "4" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" })
   ] });
-  var MoonIcon = () => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" }) });
+  var MoonIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" }) });
   function CaptureHeader({
     onClose,
     showSessionTitle = false,
@@ -38204,9 +38208,9 @@
         saveTitle();
       }
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-sidebar-header echly-session-header", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "echly-sidebar-header-left", children: showOnlyClose ? null : showSessionTitle ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "echly-session-title-wrapper", children: isEditing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "echly-sidebar-header echly-session-header", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "echly-sidebar-header-left", children: showOnlyClose ? null : showSessionTitle ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "echly-session-title-wrapper", children: isEditing ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "input",
           {
             id: "echlyTitleEdit",
@@ -38219,7 +38223,7 @@
             className: "echly-sidebar-title echly-session-title-input session-title-input",
             "aria-label": "Session title"
           }
-        ) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+        ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "span",
           {
             className: "echly-sidebar-title echly-session-title-text",
@@ -38236,12 +38240,12 @@
             children: localTitle
           }
         ) }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: "echly-sidebar-ticket-count", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "echly-sidebar-ticket-count", children: [
           openTicketCount,
           " feedback ticket",
           openTicketCount !== 1 ? "s" : ""
         ] })
-      ] }) : showHomeButton ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+      ] }) : showHomeButton ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "button",
         {
           type: "button",
@@ -38253,14 +38257,14 @@
             }
           },
           "aria-label": "Open Echly dashboard",
-          children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "header-home-btn", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(House, { size: 18 }) })
+          children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "header-home-btn", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(House, { size: 18 }) })
         }
-      ) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "echly-sidebar-title", children: title ?? "Echly" }),
-        summary && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "echly-sidebar-summary", children: summary })
+      ) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "echly-sidebar-title", children: title ?? "Echly" }),
+        summary && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "echly-sidebar-summary", children: summary })
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-header-actions echly-session-icons", children: [
-        !showOnlyClose && onThemeToggle && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "echly-header-actions echly-session-icons", children: [
+        !showOnlyClose && onThemeToggle && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
           {
             type: "button",
@@ -38269,10 +38273,10 @@
             className: "echly-theme-toggle",
             title: theme === "dark" ? "Switch to light mode" : "Switch to dark mode",
             "aria-label": theme === "dark" ? "Switch to light mode" : "Switch to dark mode",
-            children: theme === "dark" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(SunIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(MoonIcon, {})
+            children: theme === "dark" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SunIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MoonIcon, {})
           }
         ),
-        !showOnlyClose && onCaptureModeToggle && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+        !showOnlyClose && onCaptureModeToggle && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
           {
             type: "button",
@@ -38280,10 +38284,10 @@
             onClick: onCaptureModeToggle,
             title: captureMode === "voice" ? "Switch to text feedback mode" : "Switch to voice feedback mode",
             "aria-label": "Toggle capture mode",
-            children: captureMode === "voice" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Mic, { className: "echly-header-icon", size: 16, strokeWidth: 1.5 }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(PenLine, { className: "echly-header-icon", size: 16, strokeWidth: 1.5 })
+            children: captureMode === "voice" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { className: "echly-header-icon", size: 16, strokeWidth: 1.5 }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PenLine, { className: "echly-header-icon", size: 16, strokeWidth: 1.5 })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
           {
             type: "button",
@@ -38291,15 +38295,15 @@
             className: "echly-sidebar-close",
             title: "Minimize feedback panel",
             "aria-label": "Minimize feedback panel",
-            children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(X, { size: 16, strokeWidth: 1.5 })
+            children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { size: 16, strokeWidth: 1.5 })
           }
         )
       ] })
     ] });
   }
 
-  // components/CaptureWidget/FeedbackItem.tsx
-  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
+  // lib/capture-engine/core/FeedbackItem.tsx
+  var import_jsx_runtime2 = __toESM(require_jsx_runtime());
   var import_react6 = __toESM(require_react());
   function priorityFromType(type) {
     const t = (type ?? "").toLowerCase();
@@ -38373,27 +38377,27 @@
         setIsDeleting(false);
       }
     }, [ticket.id, onDelete, isDeleting]);
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
       "div",
       {
         className: `echly-feedback-item ${highlighted ? "echly-ticket-highlight" : ""}`,
         "data-priority": priority,
-        children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "echly-ticket-row", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "echly-ticket-dot echly-priority-dot", "aria-hidden": true }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "echly-ticket-content", children: !expanded ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "echly-ticket-header", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "echly-ticket-title", children: ticket.title }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "echly-header-actions", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-ticket-row", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "echly-ticket-dot echly-priority-dot", "aria-hidden": true }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "echly-ticket-content", children: !expanded ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-ticket-header", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "echly-ticket-title", children: ticket.title }),
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-header-actions", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
                 "button",
                 {
                   type: "button",
                   onClick: handleExpand,
                   className: "echly-expand-btn echly-widget-action-icon",
                   "aria-label": "Expand",
-                  children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Expand, { size: 16, strokeWidth: 1.5 })
+                  children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Expand, { size: 16, strokeWidth: 1.5 })
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
                 "button",
                 {
                   type: "button",
@@ -38401,12 +38405,12 @@
                   disabled: isDeleting,
                   className: "echly-delete-btn echly-widget-action-icon echly-widget-action-icon--delete",
                   "aria-label": isDeleting ? "Deleting\u2026" : "Delete",
-                  children: isDeleting ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "echly-spinner", "aria-hidden": true }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Trash2, { size: 16, strokeWidth: 1.5 })
+                  children: isDeleting ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "echly-spinner", "aria-hidden": true }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Trash2, { size: 16, strokeWidth: 1.5 })
                 }
               )
             ] })
-          ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "echly-ticket-expanded", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-ticket-expanded", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
               "textarea",
               {
                 className: "echly-title-editor",
@@ -38414,7 +38418,7 @@
                 onChange: (e) => setEditedTitle(e.target.value)
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
               "textarea",
               {
                 className: "echly-action-editor",
@@ -38424,9 +38428,9 @@
                 }
               }
             ),
-            error && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "echly-ticket-error", role: "alert", children: error }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "echly-edit-actions", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            error && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "echly-ticket-error", role: "alert", children: error }),
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "echly-edit-actions", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
                 "button",
                 {
                   type: "button",
@@ -38436,7 +38440,7 @@
                   children: isSaving ? "Saving..." : "Save"
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
                 "button",
                 {
                   type: "button",
@@ -38455,8 +38459,8 @@
     return prev.item === next.item && prev.highlightTicketId === next.highlightTicketId;
   });
 
-  // components/CaptureWidget/WidgetFooter.tsx
-  var import_jsx_runtime4 = __toESM(require_jsx_runtime());
+  // lib/capture-engine/core/WidgetFooter.tsx
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   function WidgetFooter({
     isIdle,
     onAddFeedback,
@@ -38470,8 +38474,8 @@
     const effectivelyDisabled = !isIdle || captureDisabled;
     const previousDisabled = effectivelyDisabled || openingPrevious;
     if (extensionMode) {
-      return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "echly-command-actions", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "echly-command-actions", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           "button",
           {
             type: "button",
@@ -38482,7 +38486,7 @@
             children: "Start Session"
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           "button",
           {
             type: "button",
@@ -38496,7 +38500,7 @@
         )
       ] });
     }
-    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "echly-add-insight-wrap", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "echly-add-insight-wrap", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       "button",
       {
         type: "button",
@@ -38509,11 +38513,8 @@
     ) });
   }
 
-  // components/CaptureWidget/CaptureLayer.tsx
-  var import_jsx_runtime9 = __toESM(require_jsx_runtime());
-
-  // components/CaptureWidget/SessionOverlay.tsx
-  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
+  // lib/capture-engine/core/CaptureLayer.tsx
+  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
 
   // components/CaptureWidget/session/elementHighlighter.ts
   var HIGHLIGHT_STYLE = {
@@ -38630,17 +38631,17 @@
   }
 
   // components/CaptureWidget/SessionControlPanel.tsx
-  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime4 = __toESM(require_jsx_runtime());
   function InlineSpinner() {
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("style", { children: `
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("style", { children: `
         @keyframes echly-inline-spin {
           to {
             transform: rotate(360deg);
           }
         }
       ` }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
         "span",
         {
           "aria-hidden": true,
@@ -38666,7 +38667,7 @@
     onResume,
     onEnd
   }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
       "div",
       {
         "data-echly-ui": "true",
@@ -38691,8 +38692,8 @@
           fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif'
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: { fontSize: 14, fontWeight: 600, color: "#F3F4F6" }, children: sessionPaused ? "Session paused" : "Session started" }),
-          pausePending ? /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { fontSize: 14, fontWeight: 600, color: "#F3F4F6" }, children: sessionPaused ? "Session paused" : "Session started" }),
+          pausePending ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
             "button",
             {
               type: "button",
@@ -38712,11 +38713,11 @@
                 cursor: "default"
               },
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(InlineSpinner, {}),
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { children: "Pausing\u2026" })
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InlineSpinner, {}),
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { children: "Pausing\u2026" })
               ]
             }
-          ) : sessionPaused ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          ) : sessionPaused ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
             "button",
             {
               type: "button",
@@ -38735,7 +38736,7 @@
               },
               children: "Resume Feedback Session"
             }
-          ) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          ) : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
             "button",
             {
               type: "button",
@@ -38755,7 +38756,7 @@
               children: "Pause"
             }
           ),
-          endPending ? /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+          endPending ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
             "button",
             {
               type: "button",
@@ -38775,11 +38776,11 @@
                 cursor: "default"
               },
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(InlineSpinner, {}),
-                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { children: "Ending\u2026" })
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InlineSpinner, {}),
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { children: "Ending\u2026" })
               ]
             }
-          ) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          ) : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
             "button",
             {
               type: "button",
@@ -38805,7 +38806,7 @@
   }
 
   // components/CaptureWidget/VoiceCapturePanel.tsx
-  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
 
   // components/ChatGPTWaveform.tsx
   var import_react9 = __toESM(require_react());
@@ -38957,32 +38958,32 @@
       window.addEventListener("keydown", onKeyDown);
       return () => window.removeEventListener("keydown", onKeyDown);
     }, [onCancel]);
-    const dimLayer = /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    const dimLayer = /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       "div",
       {
         className: `echly-dim-layer ${recordingStarted ? "echly-dim-layer--visible" : ""}`,
         "aria-hidden": true
       }
     );
-    const card = /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+    const card = /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "div",
       {
         className: `echly-capture-card ${recordingStarted ? "echly-capture-card--visible" : ""}`,
         "data-echly-ui": "true",
         children: [
-          screenshot && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "echly-capture-screenshot-preview", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("img", { src: screenshot, alt: "Capture" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h2", { className: "echly-capture-title", children: "Voice Feedback" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "echly-capture-instruction", children: "Describe the issue \u2014 Echly will structure it." }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "echly-capture-visualizer", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "echly-waveform-container", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ChatGPTWaveform, { analyser }) }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "echly-capture-status", children: isListening ? "Listening\u2026" : "Paused" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "button", className: "echly-finish-btn", onClick: onFinish, children: "Finish" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "echly-capture-cancel-hint", children: "(Press Esc. to cancel)" })
+          screenshot && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-capture-screenshot-preview", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("img", { src: screenshot, alt: "Capture" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h2", { className: "echly-capture-title", children: "Voice Feedback" }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "echly-capture-instruction", children: "Describe the issue \u2014 Echly will structure it." }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-capture-visualizer", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-waveform-container", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ChatGPTWaveform, { analyser }) }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-capture-status", children: isListening ? "Listening\u2026" : "Paused" }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { type: "button", className: "echly-finish-btn", onClick: onFinish, children: "Finish" }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "echly-capture-cancel-hint", children: "(Press Esc. to cancel)" })
         ]
       }
     );
     if (captureRoot) {
       return (0, import_react_dom.createPortal)(
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
           dimLayer,
           card
         ] }),
@@ -38993,7 +38994,7 @@
   }
 
   // components/CaptureWidget/TextFeedbackPanel.tsx
-  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
   var import_react11 = __toESM(require_react());
   function TextFeedbackPanel({
     screenshot,
@@ -39005,7 +39006,7 @@
       const t = text.trim();
       if (t) onSubmit(t);
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
       "div",
       {
         className: "text-feedback",
@@ -39030,7 +39031,7 @@
           fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif'
         },
         children: [
-          screenshot && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { padding: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          screenshot && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { padding: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
             "div",
             {
               style: {
@@ -39042,7 +39043,7 @@
                 alignItems: "center",
                 justifyContent: "center"
               },
-              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+              children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
                 "img",
                 {
                   src: screenshot,
@@ -39052,8 +39053,8 @@
               )
             }
           ) }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: { padding: 20, display: "flex", flexDirection: "column", gap: 12 }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: { padding: 20, display: "flex", flexDirection: "column", gap: 12 }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
               "textarea",
               {
                 value: text,
@@ -39076,8 +39077,8 @@
                 }
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
-              onCancel && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
+              onCancel && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
                 "button",
                 {
                   type: "button",
@@ -39095,7 +39096,7 @@
                   children: "Cancel"
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
                 "button",
                 {
                   type: "button",
@@ -39201,64 +39202,58 @@
       if (!sessionFeedbackPending) voiceStartedForPendingRef.current = false;
     }, [sessionFeedbackPending]);
     if (!sessionMode || !captureRoot) return null;
-    const content = /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
-      sessionFeedbackPending && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-        "div",
-        {
-          className: "echly-dim-layer echly-dim-layer--visible",
-          "aria-hidden": true
+    const content = /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, sessionFeedbackPending && /* @__PURE__ */ import_react12.default.createElement(
+      "div",
+      {
+        className: "echly-dim-layer echly-dim-layer--visible",
+        "aria-hidden": true
+      }
+    ), /* @__PURE__ */ import_react12.default.createElement(
+      "div",
+      {
+        "aria-hidden": true,
+        className: "echly-session-overlay-cursor",
+        style: {
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 2147483645,
+          cursor: sessionCursorActive ? COMMENT_CURSOR : "default"
         }
-      ),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-        "div",
-        {
-          "aria-hidden": true,
-          className: "echly-session-overlay-cursor",
-          style: {
-            position: "fixed",
-            inset: 0,
-            pointerEvents: "none",
-            zIndex: 2147483645,
-            cursor: sessionCursorActive ? COMMENT_CURSOR : "default"
-          }
-        }
-      ),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-        SessionControlPanel,
-        {
-          sessionPaused,
-          pausePending,
-          endPending,
-          onPause,
-          onResume,
-          onEnd
-        }
-      ),
-      sessionFeedbackPending && captureMode === "voice" && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-        VoiceCapturePanel,
-        {
-          captureRoot,
-          screenshot: sessionFeedbackPending.screenshot,
-          audioLevel: listeningAudioLevel,
-          isListening: state === "voice_listening",
-          onFinish: onDoneVoice,
-          onCancel,
-          analyser: audioAnalyser ?? null
-        }
-      ),
-      sessionFeedbackPending && captureMode === "text" && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-        TextFeedbackPanel,
-        {
-          screenshot: sessionFeedbackPending.screenshot,
-          onSubmit: onSaveText,
-          onCancel
-        }
-      )
-    ] });
+      }
+    ), /* @__PURE__ */ import_react12.default.createElement(
+      SessionControlPanel,
+      {
+        sessionPaused,
+        pausePending,
+        endPending,
+        onPause,
+        onResume,
+        onEnd
+      }
+    ), sessionFeedbackPending && captureMode === "voice" && /* @__PURE__ */ import_react12.default.createElement(
+      VoiceCapturePanel,
+      {
+        captureRoot,
+        screenshot: sessionFeedbackPending.screenshot,
+        audioLevel: listeningAudioLevel,
+        isListening: state === "voice_listening",
+        onFinish: onDoneVoice,
+        onCancel,
+        analyser: audioAnalyser ?? null
+      }
+    ), sessionFeedbackPending && captureMode === "text" && /* @__PURE__ */ import_react12.default.createElement(
+      TextFeedbackPanel,
+      {
+        screenshot: sessionFeedbackPending.screenshot,
+        onSubmit: onSaveText,
+        onCancel
+      }
+    ));
     return (0, import_react_dom2.createPortal)(content, captureRoot);
   }
 
-  // components/CaptureWidget/CaptureLayer.tsx
+  // lib/capture-engine/core/CaptureLayer.tsx
   var import_react_dom3 = __toESM(require_react_dom());
   function CaptureLayer({
     captureRoot,
@@ -39292,8 +39287,8 @@
     const showSessionOverlay = sessionMode && extensionMode && !!globalSessionModeActive && !!sessionIdProp;
     const showRegionOverlay = !showSessionOverlay && extensionMode && (state === "focus_mode" || state === "region_selecting");
     const showDimOverlay = !showSessionOverlay && !showRegionOverlay && (state === "focus_mode" || state === "region_selecting");
-    const captureContent = /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(import_jsx_runtime9.Fragment, { children: [
-      showSessionOverlay && onSessionElementClicked && onSessionPause && onSessionResume && onSessionEnd && onSessionRecordVoice && onSessionDoneVoice && onSessionSaveText && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+    const captureContent = /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+      showSessionOverlay && onSessionElementClicked && onSessionPause && onSessionResume && onSessionEnd && onSessionRecordVoice && onSessionDoneVoice && onSessionSaveText && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
         SessionOverlay,
         {
           captureRoot,
@@ -39316,7 +39311,7 @@
           onCancel: onSessionFeedbackCancel
         }
       ),
-      showDimOverlay && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+      showDimOverlay && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
         "div",
         {
           className: "echly-focus-overlay",
@@ -39331,7 +39326,7 @@
           "aria-hidden": true
         }
       ),
-      showRegionOverlay && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+      showRegionOverlay && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
         RegionCaptureOverlay,
         {
           getFullTabImage,
@@ -39341,11 +39336,11 @@
         }
       )
     ] });
-    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_jsx_runtime9.Fragment, { children: (0, import_react_dom3.createPortal)(captureContent, captureRoot) });
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_jsx_runtime7.Fragment, { children: (0, import_react_dom3.createPortal)(captureContent, captureRoot) });
   }
 
-  // components/CaptureWidget/ResumeSessionModal.tsx
-  var import_jsx_runtime10 = __toESM(require_jsx_runtime());
+  // lib/capture-engine/core/ResumeSessionModal.tsx
+  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
   var import_react14 = __toESM(require_react());
   function filterSessions(sessions, filter) {
     if (filter === "all") return sessions;
@@ -39439,7 +39434,7 @@
       return open2 + resolved + skipped;
     };
     if (!open) return null;
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
       "div",
       {
         "data-echly-ui": "true",
@@ -39459,7 +39454,7 @@
         "aria-modal": "true",
         "aria-labelledby": "resume-session-modal-title",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("style", { children: `
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("style", { children: `
         .echly-resume-session-item:hover {
           background: rgba(255,255,255,.04);
           transform: translateY(-1px);
@@ -39477,7 +39472,7 @@
           background: rgba(0,0,0,.06);
         }
       ` }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
             "div",
             {
               style: {
@@ -39496,11 +39491,11 @@
               },
               onClick: (e) => e.stopPropagation(),
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: {
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: {
                   padding: 20,
                   borderBottom: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)"
                 }, children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                     "h2",
                     {
                       id: "resume-session-modal-title",
@@ -39513,8 +39508,8 @@
                       children: loginRequired ? "Previous Sessions" : "Resume Feedback Session"
                     }
                   ),
-                  !loginRequired && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  !loginRequired && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                       "input",
                       {
                         type: "search",
@@ -39534,7 +39529,7 @@
                         }
                       }
                     ),
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: { display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }, children: FILTER_ORDER.map((key) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }, children: FILTER_ORDER.map((key) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                       "button",
                       {
                         type: "button",
@@ -39555,8 +39550,8 @@
                     )) })
                   ] })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { flex: 1, overflow: "auto", minHeight: 200, maxHeight: 360 }, children: [
-                  loginRequired && onOpenLogin && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: {
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { flex: 1, overflow: "auto", minHeight: 200, maxHeight: 360 }, children: [
+                  loginRequired && onOpenLogin && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: {
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -39565,20 +39560,20 @@
                     minHeight: 240,
                     textAlign: "center"
                   }, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { style: { fontSize: 40, marginBottom: 16 }, "aria-hidden": true, children: "\u{1F512}" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h3", { style: {
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { style: { fontSize: 40, marginBottom: 16 }, "aria-hidden": true, children: "\u{1F512}" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h3", { style: {
                       margin: "0 0 8px",
                       fontSize: 18,
                       fontWeight: 600,
                       color: isLight ? "#1F2937" : "#F3F4F6"
                     }, children: "Sign in to continue" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { style: {
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { style: {
                       margin: "0 0 20px",
                       fontSize: 14,
                       color: isLight ? "rgba(0,0,0,.6)" : "#A1A1AA",
                       maxWidth: 320
                     }, children: "To view your previous sessions, please sign in to your Echly dashboard." }),
-                    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                       "button",
                       {
                         type: "button",
@@ -39600,20 +39595,20 @@
                       }
                     )
                   ] }),
-                  !loginRequired && loading && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: {
+                  !loginRequired && loading && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: {
                     padding: 24,
                     textAlign: "center",
                     color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
                     fontSize: 14
                   }, children: "Loading sessions\u2026" }),
-                  !loginRequired && error && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: { padding: 24, color: "#EF4444", fontSize: 14 }, children: error }),
-                  !loginRequired && !loading && !error && filtered.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: {
+                  !loginRequired && error && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { padding: 24, color: "#EF4444", fontSize: 14 }, children: error }),
+                  !loginRequired && !loading && !error && filtered.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: {
                     padding: 24,
                     textAlign: "center",
                     color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
                     fontSize: 14
                   }, children: "No sessions match." }),
-                  !loginRequired && !loading && !error && filtered.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { style: { listStyle: "none", margin: 0, padding: 12 }, children: filtered.map((s) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("li", { style: { marginBottom: 4 }, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+                  !loginRequired && !loading && !error && filtered.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("ul", { style: { listStyle: "none", margin: 0, padding: 12 }, children: filtered.map((s) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { style: { marginBottom: 4 }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
                     "button",
                     {
                       type: "button",
@@ -39637,7 +39632,7 @@
                         gap: 12
                       },
                       children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                           FileText,
                           {
                             className: "echly-resume-session-icon",
@@ -39651,9 +39646,9 @@
                             }
                           }
                         ),
-                        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: { flex: 1, minWidth: 0 }, children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: { fontWeight: 600 }, children: s.title?.trim() || "Untitled Session" }),
-                          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { style: {
+                        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { flex: 1, minWidth: 0 }, children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { fontWeight: 600 }, children: s.title?.trim() || "Untitled Session" }),
+                          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: {
                             fontSize: 12,
                             fontWeight: 500,
                             color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
@@ -39668,10 +39663,10 @@
                     }
                   ) }, s.id)) })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: {
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: {
                   padding: 16,
                   borderTop: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)"
-                }, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                   "button",
                   {
                     type: "button",
@@ -39698,8 +39693,8 @@
     );
   }
 
-  // components/CaptureWidget/MicrophonePanel.tsx
-  var import_jsx_runtime11 = __toESM(require_jsx_runtime());
+  // lib/capture-engine/core/MicrophonePanel.tsx
+  var import_jsx_runtime9 = __toESM(require_jsx_runtime());
 
   // components/CaptureWidget/utils/shortDeviceName.ts
   function shortDeviceName(deviceLabel) {
@@ -39716,7 +39711,7 @@
     return s || "Default microphone";
   }
 
-  // components/CaptureWidget/MicrophonePanel.tsx
+  // lib/capture-engine/core/MicrophonePanel.tsx
   var import_react15 = __toESM(require_react());
   function MicrophonePanel({
     devices,
@@ -39734,7 +39729,7 @@
       document.addEventListener("mousedown", onMouseDown);
       return () => document.removeEventListener("mousedown", onMouseDown);
     }, [onClose]);
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
       "div",
       {
         ref: panelRef,
@@ -39742,8 +39737,8 @@
         role: "dialog",
         "aria-label": "Select microphone",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "echly-mic-panel-title", children: "Select microphone" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "echly-mic-panel-list", children: devices.map((device) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "echly-mic-panel-title", children: "Select microphone" }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "echly-mic-panel-list", children: devices.map((device) => /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
             "button",
             {
               type: "button",
@@ -39753,7 +39748,7 @@
                 onClose();
               },
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "echly-mic-panel-check", children: device.deviceId === selectedDeviceId ? "\u2713" : "" }),
+                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "echly-mic-panel-check", children: device.deviceId === selectedDeviceId ? "\u2713" : "" }),
                 shortDeviceName(device.label)
               ]
             },
@@ -39764,8 +39759,8 @@
     );
   }
 
-  // components/CaptureWidget/SessionLimitUpgradeView.tsx
-  var import_jsx_runtime12 = __toESM(require_jsx_runtime());
+  // lib/capture-engine/core/SessionLimitUpgradeView.tsx
+  var import_jsx_runtime10 = __toESM(require_jsx_runtime());
   function SessionLimitUpgradeView({
     limitMessage,
     onUpgrade
@@ -39774,7 +39769,7 @@
     const imageSrc = chrome.runtime.getURL(
       "assets/feedback-tray-session-limit.png"
     );
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
       "div",
       {
         style: {
@@ -39787,7 +39782,7 @@
           margin: "0 auto"
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: { marginBottom: 24 }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { style: { marginBottom: 24 }, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
             "img",
             {
               src: imageSrc,
@@ -39799,7 +39794,7 @@
               }
             }
           ) }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
             "h2",
             {
               style: {
@@ -39808,10 +39803,10 @@
                 marginBottom: 12,
                 color: "var(--text-primary)"
               },
-              children: "You\u2019ve reached your session limit"
+              children: "You've reached your session limit"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
             "p",
             {
               style: {
@@ -39823,12 +39818,12 @@
               },
               children: [
                 description,
-                /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("br", {}),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("br", {}),
                 "Upgrade your plan to keep capturing feedback without limits."
               ]
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
             "button",
             {
               type: "button",
@@ -39861,7 +39856,7 @@
     );
   }
 
-  // components/CaptureWidget/CaptureWidget.tsx
+  // lib/capture-engine/core/CaptureWidget.tsx
   var import_react17 = __toESM(require_react());
   var CAPTURE_FLOW_STATES2 = ["focus_mode", "region_selecting", "voice_listening", "processing"];
   function CaptureWidget({
@@ -39909,7 +39904,8 @@
     onResumeModalClose,
     verifySessionBeforeSessions,
     onTriggerLogin,
-    sessionLimitReached
+    sessionLimitReached,
+    environment
   }) {
     const [resumeModalOpen, setResumeModalOpen] = (0, import_react17.useState)(false);
     const [openingPrevious, setOpeningPrevious] = (0, import_react17.useState)(false);
@@ -39954,7 +39950,8 @@
         setMicrophones(devices);
         if (devices.length && !selectedMicrophone) setSelectedMicrophone(devices[0].deviceId || "");
       } : void 0,
-      captureRootParent
+      captureRootParent,
+      environment
     });
     const isControlled = expanded !== void 0;
     const effectiveIsOpen = isControlled ? expanded : state.isOpen;
@@ -40028,266 +40025,313 @@
         chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode });
       }
     }
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
-      extensionMode && fetchSessions && onPreviousSessionSelect && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-        ResumeSessionModal,
+    return /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, extensionMode && fetchSessions && onPreviousSessionSelect && /* @__PURE__ */ import_react17.default.createElement(
+      ResumeSessionModal,
+      {
+        open: showResumeModal,
+        onClose: () => {
+          setResumeModalOpen(false);
+          onResumeModalClose?.();
+        },
+        fetchSessions,
+        onSelectSession: (sessionId2) => {
+          setShowCommandScreen(false);
+          onPreviousSessionSelect(sessionId2);
+          setResumeModalOpen(false);
+        },
+        theme,
+        checkAuth: verifySessionBeforeSessions,
+        onOpenLogin: onTriggerLogin
+      }
+    ), captureRootEl && /* @__PURE__ */ import_react17.default.createElement(
+      CaptureLayer,
+      {
+        captureRoot: captureRootEl,
+        extensionMode,
+        state: state.state,
+        getFullTabImage: handlers.getFullTabImage,
+        onRegionCaptured: handlers.handleRegionCaptured,
+        onRegionSelectStart: handlers.handleRegionSelectStart,
+        onCancelCapture: handlers.handleCancelCapture,
+        sessionMode: state.sessionMode,
+        globalSessionModeActive,
+        sessionId,
+        sessionPaused: state.sessionPaused,
+        pausePending: state.pausePending,
+        endPending: state.endPending,
+        sessionFeedbackPending: state.sessionFeedbackPending,
+        captureMode,
+        listeningAudioLevel: state.listeningAudioLevel ?? 0,
+        audioAnalyser: state.audioAnalyser ?? null,
+        onSessionElementClicked: handlers.handleSessionElementClicked,
+        onSessionPause: () => {
+          handlers.pauseSession();
+          onExpandRequest?.();
+        },
+        onSessionResume: () => {
+          handlers.resumeSession();
+        },
+        onSessionEnd: () => {
+          handlers.endSession(() => {
+            setShowCommandScreen(true);
+            onSessionEndCallback?.();
+          });
+        },
+        onSessionRecordVoice: handlers.handleSessionStartVoice,
+        onSessionDoneVoice: handlers.finishListening,
+        onSessionSaveText: handlers.handleSessionFeedbackSubmit,
+        onSessionFeedbackCancel: handlers.handleSessionFeedbackCancel
+      }
+    ), showFloatingButton && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-floating-trigger-wrapper" }, /* @__PURE__ */ import_react17.default.createElement(
+      "button",
+      {
+        type: "button",
+        id: extensionMode && launcherLogoUrl ? "launcher_container" : void 0,
+        onClick: () => onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true),
+        className: `echly-floating-trigger${extensionMode && launcherLogoUrl ? " echly-launcher" : ""}`,
+        "aria-label": "Open Echly"
+      },
+      extensionMode && launcherLogoUrl ? /* @__PURE__ */ import_react17.default.createElement(
+        "img",
         {
-          open: showResumeModal,
-          onClose: () => {
-            setResumeModalOpen(false);
-            onResumeModalClose?.();
-          },
-          fetchSessions,
-          onSelectSession: (sessionId2) => {
-            setShowCommandScreen(false);
-            onPreviousSessionSelect(sessionId2);
-            setResumeModalOpen(false);
-          },
+          src: launcherLogoUrl,
+          className: "echly-launcher-logo",
+          alt: "Echly"
+        }
+      ) : extensionMode ? "Echly" : "Capture feedback"
+    )), showPanel && /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, !extensionMode && /* @__PURE__ */ import_react17.default.createElement(
+      "div",
+      {
+        className: "echly-backdrop",
+        style: { position: "fixed", inset: 0, zIndex: 2147483646, background: "rgba(0,0,0,0.06)", pointerEvents: "auto" },
+        "aria-hidden": true
+      }
+    ), /* @__PURE__ */ import_react17.default.createElement(
+      "div",
+      {
+        ref: refs.widgetRef,
+        className: "echly-sidebar-container",
+        style: extensionMode ? {
+          position: "fixed",
+          ...state.position ? { left: state.position.x, top: state.position.y } : { bottom: "24px", right: "24px" },
+          zIndex: 2147483647,
+          pointerEvents: "auto"
+        } : void 0
+      },
+      extensionMode && captureMode === "voice" && micDropdownOpen && /* @__PURE__ */ import_react17.default.createElement(
+        MicrophonePanel,
+        {
+          devices: microphones,
+          selectedDeviceId: selectedMicrophone,
+          onSelect: setSelectedMicrophone,
+          onClose: () => setMicDropdownOpen(false)
+        }
+      ),
+      /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-sidebar-surface", "data-theme": theme }, /* @__PURE__ */ import_react17.default.createElement(
+        CaptureHeader,
+        {
+          onClose: () => onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false),
+          showSessionTitle: !sessionLimitReached && (hasTickets || sessionModeActive || sessionLoading),
+          sessionTitle: sessionTitleProp ?? sessionTitle ?? "Untitled Session",
+          onSessionTitleChange: onSessionTitleChangeProp ?? setSessionTitle,
+          openTicketCount: openTicketsCount,
+          title: void 0,
+          summary,
+          showHomeButton: extensionMode && !sessionLimitReached,
           theme,
-          checkAuth: verifySessionBeforeSessions,
-          onOpenLogin: onTriggerLogin
-        }
-      ),
-      captureRootEl && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-        CaptureLayer,
-        {
-          captureRoot: captureRootEl,
-          extensionMode,
-          state: state.state,
-          getFullTabImage: handlers.getFullTabImage,
-          onRegionCaptured: handlers.handleRegionCaptured,
-          onRegionSelectStart: handlers.handleRegionSelectStart,
-          onCancelCapture: handlers.handleCancelCapture,
-          sessionMode: state.sessionMode,
-          globalSessionModeActive,
-          sessionId,
-          sessionPaused: state.sessionPaused,
-          pausePending: state.pausePending,
-          endPending: state.endPending,
-          sessionFeedbackPending: state.sessionFeedbackPending,
+          onThemeToggle: sessionLimitReached ? void 0 : onThemeToggle,
           captureMode,
-          listeningAudioLevel: state.listeningAudioLevel ?? 0,
-          audioAnalyser: state.audioAnalyser ?? null,
-          onSessionElementClicked: handlers.handleSessionElementClicked,
-          onSessionPause: () => {
-            handlers.pauseSession();
-            onExpandRequest?.();
-          },
-          onSessionResume: () => {
-            handlers.resumeSession();
-          },
-          onSessionEnd: () => {
-            handlers.endSession(() => {
-              setShowCommandScreen(true);
-              onSessionEndCallback?.();
-            });
-          },
-          onSessionRecordVoice: handlers.handleSessionStartVoice,
-          onSessionDoneVoice: handlers.finishListening,
-          onSessionSaveText: handlers.handleSessionFeedbackSubmit,
-          onSessionFeedbackCancel: handlers.handleSessionFeedbackCancel
+          onCaptureModeToggle: sessionLimitReached ? void 0 : extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : void 0,
+          onShowCommandScreen: () => setShowCommandScreen(true),
+          showOnlyClose: Boolean(sessionLimitReached)
         }
-      ),
-      showFloatingButton && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "echly-floating-trigger-wrapper", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-        "button",
+      ), sessionLimitReached ? /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-sidebar-body echly-upgrade-card-body" }, /* @__PURE__ */ import_react17.default.createElement(
+        SessionLimitUpgradeView,
         {
-          type: "button",
-          id: extensionMode && launcherLogoUrl ? "launcher_container" : void 0,
-          onClick: () => onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true),
-          className: `echly-floating-trigger${extensionMode && launcherLogoUrl ? " echly-launcher" : ""}`,
-          "aria-label": "Open Echly",
-          children: extensionMode && launcherLogoUrl ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-            "img",
-            {
-              src: launcherLogoUrl,
-              className: "echly-launcher-logo",
-              alt: "Echly"
+          limitMessage: sessionLimitReached.message,
+          upgradePlan: sessionLimitReached.upgradePlan,
+          onUpgrade: () => {
+            if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+              chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {
+              });
             }
-          ) : extensionMode ? "Echly" : "Capture feedback"
+          }
         }
-      ) }),
-      showPanel && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
-        !extensionMode && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-          "div",
+      )) : /* @__PURE__ */ import_react17.default.createElement(
+        "div",
+        {
+          ref: listScrollRef,
+          className: "echly-sidebar-body",
+          onScroll: handleListScroll,
+          onWheel: (e) => e.stopPropagation()
+        },
+        sessionModeActive && sessionLoading && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-session-loading-state", "aria-live": "polite", "aria-busy": "true" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-session-loading-text" }, "Loading session...")),
+        (hasTickets || isProcessingFeedback || feedbackJobs && feedbackJobs.length > 0) && (sessionModeActive || !extensionMode) && !sessionLoading && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-feedback-list" }, feedbackJobs?.filter((j) => j.status === "processing").map((job) => /* @__PURE__ */ import_react17.default.createElement("div", { key: job.id, id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-processing-text" }, "Processing feedback..."))), feedbackJobs?.filter((j) => j.status === "failed").map((job) => /* @__PURE__ */ import_react17.default.createElement("div", { key: job.id, className: "echly-feedback-card echly-feedback-failed", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-failed-text" }, job.errorMessage ?? "AI processing failed."))), !feedbackJobs?.length && isProcessingFeedback && /* @__PURE__ */ import_react17.default.createElement("div", { id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-processing-text" }, "Processing feedback...")), hasTickets && ticketsToShow.map((p) => /* @__PURE__ */ import_react17.default.createElement(
+          FeedbackItem_default,
           {
-            className: "echly-backdrop",
-            style: { position: "fixed", inset: 0, zIndex: 2147483646, background: "rgba(0,0,0,0.06)", pointerEvents: "auto" },
-            "aria-hidden": true
+            key: p.id,
+            item: p,
+            onUpdate: onUpdate ?? handlers.updatePointer,
+            onDelete: handlers.deletePointer,
+            highlightTicketId: state.highlightTicketId,
+            onExpandChange: handlers.setExpandedId
           }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
+        ))),
+        sessionModeActive && !hasTickets && !isProcessingFeedback && !(feedbackJobs && feedbackJobs.length > 0) && !sessionLoading && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-empty-session-state", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-empty-session-text" }, "No feedback yet. Add feedback from the page.")),
+        extensionMode && showHomeScreen && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-container" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-header-block" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-ai-powered", "aria-hidden": true }, /* @__PURE__ */ import_react17.default.createElement(Zap, { size: 12, strokeWidth: 2, "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", null, "Powered by GPT-4 + Whisper")), /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-header" }, "Select feedback mode")), /* @__PURE__ */ import_react17.default.createElement(
           "div",
           {
-            ref: refs.widgetRef,
-            className: "echly-sidebar-container",
-            style: extensionMode ? {
-              position: "fixed",
-              ...state.position ? { left: state.position.x, top: state.position.y } : { bottom: "24px", right: "24px" },
-              zIndex: 2147483647,
-              pointerEvents: "auto"
-            } : void 0,
-            children: [
-              extensionMode && captureMode === "voice" && micDropdownOpen && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-                MicrophonePanel,
-                {
-                  devices: microphones,
-                  selectedDeviceId: selectedMicrophone,
-                  onSelect: setSelectedMicrophone,
-                  onClose: () => setMicDropdownOpen(false)
+            className: `echly-mode-tile echly-mode-card voice-mode ${captureMode === "voice" ? "selected" : ""}`,
+            onClick: () => {
+              if (captureMode !== "voice") {
+                setMode("voice");
+              } else {
+                setMicDropdownOpen(true);
+              }
+            },
+            onKeyDown: (e) => {
+              if (e.key === "Enter") {
+                if (captureMode !== "voice") {
+                  setMode("voice");
+                } else {
+                  setMicDropdownOpen(true);
                 }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "echly-sidebar-surface", "data-theme": theme, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-                  CaptureHeader,
-                  {
-                    onClose: () => onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false),
-                    showSessionTitle: !sessionLimitReached && (hasTickets || sessionModeActive || sessionLoading),
-                    sessionTitle: sessionTitleProp ?? sessionTitle ?? "Untitled Session",
-                    onSessionTitleChange: onSessionTitleChangeProp ?? setSessionTitle,
-                    openTicketCount: openTicketsCount,
-                    title: void 0,
-                    summary,
-                    showHomeButton: extensionMode && !sessionLimitReached,
-                    theme,
-                    onThemeToggle: sessionLimitReached ? void 0 : onThemeToggle,
-                    captureMode,
-                    onCaptureModeToggle: sessionLimitReached ? void 0 : extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : void 0,
-                    onShowCommandScreen: () => setShowCommandScreen(true),
-                    showOnlyClose: Boolean(sessionLimitReached)
-                  }
-                ),
-                sessionLimitReached ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "echly-sidebar-body echly-upgrade-card-body", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-                  SessionLimitUpgradeView,
-                  {
-                    limitMessage: sessionLimitReached.message,
-                    upgradePlan: sessionLimitReached.upgradePlan,
-                    onUpgrade: () => {
-                      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
-                        chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {
-                        });
-                      }
-                    }
-                  }
-                ) }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
-                  "div",
-                  {
-                    ref: listScrollRef,
-                    className: "echly-sidebar-body",
-                    onScroll: handleListScroll,
-                    onWheel: (e) => e.stopPropagation(),
-                    children: [
-                      sessionModeActive && sessionLoading && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "echly-session-loading-state", "aria-live": "polite", "aria-busy": "true", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-spinner", "aria-hidden": true }),
-                        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-session-loading-text", children: "Loading session..." })
-                      ] }),
-                      (hasTickets || isProcessingFeedback || feedbackJobs && feedbackJobs.length > 0) && (sessionModeActive || !extensionMode) && !sessionLoading && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "echly-feedback-list", children: [
-                        feedbackJobs?.filter((j) => j.status === "processing").map((job) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing", "aria-live": "polite", children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-spinner", "aria-hidden": true }),
-                          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-processing-text", children: "Processing feedback..." })
-                        ] }, job.id)),
-                        feedbackJobs?.filter((j) => j.status === "failed").map((job) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "echly-feedback-card echly-feedback-failed", "aria-live": "polite", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-failed-text", children: job.errorMessage ?? "AI processing failed." }) }, job.id)),
-                        !feedbackJobs?.length && isProcessingFeedback && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing", children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-spinner", "aria-hidden": true }),
-                          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-processing-text", children: "Processing feedback..." })
-                        ] }),
-                        hasTickets && ticketsToShow.map((p) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-                          FeedbackItem_default,
-                          {
-                            item: p,
-                            onUpdate: onUpdate ?? handlers.updatePointer,
-                            onDelete: handlers.deletePointer,
-                            highlightTicketId: state.highlightTicketId,
-                            onExpandChange: handlers.setExpandedId
-                          },
-                          p.id
-                        ))
-                      ] }),
-                      sessionModeActive && !hasTickets && !isProcessingFeedback && !(feedbackJobs && feedbackJobs.length > 0) && !sessionLoading && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "echly-empty-session-state", "aria-live": "polite", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-empty-session-text", children: "No feedback yet. Add feedback from the page." }) }),
-                      extensionMode && showHomeScreen && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "echly-mode-container", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "echly-mode-header-block", children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "echly-ai-powered", "aria-hidden": true, children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Zap, { size: 12, strokeWidth: 2, "aria-hidden": true }),
-                            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { children: "Powered by GPT-4 + Whisper" })
-                          ] }),
-                          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "echly-mode-header", children: "Select feedback mode" })
-                        ] }),
-                        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
-                          "div",
-                          {
-                            className: `echly-mode-tile echly-mode-card voice-mode ${captureMode === "voice" ? "selected" : ""}`,
-                            onClick: () => {
-                              if (captureMode !== "voice") {
-                                setMode("voice");
-                              } else {
-                                setMicDropdownOpen(true);
-                              }
-                            },
-                            onKeyDown: (e) => {
-                              if (e.key === "Enter") {
-                                if (captureMode !== "voice") {
-                                  setMode("voice");
-                                } else {
-                                  setMicDropdownOpen(true);
-                                }
-                              }
-                            },
-                            role: "button",
-                            tabIndex: 0,
-                            "aria-pressed": captureMode === "voice",
-                            "aria-label": captureMode === "voice" ? "Voice (Recommended). Click to select microphone." : "Voice (Recommended)",
-                            children: [
-                              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-mode-card-icon echly-mic-trigger", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Mic, { size: 18, strokeWidth: 2 }) }),
-                              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-mode-card-title", children: "Voice (Recommended)" })
-                            ]
-                          }
-                        ),
-                        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
-                          "div",
-                          {
-                            className: `echly-mode-tile echly-mode-card text-mode ${captureMode === "text" ? "selected" : ""}`,
-                            onClick: () => setMode("text"),
-                            onKeyDown: (e) => e.key === "Enter" && setMode("text"),
-                            role: "button",
-                            tabIndex: 0,
-                            "aria-pressed": captureMode === "text",
-                            children: [
-                              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-mode-card-icon", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(PenLine, { className: "mode-icon", size: 18, strokeWidth: 2 }) }),
-                              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "echly-mode-card-title", children: "Write" })
-                            ]
-                          }
-                        )
-                      ] }),
-                      state.errorMessage && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "echly-sidebar-error", children: state.errorMessage })
-                    ]
-                  }
-                ),
-                !sessionLimitReached && showHomeScreen && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "echly-command-divider", "aria-hidden": true }),
-                  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-                    WidgetFooter,
-                    {
-                      isIdle: true,
-                      onAddFeedback: handlers.handleAddFeedback,
-                      extensionMode,
-                      onStartSession: extensionMode ? () => {
-                        if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
-                          chrome.runtime.sendMessage({ type: "ECHLY_START_SESSION" });
-                        }
-                      } : handlers.startSession,
-                      onOpenPreviousSession: extensionMode && showPreviousButton && fetchSessions && onPreviousSessionSelect ? handlePreviousSessions : void 0,
-                      openingPrevious,
-                      hasActiveSession: hasStoredSession,
-                      captureDisabled
-                    }
-                  )
-                ] })
-              ] })
-            ]
-          }
-        )
-      ] })
-    ] });
+              }
+            },
+            role: "button",
+            tabIndex: 0,
+            "aria-pressed": captureMode === "voice",
+            "aria-label": captureMode === "voice" ? "Voice (Recommended). Click to select microphone." : "Voice (Recommended)"
+          },
+          /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-mode-card-icon echly-mic-trigger", "aria-hidden": true }, /* @__PURE__ */ import_react17.default.createElement(Mic, { size: 18, strokeWidth: 2 })),
+          /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-mode-card-title" }, "Voice (Recommended)")
+        ), /* @__PURE__ */ import_react17.default.createElement(
+          "div",
+          {
+            className: `echly-mode-tile echly-mode-card text-mode ${captureMode === "text" ? "selected" : ""}`,
+            onClick: () => setMode("text"),
+            onKeyDown: (e) => e.key === "Enter" && setMode("text"),
+            role: "button",
+            tabIndex: 0,
+            "aria-pressed": captureMode === "text"
+          },
+          /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-mode-card-icon" }, /* @__PURE__ */ import_react17.default.createElement(PenLine, { className: "mode-icon", size: 18, strokeWidth: 2 })),
+          /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-mode-card-title" }, "Write")
+        )),
+        state.errorMessage && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-sidebar-error" }, state.errorMessage)
+      ), !sessionLimitReached && showHomeScreen && /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-command-divider", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement(
+        WidgetFooter,
+        {
+          isIdle: true,
+          onAddFeedback: handlers.handleAddFeedback,
+          extensionMode,
+          onStartSession: extensionMode ? () => {
+            if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+              chrome.runtime.sendMessage({ type: "ECHLY_START_SESSION" });
+            }
+          } : handlers.startSession,
+          onOpenPreviousSession: extensionMode && showPreviousButton && fetchSessions && onPreviousSessionSelect ? handlePreviousSessions : void 0,
+          openingPrevious,
+          hasActiveSession: hasStoredSession,
+          captureDisabled
+        }
+      )))
+    )));
   }
+
+  // lib/capture-engine/ExtensionCaptureEnvironment.ts
+  var ExtensionCaptureEnvironment = class {
+    deps;
+    constructor(deps) {
+      this.deps = deps;
+    }
+    createSession() {
+      return this.deps.createSession();
+    }
+    authenticatedFetch(url, options) {
+      return this.deps.authenticatedFetch(url, options);
+    }
+    notifyFeedbackCreated(ticket) {
+      this.deps.notifyFeedbackCreated(ticket);
+    }
+    setActiveSession(sessionId) {
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {
+        });
+      }
+    }
+    startSessionMode() {
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {
+        });
+      }
+    }
+    pauseSessionMode() {
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {
+        });
+      }
+    }
+    resumeSessionMode() {
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {
+        });
+      }
+    }
+    endSessionMode() {
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }).catch(() => {
+        });
+      }
+    }
+    reportActivity() {
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch(() => {
+        });
+      }
+    }
+    expandWidget() {
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {
+        });
+      }
+    }
+    collapseWidget() {
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {
+        });
+      }
+    }
+    openLogin() {
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {
+        });
+      }
+    }
+    openDashboard(url) {
+      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch(() => {
+        });
+      }
+    }
+    captureTabScreenshot() {
+      if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+        return Promise.resolve(null);
+      }
+      return new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "CAPTURE_TAB" },
+          (response) => {
+            if (!response || !response.success) {
+              resolve(null);
+            } else {
+              resolve(response.screenshot ?? null);
+            }
+          }
+        );
+      });
+    }
+  };
 
   // echly-extension/src/content.tsx
   var import_react18 = __toESM(require_react());
@@ -41003,6 +41047,11 @@
         return null;
       }
     }
+    const environment = new ExtensionCaptureEnvironment({
+      createSession,
+      authenticatedFetch: apiFetch,
+      notifyFeedbackCreated
+    });
     function onActiveSessionChange(newSessionId) {
       chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {
       });
@@ -41368,8 +41417,8 @@
       return null;
     }
     const pending = extensionClarityPending;
-    return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(import_jsx_runtime14.Fragment, { children: [
-      showClarityAssistant && pending && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
+      showClarityAssistant && pending && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "div",
         {
           style: {
@@ -41386,7 +41435,7 @@
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif',
             pointerEvents: "none"
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
+          children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "div",
             {
               style: {
@@ -41401,15 +41450,15 @@
                 animation: "echly-clarity-card-in 150ms ease-out"
               },
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: { fontWeight: 600, fontSize: 15, marginBottom: 6, color: "#111" }, children: "Quick suggestion" }),
-                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: { fontSize: 14, color: "#374151", marginBottom: 8 }, children: "Your feedback may be unclear." }),
-                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: { fontSize: 13, color: "#6b7280", marginBottom: 10 }, children: "Try specifying what looks wrong and what change you want." }),
-                pending.suggestedRewrite && /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { style: { fontSize: 13, fontStyle: "italic", color: "#4b5563", marginBottom: 12, opacity: 0.9 }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { fontWeight: 600, fontSize: 15, marginBottom: 6, color: "#111" }, children: "Quick suggestion" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { fontSize: 14, color: "#374151", marginBottom: 8 }, children: "Your feedback may be unclear." }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { fontSize: 13, color: "#6b7280", marginBottom: 10 }, children: "Try specifying what looks wrong and what change you want." }),
+                pending.suggestedRewrite && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { fontSize: 13, fontStyle: "italic", color: "#4b5563", marginBottom: 12, opacity: 0.9 }, children: [
                   'Example: "',
                   pending.suggestedRewrite,
                   '"'
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                   "textarea",
                   {
                     ref: clarityTextareaRef,
@@ -41434,7 +41483,7 @@
                     }
                   }
                 ),
-                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: isEditingFeedback ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: isEditingFeedback ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                   "button",
                   {
                     type: "button",
@@ -41467,8 +41516,8 @@
                     },
                     children: "Done"
                   }
-                ) : /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(import_jsx_runtime14.Fragment, { children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+                ) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                     "button",
                     {
                       type: "button",
@@ -41487,7 +41536,7 @@
                       children: "Edit feedback"
                     }
                   ),
-                  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
                     "button",
                     {
                       type: "button",
@@ -41526,7 +41575,7 @@
           )
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         CaptureWidget,
         {
           sessionId: effectiveSessionId ?? "",
@@ -41592,7 +41641,8 @@
           launcherLogoUrl,
           openResumeModal: openResumeModalFromMessage,
           onResumeModalClose: () => setOpenResumeModalFromMessage(false),
-          sessionLimitReached
+          sessionLimitReached,
+          environment
         },
         widgetResetKey
       )
@@ -41644,7 +41694,7 @@
     shadowRoot.appendChild(container2);
     console.log("[ECHLY CONTENT] mounting widget root");
     const reactRoot = (0, import_client.createRoot)(container2);
-    reactRoot.render(/* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ContentApp, { widgetRoot: container2, initialTheme }));
+    reactRoot.render(/* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ContentApp, { widgetRoot: container2, initialTheme }));
   }
   function normalizeGlobalState(state) {
     if (!state) return null;

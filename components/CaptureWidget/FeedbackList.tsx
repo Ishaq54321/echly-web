@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import FeedbackItem from "./FeedbackItem";
-import type { StructuredFeedback } from "./types";
+import FeedbackItem from "@/lib/capture-engine/core/FeedbackItem";
+import type { StructuredFeedback } from "@/lib/capture-engine/core/types";
 
 type FeedbackListProps = {
   items: StructuredFeedback[];

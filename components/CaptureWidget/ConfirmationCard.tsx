@@ -2,7 +2,7 @@
 
 import React from "react";
 import { m } from "framer-motion";
-import type { StructuredFeedback } from "./types";
+import type { StructuredFeedback } from "@/lib/capture-engine/core/types";
 
 export type ConfirmationCardProps = {
   ticket: StructuredFeedback;
