@@ -133,6 +133,7 @@ export function useCaptureWidget({
   onSessionLoaded,
   onCreateSession,
   onActiveSessionChange,
+  ensureAuthenticated,
   globalSessionModeActive,
   globalSessionPaused,
   onSessionModeStart,
@@ -1065,6 +1066,7 @@ export function useCaptureWidget({
     if (ECHLY_DEBUG) console.log("[Echly] Start New Feedback Session clicked");
     logSession("start");
     if (extensionMode && onCreateSession && onActiveSessionChange) {
+      if (ensureAuthenticated && !(await ensureAuthenticated())) return;
       const session = await onCreateSession();
       if (!session?.id) return;
       onActiveSessionChange(session.id);
@@ -1077,7 +1079,7 @@ export function useCaptureWidget({
     setSessionFeedbackSaving(false);
     setPausePending(false);
     setEndPending(false);
-  }, [extensionMode, onCreateSession, onActiveSessionChange, onSessionModeStart, onSessionViewRequested, globalSessionModeActive]);
+  }, [extensionMode, onCreateSession, onActiveSessionChange, ensureAuthenticated, onSessionModeStart, onSessionViewRequested, globalSessionModeActive]);
 
   const pauseSession = useCallback(() => {
     if (

@@ -133,9 +133,15 @@ function TicketListInner({
 
   const { openItems, skippedItems, resolvedItems } = useMemo(() => {
     const sorted = [...items].sort((a, b) => getTime(b) - getTime(a));
+    const seen = new Set<string>();
+    const deduped = sorted.filter((f) => {
+      if (seen.has(f.id)) return false;
+      seen.add(f.id);
+      return true;
+    });
     const filtered = query
-      ? sorted.filter((f) => f.title.toLowerCase().includes(query))
-      : sorted;
+      ? deduped.filter((f) => f.title.toLowerCase().includes(query))
+      : deduped;
     return {
       openItems: filtered.filter((i) => getTicketStatus(i) === "open"),
       skippedItems: filtered.filter((i) => getTicketStatus(i) === "skipped"),

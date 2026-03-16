@@ -33,7 +33,20 @@ async function verifyDashboardSession(): Promise<boolean> {
 
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-    if (tabs[0]?.id) sw.lastUserTabId = tabs[0].id;
+    const tab = tabs[0];
+    if (tab?.id) sw.lastUserTabId = tab.id;
+
+    if (trayOpen) {
+      globalUIState.visible = false;
+      globalUIState.expanded = false;
+      trayOpen = false;
+      await chrome.storage.local.set({ echlyActive: false });
+      broadcastUIState();
+      if (tab?.id) {
+        chrome.tabs.sendMessage(tab.id, { type: "ECHLY_CLOSE_WIDGET" }).catch(() => {});
+      }
+      return;
+    }
 
     const sessionValid = await verifyDashboardSession();
     if (!sessionValid) {
@@ -41,13 +54,16 @@ chrome.action.onClicked.addListener(() => {
       extensionTokenExpiresAt = null;
       sw.currentUser = null;
       setExtensionToken(null);
-      if (authTabOpen) return;
+      if (await focusExistingAuthTabIfOpen()) return;
       authTabOpen = true;
-      chrome.tabs.create({ url: EXTENSION_AUTH_URL });
+      chrome.tabs.create({ url: EXTENSION_AUTH_URL }, (tab) => {
+        if (tab?.id) authBrokerTabId = tab.id;
+      });
       return;
     }
 
     void openWidgetInActiveTab();
+    trayOpen = true;
   });
 });
 
@@ -83,6 +99,30 @@ let authBrokerTabId: number | null = null;
 /** Guard: prevent opening multiple /extension-auth tabs; track until broker resolves. */
 let authTabOpen = false;
 let brokerPromise: Promise<string> | null = null;
+
+/**
+ * If an auth tab is already open, focus it and return true.
+ * If the tab is missing (e.g. closed manually), clear state and return false so caller can open a new one.
+ */
+async function focusExistingAuthTabIfOpen(): Promise<boolean> {
+  if (!authTabOpen || authBrokerTabId == null) return false;
+  try {
+    const tab = await chrome.tabs.get(authBrokerTabId);
+    if (tab?.windowId != null) {
+      await chrome.windows.update(tab.windowId, { focused: true });
+      await chrome.tabs.update(authBrokerTabId, { active: true });
+    }
+    return true;
+  } catch (err) {
+    console.warn("[ECHLY] auth tab missing, clearing state");
+    authTabOpen = false;
+    authBrokerTabId = null;
+    return false;
+  }
+}
+
+/** Tray toggle state: icon click opens when false, closes when true (Loom-style). */
+let trayOpen = false;
 
 /** Global lock: only one ECHLY_PROCESS_FEEDBACK pipeline at a time to avoid ECONNRESET. */
 let aiProcessing = false;
@@ -213,9 +253,35 @@ async function initializeSessionState(): Promise<void> {
   });
 }
 
+chrome.runtime.onInstalled.addListener(() => {
+  console.log("[ECHLY] extension installed or updated");
+});
+
+self.addEventListener("activate", () => {
+  console.log("[ECHLY] service worker activated");
+});
+
 (async () => {
-  await initializeSessionState();
-  broadcastUIState();
+  try {
+    const stored = await chrome.storage.local.get([
+      "echlyActive",
+      "activeSessionId",
+      "sessionModeActive",
+    ]);
+
+    if (stored?.echlyActive) {
+      trayOpen = true;
+      globalUIState.visible = true;
+    }
+
+    await initializeSessionState();
+
+    broadcastUIState();
+
+    console.log("[ECHLY] service worker initialized");
+  } catch (err) {
+    console.warn("[ECHLY] worker startup recovery failed", err);
+  }
 })();
 
 /**
@@ -472,6 +538,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.tabs.remove(authBrokerTabId).catch(() => {});
         authBrokerTabId = null;
       }
+      trayOpen = true;
+      globalUIState.visible = true;
+      void (async () => {
+        await openWidgetInActiveTab();
+        broadcastUIState();
+      })();
     }
     return false;
   }
@@ -498,9 +570,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_OPEN_WIDGET") {
     console.log("[ECHLY BG] OPEN_WIDGET received");
-    openWidgetInActiveTab()
-      .then(() => sendResponse({ ok: true }))
-      .catch(() => sendResponse({ ok: false }));
+    (async () => {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0]?.id) sw.lastUserTabId = tabs[0].id;
+
+      const sessionValid = await verifyDashboardSession();
+      if (!sessionValid) {
+        extensionToken = null;
+        extensionTokenExpiresAt = null;
+        sw.currentUser = null;
+        setExtensionToken(null);
+        if (await focusExistingAuthTabIfOpen()) {
+          sendResponse({ ok: false, redirectToLogin: true });
+          return;
+        }
+        authTabOpen = true;
+        chrome.tabs.create({ url: EXTENSION_AUTH_URL }, (tab) => {
+          if (tab?.id) authBrokerTabId = tab.id;
+        });
+        sendResponse({ ok: false, redirectToLogin: true });
+        return;
+      }
+
+      trayOpen = true;
+      try {
+        await openWidgetInActiveTab();
+        sendResponse({ ok: true });
+      } catch {
+        sendResponse({ ok: false });
+      }
+    })();
     return true; // keep channel open for async sendResponse
   }
 
@@ -530,6 +629,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_GET_GLOBAL_STATE") {
     sendResponse({ state: { ...globalUIState } });
+    return true;
+  }
+
+  if (request.type === "ECHLY_GET_TRAY_STATE") {
+    sendResponse({
+      trayOpen,
+      visible: globalUIState.visible,
+    });
+    return true;
+  }
+
+  if (request.type === "ECHLY_CLOSE_WIDGET") {
+    (async () => {
+      trayOpen = false;
+      globalUIState.visible = false;
+
+      await chrome.storage.local.set({
+        echlyActive: false,
+      });
+
+      broadcastUIState();
+
+      const tabs = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: "ECHLY_CLOSE_WIDGET",
+        }).catch(() => {});
+      }
+      sendResponse({ ok: true });
+    })();
     return true;
   }
 
@@ -802,6 +935,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.tabs.create({ url: LOGIN_URL });
     sendResponse({ success: true });
     return true;
+  }
+
+  if (request.type === "ECHLY_TRIGGER_LOGIN") {
+    (async () => {
+      if (await focusExistingAuthTabIfOpen()) {
+        sendResponse({ ok: true });
+        return;
+      }
+      authTabOpen = true;
+      chrome.tabs.create({ url: EXTENSION_AUTH_URL }, (tab) => {
+        if (tab?.id) authBrokerTabId = tab.id;
+      });
+      sendResponse({ ok: true });
+    })();
+    return true; // keep channel open for async sendResponse
   }
 
   if (request.type === "START_RECORDING") {

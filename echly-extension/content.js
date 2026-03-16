@@ -36850,6 +36850,7 @@
     onSessionLoaded,
     onCreateSession,
     onActiveSessionChange,
+    ensureAuthenticated: ensureAuthenticated2,
     globalSessionModeActive,
     globalSessionPaused,
     onSessionModeStart,
@@ -37677,6 +37678,7 @@
       if (ECHLY_DEBUG) console.log("[Echly] Start New Feedback Session clicked");
       logSession("start");
       if (extensionMode && onCreateSession && onActiveSessionChange) {
+        if (ensureAuthenticated2 && !await ensureAuthenticated2()) return;
         const session = await onCreateSession();
         if (!session?.id) return;
         onActiveSessionChange(session.id);
@@ -37689,7 +37691,7 @@
       setSessionFeedbackSaving(false);
       setPausePending(false);
       setEndPending(false);
-    }, [extensionMode, onCreateSession, onActiveSessionChange, onSessionModeStart, onSessionViewRequested, globalSessionModeActive]);
+    }, [extensionMode, onCreateSession, onActiveSessionChange, ensureAuthenticated2, onSessionModeStart, onSessionViewRequested, globalSessionModeActive]);
     const pauseSession = (0, import_react4.useCallback)(() => {
       if (!sessionModeRef.current && !globalSessionModeActive || sessionPausedRef.current || pausePending || endPending) {
         return;
@@ -39721,6 +39723,7 @@
     onSessionEnd: onSessionEndCallback,
     onCreateSession,
     onActiveSessionChange,
+    ensureAuthenticated: ensureAuthenticated2,
     globalSessionModeActive,
     globalSessionPaused,
     onSessionModeStart,
@@ -39765,6 +39768,7 @@
       onSessionLoaded,
       onCreateSession,
       onActiveSessionChange,
+      ensureAuthenticated: ensureAuthenticated2,
       onSessionViewRequested: extensionMode ? () => setShowCommandScreen(false) : void 0,
       globalSessionModeActive,
       globalSessionPaused,
@@ -40143,6 +40147,22 @@
   }
   function requestOpenPopup() {
     chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {
+    });
+  }
+  function ensureAuthenticated() {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: "ECHLY_GET_AUTH_STATE" },
+        (r) => {
+          if (!r?.authenticated || !r?.user?.uid) {
+            chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {
+            });
+            resolve(false);
+            return;
+          }
+          resolve(true);
+        }
+      );
     });
   }
   function notifyFeedbackCreated(ticket) {
@@ -41329,6 +41349,7 @@
           },
           onCreateSession: createSession,
           onActiveSessionChange,
+          ensureAuthenticated,
           globalSessionModeActive: globalState.sessionModeActive ?? false,
           globalSessionPaused: globalState.sessionPaused ?? false,
           onSessionModeStart: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {
@@ -41478,6 +41499,11 @@
         console.log("[ECHLY CONTENT] OPEN_WIDGET event dispatching");
         setHostVisibility(true);
         window.dispatchEvent(new CustomEvent("ECHLY_OPEN_WIDGET"));
+        return;
+      }
+      if (msg.type === "ECHLY_CLOSE_WIDGET") {
+        setHostVisibility(false);
+        return;
       }
       const h = document.getElementById(SHADOW_HOST_ID3);
       if (!h) return;
@@ -41501,8 +41527,19 @@
         window.dispatchEvent(new CustomEvent("ECHLY_START_SESSION_REQUEST"));
       }
       if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
-        echlyLog("CONTENT", "dispatch event", { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
-        window.dispatchEvent(new CustomEvent("ECHLY_OPEN_PREVIOUS_SESSIONS"));
+        chrome.runtime.sendMessage(
+          { type: "ECHLY_GET_AUTH_STATE" },
+          (r) => {
+            if (!r?.authenticated || !r?.user?.uid) {
+              chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {
+              });
+              return;
+            }
+            echlyLog("CONTENT", "dispatch event", { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
+            window.dispatchEvent(new CustomEvent("ECHLY_OPEN_PREVIOUS_SESSIONS"));
+          }
+        );
+        return;
       }
       if (msg.type === "ECHLY_SESSION_STATE_SYNC") {
         chrome.runtime.sendMessage({ type: "ECHLY_GET_GLOBAL_STATE" }, (response) => {

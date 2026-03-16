@@ -105,6 +105,26 @@ function requestOpenPopup(): void {
   chrome.runtime.sendMessage({ type: "ECHLY_OPEN_POPUP" }).catch(() => {});
 }
 
+/**
+ * Auth guard: if user is not authenticated, open auth broker and return false; otherwise return true.
+ * Use before Start Session or before opening Previous Sessions to unify Loom-style behavior.
+ */
+function ensureAuthenticated(): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      { type: "ECHLY_GET_AUTH_STATE" },
+      (r: { authenticated?: boolean; user?: { uid: string } } | undefined) => {
+        if (!r?.authenticated || !r?.user?.uid) {
+          chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {});
+          resolve(false);
+          return;
+        }
+        resolve(true);
+      }
+    );
+  });
+}
+
 /** Notify background when content creates a ticket via apiFetch so globalUIState.pointers stays in sync. */
 function notifyFeedbackCreated(ticket: { id: string; title: string; actionSteps?: string[]; type?: string }): void {
   chrome.runtime.sendMessage({
@@ -1427,6 +1447,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         onSessionEnd={() => {}}
         onCreateSession={createSession}
         onActiveSessionChange={onActiveSessionChange}
+        ensureAuthenticated={ensureAuthenticated}
         globalSessionModeActive={globalState.sessionModeActive ?? false}
         globalSessionPaused={globalState.sessionPaused ?? false}
         onSessionModeStart={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {})}
@@ -1593,6 +1614,11 @@ function ensureMessageListener(host: HTMLDivElement): void {
       console.log("[ECHLY CONTENT] OPEN_WIDGET event dispatching");
       setHostVisibility(true);
       window.dispatchEvent(new CustomEvent("ECHLY_OPEN_WIDGET"));
+      return;
+    }
+    if (msg.type === "ECHLY_CLOSE_WIDGET") {
+      setHostVisibility(false);
+      return;
     }
     const h = document.getElementById(SHADOW_HOST_ID);
     if (!h) return;
@@ -1616,8 +1642,18 @@ function ensureMessageListener(host: HTMLDivElement): void {
       window.dispatchEvent(new CustomEvent("ECHLY_START_SESSION_REQUEST"));
     }
     if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
-      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
-      window.dispatchEvent(new CustomEvent("ECHLY_OPEN_PREVIOUS_SESSIONS"));
+      chrome.runtime.sendMessage(
+        { type: "ECHLY_GET_AUTH_STATE" },
+        (r: { authenticated?: boolean; user?: { uid: string } } | undefined) => {
+          if (!r?.authenticated || !r?.user?.uid) {
+            chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {});
+            return;
+          }
+          echlyLog("CONTENT", "dispatch event", { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
+          window.dispatchEvent(new CustomEvent("ECHLY_OPEN_PREVIOUS_SESSIONS"));
+        }
+      );
+      return;
     }
     /* Tab activation resync: always fetch and apply state; never debounce or skip. */
     if (msg.type === "ECHLY_SESSION_STATE_SYNC") {

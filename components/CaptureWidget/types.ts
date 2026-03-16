@@ -159,6 +159,8 @@ export type CaptureWidgetProps = {
   openResumeModal?: boolean;
   /** Extension: called when the resume/previous-sessions modal is closed so parent can clear openResumeModal. */
   onResumeModalClose?: () => void;
+  /** Extension: auth guard. Returns true if authenticated, false if login was triggered. Call before Start Session to open auth broker when logged out. */
+  ensureAuthenticated?: () => Promise<boolean>;
 };
 
 /** One feedback job in the pipeline (processing or failed). Completed jobs are removed and the ticket appears in pointers. */
