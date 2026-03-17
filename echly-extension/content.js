@@ -13881,6 +13881,40 @@
     });
   }
 
+  // echly-extension/src/cachedSessions.ts
+  var TTL_MS = 3e4;
+  var cached = null;
+  var inFlight = null;
+  async function getSessionsCached(fetchFn) {
+    const now = Date.now();
+    if (cached && now - cached.at < TTL_MS) {
+      return cached.sessions;
+    }
+    if (inFlight) {
+      return inFlight;
+    }
+    const promise = (async () => {
+      try {
+        const res = await fetchFn("/api/sessions");
+        const json = await res.json();
+        const sessions = json.sessions ?? [];
+        if (res.ok && json.success) {
+          cached = { sessions, at: Date.now() };
+          return sessions;
+        }
+        return [];
+      } finally {
+        inFlight = null;
+      }
+    })();
+    inFlight = promise;
+    return promise;
+  }
+  function invalidateSessionsCache() {
+    cached = null;
+    inFlight = null;
+  }
+
   // echly-extension/src/contentScreenshot.ts
   function generateFeedbackId() {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -37615,7 +37649,7 @@
       );
     }, []);
     const startSession = (0, import_react4.useCallback)(async () => {
-      console.log("[ECHLY UX] startSession clicked");
+      console.log("[ECHLY DEBUG] startSession ENTER");
       if (sessionStatusRef.current === "starting") return;
       if (stateRef.current !== "idle" || sessionModeRef.current || globalSessionModeActive) return;
       setSessionStatus("starting");
@@ -37632,17 +37666,17 @@
           setSessionStatus("idle");
           return;
         }
-        console.log("[ECHLY UX] creating session...");
         const result = environment ? await environment.createSession() : extensionMode && onCreateSession ? await onCreateSession() : null;
-        if (result?.limitReached) {
+        if (result && "limitReached" in result && result.limitReached) {
+          console.log("[ECHLY DEBUG] session limit reached \u2192 triggering upgrade view");
           setSessionStatus("idle");
           setSessionLimitReached({
-            message: result.message,
+            message: result.message ?? "You've reached your session limit.",
             upgradePlan: result.upgradePlan
           });
           return;
         }
-        if (!result?.id) {
+        if (!result || !("id" in result) || !result.id) {
           throw new Error("Session creation failed");
         }
         if (environment) {
@@ -37658,7 +37692,7 @@
         setSessionLimitReached(null);
         setSessionStatus("active");
       } catch (e) {
-        console.error("[ECHLY UX] startSession failed", e);
+        console.error("[ECHLY ERROR] startSession failed", e);
         setSessionStatus("idle");
       }
     }, [
@@ -40040,6 +40074,11 @@
         setShowCommandScreen(false);
       }
     }, [loadSessionWithPointers?.sessionId]);
+    (0, import_react17.useEffect)(() => {
+      if (effectiveSessionLimitReached && !sessionId) {
+        console.log("[ECHLY DEBUG] Rendering SessionLimitUpgradeView");
+      }
+    }, [effectiveSessionLimitReached, sessionId]);
     import_react17.default.useEffect(() => {
       if (!widgetToggleRef) return;
       widgetToggleRef.current = handlers.toggleOpen;
@@ -40610,16 +40649,11 @@
     import_react18.default.useEffect(() => {
       if (!globalState.visible) return;
       let cancelled = false;
-      async function checkSessions() {
-        try {
-          const res = await apiFetch("/api/sessions?limit=1");
-          const data = await res.json();
-          if (!cancelled) setHasPreviousSessions(Boolean(data.sessions?.length));
-        } catch {
-          if (!cancelled) setHasPreviousSessions(false);
-        }
-      }
-      checkSessions();
+      getSessionsCached(apiFetch).then((sessions) => {
+        if (!cancelled) setHasPreviousSessions(sessions.length > 0);
+      }).catch(() => {
+        if (!cancelled) setHasPreviousSessions(false);
+      });
       return () => {
         cancelled = true;
       };
@@ -41097,15 +41131,8 @@
       [effectiveSessionId]
     );
     const fetchSessions = import_react18.default.useCallback(async () => {
-      console.log("[ECHLY DEBUG] fetching sessions...");
-      console.log("[ECHLY DEBUG] before fetchSessions");
-      const res = await apiFetch("/api/sessions");
-      const json = await res.json();
-      const sessions = json.sessions ?? [];
-      console.log("[ECHLY DEBUG] after fetchSessions");
-      console.log("[ECHLY DEBUG] sessions loaded:", sessions.length);
-      if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", { ok: res.ok, status: res.status, success: json.success, count: sessions.length, sessions });
-      if (!res.ok || !json.success) return [];
+      const sessions = await getSessionsCached(apiFetch);
+      if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", { count: sessions.length, sessions });
       return sessions;
     }, []);
     import_react18.default.useEffect(() => {
@@ -41116,8 +41143,9 @@
       try {
         const res = await apiFetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
         const data = await res.json();
-        if (ECHLY_DEBUG) console.log("[Echly] Create session response:", { ok: res.ok, status: res.status, success: data.success, sessionId: data.session?.id, error: data.error });
+        console.log("[ECHLY DEBUG] startSession response:", res.status, { ok: res.ok, success: data.success, sessionId: data.session?.id, error: data.error });
         if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
+          console.log("[ECHLY DEBUG] session limit reached \u2192 returning limitReached for upgrade view");
           return {
             limitReached: true,
             message: data.message ?? "You've reached your session limit.",
@@ -41125,6 +41153,7 @@
           };
         }
         if (!res.ok || !data.success || !data.session?.id) return null;
+        invalidateSessionsCache();
         return { id: data.session.id };
       } catch (err) {
         console.error("[Echly] Failed to create session:", err);

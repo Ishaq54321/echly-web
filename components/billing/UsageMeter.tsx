@@ -1,6 +1,6 @@
 "use client";
 
-import { useBillingUsage } from "@/lib/hooks/useBillingUsage";
+import { useBillingUsageContext } from "@/lib/billing/BillingUsageProvider";
 
 export type { BillingUsageData as BillingUsage } from "@/lib/hooks/useBillingUsage";
 
@@ -54,7 +54,7 @@ function MeterRow({
 }
 
 export function UsageMeter() {
-  const { data, loading, error } = useBillingUsage();
+  const { data, loading, error } = useBillingUsageContext();
 
   if (loading) {
     return (

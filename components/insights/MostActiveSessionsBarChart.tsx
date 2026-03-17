@@ -26,8 +26,8 @@ export function MostActiveSessionsBarChart({
 
   if (!data || data.length === 0) {
     return (
-      <p className="text-sm text-secondary">
-        No session activity yet to show.
+      <p className="text-sm text-gray-500 text-center py-10">
+        No feedback yet — insights will appear once you start collecting feedback.
       </p>
     );
   }
@@ -35,8 +35,8 @@ export function MostActiveSessionsBarChart({
   const formatted = data.map((d) => ({
     ...d,
     label:
-      d.sessionName.length > 24
-        ? `${d.sessionName.slice(0, 21)}…`
+      d.sessionName.length > 28
+        ? `${d.sessionName.slice(0, 25)}…`
         : d.sessionName,
   }));
 
@@ -50,24 +50,26 @@ export function MostActiveSessionsBarChart({
         <BarChart
           data={formatted}
           layout="vertical"
-          margin={{ top: 20, right: 30, left: -25, bottom: 0 }}
-          barCategoryGap="12%"
+          margin={{ top: 12, right: 22, left: -10, bottom: 0 }}
+          barCategoryGap="18%"
         >
 
           <XAxis
             type="number"
             allowDecimals={false}
             tick={{ fontSize: 11, fill: "#9CA3AF" }}
-            axisLine={{ stroke: "#E5E7EB", strokeWidth: 1 }}
+            axisLine={false}
+            tickLine={false}
           />
 
           <YAxis
             dataKey="label"
             type="category"
-            width={120}
+            width={150}
             tickMargin={8}
-            tick={{ fontSize: 11, fill: "#9CA3AF" }}
-            axisLine={{ stroke: "#E5E7EB", strokeWidth: 1 }}
+            tick={{ fontSize: 11, fill: "#6B7280" }}
+            axisLine={false}
+            tickLine={false}
           />
 
           <Tooltip
@@ -137,9 +139,9 @@ export function MostActiveSessionsBarChart({
 
           <Bar
             dataKey="issues"
-            barSize={28}   // thicker bars
+            barSize={24}
             isAnimationActive
-            animationDuration={800}
+            animationDuration={280}
             animationEasing="ease-out"
             label={{
               position: "right",

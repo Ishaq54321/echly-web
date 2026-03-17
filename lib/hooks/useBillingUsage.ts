@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
+import { getBillingUsageCached, invalidateBillingUsageCache } from "@/lib/cachedBillingUsage";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { listenToWorkspace } from "@/lib/repositories/workspacesRepository";
 
@@ -48,14 +49,13 @@ export function useBillingUsage(
   const refetch = useCallback(async () => {
     try {
       setError(null);
-      const res = await authFetch("/api/billing/usage");
-      if (!res.ok) {
+      const json = await getBillingUsageCached(authFetch);
+      if (json === null) {
         setData(null);
         setError("Failed to load usage");
         return;
       }
-      const json = await res.json();
-      setData(json as BillingUsageData);
+      setData(json);
     } catch (e) {
       setData(null);
       setError(e instanceof Error ? e.message : "Error");
@@ -90,7 +90,10 @@ export function useBillingUsage(
         if (cancelled) return;
 
         unsubscribeWorkspace = listenToWorkspace(workspaceId, () => {
-          if (!cancelled) refetch();
+          if (!cancelled) {
+            invalidateBillingUsageCache();
+            refetch();
+          }
         });
         if (cancelled) {
           unsubscribeWorkspace();

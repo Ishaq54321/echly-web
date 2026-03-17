@@ -1070,13 +1070,13 @@ export function useCaptureWidget({
   }, []);
 
   const startSession = useCallback(async () => {
-    console.log("[ECHLY UX] startSession clicked");
+    console.log("[ECHLY DEBUG] startSession ENTER");
 
     // Prevent double-clicks while starting
     if (sessionStatusRef.current === "starting") return;
     if (stateRef.current !== "idle" || sessionModeRef.current || globalSessionModeActive) return;
 
-    // STEP 1: INSTANT UI RESPONSE
+    // STEP 1: INSTANT UI RESPONSE (do not switch screens or reset UI until API resolves)
     setSessionStatus("starting");
 
     if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "startSession" });
@@ -1095,18 +1095,18 @@ export function useCaptureWidget({
         return;
       }
 
-      console.log("[ECHLY UX] creating session...");
-
       const result = environment
         ? await environment.createSession()
         : extensionMode && onCreateSession
           ? await onCreateSession()
           : null;
 
+      // 403 / session limit: trigger existing upgrade flow immediately (no blink, no silent fail)
       if (result && "limitReached" in result && result.limitReached) {
+        console.log("[ECHLY DEBUG] session limit reached → triggering upgrade view");
         setSessionStatus("idle");
         setSessionLimitReached({
-          message: result.message,
+          message: result.message ?? "You've reached your session limit.",
           upgradePlan: result.upgradePlan,
         });
         return;
@@ -1116,7 +1116,7 @@ export function useCaptureWidget({
         throw new Error("Session creation failed");
       }
 
-      // STEP 2: FINALIZE (result narrowed to { id: string })
+      // STEP 2: FINALIZE only after successful session creation (prevents UI blink)
       if (environment) {
         await environment.setActiveSession?.(result.id);
         setPointers([]);
@@ -1131,7 +1131,7 @@ export function useCaptureWidget({
       setSessionLimitReached(null);
       setSessionStatus("active");
     } catch (e) {
-      console.error("[ECHLY UX] startSession failed", e);
+      console.error("[ECHLY ERROR] startSession failed", e);
       setSessionStatus("idle");
     }
   }, [

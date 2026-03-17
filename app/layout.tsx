@@ -19,8 +19,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
-      <body className={`${plusJakartaSans.className} font-sans antialiased h-full overflow-hidden`} suppressHydrationWarning>
-        <div className="env-canvas h-screen flex flex-col">
+      <body
+        className={`${plusJakartaSans.className} font-sans antialiased min-h-screen overflow-y-auto`}
+        suppressHydrationWarning
+      >
+        <div className="env-canvas min-h-screen flex flex-col">
           {children}
         </div>
       </body>

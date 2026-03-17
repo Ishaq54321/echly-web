@@ -57,7 +57,8 @@ export async function GET(req: Request) {
           ownerName = u.name ?? null;
         }
       }
-      const sessionsUsed = await getWorkspaceSessionCountRepo(workspaceId);
+      const workspaceData = { id: workspaceId, ...data } as Workspace;
+      const sessionsUsed = await getWorkspaceSessionCountRepo(workspaceId, workspaceData);
       const members = Array.isArray(data.members) ? data.members.length : 0;
       const createdAt = data.createdAt && typeof (data.createdAt as { toDate?: () => Date }).toDate === "function"
         ? (data.createdAt as { toDate: () => Date }).toDate().toISOString()

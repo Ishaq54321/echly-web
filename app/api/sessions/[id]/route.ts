@@ -125,7 +125,7 @@ export async function PATCH(
       await updateSessionTitleRepo(id, body.title!.trim());
     }
     if (hasArchived) {
-      await updateSessionArchivedRepo(id, body.archived!);
+      await updateSessionArchivedRepo(id, body.archived!, workspaceId);
     }
     const updated = await getSessionByIdRepo(id);
     if (!updated) {

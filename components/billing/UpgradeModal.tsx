@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "lucide-react";
-import { useBillingUsage } from "@/lib/hooks/useBillingUsage";
+import { useBillingUsageContext } from "@/lib/billing/BillingUsageProvider";
 
 export interface UpgradeModalProps {
   open: boolean;
@@ -38,7 +38,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
   const currentPlan = currentPlanFromUpgrade(upgradePlan);
   const currentPlanLabel = PLAN_LABEL[currentPlan] ?? currentPlan;
 
-  const { data: usageData } = useBillingUsage({ enabled: open });
+  const { data: usageData } = useBillingUsageContext();
 
   const usage = usageData
     ? {

@@ -192,6 +192,13 @@ export default function CaptureWidget({
     }
   }, [loadSessionWithPointers?.sessionId]);
 
+  /** Safety log when rendering SessionLimitUpgradeView (session limit reached). */
+  useEffect(() => {
+    if (effectiveSessionLimitReached && !sessionId) {
+      console.log("[ECHLY DEBUG] Rendering SessionLimitUpgradeView");
+    }
+  }, [effectiveSessionLimitReached, sessionId]);
+
   React.useEffect(() => {
     if (!widgetToggleRef) return;
     widgetToggleRef.current = handlers.toggleOpen;

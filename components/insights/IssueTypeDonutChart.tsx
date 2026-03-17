@@ -33,19 +33,28 @@ function normalizeIssueKey(type: string): string {
   return type.toLowerCase();
 }
 
-export function IssueTypeDonutChart({ data }: { data: IssueSlice[] }) {
+export function IssueTypeDonutChart({
+  data,
+  totalOverride,
+}: {
+  data: IssueSlice[];
+  totalOverride?: number;
+}) {
   const tooltipFontFamily =
     "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
   if (!data || data.length === 0) {
     return (
-      <p className="text-sm text-secondary">
-        Not enough data yet to show issue distribution.
+      <p className="text-sm text-gray-500 text-center py-10">
+        No feedback yet — insights will appear once you start collecting feedback.
       </p>
     );
   }
 
-  const total = data.reduce((sum, d) => sum + d.count, 0) || 1;
+  const computedTotal = data.reduce((sum, d) => sum + d.count, 0);
+  const safeOverride = Math.max(0, Math.floor(Number(totalOverride ?? NaN)));
+  const totalForCenter = Number.isFinite(safeOverride) ? safeOverride : computedTotal;
+  const totalForPct = computedTotal || 1;
 
   return (
     <div className="w-full flex flex-col items-center">
@@ -60,7 +69,7 @@ export function IssueTypeDonutChart({ data }: { data: IssueSlice[] }) {
               outerRadius={100}
               paddingAngle={2}
               isAnimationActive
-              animationDuration={800}
+              animationDuration={280}
               animationEasing="ease-out"
             >
               {data.map((entry) => {
@@ -86,7 +95,7 @@ export function IssueTypeDonutChart({ data }: { data: IssueSlice[] }) {
                 const item = payload[0];
                 const count = item.value as number;
                 const pct =
-                  total > 0 ? ((count / total) * 100).toFixed(1) + "%" : "0%";
+                  totalForPct > 0 ? ((count / totalForPct) * 100).toFixed(1) + "%" : "0%";
                 const rawType = item.name ?? item.payload?.type ?? "general";
                 const key = normalizeIssueKey(rawType);
                 const label = ISSUE_LABELS[key] ?? rawType;
@@ -133,10 +142,10 @@ export function IssueTypeDonutChart({ data }: { data: IssueSlice[] }) {
         </ResponsiveContainer>
         <div className="pointer-events-none absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center space-y-[2px] text-center">
           <div className="text-[32px] font-semibold text-neutral-900 leading-none">
-            {total}
+            {totalForCenter}
           </div>
           <div className="mt-1 text-[13px] font-medium text-[#6B7280]">
-            Total Issues
+            Total feedback
           </div>
         </div>
       </div>

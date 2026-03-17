@@ -16,6 +16,15 @@ export type PlanCatalog = Record<PlanId, PlanCatalogEntry>;
 
 const PLANS_COLLECTION = "plans";
 
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Global module-level cache: single source of truth for plan catalog
+let planCache = {
+  data: null as PlanCatalog | null,
+  expiresAt: 0,
+  promise: null as Promise<PlanCatalog> | null,
+};
+
 const PLAN_NAMES: Record<PlanId, string> = {
   free: "Free",
   starter: "Starter",
@@ -42,10 +51,9 @@ function buildDefaultCatalog(): PlanCatalog {
 }
 
 /**
- * Returns plan catalog (Firestore plans + code defaults). Always reads from Firestore
- * so admin plan changes propagate immediately to limits and billing.
+ * Fetches plan catalog from Firestore and merges with code defaults. Used by getPlanCatalog.
  */
-export async function getPlanCatalog(): Promise<PlanCatalog> {
+async function fetchPlans(): Promise<PlanCatalog> {
   const t_catalog_start = performance.now();
   const catalog = buildDefaultCatalog();
 
@@ -87,6 +95,34 @@ export async function getPlanCatalog(): Promise<PlanCatalog> {
     // Safety fallback: never crash because plans can't be fetched.
     console.log("[ECHLY PERF] getPlanCatalog TOTAL (fallback):", performance.now() - t_catalog_start);
     return catalog;
+  }
+}
+
+/**
+ * Returns plan catalog (Firestore plans + code defaults). Cached in-memory for 5 minutes
+ * so repeated calls in the same process (e.g. multiple API handlers) share one Firestore read.
+ */
+export async function getPlanCatalog(): Promise<PlanCatalog> {
+  if (planCache.data && Date.now() < planCache.expiresAt) {
+    console.log("[ECHLY CACHE] planCatalog HIT");
+    return planCache.data;
+  }
+
+  if (planCache.promise) {
+    console.log("[ECHLY CACHE] planCatalog IN-FLIGHT");
+    return planCache.promise;
+  }
+
+  console.log("[ECHLY CACHE] planCatalog MISS");
+  planCache.promise = fetchPlans();
+
+  try {
+    const data = await planCache.promise;
+    planCache.data = data;
+    planCache.expiresAt = Date.now() + CACHE_TTL_MS;
+    return data;
+  } finally {
+    planCache.promise = null;
   }
 }
 

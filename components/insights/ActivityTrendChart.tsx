@@ -7,7 +7,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   Area,
 } from "recharts";
@@ -15,7 +14,7 @@ import {
 export interface ActivityTrendPoint {
   date: string;
   issues: number;
-  replies: number;
+  resolved: number;
 }
 
 export function ActivityTrendChart({
@@ -31,7 +30,7 @@ export function ActivityTrendChart({
     if (!active || !payload || payload.length === 0) return null;
 
     const issues = payload.find((p: any) => p.dataKey === "issues");
-    const replies = payload.find((p: any) => p.dataKey === "replies");
+    const resolved = payload.find((p: any) => p.dataKey === "resolved");
 
     return (
       <div
@@ -56,13 +55,13 @@ export function ActivityTrendChart({
         </div>
         {issues && (
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-            <span style={{ color: "#4B5563", fontWeight: 500 }}>Issues captured</span>
+            <span style={{ color: "#4B5563", fontWeight: 500 }}>Feedback captured</span>
             <span style={{ color: "#111827", fontWeight: 600 }}>
               {issues.value}
             </span>
           </div>
         )}
-        {replies && (
+        {resolved && (
           <div
             style={{
               marginTop: 4,
@@ -71,9 +70,9 @@ export function ActivityTrendChart({
               gap: 12,
             }}
           >
-            <span style={{ color: "#4B5563", fontWeight: 500 }}>Replies made</span>
+            <span style={{ color: "#4B5563", fontWeight: 500 }}>Resolved feedback</span>
             <span style={{ color: "#111827", fontWeight: 600 }}>
-              {replies.value}
+              {resolved.value}
             </span>
           </div>
         )}
@@ -83,8 +82,8 @@ export function ActivityTrendChart({
 
   if (!data || data.length === 0) {
     return (
-      <p className="text-sm text-secondary">
-        Not enough data yet to show activity over time.
+      <p className="text-sm text-gray-500 text-center py-10">
+        No feedback yet — insights will appear once you start collecting feedback.
       </p>
     );
   }
@@ -95,7 +94,7 @@ export function ActivityTrendChart({
   }));
 
   return (
-    <div className="w-full h-[320px] flex items-center justify-center">
+    <div className="w-full h-[220px] flex items-center justify-center">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={formatted}
@@ -103,25 +102,28 @@ export function ActivityTrendChart({
         >
           <defs>
             <linearGradient id="activityIssuesGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#155DFC" stopOpacity={0.3} />
+              <stop offset="0%" stopColor="#155DFC" stopOpacity={0.28} />
               <stop offset="100%" stopColor="#155DFC" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+          <CartesianGrid vertical={false} stroke="#E5E7EB" strokeOpacity={0.35} />
           <XAxis
             dataKey="dateLabel"
             tick={{ fontSize: 11, fill: "#6B7280" }}
+            axisLine={false}
+            tickLine={false}
           />
           <YAxis
             allowDecimals={false}
             tick={{ fontSize: 11, fill: "#6B7280" }}
+            axisLine={false}
+            tickLine={false}
           />
           <Tooltip
             wrapperStyle={{ zIndex: 9999 }}
-            cursor={{ stroke: "#E5E7EB", strokeWidth: 1 }}
+            cursor={{ stroke: "#E5E7EB", strokeWidth: 1, strokeOpacity: 0.7 }}
             content={renderTooltip}
           />
-          <Legend />
           <Area
             type="monotone"
             dataKey="issues"
@@ -129,31 +131,31 @@ export function ActivityTrendChart({
             fill="url(#activityIssuesGradient)"
             fillOpacity={0.15}
             isAnimationActive
-            animationDuration={800}
+            animationDuration={280}
             animationEasing="ease-out"
           />
           <Line
             type="monotone"
             dataKey="issues"
-            name="Issues captured"
+            name="Feedback captured"
             stroke="#155DFC"
             strokeWidth={3}
             dot={false}
             activeDot={{ r: 4 }}
             isAnimationActive
-            animationDuration={800}
+            animationDuration={280}
             animationEasing="ease-out"
           />
           <Line
             type="monotone"
-            dataKey="replies"
-            name="Replies made"
+            dataKey="resolved"
+            name="Resolved feedback"
             stroke="#34D399"
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 3 }}
             isAnimationActive
-            animationDuration={800}
+            animationDuration={280}
             animationEasing="ease-out"
           />
         </LineChart>

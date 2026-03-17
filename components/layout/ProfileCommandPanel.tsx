@@ -10,8 +10,9 @@ import type { User } from "firebase/auth";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
-import { useBillingUsage } from "@/lib/hooks/useBillingUsage";
+import { useBillingUsageContext } from "@/lib/billing/BillingUsageProvider";
 import CountUp from "react-countup";
+import { filterDaily, type DailyInsights } from "@/lib/analytics/filterDaily";
 
 const PANEL_WIDTH = 520;
 
@@ -23,8 +24,20 @@ interface AnalyticsWindow {
 }
 
 interface InsightsApiResponse {
-  lifetime: AnalyticsWindow;
-  last30Days: AnalyticsWindow;
+  lifetime: {
+    totalFeedback: number;
+    totalComments: number;
+    timeSavedMinutes: number;
+  };
+  analytics: {
+    daily: DailyInsights;
+    issueTypes: Record<string, number>;
+    sessionCounts: Record<string, number>;
+    response: {
+      totalFirstReplyMs: number;
+      count: number;
+    };
+  };
 }
 
 
@@ -68,7 +81,7 @@ export function ProfileCommandPanel({
   const [analytics, setAnalytics] = useState<InsightsApiResponse | null>(null);
   const [, setAnalyticsLoading] = useState(false);
   const [hasAnimatedMetrics, setHasAnimatedMetrics] = useState(false);
-  const { data: billingUsage } = useBillingUsage();
+  const { data: billingUsage } = useBillingUsageContext();
 
   useEffect(() => {
     if (!open || !anchorRef?.current) {
@@ -148,17 +161,31 @@ export function ProfileCommandPanel({
   const metaText = `Admin • ${workspaceName}`;
   const photoURL = user?.photoURL || "/avatar-placeholder.png";
 
-  const last30 = analytics?.last30Days;
-  const last30Issues = last30?.issuesCaptured ?? 0;
-  const last30Replies = last30?.repliesMade ?? 0;
-  const last30TimeSavedHours = last30?.timeSavedHours ?? 0;
-  const last30TimeSavedRounded = Math.round(last30TimeSavedHours);
+  const last30Issues = (() => {
+    const filtered = filterDaily(analytics?.analytics?.daily ?? {}, 30);
+    return Object.values(filtered).reduce(
+      (sum, d) => sum + Math.max(0, Number(d?.feedback) || 0),
+      0
+    );
+  })();
+
+  const last30Replies = (() => {
+    const filtered = filterDaily(analytics?.analytics?.daily ?? {}, 30);
+    return Object.values(filtered).reduce(
+      (sum, d) => sum + Math.max(0, Number(d?.comments) || 0),
+      0
+    );
+  })();
+
+  const lifetimeTimeSavedHours = Math.round(
+    Math.max(0, Number(analytics?.lifetime?.timeSavedMinutes) || 0) / 60
+  );
 
   const IMPACT_STATS = [
     {
       key: "timeSaved" as const,
       label: "Time saved reviewing feedback",
-      context: "last 30 days",
+      context: "lifetime",
       bg: "#ECFDF5",
       textColor: "#065F46",
       Icon: Clock,
@@ -233,7 +260,7 @@ export function ProfileCommandPanel({
                         return (
                           <CountUp
                             start={0}
-                            end={last30TimeSavedRounded}
+                            end={lifetimeTimeSavedHours}
                             duration={1}
                             separator=","
                             onEnd={() => setHasAnimatedMetrics(true)}
@@ -249,7 +276,7 @@ export function ProfileCommandPanel({
                       }
                       return (
                         <>
-                          {last30TimeSavedRounded}
+                          {lifetimeTimeSavedHours}
                           {"h"}
                         </>
                       );

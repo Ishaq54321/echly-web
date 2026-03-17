@@ -59,8 +59,10 @@ export async function GET(req: Request) {
       });
     }
 
-    const activeSessionCount = await getWorkspaceSessionCountRepo(workspaceId);
-    const entitlements = await getWorkspaceEntitlements(workspace);
+    const [activeSessionCount, entitlements] = await Promise.all([
+      getWorkspaceSessionCountRepo(workspaceId, workspace),
+      getWorkspaceEntitlements(workspace),
+    ]);
     const limits = {
       maxSessions: entitlements.maxSessions,
       maxMembers: entitlements.maxMembers,

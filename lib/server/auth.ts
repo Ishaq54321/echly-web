@@ -26,6 +26,9 @@ export async function verifyIdToken(token: string): Promise<DecodedIdToken> {
     audience: PROJECT_ID,
   });
   const uid = (payload.sub ?? payload.user_id) as string;
+  if (typeof uid !== "string" || !uid.trim()) {
+    throw new Error("Invalid Firebase token: missing uid");
+  }
   const email = (payload.email as string) ?? undefined;
   return { uid, email, ...payload };
 }

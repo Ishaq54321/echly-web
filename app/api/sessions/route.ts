@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
     // ----------------------------------------
     const t_limit_start = performance.now();
     if (workspace) {
-      const currentSessionCount = await getWorkspaceSessionCountRepo(workspaceId);
+      const currentSessionCount = await getWorkspaceSessionCountRepo(workspaceId, workspace);
       try {
         await checkPlanLimit({
           workspace,

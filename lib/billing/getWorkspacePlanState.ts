@@ -35,9 +35,11 @@ export async function getWorkspacePlanState(
   const workspace = await getWorkspace(workspaceId);
   if (!workspace) return null;
 
-  const catalog = await getPlanCatalog();
-  const entitlements = await getWorkspaceEntitlements(workspace);
-  const usageResult = await getWorkspaceUsage(workspaceId);
+  const [catalog, entitlements, usageResult] = await Promise.all([
+    getPlanCatalog(),
+    getWorkspaceEntitlements(workspace),
+    getWorkspaceUsage(workspaceId),
+  ]);
 
   const planId = (workspace.billing?.plan ?? "free") as PlanId;
   const plan = catalog[planId] ?? catalog.free;

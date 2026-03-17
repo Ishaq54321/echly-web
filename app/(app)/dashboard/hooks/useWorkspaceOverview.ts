@@ -33,12 +33,24 @@ async function loadSessionsAndCounts(
     workspaceSessions.length > 0
       ? workspaceSessions
       : await getUserSessions(uid, SESSION_LIMIT, { archivedOnly });
-  const counts = await Promise.all(
-    userSessions.map((s) =>
-      getSessionFeedbackCounts(s.id).then((c) => [s.id, c] as const)
-    )
+
+  const countEntries = await Promise.all(
+    userSessions.map(async (s): Promise<[string, SessionFeedbackCounts]> => {
+      if (s.openCount !== undefined) {
+        return [
+          s.id,
+          {
+            open: s.openCount ?? 0,
+            resolved: s.resolvedCount ?? 0,
+            skipped: s.skippedCount ?? 0,
+          },
+        ];
+      }
+      const c = await getSessionFeedbackCounts(s.id);
+      return [s.id, c];
+    })
   );
-  return { sessions: userSessions, counts: Object.fromEntries(counts) };
+  return { sessions: userSessions, counts: Object.fromEntries(countEntries) };
 }
 
 export interface SessionWithCounts {

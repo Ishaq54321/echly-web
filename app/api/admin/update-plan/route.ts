@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
+import { invalidateWorkspaceCache } from "@/lib/server/resolveWorkspaceForUser";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository";
 import { updateWorkspacePlanRepo } from "@/lib/repositories/workspacesRepository";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
@@ -65,6 +66,7 @@ export async function POST(req: Request) {
 
   try {
     await updateWorkspacePlanRepo(workspaceId, newPlan as PlanId);
+    invalidateWorkspaceCache(user.uid);
     const catalog = await getPlanCatalog();
     const entry = catalog[newPlan as PlanId] ?? catalog.free;
     return NextResponse.json({

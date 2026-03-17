@@ -3,6 +3,7 @@ import { doc, updateDoc, serverTimestamp, deleteField } from "firebase/firestore
 import { db } from "@/lib/firebase";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { logAdminAction } from "@/lib/admin/adminLogs";
+import { invalidateWorkspaceCache } from "@/lib/server/resolveWorkspaceForUser";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository";
 import { updateWorkspacePlanRepo } from "@/lib/repositories/workspacesRepository";
 import type { PlanId } from "@/lib/billing/plans";
@@ -64,6 +65,7 @@ export async function POST(req: Request) {
       }
       await updateWorkspacePlanRepo(workspaceId, plan);
       await logAdminAction({ adminId: admin.uid, action: "workspace.set_plan", workspaceId, metadata: { plan } });
+      invalidateWorkspaceCache();
       return NextResponse.json({ success: true, plan });
     }
 
@@ -73,6 +75,7 @@ export async function POST(req: Request) {
         updatedAt: serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.grant_unlimited_sessions", workspaceId });
+      invalidateWorkspaceCache();
       return NextResponse.json({ success: true });
     }
 
@@ -85,6 +88,7 @@ export async function POST(req: Request) {
         updatedAt: serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.override_session_limit", workspaceId, metadata: { sessionLimit } });
+      invalidateWorkspaceCache();
       return NextResponse.json({ success: true });
     }
 
@@ -94,6 +98,7 @@ export async function POST(req: Request) {
         updatedAt: serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.remove_session_override", workspaceId });
+      invalidateWorkspaceCache();
       return NextResponse.json({ success: true });
     }
 
@@ -103,6 +108,7 @@ export async function POST(req: Request) {
         updatedAt: serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.suspend", workspaceId });
+      invalidateWorkspaceCache();
       return NextResponse.json({ success: true });
     }
 
@@ -112,6 +118,7 @@ export async function POST(req: Request) {
         updatedAt: serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.resume", workspaceId });
+      invalidateWorkspaceCache();
       return NextResponse.json({ success: true });
     }
 

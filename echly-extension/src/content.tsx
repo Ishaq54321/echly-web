@@ -12,6 +12,7 @@ declare global {
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { apiFetch, API_BASE } from "./api";
+import { getSessionsCached, invalidateSessionsCache } from "./cachedSessions";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/lib/capture-engine/core/CaptureWidget";
@@ -342,20 +343,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return () => document.removeEventListener("visibilitychange", handler);
   }, []);
 
-  /* On widget open, query backend for sessions so Previous Sessions button shows only when sessions exist. */
+  /* On widget open, use shared sessions cache so we don't duplicate GET /api/sessions with preload. */
   React.useEffect(() => {
     if (!globalState.visible) return;
     let cancelled = false;
-    async function checkSessions() {
-      try {
-        const res = await apiFetch("/api/sessions?limit=1");
-        const data = (await res.json()) as { sessions?: unknown[] };
-        if (!cancelled) setHasPreviousSessions(Boolean(data.sessions?.length));
-      } catch {
-        if (!cancelled) setHasPreviousSessions(false);
-      }
-    }
-    checkSessions();
+    getSessionsCached(apiFetch).then((sessions) => {
+      if (!cancelled) setHasPreviousSessions(sessions.length > 0);
+    }).catch(() => {
+      if (!cancelled) setHasPreviousSessions(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -906,15 +902,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   );
 
   const fetchSessions = React.useCallback(async () => {
-    console.log("[ECHLY DEBUG] fetching sessions...");
-    console.log("[ECHLY DEBUG] before fetchSessions");
-    const res = await apiFetch("/api/sessions");
-    const json = (await res.json()) as { success?: boolean; sessions?: Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number }> };
-    const sessions = json.sessions ?? [];
-    console.log("[ECHLY DEBUG] after fetchSessions");
-    console.log("[ECHLY DEBUG] sessions loaded:", sessions.length);
-    if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", { ok: res.ok, status: res.status, success: json.success, count: sessions.length, sessions });
-    if (!res.ok || !json.success) return [];
+    const sessions = await getSessionsCached(apiFetch);
+    if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", { count: sessions.length, sessions });
     return sessions;
   }, []);
 
@@ -936,8 +925,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         message?: string;
         upgradePlan?: unknown;
       };
-      if (ECHLY_DEBUG) console.log("[Echly] Create session response:", { ok: res.ok, status: res.status, success: data.success, sessionId: data.session?.id, error: data.error });
+      console.log("[ECHLY DEBUG] startSession response:", res.status, { ok: res.ok, success: data.success, sessionId: data.session?.id, error: data.error });
       if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
+        console.log("[ECHLY DEBUG] session limit reached → returning limitReached for upgrade view");
         return {
           limitReached: true,
           message: data.message ?? "You've reached your session limit.",
@@ -945,6 +935,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         };
       }
       if (!res.ok || !data.success || !data.session?.id) return null;
+      invalidateSessionsCache();
       return { id: data.session.id };
     } catch (err) {
       console.error("[Echly] Failed to create session:", err);

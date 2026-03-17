@@ -218,67 +218,15 @@ export function useSessionFeedbackPaginated(
     return () => observer.disconnect();
   }, [scrollContainerRef, scrollReady, items.length, debouncedLoadMore]);
 
-  // Fetch counts immediately so UI never shows 0 while first page loads.
+  // When no sessionId, clear loading so we don't block the list area.
   useEffect(() => {
-    if (!sessionId) return;
-    let cancelled = false;
-    authFetch(`/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`)
-      .then((res) => res.json())
-      .then((data: { total?: number; openCount?: number; resolvedCount?: number; skippedCount?: number }) => {
-        if (cancelled) return;
-        if (typeof data.total === "number") setTotal(data.total);
-        if (typeof data.openCount === "number") setActiveCount(data.openCount);
-        if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
-        if (typeof data.skippedCount === "number") setSkippedCount(data.skippedCount);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId]);
-
-  // Initial load: first page when sessionId becomes available.
-  useEffect(() => {
-    if (!sessionId) return;
-
-    let cancelled = false;
+    if (!sessionId) {
+      setInitialLoading(false);
+      setInitialLoadDone(false);
+      return;
+    }
     setInitialLoading(true);
     setInitialLoadDone(false);
-
-    authFetch(
-      `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
-    )
-      .then((res) => res.json())
-      .then((data: { feedback?: Feedback[]; nextCursor?: string | null; hasMore?: boolean; total?: number; activeCount?: number; resolvedCount?: number; skippedCount?: number }) => {
-        if (cancelled) return;
-        if (typeof data.total === "number") setTotal(data.total);
-        if (typeof data.activeCount === "number") setActiveCount(data.activeCount);
-        if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
-        if (typeof data.skippedCount === "number") setSkippedCount(data.skippedCount);
-        if (data.feedback?.length) {
-          setItems(data.feedback);
-          setCursor(data.nextCursor ?? null);
-          setHasMore(data.hasMore ?? false);
-        } else {
-          setItems([]);
-          setCursor(null);
-          setHasMore(false);
-        }
-        setInitialLoadDone(true);
-      })
-      .finally(() => {
-        if (!cancelled) setInitialLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId]);
-
-  // Realtime: subscribe to feedback for this session so new tickets (extension or dashboard) appear without refresh.
-  // Merges snapshot into current list (new items prepended, existing updated) and updates counts; keeps API pagination.
-  useEffect(() => {
-    if (!sessionId) return;
 
     const feedbackRef = collection(db, "feedback");
     const feedbackQuery = query(
@@ -288,7 +236,6 @@ export function useSessionFeedbackPaginated(
     );
 
     const unsubscribe = onSnapshot(feedbackQuery, (snapshot) => {
-      // Use full snapshot for counts and "newest ticket" detection
       const snapshotList = snapshot.docs
         .map((d) => mapDocToFeedback(d))
         .sort((a, b) => {
@@ -311,34 +258,35 @@ export function useSessionFeedbackPaginated(
       }
       previousFeedbackCountRef.current = totalCount;
 
-      // Process doc changes so "modified" (e.g. screenshotUrl added) updates existing ticket in state
-      const changes = snapshot.docChanges();
-      setItems((prev) => {
-        let next = [...prev];
-        for (const change of changes) {
-          const feedback = mapDocToFeedback(change.doc);
-          if (change.type === "added") {
-            const idx = next.findIndex((t) => t.id === feedback.id);
-            if (idx >= 0) {
-              next[idx] = feedback; // already in list (e.g. from API), update in place
-            } else {
-              next.push(feedback);
-            }
-          } else if (change.type === "modified") {
-            next = next.map((t) => (t.id === feedback.id ? feedback : t));
-          } else if (change.type === "removed") {
-            next = next.filter((t) => t.id !== feedback.id);
-          }
-        }
-        return next.sort((a, b) => {
-          const ta = a.createdAt?.toMillis?.() ?? a.clientTimestamp ?? 0;
-          const tb = b.createdAt?.toMillis?.() ?? b.clientTimestamp ?? 0;
-          return tb - ta;
-        });
-      });
-
-      if (!stateRef.current.initialLoadDone) {
+      const isFirstSnapshot = !stateRef.current.initialLoadDone;
+      if (isFirstSnapshot) {
+        setItems(snapshotList);
         setInitialLoadDone(true);
+        setInitialLoading(false);
+        setCursor(null);
+        setHasMore(false); // Listener-only: no API pagination; we have up to FEEDBACK_LOAD_CAP from snapshot
+      } else {
+        const changes = snapshot.docChanges();
+        setItems((prev) => {
+          let next = [...prev];
+          for (const change of changes) {
+            const feedback = mapDocToFeedback(change.doc);
+            if (change.type === "added") {
+              const idx = next.findIndex((t) => t.id === feedback.id);
+              if (idx >= 0) next[idx] = feedback;
+              else next.push(feedback);
+            } else if (change.type === "modified") {
+              next = next.map((t) => (t.id === feedback.id ? feedback : t));
+            } else if (change.type === "removed") {
+              next = next.filter((t) => t.id !== feedback.id);
+            }
+          }
+          return next.sort((a, b) => {
+            const ta = a.createdAt?.toMillis?.() ?? a.clientTimestamp ?? 0;
+            const tb = b.createdAt?.toMillis?.() ?? b.clientTimestamp ?? 0;
+            return tb - ta;
+          });
+        });
       }
     });
 

@@ -3,6 +3,17 @@ import type { Timestamp } from "firebase/firestore";
 export type WorkspacePlan = "free" | "starter" | "business" | "enterprise";
 export type WorkspaceBillingCycle = "monthly" | "annual";
 
+/** Pre-aggregated counts for /api/insights. Updated in write-path transactions. */
+export interface WorkspaceStats {
+  totalFeedback: number;
+  totalComments: number;
+  totalSessions: number;
+  last30DaysFeedback: number;
+  last30DaysComments: number;
+  last30DaysSessions: number;
+  updatedAt: Timestamp | null;
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -75,6 +86,13 @@ export interface Workspace {
     feedbackCreated: number;
     members: number;
   };
+
+  /** Active session count = sessionCount - archivedCount. Kept in sync on create/archive. */
+  sessionCount?: number;
+  archivedCount?: number;
+
+  /** Pre-aggregated counts for insights. One workspace doc read replaces 6 count + 3 getDocs. */
+  stats?: WorkspaceStats;
 }
 
 export type WorkspaceDoc = Omit<Workspace, "id">;
@@ -136,6 +154,8 @@ export function defaultWorkspaceDoc(params: {
       feedbackCreated: 0,
       members: 1,
     },
+    sessionCount: 0,
+    archivedCount: 0,
   };
 }
 

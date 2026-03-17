@@ -3,6 +3,7 @@ import { getDocs, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository";
+import type { Workspace } from "@/lib/domain/workspace";
 
 export interface UsageStats {
   totalWorkspaces: number;
@@ -38,7 +39,9 @@ export async function GET(req: Request) {
     }
 
     const sessionCounts = await Promise.all(
-      docs.map((d) => getWorkspaceSessionCountRepo(d.id))
+      docs.map((d) =>
+        getWorkspaceSessionCountRepo(d.id, { id: d.id, ...d.data() } as Workspace)
+      )
     );
     const totalSessions = sessionCounts.reduce((a, b) => a + b, 0);
 
