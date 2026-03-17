@@ -39,6 +39,30 @@ const THEME_STORAGE_KEY = "widget-theme";
 /** App origin for opening dashboard (same as API base). */
 const APP_ORIGIN = API_BASE;
 
+/** Error boundary to capture CaptureWidget render errors (OPEN_WIDGET crash trace). */
+class EchlyWidgetErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("[ECHLY ERROR BOUNDARY]", error);
+    console.error("[ECHLY ERROR BOUNDARY] componentStack:", errorInfo.componentStack);
+  }
+  render() {
+    if (this.state.hasError && this.state.error) {
+      return <div data-echly-crashed>CRASHED</div>;
+    }
+    return this.props.children;
+  }
+}
+
 function getPreferredTheme(): "dark" | "light" {
   try {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
@@ -205,10 +229,26 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [isProcessingFeedback, setIsProcessingFeedback] = React.useState(false);
   /** Job queue for concurrent feedback captures; each job shows its own Processing/failed card in the tray. */
   const [feedbackJobs, setFeedbackJobs] = React.useState<FeedbackJob[]>([]);
-  const launcherLogoUrl =
-    typeof chrome !== "undefined" && chrome.runtime?.getURL
-      ? chrome.runtime.getURL("assets/Echly_logo_launcher.svg")
-      : "/Echly_logo_launcher.svg";
+  const getAssetUrl = React.useCallback((path: string) => {
+    if (typeof chrome !== "undefined" && chrome.runtime?.getURL) {
+      return chrome.runtime.getURL(path);
+    }
+    return `/${path.replace(/^assets\//, "")}`;
+  }, []);
+
+  const launcherLogoUrl = getAssetUrl("assets/Echly_logo_launcher.svg");
+
+  React.useEffect(() => {
+    console.log("[ECHLY DEBUG] ContentApp mounted");
+  }, []);
+
+  React.useEffect(() => {
+    console.log("[ECHLY DEBUG] openResumeModal state:", openResumeModalFromMessage);
+  }, [openResumeModalFromMessage]);
+
+  React.useEffect(() => {
+    console.log("[ECHLY DEBUG] hasPreviousSessions state:", hasPreviousSessions);
+  }, [hasPreviousSessions]);
 
   React.useEffect(() => {
     echlyEventDispatcher = (type) => {
@@ -866,13 +906,22 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   );
 
   const fetchSessions = React.useCallback(async () => {
+    console.log("[ECHLY DEBUG] fetching sessions...");
+    console.log("[ECHLY DEBUG] before fetchSessions");
     const res = await apiFetch("/api/sessions");
     const json = (await res.json()) as { success?: boolean; sessions?: Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number }> };
     const sessions = json.sessions ?? [];
+    console.log("[ECHLY DEBUG] after fetchSessions");
+    console.log("[ECHLY DEBUG] sessions loaded:", sessions.length);
     if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", { ok: res.ok, status: res.status, success: json.success, count: sessions.length, sessions });
     if (!res.ok || !json.success) return [];
     return sessions;
   }, []);
+
+  /* Optional preload: warm cache so Previous Sessions modal feels faster when opened. */
+  React.useEffect(() => {
+    fetchSessions?.();
+  }, [fetchSessions]);
 
   async function createSession(): Promise<
     { id: string } | { limitReached: true; message: string; upgradePlan: unknown } | null
@@ -1295,7 +1344,33 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   const pending = extensionClarityPending;
 
-  return (
+  const captureWidgetPropsForDebug = {
+    onPreviousSessions: () => setOpenResumeModalFromMessage(true),
+    onSetCaptureMode: (mode: "voice" | "text") =>
+      chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(() => {}),
+    onOpenBilling: () => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {}),
+    onOpenDashboard: () => environment.openDashboard(`${APP_ORIGIN}/dashboard`),
+    getAssetUrl,
+    environment,
+  };
+
+  try {
+    console.log("[ECHLY DEBUG PROPS]", captureWidgetPropsForDebug);
+    console.log("[ECHLY DEBUG ENV]", {
+      hasEnv: !!environment,
+      methods: {
+        createSession: !!environment?.createSession,
+        authenticatedFetch: !!environment?.authenticatedFetch,
+        captureTabScreenshot: !!environment?.captureTabScreenshot,
+        openDashboard: !!environment?.openDashboard,
+      },
+    });
+  } catch (logErr) {
+    console.error("[ECHLY DEBUG LOG FAILED]", logErr);
+  }
+
+  try {
+    return (
     <>
       {showClarityAssistant && pending && (
         <div
@@ -1455,69 +1530,84 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           </div>
         </div>
       )}
-      <CaptureWidget
-        key={widgetResetKey}
-        sessionId={effectiveSessionId ?? ""}
-        userId={user.uid}
-        extensionMode={true}
-        captureMode={globalState.captureMode ?? "voice"}
-        onComplete={handleComplete}
-        onDelete={handleDelete}
-        onUpdate={handleUpdate}
-        widgetToggleRef={widgetToggleRef}
-        onRecordingChange={onRecordingChange}
-        expanded={globalState.expanded}
-        onExpandRequest={onExpandRequest}
-        onCollapseRequest={onCollapseRequest}
-        captureDisabled={false}
-        theme={theme}
-        onThemeToggle={onThemeToggle}
-        fetchSessions={fetchSessions}
-        hasPreviousSessions={hasPreviousSessions}
-        onPreviousSessionSelect={onPreviousSessionSelect}
-        pointers={globalState.pointers ?? []}
-        sessionLoading={globalState.sessionLoading ?? false}
-        sessionTitleProp={globalState.sessionTitle ?? undefined}
-        onSessionTitleChange={onSessionTitleChange}
-        isProcessingFeedback={isProcessingFeedback}
-        feedbackJobs={feedbackJobs}
-        onSessionEnd={() => {}}
-        onCreateSession={createSession}
-        onActiveSessionChange={onActiveSessionChange}
-        ensureAuthenticated={ensureAuthenticated}
-        verifySessionBeforeSessions={verifySessionBeforeSessions}
-        onTriggerLogin={onTriggerLogin}
-        globalSessionModeActive={globalState.sessionModeActive ?? false}
-        globalSessionPaused={globalState.sessionPaused ?? false}
-        onSessionModeStart={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {})}
-        onSessionModePause={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {})}
-        onSessionModeResume={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {})}
-        onSessionActivity={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch(() => {})}
-        onSessionModeEnd={() => {
-          const sessionId = globalState.sessionId;
-          (async () => {
-            await new Promise<void>((resolve, reject) => {
-              chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, (response) => {
-                if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-                else resolve();
+      <EchlyWidgetErrorBoundary>
+        <CaptureWidget
+          key={widgetResetKey}
+          sessionId={effectiveSessionId ?? ""}
+          userId={user.uid}
+          extensionMode={true}
+          captureMode={globalState.captureMode ?? "voice"}
+          onComplete={handleComplete}
+          onDelete={handleDelete}
+          onUpdate={handleUpdate}
+          widgetToggleRef={widgetToggleRef}
+          onRecordingChange={onRecordingChange}
+          expanded={globalState.expanded}
+          onExpandRequest={onExpandRequest}
+          onCollapseRequest={onCollapseRequest}
+          captureDisabled={false}
+          theme={theme}
+          onThemeToggle={onThemeToggle}
+          fetchSessions={fetchSessions}
+          hasPreviousSessions={hasPreviousSessions}
+          onPreviousSessionSelect={onPreviousSessionSelect}
+          pointers={globalState.pointers ?? []}
+          sessionLoading={globalState.sessionLoading ?? false}
+          sessionTitleProp={globalState.sessionTitle ?? undefined}
+          onSessionTitleChange={onSessionTitleChange}
+          isProcessingFeedback={isProcessingFeedback}
+          feedbackJobs={feedbackJobs}
+          onSessionEnd={() => {}}
+          onCreateSession={createSession}
+          onActiveSessionChange={onActiveSessionChange}
+          ensureAuthenticated={ensureAuthenticated}
+          verifySessionBeforeSessions={verifySessionBeforeSessions}
+          onTriggerLogin={onTriggerLogin}
+          globalSessionModeActive={globalState.sessionModeActive ?? false}
+          globalSessionPaused={globalState.sessionPaused ?? false}
+          onSessionModeStart={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {})}
+          onSessionModePause={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {})}
+          onSessionModeResume={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {})}
+          onSessionActivity={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch(() => {})}
+          onSessionModeEnd={() => {
+            const sessionId = globalState.sessionId;
+            (async () => {
+              await new Promise<void>((resolve, reject) => {
+                chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, (response) => {
+                  if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+                  else resolve();
+                });
               });
-            });
-            await new Promise((r) => setTimeout(r, 50));
-            if (sessionId) {
-              const url = `${APP_ORIGIN}/dashboard/${sessionId}`;
-              chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch(() => {});
-            }
-          })().catch(() => {});
-        }}
-        captureRootParent={widgetRoot}
-        launcherLogoUrl={launcherLogoUrl}
-        openResumeModal={openResumeModalFromMessage}
-        onResumeModalClose={() => setOpenResumeModalFromMessage(false)}
-        sessionLimitReached={sessionLimitReached}
-        environment={environment}
-      />
+              await new Promise((r) => setTimeout(r, 50));
+              if (sessionId) {
+                const url = `${APP_ORIGIN}/dashboard/${sessionId}`;
+                chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch(() => {});
+              }
+            })().catch(() => {});
+          }}
+          captureRootParent={widgetRoot}
+          launcherLogoUrl={launcherLogoUrl}
+          openResumeModal={openResumeModalFromMessage}
+          onResumeModalClose={() => setOpenResumeModalFromMessage(false)}
+          sessionLimitReached={sessionLimitReached}
+          environment={environment}
+          onPreviousSessions={() => {
+            console.log("[ECHLY DEBUG] EXTENSION handler fired");
+            setOpenResumeModalFromMessage(true);
+            console.log("[ECHLY DEBUG] openResumeModal set TRUE");
+          }}
+          onSetCaptureMode={(mode) => chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(() => {})}
+          onOpenBilling={() => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {})}
+          onOpenDashboard={() => environment.openDashboard(`${APP_ORIGIN}/dashboard`)}
+          getAssetUrl={getAssetUrl}
+        />
+      </EchlyWidgetErrorBoundary>
     </>
   );
+  } catch (e) {
+    console.error("[ECHLY CRASH]", e);
+    return <div data-echly-crashed>CRASHED</div>;
+  }
 }
 
 /** Minimal CSS reset inside shadow root for style isolation. #echly-capture-root lives in shadow DOM; pointer-events: none so page scroll works. */

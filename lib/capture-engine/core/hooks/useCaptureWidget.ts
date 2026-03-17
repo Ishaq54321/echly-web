@@ -1,8 +1,6 @@
 "use client";
 
-import { authFetch } from "@/lib/authFetch";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
-import { playDoneClick } from "@/lib/playDoneClick";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   StructuredFeedback,
@@ -13,16 +11,20 @@ import type {
   CaptureContext,
   SessionFeedbackPending,
 } from "../types";
-import { buildCaptureContext } from "@/lib/captureContext";
-import { playShutterSound } from "@/lib/playShutterSound";
-import { logSession } from "@/components/CaptureWidget/session/sessionMode";
+import { buildCaptureContext } from "../internal/contextHelpers";
+import { playDoneClick, playShutterSound } from "../internal/audioHelpers";
+import { logSession } from "../internal/sessionHelpers";
 import {
   detectVisualContainer,
   clampRect,
   cropImageToRegion,
-} from "@/components/CaptureWidget/RegionCaptureOverlay";
-import { hideEchlyUI, restoreEchlyUI } from "@/components/CaptureWidget/hideEchlyUI";
-import { createMarker, removeAllMarkers, updateMarker, removeMarker } from "@/components/CaptureWidget/session/feedbackMarkers";
+  hideEchlyUI,
+  restoreEchlyUI,
+  createMarker,
+  removeAllMarkers,
+  updateMarker,
+  removeMarker,
+} from "../internal/domHelpers";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 
 const SAFE_MARGIN = 24;
@@ -97,22 +99,6 @@ function generateRecordingId(): string {
   return `rec-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-async function captureTabWithoutOverlay(
-  capture: () => Promise<string | null>
-): Promise<string | null> {
-  const hidden = hideEchlyUI();
-  if (ECHLY_DEBUG) console.log("ECHLY hidden UI elements", hidden.length);
-  await new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-  );
-
-  try {
-    return await capture();
-  } finally {
-    restoreEchlyUI(hidden);
-  }
-}
-
 const CAPTURE_FLOW_STATES: CaptureState[] = [
   "focus_mode",
   "region_selecting",
@@ -163,6 +149,7 @@ export function useCaptureWidget({
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
   const [isOpen, setIsOpenState] = useState(false);
   const [state, setState] = useState<CaptureState>("idle");
+  const [sessionStatus, setSessionStatus] = useState<"idle" | "starting" | "active">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pointers, setPointers] = useState<StructuredFeedback[]>(
     initialPointers ?? []
@@ -189,9 +176,14 @@ export function useCaptureWidget({
   const [endPending, setEndPending] = useState(false);
   const [sessionFeedbackPending, setSessionFeedbackPending] = useState<SessionFeedbackPending | null>(captureState.pending);
   const [sessionFeedbackSaving, setSessionFeedbackSaving] = useState(false);
+  const [sessionLimitReached, setSessionLimitReached] = useState<{
+    message?: string;
+    upgradePlan?: unknown;
+  } | null>(null);
 
   const sessionModeRef = useRef(false);
   const sessionPausedRef = useRef(false);
+  const sessionStatusRef = useRef<"idle" | "starting" | "active">("idle");
   const lastSessionClickedElementRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     sessionModeRef.current = sessionMode;
@@ -199,6 +191,9 @@ export function useCaptureWidget({
   useEffect(() => {
     sessionPausedRef.current = sessionPaused;
   }, [sessionPaused]);
+  useEffect(() => {
+    sessionStatusRef.current = sessionStatus;
+  }, [sessionStatus]);
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -516,8 +511,12 @@ export function useCaptureWidget({
     /* Extension: never auto-load session from sessionId. Session loads only when user clicks Resume (loadSessionWithPointers). */
     if (extensionMode) return;
     if (!sessionId) return;
+    if (!environment?.authenticatedFetch) {
+      throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for loading feedback).");
+    }
     const loadFeedback = async () => {
-      const res = await authFetch(
+      console.log("[ECHLY CORE] fetch via environment");
+      const res = await environment.authenticatedFetch(
         `/api/feedback?sessionId=${sessionId}&limit=200`
       );
       const data = await res.json();
@@ -538,7 +537,7 @@ export function useCaptureWidget({
       );
     };
     loadFeedback();
-  }, [extensionMode, sessionId, initialPointers]);
+  }, [extensionMode, sessionId, initialPointers, environment]);
 
   /* ================= SPEECH ================= */
 
@@ -925,8 +924,12 @@ export function useCaptureWidget({
     );
     setEditingId(null);
 
+    if (!environment?.authenticatedFetch) {
+      throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for saveEdit).");
+    }
     try {
-      const res = await authFetch(`/api/tickets/${id}`, {
+      console.log("[ECHLY CORE] fetch via environment");
+      const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title || editedTitle, actionSteps }),
@@ -945,7 +948,7 @@ export function useCaptureWidget({
     } catch (err) {
       console.error("Save edit failed:", err);
     }
-  }, [editedTitle, editedSteps]);
+  }, [editedTitle, editedSteps, environment]);
 
   const updatePointer = useCallback(
     async (id: string, payload: { title: string; actionSteps: string[] }) => {
@@ -961,7 +964,11 @@ export function useCaptureWidget({
           );
           return;
         }
-        const res = await authFetch(`/api/tickets/${id}`, {
+        if (!environment?.authenticatedFetch) {
+          throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch or onUpdate required).");
+        }
+        console.log("[ECHLY CORE] fetch via environment");
+        const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -991,89 +998,39 @@ export function useCaptureWidget({
         throw err;
       }
     },
-    [onUpdate]
+    [onUpdate, environment]
   );
 
   /* ================= CAPTURE ================= */
 
   const getFullTabImage = useCallback(async (): Promise<string | null> => {
-    console.log("=== [ECHLY DEBUG] SCREENSHOT START ===");
-    let screenshot: string | null = null;
+    if (!environment?.captureTabScreenshot) {
+      console.error("[ECHLY CORE] No capture environment available (captureTabScreenshot required).");
+      return null;
+    }
+    console.log("[ECHLY CORE] screenshot via environment");
+    const hidden = hideEchlyUI();
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
     try {
-      if (environment?.captureTabScreenshot) {
-        console.log("=== [ECHLY DEBUG] CALLING ENV SCREENSHOT ===");
-        console.log("Environment exists:", !!environment);
-        console.log("Function exists:", !!environment?.captureTabScreenshot);
-        const hidden = hideEchlyUI();
-        await new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-        );
-        try {
-          screenshot = await environment.captureTabScreenshot?.() ?? null;
-        } catch (err) {
-          console.warn("Screenshot error ignored:", err);
-          screenshot = null;
-        }
-        restoreEchlyUI(hidden);
-        console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT ===", {
-          exists: !!screenshot,
-          length: screenshot?.length,
-        });
-        console.log("=== [ECHLY DEBUG] CONTINUING TO FEEDBACK UI ===");
-      } else if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-        screenshot = await captureTabWithoutOverlay(
-          () =>
-            new Promise((resolve, reject) => {
-              chrome.runtime.sendMessage(
-                { type: "CAPTURE_TAB" },
-                (response: { success?: boolean; screenshot?: string } | undefined) => {
-                  if (!response || !response.success) {
-                    reject(new Error("Capture failed"));
-                  } else {
-                    resolve(response.screenshot ?? null);
-                  }
-                }
-              );
-            })
-        );
-      }
+      const screenshot = await environment.captureTabScreenshot();
+      return screenshot ?? null;
     } catch (err) {
       console.warn("Screenshot error ignored:", err);
-      screenshot = null;
+      return null;
+    } finally {
+      restoreEchlyUI(hidden);
     }
-    // IMPORTANT: DO NOT BLOCK FLOW — continue regardless of screenshot
-    console.log("Screenshot captured:", !!screenshot);
-    console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT (getFullTabImage exit) ===", {
-      exists: !!screenshot,
-      length: screenshot?.length,
-    });
-    return screenshot;
   }, [environment]);
 
   const captureScreenshot = useCallback(async (): Promise<string | null> => {
-    console.log("=== [ECHLY DEBUG] SCREENSHOT START (captureScreenshot) ===");
-    let screenshot: string | null = null;
-    try {
-      if (environment?.captureTabScreenshot) {
-        screenshot = await getFullTabImage();
-        console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT (after getFullTabImage) ===", {
-          exists: !!screenshot,
-          length: screenshot?.length,
-        });
-        console.log("=== [ECHLY DEBUG] CONTINUING TO FEEDBACK UI ===");
-      } else if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-        screenshot = await getFullTabImage();
-      } else {
-        const { captureScreenshot: webCapture } = await import("@/lib/capture");
-        screenshot = await webCapture();
-      }
-    } catch (err) {
-      console.warn("Screenshot error ignored:", err);
-      screenshot = null;
+    if (!environment?.captureTabScreenshot) {
+      console.error("[ECHLY CORE] No capture environment available (captureTabScreenshot required).");
+      return null;
     }
-    // IMPORTANT: DO NOT BLOCK FLOW — continue regardless of screenshot
-    console.log("Screenshot captured:", !!screenshot);
-    return screenshot ?? null;
+    console.log("[ECHLY CORE] screenshot via environment");
+    return getFullTabImage();
   }, [environment, getFullTabImage]);
 
   const handleRegionSelectStart = useCallback(() => {
@@ -1113,33 +1070,81 @@ export function useCaptureWidget({
   }, []);
 
   const startSession = useCallback(async () => {
+    console.log("[ECHLY UX] startSession clicked");
+
+    // Prevent double-clicks while starting
+    if (sessionStatusRef.current === "starting") return;
     if (stateRef.current !== "idle" || sessionModeRef.current || globalSessionModeActive) return;
-    echlyLog("SESSION", "start");
-    if (ECHLY_DEBUG) console.log("[Echly] Start New Feedback Session clicked");
-    logSession("start");
-    if (environment) {
-      if (ensureAuthenticated && !(await ensureAuthenticated())) return;
-      const session = await environment.createSession();
-      if (!session || "limitReached" in session) return;
-      environment.setActiveSession(session.id);
-      setPointers([]);
-      environment.startSessionMode();
-      onSessionViewRequested?.();
-    } else if (extensionMode && onCreateSession && onActiveSessionChange) {
-      if (ensureAuthenticated && !(await ensureAuthenticated())) return;
-      const session = await onCreateSession();
-      if (!session || "limitReached" in session) return;
-      onActiveSessionChange(session.id);
-      setPointers([]);
-      onSessionModeStart?.();
-      onSessionViewRequested?.();
-    }
+
+    // STEP 1: INSTANT UI RESPONSE
+    setSessionStatus("starting");
+
     if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "startSession" });
     setPending(null);
     setSessionFeedbackSaving(false);
     setPausePending(false);
     setEndPending(false);
-  }, [environment, extensionMode, onCreateSession, onActiveSessionChange, ensureAuthenticated, onSessionModeStart, onSessionViewRequested, globalSessionModeActive]);
+
+    echlyLog("SESSION", "start");
+    if (ECHLY_DEBUG) console.log("[Echly] Start New Feedback Session clicked");
+    logSession("start");
+
+    try {
+      if (ensureAuthenticated && !(await ensureAuthenticated())) {
+        setSessionStatus("idle");
+        return;
+      }
+
+      console.log("[ECHLY UX] creating session...");
+
+      const result = environment
+        ? await environment.createSession()
+        : extensionMode && onCreateSession
+          ? await onCreateSession()
+          : null;
+
+      if (result && "limitReached" in result && result.limitReached) {
+        setSessionStatus("idle");
+        setSessionLimitReached({
+          message: result.message,
+          upgradePlan: result.upgradePlan,
+        });
+        return;
+      }
+
+      if (!result || !("id" in result) || !result.id) {
+        throw new Error("Session creation failed");
+      }
+
+      // STEP 2: FINALIZE (result narrowed to { id: string })
+      if (environment) {
+        await environment.setActiveSession?.(result.id);
+        setPointers([]);
+        await environment.startSessionMode?.();
+      } else if (extensionMode && onActiveSessionChange) {
+        onActiveSessionChange(result.id);
+        setPointers([]);
+        onSessionModeStart?.();
+      }
+
+      onSessionViewRequested?.();
+      setSessionLimitReached(null);
+      setSessionStatus("active");
+    } catch (e) {
+      console.error("[ECHLY UX] startSession failed", e);
+      setSessionStatus("idle");
+    }
+  }, [
+    environment,
+    extensionMode,
+    onCreateSession,
+    onActiveSessionChange,
+    ensureAuthenticated,
+    onSessionModeStart,
+    onSessionViewRequested,
+    globalSessionModeActive,
+    setPending,
+  ]);
 
   const pauseSession = useCallback(() => {
     if (
@@ -1255,6 +1260,7 @@ export function useCaptureWidget({
     if (globalSessionModeActive === true) {
       setSessionMode(true);
       setSessionPaused(globalSessionPaused ?? false);
+      setSessionStatus("active");
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
         if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "global sync (session active)" });
         setPending(null);
@@ -1270,6 +1276,7 @@ export function useCaptureWidget({
     if (globalSessionModeActive === false) {
       setSessionMode(false);
       setSessionPaused(false);
+      setSessionStatus("idle");
       setPausePending(false);
       setEndPending(false);
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
@@ -1586,6 +1593,7 @@ export function useCaptureWidget({
       pauseSession,
       resumeSession,
       endSession,
+      setSessionLimitReached,
       handleSessionElementClicked,
       handleSessionFeedbackSubmit,
       handleSessionFeedbackCancel,
@@ -1618,6 +1626,7 @@ export function useCaptureWidget({
       pauseSession,
       resumeSession,
       endSession,
+      setSessionLimitReached,
       handleSessionElementClicked,
       handleSessionFeedbackSubmit,
       handleSessionFeedbackCancel,
@@ -1640,6 +1649,7 @@ export function useCaptureWidget({
     state: {
       isOpen,
       state,
+      sessionStatus,
       errorMessage,
       pointers,
       expandedId,
@@ -1659,6 +1669,7 @@ export function useCaptureWidget({
       pausePending,
       endPending,
       sessionFeedbackPending,
+      sessionLimitReached,
       audioAnalyser,
     },
     handlers,

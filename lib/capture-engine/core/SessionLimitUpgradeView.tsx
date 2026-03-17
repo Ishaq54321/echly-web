@@ -4,19 +4,22 @@ export type SessionLimitUpgradeViewProps = {
   limitMessage: string;
   upgradePlan?: unknown;
   onUpgrade: () => void;
+  /** Resolve extension asset URL (e.g. chrome.runtime.getURL). When missing, fallback path is used. */
+  getAssetUrl?: (path: string) => string;
 };
 
 export function SessionLimitUpgradeView({
   limitMessage,
   onUpgrade,
+  getAssetUrl,
 }: SessionLimitUpgradeViewProps) {
   const description =
     limitMessage?.trim() ||
     "Your current plan allows a limited number of sessions.";
 
   const imageSrc =
-    typeof chrome !== "undefined" && chrome.runtime?.getURL
-      ? chrome.runtime.getURL("assets/feedback-tray-session-limit.png")
+    getAssetUrl != null
+      ? getAssetUrl("assets/feedback-tray-session-limit.png")
       : "/feedback-tray-session-limit.png";
 
   return (

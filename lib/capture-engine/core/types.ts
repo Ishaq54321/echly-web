@@ -174,6 +174,16 @@ export type CaptureWidgetProps = {
   sessionLimitReached?: { message: string; upgradePlan: unknown } | null;
   /** Optional capture environment adapter (extension, dashboard, etc.). When provided, useCaptureWidget uses it instead of direct props/callbacks. */
   environment?: CaptureEnvironment;
+  /** Extension: open Previous Sessions modal. Replaces chrome.runtime.sendMessage ECHLY_OPEN_PREVIOUS_SESSIONS. */
+  onPreviousSessions?: () => void;
+  /** Extension: set capture mode (voice/text). Replaces chrome.runtime.sendMessage ECHLY_SET_CAPTURE_MODE. */
+  onSetCaptureMode?: (mode: "voice" | "text") => void;
+  /** Extension: open billing/settings. Replaces chrome.runtime.sendMessage ECHLY_OPEN_BILLING. */
+  onOpenBilling?: () => void;
+  /** Extension: open dashboard (e.g. Home button). Replaces chrome.runtime.sendMessage ECHLY_OPEN_DASHBOARD. */
+  onOpenDashboard?: () => void;
+  /** Extension: resolve asset URL (e.g. chrome.runtime.getURL). Replaces chrome.runtime.getURL in core. */
+  getAssetUrl?: (path: string) => string;
 };
 
 /** One feedback job in the pipeline (processing or failed). Completed jobs are removed and the ticket appears in pointers. */

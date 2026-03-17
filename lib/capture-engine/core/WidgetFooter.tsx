@@ -29,15 +29,26 @@ export default function WidgetFooter({
   captureDisabled = false,
 }: WidgetFooterProps) {
   const effectivelyDisabled = !isIdle || captureDisabled;
-  const previousDisabled = effectivelyDisabled || openingPrevious;
   const onCaptureClick = startCapture ?? onAddFeedback;
 
   if (extensionMode) {
+    const handleStartSessionClick = () => {
+      console.log("[ECHLY DEBUG] StartSession CLICKED", performance.now());
+      onStartSession?.();
+    };
+    const handlePreviousSessionsClick = () => {
+      console.log("[ECHLY DEBUG] PreviousSessions CLICKED");
+      if (!onOpenPreviousSession) {
+        console.log("[ECHLY DEBUG] PreviousSessions handler missing (onOpenPreviousSession is undefined)");
+        return;
+      }
+      onOpenPreviousSession();
+    };
     return (
       <div className="echly-command-actions">
         <button
           type="button"
-          onClick={effectivelyDisabled ? undefined : onStartSession}
+          onClick={effectivelyDisabled ? undefined : handleStartSessionClick}
           disabled={effectivelyDisabled}
           className="echly-start-session-btn"
           aria-label="Start Session"
@@ -46,8 +57,8 @@ export default function WidgetFooter({
         </button>
         <button
           type="button"
-          onClick={previousDisabled ? undefined : onOpenPreviousSession}
-          disabled={previousDisabled}
+          onClick={handlePreviousSessionsClick}
+          disabled={false}
           className="echly-previous-session-btn"
           aria-label={openingPrevious ? "Opening previous sessions" : "Previous Sessions"}
           aria-busy={openingPrevious}

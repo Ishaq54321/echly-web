@@ -14,9 +14,15 @@ export interface ResolvedWorkspace {
  * Use in product API routes to avoid repeating getUserWorkspaceIdRepo → getWorkspace → assertWorkspaceActive.
  */
 export async function resolveWorkspaceForUser(uid: string): Promise<ResolvedWorkspace> {
+  const t_resolve_start = performance.now();
+  const t_get_user_ws_start = performance.now();
   const workspaceId = (await getUserWorkspaceIdRepo(uid)) ?? uid;
+  console.log("[ECHLY PERF] resolveWorkspaceForUser.getUserWorkspaceIdRepo:", performance.now() - t_get_user_ws_start);
+  const t_get_workspace_start = performance.now();
   const workspace = await getWorkspace(workspaceId);
+  console.log("[ECHLY PERF] resolveWorkspaceForUser.getWorkspace:", performance.now() - t_get_workspace_start);
   assertWorkspaceActive(workspace);
+  console.log("[ECHLY PERF] resolveWorkspaceForUser TOTAL:", performance.now() - t_resolve_start);
   return { workspaceId, workspace };
 }
 

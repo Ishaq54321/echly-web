@@ -36,6 +36,7 @@ export async function createSessionRepo(
   userId: string,
   createdBy?: SessionCreatedBy | null
 ): Promise<string> {
+  const t_create_start = performance.now();
   const sessionRef = doc(collection(db, "sessions"));
   const workspaceRef = doc(db, "workspaces", workspaceId);
   const sessionData = {
@@ -52,6 +53,7 @@ export async function createSessionRepo(
     feedbackCount: 0,
   };
 
+  const t_tx_start = performance.now();
   await runTransaction(db, async (tx) => {
     tx.set(sessionRef, sessionData);
     tx.update(workspaceRef, {
@@ -59,7 +61,9 @@ export async function createSessionRepo(
       updatedAt: serverTimestamp(),
     });
   });
+  console.log("[ECHLY PERF] createSessionRepo.runTransaction:", performance.now() - t_tx_start);
 
+  console.log("[ECHLY PERF] createSessionRepo TOTAL:", performance.now() - t_create_start);
   return sessionRef.id;
 }
 
@@ -72,6 +76,7 @@ export async function createSessionRepo(
  * be used to delete or prune sessions when the limit is reduced.
  */
 export async function getWorkspaceSessionCountRepo(workspaceId: string): Promise<number> {
+  const t_count_start = performance.now();
   const baseQuery = query(
     collection(db, "sessions"),
     where("workspaceId", "==", workspaceId)
@@ -80,6 +85,7 @@ export async function getWorkspaceSessionCountRepo(workspaceId: string): Promise
   // Count all sessions for the workspace and subtract archived ones to derive
   // the active session count. This avoids relying on archived:false, which
   // would exclude older documents that predate the archived field.
+  const t_counts_start = performance.now();
   const [allSnap, archivedSnap] = await Promise.all([
     getCountFromServer(baseQuery),
     getCountFromServer(
@@ -90,9 +96,11 @@ export async function getWorkspaceSessionCountRepo(workspaceId: string): Promise
       )
     ),
   ]);
+  console.log("[ECHLY PERF] getWorkspaceSessionCountRepo.getCountFromServer (both):", performance.now() - t_counts_start);
 
   const total = allSnap.data().count;
   const archived = archivedSnap.data().count;
+  console.log("[ECHLY PERF] getWorkspaceSessionCountRepo TOTAL:", performance.now() - t_count_start);
   return Math.max(0, total - archived);
 }
 

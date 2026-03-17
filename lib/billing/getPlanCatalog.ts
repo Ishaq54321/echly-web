@@ -46,10 +46,13 @@ function buildDefaultCatalog(): PlanCatalog {
  * so admin plan changes propagate immediately to limits and billing.
  */
 export async function getPlanCatalog(): Promise<PlanCatalog> {
+  const t_catalog_start = performance.now();
   const catalog = buildDefaultCatalog();
 
   try {
+    const t_firestore_start = performance.now();
     const snapshot = await getDocs(collection(db, PLANS_COLLECTION));
+    console.log("[ECHLY PERF] getPlanCatalog.getDocs(plans):", performance.now() - t_firestore_start);
     snapshot.docs.forEach((docSnap) => {
       const id = docSnap.id as PlanId;
       if (!(id in catalog)) return;
@@ -78,9 +81,11 @@ export async function getPlanCatalog(): Promise<PlanCatalog> {
             : current.insightsEnabled,
       };
     });
+    console.log("[ECHLY PERF] getPlanCatalog TOTAL:", performance.now() - t_catalog_start);
     return catalog;
   } catch {
     // Safety fallback: never crash because plans can't be fetched.
+    console.log("[ECHLY PERF] getPlanCatalog TOTAL (fallback):", performance.now() - t_catalog_start);
     return catalog;
   }
 }

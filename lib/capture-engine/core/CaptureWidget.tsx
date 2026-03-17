@@ -62,9 +62,13 @@ export default function CaptureWidget({
   onTriggerLogin,
   sessionLimitReached,
   environment,
+  onPreviousSessions,
+  onSetCaptureMode,
+  onOpenBilling,
+  onOpenDashboard,
+  getAssetUrl,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
-  const [openingPrevious, setOpeningPrevious] = useState(false);
   const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
   /** Extension: when true, show command screen (mode cards + footer). False when viewing a session (e.g. after Open Previous or when paused). */
   const [showCommandScreen, setShowCommandScreen] = useState(true);
@@ -93,7 +97,12 @@ export default function CaptureWidget({
     onCreateSession,
     onActiveSessionChange,
     ensureAuthenticated,
-    onSessionViewRequested: extensionMode ? () => setShowCommandScreen(false) : undefined,
+    onSessionViewRequested: extensionMode
+      ? () => {
+          console.log("[ECHLY DEBUG] UI entering session mode", performance.now());
+          setShowCommandScreen(false);
+        }
+      : undefined,
     globalSessionModeActive,
     globalSessionPaused,
     onSessionModeStart,
@@ -113,25 +122,29 @@ export default function CaptureWidget({
     environment,
   });
 
+  /** Session limit: prop (from parent e.g. extension) takes precedence; otherwise use hook state (set when startSession returns limitReached). */
+  const effectiveSessionLimitReached = sessionLimitReached ?? state.sessionLimitReached;
+
   const isControlled = expanded !== undefined;
   const effectiveIsOpen = isControlled ? expanded : state.isOpen;
   const listScrollRef = useRef<HTMLDivElement>(null);
 
   const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state) || state.pillExiting;
-  const hasStoredSession = Boolean(sessionId);
+  const optimisticSessionActive = state.sessionStatus === "starting" || state.sessionStatus === "active";
+  const hasStoredSession = Boolean(sessionId) || optimisticSessionActive;
   const showSidebar = !isInCaptureFlow && !state.sessionMode;
   /** Session sidebar visible when session is active or paused; hide only when session ends. */
-  const shouldShowTray = globalSessionModeActive === true || globalSessionPaused === true;
+  const shouldShowTray = globalSessionModeActive === true || globalSessionPaused === true || optimisticSessionActive;
   const showSessionSidebar = extensionMode && shouldShowTray;
   const showFloatingButton = !effectiveIsOpen && (showSidebar || showSessionSidebar);
   const showPanel = effectiveIsOpen && (showSidebar || showSessionSidebar);
 
   const hasTickets = Boolean(state.pointers?.length);
   /** When true, we are in an active or paused session; always render session layout (ticket list or empty state), never home. */
-  const sessionModeActive = globalSessionModeActive === true || globalSessionPaused === true;
+  const sessionModeActive = globalSessionModeActive === true || globalSessionPaused === true || optimisticSessionActive;
   /** Home screen (mode tiles + Start Session / Previous Sessions footer) only when not in a session. */
   const showHomeScreen = !sessionModeActive;
-  const showPreviousButton = Boolean(hasPreviousSessions);
+  const isStartingSession = state.sessionStatus === "starting";
 
   const openTicketsCount = state.pointers.filter((p) => {
     const status = (p as { status?: string }).status;
@@ -188,22 +201,14 @@ export default function CaptureWidget({
   }, [handlers, widgetToggleRef]);
 
   const handlePreviousSessions = React.useCallback(() => {
-    if (openingPrevious) return;
+    console.log("[ECHLY UX] Opening modal instantly");
+    onPreviousSessions?.();
     setResumeModalOpen(true);
-    setOpeningPrevious(true);
-    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({ type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
-    }
-  }, [openingPrevious]);
-
-  /** Reset loading state when modal is open (whether opened locally or via message). */
-  useEffect(() => {
-    if (showResumeModal) setOpeningPrevious(false);
-  }, [showResumeModal]);
+  }, [onPreviousSessions]);
 
   function setMode(mode: "voice" | "text") {
-    if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode });
+    if (onSetCaptureMode) {
+      onSetCaptureMode(mode);
     } else {
       onCaptureModeChange?.(mode);
     }
@@ -240,7 +245,8 @@ export default function CaptureWidget({
             onRegionCaptured={handlers.handleRegionCaptured}
             onRegionSelectStart={handlers.handleRegionSelectStart}
             onCancelCapture={handlers.handleCancelCapture}
-            sessionMode={state.sessionMode}
+            sessionMode={state.sessionMode || isStartingSession}
+            optimisticSessionStarting={isStartingSession}
             globalSessionModeActive={globalSessionModeActive}
             sessionId={sessionId}
             sessionPaused={state.sessionPaused}
@@ -329,31 +335,32 @@ export default function CaptureWidget({
             <div className="echly-sidebar-surface" data-theme={theme}>
               <CaptureHeader
                 onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
-                showSessionTitle={!(sessionLimitReached && !sessionId) && (hasTickets || sessionModeActive || sessionLoading)}
+                showSessionTitle={!(effectiveSessionLimitReached && !sessionId) && (hasTickets || sessionModeActive || sessionLoading)}
                 sessionTitle={sessionTitleProp ?? sessionTitle ?? "Untitled Session"}
                 onSessionTitleChange={onSessionTitleChangeProp ?? setSessionTitle}
                 openTicketCount={openTicketsCount}
                 title={undefined}
                 summary={summary}
-                showHomeButton={extensionMode && !(sessionLimitReached && !sessionId)}
+                showHomeButton={extensionMode && !(effectiveSessionLimitReached && !sessionId)}
                 theme={theme}
-                onThemeToggle={sessionLimitReached && !sessionId ? undefined : onThemeToggle}
+                onThemeToggle={effectiveSessionLimitReached && !sessionId ? undefined : isStartingSession ? undefined : onThemeToggle}
                 captureMode={captureMode}
-                onCaptureModeToggle={sessionLimitReached && !sessionId ? undefined : (extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : undefined)}
+                onCaptureModeToggle={effectiveSessionLimitReached && !sessionId ? undefined : isStartingSession ? undefined : (extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : undefined)}
                 onShowCommandScreen={() => setShowCommandScreen(true)}
-                showOnlyClose={Boolean(sessionLimitReached && !sessionId)}
+                showOnlyClose={Boolean(effectiveSessionLimitReached && !sessionId)}
+                onOpenDashboard={onOpenDashboard}
               />
 
-              {sessionLimitReached && !sessionId ? (
+              {effectiveSessionLimitReached && !sessionId ? (
                 <div className="echly-sidebar-body echly-upgrade-card-body">
                   <SessionLimitUpgradeView
-                    limitMessage={sessionLimitReached.message}
-                    upgradePlan={sessionLimitReached.upgradePlan}
+                    limitMessage={effectiveSessionLimitReached.message ?? ""}
+                    upgradePlan={effectiveSessionLimitReached.upgradePlan}
                     onUpgrade={() => {
-                      if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
-                        chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {});
-                      }
+                      onOpenBilling?.();
+                      handlers.setSessionLimitReached(null);
                     }}
+                    getAssetUrl={getAssetUrl}
                   />
                 </div>
               ) : (
@@ -362,7 +369,14 @@ export default function CaptureWidget({
                 className="echly-sidebar-body"
                 onScroll={handleListScroll}
                 onWheel={(e) => e.stopPropagation()}
+                style={isStartingSession ? { pointerEvents: "none", opacity: 0.85 } : undefined}
               >
+                {isStartingSession && (
+                  <div className="echly-session-loading-state" aria-live="polite" aria-busy="true">
+                    <span className="echly-spinner" aria-hidden />
+                    <span className="echly-session-loading-text">Starting session...</span>
+                  </div>
+                )}
                 {sessionModeActive && sessionLoading && (
                   <div className="echly-session-loading-state" aria-live="polite" aria-busy="true">
                     <span className="echly-spinner" aria-hidden />
@@ -422,6 +436,7 @@ export default function CaptureWidget({
                     <div
                       className={`echly-mode-tile echly-mode-card voice-mode ${captureMode === "voice" ? "selected" : ""}`}
                       onClick={() => {
+                        if (isStartingSession) return;
                         if (captureMode !== "voice") {
                           setMode("voice");
                         } else {
@@ -429,6 +444,7 @@ export default function CaptureWidget({
                         }
                       }}
                       onKeyDown={(e) => {
+                        if (isStartingSession) return;
                         if (e.key === "Enter") {
                           if (captureMode !== "voice") {
                             setMode("voice");
@@ -449,8 +465,14 @@ export default function CaptureWidget({
                     </div>
                     <div
                       className={`echly-mode-tile echly-mode-card text-mode ${captureMode === "text" ? "selected" : ""}`}
-                      onClick={() => setMode("text")}
-                      onKeyDown={(e) => e.key === "Enter" && setMode("text")}
+                      onClick={() => {
+                        if (isStartingSession) return;
+                        setMode("text");
+                      }}
+                      onKeyDown={(e) => {
+                        if (isStartingSession) return;
+                        if (e.key === "Enter") setMode("text");
+                      }}
                       role="button"
                       tabIndex={0}
                       aria-pressed={captureMode === "text"}
@@ -471,31 +493,17 @@ export default function CaptureWidget({
               </div>
               )}
 
-              {!(sessionLimitReached && !sessionId) && showHomeScreen && (
+              {!(effectiveSessionLimitReached && !sessionId) && showHomeScreen && (
                 <>
                   <div className="echly-command-divider" aria-hidden />
                   <WidgetFooter
-                  isIdle={true}
+                  isIdle={!isStartingSession}
                   onAddFeedback={handlers.handleAddFeedback}
                   startCapture={handlers.startCapture}
                   extensionMode={extensionMode}
-                  onStartSession={
-                      extensionMode
-                        ? () => {
-                            if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
-                              chrome.runtime.sendMessage({ type: "ECHLY_START_SESSION" });
-                            } else {
-                              handlers.startSession();
-                            }
-                          }
-                        : handlers.startSession
-                    }
-                  onOpenPreviousSession={
-                    extensionMode && showPreviousButton && fetchSessions && onPreviousSessionSelect
-                      ? handlePreviousSessions
-                      : undefined
-                  }
-                  openingPrevious={openingPrevious}
+                  onStartSession={handlers.startSession}
+                  onOpenPreviousSession={handlePreviousSessions}
+                  openingPrevious={false}
                   hasActiveSession={hasStoredSession}
                   captureDisabled={captureDisabled}
                 />

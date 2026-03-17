@@ -44,6 +44,8 @@ type CaptureHeaderProps = {
   onShowCommandScreen?: () => void;
   /** When true, show only the close button (e.g. session limit upgrade view). */
   showOnlyClose?: boolean;
+  /** When set (e.g. extension), Home button calls this instead of chrome. Replaces ECHLY_OPEN_DASHBOARD. */
+  onOpenDashboard?: () => void;
 };
 
 export default function CaptureHeader({
@@ -62,6 +64,7 @@ export default function CaptureHeader({
   handlers,
   onShowCommandScreen,
   showOnlyClose = false,
+  onOpenDashboard,
 }: CaptureHeaderProps) {
   const [localTitle, setLocalTitle] = useState(sessionTitle);
   const [isEditing, setIsEditing] = useState(false);
@@ -136,11 +139,7 @@ export default function CaptureHeader({
           <button
             type="button"
             className={`echly-header-home-wrap${theme === "dark" ? " dark" : ""}`}
-            onClick={() => {
-              if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
-                chrome.runtime.sendMessage({ type: "ECHLY_OPEN_DASHBOARD" }).catch(() => {});
-              }
-            }}
+            onClick={() => onOpenDashboard?.()}
             aria-label="Open Echly dashboard"
           >
             <div className="header-home-btn">

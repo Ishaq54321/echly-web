@@ -2,8 +2,7 @@
 
 import React from "react";
 import { createPortal } from "react-dom";
-import { RegionCaptureOverlay } from "@/components/CaptureWidget/RegionCaptureOverlay";
-import { SessionOverlay } from "@/components/CaptureWidget/SessionOverlay";
+import { RegionCaptureOverlay, SessionOverlay } from "./internal/overlayHelpers";
 import type { CaptureContext, SessionFeedbackPending } from "./types";
 
 export type CaptureLayerState =
@@ -28,6 +27,8 @@ export type CaptureLayerProps = {
   onCancelCapture: () => void;
   /** Session Feedback Mode: when true, show session overlay instead of region capture */
   sessionMode?: boolean;
+  /** Optimistic UI: when true, render session overlay even before sessionId/global state arrives. */
+  optimisticSessionStarting?: boolean;
   /** From background (ECHLY_GLOBAL_STATE). Overlay only shows when true and sessionId is set to avoid stale state. */
   globalSessionModeActive?: boolean;
   /** Active session ID. Overlay only shows when set to avoid stale state. */
@@ -66,6 +67,7 @@ export function CaptureLayer({
   onRegionSelectStart,
   onCancelCapture,
   sessionMode = false,
+  optimisticSessionStarting = false,
   globalSessionModeActive = false,
   sessionId: sessionIdProp,
   sessionPaused = false,
@@ -84,9 +86,11 @@ export function CaptureLayer({
   listeningAudioLevel = 0,
   audioAnalyser = null,
 }: CaptureLayerProps) {
-  if (extensionMode && (!sessionMode || !sessionIdProp)) return null;
+  if (extensionMode && (!sessionMode || (!sessionIdProp && !optimisticSessionStarting))) return null;
   const showSessionOverlay =
-    sessionMode && extensionMode && !!globalSessionModeActive && !!sessionIdProp;
+    sessionMode &&
+    extensionMode &&
+    ((!!globalSessionModeActive && !!sessionIdProp) || optimisticSessionStarting);
   const showRegionOverlay =
     !showSessionOverlay && (state === "focus_mode" || state === "region_selecting");
   /* Do not show focus overlay when region overlay is shown (avoids full-screen pointer-events:auto blocking scroll). */

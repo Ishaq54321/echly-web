@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { shortDeviceName } from "@/components/CaptureWidget/utils/shortDeviceName";
+import { shortDeviceName } from "./internal/uiHelpers";
 
 export interface MicrophonePanelProps {
   devices: Array<{ deviceId: string; label: string }>;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useLayoutEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { FileText } from "lucide-react";
 
@@ -17,7 +17,7 @@ export type SessionOption = {
 export type ResumeSessionModalProps = {
   open: boolean;
   onClose: () => void;
-  fetchSessions: () => Promise<SessionOption[]>;
+  fetchSessions?: () => Promise<SessionOption[]>;
   onSelectSession: (sessionId: string) => void;
   /** Theme for modal (dark/light). Defaults to "dark". */
   theme?: "dark" | "light";
@@ -83,43 +83,44 @@ export function ResumeSessionModal({
   const [loginRequired, setLoginRequired] = useState(false);
   const isLight = theme === "light";
 
-  /** On open: show modal immediately with loading true so UI doesn't wait for fetch. */
-  useLayoutEffect(() => {
-    if (open) {
-      setLoading(true);
-    }
-  }, [open]);
-
   useEffect(() => {
     if (!open) return;
     setSearch("");
     setFilter("all");
     setError(null);
     setLoginRequired(false);
-    if (checkAuth) {
-      checkAuth()
-        .then((valid) => {
+    let isMounted = true;
+
+    const load = async () => {
+      console.log("[ECHLY UX] fetching sessions inside modal");
+      setLoading(true);
+      try {
+        if (checkAuth) {
+          const valid = await checkAuth();
+          if (!isMounted) return;
           if (!valid) {
             setLoginRequired(true);
             setLoading(false);
             return;
           }
-          return fetchSessions().then((list) => {
-            if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", list);
-            setSessions(list);
-          });
-        })
-        .catch((_err) => setLoginRequired(true))
-        .finally(() => setLoading(false));
-    } else {
-      fetchSessions()
-        .then((list) => {
-          if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", list);
-          setSessions(list);
-        })
-        .catch((err) => setError(err instanceof Error ? err.message : "Failed to load sessions"))
-        .finally(() => setLoading(false));
-    }
+        }
+        const data = await fetchSessions?.();
+        if (isMounted) {
+          setSessions(data ?? []);
+          console.log("[ECHLY UX] sessions loaded:", data?.length ?? 0);
+        }
+      } catch (e) {
+        console.error("[ECHLY UX] failed to load sessions", e);
+        if (isMounted) setError(e instanceof Error ? e.message : "Failed to load sessions");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      isMounted = false;
+    };
   }, [open, fetchSessions, checkAuth]);
 
   const filtered = useMemo(() => {
@@ -313,7 +314,8 @@ export function ResumeSessionModal({
               color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
               fontSize: 14,
             }}>
-              Loading sessions…
+              <span className="echly-spinner" style={{ display: "inline-block", marginRight: 8, verticalAlign: "middle" }} aria-hidden />
+              Loading sessions...
             </div>
           )}
           {!loginRequired && error && (
@@ -328,7 +330,7 @@ export function ResumeSessionModal({
               color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
               fontSize: 14,
             }}>
-              No sessions match.
+              {sessions.length === 0 ? "No previous sessions yet" : "No sessions match."}
             </div>
           )}
           {!loginRequired && !loading && !error && filtered.length > 0 && (
