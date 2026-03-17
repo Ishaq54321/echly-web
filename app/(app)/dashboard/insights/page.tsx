@@ -2,13 +2,12 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { authFetch } from "@/lib/authFetch";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { ActivityTrendChart, type ActivityTrendPoint } from "@/components/insights/ActivityTrendChart";
 import { IssueTypeDonutChart, type IssueSlice } from "@/components/insights/IssueTypeDonutChart";
 import { MostActiveSessionsBarChart, type ActiveSessionBar } from "@/components/insights/MostActiveSessionsBarChart";
 import { filterDaily, type DailyInsights } from "@/lib/analytics/filterDaily";
-import { collection, doc, onSnapshot, query, where, documentId, type DocumentData } from "firebase/firestore";
+import { collection, onSnapshot, query, where, documentId, type DocumentData } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   emptyWorkspaceInsightsDoc,
@@ -126,58 +125,36 @@ export default function InsightsPage() {
   });
 
   useEffect(() => {
-    if (!authUser) {
-      if (!authLoading) {
-        // Avoid synchronous state updates in an effect body (eslint rule).
-        setTimeout(() => setLoading(false), 0);
-      }
-      return;
-    }
-    let cancelled = false;
-    // Avoid synchronous state updates in an effect body (eslint rule).
-    setTimeout(() => {
-      if (cancelled) return;
-      setLoading(true);
-      setError(null);
-    }, 0);
-    authFetch(`/api/insights`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to load insights");
-        return res.json();
-      })
-      .then((json: InsightsApiResponse) => {
-        if (!cancelled) setData(json);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load insights");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (authLoading) return;
+    if (!authUser) setLoading(false);
   }, [authUser, authLoading]);
 
   useEffect(() => {
     if (!authUser) return;
+    setLoading(true);
+    setError(null);
     // Realtime: keep Insights UI synced to the insights doc (no queries).
     const ref = workspaceInsightsRef(authUser.uid);
-    const unsub = onSnapshot(
+    const unsubscribe = onSnapshot(
       ref,
       (snap) => {
-        const docData = snap.exists()
-          ? (snap.data() as WorkspaceInsightsDoc)
-          : emptyWorkspaceInsightsDoc();
-        setData(mapDocToApi(docData));
+        console.log("Insights snapshot update");
+        if (!snap.exists()) {
+          setData(mapDocToApi(emptyWorkspaceInsightsDoc()));
+          setLoading(false);
+          return;
+        }
+        setData(mapDocToApi(snap.data() as WorkspaceInsightsDoc));
         setLoading(false);
       },
       (err) => {
         console.error("[insights] onSnapshot error:", err);
+        setError("Failed to load insights.");
+        setLoading(false);
       }
     );
-    return () => unsub();
-  }, [authUser]);
+    return () => unsubscribe();
+  }, [authUser?.uid]);
 
   const filteredDaily = useMemo(() => {
     return filterDaily(data?.analytics?.daily ?? {}, rangeDays);

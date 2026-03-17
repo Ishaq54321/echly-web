@@ -2,7 +2,7 @@
 
 import { authFetch } from "@/lib/authFetch";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { onSnapshot, collection, query, where, limit } from "firebase/firestore";
+import { onSnapshot, collection, query, where, limit, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { Timestamp, DocumentSnapshot } from "firebase/firestore";
@@ -11,6 +11,7 @@ const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 150;
 /** Client-side read cap: stop loading more after this many items (cost protection). */
 const FEEDBACK_LOAD_CAP = 200;
+const REALTIME_LIMIT = 30;
 
 export interface UseSessionFeedbackPaginatedResult {
   feedback: Feedback[];
@@ -95,7 +96,8 @@ export function useSessionFeedbackPaginated(
   scrollReady?: number,
   onNewTicketFromRealtime?: (newestTicketId: string) => void
 ): UseSessionFeedbackPaginatedResult {
-  const [items, setItems] = useState<Feedback[]>([]);
+  const [realtimeItems, setRealtimeItems] = useState<Feedback[]>([]);
+  const [apiItems, setApiItems] = useState<Feedback[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [activeCount, setActiveCount] = useState<number>(0);
   const [resolvedCount, setResolvedCount] = useState<number>(0);
@@ -107,21 +109,54 @@ export function useSessionFeedbackPaginated(
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [userHasScrolledList, setUserHasScrolledList] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const hasFetchedRef = useRef(false);
 
   /** Track previous snapshot size so we can detect new tickets and auto-select the newest. */
   const previousFeedbackCountRef = useRef(0);
   const onNewTicketFromRealtimeRef = useRef(onNewTicketFromRealtime);
   onNewTicketFromRealtimeRef.current = onNewTicketFromRealtime;
 
+  const sortByCreatedAtDesc = useCallback((list: Feedback[]) => {
+    return [...list].sort((a, b) => {
+      const ta = a.createdAt?.toMillis?.() ?? a.clientTimestamp ?? 0;
+      const tb = b.createdAt?.toMillis?.() ?? b.clientTimestamp ?? 0;
+      return tb - ta;
+    });
+  }, []);
+
+  const items = useMemo(() => {
+    const byId = new Map<string, Feedback>();
+    for (const f of realtimeItems) byId.set(f.id, f);
+    for (const f of apiItems) if (!byId.has(f.id)) byId.set(f.id, f);
+    return sortByCreatedAtDesc(Array.from(byId.values()));
+  }, [realtimeItems, apiItems, sortByCreatedAtDesc]);
+
   const hasReachedLimit = items.length >= FEEDBACK_LOAD_CAP;
 
-  const stateRef = useRef({ items, total, cursor, hasMore, loadingMore, initialLoadDone });
-  stateRef.current = { items, total, cursor, hasMore, loadingMore, initialLoadDone };
+  const stateRef = useRef({
+    realtimeItems,
+    apiItems,
+    total,
+    cursor,
+    hasMore,
+    loadingMore,
+    initialLoadDone,
+  });
+  stateRef.current = {
+    realtimeItems,
+    apiItems,
+    total,
+    cursor,
+    hasMore,
+    loadingMore,
+    initialLoadDone,
+  };
 
   const loadMore = useCallback(async () => {
     const s = stateRef.current;
-    if (!sessionId || !s.initialLoadDone || s.loadingMore || s.items.length >= FEEDBACK_LOAD_CAP) return;
-    if (s.total > 0 && s.items.length >= s.total) {
+    const loadedCount = s.realtimeItems.length + s.apiItems.length;
+    if (!sessionId || !s.initialLoadDone || s.loadingMore || loadedCount >= FEEDBACK_LOAD_CAP) return;
+    if (s.total > 0 && loadedCount >= s.total) {
       setHasMore(false);
       return;
     }
@@ -143,9 +178,20 @@ export function useSessionFeedbackPaginated(
       const appended = data.feedback?.length ?? 0;
       const serverTotal = typeof data.total === "number" ? data.total : s.total;
       if (appended > 0) {
-        setItems((prev) => [...prev, ...data.feedback!]);
+        setApiItems((prev) => {
+          const seen = new Set<string>();
+          for (const f of stateRef.current.realtimeItems) seen.add(f.id);
+          for (const f of prev) seen.add(f.id);
+          const next = [...prev];
+          for (const f of data.feedback!) {
+            if (seen.has(f.id)) continue;
+            seen.add(f.id);
+            next.push(f);
+          }
+          return next;
+        });
         setCursor(data.nextCursor ?? null);
-        const newLen = s.items.length + appended;
+        const newLen = loadedCount + appended;
         setHasMore(serverTotal > 0 ? newLen < serverTotal : (data.hasMore ?? false));
       } else {
         setHasMore(false);
@@ -176,7 +222,7 @@ export function useSessionFeedbackPaginated(
       scrollTimeout = setTimeout(() => {
         const s = stateRef.current;
         if (s.loadingMore) return;
-        const loadedCount = s.items.length;
+        const loadedCount = s.realtimeItems.length + s.apiItems.length;
         const totalCount = s.total;
         const hasMore = totalCount === 0 ? s.hasMore : loadedCount < totalCount;
         if (!hasMore || loadedCount >= FEEDBACK_LOAD_CAP) return;
@@ -204,7 +250,7 @@ export function useSessionFeedbackPaginated(
         if (!entries[0].isIntersecting) return;
         const s = stateRef.current;
         if (s.loadingMore) return;
-        const loadedCount = s.items.length;
+        const loadedCount = s.realtimeItems.length + s.apiItems.length;
         const totalCount = s.total;
         const hasMore = totalCount === 0 ? s.hasMore : loadedCount < totalCount;
         if (!hasMore) return;
@@ -223,34 +269,40 @@ export function useSessionFeedbackPaginated(
     if (!sessionId) {
       setInitialLoading(false);
       setInitialLoadDone(false);
+      hasFetchedRef.current = false;
+      setRealtimeItems([]);
+      setApiItems([]);
+      setCursor(null);
+      setHasMore(true);
       return;
     }
     setInitialLoading(true);
     setInitialLoadDone(false);
+    hasFetchedRef.current = false;
+    setRealtimeItems([]);
+    setApiItems([]);
+    setCursor(null);
+    setHasMore(true);
 
     const feedbackRef = collection(db, "feedback");
     const feedbackQuery = query(
       feedbackRef,
       where("sessionId", "==", sessionId),
-      limit(FEEDBACK_LOAD_CAP)
+      orderBy("createdAt", "desc"),
+      limit(REALTIME_LIMIT)
     );
 
     const unsubscribe = onSnapshot(feedbackQuery, (snapshot) => {
-      const snapshotList = snapshot.docs
-        .map((d) => mapDocToFeedback(d))
-        .sort((a, b) => {
-          const ta = a.createdAt?.toMillis?.() ?? a.clientTimestamp ?? 0;
-          const tb = b.createdAt?.toMillis?.() ?? b.clientTimestamp ?? 0;
-          return tb - ta;
-        });
+      const snapshotList = snapshot.docs.map((d) => mapDocToFeedback(d));
       const totalCount = snapshotList.length;
       const open = snapshotList.filter((f) => !f.isResolved && !f.isSkipped).length;
       const resolved = snapshotList.filter((f) => f.isResolved).length;
       const skipped = snapshotList.filter((f) => f.isSkipped).length;
-      setTotal(totalCount);
-      setActiveCount(open);
-      setResolvedCount(resolved);
-      setSkippedCount(skipped);
+      // Avoid clobbering API-derived totals/counts with the realtime-limited window.
+      setTotal((prev) => (prev === 0 ? totalCount : prev));
+      setActiveCount((prev) => (prev === 0 ? open : prev));
+      setResolvedCount((prev) => (prev === 0 ? resolved : prev));
+      setSkippedCount((prev) => (prev === 0 ? skipped : prev));
 
       if (totalCount > previousFeedbackCountRef.current && snapshotList.length > 0) {
         const newestTicketId = snapshotList[0].id;
@@ -260,38 +312,59 @@ export function useSessionFeedbackPaginated(
 
       const isFirstSnapshot = !stateRef.current.initialLoadDone;
       if (isFirstSnapshot) {
-        setItems(snapshotList);
+        setRealtimeItems(snapshotList);
         setInitialLoadDone(true);
         setInitialLoading(false);
-        setCursor(null);
-        setHasMore(false); // Listener-only: no API pagination; we have up to FEEDBACK_LOAD_CAP from snapshot
-      } else {
-        const changes = snapshot.docChanges();
-        setItems((prev) => {
-          let next = [...prev];
-          for (const change of changes) {
-            const feedback = mapDocToFeedback(change.doc);
-            if (change.type === "added") {
-              const idx = next.findIndex((t) => t.id === feedback.id);
-              if (idx >= 0) next[idx] = feedback;
-              else next.push(feedback);
-            } else if (change.type === "modified") {
-              next = next.map((t) => (t.id === feedback.id ? feedback : t));
-            } else if (change.type === "removed") {
-              next = next.filter((t) => t.id !== feedback.id);
+        if (hasFetchedRef.current) return;
+        hasFetchedRef.current = true;
+        // Seed pagination + true totals from the API. API items are treated as older pages.
+        void (async () => {
+          try {
+            const res = await authFetch(
+              `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
+            );
+            const data = (await res.json()) as {
+              feedback?: Feedback[];
+              nextCursor?: string | null;
+              hasMore?: boolean;
+              total?: number;
+              activeCount?: number;
+              resolvedCount?: number;
+              skippedCount?: number;
+            };
+            if (typeof data.total === "number") setTotal(data.total);
+            if (typeof data.activeCount === "number") setActiveCount(data.activeCount);
+            if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
+            if (typeof data.skippedCount === "number") setSkippedCount(data.skippedCount);
+            setCursor(data.nextCursor ?? null);
+            setHasMore(data.hasMore ?? false);
+            if (data.feedback?.length) {
+              setApiItems(() => {
+                const seen = new Set<string>();
+                for (const f of stateRef.current.realtimeItems) seen.add(f.id);
+                const next: Feedback[] = [];
+                for (const f of data.feedback!) {
+                  if (seen.has(f.id)) continue;
+                  seen.add(f.id);
+                  next.push(f);
+                }
+                return next;
+              });
             }
+          } catch {
+            // If API seeding fails, realtime list still works; pagination will remain unavailable.
+            setHasMore(false);
+            setCursor(null);
           }
-          return next.sort((a, b) => {
-            const ta = a.createdAt?.toMillis?.() ?? a.clientTimestamp ?? 0;
-            const tb = b.createdAt?.toMillis?.() ?? b.clientTimestamp ?? 0;
-            return tb - ta;
-          });
-        });
+        })();
+      } else {
+        // Keep realtime window separate: never remove older paginated items due to query limit churn.
+        setRealtimeItems(snapshotList);
       }
     });
 
     return () => unsubscribe();
-  }, [sessionId]);
+  }, [sessionId, sortByCreatedAtDesc]);
 
   const refetchFirstPage = useCallback(async () => {
     if (!sessionId) return;
@@ -313,11 +386,21 @@ export function useSessionFeedbackPaginated(
       if (typeof data.resolvedCount === "number") setResolvedCount(data.resolvedCount);
       if (typeof data.skippedCount === "number") setSkippedCount(data.skippedCount);
       if (data.feedback?.length) {
-        setItems(data.feedback);
+        setApiItems(() => {
+          const seen = new Set<string>();
+          for (const f of stateRef.current.realtimeItems) seen.add(f.id);
+          const next: Feedback[] = [];
+          for (const f of data.feedback!) {
+            if (seen.has(f.id)) continue;
+            seen.add(f.id);
+            next.push(f);
+          }
+          return next;
+        });
         setCursor(data.nextCursor ?? null);
         setHasMore(data.hasMore ?? false);
       } else {
-        setItems([]);
+        setApiItems([]);
         setCursor(null);
         setHasMore(false);
       }
@@ -332,7 +415,7 @@ export function useSessionFeedbackPaginated(
     activeCount,
     resolvedCount,
     skippedCount,
-    setFeedback: setItems,
+    setFeedback: setApiItems,
     setTotal,
     setActiveCount,
     setResolvedCount,

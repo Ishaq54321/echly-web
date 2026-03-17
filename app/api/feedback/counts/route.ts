@@ -5,6 +5,7 @@ import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { getCachedWorkspace } from "@/lib/server/cache/workspaceCache";
 
 /**
  * GET /api/feedback/counts?sessionId=ID
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
 
   const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
   try {
-    await resolveWorkspaceById(workspaceId);
+    await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });

@@ -12,6 +12,10 @@ const WORKSPACE_CACHE_TTL_MS = 30_000; // 30 seconds
 const workspaceCache = new Map<string, { data: ResolvedWorkspace; expiresAt: number }>();
 const resolveInFlight = new Map<string, Promise<ResolvedWorkspace>>();
 
+const WORKSPACE_ID_CACHE_TTL_MS = 30_000; // 30 seconds
+const workspaceIdCache = new Map<string, { workspaceId: string; expiresAt: number }>();
+const resolveWorkspaceIdInFlight = new Map<string, Promise<string>>();
+
 /**
  * Invalidate workspace resolution cache. Call when user switches workspace or workspace is updated.
  * @param uid - If provided, clear only this user's entry. Otherwise clear entire cache.
@@ -19,9 +23,50 @@ const resolveInFlight = new Map<string, Promise<ResolvedWorkspace>>();
 export function invalidateWorkspaceCache(uid?: string): void {
   if (uid !== undefined) {
     workspaceCache.delete(uid);
+    workspaceIdCache.delete(uid);
   } else {
     workspaceCache.clear();
+    workspaceIdCache.clear();
   }
+}
+
+/**
+ * Resolves ONLY the workspaceId for a user. This is a strict "light" variant intended
+ * for routes that must not load workspace documents (and therefore must not touch any
+ * billing/entitlement/usage code paths that other workspace resolution helpers might pull in).
+ *
+ * Cached per uid with 30s TTL.
+ */
+export async function resolveWorkspaceForUserLight(uid: string): Promise<{ workspaceId: string }> {
+  const now = Date.now();
+  const entry = workspaceIdCache.get(uid);
+  if (entry && now < entry.expiresAt) {
+    console.log("[ECHLY CACHE] workspaceId hit");
+    return { workspaceId: entry.workspaceId };
+  }
+  console.log("[ECHLY CACHE] workspaceId miss");
+
+  const pending = resolveWorkspaceIdInFlight.get(uid);
+  if (pending) {
+    const workspaceId = await pending;
+    return { workspaceId };
+  }
+
+  const promise = (async () => {
+    const workspaceId = (await getUserWorkspaceIdRepo(uid)) ?? uid;
+    workspaceIdCache.set(uid, {
+      workspaceId,
+      expiresAt: Date.now() + WORKSPACE_ID_CACHE_TTL_MS,
+    });
+    console.log("RESOLVED WORKSPACE ID:", { userId: uid, workspaceId });
+    return workspaceId;
+  })().finally(() => {
+    resolveWorkspaceIdInFlight.delete(uid);
+  });
+
+  resolveWorkspaceIdInFlight.set(uid, promise);
+  const workspaceId = await promise;
+  return { workspaceId };
 }
 
 /**

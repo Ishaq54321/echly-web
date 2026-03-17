@@ -222,7 +222,7 @@ async function initializeSessionState(): Promise<void> {
           getValidToken()
             .then(() =>
               apiFetch(
-                `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId!)}&limit=200`
+                `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId!)}&limit=20`
               )
             )
             .then((res) => res.json())
@@ -765,7 +765,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         await getValidToken();
         const [feedbackRes, sessionsRes] = await Promise.all([
-          apiFetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=200`),
+          apiFetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=20`),
           apiFetch(`${API_BASE}/api/sessions`),
         ]);
         const feedbackJson = (await feedbackRes.json()) as { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> };

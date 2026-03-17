@@ -12,6 +12,7 @@ import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { log } from "@/lib/utils/logger";
+import { getCachedWorkspace } from "@/lib/server/cache/workspaceCache";
 
 /** GET /api/tickets/:id — return single ticket (feedback) from DB. */
 export async function GET(
@@ -50,7 +51,7 @@ export async function GET(
     const session = await getSessionByIdRepo(ticket.sessionId);
     const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
     try {
-      await resolveWorkspaceById(workspaceId);
+      await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
         return NextResponse.json(
@@ -136,7 +137,7 @@ export async function PATCH(
   const session = await getSessionByIdRepo(existingForOwnership.sessionId);
   const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
   try {
-    await resolveWorkspaceById(workspaceId);
+    await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(
@@ -255,7 +256,7 @@ export async function DELETE(
     const session = await getSessionByIdRepo(existingForOwnership.sessionId);
     const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
     try {
-      await resolveWorkspaceById(workspaceId);
+      await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
         return NextResponse.json(

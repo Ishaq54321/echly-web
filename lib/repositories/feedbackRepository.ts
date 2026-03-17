@@ -17,6 +17,7 @@ import {
   where,
   increment,
   type DocumentReference,
+  type DocumentSnapshot,
   type QueryDocumentSnapshot,
   type Timestamp,
 } from "firebase/firestore";
@@ -414,6 +415,80 @@ export async function getSessionFeedbackPageWithStringCursorRepo(
   };
 }
 
+/**
+ * User-scoped session feedback page.
+ * Composite index required: feedback (workspaceId ASC, sessionId ASC, createdAt DESC).
+ *
+ * NOTE: This is intentionally separate from getSessionFeedbackPageRepo to avoid
+ * changing ordering/constraints for other callers.
+ */
+export async function getSessionFeedbackPageForUserWithStringCursorRepo(
+  args: {
+    workspaceId: string;
+    sessionId: string;
+    userId: string;
+    limit: number;
+    cursor?: string;
+  }
+): Promise<{ feedback: Feedback[]; nextCursor: string | null; hasMore: boolean }> {
+  const { workspaceId, sessionId, userId, limit: pageSize, cursor } = args;
+  assertQueryLimit(pageSize, "getSessionFeedbackPageForUserWithStringCursorRepo");
+  console.log("USING COLLECTION TYPE:", "collection");
+
+  const trimmed = cursor?.trim();
+  const cursorSnap: DocumentSnapshot | null =
+    trimmed && trimmed.length > 0 ? await getDoc(doc(db, "feedback", trimmed)) : null;
+
+  // Required query shape:
+  // where("workspaceId", "==", workspaceId)
+  // where("sessionId", "==", sessionId)
+  // orderBy("createdAt", "desc")
+  // limit(limit)
+  // startAfter(cursor) (if present)
+  const q = query(
+    collection(db, "feedback"),
+    where("workspaceId", "==", workspaceId),
+    where("sessionId", "==", sessionId),
+    orderBy("createdAt", "desc"),
+    limit(pageSize),
+    ...(cursorSnap && cursorSnap.exists() ? [startAfter(cursorSnap)] : [])
+  );
+
+  let snapshot;
+  try {
+    snapshot = await getDocs(q);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.toLowerCase().includes("requires an index")) {
+      console.warn(
+        "[FIRESTORE] Missing composite index: feedback(workspaceId ASC, sessionId ASC, createdAt DESC)",
+        { workspaceId, sessionId }
+      );
+    }
+    throw err;
+  }
+
+  console.log("[INDEX CHECK]", {
+    query: "workspaceId+sessionId+createdAt",
+    docs: snapshot.size,
+  });
+
+  console.log("[FIRESTORE QUERY STATS]", {
+    docs: snapshot.size,
+    hasCursor: !!cursor,
+  });
+
+  const feedback = snapshot.docs.map(docToFeedback);
+  const lastVisibleDoc = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+  const hasMore = snapshot.size === pageSize;
+
+  return {
+    feedback,
+    nextCursor: lastVisibleDoc ? lastVisibleDoc.id : null,
+    hasMore,
+  };
+}
+
 /** Total count of feedback for a session (for sidebar display). */
 export async function getSessionFeedbackCountRepo(sessionId: string): Promise<number> {
   console.log("USING COLLECTION TYPE:", "collection");
@@ -739,18 +814,29 @@ export async function getUserFeedbackWithCommentsRepo(
  * Composite index required: feedback (workspaceId ASC, commentCount DESC).
  */
 export async function getWorkspaceFeedbackWithCommentsRepo(
-  workspaceId: string,
-  max: number = USER_FEEDBACK_ALL_LIMIT
+  args: {
+    workspaceId: string;
+    limit: number;
+    cursor?: string;
+  }
 ): Promise<Feedback[]> {
-  assertQueryLimit(max, "getWorkspaceFeedbackWithCommentsRepo");
+  const { workspaceId, limit: pageSize, cursor } = args;
+  assertQueryLimit(pageSize, "getWorkspaceFeedbackWithCommentsRepo");
   console.log("USING COLLECTION TYPE:", "collection");
   const coll = collection(db, "feedback");
+  const trimmedCursor = cursor?.trim();
+  const cursorSnap: DocumentSnapshot | null =
+    trimmedCursor && trimmedCursor.length > 0
+      ? await getDoc(doc(db, "feedback", trimmedCursor))
+      : null;
+
   const q = query(
     coll,
     where("workspaceId", "==", workspaceId),
     where("commentCount", ">", 0),
     orderBy("commentCount", "desc"),
-    limit(max)
+    ...(cursorSnap && cursorSnap.exists() ? [startAfter(cursorSnap)] : []),
+    limit(pageSize)
   );
   const start = Date.now();
   const snapshot = await getDocs(q);

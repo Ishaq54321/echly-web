@@ -84,7 +84,7 @@ export function DiscussionList({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    authFetch("/api/feedback?conversationsOnly=true&limit=100")
+    authFetch("/api/feedback?conversationsOnly=true&limit=20")
       .then((res) => {
         if (cancelled) return;
         if (!res.ok) throw new Error("Failed to load feedback");

@@ -5,6 +5,7 @@ import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive
 import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository";
 import { getWorkspaceEntitlements } from "@/lib/billing/getWorkspaceEntitlements";
 import { getWorkspacePlanState } from "@/lib/billing/getWorkspacePlanState";
+import { getCachedWorkspace } from "@/lib/server/cache/workspaceCache";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const { workspaceId, workspace } = await resolveWorkspaceForUser(user.uid);
+    const { workspaceId, workspace } = await getCachedWorkspace(user.uid, () => resolveWorkspaceForUser(user.uid));
 
     if (!workspace) {
       return NextResponse.json(SAFE_FALLBACK);
