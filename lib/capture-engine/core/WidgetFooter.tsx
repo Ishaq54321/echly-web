@@ -7,6 +7,8 @@ type WidgetFooterProps = {
   onAddFeedback: () => void;
   /** When set (extension mode), show only session actions (no "Capture feedback") */
   extensionMode?: boolean;
+  /** When set (dashboard), "Capture feedback" calls this to start capture (idle → focus_mode). */
+  startCapture?: () => void;
   onStartSession?: () => void;
   onOpenPreviousSession?: () => void;
   /** When true, Previous Sessions button shows "Opening..." and is disabled */
@@ -19,6 +21,7 @@ export default function WidgetFooter({
   isIdle,
   onAddFeedback,
   extensionMode = false,
+  startCapture,
   onStartSession,
   onOpenPreviousSession,
   openingPrevious = false,
@@ -27,6 +30,7 @@ export default function WidgetFooter({
 }: WidgetFooterProps) {
   const effectivelyDisabled = !isIdle || captureDisabled;
   const previousDisabled = effectivelyDisabled || openingPrevious;
+  const onCaptureClick = startCapture ?? onAddFeedback;
 
   if (extensionMode) {
     return (
@@ -58,7 +62,7 @@ export default function WidgetFooter({
     <div className="echly-add-insight-wrap">
       <button
         type="button"
-        onClick={effectivelyDisabled ? undefined : onAddFeedback}
+        onClick={effectivelyDisabled ? undefined : onCaptureClick}
         disabled={effectivelyDisabled}
         className={`echly-add-insight-btn ${effectivelyDisabled ? "echly-add-insight-btn--disabled" : ""}`}
         aria-label="Capture feedback"

@@ -17,6 +17,7 @@ import { DragSessionProvider, useDragSession } from "@/components/dashboard/cont
 import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
 import { DragGhostChip } from "@/components/dashboard/DragGhostChip";
 import { UpgradeModal } from "@/components/billing/UpgradeModal";
+import DashboardCaptureHost from "./components/DashboardCaptureHost";
 
 export interface DashboardFolder {
   id: string;
@@ -61,6 +62,7 @@ function DashboardContent() {
   const [moveToFolderSessionId, setMoveToFolderSessionId] = useState<string | null>(null);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [upgradePayload, setUpgradePayload] = useState<{ message: string; upgradePlan: string | null } | null>(null);
+  const [captureOpen, setCaptureOpen] = useState(false);
 
   const loadFolders = async () => {
     setFoldersLoading(true);
@@ -167,12 +169,7 @@ function DashboardContent() {
           onTabChange={setViewMode}
           sessionCount={sessions.length}
           onNewFolder={createFolder}
-          onNewSession={() =>
-            handleCreateSession((p) => {
-              setUpgradePayload(p);
-              setUpgradeModalOpen(true);
-            })
-          }
+          onNewSession={() => setCaptureOpen(true)}
         />
 
         <main className="flex-1">
@@ -281,6 +278,11 @@ function DashboardContent() {
         }}
         message={upgradePayload?.message}
         upgradePlan={upgradePayload?.upgradePlan ?? null}
+      />
+
+      <DashboardCaptureHost
+        open={captureOpen}
+        onClose={() => setCaptureOpen(false)}
       />
 
       <DragGhostChip

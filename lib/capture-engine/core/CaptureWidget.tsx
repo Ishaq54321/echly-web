@@ -49,6 +49,7 @@ export default function CaptureWidget({
   onSessionModeEnd,
   onSessionActivity,
   captureMode = "voice",
+  onCaptureModeChange,
   captureRootParent,
   isProcessingFeedback = false,
   feedbackJobs,
@@ -188,8 +189,8 @@ export default function CaptureWidget({
 
   const handlePreviousSessions = React.useCallback(() => {
     if (openingPrevious) return;
-    setOpeningPrevious(true);
     setResumeModalOpen(true);
+    setOpeningPrevious(true);
     if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
       chrome.runtime.sendMessage({ type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
     }
@@ -203,6 +204,8 @@ export default function CaptureWidget({
   function setMode(mode: "voice" | "text") {
     if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
       chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode });
+    } else {
+      onCaptureModeChange?.(mode);
     }
   }
 
@@ -230,6 +233,7 @@ export default function CaptureWidget({
       {captureRootEl && (
           <CaptureLayer
             captureRoot={captureRootEl}
+            captureRootParent={captureRootParent ?? undefined}
             extensionMode={extensionMode}
             state={state.state}
             getFullTabImage={handlers.getFullTabImage}
@@ -325,22 +329,22 @@ export default function CaptureWidget({
             <div className="echly-sidebar-surface" data-theme={theme}>
               <CaptureHeader
                 onClose={() => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false))}
-                showSessionTitle={!sessionLimitReached && (hasTickets || sessionModeActive || sessionLoading)}
+                showSessionTitle={!(sessionLimitReached && !sessionId) && (hasTickets || sessionModeActive || sessionLoading)}
                 sessionTitle={sessionTitleProp ?? sessionTitle ?? "Untitled Session"}
                 onSessionTitleChange={onSessionTitleChangeProp ?? setSessionTitle}
                 openTicketCount={openTicketsCount}
                 title={undefined}
                 summary={summary}
-                showHomeButton={extensionMode && !sessionLimitReached}
+                showHomeButton={extensionMode && !(sessionLimitReached && !sessionId)}
                 theme={theme}
-                onThemeToggle={sessionLimitReached ? undefined : onThemeToggle}
+                onThemeToggle={sessionLimitReached && !sessionId ? undefined : onThemeToggle}
                 captureMode={captureMode}
-                onCaptureModeToggle={sessionLimitReached ? undefined : (extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : undefined)}
+                onCaptureModeToggle={sessionLimitReached && !sessionId ? undefined : (extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : undefined)}
                 onShowCommandScreen={() => setShowCommandScreen(true)}
-                showOnlyClose={Boolean(sessionLimitReached)}
+                showOnlyClose={Boolean(sessionLimitReached && !sessionId)}
               />
 
-              {sessionLimitReached ? (
+              {sessionLimitReached && !sessionId ? (
                 <div className="echly-sidebar-body echly-upgrade-card-body">
                   <SessionLimitUpgradeView
                     limitMessage={sessionLimitReached.message}
@@ -467,18 +471,21 @@ export default function CaptureWidget({
               </div>
               )}
 
-              {!sessionLimitReached && showHomeScreen && (
+              {!(sessionLimitReached && !sessionId) && showHomeScreen && (
                 <>
                   <div className="echly-command-divider" aria-hidden />
                   <WidgetFooter
                   isIdle={true}
                   onAddFeedback={handlers.handleAddFeedback}
+                  startCapture={handlers.startCapture}
                   extensionMode={extensionMode}
                   onStartSession={
                       extensionMode
                         ? () => {
                             if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
                               chrome.runtime.sendMessage({ type: "ECHLY_START_SESSION" });
+                            } else {
+                              handlers.startSession();
                             }
                           }
                         : handlers.startSession

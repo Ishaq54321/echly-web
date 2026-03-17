@@ -404,6 +404,32 @@ button[aria-disabled="true"],
   }
 }
 
+/* Extension CTA tray: fade + slide up entrance */
+.animate-extension-tray-in {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: extension-tray-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes extension-tray-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-extension-tray-out {
+  animation: extension-tray-out 0.2s ease-in forwards;
+}
+@keyframes extension-tray-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 /* Session page premium loader: subtle bar pulse */
 @keyframes session-loader-pulse {
   0%, 100% { opacity: 0.4; }

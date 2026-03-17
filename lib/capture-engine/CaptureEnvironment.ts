@@ -16,22 +16,22 @@ export interface CaptureEnvironment {
   notifyFeedbackCreated(ticket: { id: string; title: string; actionSteps?: string[]; type?: string }): void;
 
   /** Set the active session (e.g. notify background). */
-  setActiveSession(sessionId: string): void;
+  setActiveSession(sessionId: string): void | Promise<void>;
 
   /** Start session mode (e.g. enable overlay in all tabs). */
-  startSessionMode(): void;
+  startSessionMode(): void | Promise<void>;
 
   /** Pause session mode. */
-  pauseSessionMode(): void;
+  pauseSessionMode(): void | Promise<void>;
 
   /** Resume session mode. */
-  resumeSessionMode(): void;
+  resumeSessionMode(): void | Promise<void>;
 
   /** End session mode (e.g. disable overlay, optionally open dashboard). */
-  endSessionMode(): void;
+  endSessionMode(): void | Promise<void>;
 
   /** Report user activity (e.g. reset idle timeout). */
-  reportActivity(): void;
+  reportActivity(): void | Promise<void>;
 
   /** Expand the capture widget. */
   expandWidget(): void;

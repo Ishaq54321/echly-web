@@ -996,37 +996,85 @@ export function useCaptureWidget({
 
   /* ================= CAPTURE ================= */
 
-  const getFullTabImage = useCallback((): Promise<string | null> => {
-    if (environment) {
-      return captureTabWithoutOverlay(() => environment.captureTabScreenshot());
-    }
-    if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-      return captureTabWithoutOverlay(
-        () =>
-          new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage(
-              { type: "CAPTURE_TAB" },
-              (response: { success?: boolean; screenshot?: string } | undefined) => {
-                if (!response || !response.success) {
-                  reject(new Error("Capture failed"));
-                } else {
-                  resolve(response.screenshot ?? null);
+  const getFullTabImage = useCallback(async (): Promise<string | null> => {
+    console.log("=== [ECHLY DEBUG] SCREENSHOT START ===");
+    let screenshot: string | null = null;
+    try {
+      if (environment?.captureTabScreenshot) {
+        console.log("=== [ECHLY DEBUG] CALLING ENV SCREENSHOT ===");
+        console.log("Environment exists:", !!environment);
+        console.log("Function exists:", !!environment?.captureTabScreenshot);
+        const hidden = hideEchlyUI();
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+        try {
+          screenshot = await environment.captureTabScreenshot?.() ?? null;
+        } catch (err) {
+          console.warn("Screenshot error ignored:", err);
+          screenshot = null;
+        }
+        restoreEchlyUI(hidden);
+        console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT ===", {
+          exists: !!screenshot,
+          length: screenshot?.length,
+        });
+        console.log("=== [ECHLY DEBUG] CONTINUING TO FEEDBACK UI ===");
+      } else if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+        screenshot = await captureTabWithoutOverlay(
+          () =>
+            new Promise((resolve, reject) => {
+              chrome.runtime.sendMessage(
+                { type: "CAPTURE_TAB" },
+                (response: { success?: boolean; screenshot?: string } | undefined) => {
+                  if (!response || !response.success) {
+                    reject(new Error("Capture failed"));
+                  } else {
+                    resolve(response.screenshot ?? null);
+                  }
                 }
-              }
-            );
-          })
-      );
+              );
+            })
+        );
+      }
+    } catch (err) {
+      console.warn("Screenshot error ignored:", err);
+      screenshot = null;
     }
-    return Promise.resolve(null);
+    // IMPORTANT: DO NOT BLOCK FLOW — continue regardless of screenshot
+    console.log("Screenshot captured:", !!screenshot);
+    console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT (getFullTabImage exit) ===", {
+      exists: !!screenshot,
+      length: screenshot?.length,
+    });
+    return screenshot;
   }, [environment]);
 
   const captureScreenshot = useCallback(async (): Promise<string | null> => {
-    if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-      return getFullTabImage();
+    console.log("=== [ECHLY DEBUG] SCREENSHOT START (captureScreenshot) ===");
+    let screenshot: string | null = null;
+    try {
+      if (environment?.captureTabScreenshot) {
+        screenshot = await getFullTabImage();
+        console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT (after getFullTabImage) ===", {
+          exists: !!screenshot,
+          length: screenshot?.length,
+        });
+        console.log("=== [ECHLY DEBUG] CONTINUING TO FEEDBACK UI ===");
+      } else if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+        screenshot = await getFullTabImage();
+      } else {
+        const { captureScreenshot: webCapture } = await import("@/lib/capture");
+        screenshot = await webCapture();
+      }
+    } catch (err) {
+      console.warn("Screenshot error ignored:", err);
+      screenshot = null;
     }
-    const { captureScreenshot: webCapture } = await import("@/lib/capture");
-    return webCapture();
-  }, [getFullTabImage]);
+    // IMPORTANT: DO NOT BLOCK FLOW — continue regardless of screenshot
+    console.log("Screenshot captured:", !!screenshot);
+    return screenshot ?? null;
+  }, [environment, getFullTabImage]);
 
   const handleRegionSelectStart = useCallback(() => {
     setState("region_selecting");
@@ -1188,14 +1236,14 @@ export function useCaptureWidget({
     finalizeEnd();
   }, [clearSessionWaitTimeout, endPending, globalSessionModeActive, onSessionModeEnd]);
 
-  /** Root lifecycle: ONLY depends on globalSessionModeActive. Single source of truth from background. */
+  /** Root lifecycle: extension uses globalSessionModeActive; dashboard creates root in startCapture, never removes here. */
   useEffect(() => {
     if (globalSessionModeActive) {
       createCaptureRoot();
-    } else {
+    } else if (extensionMode) {
       removeCaptureRoot();
     }
-  }, [globalSessionModeActive, createCaptureRoot, removeCaptureRoot]);
+  }, [globalSessionModeActive, extensionMode, createCaptureRoot, removeCaptureRoot]);
 
   /**
    * Sync session mode from global state (ECHLY_GLOBAL_STATE).
@@ -1281,38 +1329,54 @@ export function useCaptureWidget({
 
   const handleSessionElementClicked = useCallback(
     async (element: Element) => {
+      console.log("=== [ECHLY DEBUG] CLICK DETECTED ===");
+      console.log("State:", {
+        sessionMode,
+        sessionPaused,
+        sessionFeedbackPending,
+      });
       if (sessionFeedbackPending && !captureRootRef.current) {
         if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionElementClicked (no root)" });
         setPending(null);
         return;
       }
+      console.log("=== [ECHLY DEBUG] BLOCK CHECK ===", { getFullTabImage: !!getFullTabImage, sessionFeedbackPending });
       if (!getFullTabImage || sessionFeedbackPending != null) return;
       logSession("element clicked");
       playShutterSound();
       let fullImage: string | null = null;
       try {
         fullImage = await getFullTabImage();
-      } catch {
-        return;
+      } catch (err) {
+        console.warn("Screenshot error ignored:", err);
+        fullImage = null;
       }
-      if (!fullImage) return;
-      const containerRect = detectVisualContainer(element);
-      const safeRect = clampRect({
-        x: containerRect.x,
-        y: containerRect.y,
-        w: containerRect.width,
-        h: containerRect.height,
+      console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT ===", {
+        exists: !!fullImage,
+        length: fullImage?.length,
       });
-      if (ECHLY_DEBUG) {
-        console.log("ECHLY ELEMENT DETECTED", element);
-        console.log("ECHLY CONTAINER RECT", safeRect);
-      }
-      let cropped: string;
-      try {
-        const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-        cropped = await cropImageToRegion(fullImage, safeRect, dpr);
-      } catch {
-        return;
+      console.log("=== [ECHLY DEBUG] CONTINUING TO FEEDBACK UI ===");
+      console.log("Screenshot captured:", !!fullImage);
+      let screenshot: string | undefined = undefined;
+      console.log("=== [ECHLY DEBUG] BLOCK CHECK ===", fullImage);
+      if (fullImage) {
+        const containerRect = detectVisualContainer(element);
+        const safeRect = clampRect({
+          x: containerRect.x,
+          y: containerRect.y,
+          w: containerRect.width,
+          h: containerRect.height,
+        });
+        if (ECHLY_DEBUG) {
+          console.log("ECHLY ELEMENT DETECTED", element);
+          console.log("ECHLY CONTAINER RECT", safeRect);
+        }
+        try {
+          const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+          screenshot = await cropImageToRegion(fullImage, safeRect, dpr);
+        } catch (err) {
+          console.warn("Crop failed — continuing without screenshot", err);
+        }
       }
       const context = buildCaptureContext(window, element);
       const rect = element.getBoundingClientRect();
@@ -1325,9 +1389,9 @@ export function useCaptureWidget({
         height: rect.height,
       };
       lastSessionClickedElementRef.current = element instanceof HTMLElement ? element : null;
-      if (ECHLY_DEBUG) console.log("ECHLY pending SET", { screenshot: cropped, context });
+      if (ECHLY_DEBUG) console.log("ECHLY pending SET", { screenshot: !!screenshot, context });
       sessionFeedbackPendingRef.current = true;
-      setPending({ screenshot: cropped, context, elementRect });
+      setPending({ screenshot: screenshot || undefined, context, elementRect });
       onSessionActivity?.();
     },
     [getFullTabImage, sessionFeedbackPending, onSessionActivity]
@@ -1377,7 +1441,7 @@ export function useCaptureWidget({
       if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", transcript);
       try {
         pipelineActiveRef.current = true;
-        onComplete(transcript, pending.screenshot, {
+        onComplete(transcript, pending.screenshot ?? null, {
           onSuccess: (ticket) => {
             pipelineActiveRef.current = false;
             setSessionFeedbackSaving(false);
@@ -1433,7 +1497,7 @@ export function useCaptureWidget({
     const id = generateRecordingId();
     const newRecording: Recording = {
       id,
-      screenshot: pending.screenshot,
+      screenshot: pending.screenshot ?? null,
       transcript: "",
       structuredOutput: null,
       context: pending.context ?? null,
@@ -1443,6 +1507,17 @@ export function useCaptureWidget({
     setActiveRecordingId(id);
     startListening();
   }, [sessionFeedbackPending, startListening]);
+
+  /** Starts capture flow: idle → focus_mode. Used by dashboard "Capture feedback"; region overlay then handles selection. */
+  const startCapture = useCallback(() => {
+    if (stateRef.current !== "idle") return;
+    setErrorMessage(null);
+    recognitionRef.current?.stop();
+    setWidgetOpenBeforeCapture(isOpen);
+    setIsOpenState(false);
+    createCaptureRoot();
+    setState("focus_mode");
+  }, [isOpen, createCaptureRoot]);
 
   const handleAddFeedback = useCallback(async () => {
     if (stateRef.current !== "idle") return;
@@ -1455,36 +1530,31 @@ export function useCaptureWidget({
     if (extensionMode) {
       return;
     }
+    let screenshot: string | null = null;
     try {
-      const image = await captureScreenshot();
-      if (!image) {
-        handleCancelCapture();
-        return;
-      }
-      const id = generateRecordingId();
-      const newRecording: Recording = {
-        id,
-        screenshot: image,
-        transcript: "",
-        structuredOutput: null,
-        createdAt: Date.now(),
-      };
-      setRecordings((prev) => [...prev, newRecording]);
-      setActiveRecordingId(id);
-      startListening();
+      screenshot = await captureScreenshot();
     } catch (err) {
-      console.error(err);
-      setErrorMessage("Screen capture failed.");
-      setState("error");
-      handleCancelCapture();
+      console.warn("Screenshot error ignored:", err);
+      screenshot = null;
     }
+    console.log("Screenshot captured:", !!screenshot);
+    const id = generateRecordingId();
+    const newRecording: Recording = {
+      id,
+      screenshot: screenshot ?? null,
+      transcript: "",
+      structuredOutput: null,
+      createdAt: Date.now(),
+    };
+    setRecordings((prev) => [...prev, newRecording]);
+    setActiveRecordingId(id);
+    startListening();
   }, [
     extensionMode,
     isOpen,
     captureScreenshot,
     startListening,
     createCaptureRoot,
-    handleCancelCapture,
   ]);
 
   const handlers = useMemo(
@@ -1505,6 +1575,7 @@ export function useCaptureWidget({
       setExpandedId,
       setEditedTitle,
       setEditedSteps,
+      startCapture,
       handleAddFeedback,
       handleRegionCaptured,
       handleRegionSelectStart,
@@ -1536,6 +1607,7 @@ export function useCaptureWidget({
       setExpandedId,
       setEditedTitle,
       setEditedSteps,
+      startCapture,
       handleAddFeedback,
       handleRegionCaptured,
       handleRegionSelectStart,

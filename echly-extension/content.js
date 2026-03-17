@@ -36480,7 +36480,7 @@
         style: {
           position: "fixed",
           inset: 0,
-          zIndex: 2147483647,
+          zIndex: 999999,
           userSelect: "none"
         }
       },
@@ -36494,7 +36494,7 @@
             background: hasSelection ? "transparent" : "rgba(0,0,0,0.4)",
             pointerEvents: releasedRect ? "none" : "auto",
             cursor: "crosshair",
-            zIndex: 2147483646,
+            zIndex: 999998,
             transition: `background 180ms ${ECHLY_EASE}`
           },
           onMouseDown,
@@ -36517,7 +36517,7 @@
             left: "50%",
             top: 24,
             transform: "translateX(-50%)",
-            zIndex: 2147483647,
+            zIndex: 999999,
             pointerEvents: "none",
             opacity: releasedRect ? 0 : 1,
             transition: `opacity 180ms ${ECHLY_EASE}`
@@ -36538,7 +36538,7 @@
             border: `2px solid ${flashBorder ? "#FFFFFF" : "#155DFC"}`,
             boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)",
             pointerEvents: "none",
-            zIndex: 2147483646,
+            zIndex: 999998,
             borderRadius: 14,
             transition: flashBorder ? "none" : `border-color 150ms ${ECHLY_EASE}`
           }
@@ -36560,7 +36560,7 @@
             WebkitBackdropFilter: "blur(20px)",
             border: "1px solid rgba(255,255,255,0.08)",
             boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-            zIndex: 2147483647,
+            zIndex: 999999,
             animation: `echly-confirm-bar-in 220ms ${ECHLY_EASE} forwards`
           }
         },
@@ -37607,35 +37607,81 @@
       },
       [onUpdate]
     );
-    const getFullTabImage = (0, import_react4.useCallback)(() => {
-      if (environment) {
-        return captureTabWithoutOverlay(() => environment.captureTabScreenshot());
-      }
-      if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-        return captureTabWithoutOverlay(
-          () => new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage(
-              { type: "CAPTURE_TAB" },
-              (response) => {
-                if (!response || !response.success) {
-                  reject(new Error("Capture failed"));
-                } else {
-                  resolve(response.screenshot ?? null);
+    const getFullTabImage = (0, import_react4.useCallback)(async () => {
+      console.log("=== [ECHLY DEBUG] SCREENSHOT START ===");
+      let screenshot = null;
+      try {
+        if (environment?.captureTabScreenshot) {
+          console.log("=== [ECHLY DEBUG] CALLING ENV SCREENSHOT ===");
+          console.log("Environment exists:", !!environment);
+          console.log("Function exists:", !!environment?.captureTabScreenshot);
+          const hidden = hideEchlyUI();
+          await new Promise(
+            (resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          );
+          try {
+            screenshot = await environment.captureTabScreenshot?.() ?? null;
+          } catch (err) {
+            console.warn("Screenshot error ignored:", err);
+            screenshot = null;
+          }
+          restoreEchlyUI(hidden);
+          console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT ===", {
+            exists: !!screenshot,
+            length: screenshot?.length
+          });
+          console.log("=== [ECHLY DEBUG] CONTINUING TO FEEDBACK UI ===");
+        } else if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+          screenshot = await captureTabWithoutOverlay(
+            () => new Promise((resolve, reject) => {
+              chrome.runtime.sendMessage(
+                { type: "CAPTURE_TAB" },
+                (response) => {
+                  if (!response || !response.success) {
+                    reject(new Error("Capture failed"));
+                  } else {
+                    resolve(response.screenshot ?? null);
+                  }
                 }
-              }
-            );
-          })
-        );
+              );
+            })
+          );
+        }
+      } catch (err) {
+        console.warn("Screenshot error ignored:", err);
+        screenshot = null;
       }
-      return Promise.resolve(null);
+      console.log("Screenshot captured:", !!screenshot);
+      console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT (getFullTabImage exit) ===", {
+        exists: !!screenshot,
+        length: screenshot?.length
+      });
+      return screenshot;
     }, [environment]);
     const captureScreenshot2 = (0, import_react4.useCallback)(async () => {
-      if (typeof chrome !== "undefined" && chrome.runtime?.id) {
-        return getFullTabImage();
+      console.log("=== [ECHLY DEBUG] SCREENSHOT START (captureScreenshot) ===");
+      let screenshot = null;
+      try {
+        if (environment?.captureTabScreenshot) {
+          screenshot = await getFullTabImage();
+          console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT (after getFullTabImage) ===", {
+            exists: !!screenshot,
+            length: screenshot?.length
+          });
+          console.log("=== [ECHLY DEBUG] CONTINUING TO FEEDBACK UI ===");
+        } else if (typeof chrome !== "undefined" && chrome.runtime?.id) {
+          screenshot = await getFullTabImage();
+        } else {
+          const { captureScreenshot: webCapture } = await Promise.resolve().then(() => (init_capture(), capture_exports));
+          screenshot = await webCapture();
+        }
+      } catch (err) {
+        console.warn("Screenshot error ignored:", err);
+        screenshot = null;
       }
-      const { captureScreenshot: webCapture } = await Promise.resolve().then(() => (init_capture(), capture_exports));
-      return webCapture();
-    }, [getFullTabImage]);
+      console.log("Screenshot captured:", !!screenshot);
+      return screenshot ?? null;
+    }, [environment, getFullTabImage]);
     const handleRegionSelectStart = (0, import_react4.useCallback)(() => {
       setState("region_selecting");
     }, []);
@@ -37777,10 +37823,10 @@
     (0, import_react4.useEffect)(() => {
       if (globalSessionModeActive) {
         createCaptureRoot();
-      } else {
+      } else if (extensionMode) {
         removeCaptureRoot();
       }
-    }, [globalSessionModeActive, createCaptureRoot, removeCaptureRoot]);
+    }, [globalSessionModeActive, extensionMode, createCaptureRoot, removeCaptureRoot]);
     (0, import_react4.useEffect)(() => {
       if (!extensionMode || globalSessionModeActive === void 0) return;
       echlyLog("SESSION", "global sync", { active: globalSessionModeActive, paused: globalSessionPaused });
@@ -37853,38 +37899,54 @@
     }, [extensionMode, loadSessionWithPointers, onSessionLoaded]);
     const handleSessionElementClicked = (0, import_react4.useCallback)(
       async (element) => {
+        console.log("=== [ECHLY DEBUG] CLICK DETECTED ===");
+        console.log("State:", {
+          sessionMode,
+          sessionPaused,
+          sessionFeedbackPending
+        });
         if (sessionFeedbackPending && !captureRootRef.current) {
           if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionElementClicked (no root)" });
           setPending(null);
           return;
         }
+        console.log("=== [ECHLY DEBUG] BLOCK CHECK ===", { getFullTabImage: !!getFullTabImage, sessionFeedbackPending });
         if (!getFullTabImage || sessionFeedbackPending != null) return;
         logSession("element clicked");
         playShutterSound();
         let fullImage = null;
         try {
           fullImage = await getFullTabImage();
-        } catch {
-          return;
+        } catch (err) {
+          console.warn("Screenshot error ignored:", err);
+          fullImage = null;
         }
-        if (!fullImage) return;
-        const containerRect = detectVisualContainer(element);
-        const safeRect = clampRect({
-          x: containerRect.x,
-          y: containerRect.y,
-          w: containerRect.width,
-          h: containerRect.height
+        console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT ===", {
+          exists: !!fullImage,
+          length: fullImage?.length
         });
-        if (ECHLY_DEBUG) {
-          console.log("ECHLY ELEMENT DETECTED", element);
-          console.log("ECHLY CONTAINER RECT", safeRect);
-        }
-        let cropped;
-        try {
-          const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-          cropped = await cropImageToRegion(fullImage, safeRect, dpr);
-        } catch {
-          return;
+        console.log("=== [ECHLY DEBUG] CONTINUING TO FEEDBACK UI ===");
+        console.log("Screenshot captured:", !!fullImage);
+        let screenshot = void 0;
+        console.log("=== [ECHLY DEBUG] BLOCK CHECK ===", fullImage);
+        if (fullImage) {
+          const containerRect = detectVisualContainer(element);
+          const safeRect = clampRect({
+            x: containerRect.x,
+            y: containerRect.y,
+            w: containerRect.width,
+            h: containerRect.height
+          });
+          if (ECHLY_DEBUG) {
+            console.log("ECHLY ELEMENT DETECTED", element);
+            console.log("ECHLY CONTAINER RECT", safeRect);
+          }
+          try {
+            const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+            screenshot = await cropImageToRegion(fullImage, safeRect, dpr);
+          } catch (err) {
+            console.warn("Crop failed \u2014 continuing without screenshot", err);
+          }
         }
         const context = buildCaptureContext(window, element);
         const rect = element.getBoundingClientRect();
@@ -37897,9 +37959,9 @@
           height: rect.height
         };
         lastSessionClickedElementRef.current = element instanceof HTMLElement ? element : null;
-        if (ECHLY_DEBUG) console.log("ECHLY pending SET", { screenshot: cropped, context });
+        if (ECHLY_DEBUG) console.log("ECHLY pending SET", { screenshot: !!screenshot, context });
         sessionFeedbackPendingRef.current = true;
-        setPending({ screenshot: cropped, context, elementRect });
+        setPending({ screenshot: screenshot || void 0, context, elementRect });
         onSessionActivity?.();
       },
       [getFullTabImage, sessionFeedbackPending, onSessionActivity]
@@ -37943,7 +38005,7 @@
         if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", transcript);
         try {
           pipelineActiveRef.current = true;
-          onComplete(transcript, pending.screenshot, {
+          onComplete(transcript, pending.screenshot ?? null, {
             onSuccess: (ticket) => {
               pipelineActiveRef.current = false;
               setSessionFeedbackSaving(false);
@@ -37997,7 +38059,7 @@
       const id = generateRecordingId();
       const newRecording = {
         id,
-        screenshot: pending.screenshot,
+        screenshot: pending.screenshot ?? null,
         transcript: "",
         structuredOutput: null,
         context: pending.context ?? null,
@@ -38007,6 +38069,15 @@
       setActiveRecordingId(id);
       startListening();
     }, [sessionFeedbackPending, startListening]);
+    const startCapture = (0, import_react4.useCallback)(() => {
+      if (stateRef.current !== "idle") return;
+      setErrorMessage(null);
+      recognitionRef.current?.stop();
+      setWidgetOpenBeforeCapture(isOpen);
+      setIsOpenState(false);
+      createCaptureRoot();
+      setState("focus_mode");
+    }, [isOpen, createCaptureRoot]);
     const handleAddFeedback = (0, import_react4.useCallback)(async () => {
       if (stateRef.current !== "idle") return;
       setErrorMessage(null);
@@ -38018,36 +38089,31 @@
       if (extensionMode) {
         return;
       }
+      let screenshot = null;
       try {
-        const image = await captureScreenshot2();
-        if (!image) {
-          handleCancelCapture();
-          return;
-        }
-        const id = generateRecordingId();
-        const newRecording = {
-          id,
-          screenshot: image,
-          transcript: "",
-          structuredOutput: null,
-          createdAt: Date.now()
-        };
-        setRecordings((prev) => [...prev, newRecording]);
-        setActiveRecordingId(id);
-        startListening();
+        screenshot = await captureScreenshot2();
       } catch (err) {
-        console.error(err);
-        setErrorMessage("Screen capture failed.");
-        setState("error");
-        handleCancelCapture();
+        console.warn("Screenshot error ignored:", err);
+        screenshot = null;
       }
+      console.log("Screenshot captured:", !!screenshot);
+      const id = generateRecordingId();
+      const newRecording = {
+        id,
+        screenshot: screenshot ?? null,
+        transcript: "",
+        structuredOutput: null,
+        createdAt: Date.now()
+      };
+      setRecordings((prev) => [...prev, newRecording]);
+      setActiveRecordingId(id);
+      startListening();
     }, [
       extensionMode,
       isOpen,
       captureScreenshot2,
       startListening,
-      createCaptureRoot,
-      handleCancelCapture
+      createCaptureRoot
     ]);
     const handlers = (0, import_react4.useMemo)(
       () => ({
@@ -38067,6 +38133,7 @@
         setExpandedId,
         setEditedTitle,
         setEditedSteps,
+        startCapture,
         handleAddFeedback,
         handleRegionCaptured,
         handleRegionSelectStart,
@@ -38098,6 +38165,7 @@
         setExpandedId,
         setEditedTitle,
         setEditedSteps,
+        startCapture,
         handleAddFeedback,
         handleRegionCaptured,
         handleRegionSelectStart,
@@ -38465,6 +38533,7 @@
     isIdle,
     onAddFeedback,
     extensionMode = false,
+    startCapture,
     onStartSession,
     onOpenPreviousSession,
     openingPrevious = false,
@@ -38473,6 +38542,7 @@
   }) {
     const effectivelyDisabled = !isIdle || captureDisabled;
     const previousDisabled = effectivelyDisabled || openingPrevious;
+    const onCaptureClick = startCapture ?? onAddFeedback;
     if (extensionMode) {
       return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "echly-command-actions", children: [
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
@@ -38504,7 +38574,7 @@
       "button",
       {
         type: "button",
-        onClick: effectivelyDisabled ? void 0 : onAddFeedback,
+        onClick: effectivelyDisabled ? void 0 : onCaptureClick,
         disabled: effectivelyDisabled,
         className: `echly-add-insight-btn ${effectivelyDisabled ? "echly-add-insight-btn--disabled" : ""}`,
         "aria-label": "Capture feedback",
@@ -39235,7 +39305,7 @@
       VoiceCapturePanel,
       {
         captureRoot,
-        screenshot: sessionFeedbackPending.screenshot,
+        screenshot: sessionFeedbackPending.screenshot ?? void 0,
         audioLevel: listeningAudioLevel,
         isListening: state === "voice_listening",
         onFinish: onDoneVoice,
@@ -39245,7 +39315,7 @@
     ), sessionFeedbackPending && captureMode === "text" && /* @__PURE__ */ import_react12.default.createElement(
       TextFeedbackPanel,
       {
-        screenshot: sessionFeedbackPending.screenshot,
+        screenshot: sessionFeedbackPending.screenshot ?? void 0,
         onSubmit: onSaveText,
         onCancel
       }
@@ -39257,6 +39327,7 @@
   var import_react_dom3 = __toESM(require_react_dom());
   function CaptureLayer({
     captureRoot,
+    captureRootParent,
     extensionMode,
     state,
     getFullTabImage,
@@ -39285,7 +39356,7 @@
   }) {
     if (extensionMode && (!sessionMode || !sessionIdProp)) return null;
     const showSessionOverlay = sessionMode && extensionMode && !!globalSessionModeActive && !!sessionIdProp;
-    const showRegionOverlay = !showSessionOverlay && extensionMode && (state === "focus_mode" || state === "region_selecting");
+    const showRegionOverlay = !showSessionOverlay && (state === "focus_mode" || state === "region_selecting");
     const showDimOverlay = !showSessionOverlay && !showRegionOverlay && (state === "focus_mode" || state === "region_selecting");
     const captureContent = /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
       showSessionOverlay && onSessionElementClicked && onSessionPause && onSessionResume && onSessionEnd && onSessionRecordVoice && onSessionDoneVoice && onSessionSaveText && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
@@ -39321,7 +39392,7 @@
             background: "rgba(0,0,0,0.08)",
             pointerEvents: "auto",
             cursor: "crosshair",
-            zIndex: 2147483645
+            zIndex: 999999
           },
           "aria-hidden": true
         }
@@ -39336,7 +39407,8 @@
         }
       )
     ] });
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_jsx_runtime7.Fragment, { children: (0, import_react_dom3.createPortal)(captureContent, captureRoot) });
+    const portalTarget = captureRootParent ?? captureRoot;
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_jsx_runtime7.Fragment, { children: (0, import_react_dom3.createPortal)(captureContent, portalTarget) });
   }
 
   // lib/capture-engine/core/ResumeSessionModal.tsx
@@ -39389,6 +39461,11 @@
     const [filter, setFilter] = (0, import_react14.useState)("all");
     const [loginRequired, setLoginRequired] = (0, import_react14.useState)(false);
     const isLight = theme === "light";
+    (0, import_react14.useLayoutEffect)(() => {
+      if (open) {
+        setLoading(true);
+      }
+    }, [open]);
     (0, import_react14.useEffect)(() => {
       if (!open) return;
       setSearch("");
@@ -39396,7 +39473,6 @@
       setError(null);
       setLoginRequired(false);
       if (checkAuth) {
-        setLoading(true);
         checkAuth().then((valid) => {
           if (!valid) {
             setLoginRequired(true);
@@ -39409,7 +39485,6 @@
           });
         }).catch((_err) => setLoginRequired(true)).finally(() => setLoading(false));
       } else {
-        setLoading(true);
         fetchSessions().then((list) => {
           if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", list);
           setSessions(list);
@@ -39766,9 +39841,7 @@
     onUpgrade
   }) {
     const description = limitMessage?.trim() || "Your current plan allows a limited number of sessions.";
-    const imageSrc = chrome.runtime.getURL(
-      "assets/feedback-tray-session-limit.png"
-    );
+    const imageSrc = typeof chrome !== "undefined" && chrome.runtime?.getURL ? chrome.runtime.getURL("assets/feedback-tray-session-limit.png") : "/feedback-tray-session-limit.png";
     return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
       "div",
       {
@@ -39894,6 +39967,7 @@
     onSessionModeEnd,
     onSessionActivity,
     captureMode = "voice",
+    onCaptureModeChange,
     captureRootParent,
     isProcessingFeedback = false,
     feedbackJobs,
@@ -40011,8 +40085,8 @@
     }, [handlers, widgetToggleRef]);
     const handlePreviousSessions = import_react17.default.useCallback(() => {
       if (openingPrevious) return;
-      setOpeningPrevious(true);
       setResumeModalOpen(true);
+      setOpeningPrevious(true);
       if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
         chrome.runtime.sendMessage({ type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
       }
@@ -40023,6 +40097,8 @@
     function setMode(mode) {
       if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
         chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode });
+      } else {
+        onCaptureModeChange?.(mode);
       }
     }
     return /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, extensionMode && fetchSessions && onPreviousSessionSelect && /* @__PURE__ */ import_react17.default.createElement(
@@ -40047,6 +40123,7 @@
       CaptureLayer,
       {
         captureRoot: captureRootEl,
+        captureRootParent: captureRootParent ?? void 0,
         extensionMode,
         state: state.state,
         getFullTabImage: handlers.getFullTabImage,
@@ -40131,21 +40208,21 @@
         CaptureHeader,
         {
           onClose: () => onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false),
-          showSessionTitle: !sessionLimitReached && (hasTickets || sessionModeActive || sessionLoading),
+          showSessionTitle: !(sessionLimitReached && !sessionId) && (hasTickets || sessionModeActive || sessionLoading),
           sessionTitle: sessionTitleProp ?? sessionTitle ?? "Untitled Session",
           onSessionTitleChange: onSessionTitleChangeProp ?? setSessionTitle,
           openTicketCount: openTicketsCount,
           title: void 0,
           summary,
-          showHomeButton: extensionMode && !sessionLimitReached,
+          showHomeButton: extensionMode && !(sessionLimitReached && !sessionId),
           theme,
-          onThemeToggle: sessionLimitReached ? void 0 : onThemeToggle,
+          onThemeToggle: sessionLimitReached && !sessionId ? void 0 : onThemeToggle,
           captureMode,
-          onCaptureModeToggle: sessionLimitReached ? void 0 : extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : void 0,
+          onCaptureModeToggle: sessionLimitReached && !sessionId ? void 0 : extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : void 0,
           onShowCommandScreen: () => setShowCommandScreen(true),
-          showOnlyClose: Boolean(sessionLimitReached)
+          showOnlyClose: Boolean(sessionLimitReached && !sessionId)
         }
-      ), sessionLimitReached ? /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-sidebar-body echly-upgrade-card-body" }, /* @__PURE__ */ import_react17.default.createElement(
+      ), sessionLimitReached && !sessionId ? /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-sidebar-body echly-upgrade-card-body" }, /* @__PURE__ */ import_react17.default.createElement(
         SessionLimitUpgradeView,
         {
           limitMessage: sessionLimitReached.message,
@@ -40219,15 +40296,18 @@
           /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-mode-card-title" }, "Write")
         )),
         state.errorMessage && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-sidebar-error" }, state.errorMessage)
-      ), !sessionLimitReached && showHomeScreen && /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-command-divider", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement(
+      ), !(sessionLimitReached && !sessionId) && showHomeScreen && /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-command-divider", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement(
         WidgetFooter,
         {
           isIdle: true,
           onAddFeedback: handlers.handleAddFeedback,
+          startCapture: handlers.startCapture,
           extensionMode,
           onStartSession: extensionMode ? () => {
             if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
               chrome.runtime.sendMessage({ type: "ECHLY_START_SESSION" });
+            } else {
+              handlers.startSession();
             }
           } : handlers.startSession,
           onOpenPreviousSession: extensionMode && showPreviousButton && fetchSessions && onPreviousSessionSelect ? handlePreviousSessions : void 0,

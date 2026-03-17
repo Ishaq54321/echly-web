@@ -18,9 +18,9 @@ export type ElementRect = {
   height: number;
 };
 
-/** Pending session feedback (screenshot + context + optional element position). */
+/** Pending session feedback (screenshot + context + optional element position). Screenshot is optional so capture flow can continue when screenshot fails. */
 export type SessionFeedbackPending = {
-  screenshot: string;
+  screenshot?: string | null;
   context: CaptureContext | null;
   elementRect?: ElementRect | null;
 };
@@ -146,6 +146,8 @@ export type CaptureWidgetProps = {
   onSessionActivity?: () => void;
   /** Extension: global capture mode (voice vs text). When "voice", element click opens voice UI; when "text", opens text UI. */
   captureMode?: "voice" | "text";
+  /** Dashboard: when chrome.runtime is unavailable, called when user toggles Voice/Write mode. */
+  onCaptureModeChange?: (mode: "voice" | "text") => void;
   /** Optional preferred microphone deviceId for voice capture (from enumerateDevices). */
   selectedMicrophoneId?: string;
   /** Called when devices are enumerated at start of voice recording (user-initiated). Use to populate microphone list. */

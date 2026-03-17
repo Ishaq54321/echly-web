@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { FileText } from "lucide-react";
 
@@ -83,6 +83,13 @@ export function ResumeSessionModal({
   const [loginRequired, setLoginRequired] = useState(false);
   const isLight = theme === "light";
 
+  /** On open: show modal immediately with loading true so UI doesn't wait for fetch. */
+  useLayoutEffect(() => {
+    if (open) {
+      setLoading(true);
+    }
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     setSearch("");
@@ -90,7 +97,6 @@ export function ResumeSessionModal({
     setError(null);
     setLoginRequired(false);
     if (checkAuth) {
-      setLoading(true);
       checkAuth()
         .then((valid) => {
           if (!valid) {
@@ -106,7 +112,6 @@ export function ResumeSessionModal({
         .catch((_err) => setLoginRequired(true))
         .finally(() => setLoading(false));
     } else {
-      setLoading(true);
       fetchSessions()
         .then((list) => {
           if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", list);

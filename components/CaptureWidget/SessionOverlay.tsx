@@ -155,7 +155,7 @@ export function SessionOverlay({
       {sessionFeedbackPending && captureMode === "voice" && (
         <VoiceCapturePanel
           captureRoot={captureRoot}
-          screenshot={sessionFeedbackPending.screenshot}
+          screenshot={sessionFeedbackPending.screenshot ?? undefined}
           audioLevel={listeningAudioLevel}
           isListening={state === "voice_listening"}
           onFinish={onDoneVoice}
@@ -165,7 +165,7 @@ export function SessionOverlay({
       )}
       {sessionFeedbackPending && captureMode === "text" && (
         <TextFeedbackPanel
-          screenshot={sessionFeedbackPending.screenshot}
+          screenshot={sessionFeedbackPending.screenshot ?? undefined}
           onSubmit={onSaveText}
           onCancel={onCancel}
         />

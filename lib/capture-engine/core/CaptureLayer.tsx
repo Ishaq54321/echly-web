@@ -4,7 +4,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { RegionCaptureOverlay } from "@/components/CaptureWidget/RegionCaptureOverlay";
 import { SessionOverlay } from "@/components/CaptureWidget/SessionOverlay";
-import type { CaptureContext } from "./types";
+import type { CaptureContext, SessionFeedbackPending } from "./types";
 
 export type CaptureLayerState =
   | "focus_mode"
@@ -18,6 +18,8 @@ export type CaptureLayerState =
 
 export type CaptureLayerProps = {
   captureRoot: HTMLDivElement;
+  /** When set (e.g. dashboard), overlays are portaled into this root so they appear above host UI. */
+  captureRootParent?: HTMLElement | null;
   extensionMode: boolean;
   state: CaptureLayerState;
   getFullTabImage: () => Promise<string | null>;
@@ -33,7 +35,7 @@ export type CaptureLayerProps = {
   sessionPaused?: boolean;
   pausePending?: boolean;
   endPending?: boolean;
-  sessionFeedbackPending?: { screenshot: string; context: CaptureContext | null } | null;
+  sessionFeedbackPending?: SessionFeedbackPending | null;
   onSessionElementClicked?: (element: Element) => void;
   onSessionPause?: () => void;
   onSessionResume?: () => void;
@@ -56,6 +58,7 @@ export type CaptureLayerProps = {
  */
 export function CaptureLayer({
   captureRoot,
+  captureRootParent,
   extensionMode,
   state,
   getFullTabImage,
@@ -85,7 +88,7 @@ export function CaptureLayer({
   const showSessionOverlay =
     sessionMode && extensionMode && !!globalSessionModeActive && !!sessionIdProp;
   const showRegionOverlay =
-    !showSessionOverlay && extensionMode && (state === "focus_mode" || state === "region_selecting");
+    !showSessionOverlay && (state === "focus_mode" || state === "region_selecting");
   /* Do not show focus overlay when region overlay is shown (avoids full-screen pointer-events:auto blocking scroll). */
   const showDimOverlay =
     !showSessionOverlay &&
@@ -125,7 +128,7 @@ export function CaptureLayer({
             background: "rgba(0,0,0,0.08)",
             pointerEvents: "auto",
             cursor: "crosshair",
-            zIndex: 2147483645,
+            zIndex: 999999,
           }}
           aria-hidden
         />
@@ -141,9 +144,10 @@ export function CaptureLayer({
     </>
   );
 
+  const portalTarget = captureRootParent ?? captureRoot;
   return (
     <>
-      {createPortal(captureContent, captureRoot)}
+      {createPortal(captureContent, portalTarget)}
     </>
   );
 }

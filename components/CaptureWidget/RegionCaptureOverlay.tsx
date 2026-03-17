@@ -328,7 +328,7 @@ export function RegionCaptureOverlay({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 2147483647,
+        zIndex: 999999,
         userSelect: "none",
       }}
     >
@@ -341,7 +341,7 @@ export function RegionCaptureOverlay({
           background: hasSelection ? "transparent" : "rgba(0,0,0,0.4)",
           pointerEvents: releasedRect ? "none" : "auto",
           cursor: "crosshair",
-          zIndex: 2147483646,
+          zIndex: 999998,
           transition: `background 180ms ${ECHLY_EASE}`,
         }}
         onMouseDown={onMouseDown}
@@ -363,7 +363,7 @@ export function RegionCaptureOverlay({
           left: "50%",
           top: 24,
           transform: "translateX(-50%)",
-          zIndex: 2147483647,
+          zIndex: 999999,
           pointerEvents: "none",
           opacity: releasedRect ? 0 : 1,
           transition: `opacity 180ms ${ECHLY_EASE}`,
@@ -385,7 +385,7 @@ export function RegionCaptureOverlay({
             border: `2px solid ${flashBorder ? "#FFFFFF" : "#155DFC"}`,
             boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)",
             pointerEvents: "none",
-            zIndex: 2147483646,
+            zIndex: 999998,
             borderRadius: 14,
             transition: flashBorder ? "none" : `border-color 150ms ${ECHLY_EASE}`,
           }}
@@ -408,7 +408,7 @@ export function RegionCaptureOverlay({
             WebkitBackdropFilter: "blur(20px)",
             border: "1px solid rgba(255,255,255,0.08)",
             boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-            zIndex: 2147483647,
+            zIndex: 999999,
             animation: `echly-confirm-bar-in 220ms ${ECHLY_EASE} forwards`,
           }}
         >

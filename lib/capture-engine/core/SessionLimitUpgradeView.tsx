@@ -14,9 +14,10 @@ export function SessionLimitUpgradeView({
     limitMessage?.trim() ||
     "Your current plan allows a limited number of sessions.";
 
-  const imageSrc = chrome.runtime.getURL(
-    "assets/feedback-tray-session-limit.png"
-  );
+  const imageSrc =
+    typeof chrome !== "undefined" && chrome.runtime?.getURL
+      ? chrome.runtime.getURL("assets/feedback-tray-session-limit.png")
+      : "/feedback-tray-session-limit.png";
 
   return (
     <div
