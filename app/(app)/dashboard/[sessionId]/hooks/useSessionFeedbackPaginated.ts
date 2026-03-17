@@ -1,6 +1,7 @@
 "use client";
 
 import { authFetch } from "@/lib/authFetch";
+import { cachedFetch } from "@/lib/client/requestCache";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { onSnapshot, collection, query, where, limit, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -165,7 +166,7 @@ export function useSessionFeedbackPaginated(
     setLoadingMore(true);
     try {
       const url = `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=${encodeURIComponent(s.cursor ?? "")}&limit=${PAGE_SIZE}`;
-      const res = await authFetch(url);
+      const res = await cachedFetch(url, () => authFetch(url));
       const data = (await res.json()) as {
         feedback?: Feedback[];
         nextCursor?: string | null;
@@ -320,9 +321,8 @@ export function useSessionFeedbackPaginated(
         // Seed pagination + true totals from the API. API items are treated as older pages.
         void (async () => {
           try {
-            const res = await authFetch(
-              `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
-            );
+            const url = `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`;
+            const res = await cachedFetch(url, () => authFetch(url));
             const data = (await res.json()) as {
               feedback?: Feedback[];
               nextCursor?: string | null;
@@ -369,9 +369,8 @@ export function useSessionFeedbackPaginated(
   const refetchFirstPage = useCallback(async () => {
     if (!sessionId) return;
     try {
-      const res = await authFetch(
-        `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`
-      );
+      const url = `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`;
+      const res = await cachedFetch(url, () => authFetch(url));
       const data = (await res.json()) as {
         feedback?: Feedback[];
         nextCursor?: string | null;

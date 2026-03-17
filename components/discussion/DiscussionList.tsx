@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { MessageSquareMore } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
+import { cachedFetch } from "@/lib/client/requestCache";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { getTicketStatus } from "@/lib/domain/feedback";
 
@@ -84,13 +85,12 @@ export function DiscussionList({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    authFetch("/api/feedback?conversationsOnly=true&limit=20")
-      .then((res) => {
-        if (cancelled) return;
+    const url = "/api/feedback?conversationsOnly=true&limit=20";
+    void (async () => {
+      try {
+        const res = await cachedFetch(url, () => authFetch(url));
         if (!res.ok) throw new Error("Failed to load feedback");
-        return res.json();
-      })
-      .then((data: { feedback?: unknown[] }) => {
+        const data = (await res.json()) as { feedback?: unknown[] };
         if (cancelled) return;
         const raw = Array.isArray(data.feedback) ? data.feedback : [];
         onEmptyChangeRef.current?.(raw.length === 0);
@@ -122,13 +122,12 @@ export function DiscussionList({
         });
         const projects: ProjectItem[] = Array.from(projectMap.entries()).map(([id, name]) => ({ id, name }));
         onProjectsLoadedRef.current?.(projects);
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
