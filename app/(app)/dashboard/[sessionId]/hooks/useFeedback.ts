@@ -86,24 +86,26 @@ export function useFeedback({
   const handleTranscript = async (
     transcript: string,
     screenshot: string | null
-  ): Promise<{ id: string; title: string; description: string; type: string } | undefined> => {
+  ): Promise<{
+    id: string;
+    title: string;
+    description: string;
+    type: string;
+  } | undefined> => {
     const res = await authFetch("/api/structure-feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transcript }),
     });
 
-    const data = (await res.json()) as { success?: boolean; tickets?: StructuredTicket[]; error?: string };
+    const data = (await res.json()) as {
+      success?: boolean;
+      tickets?: StructuredTicket[];
+      error?: string;
+    };
 
     const tickets = Array.isArray(data.tickets) ? data.tickets : [];
     if (!data.success || tickets.length === 0) return;
-
-    let screenshotUrl: string | null = null;
-    let firstFeedbackId: string | null = null;
-    if (tickets.length > 0 && screenshot) {
-      firstFeedbackId = generateFeedbackId();
-      screenshotUrl = await uploadScreenshot(screenshot, sessionId, firstFeedbackId);
-    }
 
     if (!session) {
       throw new Error("Session required for feedback");
@@ -114,17 +116,28 @@ export function useFeedback({
       throw new Error("Session missing workspaceId/userId");
     }
 
+    // Generate a stable id for the first ticket so screenshot upload can
+    // target the same Firestore document without blocking ticket creation.
+    const firstFeedbackId =
+      tickets.length > 0 && screenshot ? generateFeedbackId() : null;
+
     const created: Feedback[] = [];
-    let ticketIndex = 0;
-    for (const t of tickets) {
+    for (let index = 0; index < tickets.length; index++) {
+      const t = tickets[index]!;
       const payload: StructuredFeedback = {
         title: t.title,
-        description: typeof t.description === "string" ? t.description : t.title,
-        type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-        contextSummary: typeof t.description === "string" ? t.description : undefined,
+        description:
+          typeof t.description === "string" ? t.description : t.title,
+        type:
+          Array.isArray(t.suggestedTags) && t.suggestedTags[0]
+            ? t.suggestedTags[0]
+            : "Feedback",
+        contextSummary:
+          typeof t.description === "string" ? t.description : undefined,
         actionSteps: t.actionSteps ?? [],
         suggestedTags: t.suggestedTags,
-        screenshotUrl: ticketIndex === 0 ? screenshotUrl : null,
+        // Ticket is created immediately without waiting for screenshot upload.
+        screenshotUrl: null,
         timestamp: Date.now(),
       };
 
@@ -133,9 +146,9 @@ export function useFeedback({
         sessionId,
         createdByUserId,
         payload,
-        ticketIndex === 0 && firstFeedbackId ? firstFeedbackId : undefined
+        index === 0 && firstFeedbackId ? firstFeedbackId : undefined
       );
-      ticketIndex++;
+
       const newItem: Feedback = {
         id: docRef.id,
         workspaceId: session.workspaceId ?? undefined,
@@ -150,7 +163,7 @@ export function useFeedback({
         contextSummary: payload.contextSummary ?? null,
         actionSteps: payload.actionSteps ?? null,
         suggestedTags: payload.suggestedTags ?? null,
-        screenshotUrl: payload.screenshotUrl ?? null,
+        screenshotUrl: null,
         clientTimestamp: Date.now(),
       };
       created.push(newItem);
@@ -158,6 +171,51 @@ export function useFeedback({
 
     setFeedback((prev) => [...created, ...prev]);
     setSelectedId(created[0].id);
+
+    // Kick off screenshot upload and ticket patch asynchronously so UI is not blocked.
+    if (screenshot && firstFeedbackId && created[0]) {
+      const ticketId = created[0].id;
+      void (async () => {
+        try {
+          const screenshotUrl = await uploadScreenshot(
+            screenshot,
+            sessionId,
+            firstFeedbackId
+          );
+
+          const patchRes = await authFetch(`/api/tickets/${ticketId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ screenshotUrl }),
+          });
+
+          const patchData = (await patchRes.json()) as {
+            success?: boolean;
+            ticket?: Partial<Feedback> & { id: string };
+          };
+
+          // Update local UI so screenshot appears once available.
+          if (patchData.success && patchData.ticket) {
+            setFeedback((prev) =>
+              prev.map((item) =>
+                item.id === ticketId
+                  ? { ...item, ...patchData.ticket }
+                  : item
+              )
+            );
+          } else {
+            // Fallback: at least set screenshotUrl locally on success.
+            setFeedback((prev) =>
+              prev.map((item) =>
+                item.id === ticketId ? { ...item, screenshotUrl } : item
+              )
+            );
+          }
+        } catch {
+          // Swallow upload/patch errors so they never block ticket creation UX.
+        }
+      })();
+    }
 
     return {
       id: created[0].id,

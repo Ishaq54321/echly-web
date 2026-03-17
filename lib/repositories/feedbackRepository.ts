@@ -42,7 +42,7 @@ const feedbackPayload = (
   description: data.description,
   suggestion: data.suggestion ?? "",
   type: data.type,
-  status: "open" as const,
+  status: (data as StructuredFeedback & { status?: string }).status ?? "open",
   createdAt: serverTimestamp(),
   commentCount: 0,
 
@@ -140,6 +140,54 @@ export async function addFeedbackWithSessionCountersRepo(
       updatedAt: serverTimestamp(),
     } as Record<string, unknown>);
     return feedbackRef;
+  });
+}
+
+/**
+ * Updates session, workspace, and insights counters for a newly created feedback.
+ * Used by the API in a background task after createFeedbackMinimal so the response is fast.
+ * Does NOT write the feedback doc; call this only after the feedback doc exists.
+ */
+export async function incrementNewFeedbackCountersRepo(
+  workspaceId: string,
+  sessionId: string,
+  data: StructuredFeedback
+): Promise<void> {
+  const sessionRef = doc(db, "sessions", sessionId);
+  const workspaceRef = doc(db, "workspaces", workspaceId);
+  const insightsRef = workspaceInsightsRef(workspaceId);
+
+  await runTransaction(db, async (tx) => {
+    const workspaceSnap = await tx.get(workspaceRef);
+    const insightsSnap = await tx.get(insightsRef);
+    const stats = (workspaceSnap.data()?.stats ?? {}) as Record<string, unknown>;
+    const totalFeedback = (stats.totalFeedback as number | undefined) ?? 0;
+    const last30DaysFeedback = (stats.last30DaysFeedback as number | undefined) ?? 0;
+
+    const issueType = (data.type ?? "").trim() || "general";
+    const day = new Date().toISOString().slice(0, 10);
+    if (!insightsSnap.exists()) {
+      tx.set(insightsRef, emptyWorkspaceInsightsDoc());
+    }
+
+    tx.update(sessionRef, {
+      openCount: increment(1),
+      feedbackCount: increment(1),
+      updatedAt: serverTimestamp(),
+    });
+    tx.update(workspaceRef, {
+      "stats.totalFeedback": totalFeedback + 1,
+      "stats.last30DaysFeedback": last30DaysFeedback + 1,
+      "stats.updatedAt": serverTimestamp(),
+    });
+    tx.update(insightsRef, {
+      totalFeedback: increment(1),
+      timeSavedMinutes: increment(5),
+      [`issueTypes.${issueType}`]: increment(1),
+      [`sessionCounts.${sessionId}`]: increment(1),
+      [`daily.${day}.feedback`]: increment(1),
+      updatedAt: serverTimestamp(),
+    } as Record<string, unknown>);
   });
 }
 

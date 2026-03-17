@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { serializeTicket } from "@/lib/server/serializeFeedback";
-import {
-  addFeedbackWithSessionCountersRepo,
-  getFeedbackByIdRepo,
-} from "@/lib/repositories/feedbackRepository";
+import { doc, updateDoc } from "firebase/firestore";
+import { createFeedbackMinimal } from "@/lib/createFeedbackMinimal";
+import { incrementNewFeedbackCountersRepo } from "@/lib/repositories/feedbackRepository";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
@@ -17,6 +15,7 @@ import { verifyExtensionToken } from "@/lib/server/extensionAuth";
 import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
 import { getSessionUser } from "@/lib/server/session";
 import { invalidateFeedbackCache } from "@/lib/server/cache/feedbackCache";
+import { db } from "@/lib/firebase";
 
 const WORKSPACE_BY_ID_CACHE_TTL_MS = 30_000;
 const workspaceByIdCache = new Map<string, { workspace: unknown; expiresAt: number }>();
@@ -236,47 +235,61 @@ export async function POST(req: NextRequest) {
 
     const dbStart = now();
     console.log("[PIPELINE] DB_WRITE_START", { at: dbStart });
-    const docRef = await addFeedbackWithSessionCountersRepo(
+    const docRef = await createFeedbackMinimal({
       workspaceId,
       sessionId,
-      user.uid,
-      structuredData
-    );
+      userId: user.uid,
+      data: structuredData,
+    });
     const dbEnd = now();
     console.log("[PIPELINE] DB_WRITE_END", {
       duration: dbEnd - dbStart,
     });
+    console.log("[FAST WRITE] feedback created", docRef.id);
 
     const screenshotId =
       typeof body.screenshotId === "string" ? body.screenshotId.trim() : "";
-    if (screenshotId) {
-      updateScreenshotAttachedRepo(screenshotId, docRef.id).catch((err) => {
-        console.error("[feedback] updateScreenshotAttachedRepo failed:", err);
-      });
-    }
-    const created = await getFeedbackByIdRepo(docRef.id);
-    if (!created) {
-      return NextResponse.json(
-        { success: false, error: "Feedback created but could not be read" },
-        { status: 500, headers: corsHeaders(req) }
-      );
-    }
 
-    invalidateFeedbackCache(workspaceId, sessionId);
-
-    log("[API] POST /api/feedback duration:", Date.now() - start);
-
-    const responseStart = now();
-    console.log("[PIPELINE] RESPONSE_SENT", {
-      totalDuration: responseStart - requestStart,
-    });
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
-        ticket: serializeTicket(created),
+        ticket: {
+          id: docRef.id,
+          workspaceId,
+          sessionId,
+          title: structuredData.title,
+          description: structuredData.description,
+          status: "processing",
+          createdAt: Date.now(),
+        },
       },
       { headers: corsHeaders(req) }
     );
+
+    void (async () => {
+      try {
+        await incrementNewFeedbackCountersRepo(workspaceId, sessionId, structuredData);
+        await invalidateFeedbackCache(workspaceId, sessionId);
+
+        const isExtension =
+          !!req.headers.get("x-extension-id") || !!body.metadata?.clientTimestamp;
+        if (isExtension) {
+          await updateDoc(doc(db, "feedback", docRef.id), {
+            status: "processing",
+          });
+        }
+
+        if (screenshotId) {
+          await updateScreenshotAttachedRepo(screenshotId, docRef.id);
+        }
+      } catch (err) {
+        console.log("[ASYNC DB TASK ERROR]", err);
+      }
+    })();
+
+    log("[API] POST /api/feedback duration:", Date.now() - start);
+
+    return response;
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(

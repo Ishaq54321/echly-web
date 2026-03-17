@@ -209,7 +209,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     tickets: Array<{ title?: string; description?: string; suggestedTags?: string[]; actionSteps?: string[] }>;
     screenshotUrl: string | null;
     screenshotId: string;
-    uploadPromise: Promise<string | null>;
     transcript: string;
     screenshot: string | null;
     firstFeedbackId: string;
@@ -220,6 +219,28 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     callbacks: { onSuccess: (ticket: StructuredFeedback) => void; onError: () => void };
     context?: Record<string, unknown>;
   };
+
+  /** Fire-and-forget: upload screenshot then PATCH ticket. Never blocks feedback creation. */
+  const startScreenshotUploadAfterFeedback = React.useCallback(
+    (screenshot: string | null, sessionId: string, ticketId: string) => {
+      if (!screenshot) return;
+      void (async () => {
+        try {
+          console.log("[EXTENSION] UPLOAD_START", ticketId);
+          const screenshotUrl = await uploadScreenshot(screenshot, sessionId, ticketId);
+          await apiFetch(`/api/tickets/${ticketId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ screenshotUrl }),
+          });
+          console.log("[EXTENSION] UPLOAD_DONE", ticketId);
+        } catch (err) {
+          console.log("[EXTENSION ASYNC UPLOAD ERROR]", err);
+        }
+      })();
+    },
+    []
+  );
   const [extensionClarityPending, setExtensionClarityPending] = React.useState<ExtensionClarityPending | null>(null);
   const [showClarityAssistant, setShowClarityAssistant] = React.useState(false);
   const [isEditingFeedback, setIsEditingFeedback] = React.useState(false);
@@ -497,9 +518,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           const visibleTextPromise = getVisibleTextFromScreenshot(imageForOcr);
           const firstFeedbackId = generateFeedbackId();
           const screenshotId = generateScreenshotId();
-          const uploadPromise = screenshot
-            ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
-            : Promise.resolve(null as string | null);
           const visibleTextFromScreenshot = await visibleTextPromise;
           if (ECHLY_DEBUG) console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
           if (imageForOcr) {
@@ -551,7 +569,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   tickets,
                   screenshotUrl: null,
                   screenshotId,
-                  uploadPromise,
                   transcript,
                   screenshot,
                   firstFeedbackId,
@@ -580,7 +597,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   tickets: [],
                   screenshotUrl: null,
                   screenshotId,
-                  uploadPromise,
                   transcript,
                   screenshot,
                   firstFeedbackId,
@@ -620,6 +636,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                     const ticketId = response.ticket.id;
                     const t = response.ticket;
                     const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : (t.description ? t.description.split(/\n\s*\n/) : []);
+                    console.log("[EXTENSION] FEEDBACK_CREATED", ticketId);
                     echlyLog("PIPELINE", "ticket created", { ticketId });
                     setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
                     callbacks.onSuccess({
@@ -628,17 +645,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                       actionSteps,
                       type: t.type ?? "Feedback",
                     });
-                    uploadPromise.then((url) => {
-                      if (url) {
-                        echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
-                        echlyLog("PIPELINE", "screenshot patched", { ticketId });
-                        apiFetch(`/api/tickets/${ticketId}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ screenshotUrl: url }),
-                        }).catch(() => {});
-                      }
-                    }).catch(() => {});
+                    startScreenshotUploadAfterFeedback(screenshot, effectiveSessionId, ticketId);
                   } else {
                     echlyLog("PIPELINE", "error");
                     setFeedbackJobs((prev) =>
@@ -690,20 +697,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             }
             if (firstCreated) {
               const ticketId = firstCreated.id;
+              console.log("[EXTENSION] FEEDBACK_CREATED", ticketId);
               echlyLog("PIPELINE", "ticket created", { ticketId });
               setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
               notifyFeedbackCreated(firstCreated);
-              uploadPromise.then((url) => {
-                if (url) {
-                  echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
-                  echlyLog("PIPELINE", "screenshot patched", { ticketId });
-                  apiFetch(`/api/tickets/${ticketId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ screenshotUrl: url }),
-                  }).catch(() => {});
-                }
-              }).catch(() => {});
+              startScreenshotUploadAfterFeedback(screenshot, effectiveSessionId, ticketId);
               callbacks.onSuccess(firstCreated);
             } else {
               echlyLog("PIPELINE", "error");
@@ -731,9 +729,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         if (ECHLY_DEBUG) console.log("[ECHLY] OCR running on selection image");
       }
       const screenshotId = generateScreenshotId();
-      const uploadPromise = screenshot
-        ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
-        : Promise.resolve(null as string | null);
       const visibleTextFromScreenshot = await getVisibleTextFromScreenshot(imageForOcr);
       if (ECHLY_DEBUG) console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
       if (imageForOcr) {
@@ -821,23 +816,16 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       if (firstCreated) {
         const ticketId = firstCreated.id;
+        console.log("[EXTENSION] FEEDBACK_CREATED", ticketId);
         notifyFeedbackCreated(firstCreated);
-        uploadPromise.then((url) => {
-          if (url) {
-            apiFetch(`/api/tickets/${ticketId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ screenshotUrl: url }),
-            }).catch(() => {});
-          }
-        }).catch(() => {});
+        startScreenshotUploadAfterFeedback(screenshot, effectiveSessionId, ticketId);
       }
       return firstCreated;
       } finally {
         setIsProcessingFeedback(false);
       }
     },
-    [effectiveSessionId, user]
+    [effectiveSessionId, user, startScreenshotUploadAfterFeedback]
   );
 
   const handleDelete = React.useCallback(async (id: string) => {
@@ -1015,6 +1003,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             if (response?.success && response.ticket) {
               const t = response.ticket as { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
               const ticketId = t.id;
+              console.log("[EXTENSION] FEEDBACK_CREATED", ticketId);
               const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : (t.description ? t.description.split(/\n\s*\n/) : []);
               pending.callbacks.onSuccess({
                 id: ticketId,
@@ -1022,15 +1011,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 actionSteps,
                 type: t.type ?? "Feedback",
               });
-              pending.uploadPromise.then((url) => {
-                if (url) {
-                  apiFetch(`/api/tickets/${ticketId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ screenshotUrl: url }),
-                  }).catch(() => {});
-                }
-              }).catch(() => {});
+              startScreenshotUploadAfterFeedback(pending.screenshot, effectiveSessionId, ticketId);
             } else {
               echlyLog("PIPELINE", "error");
               pending.callbacks.onError();
@@ -1081,15 +1062,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       if (firstCreated) {
         const ticketId = firstCreated.id;
-        pending.uploadPromise.then((url) => {
-          if (url) {
-            apiFetch(`/api/tickets/${ticketId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ screenshotUrl: url }),
-            }).catch(() => {});
-          }
-        }).catch(() => {});
+        console.log("[EXTENSION] FEEDBACK_CREATED", ticketId);
+        startScreenshotUploadAfterFeedback(pending.screenshot, effectiveSessionId, ticketId);
         setIsProcessingFeedback(false);
         pending.callbacks.onSuccess(firstCreated);
       } else {
@@ -1098,7 +1072,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         pending.callbacks.onError();
       }
     },
-    [effectiveSessionId]
+    [effectiveSessionId, startScreenshotUploadAfterFeedback]
   );
 
   const submitEditedFeedback = React.useCallback(
@@ -1149,6 +1123,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               if (response?.success && response.ticket) {
                 const t = response.ticket as { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
                 const ticketId = t.id;
+                console.log("[EXTENSION] FEEDBACK_CREATED", ticketId);
                 const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : (t.description ? t.description.split(/\n\s*\n/) : []);
                 pending.callbacks.onSuccess({
                   id: ticketId,
@@ -1156,15 +1131,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   actionSteps,
                   type: t.type ?? "Feedback",
                 });
-                pending.uploadPromise.then((url) => {
-                  if (url) {
-                    apiFetch(`/api/tickets/${ticketId}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ screenshotUrl: url }),
-                    }).catch(() => {});
-                  }
-                }).catch(() => {});
+                startScreenshotUploadAfterFeedback(pending.screenshot, effectiveSessionId, ticketId);
               } else {
                 echlyLog("PIPELINE", "error");
                 pending.callbacks.onError();
@@ -1209,16 +1176,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
         if (firstCreated) {
           const ticketId = firstCreated.id;
+          console.log("[EXTENSION] FEEDBACK_CREATED", ticketId);
           notifyFeedbackCreated(firstCreated);
-          pending.uploadPromise.then((url) => {
-            if (url) {
-              apiFetch(`/api/tickets/${ticketId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ screenshotUrl: url }),
-              }).catch(() => {});
-            }
-          }).catch(() => {});
+          startScreenshotUploadAfterFeedback(pending.screenshot, effectiveSessionId, ticketId);
           setIsProcessingFeedback(false);
           pending.callbacks.onSuccess(firstCreated);
         } else {
@@ -1233,7 +1193,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         pending.callbacks.onError();
       }
     },
-    [effectiveSessionId]
+    [effectiveSessionId, startScreenshotUploadAfterFeedback]
   );
 
   const handleExtensionClarityUseSuggestion = React.useCallback(async () => {
@@ -1294,16 +1254,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       if (firstCreated) {
         const ticketId = firstCreated.id;
+        console.log("[EXTENSION] FEEDBACK_CREATED", ticketId);
         notifyFeedbackCreated(firstCreated);
-        pending.uploadPromise.then((url) => {
-          if (url) {
-            apiFetch(`/api/tickets/${ticketId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ screenshotUrl: url }),
-            }).catch(() => {});
-          }
-        }).catch(() => {});
+        startScreenshotUploadAfterFeedback(pending.screenshot, effectiveSessionId, ticketId);
         setIsProcessingFeedback(false);
         pending.callbacks.onSuccess(firstCreated);
       } else {
@@ -1317,7 +1270,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       setIsProcessingFeedback(false);
       pending.callbacks.onError();
     }
-  }, [extensionClarityPending, effectiveSessionId]);
+  }, [extensionClarityPending, effectiveSessionId, startScreenshotUploadAfterFeedback]);
 
   React.useEffect(() => {
     if (isEditingFeedback && clarityTextareaRef.current) {
