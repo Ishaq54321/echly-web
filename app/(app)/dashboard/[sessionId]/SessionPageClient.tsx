@@ -196,6 +196,48 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     refetchFirstPage: refetchFeedbackFirstPage,
   } = useSessionFeedbackPaginated(feedbackSessionId, listScrollRef, listScrollReady);
 
+  // updateTicket is used by the screenshot event listener to merge in screenshotUrl
+  // without refetching the full ticket list.
+  const updateTicket = useCallback(
+    (ticketId: string, updates: Partial<Feedback>) => {
+      setFeedback((prev) =>
+        prev.map((item) => (item.id === ticketId ? { ...item, ...updates } : item))
+      );
+    },
+    [setFeedback]
+  );
+
+  // Keep a stable reference to the latest feedback list for the mount-only listener.
+  const feedbackRef = useRef<Feedback[]>(feedback);
+  useEffect(() => {
+    feedbackRef.current = feedback;
+  }, [feedback]);
+
+  const refreshSingleTicket = useCallback(
+    async (ticketId: string) => {
+      try {
+        const res = await authFetch(`/api/tickets/${ticketId}`);
+        if (!res.ok) return;
+
+        const data = (await res.json()) as {
+          success?: boolean;
+          ticket?: TicketFromApi;
+        };
+
+        if (!data?.ticket) return;
+        if (data.ticket.screenshotUrl === undefined) return;
+
+        updateTicket(ticketId, { screenshotUrl: data.ticket.screenshotUrl ?? null });
+      } catch {
+        // Non-blocking: UI will converge on next user action or next successful event.
+      }
+    },
+    [updateTicket]
+  );
+
+  const screenshotRefreshCooldownRef = useRef<Map<string, number>>(new Map());
+  const screenshotRefreshTimersRef = useRef<Map<string, number[]>>(new Map());
+
   /** Single refetch after create; delayed to avoid collision with server cache invalidation. */
   const refetchFeedbackFirstPageAfterCreate = useCallback(() => {
     if (refetchAfterCreateScheduledRef.current) return;
@@ -317,6 +359,77 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     window.addEventListener("ECHLY_FEEDBACK_CREATED", handler);
     return () => window.removeEventListener("ECHLY_FEEDBACK_CREATED", handler);
   }, [sessionId, session, setFeedback, setFeedbackTotal, setFeedbackActiveCount]);
+
+  /* ====================== screenshotUrl attachment ====================== */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ev = e as CustomEvent<{
+        ticketId?: string;
+        screenshotUrl?: string | null;
+        sessionId?: string | null;
+      }>;
+
+      const { ticketId, screenshotUrl, sessionId: evSessionId } = ev.detail ?? {};
+      if (!ticketId) return;
+      if (evSessionId && evSessionId !== sessionId) return;
+
+      if (typeof screenshotUrl === "string") {
+        updateTicket(ticketId, { screenshotUrl });
+      } else {
+        // If screenshotUrl isn't provided in the event, leave the current UI state as-is
+        // and rely on the reconciliation fallback below.
+      }
+
+      const uiTicket = feedbackRef.current.find((t) => t.id === ticketId);
+      const uiHasScreenshot =
+        uiTicket && typeof uiTicket.screenshotUrl === "string" && uiTicket.screenshotUrl.length > 0;
+
+      // If the UI already has the screenshot, do not schedule any refresh.
+      if (uiHasScreenshot) return;
+
+      const now = Date.now();
+      const lastAttemptAt = screenshotRefreshCooldownRef.current.get(ticketId);
+      if (lastAttemptAt && now - lastAttemptAt < 5000) return;
+
+      // Prevent multiple timer schedules for the same ticket.
+      if (screenshotRefreshTimersRef.current.has(ticketId)) return;
+
+      const checkAt = (delayMs: number) => {
+        const timerId = window.setTimeout(() => {
+          try {
+            const current = feedbackRef.current.find((t) => t.id === ticketId);
+            if (!current) return;
+
+            const hasScreenshot =
+              typeof current.screenshotUrl === "string" && current.screenshotUrl.length > 0;
+            if (hasScreenshot) return;
+
+            const attemptNow = Date.now();
+            const last = screenshotRefreshCooldownRef.current.get(ticketId);
+            if (last && attemptNow - last < 5000) return;
+            screenshotRefreshCooldownRef.current.set(ticketId, attemptNow);
+
+            void refreshSingleTicket(ticketId);
+          } finally {
+            // Always clear timer guard after the second planned check,
+            // even if the ticket wasn't present yet.
+            if (delayMs >= 850) screenshotRefreshTimersRef.current.delete(ticketId);
+          }
+        }, delayMs);
+
+        return timerId;
+      };
+
+      const t1 = checkAt(400);
+      const t2 = checkAt(850);
+      screenshotRefreshTimersRef.current.set(ticketId, [t1, t2]);
+    };
+
+    window.addEventListener("ECHLY_FEEDBACK_SCREENSHOT_READY", handler as EventListener);
+    return () =>
+      window.removeEventListener("ECHLY_FEEDBACK_SCREENSHOT_READY", handler as EventListener);
+    // updateTicket + refreshSingleTicket are stable; this listener must attach immediately.
+  }, []);
 
   /* ================= AUTH + LOAD SESSION (title/meta only) ================= */
   useEffect(() => {

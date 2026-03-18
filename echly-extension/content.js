@@ -41341,7 +41341,10 @@
         const res = await apiFetch(`/api/sessions?${params.toString()}`);
         const json = await res.json();
         return {
-          data: json.data ?? [],
+          data: (json.data ?? []).map((s) => ({
+            ...s,
+            title: typeof s.title === "string" && s.title.trim() ? s.title : "Untitled Session"
+          })),
           nextCursor: json.nextCursor ?? null,
           totalCount: typeof json.totalCount === "number" ? json.totalCount : 0
         };
