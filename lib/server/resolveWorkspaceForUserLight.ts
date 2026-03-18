@@ -14,30 +14,31 @@ export async function resolveWorkspaceForUserLight(
   uid: string,
   req?: Request
 ): Promise<{ workspaceId: string }> {
+  console.log("[WORKSPACE] called");
   const fromRequest = (req as unknown as { __workspaceId?: unknown } | undefined)?.__workspaceId;
   if (typeof fromRequest === "string" && fromRequest.length > 0) {
-    console.log("[WORKSPACE RESOLUTION]", { source: "request-cache" as const });
+    console.log("[WORKSPACE] source:", "cache");
     return { workspaceId: fromRequest };
   }
 
   const now = Date.now();
   const entry = workspaceIdCache.get(uid);
   if (entry && now < entry.expiresAt) {
-    console.log("[WORKSPACE RESOLUTION]", { source: "memory-cache" as const });
+    console.log("[WORKSPACE] source:", "cache");
     if (req) (req as unknown as { __workspaceId?: string }).__workspaceId = entry.workspaceId;
     return { workspaceId: entry.workspaceId };
   }
 
   const pending = resolveWorkspaceIdInFlight.get(uid);
   if (pending) {
-    console.log("[WORKSPACE RESOLUTION]", { source: "memory-cache" as const });
+    console.log("[WORKSPACE] source:", "cache");
     const workspaceId = await pending;
     if (req) (req as unknown as { __workspaceId?: string }).__workspaceId = workspaceId;
     return { workspaceId };
   }
 
   const promise = (async () => {
-    console.log("[WORKSPACE RESOLUTION]", { source: "firestore" as const });
+    console.log("[WORKSPACE] source:", "firestore");
     const workspaceId = (await getUserWorkspaceIdRepo(uid)) ?? uid;
     workspaceIdCache.set(uid, {
       workspaceId,

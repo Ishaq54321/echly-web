@@ -522,6 +522,9 @@
   .z-50 {
     z-index: 50;
   }
+  .z-\[5\] {
+    z-index: 5;
+  }
   .z-\[42\] {
     z-index: 42;
   }
@@ -617,6 +620,9 @@
   }
   .-my-2 {
     margin-block: calc(var(--spacing) * -2);
+  }
+  .-my-8 {
+    margin-block: calc(var(--spacing) * -8);
   }
   .my-1 {
     margin-block: calc(var(--spacing) * 1);
@@ -2151,6 +2157,12 @@
       background-color: color-mix(in oklab, var(--layer-2-border) 40%, transparent);
     }
   }
+  .bg-\[var\(--layer-2-border\)\]\/50 {
+    background-color: var(--layer-2-border);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--layer-2-border) 50%, transparent);
+    }
+  }
   .bg-\[var\(--layer-2-hover-bg\)\] {
     background-color: var(--layer-2-hover-bg);
   }
@@ -2188,6 +2200,12 @@
     background-color: color-mix(in srgb, oklch(82.8% 0.189 84.429) 90%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--color-amber-400) 90%, transparent);
+    }
+  }
+  .bg-amber-500\/15 {
+    background-color: color-mix(in srgb, oklch(76.9% 0.188 70.08) 15%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-amber-500) 15%, transparent);
     }
   }
   .bg-black\/20 {
@@ -2276,6 +2294,9 @@
   }
   .bg-brand-primary {
     background-color: var(--color-brand-primary);
+  }
+  .bg-current {
+    background-color: currentcolor;
   }
   .bg-emerald-50 {
     background-color: var(--color-emerald-50);
@@ -5257,6 +5278,14 @@
       border-color: var(--color-neutral-700);
     }
   }
+  .dark\:bg-amber-500\/20 {
+    @media (prefers-color-scheme: dark) {
+      background-color: color-mix(in srgb, oklch(76.9% 0.188 70.08) 20%, transparent);
+      @supports (color: color-mix(in lab, red, red)) {
+        background-color: color-mix(in oklab, var(--color-amber-500) 20%, transparent);
+      }
+    }
+  }
   .dark\:bg-neutral-600 {
     @media (prefers-color-scheme: dark) {
       background-color: var(--color-neutral-600);
@@ -5291,6 +5320,11 @@
   .dark\:bg-neutral-900 {
     @media (prefers-color-scheme: dark) {
       background-color: var(--color-neutral-900);
+    }
+  }
+  .dark\:text-amber-400 {
+    @media (prefers-color-scheme: dark) {
+      color: var(--color-amber-400);
     }
   }
   .dark\:text-neutral-300 {

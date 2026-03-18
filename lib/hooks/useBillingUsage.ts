@@ -76,6 +76,8 @@ export function useBillingUsage(
     let cancelled = false;
     let unsubscribeWorkspace: (() => void) | null = null;
 
+    let billingTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (cancelled || !user) {
         if (!cancelled) {
@@ -100,7 +102,10 @@ export function useBillingUsage(
           return;
         }
 
-        await refetch();
+        // Defer billing fetch so it does not block main UI (dashboard/session load).
+        billingTimeoutId = setTimeout(() => {
+          if (!cancelled) refetch();
+        }, 2000);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Error");
@@ -111,6 +116,7 @@ export function useBillingUsage(
 
     return () => {
       cancelled = true;
+      if (billingTimeoutId) clearTimeout(billingTimeoutId);
       unsubAuth();
       if (unsubscribeWorkspace) unsubscribeWorkspace();
     };

@@ -33,21 +33,15 @@ function TicketItemInner({
       type="button"
       onClick={handleClick}
       data-ticket-id={id}
-      className={`sidebar-row-interactive group relative flex w-full items-center gap-2 px-3 py-2.5 rounded-xl text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] ${
+      className={`sidebar-row-interactive group relative flex w-full items-center gap-2 rounded-xl border border-transparent bg-[var(--layer-1-bg)] px-3 py-2 text-left cursor-pointer transition-all duration-150 hover:bg-[var(--layer-2-hover-bg)] hover:border-[var(--layer-2-border)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] ${
         active
-          ? "bg-[var(--layer-2-hover-bg)]"
+          ? "bg-[var(--layer-2-hover-bg)] border-[var(--layer-2-border)]"
           : ""
       } ${isNewTicket ? "echly-new-ticket-highlight" : ""}`}
       aria-current={active ? "true" : undefined}
     >
       <span className="relative min-w-0 flex-1 truncate text-[13px] leading-[1.4] py-0.5">
-        <span
-          className={`truncate block ${
-            active
-              ? "text-[hsl(var(--text-primary-strong))] font-medium"
-              : "text-[hsl(var(--text-secondary-soft))]"
-          }`}
-        >
+        <span className="truncate block font-medium text-[hsl(var(--text-primary-strong))]">
           {title || "Untitled"}
         </span>
       </span>

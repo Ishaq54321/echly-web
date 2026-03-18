@@ -37,5 +37,7 @@ export interface Session {
   skippedCount?: number;
   /** Denormalized: total feedback count (WAVE 1 structural). */
   feedbackCount?: number;
+  /** Session lifecycle: active (recording allowed), paused, or ended. Default "active". */
+  status?: "active" | "paused" | "ended";
 }
 

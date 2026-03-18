@@ -116,9 +116,9 @@ type TicketFromApi = {
 
 function SessionPageSkeleton() {
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden">
-      <aside className="w-[280px] shrink-0 min-h-0 flex flex-col rounded-r-[var(--radius-lg)] bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-1)] border-r border-[var(--layer-1-border)]">
-        <div className="flex-1 min-h-0 overflow-y-auto p-4">
+    <div className="flex h-full overflow-hidden">
+      <aside className="w-[300px] flex-shrink-0 h-full overflow-hidden flex flex-col rounded-r-[var(--radius-lg)] bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-1)] border-r border-[var(--layer-1-border)]">
+        <div className="flex-1 min-h-0 p-4">
           <div className="space-y-3">
             <div className="h-4 w-40 rounded bg-neutral-200/50 animate-feedback-placeholder-pulse" />
             <div className="h-3 w-56 rounded bg-neutral-100/70 animate-feedback-placeholder-pulse" />
@@ -174,6 +174,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const listScrollRef = useRef<HTMLDivElement | null>(null);
   const [listScrollReady, setListScrollReady] = useState(0);
+  /** Prevents duplicate refetch after feedback creation (server also invalidates cache). */
+  const refetchAfterCreateScheduledRef = useRef(false);
 
   const {
     feedback,
@@ -191,15 +193,19 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     hasReachedLimit: feedbackReachedLimit,
     loadingMore: feedbackLoadingMore,
     loadMoreRef: feedbackLoadMoreRef,
-  } = useSessionFeedbackPaginated(
-    feedbackSessionId,
-    listScrollRef,
-    listScrollReady,
-    (newestTicketId) => {
-      setSelectedId(newestTicketId);
-      setNewTicketId(newestTicketId);
-    }
-  );
+    refetchFirstPage: refetchFeedbackFirstPage,
+  } = useSessionFeedbackPaginated(feedbackSessionId, listScrollRef, listScrollReady);
+
+  /** Single refetch after create; delayed to avoid collision with server cache invalidation. */
+  const refetchFeedbackFirstPageAfterCreate = useCallback(() => {
+    if (refetchAfterCreateScheduledRef.current) return;
+    refetchAfterCreateScheduledRef.current = true;
+    setTimeout(() => {
+      refetchFeedbackFirstPage().catch(() => {}).finally(() => {
+        refetchAfterCreateScheduledRef.current = false;
+      });
+    }, 300);
+  }, [refetchFeedbackFirstPage]);
 
   /** Open tickets only; used for Execution Mode queue and progress. */
   const openFeedback = useMemo(
@@ -235,6 +241,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  /* Lock body scroll so only sidebar and main content scroll (Slack/Notion-style). */
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, []);
 
   /* Sync active session to extension when user opens this session page. */
@@ -370,7 +385,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /* In Execution Mode, ensure selection is an open ticket (open-only queue). */
   useEffect(() => {
     if (!executionMode) return;
-    if (openFeedback.length === 0) {
+    if (feedbackActiveCount === 0) {
       setSelectedId(null);
       return;
     }
@@ -378,13 +393,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (!current || getTicketStatus(current) !== "open") {
       setSelectedId(openFeedback[0].id);
     }
-  }, [executionMode, openFeedback, feedback, selectedId]);
+  }, [executionMode, feedbackActiveCount, feedback, selectedId]);
 
   /* ================= SELECTED ITEM (derived from feedback list) ================= */
 
   const selectedIndex = feedback.findIndex((f) => f.id === selectedId);
   const selectedIndexInOpen = openFeedback.findIndex((f) => f.id === selectedId);
-  const executionModeTotal = feedbackActiveCount > 0 ? feedbackActiveCount : openFeedback.length;
+  const executionModeTotal = feedbackActiveCount;
 
   const selectedItem = (() => {
     const ticket = feedback.find((t) => t.id === selectedId) ?? null;
@@ -392,7 +407,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return {
       ...ticket,
       index:
-        executionMode && openFeedback.length > 0
+        executionMode && feedbackActiveCount > 0
           ? selectedIndexInOpen !== -1
             ? selectedIndexInOpen + 1
             : 1
@@ -400,11 +415,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             ? selectedIndex + 1
             : 1,
       total:
-        executionMode && openFeedback.length > 0
+        executionMode && feedbackActiveCount > 0
           ? executionModeTotal
-          : feedbackTotal > 0
-            ? feedbackTotal
-            : feedback.length || 1,
+          : typeof feedbackTotal === "number"
+            ? Math.max(1, feedbackTotal)
+            : 1,
     };
   })();
 
@@ -726,11 +741,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const activeCountBefore = active.length;
     setFeedbackActiveCount((c) => Math.max(0, c - activeCountBefore));
     setFeedbackResolvedCount((c) => c + activeCountBefore);
+    await refetchFeedbackFirstPage();
   }, [
     feedback,
     setFeedback,
     setFeedbackActiveCount,
     setFeedbackResolvedCount,
+    refetchFeedbackFirstPage,
   ]);
 
   const handleMarkAllUnresolved = useCallback(async () => {
@@ -761,11 +778,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const resolvedCountBefore = resolved.length;
     setFeedbackResolvedCount((c) => Math.max(0, c - resolvedCountBefore));
     setFeedbackActiveCount((c) => c + resolvedCountBefore);
+    await refetchFeedbackFirstPage();
   }, [
     feedback,
     setFeedback,
     setFeedbackActiveCount,
     setFeedbackResolvedCount,
+    refetchFeedbackFirstPage,
   ]);
 
   /* ================= AI SAVE (Structure Engine V2) ================= */
@@ -795,9 +814,38 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (!workspaceId || !createdByUserId) return [];
     const effectiveFirstId =
       tickets.length > 0 && screenshotUrl !== null ? firstFeedbackId : null;
+
+    // Optimistic: add placeholder items immediately so UI updates without waiting.
+    const baseTime = Date.now();
+    const optimisticItems: (Feedback & { optimistic?: boolean })[] = tickets.map((t, i) => {
+      const tempId = `temp-${baseTime}-${i}`;
+      return {
+        id: tempId,
+        workspaceId,
+        sessionId,
+        userId: createdByUserId,
+        title: t.title ?? "",
+        description: typeof t.description === "string" ? t.description : (t.title ?? ""),
+        type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
+        isResolved: false,
+        createdAt: null,
+        contextSummary: typeof t.description === "string" ? t.description : null,
+        actionSteps: Array.isArray(t.actionSteps) && t.actionSteps.length > 0 ? t.actionSteps : null,
+        suggestedTags: t.suggestedTags ?? null,
+        screenshotUrl: i === 0 ? screenshotUrl : null,
+        clientTimestamp: Date.now(),
+        optimistic: true,
+      } as Feedback & { optimistic?: boolean };
+    });
+    setFeedback((prev) => [...optimisticItems, ...prev]);
+    if (optimisticItems.length > 0) setSelectedId(optimisticItems[0].id);
+    setFeedbackTotal((c) => c + optimisticItems.length);
+    setFeedbackActiveCount((c) => c + optimisticItems.length);
+
     const created: Feedback[] = [];
     for (let i = 0; i < tickets.length; i++) {
       const t = tickets[i];
+      const tempId = optimisticItems[i]!.id;
       const payload = {
         title: t.title,
         description:
@@ -818,30 +866,43 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           clarityConfidence: clarityMeta.clarityConfidence,
         }),
       };
-      const docRef = await addFeedback(
-        workspaceId,
-        sessionId,
-        createdByUserId,
-        payload,
-        i === 0 && effectiveFirstId ? effectiveFirstId : undefined
-      );
-      const newItem: Feedback = {
-        id: docRef.id,
-        workspaceId,
-        sessionId,
-        userId: createdByUserId,
-        title: payload.title,
-        description: payload.description,
-        type: payload.type,
-        isResolved: false,
-        createdAt: null,
-        contextSummary: payload.contextSummary ?? null,
-        actionSteps: payload.actionSteps?.length ? payload.actionSteps : null,
-        suggestedTags: payload.suggestedTags ?? null,
-        screenshotUrl: payload.screenshotUrl ?? null,
-        clientTimestamp: Date.now(),
-      };
-      created.push(newItem);
+      try {
+        const docRef = await addFeedback(
+          workspaceId,
+          sessionId,
+          createdByUserId,
+          payload,
+          i === 0 && effectiveFirstId ? effectiveFirstId : undefined
+        );
+        const newItem: Feedback = {
+          id: docRef.id,
+          workspaceId,
+          sessionId,
+          userId: createdByUserId,
+          title: payload.title,
+          description: payload.description,
+          type: payload.type,
+          isResolved: false,
+          createdAt: null,
+          contextSummary: payload.contextSummary ?? null,
+          actionSteps: payload.actionSteps?.length ? payload.actionSteps : null,
+          suggestedTags: payload.suggestedTags ?? null,
+          screenshotUrl: payload.screenshotUrl ?? null,
+          clientTimestamp: Date.now(),
+        };
+        created.push(newItem);
+        setFeedback((prev) =>
+          prev.map((item) => (item.id === tempId ? newItem : item))
+        );
+        if (i === 0) {
+          setSelectedId(newItem.id);
+          setNewTicketId(newItem.id);
+        }
+      } catch {
+        setFeedback((prev) => prev.filter((item) => item.id !== tempId));
+        setFeedbackTotal((c) => Math.max(0, c - 1));
+        setFeedbackActiveCount((c) => Math.max(0, c - 1));
+      }
     }
     return created;
   };
@@ -937,15 +998,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         clarityIssues: ["AI structuring failed"],
         clarityConfidence: 0,
       };
-      const docRef = await addFeedback(
-        workspaceId,
-        sessionId,
-        createdByUserId,
-        rawPayload,
-        firstFeedbackId
-      );
-      const newItem: Feedback = {
-        id: docRef.id,
+      const tempId = `temp-${Date.now()}`;
+      const optimisticItem: Feedback & { optimistic?: boolean } = {
+        id: tempId,
         workspaceId,
         sessionId,
         userId: createdByUserId,
@@ -959,12 +1014,49 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         suggestedTags: null,
         screenshotUrl: rawPayload.screenshotUrl ?? null,
         clientTimestamp: Date.now(),
+        optimistic: true,
       };
-      setFeedback((prev) => [newItem, ...prev]);
-      setSelectedId(newItem.id);
+      setFeedback((prev) => [optimisticItem, ...prev]);
+      setSelectedId(tempId);
       setFeedbackTotal((c) => c + 1);
       setFeedbackActiveCount((c) => c + 1);
-      return newItem;
+      try {
+        const docRef = await addFeedback(
+          workspaceId,
+          sessionId,
+          createdByUserId,
+          rawPayload,
+          firstFeedbackId
+        );
+        const newItem: Feedback = {
+          id: docRef.id,
+          workspaceId,
+          sessionId,
+          userId: createdByUserId,
+          title: rawPayload.title,
+          description: rawPayload.description,
+          type: rawPayload.type,
+          isResolved: false,
+          createdAt: null,
+          contextSummary: rawPayload.contextSummary ?? null,
+          actionSteps: null,
+          suggestedTags: null,
+          screenshotUrl: rawPayload.screenshotUrl ?? null,
+          clientTimestamp: Date.now(),
+        };
+        setFeedback((prev) =>
+          prev.map((item) => (item.id === tempId ? newItem : item))
+        );
+        setSelectedId(newItem.id);
+        setNewTicketId(newItem.id);
+        refetchFeedbackFirstPageAfterCreate();
+        return newItem;
+      } catch {
+        setFeedback((prev) => prev.filter((item) => item.id !== tempId));
+        setFeedbackTotal((c) => Math.max(0, c - 1));
+        setFeedbackActiveCount((c) => Math.max(0, c - 1));
+        return undefined;
+      }
     }
 
     /* Block submission when clarity is too low */
@@ -1004,11 +1096,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       clarityMeta
     );
     if (created.length === 0) return undefined;
-
-    setFeedback((prev) => [...created, ...prev]);
-    setSelectedId(created[0].id);
-    setFeedbackTotal((c) => c + created.length);
-    setFeedbackActiveCount((c) => c + created.length);
+    refetchFeedbackFirstPageAfterCreate();
     return created[0];
   };
 
@@ -1046,10 +1134,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       clarityMeta
     );
     if (created.length === 0) return;
-    setFeedback((prev) => [...created, ...prev]);
-    setSelectedId(created[0].id);
-    setFeedbackTotal((c) => c + created.length);
-    setFeedbackActiveCount((c) => c + created.length);
+    refetchFeedbackFirstPageAfterCreate();
   };
 
   const handleClaritySubmitAnyway = async () => {
@@ -1073,10 +1158,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       clarityMeta
     );
     if (created.length === 0) return;
-    setFeedback((prev) => [...created, ...prev]);
-    setSelectedId(created[0].id);
-    setFeedbackTotal((c) => c + created.length);
-    setFeedbackActiveCount((c) => c + created.length);
+    refetchFeedbackFirstPageAfterCreate();
   };
 
   const handleDeleteFeedback = async (id: string) => {
@@ -1098,6 +1180,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       const res = await authFetch(`/api/tickets/${id}`, { method: "DELETE" });
       const data = (await res.json()) as { success?: boolean; error?: string };
       if (!res.ok || !data?.success) throw new Error(data?.error ?? "Delete failed");
+      await refetchFeedbackFirstPage();
       router.push(`/dashboard/${sessionId}`);
     } catch {
       setFeedback(prevFeedback);
@@ -1170,7 +1253,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   if (executionMode) {
     return (
       <>
-        <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="flex h-screen overflow-hidden">
           <ExecutionModeLayout
             item={selectedItem}
             onExitExecutionMode={() => setExecutionMode(false)}
@@ -1256,10 +1339,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   return (
     <>
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside className="hidden lg:flex w-[300px] shrink-0 min-h-0 flex-col">
+      <div className="flex h-full overflow-hidden">
+        <aside className="hidden lg:flex w-[300px] flex-shrink-0 flex-col h-full overflow-hidden">
           <TicketList
             sessionTitle={session?.title ?? "Session"}
+            sessionStatus={session?.status}
             totalCount={feedbackTotal}
             openCount={feedbackActiveCount}
             resolvedCount={feedbackResolvedCount}
@@ -1286,6 +1370,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             hasMore={hasMoreFeedback}
             hasReachedLimit={feedbackReachedLimit}
             loadMoreRef={feedbackLoadMoreRef}
+            loading={feedbackLoading}
             scrollContainerRef={listScrollRef}
             onScrollContainerReady={() => setListScrollReady((n) => n + 1)}
             onMarkAllTicketsResolved={handleMarkAllResolved}
@@ -1294,8 +1379,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           />
         </aside>
 
-        <main className="surface-main flex-1 min-h-0 flex flex-col min-w-0">
-          <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--layer-1-border)] bg-[var(--layer-1-bg)]/80">
+        <main className="surface-main flex-1 flex flex-col overflow-hidden min-w-0">
+          <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--layer-1-border)] bg-[var(--layer-1-bg)]/80">
             <div className="lg:hidden">
               <button
                 type="button"
@@ -1305,7 +1390,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 Tickets
               </button>
             </div>
-            {openFeedback.length > 0 && (
+            {feedbackActiveCount > 0 && (
               <button
                 type="button"
                 onClick={() => setExecutionMode(true)}
@@ -1315,7 +1400,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               </button>
             )}
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto min-h-0">
             <div className="max-w-3xl mx-auto w-full px-6 py-4">
               {renderExecutionContent()}
             </div>
@@ -1430,6 +1515,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           >
             <TicketList
               sessionTitle={session?.title ?? "Session"}
+              sessionStatus={session?.status}
               totalCount={feedbackTotal}
               openCount={feedbackActiveCount}
               resolvedCount={feedbackResolvedCount}
@@ -1459,6 +1545,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               hasMore={hasMoreFeedback}
               hasReachedLimit={feedbackReachedLimit}
               loadMoreRef={feedbackLoadMoreRef}
+              loading={feedbackLoading}
               scrollContainerRef={listScrollRef}
               onScrollContainerReady={() => setListScrollReady((n) => n + 1)}
               onMarkAllTicketsResolved={handleMarkAllResolved}

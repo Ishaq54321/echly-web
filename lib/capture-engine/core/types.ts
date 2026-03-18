@@ -102,9 +102,11 @@ export type CaptureWidgetProps = {
   theme?: "dark" | "light";
   /** Called when user clicks theme toggle. */
   onThemeToggle?: () => void;
-  /** Extension: fetch sessions for Previous Sessions picker. */
-  fetchSessions?: () => Promise<Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number; [key: string]: unknown }>>;
-  /** Extension: true when backend has at least one session (from /api/sessions?limit=1). Used to show Previous Sessions button only when sessions exist. */
+  /** Extension: cursor-based fetch for Previous Sessions modal (limit=25, cursor). Required for extension resume modal. */
+  fetchSessionsPage?: (opts: { limit: number; cursor?: string | null }) => Promise<{ data: Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number; [key: string]: unknown }>; nextCursor: string | null; totalCount: number }>;
+  /** Extension: fetch single session detail for lazy hydration (feedbackCount, updatedAt). When provided, resume modal hydrates each row in background. */
+  fetchSessionDetail?: (sessionId: string) => Promise<{ feedbackCount?: number; updatedAt?: string; openCount?: number; resolvedCount?: number; [key: string]: unknown } | null>;
+  /** Extension: true when backend has at least one session (from recent IDs + GET /api/sessions/:id). Used to show Previous Sessions button only when sessions exist. */
   hasPreviousSessions?: boolean;
   /** Extension: when user selects a session from Previous Sessions picker. Parent should set active session, fetch feedback, then pass loadSessionWithPointers. If options.enterCaptureImmediately, parent should also start session mode (overlay) after load. */
   onPreviousSessionSelect?: (sessionId: string, options?: { enterCaptureImmediately?: boolean }) => void;
@@ -114,6 +116,16 @@ export type CaptureWidgetProps = {
   pointers?: StructuredFeedback[];
   /** Extension: true while loading a previous session's feedback; show spinner instead of empty state. */
   sessionLoading?: boolean;
+  /** Extension: open (active) count from backend; use instead of deriving from pointers. */
+  feedbackOpenCount?: number;
+  /** Extension: total count from backend (cursor-based pagination). */
+  feedbackTotalCount?: number;
+  /** Extension: true when more feedback pages are available. */
+  feedbackHasMore?: boolean;
+  /** Extension: true while loading next page of feedback. */
+  feedbackLoadingMore?: boolean;
+  /** Extension: called when user scrolls near bottom and hasMore; triggers ECHLY_FEEDBACK_LOAD_NEXT. */
+  onLoadMoreFeedback?: () => void;
   /** Extension: session title from globalUIState. When provided, overrides internal sessionTitle for display. */
   sessionTitleProp?: string | null;
   /** Extension: when session title is saved in tray. When provided, called instead of internal setSessionTitle (enables PATCH + broadcast). */
@@ -164,6 +176,8 @@ export type CaptureWidgetProps = {
   openResumeModal?: boolean;
   /** Extension: called when the resume/previous-sessions modal is closed so parent can clear openResumeModal. */
   onResumeModalClose?: () => void;
+  /** Extension: bump when a session is created or cache invalidated so the resume modal refetches first page and totalCount. */
+  sessionListVersion?: number;
   /** Extension: auth guard. Returns true if authenticated, false if login was triggered. Call before Start Session to open auth broker when logged out. */
   ensureAuthenticated?: () => Promise<boolean>;
   /** Extension: verify dashboard session before loading previous sessions list. If false, modal shows login-required UI and does not call /api/sessions. */

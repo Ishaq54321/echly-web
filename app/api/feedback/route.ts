@@ -6,56 +6,18 @@ import {
   getWorkspaceFeedbackAllRepo,
   getWorkspaceFeedbackWithCommentsRepo,
 } from "@/lib/repositories/feedbackRepository";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { resolveWorkspaceForUserLight } from "@/lib/server/resolveWorkspaceForUserLight";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { log } from "@/lib/utils/logger";
 import { corsHeaders } from "@/lib/server/cors";
-import { verifyExtensionToken } from "@/lib/server/extensionAuth";
-import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
-import { getSessionUser } from "@/lib/server/session";
-import { getCachedFeedback, setCachedFeedback } from "@/lib/server/cache/feedbackCache";
+import { requireAuth, type AuthUser } from "@/lib/server/auth";
+import {
+  getCachedFeedbackPage,
+  setCachedFeedbackPage,
+} from "@/lib/server/cache/feedbackCache";
 
-function unauthorized(message: string): Response {
-  return new Response(JSON.stringify({ error: message }), { status: 401 });
-}
-
-function base64UrlDecodeToString(input: string): string {
-  const b64 = input.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-  // Node runtime (Next.js): Buffer exists.
-  return Buffer.from(padded, "base64").toString("utf8");
-}
-
-function peekJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const json = base64UrlDecodeToString(parts[1] ?? "");
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
-  const authHeader = req.headers.get("Authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7).trim();
-    const payload = peekJwtPayload(token);
-    if (payload && payload.type === "extension") {
-      const decoded = await verifyExtensionToken(token);
-      if (!decoded) throw unauthorized("Unauthorized - Invalid extension token");
-      return { uid: decoded.uid, email: decoded.email ?? undefined };
-    }
-    const decoded = await verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email ?? undefined };
-  }
-
-  const sessionUser = await getSessionUser(req);
-  if (sessionUser) return { uid: sessionUser.uid, email: sessionUser.email ?? undefined };
-  throw unauthorized("Unauthorized - Missing token");
-}
+const prefetchInFlight = new Set<string>();
 
 export async function OPTIONS(req: NextRequest) {
   return new Response(null, {
@@ -115,7 +77,72 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
     status: (item as unknown as { status?: string }).status,
     isResolved: (item as unknown as { isResolved?: boolean }).isResolved,
     isSkipped: (item as unknown as { isSkipped?: boolean }).isSkipped,
+
+    // Screenshot for feedback list and detail
+    screenshotUrl: item.screenshotUrl ?? null,
   };
+}
+
+async function fetchNextPageInBackground(
+  workspaceId: string,
+  sessionId: string,
+  cursor: string,
+  userId: string,
+  limit: number
+) {
+  const key = `${workspaceId}:${sessionId}:${cursor}`;
+  if (prefetchInFlight.has(key)) return;
+  prefetchInFlight.add(key);
+  try {
+    const nextPage = await getSessionFeedbackPageForUserWithStringCursorRepo({
+      workspaceId,
+      sessionId,
+      userId,
+      limit,
+      cursor,
+    });
+    const data = {
+      feedback: nextPage.feedback.map(serializeFeedbackMinimal),
+      nextCursor: nextPage.nextCursor,
+      hasMore: nextPage.hasMore,
+    };
+    setCachedFeedbackPage(workspaceId, sessionId, cursor, data);
+
+    // Second-level prefetch: next-next page so user never hits Firestore while scrolling
+    if (nextPage.nextCursor) {
+      const nextKey = `${workspaceId}:${sessionId}:${nextPage.nextCursor}`;
+      if (!prefetchInFlight.has(nextKey)) {
+        prefetchInFlight.add(nextKey);
+        try {
+          const nextNextPage = await getSessionFeedbackPageForUserWithStringCursorRepo({
+            workspaceId,
+            sessionId,
+            userId,
+            limit,
+            cursor: nextPage.nextCursor,
+          });
+          const nextNextData = {
+            feedback: nextNextPage.feedback.map(serializeFeedbackMinimal),
+            nextCursor: nextNextPage.nextCursor,
+            hasMore: nextNextPage.hasMore,
+          };
+          setCachedFeedbackPage(
+            workspaceId,
+            sessionId,
+            nextPage.nextCursor,
+            nextNextData
+          );
+        } catch {
+          // Prefetch is best-effort; ignore errors
+        }
+        prefetchInFlight.delete(nextKey);
+      }
+    }
+  } catch {
+    // Prefetch is best-effort; ignore errors
+  } finally {
+    prefetchInFlight.delete(key);
+  }
 }
 
 /**
@@ -124,31 +151,34 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
  */
 export async function GET(req: NextRequest) {
   const totalStart = Date.now();
+  console.log("[TRACE] STEP 1: request received");
   log("[API] GET /api/feedback start");
   console.log("[FEEDBACK ROUTE CHECK]", {
     hasBilling: typeof (globalThis as unknown as { getWorkspaceEntitlements?: unknown }).getWorkspaceEntitlements !== "undefined",
   });
-  let user;
-  try {
-    const t0 = Date.now();
-    user = await requireAuthFast(req);
-    const authTime = Date.now() - t0;
-    // Keep authTime for perf breakdown log later
-    (req as unknown as { __echly_authTime?: number }).__echly_authTime = authTime;
-  } catch (res) {
-    const errRes = res as Response;
-    return new NextResponse(errRes.body, {
-      status: errRes.status,
-      statusText: errRes.statusText,
-      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
-    });
-  }
+  const userIdFromHeader = req.headers.get("x-user-id");
+  const authPromise =
+    typeof userIdFromHeader === "string" && userIdFromHeader.trim()
+      ? Promise.resolve({ uid: userIdFromHeader.trim() } as AuthUser)
+      : requireAuth(req);
+  const workspacePromise = authPromise.then((auth) => resolveWorkspaceForUserLight(auth.uid, req));
 
-  const tWorkspace0 = Date.now();
+  let auth: AuthUser;
   let resolvedWorkspaceId: string | null = null;
   try {
-    const { workspaceId } = await resolveWorkspaceForUserLight(user.uid, req);
-    resolvedWorkspaceId = workspaceId;
+    console.log("[TRACE] STEP 2+3: auth + workspace parallel start");
+    const t0 = Date.now();
+    const [authResult, workspaceResult] = await Promise.all([
+      authPromise,
+      workspacePromise,
+    ]);
+    auth = authResult;
+    resolvedWorkspaceId = workspaceResult.workspaceId;
+    const parallelTime = Date.now() - t0;
+    console.log("[TRACE] STEP 2+3: auth + workspace done");
+    console.log("[TIME] auth+workspace parallel:", parallelTime);
+    (req as unknown as { __echly_authTime?: number }).__echly_authTime = parallelTime;
+    (req as unknown as { __echly_workspaceTime?: number }).__echly_workspaceTime = 0;
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
@@ -156,26 +186,31 @@ export async function GET(req: NextRequest) {
         headers: corsHeaders(req),
       });
     }
+    const errRes = err as Response;
+    if (errRes?.status) {
+      return new NextResponse(errRes.body, {
+        status: errRes.status,
+        statusText: errRes.statusText,
+        headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
+      });
+    }
     throw err;
   }
-  const workspaceTime = Date.now() - tWorkspace0;
-  (req as unknown as { __echly_workspaceTime?: number }).__echly_workspaceTime = workspaceTime;
 
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId");
   const cursor = searchParams.get("cursor") ?? "";
-  const limitParam = searchParams.get("limit");
-  const DEFAULT_LIMIT = 20;
-  const requestedLimit = limitParam ? parseInt(limitParam, 10) : NaN;
-  const normalizedRequestedLimit = Number.isFinite(requestedLimit) ? Math.max(1, requestedLimit) : DEFAULT_LIMIT;
-  const safeLimit = Math.min(normalizedRequestedLimit, 50);
+  /** Session feedback list: default 25, enforce exactly 25 per page for consistent initial load and scroll (25 → 50 → 75). */
+  const limit = Number(searchParams.get("limit")) || 25;
+  const safeLimit = Math.min(Math.max(1, limit), 25);
 
   // When sessionId is omitted, return feedback across sessions (Discussion inbox)
   // Use conversationsOnly=true to fetch only feedback with comments (conversation feed)
   if (!sessionId || sessionId.trim() === "") {
     const conversationsOnly = searchParams.get("conversationsOnly") === "true";
     try {
-      const workspaceId = resolvedWorkspaceId ?? user.uid;
+      const workspaceId = resolvedWorkspaceId ?? auth.uid;
+      console.log("[TRACE] STEP 4: firestore query start");
       const tFs0 = Date.now();
       const feedback = conversationsOnly
         ? await getWorkspaceFeedbackWithCommentsRepo({
@@ -185,6 +220,8 @@ export async function GET(req: NextRequest) {
           })
         : await getWorkspaceFeedbackAllRepo(workspaceId, safeLimit);
       const firestoreTime = Date.now() - tFs0;
+      console.log("[TRACE] STEP 4: firestore done");
+      console.log("[TIME] firestore:", firestoreTime);
 
       const totalTime = Date.now() - totalStart;
       console.log("[PERF BREAKDOWN]", {
@@ -195,6 +232,7 @@ export async function GET(req: NextRequest) {
       });
 
       log("[API] GET /api/feedback (all) duration:", totalTime);
+      console.log("[TRACE] STEP 5: response sent");
       return NextResponse.json(
         {
           feedback: feedback.map(serializeFeedbackMinimal),
@@ -220,44 +258,60 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const workspaceId = resolvedWorkspaceId ?? user.uid;
+    const workspaceId = resolvedWorkspaceId ?? auth.uid;
     const isFirstPage = !cursor || cursor.trim() === "";
+    const cursorKey = isFirstPage ? "FIRST" : cursor;
 
-    if (isFirstPage) {
-      const cached = getCachedFeedback(workspaceId, sessionId);
-      if (cached) {
-        const totalTime = Date.now() - totalStart;
-        console.log("[PERF BREAKDOWN]", {
-          authTime: (req as unknown as { __echly_authTime?: number }).__echly_authTime ?? null,
-          workspaceTime: (req as unknown as { __echly_workspaceTime?: number }).__echly_workspaceTime ?? null,
-          firestoreTime: 0,
-          totalTime,
-        });
-
-        log("[API] GET /api/feedback duration (cached):", totalTime);
-        return NextResponse.json(cached, { headers: corsHeaders(req) });
-      }
+    const cached = getCachedFeedbackPage(workspaceId, sessionId!, cursorKey);
+    if (cached) {
+      const totalTime = Date.now() - totalStart;
+      console.log("[CACHE CHECK]", { hit: true, cursorKey });
+      console.log("[PERF BREAKDOWN]", {
+        authTime: (req as unknown as { __echly_authTime?: number }).__echly_authTime ?? null,
+        workspaceTime: (req as unknown as { __echly_workspaceTime?: number }).__echly_workspaceTime ?? null,
+        firestoreTime: 0,
+        totalTime,
+      });
+      log("[API] GET /api/feedback duration (cached):", totalTime);
+      console.log("[TRACE] STEP 5: response sent");
+      return NextResponse.json(cached, { headers: corsHeaders(req) });
     }
 
+    console.log("[TRACE] STEP 4: firestore query start");
     const tFs0 = Date.now();
-    const pageResult = await getSessionFeedbackPageForUserWithStringCursorRepo({
-      workspaceId,
-      sessionId,
-      userId: user.uid,
-      limit: safeLimit,
-      cursor: isFirstPage ? undefined : cursor,
-    });
+    const [pageResult, sessionDoc] = await Promise.all([
+      getSessionFeedbackPageForUserWithStringCursorRepo({
+        workspaceId,
+        sessionId,
+        userId: auth.uid,
+        limit: safeLimit,
+        cursor: isFirstPage ? undefined : cursor,
+      }),
+      getSessionByIdRepo(sessionId),
+    ]);
     const firestoreTime = Date.now() - tFs0;
+    console.log("[TRACE] STEP 4: firestore done");
+    console.log("[TIME] firestore:", firestoreTime);
     const { feedback, nextCursor, hasMore } = pageResult;
+    const totalCount = typeof sessionDoc?.feedbackCount === "number" ? sessionDoc.feedbackCount : 0;
+    const openCount = typeof sessionDoc?.openCount === "number" ? sessionDoc.openCount : 0;
+    const resolvedCount = typeof sessionDoc?.resolvedCount === "number" ? sessionDoc.resolvedCount : 0;
+    const skippedCount = typeof sessionDoc?.skippedCount === "number" ? sessionDoc.skippedCount : 0;
 
     const responseBody = {
       feedback: feedback.map(serializeFeedbackMinimal),
       nextCursor,
       hasMore,
+      totalCount,
+      openCount,
+      resolvedCount,
+      skippedCount,
     };
 
-    if (isFirstPage) {
-      setCachedFeedback(workspaceId, sessionId, responseBody);
+    setCachedFeedbackPage(workspaceId, sessionId, cursorKey, responseBody);
+
+    if (nextCursor) {
+      fetchNextPageInBackground(workspaceId, sessionId, nextCursor, auth.uid, safeLimit).catch(() => {});
     }
 
     const totalTime = Date.now() - totalStart;
@@ -269,6 +323,7 @@ export async function GET(req: NextRequest) {
     });
 
     log("[API] GET /api/feedback duration:", totalTime);
+    console.log("[TRACE] STEP 5: response sent");
     return NextResponse.json(
       responseBody,
       { headers: corsHeaders(req) }

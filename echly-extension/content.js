@@ -13882,37 +13882,57 @@
   }
 
   // echly-extension/src/cachedSessions.ts
-  var TTL_MS = 3e4;
-  var cached = null;
-  var inFlight = null;
-  async function getSessionsCached(fetchFn) {
-    const now = Date.now();
-    if (cached && now - cached.at < TTL_MS) {
-      return cached.sessions;
-    }
-    if (inFlight) {
-      return inFlight;
-    }
-    const promise = (async () => {
-      try {
-        const res = await fetchFn("/api/sessions");
-        const json = await res.json();
-        const sessions = json.sessions ?? [];
-        if (res.ok && json.success) {
-          cached = { sessions, at: Date.now() };
-          return sessions;
-        }
-        return [];
-      } finally {
-        inFlight = null;
-      }
-    })();
-    inFlight = promise;
-    return promise;
+  var HYDRATED_TTL_MS = 6e4;
+  var STORAGE_KEY_RECENT_IDS = "echlyRecentSessionIds";
+  var MAX_RECENT_IDS = 50;
+  var hydratedCache = /* @__PURE__ */ new Map();
+  function sessionFromApiJson(json) {
+    const s = json?.session;
+    if (!s?.id) return null;
+    return {
+      id: s.id,
+      title: s.title ?? "Untitled Session",
+      updatedAt: s.updatedAt,
+      openCount: s.openCount,
+      resolvedCount: s.resolvedCount,
+      feedbackCount: s.feedbackCount
+    };
+  }
+  async function addRecentSessionId(sessionId) {
+    if (!sessionId || typeof chrome === "undefined" || !chrome.storage?.local?.get) return;
+    const stored = await new Promise((resolve) => {
+      chrome.storage.local.get(STORAGE_KEY_RECENT_IDS, (result) => {
+        const ids = result[STORAGE_KEY_RECENT_IDS];
+        resolve(Array.isArray(ids) ? ids.filter((x) => typeof x === "string") : []);
+      });
+    });
+    const next = [sessionId, ...stored.filter((id) => id !== sessionId)].slice(0, MAX_RECENT_IDS);
+    await new Promise((resolve) => {
+      chrome.storage.local.set({ [STORAGE_KEY_RECENT_IDS]: next }, () => resolve());
+    });
+    invalidateSessionsCache();
   }
   function invalidateSessionsCache() {
-    cached = null;
-    inFlight = null;
+    hydratedCache.clear();
+  }
+  async function getSessionDetailCached(fetchFn, sessionId) {
+    const now = Date.now();
+    const entry = hydratedCache.get(sessionId);
+    if (entry && now - entry.at < HYDRATED_TTL_MS) {
+      return entry.data;
+    }
+    try {
+      const res = await fetchFn(`/api/sessions/${sessionId}`);
+      const json = await res.json();
+      if (!res.ok || !json.success) return null;
+      const item = sessionFromApiJson(json);
+      if (item) {
+        hydratedCache.set(sessionId, { data: item, at: Date.now() });
+      }
+      return item;
+    } catch {
+      return null;
+    }
   }
 
   // echly-extension/src/contentScreenshot.ts
@@ -37152,7 +37172,7 @@
       const loadFeedback = async () => {
         console.log("[ECHLY CORE] fetch via environment");
         const res = await environment.authenticatedFetch(
-          `/api/feedback?sessionId=${sessionId}&limit=20`
+          `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=25`
         );
         const data = await res.json();
         const existing = data?.feedback ?? [];
@@ -38739,7 +38759,7 @@
           fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif'
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { fontSize: 14, fontWeight: 600, color: "#F3F4F6" }, children: sessionPaused ? "Session paused" : "Session started" }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { style: { fontSize: 14, fontWeight: 600, color: "#F3F4F6" }, children: sessionPaused ? "Paused \u2014 resume to continue" : "Session started" }),
           pausePending ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
             "button",
             {
@@ -39392,6 +39412,8 @@
   // lib/capture-engine/core/ResumeSessionModal.tsx
   var import_jsx_runtime8 = __toESM(require_jsx_runtime());
   var import_react14 = __toESM(require_react());
+  var INITIAL_PAGE_LIMIT = 25;
+  var SKELETON_ROWS = 4;
   function filterSessions(sessions, filter) {
     if (filter === "all") return sessions;
     const now = Date.now();
@@ -39423,31 +39445,140 @@
     "7days": "Last 7 days",
     "30days": "Last 30 days"
   };
+  var CONCURRENCY = 3;
+  async function runWithConcurrency(items, concurrency, fn) {
+    const results = [];
+    let index = 0;
+    async function worker() {
+      while (index < items.length) {
+        const i = index++;
+        const item = items[i];
+        results[i] = await fn(item);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+    return results;
+  }
   function ResumeSessionModal({
     open,
     onClose,
-    fetchSessions,
+    fetchSessionsPage,
+    fetchSessionDetail,
     onSelectSession,
     theme = "dark",
     checkAuth,
-    onOpenLogin
+    onOpenLogin,
+    sessionListVersion
   }) {
     const [sessions, setSessions] = (0, import_react14.useState)([]);
+    const [cursor, setCursor] = (0, import_react14.useState)(null);
+    const [hasMore, setHasMore] = (0, import_react14.useState)(true);
+    const [isLoadingMore, setIsLoadingMore] = (0, import_react14.useState)(false);
+    const [totalCount, setTotalCount] = (0, import_react14.useState)(0);
     const [loading, setLoading] = (0, import_react14.useState)(false);
     const [error, setError] = (0, import_react14.useState)(null);
     const [search, setSearch] = (0, import_react14.useState)("");
     const [filter, setFilter] = (0, import_react14.useState)("all");
     const [loginRequired, setLoginRequired] = (0, import_react14.useState)(false);
     const isLight = theme === "light";
+    const hasLoadedRef = (0, import_react14.useRef)(false);
+    const hasHydratedRef = (0, import_react14.useRef)(false);
+    const scrollContainerRef = (0, import_react14.useRef)(null);
+    const prevSessionListVersionRef = (0, import_react14.useRef)(sessionListVersion);
+    (0, import_react14.useEffect)(() => {
+      if (!open || sessionListVersion === void 0) return;
+      if (prevSessionListVersionRef.current === sessionListVersion) return;
+      prevSessionListVersionRef.current = sessionListVersion;
+      let isMounted = true;
+      (async () => {
+        try {
+          const res = await fetchSessionsPage({ limit: INITIAL_PAGE_LIMIT });
+          if (!isMounted) return;
+          setSessions(res.data.map((s) => ({ ...s, isLoading: true })));
+          setCursor(res.nextCursor);
+          setHasMore(!!res.nextCursor);
+          setTotalCount(res.totalCount);
+          const list = res.data;
+          if (fetchSessionDetail && list.length > 0) {
+            runWithConcurrency(list, CONCURRENCY, async (s) => {
+              let detail = null;
+              try {
+                detail = await fetchSessionDetail(s.id);
+              } catch {
+              }
+              if (!isMounted) return null;
+              setSessions(
+                (prev) => prev.map(
+                  (x) => x.id === s.id ? { ...x, ...detail ?? {}, isLoading: false } : x
+                )
+              );
+              return detail;
+            }).catch(() => {
+            });
+          } else if (list.length > 0) {
+            setSessions(
+              (prev) => prev.map((s) => ({ ...s, isLoading: false }))
+            );
+          }
+        } catch (e) {
+          console.error("[ECHLY UX] refetch sessions failed", e);
+        }
+      })();
+      return () => {
+        isMounted = false;
+      };
+    }, [open, sessionListVersion, fetchSessionsPage, fetchSessionDetail]);
+    const loadMore = (0, import_react14.useCallback)(async () => {
+      if (isLoadingMore || !hasMore) return;
+      setIsLoadingMore(true);
+      try {
+        const res = await fetchSessionsPage({ limit: INITIAL_PAGE_LIMIT, cursor: cursor || void 0 });
+        const newSessions = res.data.map((s) => ({ ...s, isLoading: true }));
+        setSessions((prev) => [...prev, ...newSessions]);
+        setCursor(res.nextCursor);
+        setHasMore(!!res.nextCursor);
+        if (fetchSessionDetail && newSessions.length > 0) {
+          runWithConcurrency(newSessions, CONCURRENCY, async (s) => {
+            let detail = null;
+            try {
+              detail = await fetchSessionDetail(s.id);
+            } catch {
+            }
+            setSessions(
+              (prev) => prev.map(
+                (x) => x.id === s.id ? { ...x, ...detail ?? {}, isLoading: false } : x
+              )
+            );
+            return detail;
+          }).catch(() => {
+          });
+        } else if (newSessions.length > 0) {
+          setSessions(
+            (prev) => prev.map(
+              (x) => newSessions.some((n) => n.id === x.id) ? { ...x, isLoading: false } : x
+            )
+          );
+        }
+      } finally {
+        setIsLoadingMore(false);
+      }
+    }, [fetchSessionsPage, fetchSessionDetail, isLoadingMore, hasMore, cursor]);
     (0, import_react14.useEffect)(() => {
       if (!open) return;
+      prevSessionListVersionRef.current = sessionListVersion ?? 0;
       setSearch("");
       setFilter("all");
       setError(null);
       setLoginRequired(false);
+      setSessions([]);
+      setCursor(null);
+      setHasMore(true);
+      setTotalCount(0);
+      hasLoadedRef.current = false;
       let isMounted = true;
-      const load = async () => {
-        console.log("[ECHLY UX] fetching sessions inside modal");
+      const loadSessions = async () => {
+        if (hasLoadedRef.current) return;
+        hasLoadedRef.current = true;
         setLoading(true);
         try {
           if (checkAuth) {
@@ -39459,10 +39590,39 @@
               return;
             }
           }
-          const data = await fetchSessions?.();
-          if (isMounted) {
-            setSessions(data ?? []);
-            console.log("[ECHLY UX] sessions loaded:", data?.length ?? 0);
+          const res = await fetchSessionsPage({ limit: INITIAL_PAGE_LIMIT });
+          if (!isMounted) return;
+          setSessions(
+            res.data.map((s) => ({
+              ...s,
+              isLoading: true
+            }))
+          );
+          setCursor(res.nextCursor);
+          setHasMore(!!res.nextCursor);
+          setTotalCount(res.totalCount);
+          const list = res.data;
+          if (fetchSessionDetail && list.length > 0) {
+            hasHydratedRef.current = true;
+            runWithConcurrency(list, CONCURRENCY, async (s) => {
+              let detail = null;
+              try {
+                detail = await fetchSessionDetail(s.id);
+              } catch {
+              }
+              if (!isMounted) return null;
+              setSessions(
+                (prev) => prev.map(
+                  (x) => x.id === s.id ? { ...x, ...detail ?? {}, isLoading: false } : x
+                )
+              );
+              return detail;
+            }).catch(() => {
+            });
+          } else if (list.length > 0) {
+            setSessions(
+              (prev) => prev.map((s) => ({ ...s, isLoading: false }))
+            );
           }
         } catch (e) {
           console.error("[ECHLY UX] failed to load sessions", e);
@@ -39471,11 +39631,24 @@
           if (isMounted) setLoading(false);
         }
       };
-      load();
+      loadSessions();
       return () => {
         isMounted = false;
       };
-    }, [open, fetchSessions, checkAuth]);
+    }, [open, fetchSessionsPage, fetchSessionDetail, checkAuth]);
+    (0, import_react14.useEffect)(() => {
+      if (!scrollContainerRef.current) return;
+      const el = scrollContainerRef.current;
+      const onScroll = () => {
+        if (isLoadingMore || !hasMore) return;
+        const { scrollTop, clientHeight, scrollHeight } = el;
+        if (scrollTop + clientHeight >= scrollHeight * 0.7) {
+          loadMore();
+        }
+      };
+      el.addEventListener("scroll", onScroll, { passive: true });
+      return () => el.removeEventListener("scroll", onScroll);
+    }, [isLoadingMore, hasMore, loadMore]);
     const filtered = (0, import_react14.useMemo)(() => {
       let list = filterSessions(sessions, filter);
       if (search.trim()) {
@@ -39492,6 +39665,16 @@
       const resolved = typeof s.resolvedCount === "number" ? s.resolvedCount : 0;
       const skipped = typeof s.skippedCount === "number" ? s.skippedCount : 0;
       return open2 + resolved + skipped;
+    };
+    const feedbackSubline = (s) => {
+      if (s.isLoading === true) return "Loading...";
+      const n = feedbackCount(s);
+      const items = n === 1 ? "feedback item" : "feedback items";
+      return `${n} ${items} \xB7 ${formatLastUpdated(s.updatedAt ?? s.createdAt)}`;
+    };
+    const sessionTitle = (s) => {
+      if (s.isLoading === true) return "Loading...";
+      return s.title?.trim() || "Untitled Session";
     };
     if (!open) return null;
     return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
@@ -39568,6 +39751,7 @@
                       children: loginRequired ? "Previous Sessions" : "Resume Feedback Session"
                     }
                   ),
+                  !loginRequired && (loading || sessions.length > 0 || totalCount > 0) && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { style: { margin: "0 0 12px", fontSize: 13, color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA" }, children: loading ? "Loading\u2026" : `${totalCount} session${totalCount === 1 ? "" : "s"}` }),
                   !loginRequired && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
                     /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                       "input",
@@ -39610,7 +39794,7 @@
                     )) })
                   ] })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { flex: 1, overflow: "auto", minHeight: 200, maxHeight: 360 }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { ref: scrollContainerRef, style: { flex: 1, overflow: "auto", minHeight: 200, maxHeight: 360 }, children: [
                   loginRequired && onOpenLogin && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: {
                     display: "flex",
                     flexDirection: "column",
@@ -39662,7 +39846,7 @@
                     fontSize: 14
                   }, children: [
                     /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "echly-spinner", style: { display: "inline-block", marginRight: 8, verticalAlign: "middle" }, "aria-hidden": true }),
-                    "Loading sessions..."
+                    "Loading previous sessions..."
                   ] }),
                   !loginRequired && error && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { padding: 24, color: "#EF4444", fontSize: 14 }, children: error }),
                   !loginRequired && !loading && !error && filtered.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: {
@@ -39670,61 +39854,79 @@
                     textAlign: "center",
                     color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
                     fontSize: 14
-                  }, children: sessions.length === 0 ? "No previous sessions yet" : "No sessions match." }),
-                  !loginRequired && !loading && !error && filtered.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("ul", { style: { listStyle: "none", margin: 0, padding: 12 }, children: filtered.map((s) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { style: { marginBottom: 4 }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                    "button",
-                    {
-                      type: "button",
-                      className: "echly-resume-session-item",
-                      onClick: () => {
-                        onSelectSession(s.id);
-                        onClose();
-                      },
-                      style: {
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "14px 16px",
-                        borderRadius: 14,
-                        border: "none",
-                        background: "transparent",
-                        color: isLight ? "#1F2937" : "#F3F4F6",
-                        fontSize: 14,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 12
-                      },
-                      children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                          FileText,
-                          {
-                            className: "echly-resume-session-icon",
-                            style: {
-                              width: 18,
-                              height: 18,
-                              color: isLight ? "#111827" : "white",
-                              opacity: 0.9,
-                              flexShrink: 0,
-                              marginTop: 2
+                  }, children: totalCount === 0 && sessions.length === 0 ? "No previous sessions yet" : "No sessions match." }),
+                  !loginRequired && !loading && !error && filtered.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("ul", { style: { listStyle: "none", margin: 0, padding: 12 }, children: [
+                    filtered.map((s) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { style: { marginBottom: 4 }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                      "button",
+                      {
+                        type: "button",
+                        className: "echly-resume-session-item",
+                        onClick: () => {
+                          onSelectSession(s.id);
+                          onClose();
+                        },
+                        style: {
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "14px 16px",
+                          borderRadius: 14,
+                          border: "none",
+                          background: "transparent",
+                          color: isLight ? "#1F2937" : "#F3F4F6",
+                          fontSize: 14,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12
+                        },
+                        children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                            FileText,
+                            {
+                              className: "echly-resume-session-icon",
+                              style: {
+                                width: 18,
+                                height: 18,
+                                color: isLight ? "#111827" : "white",
+                                opacity: 0.9,
+                                flexShrink: 0,
+                                marginTop: 2
+                              }
                             }
-                          }
-                        ),
-                        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { flex: 1, minWidth: 0 }, children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { fontWeight: 600 }, children: s.title?.trim() || "Untitled Session" }),
-                          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: {
-                            fontSize: 12,
-                            fontWeight: 500,
-                            color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
-                            marginTop: 4
-                          }, children: [
-                            feedbackCount(s),
-                            " feedback items \xB7 ",
-                            formatLastUpdated(s.updatedAt)
+                          ),
+                          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { flex: 1, minWidth: 0 }, children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { fontWeight: 600 }, children: sessionTitle(s) }),
+                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: {
+                              fontSize: 12,
+                              fontWeight: 500,
+                              color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
+                              marginTop: 4
+                            }, children: feedbackSubline(s) })
                           ] })
-                        ] })
-                      ]
-                    }
-                  ) }, s.id)) })
+                        ]
+                      }
+                    ) }, s.id)),
+                    isLoadingMore && Array.from({ length: SKELETON_ROWS }).map((_, i) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { style: { marginBottom: 4 }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                      "div",
+                      {
+                        style: {
+                          padding: "14px 16px",
+                          borderRadius: 14,
+                          background: isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.06)",
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12
+                        },
+                        children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { width: 18, height: 18, borderRadius: 4, background: isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.1)", flexShrink: 0, marginTop: 2 } }),
+                          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { flex: 1, minWidth: 0 }, children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { height: 14, borderRadius: 4, background: isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.1)", width: "70%", marginBottom: 8 } }),
+                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { height: 12, borderRadius: 4, background: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)", width: "50%" } })
+                          ] })
+                        ]
+                      }
+                    ) }, `skeleton-${i}`))
+                  ] })
                 ] }),
                 /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: {
                   padding: 16,
@@ -39937,12 +40139,18 @@
     captureDisabled = false,
     theme = "dark",
     onThemeToggle,
-    fetchSessions,
+    fetchSessionsPage,
+    fetchSessionDetail,
     hasPreviousSessions = false,
     onPreviousSessionSelect,
     loadSessionWithPointers,
     pointers: pointersProp,
     sessionLoading = false,
+    feedbackOpenCount,
+    feedbackTotalCount,
+    feedbackHasMore,
+    feedbackLoadingMore,
+    onLoadMoreFeedback,
     onSessionLoaded,
     onSessionEnd: onSessionEndCallback,
     onCreateSession,
@@ -39965,6 +40173,7 @@
     onSessionTitleChange: onSessionTitleChangeProp,
     openResumeModal: openResumeModalProp,
     onResumeModalClose,
+    sessionListVersion,
     verifySessionBeforeSessions,
     onTriggerLogin,
     sessionLimitReached,
@@ -40039,7 +40248,7 @@
     const sessionModeActive = globalSessionModeActive === true || globalSessionPaused === true || optimisticSessionActive;
     const showHomeScreen = !sessionModeActive;
     const isStartingSession = state.sessionStatus === "starting";
-    const openTicketsCount = state.pointers.filter((p) => {
+    const openTicketsCount = typeof feedbackOpenCount === "number" ? feedbackOpenCount : state.pointers.filter((p) => {
       const status = p.status;
       const isResolved = p.isResolved;
       if (status === "resolved" || isResolved === true) return false;
@@ -40048,13 +40257,29 @@
     const ticketsToShow = state.pointers.slice(0, Math.min(visibleTickets, state.pointers.length));
     const handleListScroll = import_react17.default.useCallback(() => {
       const el = listScrollRef.current;
-      if (!el || state.pointers.length <= visibleTickets) return;
+      if (!el) return;
       const { scrollTop, scrollHeight, clientHeight } = el;
       const scrollRatio = (scrollTop + clientHeight) / scrollHeight;
+      const scrollPosition = scrollRatio;
+      const triggered = Boolean(
+        extensionMode && feedbackHasMore && !feedbackLoadingMore && onLoadMoreFeedback && scrollRatio > 0.85
+      );
+      console.log("[SCROLL]", { scrollPosition, triggered });
+      if (triggered && onLoadMoreFeedback) {
+        onLoadMoreFeedback();
+      }
+      if (state.pointers.length <= visibleTickets) return;
       if (scrollRatio > 0.8) {
         setVisibleTickets((prev) => Math.min(prev + 10, state.pointers.length));
       }
-    }, [state.pointers.length, visibleTickets]);
+    }, [
+      extensionMode,
+      state.pointers.length,
+      visibleTickets,
+      feedbackHasMore,
+      feedbackLoadingMore,
+      onLoadMoreFeedback
+    ]);
     (0, import_react17.useEffect)(() => {
       if (state.pointers.length < visibleTickets) {
         setVisibleTickets((prev) => Math.min(prev, Math.max(10, state.pointers.length)));
@@ -40098,7 +40323,7 @@
         onCaptureModeChange?.(mode);
       }
     }
-    return /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, extensionMode && fetchSessions && onPreviousSessionSelect && /* @__PURE__ */ import_react17.default.createElement(
+    return /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, extensionMode && fetchSessionsPage && onPreviousSessionSelect && /* @__PURE__ */ import_react17.default.createElement(
       ResumeSessionModal,
       {
         open: showResumeModal,
@@ -40106,7 +40331,8 @@
           setResumeModalOpen(false);
           onResumeModalClose?.();
         },
-        fetchSessions,
+        fetchSessionsPage,
+        fetchSessionDetail,
         onSelectSession: (sessionId2) => {
           setShowCommandScreen(false);
           onPreviousSessionSelect(sessionId2);
@@ -40114,7 +40340,8 @@
         },
         theme,
         checkAuth: verifySessionBeforeSessions,
-        onOpenLogin: onTriggerLogin
+        onOpenLogin: onTriggerLogin,
+        sessionListVersion
       }
     ), captureRootEl && /* @__PURE__ */ import_react17.default.createElement(
       CaptureLayer,
@@ -40253,7 +40480,7 @@
             highlightTicketId: state.highlightTicketId,
             onExpandChange: handlers.setExpandedId
           }
-        ))),
+        )), feedbackLoadingMore && /* @__PURE__ */ import_react17.default.createElement("div", { className: "flex items-center justify-center py-4 text-xs text-[hsl(var(--text-tertiary))]", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "flex items-center gap-2 animate-pulse" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "w-1.5 h-1.5 rounded-full bg-current opacity-60" }), /* @__PURE__ */ import_react17.default.createElement("div", { className: "w-1.5 h-1.5 rounded-full bg-current opacity-60", style: { animationDelay: "75ms" } }), /* @__PURE__ */ import_react17.default.createElement("div", { className: "w-1.5 h-1.5 rounded-full bg-current opacity-60", style: { animationDelay: "150ms" } })), /* @__PURE__ */ import_react17.default.createElement("span", { className: "ml-2" }, "Loading more"))),
         sessionModeActive && !hasTickets && !isProcessingFeedback && !(feedbackJobs && feedbackJobs.length > 0) && !sessionLoading && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-empty-session-state", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-empty-session-text" }, "No feedback yet. Add feedback from the page.")),
         extensionMode && showHomeScreen && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-container" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-header-block" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-ai-powered", "aria-hidden": true }, /* @__PURE__ */ import_react17.default.createElement(Zap, { size: 12, strokeWidth: 2, "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", null, "Powered by GPT-4 + Whisper")), /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-header" }, "Select feedback mode")), /* @__PURE__ */ import_react17.default.createElement(
           "div",
@@ -40540,6 +40767,7 @@
     const [widgetResetKey, setWidgetResetKey] = import_react18.default.useState(0);
     const [hasPreviousSessions, setHasPreviousSessions] = import_react18.default.useState(false);
     const [openResumeModalFromMessage, setOpenResumeModalFromMessage] = import_react18.default.useState(false);
+    const [sessionListVersion, setSessionListVersion] = import_react18.default.useState(0);
     const [sessionLimitReached, setSessionLimitReached] = import_react18.default.useState(null);
     const effectiveSessionId = globalState.sessionId;
     const widgetToggleRef = import_react18.default.useRef(null);
@@ -40667,16 +40895,7 @@
       return () => document.removeEventListener("visibilitychange", handler);
     }, []);
     import_react18.default.useEffect(() => {
-      if (!globalState.visible) return;
-      let cancelled = false;
-      getSessionsCached(apiFetch).then((sessions) => {
-        if (!cancelled) setHasPreviousSessions(sessions.length > 0);
-      }).catch(() => {
-        if (!cancelled) setHasPreviousSessions(false);
-      });
-      return () => {
-        cancelled = true;
-      };
+      if (globalState.visible) setHasPreviousSessions(true);
     }, [globalState.visible]);
     import_react18.default.useEffect(() => {
       const handler = () => {
@@ -41115,14 +41334,24 @@
       },
       [effectiveSessionId]
     );
-    const fetchSessions = import_react18.default.useCallback(async () => {
-      const sessions = await getSessionsCached(apiFetch);
-      if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", { count: sessions.length, sessions });
-      return sessions;
-    }, []);
-    import_react18.default.useEffect(() => {
-      fetchSessions?.();
-    }, [fetchSessions]);
+    const fetchSessionsPage = import_react18.default.useCallback(
+      async (opts) => {
+        const params = new URLSearchParams({ limit: String(opts.limit) });
+        if (opts.cursor) params.set("cursor", opts.cursor);
+        const res = await apiFetch(`/api/sessions?${params.toString()}`);
+        const json = await res.json();
+        return {
+          data: json.data ?? [],
+          nextCursor: json.nextCursor ?? null,
+          totalCount: typeof json.totalCount === "number" ? json.totalCount : 0
+        };
+      },
+      []
+    );
+    const fetchSessionDetail = import_react18.default.useCallback(
+      (id) => getSessionDetailCached(apiFetch, id),
+      []
+    );
     async function createSession() {
       if (ECHLY_DEBUG) console.log("[Echly] Creating session");
       try {
@@ -41139,6 +41368,8 @@
         }
         if (!res.ok || !data.success || !data.session?.id) return null;
         invalidateSessionsCache();
+        await addRecentSessionId(data.session.id);
+        setSessionListVersion((v) => v + 1);
         return { id: data.session.id };
       } catch (err) {
         console.error("[Echly] Failed to create session:", err);
@@ -41156,9 +41387,17 @@
     }
     const onPreviousSessionSelect = import_react18.default.useCallback(
       async (sessionId, _options) => {
+        addRecentSessionId(sessionId).catch(() => {
+        });
         chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {
         });
         chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {
+        });
+        apiFetch("/api/session/state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId, action: "resume" })
+        }).catch(() => {
         });
         try {
           const sessionRes = await apiFetch(`/api/sessions/${sessionId}`);
@@ -41668,14 +41907,22 @@
             expanded: globalState.expanded,
             onExpandRequest,
             onCollapseRequest,
-            captureDisabled: false,
+            captureDisabled: globalState.sessionPaused,
             theme,
             onThemeToggle,
-            fetchSessions,
+            fetchSessionsPage,
+            fetchSessionDetail,
+            sessionListVersion,
             hasPreviousSessions,
             onPreviousSessionSelect,
             pointers: globalState.pointers ?? [],
             sessionLoading: globalState.sessionLoading ?? false,
+            feedbackOpenCount: globalState.openCount,
+            feedbackTotalCount: globalState.totalCount,
+            feedbackHasMore: globalState.feedbackHasMore,
+            feedbackLoadingMore: globalState.feedbackLoadingMore,
+            onLoadMoreFeedback: () => chrome.runtime.sendMessage({ type: "ECHLY_FEEDBACK_LOAD_NEXT" }).catch(() => {
+            }),
             sessionTitleProp: globalState.sessionTitle ?? void 0,
             onSessionTitleChange,
             isProcessingFeedback,
@@ -41801,7 +42048,13 @@
       sessionPaused: state.sessionPaused ?? false,
       sessionLoading: state.sessionLoading ?? false,
       pointers: Array.isArray(state.pointers) ? state.pointers : [],
-      captureMode: state.captureMode === "text" ? "text" : "voice"
+      captureMode: state.captureMode === "text" ? "text" : "voice",
+      totalCount: state.totalCount,
+      openCount: state.openCount,
+      resolvedCount: state.resolvedCount,
+      skippedCount: state.skippedCount,
+      feedbackHasMore: state.feedbackHasMore,
+      feedbackLoadingMore: state.feedbackLoadingMore
     };
   }
   function dispatchGlobalState(state) {

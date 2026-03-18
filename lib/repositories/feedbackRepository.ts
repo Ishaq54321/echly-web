@@ -503,6 +503,7 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
   );
 
   let snapshot;
+  const queryStart = Date.now();
   try {
     snapshot = await getDocs(q);
   } catch (err) {
@@ -515,10 +516,17 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
     }
     throw err;
   }
+  const queryTime = Date.now() - queryStart;
 
   console.log("[INDEX CHECK]", {
     query: "workspaceId+sessionId+createdAt",
     docs: snapshot.size,
+  });
+
+  console.log("[FIRESTORE DETAILS]", {
+    docs: snapshot.size,
+    hasCursor: !!cursor,
+    queryTime,
   });
 
   console.log("[FIRESTORE QUERY STATS]", {

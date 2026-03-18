@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SignJWT } from "jose";
-import { getSessionUser } from "@/lib/server/session";
+import { requireAuth } from "@/lib/server/auth";
 import { corsHeaders } from "@/lib/server/cors";
 
 export const dynamic = "force-dynamic";
@@ -29,12 +29,16 @@ export async function OPTIONS(req: NextRequest) {
  * No request body. Session is read from the echly_session cookie.
  */
 export async function POST(request: NextRequest) {
-  const user = await getSessionUser(request);
-  if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized - Missing or invalid session" },
-      { status: 401, headers: corsHeaders(request) }
-    );
+  let user;
+  try {
+    user = await requireAuth(request);
+  } catch (res) {
+    const errRes = res instanceof Response ? res : new Response(JSON.stringify({ error: "Unauthorized - Missing or invalid session" }), { status: 401 });
+    return new NextResponse(errRes.body, {
+      status: errRes.status,
+      statusText: errRes.statusText,
+      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(request) },
+    });
   }
 
   try {

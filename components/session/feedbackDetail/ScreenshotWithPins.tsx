@@ -281,15 +281,17 @@ const ScreenshotWithPinsInner = ({
         aria-label={isCommentMode ? "Click to add comment pin" : undefined}
       >
         <div className="relative w-full max-h-[317px] aspect-video overflow-hidden rounded-lg">
+          <div className="absolute inset-0 animate-pulse rounded-lg bg-[var(--layer-2-border)]/50 z-0" aria-hidden />
           <Image
             src={screenshotUrl}
             alt="Screenshot"
             width={800}
             height={317}
             sizes="(max-width: 1024px) 100vw, 768px"
-            className="w-full h-full object-contain max-h-[317px] pointer-events-none"
+            className="relative z-10 w-full h-full object-contain max-h-[317px] pointer-events-none rounded-lg"
             loading="lazy"
             draggable={false}
+            onLoad={(e) => (e.currentTarget.previousElementSibling as HTMLElement)?.classList?.add("hidden")}
           />
         </div>
 

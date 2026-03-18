@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import {
-  getUserSessionsRepo,
   createSessionRepo,
-  getWorkspaceSessionsRepo,
   getWorkspaceSessionCountRepo,
+  getWorkspaceSessionsPaginatedRepo,
 } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
 import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
@@ -24,35 +23,57 @@ export async function OPTIONS(req: NextRequest) {
   });
 }
 
-/** GET /api/sessions — list sessions for the authenticated user. */
+const PAGINATED_DEFAULT_LIMIT = 25;
+const PAGINATED_MAX_LIMIT = 25;
+
+/** GET /api/sessions — list sessions (paginated only). ?limit=25&cursor=ID returns { data, nextCursor, totalCount }. */
 export async function GET(req: NextRequest) {
   const start = Date.now();
-  log("[API] GET /api/sessions start");
-  let user;
-  try {
-    user = await requireAuth(req);
-  } catch (res) {
-    const errRes = res as Response;
-    return new NextResponse(errRes.body, {
-      status: errRes.status,
-      statusText: errRes.statusText,
-      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
-    });
+  const url = new URL(req.url);
+  const fullUrl = url.toString();
+  if (fullUrl.includes("limit=10") || fullUrl.includes("fields=")) {
+    console.error("❌ LEGACY API SHOULD NOT BE USED. Use /api/sessions?limit=25 and ?limit=25&cursor=... only.");
+    return NextResponse.json(
+      { error: "Legacy sessions API is removed. Use ?limit=25 and cursor for pagination." },
+      { status: 400, headers: corsHeaders(req) }
+    );
+  }
+
+  const limitParam = url.searchParams.get("limit");
+  const cursorParam = url.searchParams.get("cursor") ?? "";
+  const paginatedLimit = Math.min(
+    Number(limitParam) || PAGINATED_DEFAULT_LIMIT,
+    PAGINATED_MAX_LIMIT
+  );
+
+  log("[API] GET /api/sessions start (paginated)");
+
+  let uid = (req.headers.get("x-user-id") ?? "").trim();
+  if (!uid) {
+    try {
+      uid = (await requireAuth(req)).uid;
+    } catch (res) {
+      const errRes = res as Response;
+      return new NextResponse(errRes.body, {
+        status: errRes.status,
+        statusText: errRes.statusText,
+        headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
+      });
+    }
   }
 
   try {
-    const { workspaceId, workspace } = await resolveWorkspaceForUser(user.uid);
-    const workspaceSessions = await getWorkspaceSessionsRepo(workspaceId, 100);
-    const sessions =
-      workspaceSessions.length > 0
-        ? workspaceSessions
-        : await getUserSessionsRepo(user.uid, 100);
-    log("[API] GET /api/sessions duration:", Date.now() - start);
+    const { workspaceId, workspace } = await resolveWorkspaceForUser(uid);
+    const cursor = cursorParam.trim() || undefined;
+    const [pageResult, totalCount] = await Promise.all([
+      getWorkspaceSessionsPaginatedRepo(workspaceId, paginatedLimit, cursor ?? null),
+      getWorkspaceSessionCountRepo(workspaceId, workspace),
+    ]);
+    const { sessions, nextCursor } = pageResult;
+    const data = sessions.map((s) => serializeSession(s));
+    log("[API] GET /api/sessions duration (paginated):", Date.now() - start);
     return NextResponse.json(
-      {
-        success: true,
-        sessions: sessions.map((s) => serializeSession(s)),
-      },
+      { data, nextCursor, totalCount },
       { headers: corsHeaders(req) }
     );
   } catch (err) {
@@ -83,18 +104,20 @@ export async function POST(req: NextRequest) {
   // AUTH CHECK
   // ----------------------------------------
   const t_auth_start = performance.now();
-  let user;
-  try {
-    user = await requireAuth(req);
-  } catch (res) {
-    const t_auth_end = performance.now();
-    console.log("[ECHLY PERF] auth:", t_auth_end - t_auth_start);
-    const errRes = res as Response;
-    return new NextResponse(errRes.body, {
-      status: errRes.status,
-      statusText: errRes.statusText,
-      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
-    });
+  let uid = (req.headers.get("x-user-id") ?? "").trim();
+  if (!uid) {
+    try {
+      uid = (await requireAuth(req)).uid;
+    } catch (res) {
+      const t_auth_end = performance.now();
+      console.log("[ECHLY PERF] auth:", t_auth_end - t_auth_start);
+      const errRes = res as Response;
+      return new NextResponse(errRes.body, {
+        status: errRes.status,
+        statusText: errRes.statusText,
+        headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
+      });
+    }
   }
   const t_auth_end = performance.now();
   console.log("[ECHLY PERF] auth:", t_auth_end - t_auth_start);
@@ -112,7 +135,7 @@ export async function POST(req: NextRequest) {
     // RESOLVE WORKSPACE
     // ----------------------------------------
     const t_resolve_start = performance.now();
-    const { workspaceId, workspace } = await resolveWorkspaceForUser(user.uid);
+    const { workspaceId, workspace } = await resolveWorkspaceForUser(uid);
     const t_resolve_end = performance.now();
     console.log("[ECHLY PERF] resolve_workspace:", t_resolve_end - t_resolve_start);
 
@@ -150,7 +173,7 @@ export async function POST(req: NextRequest) {
     // DATABASE WRITE
     // ----------------------------------------
     const t_db_start = performance.now();
-    const id = await createSessionRepo(workspaceId, user.uid, null);
+    const id = await createSessionRepo(workspaceId, uid, null);
     const t_db_end = performance.now();
     console.log("[ECHLY PERF] db write:", t_db_end - t_db_start);
 

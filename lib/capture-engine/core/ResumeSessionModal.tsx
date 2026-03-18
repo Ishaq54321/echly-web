@@ -1,31 +1,41 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
-import { ECHLY_DEBUG } from "@/lib/utils/logger";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { FileText } from "lucide-react";
 
 export type SessionOption = {
   id: string;
   title: string;
+  createdAt?: string;
   updatedAt?: string;
   openCount?: number;
   resolvedCount?: number;
   feedbackCount?: number;
+  /** True until GET /api/sessions/:id has been applied (title, createdAt, feedbackCount, etc.). */
+  isLoading?: boolean;
   [key: string]: unknown;
 };
 
 export type ResumeSessionModalProps = {
   open: boolean;
   onClose: () => void;
-  fetchSessions?: () => Promise<SessionOption[]>;
+  /** Cursor-based paginated fetch: initial limit=25, then limit=25&cursor. Required. */
+  fetchSessionsPage: (opts: { limit: number; cursor?: string | null }) => Promise<{ data: SessionOption[]; nextCursor: string | null; totalCount: number }>;
+  /** Optional: fetch single session detail for lazy hydration (feedbackCount, updatedAt). When provided, each row hydrates in background after list load. */
+  fetchSessionDetail?: (sessionId: string) => Promise<Partial<SessionOption> | null>;
   onSelectSession: (sessionId: string) => void;
   /** Theme for modal (dark/light). Defaults to "dark". */
   theme?: "dark" | "light";
-  /** Extension: run before loading sessions. If returns false, show login-required UI and do not call fetchSessions. */
+  /** Extension: run before loading sessions. If returns false, show login-required UI and do not call fetchSessionsPage. */
   checkAuth?: () => Promise<boolean>;
   /** Extension: called when user clicks "Open Login" in login-required state. */
   onOpenLogin?: () => void;
+  /** When this value changes while modal is open, refetch first page and set totalCount from API (e.g. after new session created or cache invalidated). */
+  sessionListVersion?: number;
 };
+
+const INITIAL_PAGE_LIMIT = 25;
+const SKELETON_ROWS = 4;
 
 type FilterKey = "today" | "7days" | "30days" | "all";
 
@@ -66,33 +76,152 @@ const FILTER_LABELS: Record<FilterKey, string> = {
   "30days": "Last 30 days",
 };
 
+const CONCURRENCY = 3;
+
+/** Run items with a concurrency limit. */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  let index = 0;
+  async function worker(): Promise<void> {
+    while (index < items.length) {
+      const i = index++;
+      const item = items[i];
+      results[i] = await fn(item);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+  return results;
+}
+
 export function ResumeSessionModal({
   open,
   onClose,
-  fetchSessions,
+  fetchSessionsPage,
+  fetchSessionDetail,
   onSelectSession,
   theme = "dark",
   checkAuth,
   onOpenLogin,
+  sessionListVersion,
 }: ResumeSessionModalProps) {
   const [sessions, setSessions] = useState<SessionOption[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [loginRequired, setLoginRequired] = useState(false);
   const isLight = theme === "light";
+  const hasLoadedRef = useRef(false);
+  const hasHydratedRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const prevSessionListVersionRef = useRef<number | undefined>(sessionListVersion);
+
+  /** Refetch first page when sessionListVersion changes (e.g. after new session created or cache invalidated). */
+  useEffect(() => {
+    if (!open || sessionListVersion === undefined) return;
+    if (prevSessionListVersionRef.current === sessionListVersion) return;
+    prevSessionListVersionRef.current = sessionListVersion;
+    let isMounted = true;
+    (async () => {
+      try {
+        const res = await fetchSessionsPage({ limit: INITIAL_PAGE_LIMIT });
+        if (!isMounted) return;
+        setSessions(res.data.map((s) => ({ ...s, isLoading: true })));
+        setCursor(res.nextCursor);
+        setHasMore(!!res.nextCursor);
+        setTotalCount(res.totalCount);
+        const list = res.data;
+        if (fetchSessionDetail && list.length > 0) {
+          runWithConcurrency(list, CONCURRENCY, async (s) => {
+            let detail: Partial<SessionOption> | null = null;
+            try {
+              detail = await fetchSessionDetail(s.id);
+            } catch {
+              // leave detail null
+            }
+            if (!isMounted) return null;
+            setSessions((prev) =>
+              prev.map((x) =>
+                x.id === s.id ? { ...x, ...(detail ?? {}), isLoading: false } : x
+              )
+            );
+            return detail;
+          }).catch(() => {});
+        } else if (list.length > 0) {
+          setSessions((prev) =>
+            prev.map((s) => ({ ...s, isLoading: false }))
+          );
+        }
+      } catch (e) {
+        console.error("[ECHLY UX] refetch sessions failed", e);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [open, sessionListVersion, fetchSessionsPage, fetchSessionDetail]);
+
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    try {
+      const res = await fetchSessionsPage({ limit: INITIAL_PAGE_LIMIT, cursor: cursor || undefined });
+      const newSessions = res.data.map((s) => ({ ...s, isLoading: true }));
+      setSessions((prev) => [...prev, ...newSessions]);
+      setCursor(res.nextCursor);
+      setHasMore(!!res.nextCursor);
+      if (fetchSessionDetail && newSessions.length > 0) {
+        runWithConcurrency(newSessions, CONCURRENCY, async (s) => {
+          let detail: Partial<SessionOption> | null = null;
+          try {
+            detail = await fetchSessionDetail(s.id);
+          } catch {
+            // clear isLoading so row shows list data
+          }
+          setSessions((prev) =>
+            prev.map((x) =>
+              x.id === s.id ? { ...x, ...(detail ?? {}), isLoading: false } : x
+            )
+          );
+          return detail;
+        }).catch(() => {});
+      } else if (newSessions.length > 0) {
+        setSessions((prev) =>
+          prev.map((x) =>
+            newSessions.some((n) => n.id === x.id) ? { ...x, isLoading: false } : x
+          )
+        );
+      }
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [fetchSessionsPage, fetchSessionDetail, isLoadingMore, hasMore, cursor]);
 
   useEffect(() => {
     if (!open) return;
+    prevSessionListVersionRef.current = sessionListVersion ?? 0;
     setSearch("");
     setFilter("all");
     setError(null);
     setLoginRequired(false);
+    setSessions([]);
+    setCursor(null);
+    setHasMore(true);
+    setTotalCount(0);
+    hasLoadedRef.current = false;
     let isMounted = true;
 
-    const load = async () => {
-      console.log("[ECHLY UX] fetching sessions inside modal");
+    const loadSessions = async () => {
+      if (hasLoadedRef.current) return;
+      hasLoadedRef.current = true;
       setLoading(true);
       try {
         if (checkAuth) {
@@ -104,10 +233,39 @@ export function ResumeSessionModal({
             return;
           }
         }
-        const data = await fetchSessions?.();
-        if (isMounted) {
-          setSessions(data ?? []);
-          console.log("[ECHLY UX] sessions loaded:", data?.length ?? 0);
+        const res = await fetchSessionsPage({ limit: INITIAL_PAGE_LIMIT });
+        if (!isMounted) return;
+        setSessions(
+          res.data.map((s) => ({
+            ...s,
+            isLoading: true,
+          }))
+        );
+        setCursor(res.nextCursor);
+        setHasMore(!!res.nextCursor);
+        setTotalCount(res.totalCount);
+        const list = res.data;
+        if (fetchSessionDetail && list.length > 0) {
+          hasHydratedRef.current = true;
+          runWithConcurrency(list, CONCURRENCY, async (s) => {
+            let detail: Partial<SessionOption> | null = null;
+            try {
+              detail = await fetchSessionDetail(s.id);
+            } catch {
+              // leave detail null; we still clear isLoading so row shows list data
+            }
+            if (!isMounted) return null;
+            setSessions((prev) =>
+              prev.map((x) =>
+                x.id === s.id ? { ...x, ...(detail ?? {}), isLoading: false } : x
+              )
+            );
+            return detail;
+          }).catch(() => {});
+        } else if (list.length > 0) {
+          setSessions((prev) =>
+            prev.map((s) => ({ ...s, isLoading: false }))
+          );
         }
       } catch (e) {
         console.error("[ECHLY UX] failed to load sessions", e);
@@ -117,11 +275,25 @@ export function ResumeSessionModal({
       }
     };
 
-    load();
+    loadSessions();
     return () => {
       isMounted = false;
     };
-  }, [open, fetchSessions, checkAuth]);
+  }, [open, fetchSessionsPage, fetchSessionDetail, checkAuth]);
+
+  useEffect(() => {
+    if (!scrollContainerRef.current) return;
+    const el = scrollContainerRef.current;
+    const onScroll = () => {
+      if (isLoadingMore || !hasMore) return;
+      const { scrollTop, clientHeight, scrollHeight } = el;
+      if (scrollTop + clientHeight >= scrollHeight * 0.7) {
+        loadMore();
+      }
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [isLoadingMore, hasMore, loadMore]);
 
   const filtered = useMemo(() => {
     let list = filterSessions(sessions, filter);
@@ -142,6 +314,18 @@ export function ResumeSessionModal({
     const resolved = typeof s.resolvedCount === "number" ? s.resolvedCount : 0;
     const skipped = typeof (s as Record<string, unknown>).skippedCount === "number" ? (s as Record<string, unknown>).skippedCount as number : 0;
     return open + resolved + skipped;
+  };
+
+  const feedbackSubline = (s: SessionOption): string => {
+    if (s.isLoading === true) return "Loading...";
+    const n = feedbackCount(s);
+    const items = n === 1 ? "feedback item" : "feedback items";
+    return `${n} ${items} · ${formatLastUpdated(s.updatedAt ?? s.createdAt)}`;
+  };
+
+  const sessionTitle = (s: SessionOption): string => {
+    if (s.isLoading === true) return "Loading...";
+    return (s.title?.trim() || "Untitled Session");
   };
 
   if (!open) return null;
@@ -215,6 +399,11 @@ export function ResumeSessionModal({
           >
             {loginRequired ? "Previous Sessions" : "Resume Feedback Session"}
           </h2>
+          {!loginRequired && (loading || sessions.length > 0 || totalCount > 0) && (
+            <p style={{ margin: "0 0 12px", fontSize: 13, color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA" }}>
+              {loading ? "Loading…" : `${totalCount} session${totalCount === 1 ? "" : "s"}`}
+            </p>
+          )}
           {!loginRequired && (
             <>
               <input
@@ -258,7 +447,7 @@ export function ResumeSessionModal({
             </>
           )}
         </div>
-        <div style={{ flex: 1, overflow: "auto", minHeight: 200, maxHeight: 360 }}>
+        <div ref={scrollContainerRef} style={{ flex: 1, overflow: "auto", minHeight: 200, maxHeight: 360 }}>
           {loginRequired && onOpenLogin && (
             <div style={{
               display: "flex",
@@ -315,7 +504,7 @@ export function ResumeSessionModal({
               fontSize: 14,
             }}>
               <span className="echly-spinner" style={{ display: "inline-block", marginRight: 8, verticalAlign: "middle" }} aria-hidden />
-              Loading sessions...
+              Loading previous sessions...
             </div>
           )}
           {!loginRequired && error && (
@@ -330,7 +519,7 @@ export function ResumeSessionModal({
               color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
               fontSize: 14,
             }}>
-              {sessions.length === 0 ? "No previous sessions yet" : "No sessions match."}
+              {totalCount === 0 && sessions.length === 0 ? "No previous sessions yet" : "No sessions match."}
             </div>
           )}
           {!loginRequired && !loading && !error && filtered.length > 0 && (
@@ -371,17 +560,37 @@ export function ResumeSessionModal({
                       }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600 }}>{s.title?.trim() || "Untitled Session"}</div>
+                      <div style={{ fontWeight: 600 }}>{sessionTitle(s)}</div>
                       <div style={{
                         fontSize: 12,
                         fontWeight: 500,
                         color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
                         marginTop: 4,
                       }}>
-                        {feedbackCount(s)} feedback items · {formatLastUpdated(s.updatedAt)}
+                        {feedbackSubline(s)}
                       </div>
                     </div>
                   </button>
+                </li>
+              ))}
+              {isLoadingMore && Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+                <li key={`skeleton-${i}`} style={{ marginBottom: 4 }}>
+                  <div
+                    style={{
+                      padding: "14px 16px",
+                      borderRadius: 14,
+                      background: isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.06)",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ width: 18, height: 18, borderRadius: 4, background: isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.1)", flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ height: 14, borderRadius: 4, background: isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.1)", width: "70%", marginBottom: 8 }} />
+                      <div style={{ height: 12, borderRadius: 4, background: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)", width: "50%" }} />
+                    </div>
+                  </div>
                 </li>
               ))}
             </ul>

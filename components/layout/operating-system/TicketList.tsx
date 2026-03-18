@@ -9,6 +9,8 @@ import { TicketItem } from "./TicketItem";
 export interface TicketListProps {
   /** Session header (left sidebar top) */
   sessionTitle?: string;
+  /** Session lifecycle status; when paused/ended show badge (soft sync only). */
+  sessionStatus?: "active" | "paused" | "ended";
   totalCount?: number;
   openCount?: number;
   resolvedCount?: number;
@@ -42,10 +44,13 @@ export interface TicketListProps {
   onMarkAllTicketsUnresolved?: () => void;
   /** When set (e.g. from ?ticket= deep link), expand the section containing this id and scroll to it. */
   scrollToId?: string | null;
+  /** When true and items are empty, show skeleton rows (first load). */
+  loading?: boolean;
 }
 
 function TicketListInner({
   sessionTitle = "Session",
+  sessionStatus,
   totalCount,
   openCount,
   resolvedCount,
@@ -71,6 +76,7 @@ function TicketListInner({
   onMarkAllTicketsResolved,
   onMarkAllTicketsUnresolved,
   scrollToId,
+  loading = false,
 }: TicketListProps) {
   const [searchInput, setSearchInput] = useState("");
   const [sidebarMenuOpen, setSidebarMenuOpen] = useState(false);
@@ -97,19 +103,11 @@ function TicketListInner({
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const total = typeof totalCount === "number" ? totalCount : items.length;
-  const open =
-    typeof openCount === "number"
-      ? openCount
-      : items.filter((i) => getTicketStatus(i) === "open").length;
-  const skipped =
-    typeof skippedCount === "number"
-      ? skippedCount
-      : items.filter((i) => getTicketStatus(i) === "skipped").length;
-  const resolved =
-    typeof resolvedCount === "number"
-      ? resolvedCount
-      : items.filter((i) => getTicketStatus(i) === "resolved").length;
+  /** All counts from backend metadata only; never derive from items.length. */
+  const total = typeof totalCount === "number" ? totalCount : 0;
+  const open = typeof openCount === "number" ? openCount : 0;
+  const skipped = typeof skippedCount === "number" ? skippedCount : 0;
+  const resolved = typeof resolvedCount === "number" ? resolvedCount : 0;
 
   const meta =
     total > 0
@@ -202,10 +200,20 @@ function TicketListInner({
             </div>
           ) : (
             <>
-              <div className="min-w-0 flex-1 flex items-center gap-2">
+              <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
                 <h1 className="text-[15px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] truncate">
                   {sessionTitle}
                 </h1>
+                {sessionStatus === "paused" && (
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400" aria-label="Session paused">
+                    Paused
+                  </span>
+                )}
+                {sessionStatus === "ended" && (
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-[var(--layer-2-bg)] text-[hsl(var(--text-tertiary))]" aria-label="Session ended">
+                    Ended
+                  </span>
+                )}
                 {saveSessionTitleSuccess && (
                   <Check className="h-3.5 w-3.5 text-[var(--color-success)] shrink-0" aria-hidden />
                 )}
@@ -273,7 +281,7 @@ function TicketListInner({
         </div>
       </div>
 
-      {/* Status sections: Open → Skipped (if >0) → Resolved. Soft pill badges, no hard blocks. */}
+      {/* Status sections: Open → Skipped (if >0) → Resolved. Single scroll container. */}
       <div
         ref={(el) => {
           if (scrollContainerRef) (scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
@@ -282,8 +290,16 @@ function TicketListInner({
             onScrollContainerReady?.();
           }
         }}
-        className="flex-1 min-h-0 overflow-y-auto px-2 pb-4"
+        className="relative flex-1 min-h-0 overflow-y-auto px-2 pb-4"
       >
+        {loading && items.length === 0 ? (
+          <div className="animate-pulse space-y-3 pt-2">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-12 rounded-lg bg-[var(--layer-2-border)]/40" />
+            ))}
+          </div>
+        ) : (
+          <>
         {/* Open */}
         <section className="pt-1">
           <button
@@ -436,6 +452,8 @@ function TicketListInner({
                 </svg>
               </div>
             )}
+          </>
+        )}
           </>
         )}
       </div>

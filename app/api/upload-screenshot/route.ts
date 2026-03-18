@@ -28,12 +28,18 @@ export async function OPTIONS(req: NextRequest) {
  * When feedback is created with this screenshotId, the record is updated to ATTACHED.
  * TEMP screenshots never attached are cleaned up by a scheduled job.
  */
+const UPLOAD_TIMEOUT_WARN_MS = 8000;
+
 export async function POST(req: NextRequest) {
+  const requestStart = Date.now();
+  console.log("[REQUEST START]", "upload-screenshot", requestStart);
+
   try {
     let user;
     try {
       user = await requireAuth(req);
     } catch (res) {
+      console.log("[REQUEST END]", "upload-screenshot", Date.now() - requestStart, "ms");
       const errRes = res as Response;
       return new NextResponse(errRes.body, {
         status: errRes.status,
@@ -53,6 +59,7 @@ export async function POST(req: NextRequest) {
       typeof sessionId !== "string" ||
       !sessionId.trim()
     ) {
+      console.log("[REQUEST END]", "upload-screenshot", Date.now() - requestStart, "ms");
       return NextResponse.json(
         { error: "Missing required fields: screenshotId, imageDataUrl, sessionId" },
         { status: 400, headers: corsHeaders(req) }
@@ -64,12 +71,14 @@ export async function POST(req: NextRequest) {
 
     const session = await getSessionByIdRepo(sid);
     if (!session) {
+      console.log("[REQUEST END]", "upload-screenshot", Date.now() - requestStart, "ms");
       return NextResponse.json(
         { error: "Session not found" },
         { status: 404, headers: corsHeaders(req) }
       );
     }
     if (session.userId !== user.uid) {
+      console.log("[REQUEST END]", "upload-screenshot", Date.now() - requestStart, "ms");
       return NextResponse.json(
         { error: "Forbidden" },
         { status: 403, headers: corsHeaders(req) }
@@ -81,6 +90,7 @@ export async function POST(req: NextRequest) {
       await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+        console.log("[REQUEST END]", "upload-screenshot", Date.now() - requestStart, "ms");
         return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
           status: 403,
           headers: corsHeaders(req),
@@ -105,10 +115,16 @@ export async function POST(req: NextRequest) {
 
     const url = await getDownloadURL(screenshotRef);
     const uploadDuration = Date.now() - uploadStart;
-    console.log(`[UPLOAD] screenshot upload duration: ${uploadDuration}ms`);
+    const totalDuration = Date.now() - requestStart;
+    console.log("[UPLOAD] screenshot upload duration:", uploadDuration, "ms");
+    console.log("[REQUEST END]", "upload-screenshot", totalDuration, "ms (upload:", uploadDuration, "ms)");
+    if (uploadDuration > UPLOAD_TIMEOUT_WARN_MS) {
+      console.warn("[UPLOAD] upload exceeded", UPLOAD_TIMEOUT_WARN_MS, "ms:", uploadDuration, "ms");
+    }
 
     return NextResponse.json({ url }, { headers: corsHeaders(req) });
   } catch (err) {
+    console.log("[REQUEST END]", "upload-screenshot", Date.now() - requestStart, "ms (error)");
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
         status: 403,

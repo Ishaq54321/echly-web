@@ -28,15 +28,17 @@ const SAFE_FALLBACK = {
  * uses safe fallback when workspace or usage data is missing or on error.
  */
 export async function GET(req: Request) {
-  let user;
-  try {
-    user = await requireAuth(req);
-  } catch {
-    return NextResponse.json(SAFE_FALLBACK);
+  let uid = (req.headers.get("x-user-id") ?? "").trim();
+  if (!uid) {
+    try {
+      uid = (await requireAuth(req)).uid;
+    } catch {
+      return NextResponse.json(SAFE_FALLBACK);
+    }
   }
 
   try {
-    const { workspaceId, workspace } = await getCachedWorkspace(user.uid, () => resolveWorkspaceForUser(user.uid));
+    const { workspaceId, workspace } = await getCachedWorkspace(uid, () => resolveWorkspaceForUser(uid));
 
     if (!workspace) {
       return NextResponse.json(SAFE_FALLBACK);

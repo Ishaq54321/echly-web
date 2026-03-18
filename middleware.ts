@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { corsHeaders } from "@/lib/server/cors";
+import { requireAuth } from "@/lib/server/auth";
 
-export function middleware(request: NextRequest) {
+function hasAnyAuthCredential(request: NextRequest): boolean {
+  const authHeader = request.headers.get("authorization") ?? request.headers.get("Authorization");
+  if (authHeader && authHeader.trim().toLowerCase().startsWith("bearer ")) return true;
+  const cookieHeader = request.headers.get("cookie");
+  if (!cookieHeader) return false;
+  // We only attempt auth if it looks like a session cookie is present.
+  // (Avoids turning "unauthenticated but safe" routes into 401s.)
+  return /(?:^|;\s*)echly_session=/.test(cookieHeader);
+}
+
+export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Admin routes: access control is enforced in app/admin/layout.tsx via /api/admin/me (user.isAdmin).
@@ -29,8 +40,24 @@ export function middleware(request: NextRequest) {
     });
   }
 
+  // If we have credentials, authenticate once here and forward the user id to the route handler.
+  // If credentials are missing/invalid, let the route decide how to respond (some routes return safe fallbacks).
+  const requestHeaders = new Headers(request.headers);
+  if (!requestHeaders.has("x-user-id") && hasAnyAuthCredential(request)) {
+    try {
+      const user = await requireAuth(request);
+      requestHeaders.set("x-user-id", user.uid);
+    } catch {
+      // Do not block; individual routes can enforce auth or return safe fallbacks.
+    }
+  }
+
   // For GET, POST, PATCH, DELETE: continue to handler and add CORS headers to response
-  const response = NextResponse.next();
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
   Object.entries(headers).forEach(([key, value]) => {
     response.headers.set(key, value);
   });

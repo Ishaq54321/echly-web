@@ -11,9 +11,7 @@ import { updateScreenshotAttachedRepo } from "@/lib/repositories/screenshotsRepo
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { corsHeaders } from "@/lib/server/cors";
-import { verifyExtensionToken } from "@/lib/server/extensionAuth";
-import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
-import { getSessionUser } from "@/lib/server/session";
+import { requireAuth } from "@/lib/server/auth";
 import { invalidateFeedbackCache } from "@/lib/server/cache/feedbackCache";
 import { db } from "@/lib/firebase";
 
@@ -22,47 +20,6 @@ const workspaceByIdCache = new Map<string, { workspace: unknown; expiresAt: numb
 
 function now() {
   return Number(process.hrtime.bigint()) / 1e6; // ms with high precision
-}
-
-function unauthorized(message: string): Response {
-  return new Response(JSON.stringify({ error: message }), { status: 401 });
-}
-
-function base64UrlDecodeToString(input: string): string {
-  const b64 = input.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-  return Buffer.from(padded, "base64").toString("utf8");
-}
-
-function peekJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const json = base64UrlDecodeToString(parts[1] ?? "");
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
-  const authHeader = req.headers.get("Authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7).trim();
-    const payload = peekJwtPayload(token);
-    if (payload && payload.type === "extension") {
-      const decoded = await verifyExtensionToken(token);
-      if (!decoded) throw unauthorized("Unauthorized - Invalid extension token");
-      return { uid: decoded.uid, email: decoded.email ?? undefined };
-    }
-    const decoded = await verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email ?? undefined };
-  }
-
-  const sessionUser = await getSessionUser(req);
-  if (sessionUser) return { uid: sessionUser.uid, email: sessionUser.email ?? undefined };
-  throw unauthorized("Unauthorized - Missing token");
 }
 
 async function resolveWorkspaceByIdCached(workspaceId: string): Promise<{ workspace: unknown }> {
@@ -87,7 +44,7 @@ export async function POST(req: NextRequest) {
   log("[API] POST /api/feedback start");
   let user;
   try {
-    user = await requireAuthFast(req);
+    user = await requireAuth(req);
   } catch (res) {
     const errRes = res as Response;
     return new NextResponse(errRes.body, {

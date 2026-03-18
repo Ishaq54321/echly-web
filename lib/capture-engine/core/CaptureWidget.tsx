@@ -30,12 +30,18 @@ export default function CaptureWidget({
   captureDisabled = false,
   theme = "dark",
   onThemeToggle,
-  fetchSessions,
+  fetchSessionsPage,
+  fetchSessionDetail,
   hasPreviousSessions = false,
   onPreviousSessionSelect,
   loadSessionWithPointers,
   pointers: pointersProp,
   sessionLoading = false,
+  feedbackOpenCount,
+  feedbackTotalCount,
+  feedbackHasMore,
+  feedbackLoadingMore,
+  onLoadMoreFeedback,
   onSessionLoaded,
   onSessionEnd: onSessionEndCallback,
   onCreateSession,
@@ -58,6 +64,7 @@ export default function CaptureWidget({
   onSessionTitleChange: onSessionTitleChangeProp,
   openResumeModal: openResumeModalProp,
   onResumeModalClose,
+  sessionListVersion,
   verifySessionBeforeSessions,
   onTriggerLogin,
   sessionLimitReached,
@@ -146,24 +153,49 @@ export default function CaptureWidget({
   const showHomeScreen = !sessionModeActive;
   const isStartingSession = state.sessionStatus === "starting";
 
-  const openTicketsCount = state.pointers.filter((p) => {
-    const status = (p as { status?: string }).status;
-    const isResolved = (p as { isResolved?: boolean }).isResolved;
-    if (status === "resolved" || isResolved === true) return false;
-    return true;
-  }).length;
+  /** Use backend count when provided (extension cursor-based pagination); otherwise derive from pointers. */
+  const openTicketsCount =
+    typeof feedbackOpenCount === "number"
+      ? feedbackOpenCount
+      : state.pointers.filter((p) => {
+          const status = (p as { status?: string }).status;
+          const isResolved = (p as { isResolved?: boolean }).isResolved;
+          if (status === "resolved" || isResolved === true) return false;
+          return true;
+        }).length;
 
   // Lazy-load: reset when list shrinks, cap visible to actual length
   const ticketsToShow = state.pointers.slice(0, Math.min(visibleTickets, state.pointers.length));
   const handleListScroll = React.useCallback(() => {
     const el = listScrollRef.current;
-    if (!el || state.pointers.length <= visibleTickets) return;
+    if (!el) return;
     const { scrollTop, scrollHeight, clientHeight } = el;
     const scrollRatio = (scrollTop + clientHeight) / scrollHeight;
+    const scrollPosition = scrollRatio;
+    // Extension: load next page when near bottom and hasMore
+    const triggered = Boolean(
+      extensionMode &&
+        feedbackHasMore &&
+        !feedbackLoadingMore &&
+        onLoadMoreFeedback &&
+        scrollRatio > 0.85
+    );
+    console.log("[SCROLL]", { scrollPosition, triggered });
+    if (triggered && onLoadMoreFeedback) {
+      onLoadMoreFeedback();
+    }
+    if (state.pointers.length <= visibleTickets) return;
     if (scrollRatio > 0.8) {
       setVisibleTickets((prev) => Math.min(prev + 10, state.pointers.length));
     }
-  }, [state.pointers.length, visibleTickets]);
+  }, [
+    extensionMode,
+    state.pointers.length,
+    visibleTickets,
+    feedbackHasMore,
+    feedbackLoadingMore,
+    onLoadMoreFeedback,
+  ]);
   useEffect(() => {
     if (state.pointers.length < visibleTickets) {
       setVisibleTickets((prev) => Math.min(prev, Math.max(10, state.pointers.length)));
@@ -223,14 +255,15 @@ export default function CaptureWidget({
 
   return (
     <>
-      {extensionMode && fetchSessions && onPreviousSessionSelect && (
+      {extensionMode && fetchSessionsPage && onPreviousSessionSelect && (
         <ResumeSessionModal
           open={showResumeModal}
           onClose={() => {
             setResumeModalOpen(false);
             onResumeModalClose?.();
           }}
-          fetchSessions={fetchSessions}
+          fetchSessionsPage={fetchSessionsPage}
+          fetchSessionDetail={fetchSessionDetail}
           onSelectSession={(sessionId) => {
             setShowCommandScreen(false);
             onPreviousSessionSelect(sessionId);
@@ -239,6 +272,7 @@ export default function CaptureWidget({
           theme={theme}
           checkAuth={verifySessionBeforeSessions}
           onOpenLogin={onTriggerLogin}
+          sessionListVersion={sessionListVersion}
         />
       )}
       {/* Capture layer: portaled into #echly-capture-root. Never inside sidebar. */}
@@ -424,6 +458,16 @@ export default function CaptureWidget({
                           onExpandChange={handlers.setExpandedId}
                         />
                       ))}
+                    {feedbackLoadingMore && (
+                      <div className="flex items-center justify-center py-4 text-xs text-[hsl(var(--text-tertiary))]" aria-live="polite">
+                        <div className="flex items-center gap-2 animate-pulse">
+                          <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" style={{ animationDelay: "75ms" }} />
+                          <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" style={{ animationDelay: "150ms" }} />
+                        </div>
+                        <span className="ml-2">Loading more</span>
+                      </div>
+                    )}
                   </div>
                 )}
                 {sessionModeActive && !hasTickets && !isProcessingFeedback && !(feedbackJobs && feedbackJobs.length > 0) && !sessionLoading && (

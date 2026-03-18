@@ -1,3 +1,4 @@
+import type { Session } from "@/lib/domain/session";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import {
@@ -14,39 +15,58 @@ import { log } from "@/lib/utils/logger";
 
 type PatchBody = { title?: string; archived?: boolean };
 
-/** GET /api/sessions/:id — return session metadata (e.g. title for Discussion context). */
+const SESSION_GET_CACHE_TTL_MS = 5_000; // 5 seconds — tab switch feels instant, fewer Firestore reads
+const sessionGetCache = new Map<string, { session: Session; at: number }>();
+
+function getCachedSession(sessionId: string): Session | null {
+  const entry = sessionGetCache.get(sessionId);
+  if (!entry) return null;
+  if (Date.now() - entry.at > SESSION_GET_CACHE_TTL_MS) {
+    sessionGetCache.delete(sessionId);
+    return null;
+  }
+  return entry.session;
+}
+
+function setCachedSession(sessionId: string, session: Session): void {
+  sessionGetCache.set(sessionId, { session, at: Date.now() });
+}
+
+export function invalidateSessionGetCache(sessionId: string): void {
+  sessionGetCache.delete(sessionId);
+}
+
+/** GET /api/sessions/:id — lightweight single-session fetch (extension sync, title). No workspace resolve. */
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  let user;
-  try {
-    user = await requireAuth(req);
-  } catch (res) {
-    return res as Response;
+  let uid = (req.headers.get("x-user-id") ?? "").trim();
+  if (!uid) {
+    try {
+      uid = (await requireAuth(req)).uid;
+    } catch (res) {
+      return res as Response;
+    }
   }
   const { id } = await params;
   if (!id) {
     return NextResponse.json({ success: false, error: "Missing session id" }, { status: 400 });
   }
-  const session = await getSessionByIdRepo(id);
+  let session: Session | null = getCachedSession(id);
   if (!session) {
-    return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
-  }
-  if (session.userId !== user.uid) {
-    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-  }
-  const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-  try {
-    await resolveWorkspaceById(workspaceId);
-  } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(
-        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-        { status: 403 }
-      );
+    session = await getSessionByIdRepo(id);
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
     }
-    throw err;
+    if (session.userId !== uid) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+    setCachedSession(id, session);
+  } else {
+    if (session.userId !== uid) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
   }
   return NextResponse.json({
     success: true,
@@ -61,11 +81,13 @@ export async function PATCH(
 ) {
   const start = Date.now();
   log("[API] PATCH /api/sessions/[id] start");
-  let user;
-  try {
-    user = await requireAuth(req);
-  } catch (res) {
-    return res as Response;
+  let uid = (req.headers.get("x-user-id") ?? "").trim();
+  if (!uid) {
+    try {
+      uid = (await requireAuth(req)).uid;
+    } catch (res) {
+      return res as Response;
+    }
   }
   const { id } = await params;
   if (!id) {
@@ -91,13 +113,13 @@ export async function PATCH(
       { status: 404 }
     );
   }
-  if (existing.userId !== user.uid) {
+  if (existing.userId !== uid) {
     return NextResponse.json(
       { success: false, error: "Forbidden" },
       { status: 403 }
     );
   }
-  const workspaceId = existing.workspaceId ?? existing.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+  const workspaceId = existing.workspaceId ?? existing.userId ?? (await getUserWorkspaceIdRepo(uid)) ?? uid;
   try {
     await resolveWorkspaceById(workspaceId);
   } catch (err) {
@@ -134,6 +156,7 @@ export async function PATCH(
         { status: 404 }
       );
     }
+    invalidateSessionGetCache(id);
     log("[API] PATCH /api/sessions/[id] duration:", Date.now() - start);
     return NextResponse.json({
       success: true,
@@ -162,11 +185,13 @@ export async function DELETE(
 ) {
   const start = Date.now();
   log("[API] DELETE /api/sessions/[id] start");
-  let user;
-  try {
-    user = await requireAuth(req);
-  } catch (res) {
-    return res as Response;
+  let uid = (req.headers.get("x-user-id") ?? "").trim();
+  if (!uid) {
+    try {
+      uid = (await requireAuth(req)).uid;
+    } catch (res) {
+      return res as Response;
+    }
   }
   const { id } = await params;
   if (!id) {
@@ -182,13 +207,13 @@ export async function DELETE(
       { status: 404 }
     );
   }
-  if (existing.userId !== user.uid) {
+  if (existing.userId !== uid) {
     return NextResponse.json(
       { success: false, error: "Forbidden" },
       { status: 403 }
     );
   }
-  const workspaceId = existing.workspaceId ?? existing.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+  const workspaceId = existing.workspaceId ?? existing.userId ?? (await getUserWorkspaceIdRepo(uid)) ?? uid;
   try {
     await resolveWorkspaceById(workspaceId);
   } catch (err) {
@@ -202,6 +227,7 @@ export async function DELETE(
   }
   try {
     await deleteSessionRepo(id);
+    invalidateSessionGetCache(id);
     log("[API] DELETE /api/sessions/[id] duration:", Date.now() - start);
     return NextResponse.json({ success: true });
   } catch (err) {

@@ -11,9 +11,11 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  startAfter,
   updateDoc,
   where,
   increment,
+  type DocumentSnapshot,
   type Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -52,6 +54,7 @@ export async function createSessionRepo(
     openCount: 0,
     resolvedCount: 0,
     feedbackCount: 0,
+    status: "active" as const,
   };
 
   const t_tx_start = performance.now();
@@ -152,6 +155,54 @@ export async function getWorkspaceSessionsRepo(
       id: docSnap.id,
       ...(docSnap.data() as SessionDoc),
     }));
+}
+
+const PAGINATED_SESSIONS_LIMIT_MAX = 50;
+
+/**
+ * Cursor-paginated workspace sessions. ORDER BY createdAt DESC.
+ * Composite index required: sessions (workspaceId ASC, createdAt DESC).
+ * cursor = last visible doc id; next request uses startAfter(cursorDoc).
+ * Excludes archived by default (filter in memory).
+ */
+export async function getWorkspaceSessionsPaginatedRepo(
+  workspaceId: string,
+  limitSize: number = 25,
+  cursor?: string | null
+): Promise<{ sessions: Session[]; nextCursor: string | null }> {
+  const safeLimit = Math.min(Math.max(1, limitSize), PAGINATED_SESSIONS_LIMIT_MAX);
+  assertQueryLimit(safeLimit, "getWorkspaceSessionsPaginatedRepo");
+  console.log("USING COLLECTION TYPE:", "collection");
+
+  let cursorSnap: DocumentSnapshot | null = null;
+  if (cursor?.trim()) {
+    cursorSnap = await getDoc(doc(db, "sessions", cursor.trim()));
+    if (!cursorSnap.exists()) cursorSnap = null;
+  }
+
+  const q = query(
+    collection(db, "sessions"),
+    where("workspaceId", "==", workspaceId),
+    orderBy("createdAt", "desc"),
+    ...(cursorSnap ? [startAfter(cursorSnap)] : []),
+    limit(safeLimit)
+  );
+
+  const snapshot = await getDocs(q);
+  const filtered = snapshot.docs.filter((docSnap) => {
+    const archived = (docSnap.data() as { archived?: boolean }).archived === true;
+    return !archived;
+  });
+
+  const sessions = filtered.map((docSnap) => ({
+    id: docSnap.id,
+    ...(docSnap.data() as SessionDoc),
+  }));
+
+  const lastVisible = filtered.length > 0 ? filtered[filtered.length - 1] : null;
+  const nextCursor = lastVisible ? lastVisible.id : null;
+
+  return { sessions, nextCursor };
 }
 
 /**
@@ -255,6 +306,19 @@ export async function updateSessionTitleRepo(
   });
 }
 
+/** Session lifecycle state: active (recording allowed), paused, or ended. */
+export type SessionStatus = "active" | "paused" | "ended";
+
+export async function updateSessionStatusRepo(
+  sessionId: string,
+  status: SessionStatus
+): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    status,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 /**
  * Updates session.archived and, when workspaceId is provided (or resolved from session),
  * updates workspace.archivedCount (increment on archive, decrement on unarchive).
@@ -304,6 +368,29 @@ export async function updateSessionUpdatedAtRepo(sessionId: string): Promise<voi
   await updateDoc(doc(db, "sessions", sessionId), {
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Updates session AI insight status fields (processing / completed / failed).
+ * Used by session-insight decoupled flow. Does NOT change session.updatedAt.
+ */
+export async function updateSessionRepo(
+  sessionId: string,
+  updates: {
+    aiInsightStatus?: string;
+    aiInsightRequestedAt?: number;
+    aiInsightCompletedAt?: number;
+    aiInsightError?: string;
+  }
+): Promise<void> {
+  if (!sessionId || typeof sessionId !== "string" || sessionId.trim() === "") return;
+  const payload: Record<string, unknown> = {};
+  if (updates.aiInsightStatus !== undefined) payload.aiInsightStatus = updates.aiInsightStatus;
+  if (updates.aiInsightRequestedAt !== undefined) payload.aiInsightRequestedAt = updates.aiInsightRequestedAt;
+  if (updates.aiInsightCompletedAt !== undefined) payload.aiInsightCompletedAt = updates.aiInsightCompletedAt;
+  if (updates.aiInsightError !== undefined) payload.aiInsightError = updates.aiInsightError;
+  if (Object.keys(payload).length === 0) return;
+  await updateDoc(doc(db, "sessions", sessionId), payload as Record<string, unknown>);
 }
 
 /**

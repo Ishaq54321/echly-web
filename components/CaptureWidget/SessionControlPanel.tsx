@@ -71,7 +71,7 @@ export function SessionControlPanel({
       }}
     >
       <span style={{ fontSize: 14, fontWeight: 600, color: "#F3F4F6" }}>
-        {sessionPaused ? "Session paused" : "Session started"}
+        {sessionPaused ? "Paused — resume to continue" : "Session started"}
       </span>
       {pausePending ? (
         <button

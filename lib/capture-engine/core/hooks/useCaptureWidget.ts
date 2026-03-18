@@ -517,7 +517,7 @@ export function useCaptureWidget({
     const loadFeedback = async () => {
       console.log("[ECHLY CORE] fetch via environment");
       const res = await environment.authenticatedFetch(
-        `/api/feedback?sessionId=${sessionId}&limit=20`
+        `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=25`
       );
       const data = await res.json();
       const existing = (data?.feedback ?? []) as Array<{

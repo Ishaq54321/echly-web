@@ -66,6 +66,21 @@ chrome.action.onClicked.addListener(() => {
 
 type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
 
+/** Response shape from GET /api/feedback?sessionId=...&cursor=...&limit=25 */
+interface FeedbackListResponse {
+  feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }>;
+  nextCursor?: string | null;
+  hasMore?: boolean;
+  totalCount?: number;
+  openCount?: number;
+  resolvedCount?: number;
+  skippedCount?: number;
+}
+
+function mapFeedbackToPointer(f: { id: string; title?: string; actionSteps?: string[] }): StructuredFeedback {
+  return { id: f.id, title: f.title ?? "", actionSteps: f.actionSteps ?? [] };
+}
+
 /** Global message-router API: single source for extension token, user, capture mode (used by message handler). */
 const sw = globalThis as typeof globalThis & {
   extensionToken: string | null;
@@ -136,6 +151,13 @@ let globalUIState: {
   sessionLoading: boolean;
   pointers: StructuredFeedback[];
   captureMode: "voice" | "text";
+  /** Backend counts (from first page); use these instead of array.length. */
+  totalCount?: number;
+  openCount?: number;
+  resolvedCount?: number;
+  skippedCount?: number;
+  feedbackHasMore?: boolean;
+  feedbackLoadingMore?: boolean;
 } = {
   visible: false,
   expanded: false,
@@ -149,6 +171,11 @@ let globalUIState: {
   captureMode: "voice",
 };
 
+/** Cursor-based pagination: next cursor and hasMore for current session (not broadcast). */
+let feedbackNextCursor: string | null = null;
+let feedbackHasMore = false;
+const FEEDBACK_PAGE_SIZE = 25;
+
 /** 30-minute safety timeout: session ends after this much inactivity. */
 const SESSION_IDLE_TIMEOUT = 30 * 60 * 1000;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -158,6 +185,17 @@ function clearSessionIdleTimer(): void {
     clearTimeout(idleTimer);
     idleTimer = null;
   }
+}
+
+function clearFeedbackPaginationState(): void {
+  feedbackNextCursor = null;
+  feedbackHasMore = false;
+  globalUIState.totalCount = undefined;
+  globalUIState.openCount = undefined;
+  globalUIState.resolvedCount = undefined;
+  globalUIState.skippedCount = undefined;
+  globalUIState.feedbackHasMore = undefined;
+  globalUIState.feedbackLoadingMore = undefined;
 }
 
 function endSessionFromIdle(): void {
@@ -170,6 +208,7 @@ function endSessionFromIdle(): void {
   globalUIState.sessionPaused = false;
   globalUIState.sessionLoading = false;
   globalUIState.pointers = [];
+  clearFeedbackPaginationState();
   chrome.storage.local.set({
     activeSessionId: null,
     sessionModeActive: false,
@@ -201,6 +240,35 @@ function persistSessionLifecycleState(): void {
   });
 }
 
+/** Lightweight race protection: throttle rapid pause/resume/end. */
+let lastSessionActionAt: number | null = null;
+
+/** Sync session state from backend; reconcile and broadcast only if different from local. */
+async function syncSessionStateFromBackend(): Promise<void> {
+  if (!activeSessionId) return;
+  try {
+    await getValidToken();
+    const res = await apiFetch(`${API_BASE}/api/sessions/${activeSessionId}`);
+    if (!res.ok) return;
+    const json = (await res.json()) as { session?: { status?: string } };
+    const status = json?.session?.status;
+    if (status !== "active" && status !== "paused" && status !== "ended") return;
+    const wantPaused = status === "paused";
+    const wantModeActive = status !== "ended";
+    if (
+      globalUIState.sessionPaused !== wantPaused ||
+      globalUIState.sessionModeActive !== wantModeActive
+    ) {
+      globalUIState.sessionPaused = wantPaused;
+      globalUIState.sessionModeActive = wantModeActive;
+      persistSessionLifecycleState();
+      broadcastUIState();
+    }
+  } catch {
+    // Non-blocking
+  }
+}
+
 async function initializeSessionState(): Promise<void> {
   return new Promise<void>((resolve) => {
     chrome.storage.local.get(
@@ -219,24 +287,37 @@ async function initializeSessionState(): Promise<void> {
           globalUIState.sessionModeActive === true && activeSessionId != null;
 
         if (shouldReloadPointers) {
+          console.log("[FETCH TRIGGERED]", { sessionId: activeSessionId, cursor: "", source: "initial" });
           getValidToken()
             .then(() =>
               apiFetch(
-                `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId!)}&limit=20`
+                `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId!)}&cursor=&limit=${FEEDBACK_PAGE_SIZE}`
               )
             )
             .then((res) => res.json())
-            .then((json: { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> }) => {
-              globalUIState.pointers = (json.feedback ?? []).map((f) => ({
-                id: f.id,
-                title: f.title ?? "",
-                actionSteps: f.actionSteps ?? [],
-              }));
+            .then((json: FeedbackListResponse) => {
+              const items = (json.feedback ?? []).map(mapFeedbackToPointer);
+              globalUIState.pointers = items;
+              feedbackNextCursor = json.nextCursor ?? null;
+              feedbackHasMore = Boolean(json.hasMore);
+              console.log("[EXT PAGINATION STATE]", {
+                nextCursor: feedbackNextCursor,
+                hasMore: feedbackHasMore,
+                loadingMore: false,
+                pointerCount: globalUIState.pointers.length,
+              });
+              globalUIState.totalCount = json.totalCount;
+              globalUIState.openCount = json.openCount;
+              globalUIState.resolvedCount = json.resolvedCount;
+              globalUIState.skippedCount = json.skippedCount;
+              globalUIState.feedbackHasMore = feedbackHasMore;
+              globalUIState.feedbackLoadingMore = false;
               broadcastUIState();
               resolve();
             })
             .catch(() => {
               globalUIState.pointers = [];
+              clearFeedbackPaginationState();
               broadcastUIState();
               resolve();
             });
@@ -272,6 +353,10 @@ self.addEventListener("activate", () => {
     await initializeSessionState();
 
     broadcastUIState();
+
+    if (activeSessionId) {
+      void syncSessionStateFromBackend();
+    }
 
     console.log("[ECHLY] service worker initialized");
   } catch (err) {
@@ -480,6 +565,9 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
       .catch((e) => {
         if (ECHLY_DEBUG) console.debug("ECHLY session state sync failed for tab", activeInfo.tabId, e);
       });
+    if (activeSessionId) {
+      void syncSessionStateFromBackend();
+    }
   } catch (e) {
     if (ECHLY_DEBUG) console.debug("ECHLY onActivated inject/sync failed", e);
   }
@@ -757,6 +845,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       if (!sessionId) {
         globalUIState.pointers = [];
+        clearFeedbackPaginationState();
         globalUIState.sessionLoading = false;
         broadcastUIState();
         sendResponse({ success: true });
@@ -764,28 +853,81 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       try {
         await getValidToken();
-        const [feedbackRes, sessionsRes] = await Promise.all([
-          apiFetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=20`),
-          apiFetch(`${API_BASE}/api/sessions`),
+        console.log("[FETCH TRIGGERED]", { sessionId, cursor: "", source: "initial" });
+        const [feedbackRes, sessionRes] = await Promise.all([
+          apiFetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${FEEDBACK_PAGE_SIZE}`),
+          apiFetch(`${API_BASE}/api/sessions/${sessionId}`),
         ]);
-        const feedbackJson = (await feedbackRes.json()) as { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> };
-        globalUIState.pointers = (feedbackJson.feedback ?? []).map((f) => ({
-          id: f.id,
-          title: f.title ?? "",
-          actionSteps: f.actionSteps ?? [],
-        }));
-        const sessionsJson = (await sessionsRes.json()) as { success?: boolean; sessions?: Array<{ id: string; title?: string }> };
-        if (sessionsJson.success && Array.isArray(sessionsJson.sessions)) {
-          const match = sessionsJson.sessions.find((s) => s.id === sessionId);
-          globalUIState.sessionTitle = match?.title ?? null;
+        const feedbackJson = (await feedbackRes.json()) as FeedbackListResponse;
+        globalUIState.pointers = (feedbackJson.feedback ?? []).map(mapFeedbackToPointer);
+        feedbackNextCursor = feedbackJson.nextCursor ?? null;
+        feedbackHasMore = Boolean(feedbackJson.hasMore);
+        console.log("[EXT PAGINATION STATE]", {
+          nextCursor: feedbackNextCursor,
+          hasMore: feedbackHasMore,
+          loadingMore: false,
+          pointerCount: globalUIState.pointers.length,
+        });
+        globalUIState.totalCount = feedbackJson.totalCount;
+        globalUIState.openCount = feedbackJson.openCount;
+        globalUIState.resolvedCount = feedbackJson.resolvedCount;
+        globalUIState.skippedCount = feedbackJson.skippedCount;
+        globalUIState.feedbackHasMore = feedbackHasMore;
+        globalUIState.feedbackLoadingMore = false;
+        if (sessionRes.ok) {
+          const sessionJson = (await sessionRes.json()) as { success?: boolean; session?: { title?: string } };
+          if (sessionJson.success && sessionJson.session) {
+            globalUIState.sessionTitle = sessionJson.session.title ?? null;
+          }
         }
       } catch {
         globalUIState.pointers = [];
+        clearFeedbackPaginationState();
       }
       globalUIState.sessionLoading = false;
       broadcastUIState();
       sendResponse({ success: true });
     })();
+    return true;
+  }
+
+  if (request.type === "ECHLY_FEEDBACK_LOAD_NEXT") {
+    if (!activeSessionId || globalUIState.feedbackLoadingMore || !globalUIState.feedbackHasMore) {
+      sendResponse({ success: true });
+      return true;
+    }
+    globalUIState.feedbackLoadingMore = true;
+    broadcastUIState();
+    const cursor = feedbackNextCursor ?? "";
+    console.log("[FETCH TRIGGERED]", { sessionId: activeSessionId, cursor, source: "loadMore" });
+    getValidToken()
+      .then(() =>
+        apiFetch(
+          `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId ?? "")}&cursor=${encodeURIComponent(cursor)}&limit=${FEEDBACK_PAGE_SIZE}`
+        )
+      )
+      .then((res) => res.json())
+      .then((json: FeedbackListResponse) => {
+        const newItems = (json.feedback ?? []).map(mapFeedbackToPointer);
+        globalUIState.pointers = [...globalUIState.pointers, ...newItems];
+        feedbackNextCursor = json.nextCursor ?? null;
+        feedbackHasMore = Boolean(json.hasMore);
+        globalUIState.feedbackHasMore = feedbackHasMore;
+        globalUIState.feedbackLoadingMore = false;
+        console.log("[EXT PAGINATION STATE]", {
+          nextCursor: feedbackNextCursor,
+          hasMore: feedbackHasMore,
+          loadingMore: false,
+          pointerCount: globalUIState.pointers.length,
+        });
+        broadcastUIState();
+        sendResponse({ success: true });
+      })
+      .catch(() => {
+        globalUIState.feedbackLoadingMore = false;
+        broadcastUIState();
+        sendResponse({ success: true });
+      });
     return true;
   }
 
@@ -830,6 +972,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_SESSION_MODE_PAUSE") {
+    console.log("[SESSION STATE] pause");
     echlyLog("BACKGROUND", "session pause broadcast");
     globalUIState.sessionModeActive = true;
     globalUIState.sessionPaused = true;
@@ -837,11 +980,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     persistSessionLifecycleState();
     broadcastUIState();
     resetSessionIdleTimer();
+    if (activeSessionId) {
+      (async () => {
+        const now = Date.now();
+        if (lastSessionActionAt != null && now - lastSessionActionAt < 500) {
+          console.log("[SESSION STATE] throttled duplicate action");
+          return;
+        }
+        lastSessionActionAt = now;
+        try {
+          await getValidToken();
+          await apiFetch(`${API_BASE}/api/session/state`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: activeSessionId, action: "pause" }),
+          });
+        } catch {
+          // Non-blocking: do not fail pause UX
+        }
+      })();
+    }
     sendResponse({ ok: true });
     return false;
   }
 
   if (request.type === "ECHLY_SESSION_MODE_RESUME") {
+    console.log("[SESSION STATE] resume");
     echlyLog("BACKGROUND", "session resume broadcast");
     globalUIState.sessionModeActive = true;
     globalUIState.sessionPaused = false;
@@ -849,12 +1013,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     persistSessionLifecycleState();
     broadcastUIState();
     resetSessionIdleTimer();
+    if (activeSessionId) {
+      (async () => {
+        const now = Date.now();
+        if (lastSessionActionAt != null && now - lastSessionActionAt < 500) {
+          console.log("[SESSION STATE] throttled duplicate action");
+          return;
+        }
+        lastSessionActionAt = now;
+        try {
+          await getValidToken();
+          await apiFetch(`${API_BASE}/api/session/state`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: activeSessionId, action: "resume" }),
+          });
+        } catch {
+          // Non-blocking: do not fail resume UX
+        }
+      })();
+    }
     sendResponse({ ok: true });
     return false;
   }
 
   if (request.type === "ECHLY_SESSION_MODE_END") {
+    console.log("[SESSION STATE] end");
     echlyLog("BACKGROUND", "session end broadcast");
+    const sessionIdForApi = activeSessionId;
     clearSessionIdleTimer();
     activeSessionId = null;
     globalUIState.sessionId = null;
@@ -863,12 +1049,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionPaused = false;
     globalUIState.sessionLoading = false;
     globalUIState.pointers = [];
+    clearFeedbackPaginationState();
     chrome.storage.local.set({
       activeSessionId: null,
       sessionModeActive: false,
       sessionPaused: false,
     });
     broadcastUIState();
+    if (sessionIdForApi) {
+      (async () => {
+        const now = Date.now();
+        if (lastSessionActionAt != null && now - lastSessionActionAt < 500) {
+          console.log("[SESSION STATE] throttled duplicate action");
+          return;
+        }
+        lastSessionActionAt = now;
+        try {
+          await getValidToken();
+          await apiFetch(`${API_BASE}/api/session/state`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: sessionIdForApi, action: "end" }),
+          });
+        } catch {
+          // Non-blocking: do not fail end UX
+        }
+      })();
+    }
     chrome.tabs.query({}, (tabs) => {
       tabs.forEach((tab) => {
         if (tab.id) {

@@ -12,7 +12,7 @@ declare global {
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { apiFetch, API_BASE } from "./api";
-import { getSessionsCached, invalidateSessionsCache } from "./cachedSessions";
+import { getSessionDetailCached, invalidateSessionsCache, addRecentSessionId } from "./cachedSessions";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/lib/capture-engine/core/CaptureWidget";
@@ -114,6 +114,12 @@ type GlobalUIState = {
   sessionLoading: boolean;
   pointers: StructuredFeedback[];
   captureMode: "voice" | "text";
+  totalCount?: number;
+  openCount?: number;
+  resolvedCount?: number;
+  skippedCount?: number;
+  feedbackHasMore?: boolean;
+  feedbackLoadingMore?: boolean;
 };
 
 /** Prevent overwriting a valid pointer list with empty when session has not changed (Pause → Minimize → Resume). */
@@ -197,6 +203,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [widgetResetKey, setWidgetResetKey] = React.useState(0);
   const [hasPreviousSessions, setHasPreviousSessions] = React.useState(false);
   const [openResumeModalFromMessage, setOpenResumeModalFromMessage] = React.useState(false);
+  const [sessionListVersion, setSessionListVersion] = React.useState(0);
   /** When POST /api/sessions returns 403 PLAN_LIMIT_REACHED, show upgrade view in tray. */
   const [sessionLimitReached, setSessionLimitReached] = React.useState<{
     message: string;
@@ -364,18 +371,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return () => document.removeEventListener("visibilitychange", handler);
   }, []);
 
-  /* On widget open, use shared sessions cache so we don't duplicate GET /api/sessions with preload. */
+  /* Previous Sessions button: always show in extension (list loaded via fetchSessionsPage when modal opens). */
   React.useEffect(() => {
-    if (!globalState.visible) return;
-    let cancelled = false;
-    getSessionsCached(apiFetch).then((sessions) => {
-      if (!cancelled) setHasPreviousSessions(sessions.length > 0);
-    }).catch(() => {
-      if (!cancelled) setHasPreviousSessions(false);
-    });
-    return () => {
-      cancelled = true;
-    };
+    if (globalState.visible) setHasPreviousSessions(true);
   }, [globalState.visible]);
 
   /* Extension: when background forwards ECHLY_START_SESSION to this tab, run start-session flow. */
@@ -498,6 +496,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         callbacks?.onError?.();
         return undefined;
       }
+      /* Do NOT block here: in-flight feedback must finish. New captures are blocked at entry (SessionOverlay getActive when paused). */
       if (callbacks) {
         const jobId = createUniqueId();
         const job: FeedbackJob = {
@@ -889,16 +888,40 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     [effectiveSessionId]
   );
 
-  const fetchSessions = React.useCallback(async () => {
-    const sessions = await getSessionsCached(apiFetch);
-    if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", { count: sessions.length, sessions });
-    return sessions;
-  }, []);
+  const fetchSessionsPage = React.useCallback(
+    async (opts: { limit: number; cursor?: string | null }) => {
+      const params = new URLSearchParams({ limit: String(opts.limit) });
+      if (opts.cursor) params.set("cursor", opts.cursor);
+      const res = await apiFetch(`/api/sessions?${params.toString()}`);
+      const json = (await res.json()) as {
+        data?: Array<{
+          id: string;
+          title?: string;
+          createdAt?: string;
+          updatedAt?: string;
+          openCount?: number;
+          resolvedCount?: number;
+          feedbackCount?: number;
+        }>;
+        nextCursor?: string | null;
+        totalCount?: number;
+      };
+      return {
+        data: (json.data ?? []).map((s) => ({
+          ...s,
+          title: typeof s.title === "string" && s.title.trim() ? s.title : "Untitled Session",
+        })),
+        nextCursor: json.nextCursor ?? null,
+        totalCount: typeof json.totalCount === "number" ? json.totalCount : 0,
+      };
+    },
+    []
+  );
 
-  /* Optional preload: warm cache so Previous Sessions modal feels faster when opened. */
-  React.useEffect(() => {
-    fetchSessions?.();
-  }, [fetchSessions]);
+  const fetchSessionDetail = React.useCallback(
+    (id: string) => getSessionDetailCached(apiFetch, id),
+    []
+  );
 
   async function createSession(): Promise<
     { id: string } | { limitReached: true; message: string; upgradePlan: unknown } | null
@@ -924,6 +947,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       if (!res.ok || !data.success || !data.session?.id) return null;
       invalidateSessionsCache();
+      await addRecentSessionId(data.session.id);
+      setSessionListVersion((v) => v + 1);
       return { id: data.session.id };
     } catch (err) {
       console.error("[Echly] Failed to create session:", err);
@@ -943,8 +968,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   const onPreviousSessionSelect = React.useCallback(
     async (sessionId: string, _options?: { enterCaptureImmediately?: boolean }) => {
+      addRecentSessionId(sessionId).catch(() => {});
       chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {});
       chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
+      // Fire-and-forget: notify backend that session was resumed (reopen session).
+      apiFetch("/api/session/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, action: "resume" }),
+      }).catch(() => {});
       try {
         const sessionRes = await apiFetch(`/api/sessions/${sessionId}`);
         const sessionData = (await sessionRes.json()) as { session?: { url?: string } };
@@ -1489,14 +1521,21 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           expanded={globalState.expanded}
           onExpandRequest={onExpandRequest}
           onCollapseRequest={onCollapseRequest}
-          captureDisabled={false}
+          captureDisabled={globalState.sessionPaused}
           theme={theme}
           onThemeToggle={onThemeToggle}
-          fetchSessions={fetchSessions}
+          fetchSessionsPage={fetchSessionsPage}
+          fetchSessionDetail={fetchSessionDetail}
+          sessionListVersion={sessionListVersion}
           hasPreviousSessions={hasPreviousSessions}
           onPreviousSessionSelect={onPreviousSessionSelect}
           pointers={globalState.pointers ?? []}
           sessionLoading={globalState.sessionLoading ?? false}
+          feedbackOpenCount={globalState.openCount}
+          feedbackTotalCount={globalState.totalCount}
+          feedbackHasMore={globalState.feedbackHasMore}
+          feedbackLoadingMore={globalState.feedbackLoadingMore}
+          onLoadMoreFeedback={() => chrome.runtime.sendMessage({ type: "ECHLY_FEEDBACK_LOAD_NEXT" }).catch(() => {})}
           sessionTitleProp={globalState.sessionTitle ?? undefined}
           onSessionTitleChange={onSessionTitleChange}
           isProcessingFeedback={isProcessingFeedback}
@@ -1631,6 +1670,12 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     sessionLoading: state.sessionLoading ?? false,
     pointers: Array.isArray(state.pointers) ? state.pointers : [],
     captureMode: state.captureMode === "text" ? "text" : "voice",
+    totalCount: state.totalCount,
+    openCount: state.openCount,
+    resolvedCount: state.resolvedCount,
+    skippedCount: state.skippedCount,
+    feedbackHasMore: state.feedbackHasMore,
+    feedbackLoadingMore: state.feedbackLoadingMore,
   };
 }
 
