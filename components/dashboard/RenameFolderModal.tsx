@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/Button";
 
 export interface RenameFolderModalProps {
   open: boolean;
@@ -94,14 +95,15 @@ export function RenameFolderModal({
           >
             Cancel
           </button>
-          <button
+          <Button
+            variant="primary"
             type="button"
             onClick={handleSave}
             disabled={value.trim() === ""}
-            className="px-4 py-2.5 text-sm font-medium rounded-xl bg-[#155DFC] text-white hover:bg-[#0F4ED1] transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 text-sm font-semibold rounded-xl"
           >
             Save
-          </button>
+          </Button>
         </div>
       </div>
     </div>

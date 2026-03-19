@@ -2,13 +2,12 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { clearAuthTokenCache } from "@/lib/authFetch";
 import { getWorkspaceSessions, getUserSessions } from "@/lib/sessions";
-import { getSessionFeedbackCounts } from "@/lib/feedback";
-import { Search, Folder } from "lucide-react";
+import { Search, Folder, Loader2 } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import SessionsTableSkeleton from "@/components/skeleton/SessionsTableSkeleton";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
@@ -37,6 +36,8 @@ interface FolderData {
   sessionIds: string[];
 }
 
+const FOLDERS_CACHE_KEY = "echly_folders";
+
 async function loadSessionsAndCounts(
   uid: string
 ): Promise<SessionWithCounts[]> {
@@ -48,12 +49,14 @@ async function loadSessionsAndCounts(
     workspaceSessions.length > 0
       ? workspaceSessions
       : await getUserSessions(uid, SESSION_LIMIT, { includeArchived: true });
-  const withCounts = await Promise.all(
-    userSessions.map(async (session) => {
-      const counts = await getSessionFeedbackCounts(session.id);
-      return { session, counts };
-    })
-  );
+  const withCounts = userSessions.map((session) => ({
+    session,
+    counts: {
+      open: session.openCount ?? 0,
+      resolved: session.resolvedCount ?? 0,
+      skipped: session.skippedCount ?? 0,
+    },
+  }));
   return withCounts.sort((a, b) => {
     const ta = a.session.updatedAt as { seconds?: number } | null | undefined;
     const tb = b.session.updatedAt as { seconds?: number } | null | undefined;
@@ -97,6 +100,7 @@ export default function SessionsPage() {
   const [loading, setLoading] = useState(true);
   const [foldersLoading, setFoldersLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -120,19 +124,41 @@ export default function SessionsPage() {
     }
   }, []);
 
-  const loadFolders = useCallback(async () => {
+  const loadFolders = useCallback(async (uid: string) => {
     setFoldersLoading(true);
-    const snapshot = await getDocs(collection(db, "folders"));
-    const list: FolderData[] = snapshot.docs.map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        name: (data.name as string) ?? "Untitled Folder",
-        sessionIds: (data.sessionIds as string[]) ?? [],
-      };
-    });
-    setFolders(list);
-    setFoldersLoading(false);
+    try {
+      const cached = sessionStorage.getItem(FOLDERS_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) setFolders(parsed as FolderData[]);
+      }
+    } catch {
+      // Ignore cache read/parse errors.
+    }
+    try {
+      const workspaceId = (await getUserWorkspaceIdRepo(uid)) ?? uid;
+      const q = query(
+        collection(db, "folders"),
+        where("workspaceId", "==", workspaceId)
+      );
+      const snapshot = await getDocs(q);
+      const list: FolderData[] = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          name: (data.name as string) ?? "Untitled Folder",
+          sessionIds: (data.sessionIds as string[]) ?? [],
+        };
+      });
+      setFolders(list);
+      try {
+        sessionStorage.setItem(FOLDERS_CACHE_KEY, JSON.stringify(list));
+      } catch {
+        // Ignore cache write errors.
+      }
+    } finally {
+      setFoldersLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -141,8 +167,9 @@ export default function SessionsPage() {
   }, [user?.uid, loadSessions]);
 
   useEffect(() => {
-    loadFolders();
-  }, [loadFolders]);
+    if (!user?.uid) return;
+    loadFolders(user.uid);
+  }, [user?.uid, loadFolders]);
 
   const filteredSessions = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -255,7 +282,14 @@ export default function SessionsPage() {
                 {filteredSessions.map(({ session, counts }) => {
                   const open = session.openCount ?? counts.open;
                   const resolved = session.resolvedCount ?? counts.resolved;
-                  const total = open + resolved;
+                  const total =
+                    session.totalCount ??
+                    session.feedbackCount ??
+                    open + resolved + (session.skippedCount ?? counts.skipped);
+                  const hasStoredCounts =
+                    typeof session.openCount === "number" &&
+                    (typeof session.totalCount === "number" ||
+                      typeof session.feedbackCount === "number");
                   const progress = total > 0 ? Math.round((resolved / total) * 100) : 0;
                   const status = session.archived ? "Archived" : "Active";
                   const folder = sessionIdToFolder.get(session.id);
@@ -265,19 +299,28 @@ export default function SessionsPage() {
                       key={session.id}
                       role="button"
                       tabIndex={0}
-                      onClick={() => router.push(`/dashboard/${session.id}`)}
+                      onClick={() => {
+                        setOpeningSessionId(session.id);
+                        router.push(`/dashboard/${session.id}`);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
+                          setOpeningSessionId(session.id);
                           router.push(`/dashboard/${session.id}`);
                         }
                       }}
-                      className="border-b border-[rgba(0,0,0,0.06)] hover:bg-[#155DFC0D] cursor-pointer transition-colors"
+                      className={`border-b border-[rgba(0,0,0,0.06)] hover:bg-[#155DFC0D] cursor-pointer transition-colors ${
+                        openingSessionId === session.id ? "ring-2 ring-[#155DFC]/30 bg-[#155DFC0D]" : ""
+                      }`}
                     >
                       <td className="px-3 py-[12px]">
                         <div className="min-w-0">
-                          <p className="font-medium text-neutral-900">
+                          <p className="font-medium text-neutral-900 inline-flex items-center gap-2">
                             {session.title || "Untitled Session"}
+                            {openingSessionId === session.id && (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                            )}
                           </p>
                           {folder && (
                             <p className="text-xs text-secondary mt-1">
@@ -285,7 +328,12 @@ export default function SessionsPage() {
                             </p>
                           )}
                           <p className="text-xs text-secondary mt-1">
-                            Created by {createdBy} • {total} feedback
+                            Created by {createdBy} •{" "}
+                            {hasStoredCounts ? (
+                              `${total} feedback`
+                            ) : (
+                              <span className="inline-block h-3 w-14 rounded bg-neutral-200 animate-pulse align-middle" />
+                            )}
                           </p>
                         </div>
                       </td>
@@ -301,7 +349,11 @@ export default function SessionsPage() {
                         </span>
                       </td>
                       <td className="px-3 py-[12px] text-right tabular-nums text-[13px] text-secondary">
-                        {open}
+                        {hasStoredCounts ? (
+                          open
+                        ) : (
+                          <span className="inline-block h-3 w-5 rounded bg-neutral-200 animate-pulse align-middle" />
+                        )}
                       </td>
                       <td className="px-3 py-[12px] text-right tabular-nums text-[13px] text-secondary">
                         {resolved}

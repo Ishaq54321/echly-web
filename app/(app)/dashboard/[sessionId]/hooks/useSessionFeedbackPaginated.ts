@@ -3,15 +3,15 @@
 import { authFetch } from "@/lib/authFetch";
 import { cachedFetch } from "@/lib/client/requestCache";
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
-import { onSnapshot, collection, query, where, limit, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import type { Feedback } from "@/lib/domain/feedback";
-import type { Timestamp, DocumentSnapshot } from "firebase/firestore";
+import {
+  subscribeFeedbackSession,
+  useFeedbackRealtimeStore,
+} from "@/lib/realtime/feedbackStore";
 
 const PAGE_SIZE = 20;
 /** Client-side read cap: stop loading more after this many items (cost protection). */
 const FEEDBACK_LOAD_CAP = 200;
-const REALTIME_LIMIT = 30;
 
 type SessionCounts = {
   total: number;
@@ -45,50 +45,6 @@ export interface UseSessionFeedbackPaginatedResult {
 
 const SCROLL_THRESHOLD_PX = 150;
 
-/** Maps a Firestore doc to domain Feedback (same shape as feedbackRepository). */
-function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback {
-  const data = docSnap.data() ?? {};
-  const status = (data.status ?? "open") as string;
-  const isResolved =
-    data.isResolved === true ||
-    status === "resolved" ||
-    status === "done";
-  const isSkipped = status === "skipped";
-  return {
-    id: docSnap.id,
-    workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : undefined,
-    sessionId: data.sessionId as string,
-    userId: data.userId as string,
-    title: (data.title as string) ?? "",
-    description: (data.description as string) ?? "",
-    suggestion: (data.suggestion as string) ?? "",
-    type: (data.type as string) ?? "Feedback",
-    isResolved,
-    isSkipped: isSkipped || undefined,
-    createdAt: (data.createdAt ?? null) as Timestamp | null,
-    contextSummary: (data.contextSummary as string | null) ?? null,
-    actionSteps: (data.actionSteps ?? data.actionItems ?? null) as string[] | null,
-    suggestedTags: (data.suggestedTags as string[] | null) ?? null,
-    url: (data.url as string | null) ?? null,
-    viewportWidth: (data.viewportWidth as number | null) ?? null,
-    viewportHeight: (data.viewportHeight as number | null) ?? null,
-    userAgent: (data.userAgent as string | null) ?? null,
-    clientTimestamp: (data.clientTimestamp as number | null) ?? null,
-    screenshotUrl: (data.screenshotUrl as string | null) ?? null,
-    clarityScore: (data.clarityScore as number | null) ?? null,
-    clarityStatus: (() => {
-      const s = data.clarityStatus;
-      return s === "clear" || s === "needs_improvement" || s === "unclear" ? s : null;
-    })(),
-    clarityIssues: (data.clarityIssues as string[] | null) ?? null,
-    clarityConfidence: (data.clarityConfidence as number | null) ?? null,
-    clarityCheckedAt: (data.clarityCheckedAt as Timestamp | null) ?? null,
-    commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
-    lastCommentPreview: typeof data.lastCommentPreview === "string" ? data.lastCommentPreview : undefined,
-    lastCommentAt: (data.lastCommentAt ?? null) as Timestamp | null,
-  };
-}
-
 /**
  * Infinite scroll: first page only on mount; next pages only when user scrolls near bottom.
  * Uses scroll-container ref to avoid triggering load on initial paint.
@@ -100,7 +56,12 @@ export function useSessionFeedbackPaginated(
   scrollReady?: number,
   onNewTicketFromRealtime?: (newestTicketId: string) => void
 ): UseSessionFeedbackPaginatedResult {
-  const [realtimeItems, setRealtimeItems] = useState<Feedback[]>([]);
+  const feedbackRealtime = useFeedbackRealtimeStore();
+  const realtimeItems = useMemo(() => {
+    if (!sessionId) return [];
+    if (feedbackRealtime.sessionId !== sessionId) return [];
+    return feedbackRealtime.items;
+  }, [feedbackRealtime.sessionId, feedbackRealtime.items, sessionId]);
   const [apiItems, setApiItems] = useState<Feedback[]>([]);
   const [counts, setCounts] = useState<SessionCounts>({
     total: 0,
@@ -118,7 +79,6 @@ export function useSessionFeedbackPaginated(
   const [loadingMore, setLoadingMore] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
-  const [userHasScrolledList, setUserHasScrolledList] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const isFetchingRef = useRef(false);
   const hasUserScrolledRef = useRef(false);
@@ -135,19 +95,18 @@ export function useSessionFeedbackPaginated(
 
   // Reset infinite scroll state when sessionId changes to avoid ghost items.
   useLayoutEffect(() => {
-    setRealtimeItems([]);
     setApiItems([]);
     setCursor(null);
     setHasMore(true);
     setLoadingMore(false);
     setInitialLoadDone(false);
-    setUserHasScrolledList(false);
     isFetchingRef.current = false;
     hasUserScrolledRef.current = false;
     // Refs (used by the realtime + pagination effects) must also be reset immediately,
     // otherwise in-flight seeding/pagination may update state for the new session.
     hasFetchedRef.current = false;
     countsLoadedRef.current = false;
+    previousFeedbackCountRef.current = 0;
   }, [sessionId]);
 
   /** Track previous snapshot size so we can detect new tickets and auto-select the newest. */
@@ -304,7 +263,6 @@ export function useSessionFeedbackPaginated(
         ignoreFirstScrollEvent = false;
         return;
       }
-      setUserHasScrolledList(true);
       hasUserScrolledRef.current = true;
       const s = stateRef.current;
       if (s.loadingMore || isFetchingRef.current) return;
@@ -361,8 +319,8 @@ export function useSessionFeedbackPaginated(
       hasFetchedRef.current = false;
       countsLoadedRef.current = false;
       hasUserScrolledRef.current = false;
+      previousFeedbackCountRef.current = 0;
       setCountsLoading(false);
-      setRealtimeItems([]);
       setApiItems([]);
       setCursor(null);
       setHasMore(true);
@@ -374,7 +332,6 @@ export function useSessionFeedbackPaginated(
     hasFetchedRef.current = false;
     countsLoadedRef.current = false;
     setCountsLoading(true);
-    setRealtimeItems([]);
     setApiItems([]);
     setCursor(null);
     setHasMore(true);
@@ -421,88 +378,86 @@ export function useSessionFeedbackPaginated(
       }
     })();
 
-    const feedbackRef = collection(db, "feedback");
-    const feedbackQuery = query(
-      feedbackRef,
-      where("sessionId", "==", sessionId),
-      orderBy("createdAt", "desc"),
-      limit(REALTIME_LIMIT)
-    );
-
-    const effectSessionId = sessionId;
-    const unsubscribe = onSnapshot(feedbackQuery, (snapshot) => {
-      // Ignore stale snapshots from a previous sessionId.
-      if (sessionIdRef.current !== effectSessionId) return;
-      const snapshotList = snapshot.docs.map((d) => mapDocToFeedback(d));
-      const realtimeWindowCount = snapshotList.length;
-
-      if (realtimeWindowCount > previousFeedbackCountRef.current && snapshotList.length > 0) {
-        const newestTicketId = snapshotList[0].id;
-        onNewTicketFromRealtimeRef.current?.(newestTicketId);
-      }
-      previousFeedbackCountRef.current = realtimeWindowCount;
-
-      const isFirstSnapshot = !stateRef.current.initialLoadDone;
-      if (isFirstSnapshot) {
-        setRealtimeItems(snapshotList);
-        setInitialLoadDone(true);
-        setInitialLoading(false);
-        if (hasFetchedRef.current) return;
-        hasFetchedRef.current = true;
-        // Seed pagination + true totals from the API. API items are treated as older pages.
-        void (async () => {
-          try {
-            const url = `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`;
-            const res = await cachedFetch(url, () => authFetch(url));
-            const data = (await res.json()) as {
-              feedback?: Feedback[];
-              nextCursor?: string | null;
-              hasMore?: boolean;
-              total?: number;
-              activeCount?: number;
-              resolvedCount?: number;
-              skippedCount?: number;
-            };
-            // Ignore stale API seeding if the user switched sessions.
-            if (sessionIdRef.current !== effectSessionId) return;
-            const incoming = data.feedback ?? [];
-            const pageCursor = data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
-            setCursor(pageCursor);
-            setHasMore(data.hasMore ?? false);
-            if (incoming.length > 0) {
-              setApiItems(() => {
-                const seen = new Set<string>();
-                for (const f of stateRef.current.realtimeItems) seen.add(f.id);
-                const next: Feedback[] = [];
-                for (const f of incoming) {
-                  if (seen.has(f.id)) continue;
-                  seen.add(f.id);
-                  next.push(f);
-                }
-                return next;
-              });
-              console.log("SEED PAGE RESULT", {
-                cursor: pageCursor,
-                returnedCount: incoming.length,
-              });
-            }
-          } catch {
-            // If API seeding fails, realtime list still works; pagination will remain unavailable.
-            setHasMore(false);
-            setCursor(null);
-          }
-        })();
-      } else {
-        // Keep realtime window separate: never remove older paginated items due to query limit churn.
-        setRealtimeItems(snapshotList);
-      }
-    });
+    subscribeFeedbackSession(sessionId);
 
     return () => {
       countsCancelled = true;
-      unsubscribe();
     };
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    if (feedbackRealtime.sessionId !== sessionId) return;
+    if (feedbackRealtime.loading) return;
+
+    const effectSessionId = sessionId;
+    const snapshotList = realtimeItems;
+    const realtimeWindowCount = snapshotList.length;
+
+    if (realtimeWindowCount > previousFeedbackCountRef.current && snapshotList.length > 0) {
+      const newestTicketId = snapshotList[0].id;
+      onNewTicketFromRealtimeRef.current?.(newestTicketId);
+    }
+    previousFeedbackCountRef.current = realtimeWindowCount;
+
+    const isFirstSnapshot = !stateRef.current.initialLoadDone;
+    if (!isFirstSnapshot) return;
+
+    setInitialLoadDone(true);
+    setInitialLoading(false);
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+
+    // Seed pagination + true totals from the API. API items are treated as older pages.
+    void (async () => {
+      try {
+        const url = `/api/feedback?sessionId=${encodeURIComponent(effectSessionId)}&cursor=&limit=${PAGE_SIZE}`;
+        const res = await cachedFetch(url, () => authFetch(url));
+        const data = (await res.json()) as {
+          feedback?: Feedback[];
+          nextCursor?: string | null;
+          hasMore?: boolean;
+          total?: number;
+          activeCount?: number;
+          resolvedCount?: number;
+          skippedCount?: number;
+        };
+        // Ignore stale API seeding if the user switched sessions.
+        if (sessionIdRef.current !== effectSessionId) return;
+        const incoming = data.feedback ?? [];
+        const pageCursor = data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
+        setCursor(pageCursor);
+        setHasMore(data.hasMore ?? false);
+        if (incoming.length > 0) {
+          setApiItems(() => {
+            const seen = new Set<string>();
+            for (const f of stateRef.current.realtimeItems) seen.add(f.id);
+            const next: Feedback[] = [];
+            for (const f of incoming) {
+              if (seen.has(f.id)) continue;
+              seen.add(f.id);
+              next.push(f);
+            }
+            return next;
+          });
+          console.log("SEED PAGE RESULT", {
+            cursor: pageCursor,
+            returnedCount: incoming.length,
+          });
+        }
+      } catch {
+        // If API seeding fails, realtime list still works; pagination will remain unavailable.
+        setHasMore(false);
+        setCursor(null);
+      }
+    })();
+  }, [
+    feedbackRealtime.loading,
+    feedbackRealtime.sessionId,
+    feedbackRealtime.version,
+    realtimeItems,
+    sessionId,
+  ]);
 
   const refetchFirstPage = useCallback(async () => {
     if (!sessionId) return;

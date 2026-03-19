@@ -3,13 +3,26 @@
 import { authFetch } from "@/lib/authFetch";
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { Link2, UserPlus, MoreHorizontal, Pencil, Archive, Trash2, Eye, MessageCircle, FileText, FolderPlus, ArrowLeft } from "lucide-react";
+import {
+  Link2,
+  UserPlus,
+  MoreHorizontal,
+  Pencil,
+  Archive,
+  Trash2,
+  Eye,
+  MessageCircle,
+  FileText,
+  FolderPlus,
+  ArrowLeft,
+  Loader2,
+} from "lucide-react";
 import { useDragSession } from "./context/DragSessionContext";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
-import { formatRelativeTime } from "@/lib/utils/time";
+import type { Session } from "@/lib/domain/session";
+import { formatDistanceToNowStrict } from "date-fns/formatDistanceToNowStrict";
 import { ShareSessionModal } from "./ShareSessionModal";
 import { RenameSessionModal } from "./RenameSessionModal";
-import { DeleteSessionModal } from "./DeleteSessionModal";
 
 const DROPDOWN_Z_INDEX = 1000;
 const TOOLTIP_HOVER_DELAY_MS = 300;
@@ -21,7 +34,7 @@ export interface WorkspaceCardProps {
   index: number;
   onRenameSuccess?: (session: { id: string; title: string; updatedAt?: unknown }) => void;
   onArchiveSuccess?: (sessionId: string) => void;
-  onDeleteSuccess?: (sessionId: string) => void;
+  onRequestDelete?: (session: Session) => void;
   /** If true, this session is in a folder (root sessions only can be dragged) */
   isRootSession?: boolean;
   /** Open move-to-folder modal for this session (dashboard only) */
@@ -39,7 +52,7 @@ export function WorkspaceCard({
   index,
   onRenameSuccess,
   onArchiveSuccess,
-  onDeleteSuccess,
+  onRequestDelete,
   isRootSession = true,
   onOpenMoveToFolder,
   folderId,
@@ -47,6 +60,14 @@ export function WorkspaceCard({
 }: WorkspaceCardProps) {
   const { setDraggedSessionId } = useDragSession();
   const { session, counts } = item;
+  console.log("SESSION DATA", session);
+  const isOptimistic = Boolean(session.isOptimistic);
+  const updatedAt = typeof session.updatedAt === "string" ? session.updatedAt : null;
+  const updatedAtDate = updatedAt ? new Date(updatedAt) : null;
+  const updatedAtLabel =
+    updatedAtDate && !Number.isNaN(updatedAtDate.getTime())
+      ? formatDistanceToNowStrict(updatedAtDate, { addSuffix: true })
+      : "—";
   const feedbackCount = counts.open + counts.resolved;
   const openFeedbackCount = counts.open;
   const openCount = openFeedbackCount;
@@ -61,8 +82,8 @@ export function WorkspaceCard({
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement>(null);
@@ -72,6 +93,12 @@ export function WorkspaceCard({
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    // If we were showing an "Opening..." state and the session becomes real,
+    // let the card render its normal content again.
+    if (!isOptimistic) setIsOpening(false);
+  }, [isOptimistic]);
 
   const closeMenu = useCallback(() => {
     setMoreOpen(false);
@@ -143,12 +170,24 @@ export function WorkspaceCard({
 
   const handleCardClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("[data-card-actions]")) return;
+    if (isOpening) return;
+    if (isOptimistic) {
+      setIsOpening(true);
+      return;
+    }
+    setIsOpening(true);
     onView(session.id);
   };
 
   const handleCardKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
+      if (isOpening) return;
+      if (isOptimistic) {
+        setIsOpening(true);
+        return;
+      }
+      setIsOpening(true);
       onView(session.id);
     }
   };
@@ -192,6 +231,7 @@ export function WorkspaceCard({
   const handleRenameClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isOptimistic || isOpening) return;
     setRenameOpen(true);
     closeMenu();
   };
@@ -199,6 +239,7 @@ export function WorkspaceCard({
   const handleArchiveClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isOptimistic || isOpening) return;
     closeMenu();
     if (archiving || !onArchiveSuccess) return;
     setArchiving(true);
@@ -217,7 +258,8 @@ export function WorkspaceCard({
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setDeleteOpen(true);
+    if (isOptimistic || isOpening) return;
+    onRequestDelete?.(session);
     closeMenu();
   };
 
@@ -232,12 +274,6 @@ export function WorkspaceCard({
     if (data.success && data.session && onRenameSuccess) {
       onRenameSuccess(data.session);
     }
-  };
-
-  const handleDeleteConfirm = async () => {
-    const res = await authFetch(`/api/sessions/${session.id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Failed to delete");
-    onDeleteSuccess?.(session.id);
   };
 
   const menuItemClass =
@@ -279,6 +315,12 @@ export function WorkspaceCard({
         data-session-id={session.id}
       >
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-blue-500/70 rounded-t-xl" aria-hidden />
+        {(isOptimistic || isOpening) && (
+          <div
+            className="absolute inset-0 rounded-xl ring-2 ring-[#155DFC]/35 pointer-events-none"
+            aria-hidden
+          />
+        )}
         {/* 3-DOTS — visible on hover; tooltip only when hover and dropdown closed */}
         <div className="absolute top-4 right-4">
           <div data-card-actions className="relative z-10 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
@@ -304,6 +346,7 @@ export function WorkspaceCard({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  if (isOptimistic || isOpening) return;
                   setShowTooltip(false);
                   setMoreOpen((prev) => !prev);
                 }}
@@ -462,8 +505,15 @@ export function WorkspaceCard({
                 <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2 overflow-hidden text-ellipsis min-w-0">
                   {session.title}
                 </h3>
-                <div className="text-xs text-meta font-medium mt-1">
-                  Updated {session.updatedAt ? formatRelativeTime(session.updatedAt) : "recently"}
+                <div className="text-xs text-meta font-medium mt-1 flex items-center gap-2 min-w-0">
+                  {isOptimistic || isOpening ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      {isOptimistic ? "Creating…" : "Opening…"}
+                    </>
+                  ) : (
+                    <>Updated: {updatedAtLabel}</>
+                  )}
                 </div>
               </div>
             </div>
@@ -507,12 +557,6 @@ export function WorkspaceCard({
         sessionId={session.id}
         currentTitle={session.title}
         onSave={handleRenameSave}
-      />
-      <DeleteSessionModal
-        open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        sessionTitle={session.title}
-        onConfirm={handleDeleteConfirm}
       />
     </>
   );

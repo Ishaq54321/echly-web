@@ -236,6 +236,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [blockSubmit, setBlockSubmit] = useState(false);
   const [pendingClaritySubmit, setPendingClaritySubmit] = useState<PendingClaritySubmit | null>(null);
   const preloadedScreenshotUrlsRef = useRef<Set<string>>(new Set());
+  const insightRequestKeyRef = useRef<string | null>(null);
 
   /* Escape exits comment mode (canvas-native: no panel open by default). */
   useEffect(() => {
@@ -1101,36 +1102,69 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       !existing || (existingCount != null && existingCount !== currentCount);
     if (!shouldFetch) return;
 
+    const requestKey = `${sessionId}:${currentCount}`;
+    if (insightRequestKeyRef.current === requestKey) return;
+    insightRequestKeyRef.current = requestKey;
+
     let cancelled = false;
-    authFetch("/api/session-insight", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId }),
-    })
-      .then(async (res) => (await res.json()) as SummaryResponse)
-      .then((data) => {
-        if (cancelled) return;
-        const summary = data.summary;
-        if (typeof summary === "string" && summary.trim() !== "") {
-          setSession((prev) =>
-            prev
-              ? ({
-                  ...prev,
-                  aiInsightSummary: summary.trim(),
-                  aiInsightSummaryFeedbackCount: currentCount,
-                } as Session)
-              : prev
-          );
-        }
+    let idleHandle: ReturnType<typeof setTimeout> | number | null = null;
+    const runInsightFetch = () => {
+      authFetch("/api/session-insight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
       })
-      .catch(() => {
-        // Fail silently
-      });
+        .then(async (res) => (await res.json()) as SummaryResponse)
+        .then((data) => {
+          if (cancelled) return;
+          const summary = data.summary;
+          if (typeof summary === "string" && summary.trim() !== "") {
+            setSession((prev) =>
+              prev
+                ? ({
+                    ...prev,
+                    aiInsightSummary: summary.trim(),
+                    aiInsightSummaryFeedbackCount: currentCount,
+                  } as Session)
+                : prev
+            );
+          }
+        })
+        .catch(() => {
+          // Allow retry on next render cycle if background fetch fails.
+          insightRequestKeyRef.current = null;
+        });
+    };
+
+    const windowWithIdle = window as Window & {
+      requestIdleCallback?: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (typeof windowWithIdle.requestIdleCallback === "function") {
+      idleHandle = windowWithIdle.requestIdleCallback(runInsightFetch, { timeout: 1500 });
+    } else {
+      idleHandle = setTimeout(runInsightFetch, 350);
+    }
 
     return () => {
       cancelled = true;
+      if (idleHandle != null) {
+        if (typeof windowWithIdle.cancelIdleCallback === "function") {
+          windowWithIdle.cancelIdleCallback(Number(idleHandle));
+        } else {
+          clearTimeout(idleHandle);
+        }
+      }
     };
-  }, [authLoading, authUser, sessionId, session, feedbackLoading, feedbackTotal]);
+  }, [
+    authLoading,
+    authUser,
+    sessionId,
+    session?.aiInsightSummary,
+    session?.aiInsightSummaryFeedbackCount,
+    feedbackLoading,
+    feedbackTotal,
+  ]);
 
   // If auth is still settling, keep the UI stable but show a lightweight skeleton.
   if (authLoading) return <SessionPageSkeleton />;

@@ -1,6 +1,7 @@
 "use client";
 
-import { useBillingUsageContext } from "@/lib/billing/BillingUsageProvider";
+import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime";
+import { useBillingStore } from "@/lib/store/billingStore";
 
 export type { BillingUsageData as BillingUsage } from "@/lib/hooks/useBillingUsage";
 
@@ -54,9 +55,10 @@ function MeterRow({
 }
 
 export function UsageMeter() {
-  const { data, loading, error } = useBillingUsageContext();
+  const { data: realtimeUsage, loading: realtimeLoading, error: realtimeError } = useWorkspaceUsageRealtime();
+  const { maxSessions, plan: cachedPlan, isLoaded: isBillingLoaded } = useBillingStore();
 
-  if (loading) {
+  if (realtimeLoading || !isBillingLoaded) {
     return (
       <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="h-4 w-24 rounded bg-neutral-100 animate-pulse mb-3" />
@@ -69,15 +71,16 @@ export function UsageMeter() {
     );
   }
 
-  if (error || !data) {
+  if (realtimeError || realtimeUsage == null) {
     return (
       <div className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
-        {error ? `Usage unavailable: ${error}` : "Usage unavailable"}
+        {realtimeError ? `Usage unavailable: ${realtimeError}` : "Usage unavailable"}
       </div>
     );
   }
 
-  const planLabel = PLAN_LABEL[data.plan] ?? data.plan;
+  const plan = cachedPlan ?? realtimeUsage.plan;
+  const planLabel = PLAN_LABEL[plan] ?? plan;
 
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -88,13 +91,8 @@ export function UsageMeter() {
       <div className="space-y-3">
         <MeterRow
           label="Sessions used"
-          used={data.usage.activeSessions ?? 0}
-          limit={data.limits.maxSessions}
-        />
-        <MeterRow
-          label="Members"
-          used={data.usage.members ?? 0}
-          limit={data.limits.maxMembers}
+          used={realtimeUsage.sessionUsed}
+          limit={maxSessions}
         />
       </div>
     </div>

@@ -7,13 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "fix:folders": "ts-node scripts/fixMissingFolderWorkspaceId.ts",
+    "backfill:folder-workspace-id": "npx tsx scripts/backfillFolderWorkspaceId.ts",
     "build:extension": "npm run build:extension:css && npm run build:extension:js",
     "build:extension:css": "npx postcss app/globals.css -o echly-extension/popup.css && node -e \"const fs=require('fs'); const f=fs.readFileSync('echly-extension/extension-fonts.css','utf8'); const m=fs.readFileSync('echly-extension/popup.css','utf8'); fs.writeFileSync('echly-extension/popup.css', f+m);\"",
     "build:extension:js": "node esbuild-extension.mjs"
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
+    "date-fns": "^4.1.0",
     "firebase": "^12.10.0",
+    "firebase-admin": "^13.7.0",
     "framer-motion": "^12.35.2",
     "html2canvas": "^1.4.1",
     "jose": "^6.0.11",
@@ -42,6 +46,7 @@
     "eslint-config-next": "16.1.6",
     "postcss-cli": "^11.0.1",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

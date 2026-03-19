@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/Switch";
 import { Modal } from "@/components/ui/Modal";
 import type { Workspace } from "@/lib/domain/workspace";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { BillingUsageProvider } from "@/lib/billing/BillingUsageProvider";
 import {
   listenToWorkspace,
   updateWorkspaceAppearance,
@@ -170,7 +171,11 @@ function SettingsPageInner() {
         {activeTab === "integrations" && (
           <IntegrationsTab onNavigateToBilling={() => setActiveTab("billing")} />
         )}
-        {activeTab === "billing" && <BillingTab />}
+        {activeTab === "billing" && (
+          <BillingUsageProvider>
+            <BillingTab />
+          </BillingUsageProvider>
+        )}
       </div>
     </div>
   );

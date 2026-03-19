@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "lucide-react";
-import { useBillingUsageContext } from "@/lib/billing/BillingUsageProvider";
+import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime";
+import { useBillingStore } from "@/lib/store/billingStore";
 
 export interface UpgradeModalProps {
   open: boolean;
@@ -37,16 +38,8 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
   const router = useRouter();
   const currentPlan = currentPlanFromUpgrade(upgradePlan);
   const currentPlanLabel = PLAN_LABEL[currentPlan] ?? currentPlan;
-
-  const { data: usageData } = useBillingUsageContext();
-
-  const usage = usageData
-    ? {
-        activeSessions: usageData.usage?.activeSessions ?? 0,
-        sessionsCreated: usageData.usage?.sessionsCreated ?? 0,
-        maxSessions: usageData.limits?.maxSessions ?? null,
-      }
-    : null;
+  const { data: workspaceUsage } = useWorkspaceUsageRealtime({ enabled: open });
+  const { maxSessions } = useBillingStore();
 
   const ctaLabel =
     currentPlan === "starter"
@@ -60,8 +53,8 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
     router.push("/settings?tab=billing");
   };
 
-  const sessionsUsed = usage?.activeSessions ?? 0;
-  const sessionsMax = usage?.maxSessions ?? null;
+  const sessionsUsed = workspaceUsage?.sessionUsed ?? 0;
+  const sessionsMax = maxSessions;
 
   const progressPct =
     sessionsMax != null && sessionsMax > 0
@@ -136,7 +129,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
             </p>
 
             {/* Usage */}
-            {usage != null && sessionsMax != null && sessionsMax > 0 && (
+            {workspaceUsage != null && sessionsMax != null && sessionsMax > 0 && (
               <div className="mt-5">
 
                 <div className="flex items-baseline justify-between text-sm">

@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { FileText } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils/time";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
+import { Button } from "@/components/ui/Button";
 
 export interface MoveSessionsModalProps {
   open: boolean;
@@ -196,7 +197,11 @@ export function MoveSessionsModal({
                     <p className="text-xs text-secondary mt-0.5">
                       Updated{" "}
                       {session.updatedAt
-                        ? formatRelativeTime(session.updatedAt)
+                        ? formatRelativeTime(
+                            typeof session.updatedAt === "string"
+                              ? new Date(session.updatedAt)
+                              : session.updatedAt
+                          )
                         : "recently"}
                     </p>
                   </div>
@@ -222,14 +227,15 @@ export function MoveSessionsModal({
           >
             Cancel
           </button>
-          <button
+          <Button
+            variant="primary"
             type="button"
             onClick={handleMove}
             disabled={moveDisabled}
-            className="bg-[#155DFC] text-white px-5 py-2 rounded-full text-sm font-semibold disabled:opacity-40 hover:bg-[#0F4ED1] transition disabled:cursor-not-allowed"
+            className="rounded-full px-5 py-2 text-sm font-semibold"
           >
             Move{moveCount > 0 ? ` (${moveCount})` : ""}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

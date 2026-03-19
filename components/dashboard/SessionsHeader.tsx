@@ -1,11 +1,15 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+
 export interface SessionsHeaderProps {
   activeTab: "all" | "archived";
   onTabChange: (tab: "all" | "archived") => void;
   sessionCount: number;
   onNewFolder: () => void;
   onNewSession: () => void;
+  isCreating?: boolean;
 }
 
 export function SessionsHeader({
@@ -14,6 +18,7 @@ export function SessionsHeader({
   sessionCount,
   onNewFolder,
   onNewSession,
+  isCreating = false,
 }: SessionsHeaderProps) {
   return (
     <div>
@@ -33,13 +38,23 @@ export function SessionsHeader({
             New Folder
           </button>
 
-          <button
+          <Button
+            variant="primary"
             type="button"
             onClick={onNewSession}
-            className="bg-[#155DFC] text-white rounded-full px-5 py-2 text-sm font-semibold hover:bg-[#0F4ED1] transition"
+            disabled={isCreating}
+            aria-busy={isCreating}
+            className="rounded-full px-5 py-2 text-sm font-semibold"
           >
-            New Session
-          </button>
+            {isCreating ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creating…
+              </span>
+            ) : (
+              "New Session"
+            )}
+          </Button>
         </div>
       </div>
 

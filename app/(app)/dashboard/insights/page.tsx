@@ -7,7 +7,15 @@ import { ActivityTrendChart, type ActivityTrendPoint } from "@/components/insigh
 import { IssueTypeDonutChart, type IssueSlice } from "@/components/insights/IssueTypeDonutChart";
 import { MostActiveSessionsBarChart, type ActiveSessionBar } from "@/components/insights/MostActiveSessionsBarChart";
 import { filterDaily, type DailyInsights } from "@/lib/analytics/filterDaily";
-import { collection, onSnapshot, query, where, documentId, type DocumentData } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  onSnapshot,
+  query,
+  where,
+  documentId,
+  type DocumentData,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   emptyWorkspaceInsightsDoc,
@@ -239,13 +247,14 @@ export default function InsightsPage() {
     // Firestore "in" queries are limited to 10 values; we only fetch top 5.
     const ids = topSessionIds.slice(0, 10);
     const qSessions = query(collection(db, "sessions"), where(documentId(), "in", ids));
-
-    const unsub = onSnapshot(
-      qSessions,
-      (snap) => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const snap = await getDocs(qSessions);
+        if (cancelled) return;
         setSessionTitleMap((prev) => {
           const next: Record<string, string> = { ...prev };
-          // Clear titles for ids we care about, then repopulate from snapshot
+          // Clear titles for ids we care about, then repopulate from fetched docs.
           for (const id of ids) delete next[id];
           for (const d of snap.docs) {
             const sd = d.data() as DocumentData;
@@ -254,13 +263,13 @@ export default function InsightsPage() {
           }
           return next;
         });
-      },
-      (err) => {
-        console.error("[insights] sessions onSnapshot error:", err);
+      } catch (err) {
+        console.error("[insights] sessions fetch error:", err);
       }
-    );
-
-    return () => unsub();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [authUser?.uid, topSessionIdsKey]);
 
   const topSession = useMemo(() => {

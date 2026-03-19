@@ -31,11 +31,10 @@ export async function getSessionsCached(
     try {
       const res = await fetchFn("/api/sessions");
       const json = (await res.json()) as {
-        success?: boolean;
         sessions?: SessionListItem[];
       };
       const sessions = json.sessions ?? [];
-      if (res.ok && json.success) {
+      if (res.ok) {
         cached = { sessions, at: Date.now() };
         return sessions;
       }

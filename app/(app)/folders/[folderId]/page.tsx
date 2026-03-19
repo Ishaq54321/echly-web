@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -13,12 +13,14 @@ import type { Session } from "@/lib/domain/session";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import { useWorkspaceOverview } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
-import { Folder } from "lucide-react";
+import { Folder, Loader2 } from "lucide-react";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { MoveSessionsModal } from "@/components/dashboard/MoveSessionsModal";
 import SessionsGridSkeleton from "@/components/skeleton/SessionsGridSkeleton";
 import { DragSessionProvider } from "@/components/dashboard/context/DragSessionContext";
 import { UpgradeModal } from "@/components/billing/UpgradeModal";
+import { Button } from "@/components/ui/Button";
+import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
 
 interface FolderData {
   id: string;
@@ -63,6 +65,9 @@ function FolderPageContent() {
   const [folder, setFolder] = useState<FolderData | null>(null);
   const [sessions, setSessions] = useState<SessionWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creatingSession, setCreatingSession] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
+  const initialSnapshotHandledRef = useRef(false);
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [upgradePayload, setUpgradePayload] = useState<{
@@ -117,8 +122,11 @@ function FolderPageContent() {
 
   useEffect(() => {
     if (!folderId) return;
-    setLoading(true);
+    initialSnapshotHandledRef.current = false;
     const unsub = onSnapshot(doc(db, "folders", folderId), async (snap) => {
+      if (!initialSnapshotHandledRef.current) {
+        initialSnapshotHandledRef.current = true;
+      }
       if (!snap.exists()) {
         setFolder(null);
         setSessions([]);
@@ -143,54 +151,89 @@ function FolderPageContent() {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
-    const res = await authFetch("/api/sessions", { method: "POST" });
-    const data = await res.json().catch(() => ({}));
+    // Optimistic insert: show a temp session card instantly.
+    const tempSessionId = `temp-${Date.now()}`;
+    const tempItem: SessionWithCounts = {
+      session: {
+        id: tempSessionId,
+        title: "Untitled Session",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isOptimistic: true,
+      },
+      counts: { open: 0, resolved: 0, skipped: 0 },
+    };
+    setSessions((prev) => [tempItem, ...prev]);
 
-    if (res.status === 403) {
-      if (data.error === "PLAN_LIMIT_REACHED") {
+    try {
+      const res = await authFetch("/api/sessions", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 403) {
+        setSessions((prev) => prev.filter((x) => x.session.id !== tempSessionId));
+        if (data.error === "PLAN_LIMIT_REACHED") {
+          setUpgradePayload({
+            message: data.message ?? "You've reached your plan limit.",
+            upgradePlan: data.upgradePlan ?? "starter",
+          });
+          setUpgradeModalOpen(true);
+          return;
+        }
+        if (data.error === "WORKSPACE_SUSPENDED") {
+          setUpgradePayload({
+            message: data.message ?? "Workspace suspended. Contact support.",
+            upgradePlan: null,
+          });
+          setUpgradeModalOpen(true);
+          return;
+        }
         setUpgradePayload({
-          message: data.message ?? "You've reached your plan limit.",
-          upgradePlan: data.upgradePlan ?? "starter",
+          message:
+            (data && typeof data.message === "string" && data.message) ||
+            "You don't have permission to create a session.",
+          upgradePlan: data?.upgradePlan ?? null,
         });
         setUpgradeModalOpen(true);
         return;
       }
-      if (data.error === "WORKSPACE_SUSPENDED") {
-        setUpgradePayload({
-          message: data.message ?? "Workspace suspended. Contact support.",
-          upgradePlan: null,
-        });
-        setUpgradeModalOpen(true);
+
+      if (!res.ok) {
+        setSessions((prev) => prev.filter((x) => x.session.id !== tempSessionId));
+        console.error("Create session failed:", res.status, data);
         return;
       }
-      setUpgradePayload({
-        message:
-          (data && typeof data.message === "string" && data.message) ||
-          "You don't have permission to create a session.",
-        upgradePlan: data?.upgradePlan ?? null,
-      });
-      setUpgradeModalOpen(true);
-      return;
+
+      const sessionId = data.session?.id;
+      if (!sessionId) {
+        setSessions((prev) => prev.filter((x) => x.session.id !== tempSessionId));
+        return;
+      }
+
+      // Replace temp session with the real one (match by temp id).
+      setSessions((prev) =>
+        prev.map((x) =>
+          x.session.id === tempSessionId
+            ? {
+                ...x,
+                session: { ...x.session, id: sessionId, isOptimistic: false, updatedAt: new Date() },
+              }
+            : x
+        )
+      );
+
+      // Sync folder membership in the background.
+      if (folderId) {
+        void updateDoc(doc(db, "folders", folderId), {
+          sessionIds: arrayUnion(sessionId),
+        }).catch((err) => console.error("Failed to add session to folder:", err));
+      }
+
+      router.push(`/dashboard/${sessionId}`);
+    } catch (err) {
+      setSessions((prev) => prev.filter((x) => x.session.id !== tempSessionId));
+      console.error("Create session failed:", err);
     }
-
-    if (!res.ok) {
-      console.error("Create session failed:", res.status, data);
-      return;
-    }
-
-    const sessionId = data.session?.id;
-    if (!sessionId) return;
-
-    if (folderId) {
-      const { updateDoc, arrayUnion } = await import("firebase/firestore");
-      await updateDoc(doc(db, "folders", folderId), {
-        sessionIds: arrayUnion(sessionId),
-      });
-      await loadFolder();
-    }
-
-    router.push(`/dashboard/${sessionId}`);
-  }, [folderId, router, loadFolder]);
+  }, [folderId, router]);
 
   const handleView = (sessionId: string) => {
     router.push(`/dashboard/${sessionId}`);
@@ -209,6 +252,29 @@ function FolderPageContent() {
   const handleArchiveOrDelete = (sessionId: string) => {
     setSessions((prev) => prev.filter((item) => item.session.id !== sessionId));
   };
+
+  const handleDeleteSessionOptimistic = useCallback(
+    async (session: Session) => {
+      const sessionId = session.id;
+      const snapshot = sessions.find((x) => x.session.id === sessionId);
+
+      // Optimistic remove.
+      setSessions((prev) => prev.filter((item) => item.session.id !== sessionId));
+
+      try {
+        const res = await authFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error((data && data.error) || "Failed to delete session");
+        }
+      } catch (err) {
+        // Error recovery: reinsert session when delete fails.
+        if (snapshot) setSessions((prev) => [snapshot, ...prev]);
+        throw err;
+      }
+    },
+    [sessions]
+  );
 
   const removeSessionFromFolder = async (sessionId: string) => {
     await updateDoc(doc(db, "folders", folderId), {
@@ -248,13 +314,26 @@ function FolderPageContent() {
 
           <div className="flex gap-3">
             {!loading && (
-              <button
+              <Button
+                variant="primary"
                 type="button"
-                onClick={handleCreateSession}
-                className="bg-[#155DFC] text-white rounded-full px-5 py-2 text-sm font-semibold hover:bg-[#0F4ED1] transition"
+                onClick={() => {
+                  setCreatingSession(true);
+                  void handleCreateSession().finally(() => setCreatingSession(false));
+                }}
+                disabled={creatingSession}
+                aria-busy={creatingSession}
+                className="rounded-full px-5 py-2 text-sm font-semibold"
               >
-                New Session
-              </button>
+                {creatingSession ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    Creating…
+                  </span>
+                ) : (
+                  "New Session"
+                )}
+              </Button>
             )}
           </div>
         </div>
@@ -274,7 +353,7 @@ function FolderPageContent() {
                       index={index}
                       onRenameSuccess={handleRenameSuccess}
                       onArchiveSuccess={handleArchiveOrDelete}
-                      onDeleteSuccess={handleArchiveOrDelete}
+                      onRequestDelete={(session) => setDeleteTarget(session)}
                       isRootSession={false}
                       folderId={folderId}
                       onRemoveFromFolder={removeSessionFromFolder}
@@ -290,13 +369,14 @@ function FolderPageContent() {
                   <p className="text-sm text-secondary mb-6 max-w-sm">
                     Move sessions into this folder to organize your feedback and recordings.
                   </p>
-                  <button
+                  <Button
+                    variant="primary"
                     type="button"
                     onClick={() => setMoveModalOpen(true)}
-                    className="bg-[#155DFC] text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-[#0F4ED1]"
+                    className="rounded-full px-5 py-2 text-sm font-semibold"
                   >
                     Add Sessions
-                  </button>
+                  </Button>
                 </div>
               ) : null}
             </div>
@@ -326,6 +406,16 @@ function FolderPageContent() {
         }}
         message={upgradePayload?.message}
         upgradePlan={upgradePayload?.upgradePlan ?? null}
+      />
+
+      <DeleteSessionModal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        sessionTitle={deleteTarget?.title ?? ""}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          await handleDeleteSessionOptimistic(deleteTarget);
+        }}
       />
     </div>
   );

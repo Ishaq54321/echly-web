@@ -15,8 +15,8 @@ export interface Session {
   userId?: string;
   title: string;
   archived?: boolean;
-  createdAt?: Timestamp | null;
-  updatedAt?: Timestamp | null;
+  createdAt?: Timestamp | Date | string | null;
+  updatedAt?: Timestamp | Date | string | null;
   /** Set at creation. Creator profile for card display. */
   createdBy?: SessionCreatedBy | null;
   /** Loom-style unique view count (one per viewer per session). */
@@ -35,7 +35,15 @@ export interface Session {
   resolvedCount?: number;
   /** Denormalized: total skipped feedback (Execution Mode skip). */
   skippedCount?: number;
+  /** Denormalized: total feedback count (open + resolved + skipped). */
+  totalCount?: number;
   /** Denormalized: total feedback count (WAVE 1 structural). */
   feedbackCount?: number;
+
+  /**
+   * Client-only flag for optimistic UI rows (temp sessions).
+   * Not persisted/returned by the backend.
+   */
+  isOptimistic?: boolean;
 }
 

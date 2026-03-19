@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
+
 export interface CommandCenterHeaderProps {
   search: string;
   onSearchChange: (value: string) => void;
@@ -58,13 +60,14 @@ export function CommandCenterHeader({
             Archived
           </button>
         </div>
-        <button
+        <Button
+          variant="primary"
           type="button"
           onClick={onNewSession}
-          className="btn-primary-glow h-9 rounded-lg bg-[var(--color-primary)] text-white text-[14px] px-4 font-semibold shadow-[0_2px_8px_rgba(26,86,219,0.28)] hover:bg-[var(--color-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-2 transition-[transform,box-shadow,background-color] duration-200 [transition-timing-function:var(--ease-premium)] cursor-pointer"
+          className="h-9 rounded-lg text-[14px] px-4 font-semibold"
         >
           New Session
-        </button>
+        </Button>
         <input
           type="search"
           placeholder="Search sessions"

@@ -9,8 +9,8 @@ interface WorkspaceSuspendedGuardProps {
 }
 
 /**
- * Fetches current workspace status. If suspended, redirects to /workspace-suspended
- * so no workspace UI renders. Used in (app) layout.
+ * Fetches workspace status in the background. If suspended, redirects to
+ * /workspace-suspended after initial render so app UI is not blocked on status fetch.
  */
 export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardProps) {
   const router = useRouter();
@@ -36,18 +36,6 @@ export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardPro
       router.replace("/workspace-suspended");
     }
   }, [suspended, router]);
-
-  if (suspended === null) {
-    return (
-      <div className="flex h-full items-center justify-center bg-neutral-50">
-        <div className="text-sm text-neutral-500">Loading…</div>
-      </div>
-    );
-  }
-
-  if (suspended) {
-    return null;
-  }
 
   return <>{children}</>;
 }

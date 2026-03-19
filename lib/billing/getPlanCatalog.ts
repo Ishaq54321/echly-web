@@ -16,14 +16,10 @@ export type PlanCatalog = Record<PlanId, PlanCatalogEntry>;
 
 const PLANS_COLLECTION = "plans";
 
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-// Global module-level cache: single source of truth for plan catalog
-let planCache = {
-  data: null as PlanCatalog | null,
-  expiresAt: 0,
-  promise: null as Promise<PlanCatalog> | null,
-};
+let cachedCatalog: PlanCatalog | null = null;
+let lastFetchTime = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let inFlightCatalogFetch: Promise<PlanCatalog> | null = null;
 
 const PLAN_NAMES: Record<PlanId, string> = {
   free: "Free",
@@ -103,26 +99,32 @@ async function fetchPlans(): Promise<PlanCatalog> {
  * so repeated calls in the same process (e.g. multiple API handlers) share one Firestore read.
  */
 export async function getPlanCatalog(): Promise<PlanCatalog> {
-  if (planCache.data && Date.now() < planCache.expiresAt) {
+  const now = Date.now();
+  if (cachedCatalog && now - lastFetchTime < CACHE_TTL) {
     console.log("[ECHLY CACHE] planCatalog HIT");
-    return planCache.data;
+    return cachedCatalog;
   }
 
-  if (planCache.promise) {
+  if (inFlightCatalogFetch) {
     console.log("[ECHLY CACHE] planCatalog IN-FLIGHT");
-    return planCache.promise;
+    return inFlightCatalogFetch;
   }
 
   console.log("[ECHLY CACHE] planCatalog MISS");
-  planCache.promise = fetchPlans();
-
+  inFlightCatalogFetch = fetchPlans();
   try {
-    const data = await planCache.promise;
-    planCache.data = data;
-    planCache.expiresAt = Date.now() + CACHE_TTL_MS;
-    return data;
+    const catalog = await inFlightCatalogFetch;
+    cachedCatalog = catalog;
+    lastFetchTime = Date.now();
+    return catalog;
   } finally {
-    planCache.promise = null;
+    inFlightCatalogFetch = null;
   }
+}
+
+export function invalidatePlanCatalogCache(): void {
+  cachedCatalog = null;
+  lastFetchTime = 0;
+  inFlightCatalogFetch = null;
 }
 

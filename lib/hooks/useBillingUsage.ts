@@ -6,20 +6,33 @@ import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
 import { getBillingUsageCached, invalidateBillingUsageCache } from "@/lib/cachedBillingUsage";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
-import { listenToWorkspace } from "@/lib/repositories/workspacesRepository";
+import {
+  clearWorkspaceSubscription,
+  getWorkspaceRealtimeSnapshot,
+  subscribeWorkspace,
+  subscribeWorkspaceStore,
+} from "@/lib/realtime/workspaceStore";
+
+function scheduleIdleTask(task: () => void): number {
+  if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+    return window.requestIdleCallback(() => task(), { timeout: 1200 });
+  }
+  // Use globalThis to keep this type-safe even when `window` is not narrowed.
+  return globalThis.setTimeout(task, 250) as unknown as number;
+}
+
+function cancelIdleTask(handle: number): void {
+  if (typeof window !== "undefined" && "cancelIdleCallback" in window) {
+    window.cancelIdleCallback(handle);
+    return;
+  }
+  globalThis.clearTimeout(handle);
+}
 
 export interface BillingUsageData {
   plan: string;
-  usage: {
-    /** Active (non-archived, non-deleted) sessions — use this for plan limit display (X / Y sessions used). */
-    activeSessions?: number;
-    /** Lifetime sessions created (for analytics only). Do not use for limit display. */
-    sessionsCreated: number;
-    members?: number;
-  };
   limits: {
     maxSessions: number | null;
-    maxMembers: number | null;
   };
 }
 
@@ -74,11 +87,27 @@ export function useBillingUsage(
 
     setLoading(true);
     let cancelled = false;
-    let unsubscribeWorkspace: (() => void) | null = null;
+    let unsubscribeWorkspaceStore: (() => void) | null = null;
+    let idleHandle: number | null = null;
+
+    const queueRefetch = () => {
+      if (idleHandle != null) cancelIdleTask(idleHandle);
+      idleHandle = scheduleIdleTask(() => {
+        idleHandle = null;
+        if (cancelled) return;
+        invalidateBillingUsageCache();
+        void refetch();
+      });
+    };
 
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (cancelled || !user) {
         if (!cancelled) {
+          if (unsubscribeWorkspaceStore) {
+            unsubscribeWorkspaceStore();
+            unsubscribeWorkspaceStore = null;
+          }
+          clearWorkspaceSubscription();
           setData(null);
           setLoading(false);
         }
@@ -89,18 +118,33 @@ export function useBillingUsage(
         const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
         if (cancelled) return;
 
-        unsubscribeWorkspace = listenToWorkspace(workspaceId, () => {
-          if (!cancelled) {
-            invalidateBillingUsageCache();
-            refetch();
+        if (unsubscribeWorkspaceStore) {
+          unsubscribeWorkspaceStore();
+          unsubscribeWorkspaceStore = null;
+        }
+        let seenInitialSnapshot = false;
+        subscribeWorkspace(workspaceId);
+        unsubscribeWorkspaceStore = subscribeWorkspaceStore(() => {
+          const snap = getWorkspaceRealtimeSnapshot();
+          if (snap.workspaceId !== workspaceId || snap.loading) return;
+          if (cancelled) return;
+          // Skip initial snapshot; we already queue the initial fetch below.
+          if (!seenInitialSnapshot) {
+            seenInitialSnapshot = true;
+            return;
           }
+          queueRefetch();
         });
+        const initialWorkspaceSnap = getWorkspaceRealtimeSnapshot();
+        if (initialWorkspaceSnap.workspaceId === workspaceId && !initialWorkspaceSnap.loading) {
+          seenInitialSnapshot = true;
+        }
         if (cancelled) {
-          unsubscribeWorkspace();
+          unsubscribeWorkspaceStore();
           return;
         }
 
-        await refetch();
+        queueRefetch();
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Error");
@@ -111,8 +155,9 @@ export function useBillingUsage(
 
     return () => {
       cancelled = true;
+      if (idleHandle != null) cancelIdleTask(idleHandle);
       unsubAuth();
-      if (unsubscribeWorkspace) unsubscribeWorkspace();
+      if (unsubscribeWorkspaceStore) unsubscribeWorkspaceStore();
     };
   }, [enabled, refetch]);
 

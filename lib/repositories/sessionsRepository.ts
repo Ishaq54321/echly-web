@@ -51,6 +51,8 @@ export async function createSessionRepo(
     commentCount: 0,
     openCount: 0,
     resolvedCount: 0,
+    skippedCount: 0,
+    totalCount: 0,
     feedbackCount: 0,
   };
 

@@ -3,6 +3,27 @@ import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 
+const WORKSPACE_ID_CACHE_TTL_MS = 60_000;
+const workspaceIdCache = new Map<string, { value: string | null; expiresAt: number }>();
+const workspaceIdInFlight = new Map<string, Promise<string | null>>();
+
+function setWorkspaceIdCache(uid: string, value: string | null): void {
+  workspaceIdCache.set(uid, {
+    value,
+    expiresAt: Date.now() + WORKSPACE_ID_CACHE_TTL_MS,
+  });
+}
+
+export function invalidateUserWorkspaceIdCache(uid?: string): void {
+  if (uid) {
+    workspaceIdCache.delete(uid);
+    workspaceIdInFlight.delete(uid);
+    return;
+  }
+  workspaceIdCache.clear();
+  workspaceIdInFlight.clear();
+}
+
 /** Set or update user's workspaceId (e.g. after onboarding). Creates user doc if missing. */
 export async function setUserWorkspaceIdRepo(
   user: User,
@@ -32,6 +53,7 @@ export async function setUserWorkspaceIdRepo(
   } else {
     await updateDoc(userRef, payload);
   }
+  setWorkspaceIdCache(user.uid, workspaceId);
 }
 
 export async function ensureUserRepo(user: User): Promise<void> {
@@ -50,18 +72,38 @@ export async function ensureUserRepo(user: User): Promise<void> {
 }
 
 export async function getUserWorkspaceIdRepo(uid: string): Promise<string | null> {
-  const snap = await getDoc(doc(db, "users", uid));
-  if (!snap.exists()) return null;
-  const data = snap.data() as { workspaceId?: string | null };
-  const wid = (data.workspaceId ?? null);
-  return typeof wid === "string" && wid.trim() ? wid.trim() : null;
+  const cached = workspaceIdCache.get(uid);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const inFlight = workspaceIdInFlight.get(uid);
+  if (inFlight) return inFlight;
+
+  const loadPromise = (async () => {
+    const snap = await getDoc(doc(db, "users", uid));
+    if (!snap.exists()) {
+      setWorkspaceIdCache(uid, null);
+      return null;
+    }
+    const data = snap.data() as { workspaceId?: string | null };
+    const wid = data.workspaceId ?? null;
+    const normalized = typeof wid === "string" && wid.trim() ? wid.trim() : null;
+    setWorkspaceIdCache(uid, normalized);
+    return normalized;
+  })();
+
+  workspaceIdInFlight.set(uid, loadPromise);
+  try {
+    return await loadPromise;
+  } finally {
+    workspaceIdInFlight.delete(uid);
+  }
 }
 
 export async function ensureUserWorkspaceLinkRepo(user: User): Promise<{ workspaceId: string }> {
   const userRef = doc(db, "users", user.uid);
   const defaultWorkspaceId = user.uid; // migration + default: 1 workspace per user for now
 
-  return await runTransaction(db, async (tx) => {
+  const result = await runTransaction(db, async (tx) => {
     // Reads (must all happen before any writes)
     const userSnap = await tx.get(userRef);
     const existingWorkspaceId = userSnap.exists()
@@ -108,6 +150,8 @@ export async function ensureUserWorkspaceLinkRepo(user: User): Promise<{ workspa
 
     return { workspaceId };
   });
+  setWorkspaceIdCache(user.uid, result.workspaceId);
+  return result;
 }
 
 export interface UserDoc {

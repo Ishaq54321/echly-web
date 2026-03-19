@@ -9,6 +9,7 @@ import { useSessionOverview } from "./hooks/useSessionOverview";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { OverviewActivityItem } from "./hooks/useSessionOverview";
 import { formatOverviewDate, formatActivityTime } from "@/lib/utils/date";
+import type { Timestamp } from "firebase/firestore";
 
 function resolutionLabel(isResolved: boolean): string {
   return isResolved ? "Done" : "Open";
@@ -23,12 +24,14 @@ function OverviewSessionHeader({
   onCopy,
 }: {
   title: string;
-  createdAt: Feedback["createdAt"];
+  createdAt: string | Date | Timestamp | null;
   sessionId: string;
   copied: boolean;
   onCopy: () => void;
 }) {
-  const dateStr = formatOverviewDate(createdAt ?? null);
+  const normalizedCreatedAt =
+    typeof createdAt === "string" ? new Date(createdAt) : createdAt ?? null;
+  const dateStr = formatOverviewDate(normalizedCreatedAt as any);
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--layer-1-border)]">
       <div>

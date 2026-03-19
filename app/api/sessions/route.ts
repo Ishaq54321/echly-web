@@ -2,18 +2,17 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import {
-  getUserSessionsRepo,
   createSessionRepo,
-  getWorkspaceSessionsRepo,
   getWorkspaceSessionCountRepo,
 } from "@/lib/repositories/sessionsRepository";
 import { log } from "@/lib/utils/logger";
 import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
-import { serializeSession } from "@/lib/server/serializeSession";
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
 import { corsHeaders } from "@/lib/server/cors";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 
 export const dynamic = "force-dynamic";
 
@@ -41,20 +40,59 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { workspaceId, workspace } = await resolveWorkspaceForUser(user.uid);
-    const workspaceSessions = await getWorkspaceSessionsRepo(workspaceId, 100);
-    const sessions =
-      workspaceSessions.length > 0
-        ? workspaceSessions
-        : await getUserSessionsRepo(user.uid, 100);
-    log("[API] GET /api/sessions duration:", Date.now() - start);
-    return NextResponse.json(
-      {
-        success: true,
-        sessions: sessions.map((s) => serializeSession(s)),
-      },
-      { headers: corsHeaders(req) }
+    const { workspaceId } = await resolveWorkspaceForUser(user.uid);
+    const q = query(
+      collection(db, "sessions"),
+      where("workspaceId", "==", workspaceId),
+      orderBy("updatedAt", "desc"),
+      limit(30)
     );
+    const snap = await getDocs(q);
+    const sessions = snap.docs.map((docSnap) => {
+      const data = docSnap.data() as {
+        title?: string;
+        updatedAt?: { toDate?: () => Date } | string | null;
+        createdAt?: { toDate?: () => Date } | string | null;
+        openCount?: number;
+        resolvedCount?: number;
+        skippedCount?: number;
+        totalCount?: number;
+        feedbackCount?: number;
+        archived?: boolean;
+      };
+      const toIsoString = (
+        value: { toDate?: () => Date } | string | null | undefined
+      ): string | null => {
+        if (typeof value === "string") return value;
+        if (value != null && typeof value === "object" && typeof value.toDate === "function") {
+          return value.toDate().toISOString();
+        }
+        return null;
+      };
+
+      const updatedAt = toIsoString(data.updatedAt) ?? toIsoString(data.createdAt) ?? null;
+
+      return {
+        id: docSnap.id,
+        // Keep `title` for compatibility and include `name` as a normalized alias.
+        title: data.title ?? "Untitled Session",
+        name: data.title ?? "Untitled Session",
+        updatedAt,
+        openCount: typeof data.openCount === "number" ? data.openCount : 0,
+        resolvedCount: typeof data.resolvedCount === "number" ? data.resolvedCount : 0,
+        skippedCount: typeof data.skippedCount === "number" ? data.skippedCount : 0,
+        totalCount:
+          typeof data.totalCount === "number"
+            ? data.totalCount
+            : typeof data.feedbackCount === "number"
+              ? data.feedbackCount
+              : 0,
+        feedbackCount: typeof data.feedbackCount === "number" ? data.feedbackCount : 0,
+        archived: data.archived === true,
+      };
+    });
+    log("[API] GET /api/sessions duration:", Date.now() - start);
+    return NextResponse.json({ sessions }, { headers: corsHeaders(req) });
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {

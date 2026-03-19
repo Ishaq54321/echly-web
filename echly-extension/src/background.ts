@@ -943,10 +943,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             : null;
         globalUIState.hasMore = feedbackJson.hasMore === true;
         globalUIState.isFetching = false;
-        const sessionsJson = (await sessionsRes.json()) as { success?: boolean; sessions?: Array<{ id: string; title?: string }> };
-        if (sessionsJson.success && Array.isArray(sessionsJson.sessions)) {
+        const sessionsJson = (await sessionsRes.json()) as { sessions?: Array<{ id: string; title?: string; name?: string }> };
+        if (sessionsRes.ok && Array.isArray(sessionsJson.sessions)) {
           const match = sessionsJson.sessions.find((s) => s.id === sessionId);
-          globalUIState.sessionTitle = match?.title ?? null;
+          globalUIState.sessionTitle = match?.title ?? match?.name ?? null;
         }
       } catch {
         globalUIState.pointers = [];

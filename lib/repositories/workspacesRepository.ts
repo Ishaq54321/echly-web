@@ -1,7 +1,6 @@
 import {
   doc,
   getDoc,
-  onSnapshot,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -12,6 +11,23 @@ import { db } from "@/lib/firebase";
 import type { Workspace, WorkspaceDoc } from "@/lib/domain/workspace";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 import type { PlanId } from "@/lib/billing/plans";
+import {
+  getWorkspaceRealtimeSnapshot,
+  subscribeWorkspace,
+  subscribeWorkspaceStore,
+} from "@/lib/realtime/workspaceStore";
+
+const WORKSPACE_CACHE_TTL_MS = 60 * 1000; // 1 minute
+const WORKSPACE_CACHE_MAX_ENTRIES = 1000;
+const workspaceCache = new Map<string, { data: Workspace; expiresAt: number }>();
+
+export function invalidateWorkspaceDocCache(workspaceId?: string): void {
+  if (workspaceId) {
+    workspaceCache.delete(workspaceId);
+    return;
+  }
+  workspaceCache.clear();
+}
 
 /** Used by onboarding: create a new workspace and return its id (caller must update user.workspaceId). */
 export async function createWorkspaceRepo(params: {
@@ -31,6 +47,7 @@ export async function createWorkspaceRepo(params: {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  invalidateWorkspaceDocCache(params.workspaceId);
 }
 
 function docToWorkspace(workspaceId: string, data: DocumentData): Workspace {
@@ -41,17 +58,41 @@ function docToWorkspace(workspaceId: string, data: DocumentData): Workspace {
 }
 
 export async function getWorkspace(workspaceId: string): Promise<Workspace | null> {
+  const cached = workspaceCache.get(workspaceId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+
   const snap = await getDoc(doc(db, "workspaces", workspaceId));
   if (!snap.exists()) return null;
-  return docToWorkspace(snap.id, snap.data());
+  const workspace = docToWorkspace(snap.id, snap.data());
+
+  // Safety valve against unbounded in-memory growth.
+  if (workspaceCache.size > WORKSPACE_CACHE_MAX_ENTRIES) {
+    workspaceCache.clear();
+  }
+  workspaceCache.set(workspaceId, {
+    data: workspace,
+    expiresAt: Date.now() + WORKSPACE_CACHE_TTL_MS,
+  });
+  return workspace;
 }
 
 export function listenToWorkspace(
   workspaceId: string,
   callback: (workspace: Workspace | null) => void
 ): Unsubscribe {
-  return onSnapshot(doc(db, "workspaces", workspaceId), (snap) => {
-    callback(snap.exists() ? docToWorkspace(snap.id, snap.data()) : null);
+  subscribeWorkspace(workspaceId);
+  const emit = () => {
+    const snap = getWorkspaceRealtimeSnapshot();
+    if (snap.workspaceId !== workspaceId) return;
+    callback(snap.workspace);
+  };
+  emit();
+  return subscribeWorkspaceStore(() => {
+    const snap = getWorkspaceRealtimeSnapshot();
+    if (snap.workspaceId !== workspaceId) return;
+    callback(snap.workspace);
   });
 }
 
@@ -80,6 +121,7 @@ export async function ensureWorkspaceRepo(params: {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  invalidateWorkspaceDocCache(params.workspaceId);
 }
 
 export async function updateWorkspaceName(
@@ -90,6 +132,7 @@ export async function updateWorkspaceName(
     name,
     updatedAt: serverTimestamp(),
   });
+  invalidateWorkspaceDocCache(workspaceId);
 }
 
 export async function updateWorkspaceNotifications(
@@ -100,6 +143,7 @@ export async function updateWorkspaceNotifications(
     notifications,
     updatedAt: serverTimestamp(),
   });
+  invalidateWorkspaceDocCache(workspaceId);
 }
 
 export async function updateWorkspaceAppearance(
@@ -110,6 +154,7 @@ export async function updateWorkspaceAppearance(
     appearance,
     updatedAt: serverTimestamp(),
   });
+  invalidateWorkspaceDocCache(workspaceId);
 }
 
 export async function updateWorkspaceSettings(
@@ -133,6 +178,7 @@ export async function updateWorkspaceSettings(
 ): Promise<void> {
   const payload: Record<string, unknown> = { ...updates, updatedAt: serverTimestamp() };
   await updateDoc(doc(db, "workspaces", workspaceId), payload);
+  invalidateWorkspaceDocCache(workspaceId);
 }
 
 /**
@@ -148,5 +194,6 @@ export async function updateWorkspacePlanRepo(
     "billing.plan": newPlan,
     updatedAt: serverTimestamp(),
   });
+  invalidateWorkspaceDocCache(workspaceId);
 }
 

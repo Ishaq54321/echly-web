@@ -9,6 +9,7 @@ import {
   type PlanId,
   DEFAULT_PRICES,
 } from "@/lib/billing/plans";
+import { invalidatePlanCatalogCache } from "@/lib/billing/getPlanCatalog";
 const PLANS_COLLECTION = "plans";
 
 export type PlanWithId = PlanDoc & { id: string };
@@ -94,6 +95,7 @@ export async function PATCH(req: Request) {
   }
   try {
     await setDoc(ref, payload, { merge: true });
+    invalidatePlanCatalogCache();
     await logAdminAction({
       adminId: admin.uid,
       action: "plans.update",

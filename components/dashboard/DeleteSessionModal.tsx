@@ -16,12 +16,16 @@ export function DeleteSessionModal({
   onConfirm,
 }: DeleteSessionModalProps) {
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleConfirm = async () => {
     setDeleting(true);
+    setError(null);
     try {
       await onConfirm();
       onClose();
+    } catch {
+      setError("Failed to delete the session. Please try again.");
     } finally {
       setDeleting(false);
     }
@@ -56,6 +60,11 @@ export function DeleteSessionModal({
           </p>
         )}
         <div className="mt-6 flex gap-3 justify-end">
+          {error && (
+            <p className="mr-auto text-[13px] text-red-600" role="alert">
+              {error}
+            </p>
+          )}
           <button
             type="button"
             onClick={onClose}

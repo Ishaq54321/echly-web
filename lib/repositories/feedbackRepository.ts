@@ -123,6 +123,7 @@ export async function addFeedbackWithSessionCountersRepo(
     tx.set(feedbackRef, payload);
     tx.update(sessionRef, {
       openCount: increment(1),
+      totalCount: increment(1),
       feedbackCount: increment(1),
       updatedAt: serverTimestamp(),
     });
@@ -532,6 +533,7 @@ export async function deleteFeedbackWithSessionCountersRepo(
       0,
       ((s.skippedCount as number) ?? 0) - (status === "skipped" ? 1 : 0)
     );
+    const totalCount = Math.max(0, ((s.totalCount as number) ?? 0) - 1);
     const feedbackCount = Math.max(0, ((s.feedbackCount as number) ?? 0) - 1);
 
     tx.delete(feedbackRef);
@@ -539,6 +541,7 @@ export async function deleteFeedbackWithSessionCountersRepo(
       openCount,
       resolvedCount,
       skippedCount,
+      totalCount,
       feedbackCount,
       updatedAt: serverTimestamp(),
     });

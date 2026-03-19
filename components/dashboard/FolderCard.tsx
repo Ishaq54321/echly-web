@@ -12,7 +12,8 @@ const DROPDOWN_Z_INDEX = 1000;
 export interface FolderCardFolder {
   id: string;
   name: string;
-  sessions: string[];
+  sessions?: string[];
+  sessionCount?: number;
 }
 
 export interface FolderCardProps {
@@ -168,6 +169,11 @@ export function FolderCard({
     closeMenu();
   };
 
+  const displayedSessionCount =
+    typeof folder.sessionCount === "number"
+      ? folder.sessionCount
+      : folder.sessions?.length ?? 0;
+
   return (
     <>
       <div
@@ -195,7 +201,7 @@ export function FolderCard({
             {folder.name}
           </div>
           <div className="text-xs text-secondary">
-            {folder.sessions.length} sessions
+            {displayedSessionCount} sessions
           </div>
         </div>
         <div className="relative shrink-0" data-card-actions>
