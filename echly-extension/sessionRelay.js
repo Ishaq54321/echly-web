@@ -1,1 +1,0 @@
-"use strict";(()=>{window.addEventListener("message",e=>{e.data?.type==="ECHLY_EXTENSION_TOKEN"&&typeof e.data.token=="string"&&chrome.runtime.sendMessage({type:"ECHLY_EXTENSION_TOKEN",token:e.data.token,user:e.data.user}).catch(()=>{})});})();

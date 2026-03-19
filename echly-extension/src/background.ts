@@ -60,18 +60,7 @@ chrome.action.onClicked.addListener(() => {
       return;
     }
 
-    const authenticated = await requireAuthForExplicitOpen();
-    if (!authenticated) {
-      trayOpen = false;
-      globalUIState.visible = false;
-      globalUIState.expanded = false;
-      await chrome.storage.local.set({ echlyActive: false });
-      broadcastUIState();
-      return;
-    }
-
-    void openWidgetInActiveTab();
-    trayOpen = true;
+    await openRecorderUI();
   });
 });
 
@@ -621,6 +610,7 @@ async function openWidgetInActiveTab(): Promise<void> {
   });
 
   const tabId = tabs[0]?.id;
+  console.log("[ECHLY][INJECTION] Injecting recorder UI into tab:", tabId);
 
   if (!tabId) {
     console.warn("[ECHLY BG] No active tab found");
@@ -639,6 +629,26 @@ async function openWidgetInActiveTab(): Promise<void> {
       type: "ECHLY_OPEN_WIDGET",
     })
     .catch(() => {});
+}
+
+async function openRecorderUI(tabId?: number): Promise<boolean> {
+  if (typeof tabId === "number") {
+    sw.lastUserTabId = tabId;
+  }
+
+  const authenticated = await requireAuthForExplicitOpen();
+  if (!authenticated) {
+    trayOpen = false;
+    globalUIState.visible = false;
+    globalUIState.expanded = false;
+    await chrome.storage.local.set({ echlyActive: false });
+    broadcastUIState();
+    return false;
+  }
+
+  trayOpen = true;
+  await openWidgetInActiveTab();
+  return true;
 }
 
 /** Loom-style: when user switches tabs and Echly is active, inject content script so widget appears on every tab. */
@@ -686,6 +696,7 @@ chrome.tabs.onCreated.addListener((tab) => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log("[ECHLY][BACKGROUND] Message received:", request);
   console.log("[ECHLY] message received:", request.type);
   console.log("BACKGROUND RECEIVED MESSAGE", request.type);
   console.log("BACKGROUND MESSAGE RECEIVED:", request);
@@ -742,28 +753,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log("[ECHLY BG] OPEN_WIDGET received");
     (async () => {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs[0]?.id) sw.lastUserTabId = tabs[0].id;
-
-      const authenticated = await requireAuthForExplicitOpen();
-      if (!authenticated) {
-        trayOpen = false;
-        globalUIState.visible = false;
-        globalUIState.expanded = false;
-        await chrome.storage.local.set({ echlyActive: false });
-        broadcastUIState();
+      const tabId = tabs[0]?.id;
+      const opened = await openRecorderUI(tabId);
+      if (!opened) {
         sendResponse({ ok: false, authenticated: false });
         return;
       }
-
-      trayOpen = true;
-      try {
-        await openWidgetInActiveTab();
-        sendResponse({ ok: true });
-      } catch {
-        sendResponse({ ok: false });
-      }
+      sendResponse({ ok: true });
     })();
     return true; // keep channel open for async sendResponse
+  }
+
+  if (request.type === "OPEN_RECORDER") {
+    console.log("[ECHLY][BACKGROUND] Handling OPEN_RECORDER");
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      console.log("[ECHLY][BACKGROUND] Active tab:", tab);
+      (async () => {
+        console.log("[ECHLY][BACKGROUND] Calling openRecorderUI");
+        const opened = await openRecorderUI(tab?.id);
+        if (opened && tab?.id) {
+          console.log("[ECHLY][BACKGROUND] Recorder UI triggered");
+          chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RECORDER_OPENED" }).catch(() => {});
+        }
+        sendResponse({ ok: opened });
+      })();
+    });
+    return true;
   }
 
   if (request.type === "ECHLY_EXPAND_WIDGET") {

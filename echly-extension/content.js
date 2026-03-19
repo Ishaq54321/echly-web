@@ -13881,6 +13881,25 @@
     });
   }
 
+  // echly-extension/src/sessionRelay.ts
+  (function initSessionRelay() {
+    if (window.__ECHLY_RELAY_INITIALIZED__) return;
+    window.__ECHLY_RELAY_INITIALIZED__ = true;
+    window.addEventListener("message", (event) => {
+      if (event.data?.type === "ECHLY_EXTENSION_PING") {
+        console.log("[ECHLY][CONTENT] Received PING");
+        window.postMessage({ type: "ECHLY_EXTENSION_PONG" }, "*");
+      }
+      if (event.data?.type === "ECHLY_OPEN_RECORDER") {
+        console.log("[ECHLY][CONTENT] Received OPEN_RECORDER from dashboard");
+        chrome.runtime.sendMessage({ type: "OPEN_RECORDER" }, (response) => {
+          console.log("[ECHLY][CONTENT] Sent OPEN_RECORDER to background, response:", response);
+        });
+        window.postMessage({ type: "ECHLY_RECORDER_OPENED" }, "*");
+      }
+    });
+  })();
+
   // echly-extension/src/cachedSessions.ts
   var TTL_MS = 3e4;
   var cached = null;
@@ -13898,7 +13917,7 @@
         const res = await fetchFn("/api/sessions");
         const json = await res.json();
         const sessions = json.sessions ?? [];
-        if (res.ok && json.success) {
+        if (res.ok) {
           cached = { sessions, at: Date.now() };
           return sessions;
         }

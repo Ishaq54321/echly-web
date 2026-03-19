@@ -12,6 +12,7 @@ declare global {
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { apiFetch, API_BASE } from "./api";
+import "./sessionRelay";
 import { getSessionsCached, invalidateSessionsCache } from "./cachedSessions";
 import { uploadScreenshot, generateFeedbackId, generateScreenshotId } from "./contentScreenshot";
 import { getVisibleTextFromScreenshot } from "./ocr";

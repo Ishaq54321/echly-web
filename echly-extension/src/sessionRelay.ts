@@ -1,14 +1,20 @@
-/**
- * Session relay: runs as a content script on the dashboard extension-auth page only.
- * Listens for token messages from the page (postMessage) and forwards to the background
- * so the extension can receive the short-lived token without ever handling login credentials.
- */
-window.addEventListener("message", (event: MessageEvent) => {
-  if (event.data?.type === "ECHLY_EXTENSION_TOKEN" && typeof event.data.token === "string") {
-    chrome.runtime.sendMessage({
-      type: "ECHLY_EXTENSION_TOKEN",
-      token: event.data.token,
-      user: event.data.user,
-    }).catch(() => {});
-  }
-});
+(function initSessionRelay() {
+  if ((window as any).__ECHLY_RELAY_INITIALIZED__) return;
+  (window as any).__ECHLY_RELAY_INITIALIZED__ = true;
+
+  window.addEventListener("message", (event) => {
+    if (event.data?.type === "ECHLY_EXTENSION_PING") {
+      console.log("[ECHLY][CONTENT] Received PING");
+      window.postMessage({ type: "ECHLY_EXTENSION_PONG" }, "*");
+    }
+
+    if (event.data?.type === "ECHLY_OPEN_RECORDER") {
+      console.log("[ECHLY][CONTENT] Received OPEN_RECORDER from dashboard");
+      chrome.runtime.sendMessage({ type: "OPEN_RECORDER" }, (response) => {
+        console.log("[ECHLY][CONTENT] Sent OPEN_RECORDER to background, response:", response);
+      });
+
+      window.postMessage({ type: "ECHLY_RECORDER_OPENED" }, "*");
+    }
+  });
+})();

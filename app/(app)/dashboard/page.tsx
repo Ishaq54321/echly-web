@@ -272,9 +272,7 @@ function DashboardContent() {
               </div>
             ) : null}
 
-            {dashboardState === "empty" ? (
-              <EmptySessionsCard onStartRecording={startRecording} isLoading={creatingSession} />
-            ) : null}
+            {dashboardState === "empty" ? <EmptySessionsCard /> : null}
 
             {dashboardState === "loaded" ? (
               <div className="relative">

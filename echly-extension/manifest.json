@@ -17,11 +17,8 @@
   ],
   "content_scripts": [
     {
-      "matches": [
-        "http://localhost:3000/extension-auth*",
-        "https://localhost:3000/extension-auth*"
-      ],
-      "js": ["sessionRelay.js"],
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
       "run_at": "document_start"
     }
   ],

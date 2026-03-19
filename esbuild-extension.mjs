@@ -86,15 +86,3 @@ await esbuild.build({
   define,
   absWorkingDir: root,
 });
-
-await esbuild.build({
-  entryPoints: [path.join(extDir, "src", "sessionRelay.ts")],
-  bundle: true,
-  outfile: path.join(extDir, "sessionRelay.js"),
-  platform: "browser",
-  target: "es2020",
-  minify: true,
-  sourcemap: false,
-  define,
-  absWorkingDir: root,
-});
