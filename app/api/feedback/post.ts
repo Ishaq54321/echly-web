@@ -25,8 +25,18 @@ function now() {
   return Number(process.hrtime.bigint()) / 1e6; // ms with high precision
 }
 
-function unauthorized(message: string): Response {
-  return new Response(JSON.stringify({ error: message }), { status: 401 });
+function unauthorized(): Response {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: "NOT_AUTHENTICATED",
+      message: "User is not authenticated",
+    }),
+    {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    }
+  );
 }
 
 function base64UrlDecodeToString(input: string): string {
@@ -54,7 +64,7 @@ async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
     const payload = peekJwtPayload(token);
     if (payload && payload.type === "extension") {
       const decoded = await verifyExtensionToken(token);
-      if (!decoded) throw unauthorized("Unauthorized - Invalid extension token");
+      if (!decoded) throw unauthorized();
       return { uid: decoded.uid, email: decoded.email ?? undefined };
     }
     const decoded = await verifyIdToken(token);
@@ -63,7 +73,7 @@ async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
 
   const sessionUser = await getSessionUser(req);
   if (sessionUser) return { uid: sessionUser.uid, email: sessionUser.email ?? undefined };
-  throw unauthorized("Unauthorized - Missing token");
+  throw unauthorized();
 }
 
 async function resolveWorkspaceByIdCached(workspaceId: string): Promise<{ workspace: unknown }> {

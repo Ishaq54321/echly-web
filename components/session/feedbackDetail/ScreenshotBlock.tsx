@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
-import { ZoomIn } from "lucide-react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
+import { Loader2, ZoomIn } from "lucide-react";
 
 interface ScreenshotBlockProps {
   screenshotUrl: string;
@@ -9,18 +9,45 @@ interface ScreenshotBlockProps {
 }
 
 export function ScreenshotBlock({ screenshotUrl, onExpand }: ScreenshotBlockProps) {
+  const [isImageLoading, setIsImageLoading] = useState(true);
+
+  // Prevent "ghost" screenshot during ticket switch: reset loading before paint.
+  useLayoutEffect(() => {
+    setIsImageLoading(true);
+  }, [screenshotUrl]);
+  useEffect(() => {
+    setIsImageLoading(true);
+    const timeout = window.setTimeout(() => {
+      setIsImageLoading(false);
+    }, 5000);
+    return () => window.clearTimeout(timeout);
+  }, [screenshotUrl]);
+
   return (
     <div className="rounded-[var(--radius-xl)] overflow-hidden shadow-[var(--shadow-level-3)] border border-[var(--card-border)] transition-transform duration-200 hover:scale-[1.01] group">
       <div className="relative overflow-hidden rounded-[var(--radius-xl)] max-h-[317px] bg-[var(--layer-2-bg)]">
-        <Image
+        <img
+          key={screenshotUrl} // Hard reset the image element on ticket switch
           src={screenshotUrl}
           alt="Screenshot"
-          width={800}
-          height={317}
-          sizes="(max-width: 1024px) 100vw, 768px"
           className="w-full h-auto max-h-[317px] object-contain"
+          style={{
+            display: isImageLoading ? "none" : "block",
+            opacity: isImageLoading ? 0 : 1,
+            transition: "opacity 0.2s ease",
+          }}
           loading="lazy"
+          onLoad={() => {
+            setIsImageLoading(false);
+          }}
+          onError={() => setIsImageLoading(false)}
         />
+
+        {isImageLoading && (
+          <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)]">
+            <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--text-tertiary))]" strokeWidth={1.8} aria-hidden />
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/8 via-transparent to-transparent pointer-events-none" />
         <button
           type="button"

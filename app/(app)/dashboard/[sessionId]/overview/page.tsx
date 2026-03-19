@@ -257,7 +257,7 @@ export default function SessionOverviewPage() {
 
   if (authLoading || (loading && !data.session)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--canvas-base)]">
+      <div className="h-full flex items-center justify-center bg-[var(--canvas-base)]">
         <p className="text-sm text-[hsl(var(--text-muted))]">Loading…</p>
       </div>
     );
@@ -265,7 +265,7 @@ export default function SessionOverviewPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--canvas-base)]">
+      <div className="h-full flex items-center justify-center bg-[var(--canvas-base)]">
         <p className="text-sm text-secondary">Failed to load overview.</p>
       </div>
     );
@@ -282,7 +282,7 @@ export default function SessionOverviewPage() {
   const completionPercent = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-[var(--canvas-base)]">
+    <div className="h-full bg-[var(--canvas-base)]">
       <OverviewSessionHeader
         title={session.title}
         createdAt={session.createdAt ?? null}

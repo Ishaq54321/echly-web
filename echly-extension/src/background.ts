@@ -9,9 +9,21 @@ import { setExtensionToken, apiFetch } from "../utils/apiFetch";
 import { API_BASE, WEB_APP_URL } from "../config";
 
 const LOGIN_URL = `${WEB_APP_URL}/login`;
-const EXTENSION_AUTH_URL = `${WEB_APP_URL}/extension-auth`;
 /** Extension token TTL from backend is 15m; treat as valid for 14 min to avoid edge expiry. */
 const EXTENSION_TOKEN_TTL_MS = 14 * 60 * 1000;
+
+async function openOrFocusLoginTab(): Promise<void> {
+  const tabs = await chrome.tabs.query({});
+  const existing = tabs.find((tab) => tab.url?.includes("/login"));
+  if (existing?.id) {
+    await chrome.tabs.update(existing.id, { active: true });
+    if (typeof existing.windowId === "number") {
+      await chrome.windows.update(existing.windowId, { focused: true });
+    }
+    return;
+  }
+  await chrome.tabs.create({ url: LOGIN_URL });
+}
 
 console.log("ECHLY background script loaded");
 if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
@@ -48,14 +60,13 @@ chrome.action.onClicked.addListener(() => {
       return;
     }
 
-    const sessionValid = await verifyDashboardSession();
-    if (!sessionValid) {
-      extensionToken = null;
-      extensionTokenExpiresAt = null;
-      sw.currentUser = null;
-      setExtensionToken(null);
-      if (await focusExistingAuthTabIfOpen()) return;
-      void getExtensionToken().catch(() => {});
+    const authenticated = await requireAuthForExplicitOpen();
+    if (!authenticated) {
+      trayOpen = false;
+      globalUIState.visible = false;
+      globalUIState.expanded = false;
+      await chrome.storage.local.set({ echlyActive: false });
+      broadcastUIState();
       return;
     }
 
@@ -65,6 +76,18 @@ chrome.action.onClicked.addListener(() => {
 });
 
 type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
+type FeedbackApiItem = { id: string; title?: string; actionSteps?: string[]; type?: string };
+type FeedbackListResponse = {
+  feedback?: FeedbackApiItem[];
+  nextCursor?: string | null;
+  hasMore?: boolean;
+};
+type FeedbackCountResponse = {
+  total?: number;
+  open?: number;
+  skipped?: number;
+  resolved?: number;
+};
 
 /** Global message-router API: single source for extension token, user, capture mode (used by message handler). */
 const sw = globalThis as typeof globalThis & {
@@ -87,34 +110,6 @@ let extensionToken: string | null = null;
 let extensionTokenExpiresAt: number | null = null;
 /** Cached user from last successful session response; used for ECHLY_GET_AUTH_STATE. */
 let cachedSessionUser: StoredUser | null = null;
-/** Resolver for the pending getExtensionToken() when waiting for broker tab. */
-let tokenBrokerResolve: ((token: string) => void) | null = null;
-let tokenBrokerReject: ((err: Error) => void) | null = null;
-let authBrokerTabId: number | null = null;
-/** Guard: prevent opening multiple /extension-auth tabs; track until broker resolves. */
-let authTabOpen = false;
-let brokerPromise: Promise<string> | null = null;
-
-/**
- * If an auth tab is already open, focus it and return true.
- * If the tab is missing (e.g. closed manually), clear state and return false so caller can open a new one.
- */
-async function focusExistingAuthTabIfOpen(): Promise<boolean> {
-  if (!authTabOpen || authBrokerTabId == null) return false;
-  try {
-    const tab = await chrome.tabs.get(authBrokerTabId);
-    if (tab?.windowId != null) {
-      await chrome.windows.update(tab.windowId, { focused: true });
-      await chrome.tabs.update(authBrokerTabId, { active: true });
-    }
-    return true;
-  } catch (err) {
-    console.warn("[ECHLY] auth tab missing, clearing state");
-    authTabOpen = false;
-    authBrokerTabId = null;
-    return false;
-  }
-}
 
 /** Tray toggle state: icon click opens when false, closes when true (Loom-style). */
 let trayOpen = false;
@@ -134,7 +129,14 @@ let globalUIState: {
   sessionModeActive: boolean;
   sessionPaused: boolean;
   sessionLoading: boolean;
+  totalCount: number;
+  openCount: number;
+  skippedCount: number;
+  resolvedCount: number;
   pointers: StructuredFeedback[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  isFetching: boolean;
   captureMode: "voice" | "text";
 } = {
   visible: false,
@@ -145,9 +147,123 @@ let globalUIState: {
   sessionModeActive: false,
   sessionPaused: false,
   sessionLoading: false,
+  totalCount: 0,
+  openCount: 0,
+  skippedCount: 0,
+  resolvedCount: 0,
   pointers: [],
+  nextCursor: null,
+  hasMore: false,
+  isFetching: false,
   captureMode: "voice",
 };
+
+function mapFeedbackToPointers(feedback: FeedbackApiItem[]): StructuredFeedback[] {
+  return feedback.map((item) => ({
+    id: item.id,
+    title: item.title ?? "",
+    actionSteps: item.actionSteps ?? [],
+    type: item.type ?? "Feedback",
+  }));
+}
+
+function resetPaginationState(): void {
+  globalUIState.nextCursor = null;
+  globalUIState.hasMore = false;
+  globalUIState.isFetching = false;
+}
+
+async function fetchFeedbackCount(sessionId: string): Promise<{
+  total: number;
+  open: number;
+  skipped: number;
+  resolved: number;
+}> {
+  try {
+    const res = await apiFetch(
+      `${API_BASE}/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`
+    );
+    const data = (await res.json()) as FeedbackCountResponse;
+    console.log("COUNT API RESULT", data);
+    return {
+      total: typeof data.total === "number" ? data.total : 0,
+      open: typeof data.open === "number" ? data.open : 0,
+      skipped: typeof data.skipped === "number" ? data.skipped : 0,
+      resolved: typeof data.resolved === "number" ? data.resolved : 0,
+    };
+  } catch (err) {
+    console.warn("[ECHLY] feedback count fetch failed", err);
+    return {
+      total: 0,
+      open: 0,
+      skipped: 0,
+      resolved: 0,
+    };
+  }
+}
+
+async function loadMore(): Promise<void> {
+  const sessionId = activeSessionId ?? globalUIState.sessionId;
+  console.log("loadMore ENTRY", {
+    isFetching: globalUIState.isFetching,
+    hasMore: globalUIState.hasMore,
+    nextCursor: globalUIState.nextCursor,
+  });
+  console.log("loadMore called", {
+    isFetching: globalUIState.isFetching,
+    hasMore: globalUIState.hasMore,
+    nextCursor: globalUIState.nextCursor,
+  });
+  if (!sessionId) return;
+  if (globalUIState.isFetching || !globalUIState.hasMore || !globalUIState.nextCursor) return;
+
+  globalUIState.isFetching = true;
+  broadcastUIState();
+
+  try {
+    await getValidToken();
+    console.log("CALLING API WITH CURSOR:", globalUIState.nextCursor);
+    console.log("FETCHING NEXT PAGE", globalUIState.nextCursor);
+    const res = await apiFetch(
+      `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=${encodeURIComponent(globalUIState.nextCursor)}&limit=20`
+    );
+    const json = (await res.json()) as FeedbackListResponse;
+    const rawItems = json.feedback ?? [];
+    const newItems = mapFeedbackToPointers(rawItems);
+    const existingIds = new Set(globalUIState.pointers.map((p) => p.id));
+    const filteredItems = newItems.filter((item) => !existingIds.has(item.id));
+    console.log("DEDUPED ITEMS", {
+      before: existingIds.size,
+      incoming: rawItems.length,
+      after: filteredItems.length,
+    });
+    if (filteredItems.length > 0) {
+      globalUIState.pointers = [...globalUIState.pointers, ...filteredItems];
+      console.log("POINTERS UPDATED:", globalUIState.pointers.length);
+      console.log("UPDATED POINTER COUNT", globalUIState.pointers.length);
+    }
+    globalUIState.nextCursor =
+      typeof json.nextCursor === "string" && json.nextCursor.length > 0
+        ? json.nextCursor
+        : null;
+    globalUIState.hasMore = json.hasMore === true;
+    console.log("API RESPONSE", {
+      count: rawItems.length,
+      nextCursor: globalUIState.nextCursor,
+      hasMore: globalUIState.hasMore,
+    });
+    console.log("LOAD MORE RESULT", {
+      count: newItems.length,
+      nextCursor: globalUIState.nextCursor,
+      hasMore: globalUIState.hasMore,
+    });
+  } catch {
+    // Keep existing pointers unchanged on pagination errors.
+  } finally {
+    globalUIState.isFetching = false;
+    broadcastUIState();
+  }
+}
 
 /** 30-minute safety timeout: session ends after this much inactivity. */
 const SESSION_IDLE_TIMEOUT = 30 * 60 * 1000;
@@ -169,7 +285,12 @@ function endSessionFromIdle(): void {
   globalUIState.sessionModeActive = false;
   globalUIState.sessionPaused = false;
   globalUIState.sessionLoading = false;
+  globalUIState.totalCount = 0;
+  globalUIState.openCount = 0;
+  globalUIState.skippedCount = 0;
+  globalUIState.resolvedCount = 0;
   globalUIState.pointers = [];
+  resetPaginationState();
   chrome.storage.local.set({
     activeSessionId: null,
     sessionModeActive: false,
@@ -219,28 +340,52 @@ async function initializeSessionState(): Promise<void> {
           globalUIState.sessionModeActive === true && activeSessionId != null;
 
         if (shouldReloadPointers) {
+          resetPaginationState();
+          globalUIState.totalCount = 0;
+          globalUIState.openCount = 0;
+          globalUIState.skippedCount = 0;
+          globalUIState.resolvedCount = 0;
           getValidToken()
             .then(() =>
-              apiFetch(
-                `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId!)}&limit=20`
-              )
+              Promise.all([
+                apiFetch(
+                  `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId!)}&limit=20`
+                ),
+                fetchFeedbackCount(activeSessionId!),
+              ])
             )
-            .then((res) => res.json())
-            .then((json: { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> }) => {
-              globalUIState.pointers = (json.feedback ?? []).map((f) => ({
-                id: f.id,
-                title: f.title ?? "",
-                actionSteps: f.actionSteps ?? [],
-              }));
+            .then(async ([res, counts]) => {
+              const json = (await res.json()) as FeedbackListResponse;
+              globalUIState.pointers = mapFeedbackToPointers(json.feedback ?? []);
+              globalUIState.totalCount = counts.total;
+              globalUIState.openCount = counts.open;
+              globalUIState.skippedCount = counts.skipped;
+              globalUIState.resolvedCount = counts.resolved;
+              globalUIState.nextCursor =
+                typeof json.nextCursor === "string" && json.nextCursor.length > 0
+                  ? json.nextCursor
+                  : null;
+              globalUIState.hasMore = json.hasMore === true;
+              globalUIState.isFetching = false;
               broadcastUIState();
               resolve();
             })
             .catch(() => {
               globalUIState.pointers = [];
+              globalUIState.totalCount = 0;
+              globalUIState.openCount = 0;
+              globalUIState.skippedCount = 0;
+              globalUIState.resolvedCount = 0;
+              resetPaginationState();
               broadcastUIState();
               resolve();
             });
         } else {
+          globalUIState.totalCount = 0;
+          globalUIState.openCount = 0;
+          globalUIState.skippedCount = 0;
+          globalUIState.resolvedCount = 0;
+          resetPaginationState();
           resolve();
         }
       }
@@ -280,12 +425,8 @@ self.addEventListener("activate", () => {
 })();
 
 /**
- * Loom-style auth broker: get extension token from the web dashboard session.
- * 1. If a valid token exists in memory and is not expired, return it.
- * 2. Otherwise open a hidden tab to /extension-auth (dashboard checks auth and POSTs for token).
- * 3. The page postMessages the token; sessionRelay content script forwards it here.
- * 4. We store the token in memory, then return it. Tab is closed by the page or by us.
- * The extension never stores or manages user login credentials.
+ * Resolve extension auth silently using dashboard cookies.
+ * Never opens login or extension-auth routes automatically.
  */
 async function getExtensionToken(): Promise<string> {
   const now = Date.now();
@@ -297,41 +438,50 @@ async function getExtensionToken(): Promise<string> {
     return extensionToken;
   }
 
-  if (await focusExistingAuthTabIfOpen()) {
-    if (brokerPromise != null) return brokerPromise;
-    brokerPromise = new Promise<string>((resolve, reject) => {
-      tokenBrokerResolve = resolve;
-      tokenBrokerReject = reject;
-    });
-    return brokerPromise;
-  }
-
-  if (authTabOpen && brokerPromise != null) {
-    return brokerPromise;
-  }
-
-  authTabOpen = true;
-  brokerPromise = new Promise<string>((resolve, reject) => {
-    tokenBrokerResolve = resolve;
-    tokenBrokerReject = reject;
-
-    chrome.tabs.create({ url: EXTENSION_AUTH_URL }, (tab) => {
-      if (chrome.runtime.lastError) {
-        authTabOpen = false;
-        brokerPromise = null;
-        tokenBrokerResolve = null;
-        tokenBrokerReject = null;
-        reject(new Error("NOT_AUTHENTICATED"));
-        return;
-      }
-      authBrokerTabId = tab?.id ?? null;
-    });
+  const res = await fetch(`${API_BASE}/api/extension/session`, {
+    method: "POST",
+    credentials: "include",
   });
+  if (res.status === 401) {
+    extensionToken = null;
+    extensionTokenExpiresAt = null;
+    sw.extensionToken = null;
+    sw.currentUser = null;
+    cachedSessionUser = null;
+    setExtensionToken(null);
+    throw new Error("NOT_AUTHENTICATED");
+  }
+  if (!res.ok) {
+    throw new Error("NOT_AUTHENTICATED");
+  }
 
-  return brokerPromise;
+  const data = (await res.json()) as {
+    extensionToken?: string;
+    user?: { uid: string; email?: string | null };
+  };
+  const token = data?.extensionToken;
+  if (!token) {
+    throw new Error("NOT_AUTHENTICATED");
+  }
+
+  extensionToken = token;
+  extensionTokenExpiresAt = Date.now() + EXTENSION_TOKEN_TTL_MS;
+  setExtensionToken(token);
+  sw.extensionToken = token;
+  if (data.user?.uid) {
+    sw.currentUser = {
+      uid: data.user.uid,
+      name: null,
+      email: data.user.email ?? null,
+      photoURL: null,
+    };
+    cachedSessionUser = sw.currentUser;
+  }
+
+  return token;
 }
 
-/** Returns valid extension token from cache if not expired and dashboard session valid. Throws NOT_AUTHENTICATED if no valid token. Never opens /extension-auth. */
+/** Returns valid extension token from cache if not expired and dashboard session valid. Throws NOT_AUTHENTICATED if no valid token. */
 async function getValidToken(): Promise<string> {
   const now = Date.now();
 
@@ -357,7 +507,7 @@ async function getValidToken(): Promise<string> {
 
 /**
  * Verify dashboard session only. Never requests tokens or opens login.
- * Used by ECHLY_GET_AUTH_STATE to report authenticated state from in-memory user/token or session cookie.
+ * Used by auth-state requests to report authenticated state from in-memory user/token or session cookie.
  */
 async function hydrateAuthState(): Promise<boolean> {
   // Already authenticated in memory
@@ -386,6 +536,33 @@ async function hydrateAuthState(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+type AuthStateResponse = {
+  authenticated: boolean;
+  user: StoredUser | null;
+  token: string | null;
+};
+
+/** Shared auth-state payload used by GET_AUTH_STATE and explicit-open gates. */
+async function getAuthStateResponse(): Promise<AuthStateResponse> {
+  const authenticated = await hydrateAuthState();
+  return {
+    authenticated,
+    user: authenticated ? sw.currentUser ?? null : null,
+    token: authenticated ? sw.extensionToken ?? null : null,
+  };
+}
+
+/**
+ * Explicit open only: icon click / open-widget / open-popup.
+ * If unauthenticated, open dashboard login and prevent widget/popup flow.
+ */
+async function requireAuthForExplicitOpen(): Promise<boolean> {
+  const authState = await getAuthStateResponse();
+  if (authState.authenticated) return true;
+  await chrome.tabs.create({ url: LOGIN_URL });
+  return false;
 }
 
 function broadcastUIState(): void {
@@ -508,22 +685,10 @@ chrome.tabs.onCreated.addListener((tab) => {
     });
 });
 
-/** If the auth broker tab is closed before sending the token, reject the pending promise. */
-chrome.tabs.onRemoved.addListener((tabId) => {
-  if (tabId === authBrokerTabId) {
-    authBrokerTabId = null;
-    authTabOpen = false;
-    brokerPromise = null;
-    if (tokenBrokerReject) {
-      tokenBrokerReject(new Error("NOT_AUTHENTICATED"));
-      tokenBrokerResolve = null;
-      tokenBrokerReject = null;
-    }
-  }
-});
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("[ECHLY] message received:", request.type);
+  console.log("BACKGROUND RECEIVED MESSAGE", request.type);
+  console.log("BACKGROUND MESSAGE RECEIVED:", request);
   echlyLog("MESSAGE", "received", request.type);
 
   if (request.type === "ECHLY_EXTENSION_TOKEN") {
@@ -542,17 +707,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           photoURL: null,
         };
         cachedSessionUser = sw.currentUser;
-      }
-      if (tokenBrokerResolve) {
-        tokenBrokerResolve(token);
-        tokenBrokerResolve = null;
-        tokenBrokerReject = null;
-      }
-      authTabOpen = false;
-      brokerPromise = null;
-      if (authBrokerTabId != null) {
-        chrome.tabs.remove(authBrokerTabId).catch(() => {});
-        authBrokerTabId = null;
       }
       trayOpen = true;
       globalUIState.visible = true;
@@ -590,18 +744,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tabs[0]?.id) sw.lastUserTabId = tabs[0].id;
 
-      const sessionValid = await verifyDashboardSession();
-      if (!sessionValid) {
-        extensionToken = null;
-        extensionTokenExpiresAt = null;
-        sw.currentUser = null;
-        setExtensionToken(null);
-        if (await focusExistingAuthTabIfOpen()) {
-          sendResponse({ ok: false, redirectToLogin: true });
-          return;
-        }
-        void getExtensionToken().catch(() => {});
-        sendResponse({ ok: false, redirectToLogin: true });
+      const authenticated = await requireAuthForExplicitOpen();
+      if (!authenticated) {
+        trayOpen = false;
+        globalUIState.visible = false;
+        globalUIState.expanded = false;
+        await chrome.storage.local.set({ echlyActive: false });
+        broadcastUIState();
+        sendResponse({ ok: false, authenticated: false });
         return;
       }
 
@@ -689,6 +839,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         type: ticket.type ?? "Feedback",
       };
       globalUIState.pointers = [pointer, ...globalUIState.pointers];
+      globalUIState.totalCount += 1;
+      globalUIState.openCount += 1;
       resetSessionIdleTimer();
       broadcastUIState();
     }
@@ -744,6 +896,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionModeActive = true;
     globalUIState.sessionPaused = false;
     globalUIState.sessionLoading = Boolean(sessionId);
+    globalUIState.totalCount = 0;
+    globalUIState.openCount = 0;
+    globalUIState.skippedCount = 0;
+    globalUIState.resolvedCount = 0;
+    resetPaginationState();
     chrome.storage.local.set({
       activeSessionId: sessionId,
       sessionModeActive: true,
@@ -757,6 +914,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       if (!sessionId) {
         globalUIState.pointers = [];
+        globalUIState.totalCount = 0;
+        globalUIState.openCount = 0;
+        globalUIState.skippedCount = 0;
+        globalUIState.resolvedCount = 0;
+        resetPaginationState();
         globalUIState.sessionLoading = false;
         broadcastUIState();
         sendResponse({ success: true });
@@ -764,16 +926,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       try {
         await getValidToken();
-        const [feedbackRes, sessionsRes] = await Promise.all([
+        const [feedbackRes, sessionsRes, counts] = await Promise.all([
           apiFetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=20`),
           apiFetch(`${API_BASE}/api/sessions`),
+          fetchFeedbackCount(sessionId),
         ]);
-        const feedbackJson = (await feedbackRes.json()) as { feedback?: Array<{ id: string; title?: string; actionSteps?: string[] }> };
-        globalUIState.pointers = (feedbackJson.feedback ?? []).map((f) => ({
-          id: f.id,
-          title: f.title ?? "",
-          actionSteps: f.actionSteps ?? [],
-        }));
+        const feedbackJson = (await feedbackRes.json()) as FeedbackListResponse;
+        globalUIState.pointers = mapFeedbackToPointers(feedbackJson.feedback ?? []);
+        globalUIState.totalCount = counts.total;
+        globalUIState.openCount = counts.open;
+        globalUIState.skippedCount = counts.skipped;
+        globalUIState.resolvedCount = counts.resolved;
+        globalUIState.nextCursor =
+          typeof feedbackJson.nextCursor === "string" && feedbackJson.nextCursor.length > 0
+            ? feedbackJson.nextCursor
+            : null;
+        globalUIState.hasMore = feedbackJson.hasMore === true;
+        globalUIState.isFetching = false;
         const sessionsJson = (await sessionsRes.json()) as { success?: boolean; sessions?: Array<{ id: string; title?: string }> };
         if (sessionsJson.success && Array.isArray(sessionsJson.sessions)) {
           const match = sessionsJson.sessions.find((s) => s.id === sessionId);
@@ -781,12 +950,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       } catch {
         globalUIState.pointers = [];
+        globalUIState.totalCount = 0;
+        globalUIState.openCount = 0;
+        globalUIState.skippedCount = 0;
+        globalUIState.resolvedCount = 0;
+        resetPaginationState();
       }
       globalUIState.sessionLoading = false;
       broadcastUIState();
       sendResponse({ success: true });
     })();
     return true;
+  }
+
+  if (request.type === "ECHLY_LOAD_MORE") {
+    console.log("LOAD MORE TRIGGERED IN BACKGROUND");
+    console.log("TRIGGERING loadMore");
+    void loadMore();
+    sendResponse({ ok: true });
+    return false;
   }
 
   if (request.type === "ECHLY_OPEN_TAB") {
@@ -862,7 +1044,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionModeActive = false;
     globalUIState.sessionPaused = false;
     globalUIState.sessionLoading = false;
+    globalUIState.totalCount = 0;
+    globalUIState.openCount = 0;
+    globalUIState.skippedCount = 0;
+    globalUIState.resolvedCount = 0;
     globalUIState.pointers = [];
+    resetPaginationState();
     chrome.storage.local.set({
       activeSessionId: null,
       sessionModeActive: false,
@@ -939,13 +1126,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
-  if (request.type === "ECHLY_GET_AUTH_STATE") {
+  if (request.type === "ECHLY_GET_AUTH_STATE" || request.type === "GET_AUTH_STATE") {
     (async () => {
-      const authenticated = await hydrateAuthState();
-      sendResponse({
-        authenticated,
-        user: sw.currentUser ?? null,
-      });
+      const authState = await getAuthStateResponse();
+      sendResponse(authState);
     })();
     return true;
   }
@@ -960,12 +1144,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_OPEN_POPUP") {
     (async () => {
-      if (await focusExistingAuthTabIfOpen()) {
-        sendResponse({ ok: true });
-        return;
-      }
-      void getExtensionToken().catch(() => {});
-      sendResponse({ ok: true });
+      const authenticated = await requireAuthForExplicitOpen();
+      sendResponse({ ok: authenticated, authenticated });
     })();
     return true;
   }
@@ -978,14 +1158,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_TRIGGER_LOGIN") {
     (async () => {
-      if (await focusExistingAuthTabIfOpen()) {
+      try {
+        await openOrFocusLoginTab();
         sendResponse({ ok: true });
-        return;
+      } catch {
+        sendResponse({ ok: false });
       }
-      void getExtensionToken().catch(() => {});
-      sendResponse({ ok: true });
     })();
-    return true; // keep channel open for async sendResponse
+    return true;
   }
 
   if (request.type === "START_RECORDING") {
@@ -1221,6 +1401,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             type: firstCreated.type,
           };
           globalUIState.pointers = [...globalUIState.pointers, pointer];
+          globalUIState.totalCount += 1;
+          globalUIState.openCount += 1;
           resetSessionIdleTimer();
           broadcastUIState();
           sendResponse({ success: true, ticket: firstCreated });

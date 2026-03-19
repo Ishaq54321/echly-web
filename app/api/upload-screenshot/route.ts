@@ -101,7 +101,9 @@ export async function POST(req: NextRequest) {
     const uploadStart = Date.now();
     await uploadString(screenshotRef, imageDataUrl, "data_url", {
       contentType: "image/png",
+      cacheControl: "public, max-age=31536000, immutable",
     });
+    console.log("UPLOAD CACHE CONTROL APPLIED");
 
     const url = await getDownloadURL(screenshotRef);
     const uploadDuration = Date.now() - uploadStart;

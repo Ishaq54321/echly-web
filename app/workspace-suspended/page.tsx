@@ -5,7 +5,7 @@ import { Lock } from "lucide-react";
 
 export default function WorkspaceSuspendedPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-50 px-4">
+    <div className="flex h-full flex-col items-center justify-center bg-neutral-50 px-4">
       <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-8 text-center shadow-sm">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
           <Lock className="h-6 w-6" aria-hidden />

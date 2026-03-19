@@ -4,7 +4,7 @@ export default function OnboardingLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative min-h-screen bg-[#f9fafc] overflow-hidden">
+    <div className="relative h-full bg-[#f9fafc] overflow-hidden">
       {/* Premium SaaS gradient background (matches login) */}
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden>
         <div
@@ -51,7 +51,7 @@ export default function OnboardingLayout({
           }}
         />
       </div>
-      <div className="w-full min-h-screen flex flex-col items-center pt-[8vh] px-4 pb-12">
+      <div className="w-full h-full flex flex-col items-center pt-[8vh] px-4 pb-12">
         {children}
       </div>
     </div>

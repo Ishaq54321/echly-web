@@ -112,6 +112,14 @@ export type CaptureWidgetProps = {
   loadSessionWithPointers?: { sessionId: string; pointers: StructuredFeedback[] } | null;
   /** Extension: global session pointers from background. When provided, overrides loadSessionWithPointers for tray list; all tabs show same list. */
   pointers?: StructuredFeedback[];
+  /** Extension: total feedback count from backend aggregation; independent of loaded pointers. */
+  totalCount?: number;
+  /** Extension: open feedback count from backend aggregation; independent of loaded pointers. */
+  openCount?: number;
+  /** Extension: skipped feedback count from backend aggregation; independent of loaded pointers. */
+  skippedCount?: number;
+  /** Extension: resolved feedback count from backend aggregation; independent of loaded pointers. */
+  resolvedCount?: number;
   /** Extension: true while loading a previous session's feedback; show spinner instead of empty state. */
   sessionLoading?: boolean;
   /** Extension: session title from globalUIState. When provided, overrides internal sessionTitle for display. */

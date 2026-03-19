@@ -15,8 +15,18 @@ import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
 import { getSessionUser } from "@/lib/server/session";
 import { getCachedFeedback, setCachedFeedback } from "@/lib/server/cache/feedbackCache";
 
-function unauthorized(message: string): Response {
-  return new Response(JSON.stringify({ error: message }), { status: 401 });
+function unauthorized(): Response {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: "NOT_AUTHENTICATED",
+      message: "User is not authenticated",
+    }),
+    {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    }
+  );
 }
 
 function base64UrlDecodeToString(input: string): string {
@@ -45,7 +55,7 @@ async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
     const payload = peekJwtPayload(token);
     if (payload && payload.type === "extension") {
       const decoded = await verifyExtensionToken(token);
-      if (!decoded) throw unauthorized("Unauthorized - Invalid extension token");
+      if (!decoded) throw unauthorized();
       return { uid: decoded.uid, email: decoded.email ?? undefined };
     }
     const decoded = await verifyIdToken(token);
@@ -54,7 +64,7 @@ async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
 
   const sessionUser = await getSessionUser(req);
   if (sessionUser) return { uid: sessionUser.uid, email: sessionUser.email ?? undefined };
-  throw unauthorized("Unauthorized - Missing token");
+  throw unauthorized();
 }
 
 export async function OPTIONS(req: NextRequest) {
@@ -67,11 +77,7 @@ export async function OPTIONS(req: NextRequest) {
 function serializeFeedback(item: Feedback): Record<string, unknown> {
   const out = { ...item } as Record<string, unknown>;
   const createdAt = item.createdAt as { toDate?: () => Date; seconds?: number } | null;
-  if (createdAt != null && typeof createdAt.toDate === "function") {
-    out.createdAt = { seconds: Math.floor(createdAt.toDate().getTime() / 1000) };
-  } else if (createdAt != null && typeof (createdAt as { seconds?: number }).seconds === "number") {
-    out.createdAt = { seconds: (createdAt as { seconds: number }).seconds };
-  }
+  out.createdAt = createdAt != null && typeof createdAt.toDate === "function" ? createdAt.toDate().toISOString() : null;
   const lastCommentAt = item.lastCommentAt as { toDate?: () => Date; seconds?: number } | null | undefined;
   if (lastCommentAt != null && typeof lastCommentAt.toDate === "function") {
     out.lastCommentAt = { seconds: Math.floor(lastCommentAt.toDate().getTime() / 1000) };
@@ -85,10 +91,8 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
   const createdAt = item.createdAt as { toDate?: () => Date; seconds?: number } | null;
   const createdAtOut =
     createdAt != null && typeof createdAt.toDate === "function"
-      ? { seconds: Math.floor(createdAt.toDate().getTime() / 1000) }
-      : createdAt != null && typeof (createdAt as { seconds?: number }).seconds === "number"
-        ? { seconds: (createdAt as { seconds: number }).seconds }
-        : null;
+      ? createdAt.toDate().toISOString()
+      : null;
 
   const lastCommentAt = item.lastCommentAt as { toDate?: () => Date; seconds?: number } | null | undefined;
   const lastCommentAtOut =
@@ -101,7 +105,7 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
   return {
     id: item.id,
     sessionId: item.sessionId,
-    createdAt: createdAtOut ?? undefined,
+    createdAt: createdAtOut,
 
     // Fields used by capture widget + discussion UI
     title: item.title,

@@ -114,10 +114,19 @@ type TicketFromApi = {
   [key: string]: unknown;
 };
 
+function preloadImage(src: string, preloaded: Set<string>) {
+  if (!src || typeof window === "undefined") return;
+  if (preloaded.has(src)) return;
+  preloaded.add(src);
+  const img = new window.Image();
+  img.src = src;
+  console.log("PRELOADING", src);
+}
+
 function SessionPageSkeleton() {
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden">
-      <aside className="w-[280px] shrink-0 min-h-0 flex flex-col rounded-r-[var(--radius-lg)] bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-1)] border-r border-[var(--layer-1-border)]">
+    <div className="flex h-screen overflow-hidden pt-6">
+      <aside className="w-[280px] h-full shrink-0 min-h-0 flex flex-col rounded-none bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-1)] border-r border-[var(--layer-1-border)]">
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           <div className="space-y-3">
             <div className="h-4 w-40 rounded bg-neutral-200/50 animate-feedback-placeholder-pulse" />
@@ -126,26 +135,28 @@ function SessionPageSkeleton() {
           </div>
         </div>
       </aside>
-      <main className="surface-main flex-1 min-h-0 flex flex-col">
-        <div className="max-w-4xl mx-auto w-full px-12 py-9 border-b border-[var(--layer-1-border)] shrink-0">
-          <div className="flex justify-between items-center gap-4">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
-                Session
-              </h1>
-              <p className="text-[13px] text-[hsl(var(--text-tertiary))] mt-2">
-                Loading…
-              </p>
-            </div>
-            <div className="text-[13px] text-secondary flex-shrink-0">
-              —
+      <main className="surface-main flex-1 h-full overflow-y-auto min-h-0 flex flex-col">
+        <div className="h-full flex flex-col min-w-0">
+          <div className="max-w-4xl mx-auto w-full px-12 py-9 border-b border-[var(--layer-1-border)] shrink-0">
+            <div className="flex justify-between items-center gap-4">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
+                  Session
+                </h1>
+                <p className="text-[13px] text-[hsl(var(--text-tertiary))] mt-2">
+                  Loading…
+                </p>
+              </div>
+              <div className="text-[13px] text-secondary flex-shrink-0">
+                —
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="max-w-4xl mx-auto w-full px-10 py-8">
-            <div className="h-6 w-72 rounded bg-neutral-200/70 animate-feedback-placeholder-pulse" />
-            <div className="mt-4 h-28 w-full rounded bg-neutral-100/90 animate-feedback-placeholder-pulse" />
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="max-w-4xl mx-auto w-full px-10 py-8">
+              <div className="h-6 w-72 rounded bg-neutral-200/70 animate-feedback-placeholder-pulse" />
+              <div className="mt-4 h-28 w-full rounded bg-neutral-100/90 animate-feedback-placeholder-pulse" />
+            </div>
           </div>
         </div>
       </main>
@@ -182,10 +193,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     activeCount: feedbackActiveCount,
     resolvedCount: feedbackResolvedCount,
     skippedCount: feedbackSkippedCount,
-    setTotal: setFeedbackTotal,
-    setActiveCount: setFeedbackActiveCount,
-    setResolvedCount: setFeedbackResolvedCount,
-    setSkippedCount: setFeedbackSkippedCount,
+    countsLoading: feedbackCountsLoading,
     loading: feedbackLoading,
     hasMore: hasMoreFeedback,
     hasReachedLimit: feedbackReachedLimit,
@@ -227,6 +235,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   } | null>(null);
   const [blockSubmit, setBlockSubmit] = useState(false);
   const [pendingClaritySubmit, setPendingClaritySubmit] = useState<PendingClaritySubmit | null>(null);
+  const preloadedScreenshotUrlsRef = useRef<Set<string>>(new Set());
 
   /* Escape exits comment mode (canvas-native: no panel open by default). */
   useEffect(() => {
@@ -296,12 +305,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setFeedback((prev) => [newItem, ...prev]);
       setSelectedId(ticket.id);
       setNewTicketId(ticket.id);
-      setFeedbackTotal((c) => c + 1);
-      setFeedbackActiveCount((c) => c + 1);
     };
     window.addEventListener("ECHLY_FEEDBACK_CREATED", handler);
     return () => window.removeEventListener("ECHLY_FEEDBACK_CREATED", handler);
-  }, [sessionId, session, setFeedback, setFeedbackTotal, setFeedbackActiveCount]);
+  }, [sessionId, session, setFeedback]);
 
   /* ================= AUTH + LOAD SESSION (title/meta only) ================= */
   useEffect(() => {
@@ -384,7 +391,19 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const selectedIndex = feedback.findIndex((f) => f.id === selectedId);
   const selectedIndexInOpen = openFeedback.findIndex((f) => f.id === selectedId);
-  const executionModeTotal = feedbackActiveCount > 0 ? feedbackActiveCount : openFeedback.length;
+  const executionModeTotal =
+    !feedbackCountsLoading && feedbackActiveCount > 0 ? feedbackActiveCount : openFeedback.length;
+
+  // Preload only the next 1-2 ticket screenshots from the current selection.
+  useEffect(() => {
+    if (selectedIndex === -1) return;
+    const nextItems = [feedback[selectedIndex + 1], feedback[selectedIndex + 2]].filter(Boolean);
+    nextItems.forEach((item) => {
+      const url = item?.screenshotUrl;
+      if (!url) return;
+      preloadImage(url, preloadedScreenshotUrlsRef.current);
+    });
+  }, [selectedIndex, feedback]);
 
   const selectedItem = (() => {
     const ticket = feedback.find((t) => t.id === selectedId) ?? null;
@@ -404,7 +423,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           ? executionModeTotal
           : feedbackTotal > 0
             ? feedbackTotal
-            : feedback.length || 1,
+            : 1,
     };
   })();
 
@@ -545,25 +564,20 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const saveResolved = async (isResolved: boolean) => {
     if (!selectedId) return;
     const previousResolved = Boolean(selectedItem?.isResolved);
+    const previousSkipped = Boolean(selectedItem?.isSkipped);
+
+    // Optimistic update: resolving/unresolving clears skipped state.
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === selectedId ? { ...item, isResolved } : item
+        item.id === selectedId ? { ...item, isResolved, isSkipped: false } : item
       )
     );
-    if (previousResolved !== isResolved) {
-      if (isResolved) {
-        setFeedbackActiveCount((c) => Math.max(0, c - 1));
-        setFeedbackResolvedCount((c) => c + 1);
-      } else {
-        setFeedbackActiveCount((c) => c + 1);
-        setFeedbackResolvedCount((c) => Math.max(0, c - 1));
-      }
-    }
     try {
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isResolved }),
+        // Clear `isSkipped` so status transitions are consistent with counts.
+        body: JSON.stringify({ isResolved, isSkipped: false }),
       });
       const data = (await res.json()) as {
         success?: boolean;
@@ -581,19 +595,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId
-            ? { ...item, isResolved: previousResolved }
+            ? { ...item, isResolved: previousResolved, isSkipped: previousSkipped }
             : item
         )
       );
-      if (previousResolved !== isResolved) {
-        if (previousResolved) {
-          setFeedbackActiveCount((c) => c + 1);
-          setFeedbackResolvedCount((c) => Math.max(0, c - 1));
-        } else {
-          setFeedbackActiveCount((c) => Math.max(0, c - 1));
-          setFeedbackResolvedCount((c) => c - 1);
-        }
-      }
     }
   };
 
@@ -621,8 +626,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         item.id === selectedId ? { ...item, isSkipped: true, isResolved: false } : item
       )
     );
-    setFeedbackActiveCount((c) => Math.max(0, c - 1));
-    setFeedbackSkippedCount((c) => c + 1);
     setSelectedId(nextOpenId ?? null);
 
     try {
@@ -637,8 +640,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           item.id === selectedId ? { ...item, isSkipped: false } : item
         )
       );
-      setFeedbackActiveCount((c) => c + 1);
-      setFeedbackSkippedCount((c) => Math.max(0, c - 1));
       setSelectedId(selectedId);
     }
   };
@@ -723,15 +724,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
       )
     );
-    const activeCountBefore = active.length;
-    setFeedbackActiveCount((c) => Math.max(0, c - activeCountBefore));
-    setFeedbackResolvedCount((c) => c + activeCountBefore);
-  }, [
-    feedback,
-    setFeedback,
-    setFeedbackActiveCount,
-    setFeedbackResolvedCount,
-  ]);
+  }, [feedback, setFeedback]);
 
   const handleMarkAllUnresolved = useCallback(async () => {
     const resolved = feedback.filter((item) => getTicketStatus(item) === "resolved");
@@ -758,15 +751,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           : item
       )
     );
-    const resolvedCountBefore = resolved.length;
-    setFeedbackResolvedCount((c) => Math.max(0, c - resolvedCountBefore));
-    setFeedbackActiveCount((c) => c + resolvedCountBefore);
-  }, [
-    feedback,
-    setFeedback,
-    setFeedbackActiveCount,
-    setFeedbackResolvedCount,
-  ]);
+  }, [feedback, setFeedback]);
 
   /* ================= AI SAVE (Structure Engine V2) ================= */
 
@@ -962,8 +947,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       };
       setFeedback((prev) => [newItem, ...prev]);
       setSelectedId(newItem.id);
-      setFeedbackTotal((c) => c + 1);
-      setFeedbackActiveCount((c) => c + 1);
       return newItem;
     }
 
@@ -1007,8 +990,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
     setFeedback((prev) => [...created, ...prev]);
     setSelectedId(created[0].id);
-    setFeedbackTotal((c) => c + created.length);
-    setFeedbackActiveCount((c) => c + created.length);
     return created[0];
   };
 
@@ -1048,8 +1029,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (created.length === 0) return;
     setFeedback((prev) => [...created, ...prev]);
     setSelectedId(created[0].id);
-    setFeedbackTotal((c) => c + created.length);
-    setFeedbackActiveCount((c) => c + created.length);
   };
 
   const handleClaritySubmitAnyway = async () => {
@@ -1075,23 +1054,16 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (created.length === 0) return;
     setFeedback((prev) => [...created, ...prev]);
     setSelectedId(created[0].id);
-    setFeedbackTotal((c) => c + created.length);
-    setFeedbackActiveCount((c) => c + created.length);
   };
 
   const handleDeleteFeedback = async (id: string) => {
     const deletedItem = feedback.find((f) => f.id === id);
     const wasResolved = deletedItem?.isResolved ?? false;
+    const wasSkipped = deletedItem?.isSkipped === true;
     const prevFeedback = feedback;
     const nextList = feedback.filter((item) => item.id !== id);
     const nextSelected = selectedId === id ? nextList[0]?.id ?? null : selectedId;
     setFeedback(nextList);
-    setFeedbackTotal((c) => Math.max(0, c - 1));
-    if (wasResolved) {
-      setFeedbackResolvedCount((c) => Math.max(0, c - 1));
-    } else {
-      setFeedbackActiveCount((c) => Math.max(0, c - 1));
-    }
     setSelectedId(nextSelected);
     setShowDeleteModal(false);
     try {
@@ -1101,9 +1073,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       router.push(`/dashboard/${sessionId}`);
     } catch {
       setFeedback(prevFeedback);
-      setFeedbackTotal((c) => c + 1);
-      if (wasResolved) setFeedbackResolvedCount((c) => c + 1);
-      else setFeedbackActiveCount((c) => c + 1);
       setSelectedId(selectedId);
     }
   };
@@ -1170,7 +1139,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   if (executionMode) {
     return (
       <>
-        <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="flex h-screen overflow-hidden">
           <ExecutionModeLayout
             item={selectedItem}
             onExitExecutionMode={() => setExecutionMode(false)}
@@ -1256,14 +1225,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   return (
     <>
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside className="hidden lg:flex w-[300px] shrink-0 min-h-0 flex-col">
+      <div className="flex h-screen overflow-hidden pt-6">
+        <aside className="hidden lg:flex w-[300px] h-full overflow-hidden shrink-0 min-h-0 flex-col">
           <TicketList
             sessionTitle={session?.title ?? "Session"}
             totalCount={feedbackTotal}
             openCount={feedbackActiveCount}
             resolvedCount={feedbackResolvedCount}
             skippedCount={feedbackSkippedCount}
+            countsLoading={feedbackCountsLoading}
             isEditingSessionTitle={isEditingSessionTitle}
             sessionTitleDraft={sessionTitleDraft}
             onSessionTitleChange={setSessionTitleDraft}
@@ -1294,30 +1264,32 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           />
         </aside>
 
-        <main className="surface-main flex-1 min-h-0 flex flex-col min-w-0">
-          <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--layer-1-border)] bg-[var(--layer-1-bg)]/80">
-            <div className="lg:hidden">
-              <button
-                type="button"
-                onClick={() => setIsTicketNavigatorOpen(true)}
-                className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-200"
-              >
-                Tickets
-              </button>
+        <main className="surface-main flex-1 h-full overflow-y-auto min-h-0 flex flex-col min-w-0">
+          <div className="h-full flex flex-col min-w-0">
+            <div className="z-20 shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--layer-1-border)] bg-[var(--layer-1-bg)]">
+              <div className="lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setIsTicketNavigatorOpen(true)}
+                  className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-200"
+                >
+                  Tickets
+                </button>
+              </div>
+              {openFeedback.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setExecutionMode(true)}
+                  className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-200 cursor-pointer"
+                >
+                  Execution Mode
+                </button>
+              )}
             </div>
-            {openFeedback.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setExecutionMode(true)}
-                className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-200 cursor-pointer"
-              >
-                Execution Mode
-              </button>
-            )}
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-3xl mx-auto w-full px-6 py-4">
-              {renderExecutionContent()}
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+              <div className="max-w-3xl mx-auto w-full px-6 pt-4 pb-4 flex-1 min-h-0 flex flex-col">
+                {renderExecutionContent()}
+              </div>
             </div>
           </div>
         </main>
@@ -1434,6 +1406,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               openCount={feedbackActiveCount}
               resolvedCount={feedbackResolvedCount}
               skippedCount={feedbackSkippedCount}
+            countsLoading={feedbackCountsLoading}
               isEditingSessionTitle={isEditingSessionTitle}
               sessionTitleDraft={sessionTitleDraft}
               onSessionTitleChange={setSessionTitleDraft}

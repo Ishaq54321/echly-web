@@ -32,7 +32,11 @@ export async function POST(request: NextRequest) {
   const user = await getSessionUser(request);
   if (!user) {
     return NextResponse.json(
-      { error: "Unauthorized - Missing or invalid session" },
+      {
+        success: false,
+        error: "NOT_AUTHENTICATED",
+        message: "User is not authenticated",
+      },
       { status: 401, headers: corsHeaders(request) }
     );
   }

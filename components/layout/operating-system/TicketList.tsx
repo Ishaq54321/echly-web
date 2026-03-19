@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo, useState, memo, useRef, useEffect } from "react";
-import { ChevronDown, ChevronRight, Check, Search, MoreVertical } from "lucide-react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
+import { ChevronDown, ChevronRight, Check, Search, MoreVertical, Loader2 } from "lucide-react";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { TicketItem } from "./TicketItem";
@@ -13,6 +13,8 @@ export interface TicketListProps {
   openCount?: number;
   resolvedCount?: number;
   skippedCount?: number;
+  /** True while `/api/feedback/counts` is still loading aggregation counts. */
+  countsLoading?: boolean;
   /** Optional: editable session title */
   isEditingSessionTitle?: boolean;
   sessionTitleDraft?: string;
@@ -50,6 +52,7 @@ function TicketListInner({
   openCount,
   resolvedCount,
   skippedCount,
+  countsLoading = false,
   isEditingSessionTitle = false,
   sessionTitleDraft,
   onSessionTitleChange,
@@ -66,7 +69,7 @@ function TicketListInner({
   hasMore = false,
   hasReachedLimit = false,
   loadMoreRef,
-  scrollContainerRef,
+  scrollContainerRef: scrollContainerRefRef,
   onScrollContainerReady,
   onMarkAllTicketsResolved,
   onMarkAllTicketsUnresolved,
@@ -89,6 +92,9 @@ function TicketListInner({
   const [openExpanded, setOpenExpanded] = useState(true);
   const [resolvedExpanded, setResolvedExpanded] = useState(false);
   const scrollContainerReadySent = useRef(false);
+  const internalContainerRef = useRef<HTMLDivElement | null>(null);
+  const prevScrollHeightRef = useRef(0);
+  const prevItemsLengthRef = useRef(items.length);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -97,29 +103,36 @@ function TicketListInner({
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const total = typeof totalCount === "number" ? totalCount : items.length;
-  const open =
-    typeof openCount === "number"
-      ? openCount
-      : items.filter((i) => getTicketStatus(i) === "open").length;
-  const skipped =
-    typeof skippedCount === "number"
-      ? skippedCount
-      : items.filter((i) => getTicketStatus(i) === "skipped").length;
-  const resolved =
-    typeof resolvedCount === "number"
-      ? resolvedCount
-      : items.filter((i) => getTicketStatus(i) === "resolved").length;
+  const total = typeof totalCount === "number" ? totalCount : 0;
+  const open = typeof openCount === "number" ? openCount : 0;
+  const resolved = typeof resolvedCount === "number" ? resolvedCount : 0;
+  const skipped = typeof skippedCount === "number" ? skippedCount : 0;
 
-  const meta =
-    total > 0
-      ? [
-          `${total} total`,
-          `${open} open`,
-          ...(skipped > 0 ? [`${skipped} skipped`] : []),
-          `${resolved} resolved`,
-        ].join(" · ")
-      : "0 total";
+  console.log("SIDEBAR COUNTS RENDER", {
+    openCount: open,
+    skippedCount: skipped,
+    resolvedCount: resolved,
+  });
+
+  const meta = (() => {
+    // Keep header pills consistent with the "…" loading treatment.
+    // The `total` value must not be derived from lazy-loaded list length.
+    if (countsLoading) return `… total · loading…`;
+
+    const base =
+      total > 0
+        ? [
+            `${total} total`,
+            `${open} open`,
+            ...(skipped > 0 ? [`${skipped} skipped`] : []),
+            `${resolved} resolved`,
+          ].join(" · ")
+        : "0 total";
+
+    return base;
+  })();
+
+  const loadingValueClass = countsLoading ? "animate-pulse opacity-70" : "";
 
   const getTime = (f: Feedback): number => {
     const createdSeconds =
@@ -130,6 +143,26 @@ function TicketListInner({
   };
 
   const query = searchQuery.trim().toLowerCase();
+
+  const { loadedOpenCount, loadedSkippedCount, loadedResolvedCount } = useMemo(() => {
+    const seen = new Set<string>();
+    let openLoaded = 0;
+    let skippedLoaded = 0;
+    let resolvedLoaded = 0;
+    for (const item of items) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      const status = getTicketStatus(item);
+      if (status === "open") openLoaded += 1;
+      if (status === "skipped") skippedLoaded += 1;
+      if (status === "resolved") resolvedLoaded += 1;
+    }
+    return {
+      loadedOpenCount: openLoaded,
+      loadedSkippedCount: skippedLoaded,
+      loadedResolvedCount: resolvedLoaded,
+    };
+  }, [items]);
 
   const { openItems, skippedItems, resolvedItems } = useMemo(() => {
     const sorted = [...items].sort((a, b) => getTime(b) - getTime(a));
@@ -149,7 +182,22 @@ function TicketListInner({
     };
   }, [items, query]);
 
+  const missingOpenCount = Math.max(open - loadedOpenCount, 0);
+  const missingSkippedCount = Math.max(skipped - loadedSkippedCount, 0);
+  const missingResolvedCount = Math.max(resolved - loadedResolvedCount, 0);
   const [skippedExpanded, setSkippedExpanded] = useState(false);
+
+  const activeLoadingSection = (() => {
+    if (!loadingMore) return null;
+    if (missingOpenCount > 0) return "open" as const;
+    if (missingSkippedCount > 0) return "skipped" as const;
+    if (missingResolvedCount > 0) return "resolved" as const;
+    return null;
+  })();
+
+  const isLoadingOpen = activeLoadingSection === "open" && openExpanded && openItems.length > 0;
+  const isLoadingSkipped = activeLoadingSection === "skipped" && skippedExpanded && skippedItems.length > 0;
+  const isLoadingResolved = activeLoadingSection === "resolved" && resolvedExpanded && resolvedItems.length > 0;
 
   // Deep link: expand section containing scrollToId and scroll to it (once per mount).
   useEffect(() => {
@@ -174,10 +222,30 @@ function TicketListInner({
     typeof onSessionTitleSave === "function" &&
     typeof onSessionTitleEdit === "function";
 
+  useEffect(() => {
+    const container = internalContainerRef.current;
+    if (!container) return;
+    const rafId = requestAnimationFrame(() => {
+      const prevHeight = prevScrollHeightRef.current;
+      const newHeight = container.scrollHeight;
+      const heightDiff = newHeight - prevHeight;
+
+      // Preserve relative position only when the user was near the previous bottom.
+      const isNearBottom = container.scrollTop + container.clientHeight >= prevHeight - 5;
+      if (prevItemsLengthRef.current !== items.length && prevHeight > 0 && isNearBottom && heightDiff > 0) {
+        container.scrollTop += heightDiff;
+      }
+
+      prevScrollHeightRef.current = newHeight;
+      prevItemsLengthRef.current = items.length;
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [items.length]);
+
   return (
-    <div className="flex flex-col h-full min-h-0 rounded-r-[var(--radius-lg)] bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-1)] border-r border-[var(--layer-1-border)] overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 rounded-none bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-1)] border-r border-[var(--layer-1-border)] overflow-hidden">
       {/* Session header */}
-      <div className="shrink-0 px-4 pt-5 pb-4">
+      <div className="z-20 shrink-0 px-4 pt-0 pb-4 bg-[var(--layer-1-bg)] border-b border-[var(--layer-1-border)]">
         <div className="flex items-start justify-between gap-2 min-w-0">
           {isEditingSessionTitle && canEditTitle ? (
             <div className="min-w-0 flex-1">
@@ -258,7 +326,7 @@ function TicketListInner({
         <p className="mt-1.5 text-[12px] text-[hsl(var(--text-tertiary))] leading-relaxed">
           {meta}
         </p>
-        <div className="mt-4">
+        <div className="mt-3">
           <div className="flex items-center gap-2.5 h-10 rounded-xl bg-[var(--layer-2-bg)] border border-[var(--layer-2-border)] px-3 focus-within:border-[var(--accent-operational-border)] focus-within:ring-2 focus-within:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration-fast)]">
             <Search className="h-4 w-4 shrink-0 text-[hsl(var(--text-tertiary))]" aria-hidden />
             <input
@@ -276,24 +344,30 @@ function TicketListInner({
       {/* Status sections: Open → Skipped (if >0) → Resolved. Soft pill badges, no hard blocks. */}
       <div
         ref={(el) => {
-          if (scrollContainerRef) (scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+          internalContainerRef.current = el;
+          // We intentionally mutate `.current` on the passed-in ref.
+          // eslint-disable-next-line react-hooks/immutability
+          if (scrollContainerRefRef) (scrollContainerRefRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+          if (el && prevScrollHeightRef.current === 0) {
+            prevScrollHeightRef.current = el.scrollHeight;
+          }
           if (el && !scrollContainerReadySent.current) {
             scrollContainerReadySent.current = true;
             onScrollContainerReady?.();
           }
         }}
-        className="flex-1 min-h-0 overflow-y-auto px-2 pb-4"
+        className="h-full max-h-[100vh] overflow-y-auto flex-1 min-h-0 px-2 pb-4"
       >
         {/* Open */}
         <section className="pt-1">
           <button
             type="button"
             onClick={() => setOpenExpanded((x) => !x)}
-            className="sticky top-0 z-10 flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
+            className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left border-none shadow-none hover:bg-white transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
             aria-expanded={openExpanded}
           >
             <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-primary-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-primary)]">
-              {open}
+              <span className={loadingValueClass}>{countsLoading ? "…" : open}</span>
             </span>
             <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
               Open
@@ -307,7 +381,7 @@ function TicketListInner({
             </span>
           </button>
           {openExpanded && (
-            <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0.5">
+            <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0">
               {openItems.map((item, idx) => (
                 <TicketItem
                   key={item.id}
@@ -322,40 +396,62 @@ function TicketListInner({
                 />
               ))}
               {openItems.length === 0 && (
-                <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
-                  No open tickets
-                </p>
+                <>
+                  {countsLoading ? (
+                    <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
+                      Loading open tickets…
+                    </p>
+                  ) : open === 0 ? (
+                    <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
+                      No open tickets
+                    </p>
+                  ) : (
+                    <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
+                      Loading open tickets…
+                    </p>
+                  )}
+                </>
+              )}
+              {isLoadingOpen && (
+                <div className="mt-2 flex items-center justify-center gap-2 py-3 text-[11px] text-[hsl(var(--text-tertiary))]">
+                  <Loader2 className="h-3 w-3 animate-spin opacity-70" aria-hidden />
+                  <span className="opacity-80">Loading more</span>
+                </div>
               )}
             </div>
           )}
         </section>
 
-        {/* Skipped — only if count > 0. Soft amber pill. */}
-        {skipped > 0 && (
-          <section className="pt-2">
-            <button
-              type="button"
-              onClick={() => setSkippedExpanded((x) => !x)}
-              className="sticky top-0 z-10 flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
-              aria-expanded={skippedExpanded}
-            >
-              <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-skipped-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-skipped)]">
-                {skipped}
-              </span>
-              <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
-                Skipped
-              </span>
-              <span className="ml-auto shrink-0 text-[hsl(var(--text-tertiary))]">
-                {skippedExpanded ? (
-                  <ChevronDown className="h-4 w-4" aria-hidden />
-                ) : (
-                  <ChevronRight className="h-4 w-4" aria-hidden />
-                )}
-              </span>
-            </button>
-            {skippedExpanded && (
-              <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0.5">
-                {skippedItems.map((item, idx) => (
+        {/* Skipped */}
+        <section className="pt-2">
+          <button
+            type="button"
+            onClick={() => setSkippedExpanded((x) => !x)}
+            className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left border-none shadow-none hover:bg-white transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
+            aria-expanded={skippedExpanded}
+          >
+            <span className={`flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-skipped-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-skipped)] ${loadingValueClass}`}>
+              {countsLoading ? "…" : skipped}
+            </span>
+            <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
+              Skipped
+            </span>
+            <span className="ml-auto shrink-0 text-[hsl(var(--text-tertiary))]">
+              {skippedExpanded ? (
+                <ChevronDown className="h-4 w-4" aria-hidden />
+              ) : (
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              )}
+            </span>
+          </button>
+          {skippedExpanded && (
+            <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0">
+              {skippedItems.length === 0 ? (
+                <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
+                  {countsLoading ? "Loading skipped tickets…" : "No skipped tickets"}
+                </p>
+              ) : (
+                skippedItems.map((item, idx) => (
                   <TicketItem
                     key={item.id}
                     id={item.id}
@@ -367,22 +463,28 @@ function TicketListInner({
                     onSelect={onSelect}
                     isNewTicket={item.id === newTicketId}
                   />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+                ))
+              )}
+              {isLoadingSkipped && (
+                <div className="mt-2 flex items-center justify-center gap-2 py-3 text-[11px] text-[hsl(var(--text-tertiary))]">
+                  <Loader2 className="h-3 w-3 animate-spin opacity-70" aria-hidden />
+                  <span className="opacity-80">Loading more</span>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
 
         {/* Resolved */}
         <section className="pt-2">
           <button
             type="button"
             onClick={() => setResolvedExpanded((x) => !x)}
-            className="sticky top-0 z-10 flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
+            className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left border-none shadow-none hover:bg-white transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
             aria-expanded={resolvedExpanded}
           >
             <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-success-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-success)]">
-              {resolved}
+              <span className={loadingValueClass}>{countsLoading ? "…" : resolved}</span>
             </span>
             <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
               Resolved
@@ -396,7 +498,7 @@ function TicketListInner({
             </span>
           </button>
           {resolvedExpanded && (
-            <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0.5">
+            <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0">
               {resolvedItems.map((item, idx) => (
                 <TicketItem
                   key={item.id}
@@ -411,14 +513,26 @@ function TicketListInner({
                 />
               ))}
               {resolvedItems.length === 0 && !loadingMore && (
-                <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
-                  No resolved tickets
-                </p>
+                <>
+                  {countsLoading ? (
+                    <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
+                      Loading resolved tickets…
+                    </p>
+                  ) : resolved === 0 ? (
+                    <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
+                      No resolved tickets
+                    </p>
+                  ) : (
+                    <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
+                      Loading resolved tickets…
+                    </p>
+                  )}
+                </>
               )}
-              {resolvedExpanded && loadingMore && (
-                <div className="px-3 py-2 space-y-1.5" aria-hidden>
-                  <div className="h-10 rounded-xl bg-[var(--layer-2-border)]/40 animate-pulse" />
-                  <div className="h-10 rounded-xl bg-[var(--layer-2-border)]/30 animate-pulse" />
+              {isLoadingResolved && (
+                <div className="mt-2 flex items-center justify-center gap-2 py-3 text-[11px] text-[hsl(var(--text-tertiary))]">
+                  <Loader2 className="h-3 w-3 animate-spin opacity-70" aria-hidden />
+                  <span className="opacity-80">Loading more</span>
                 </div>
               )}
             </div>
@@ -427,15 +541,8 @@ function TicketListInner({
 
         {loadMoreRef && (
           <>
-            <div ref={loadMoreRef} aria-hidden />
-            {loadingMore && (
-              <div className="flex justify-center py-4" aria-hidden>
-                <svg className="animate-spin h-5 w-5 text-[hsl(var(--text-tertiary))]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              </div>
-            )}
+            {/* Sentinel used by IntersectionObserver in `useSessionFeedbackPaginated`. Must be measurable. */}
+            <div ref={loadMoreRef} aria-hidden style={{ height: "1px" }} />
           </>
         )}
       </div>
@@ -443,4 +550,4 @@ function TicketListInner({
   );
 }
 
-export const TicketList = memo(TicketListInner);
+export const TicketList = TicketListInner;

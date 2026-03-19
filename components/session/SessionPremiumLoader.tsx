@@ -3,7 +3,7 @@
 export function SessionPremiumLoader() {
   return (
     <div
-      className="flex flex-1 min-h-screen items-center justify-center bg-[hsl(var(--background))]"
+      className="flex flex-1 h-full items-center justify-center bg-[hsl(var(--background))]"
       aria-label="Loading session"
     >
       <div

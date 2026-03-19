@@ -26,7 +26,7 @@ export default function AdminLayout({
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-screen bg-neutral-50">
+    <div className="flex h-full bg-neutral-50">
       <aside
         className="w-56 border-r border-neutral-200 flex flex-col bg-white shrink-0"
         aria-label="Admin navigation"

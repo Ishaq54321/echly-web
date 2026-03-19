@@ -135,15 +135,19 @@ export function FeedbackContent({
         />
       ) : (
         actionSteps.length > 0 && (
-          <Section title="ACTION STEPS" titleSemantic="attention">
-            <ul className="list-none space-y-2 p-0 m-0">
+          <section className="my-4">
+            <h2 className="text-sm font-semibold text-orange-700 tracking-wide mb-1">ACTION STEPS</h2>
+            <ul className="list-none space-y-1 p-0 m-0 text-base leading-relaxed">
               {actionSteps.map((action, i) => (
-                <li key={i} className="font-mono text-[13px] text-[hsl(var(--text-primary-strong))] border border-[var(--layer-2-border)] bg-white px-2 py-1 rounded-lg inline-block">
+                <li
+                  key={i}
+                  className="font-medium text-base text-gray-800 leading-relaxed border border-[var(--layer-2-border)] bg-white px-2 py-1 rounded-lg inline-block"
+                >
                   {formatActionStep(action)}
                 </li>
               ))}
             </ul>
-          </Section>
+          </section>
         )
       )}
       {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (

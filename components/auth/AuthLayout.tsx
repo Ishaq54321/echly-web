@@ -5,7 +5,7 @@ import { ReactNode } from "react";
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div
-      className="min-h-screen w-full flex items-center justify-center relative overflow-hidden"
+      className="h-full w-full flex items-center justify-center relative overflow-hidden"
       style={{
         background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
       }}

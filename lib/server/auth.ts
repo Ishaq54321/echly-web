@@ -33,8 +33,18 @@ export async function verifyIdToken(token: string): Promise<DecodedIdToken> {
   return { uid, email, ...payload };
 }
 
-function unauthorized(message: string): Response {
-  return new Response(JSON.stringify({ error: message }), { status: 401 });
+function unauthorized(): Response {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: "NOT_AUTHENTICATED",
+      message: "User is not authenticated",
+    }),
+    {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    }
+  );
 }
 
 /**
@@ -68,7 +78,7 @@ export async function requireAuth(request: Request): Promise<AuthUser> {
         return user;
       }
       console.error("Token verification failed: invalid Firebase and extension token");
-      throw unauthorized("Unauthorized - Invalid token");
+      throw unauthorized();
     }
   }
 
@@ -82,5 +92,5 @@ export async function requireAuth(request: Request): Promise<AuthUser> {
     return user;
   }
 
-  throw unauthorized("Unauthorized - Missing token");
+  throw unauthorized();
 }

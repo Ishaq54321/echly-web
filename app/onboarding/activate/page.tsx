@@ -288,7 +288,7 @@ export default function ActivationPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center pt-[7vh] px-6 pb-20 relative">
+    <div className="h-full flex flex-col items-center pt-[7vh] px-6 pb-20 relative">
       {(guidedStep === "demo_completed" || dashboardPhase === "ready") ? (
         <ReplayDemoButton onReplay={handleReplayDemo} />
       ) : null}

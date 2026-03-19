@@ -5,8 +5,6 @@ export function serializeTicket(ticket: Feedback): Record<string, unknown> {
   const out = { ...ticket } as Record<string, unknown>;
   out.status = getTicketStatus(ticket);
   const createdAt = ticket.createdAt as { toDate?: () => Date } | null;
-  if (createdAt != null && typeof createdAt.toDate === "function") {
-    out.createdAt = createdAt.toDate().toISOString();
-  }
+  out.createdAt = createdAt != null && typeof createdAt.toDate === "function" ? createdAt.toDate().toISOString() : null;
   return out;
 }

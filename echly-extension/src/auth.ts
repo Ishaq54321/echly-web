@@ -1,7 +1,7 @@
 /**
  * Auth helpers for Chrome extension.
  * No Firebase. Sign-in is done on the dashboard (localhost:3000/login).
- * Use ECHLY_START_LOGIN message to open the login page; ECHLY_GET_AUTH_STATE for state.
+ * Use ECHLY_START_LOGIN message to open the login page; GET_AUTH_STATE for state.
  */
 
 export function signInWithGoogle(): Promise<never> {

@@ -47,7 +47,7 @@ export default function AdminRootLayout({
 
   if (authLoading || !adminChecked || !user || !isAdmin) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+      <div className="flex h-full items-center justify-center bg-neutral-50">
         <div className="text-sm text-neutral-500">Loading…</div>
       </div>
     );

@@ -30,8 +30,10 @@ export async function uploadScreenshot(
     "data_url",
     {
       contentType: "image/png",
+      cacheControl: "public, max-age=31536000, immutable",
     }
   );
+  console.log("UPLOAD CACHE CONTROL APPLIED");
 
   return await getDownloadURL(screenshotRef);
 }

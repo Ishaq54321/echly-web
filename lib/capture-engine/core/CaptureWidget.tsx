@@ -35,6 +35,10 @@ export default function CaptureWidget({
   onPreviousSessionSelect,
   loadSessionWithPointers,
   pointers: pointersProp,
+  totalCount,
+  openCount,
+  skippedCount,
+  resolvedCount,
   sessionLoading = false,
   onSessionLoaded,
   onSessionEnd: onSessionEndCallback,
@@ -73,7 +77,6 @@ export default function CaptureWidget({
   /** Extension: when true, show command screen (mode cards + footer). False when viewing a session (e.g. after Open Previous or when paused). */
   const [showCommandScreen, setShowCommandScreen] = useState(true);
   const [sessionTitle, setSessionTitle] = useState("Untitled Session");
-  const [visibleTickets, setVisibleTickets] = useState(10);
   const [microphones, setMicrophones] = useState<Array<{ deviceId: string; label: string }>>([]);
   const [selectedMicrophone, setSelectedMicrophone] = useState<string>("");
   const [micDropdownOpen, setMicDropdownOpen] = useState(false);
@@ -128,6 +131,7 @@ export default function CaptureWidget({
   const isControlled = expanded !== undefined;
   const effectiveIsOpen = isControlled ? expanded : state.isOpen;
   const listScrollRef = useRef<HTMLDivElement>(null);
+  const isFetchingRef = useRef(false);
 
   const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state) || state.pillExiting;
   const optimisticSessionActive = state.sessionStatus === "starting" || state.sessionStatus === "active";
@@ -146,34 +150,35 @@ export default function CaptureWidget({
   const showHomeScreen = !sessionModeActive;
   const isStartingSession = state.sessionStatus === "starting";
 
-  const openTicketsCount = state.pointers.filter((p) => {
-    const status = (p as { status?: string }).status;
-    const isResolved = (p as { isResolved?: boolean }).isResolved;
-    if (status === "resolved" || isResolved === true) return false;
-    return true;
-  }).length;
+  const openTicketsCount = extensionMode
+    ? (typeof openCount === "number" ? openCount : 0)
+    : state.pointers.filter((p) => {
+        const status = (p as { status?: string }).status;
+        const isResolved = (p as { isResolved?: boolean }).isResolved;
+        if (status === "resolved" || isResolved === true) return false;
+        return true;
+      }).length;
+  const skippedTicketsCount = extensionMode
+    ? (typeof skippedCount === "number" ? skippedCount : 0)
+    : state.pointers.filter((p) => (p as { status?: string }).status === "skipped").length;
+  const resolvedTicketsCount = extensionMode
+    ? (typeof resolvedCount === "number" ? resolvedCount : 0)
+    : state.pointers.filter((p) => {
+        const status = (p as { status?: string }).status;
+        const isResolved = (p as { isResolved?: boolean }).isResolved;
+        return status === "resolved" || isResolved === true;
+      }).length;
+  const sessionHeaderCount =
+    extensionMode && typeof totalCount === "number"
+      ? totalCount
+      : openTicketsCount;
 
-  // Lazy-load: reset when list shrinks, cap visible to actual length
-  const ticketsToShow = state.pointers.slice(0, Math.min(visibleTickets, state.pointers.length));
-  const handleListScroll = React.useCallback(() => {
-    const el = listScrollRef.current;
-    if (!el || state.pointers.length <= visibleTickets) return;
-    const { scrollTop, scrollHeight, clientHeight } = el;
-    const scrollRatio = (scrollTop + clientHeight) / scrollHeight;
-    if (scrollRatio > 0.8) {
-      setVisibleTickets((prev) => Math.min(prev + 10, state.pointers.length));
-    }
-  }, [state.pointers.length, visibleTickets]);
-  useEffect(() => {
-    if (state.pointers.length < visibleTickets) {
-      setVisibleTickets((prev) => Math.min(prev, Math.max(10, state.pointers.length)));
-    }
-  }, [state.pointers.length, visibleTickets]);
   const highPriorityCount = state.pointers.filter((p) =>
     /critical|bug|high|urgent/i.test(p.type || "")
   ).length;
-  const summary =
-    openTicketsCount > 0
+  const summary = extensionMode
+    ? `${typeof totalCount === "number" ? totalCount : 0} total · ${openTicketsCount} open · ${skippedTicketsCount} skipped · ${resolvedTicketsCount} resolved`
+    : openTicketsCount > 0
       ? highPriorityCount > 0
         ? `${highPriorityCount} need attention`
         : null
@@ -184,6 +189,66 @@ export default function CaptureWidget({
       listScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [state.highlightTicketId]);
+
+  useEffect(() => {
+    const el = listScrollRef.current;
+    if (!el) {
+      console.log("❌ scrollRef not attached");
+      return;
+    }
+
+    console.log("✅ React scroll container ready", el);
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const handleScroll = () => {
+      if (timeoutId != null) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        const { scrollTop, clientHeight, scrollHeight } = el;
+        const threshold = 200;
+        const isNearBottom = scrollTop + clientHeight >= scrollHeight - threshold;
+
+        console.log("SCROLL CHECK", {
+          scrollTop,
+          clientHeight,
+          scrollHeight,
+          isNearBottom,
+        });
+
+        if (
+          extensionMode &&
+          isNearBottom &&
+          !isFetchingRef.current &&
+          typeof chrome !== "undefined" &&
+          chrome.runtime?.sendMessage
+        ) {
+          isFetchingRef.current = true;
+          console.log("🔥 LOAD MORE (REACT)");
+          chrome.runtime.sendMessage({ type: "ECHLY_LOAD_MORE" }, () => {
+            isFetchingRef.current = false;
+          });
+        }
+      }, 50);
+    };
+
+    el.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      if (timeoutId != null) {
+        clearTimeout(timeoutId);
+      }
+      el.removeEventListener("scroll", handleScroll);
+    };
+  }, [
+    extensionMode,
+    hasTickets,
+    isProcessingFeedback,
+    feedbackJobs?.length,
+    sessionModeActive,
+    sessionLoading,
+  ]);
 
   /** When session is loaded explicitly (user selected from Previous Sessions), transition to session view. */
   useEffect(() => {
@@ -345,7 +410,7 @@ export default function CaptureWidget({
                 showSessionTitle={!(effectiveSessionLimitReached && !sessionId) && (hasTickets || sessionModeActive || sessionLoading)}
                 sessionTitle={sessionTitleProp ?? sessionTitle ?? "Untitled Session"}
                 onSessionTitleChange={onSessionTitleChangeProp ?? setSessionTitle}
-                openTicketCount={openTicketsCount}
+                openTicketCount={sessionHeaderCount}
                 title={undefined}
                 summary={summary}
                 showHomeButton={extensionMode && !(effectiveSessionLimitReached && !sessionId)}
@@ -372,10 +437,7 @@ export default function CaptureWidget({
                 </div>
               ) : (
               <div
-                ref={listScrollRef}
                 className="echly-sidebar-body"
-                onScroll={handleListScroll}
-                onWheel={(e) => e.stopPropagation()}
                 style={isStartingSession ? { pointerEvents: "none", opacity: 0.85 } : undefined}
               >
                 {isStartingSession && (
@@ -391,39 +453,46 @@ export default function CaptureWidget({
                   </div>
                 )}
                 {((hasTickets || isProcessingFeedback || (feedbackJobs && feedbackJobs.length > 0)) && (sessionModeActive || !extensionMode) && !sessionLoading) && (
-                  <div className="echly-feedback-list">
-                    {feedbackJobs?.filter((j) => j.status === "processing").map((job) => (
-                      <div key={job.id} id="processing_card_markup" className="echly-feedback-card echly-feedback-processing" aria-live="polite">
-                        <span className="echly-spinner" aria-hidden />
-                        <span className="echly-processing-text">
-                          Processing feedback...
-                        </span>
-                      </div>
-                    ))}
-                    {feedbackJobs?.filter((j) => j.status === "failed").map((job) => (
-                      <div key={job.id} className="echly-feedback-card echly-feedback-failed" aria-live="polite">
-                        <span className="echly-failed-text">{job.errorMessage ?? "AI processing failed."}</span>
-                      </div>
-                    ))}
-                    {!feedbackJobs?.length && isProcessingFeedback && (
-                      <div id="processing_card_markup" className="echly-feedback-card echly-feedback-processing">
-                        <span className="echly-spinner" aria-hidden />
-                        <span className="echly-processing-text">
-                          Processing feedback...
-                        </span>
-                      </div>
-                    )}
-                    {hasTickets &&
-                      ticketsToShow.map((p) => (
-                        <FeedbackItem
-                          key={p.id}
-                          item={p}
-                          onUpdate={onUpdate ?? handlers.updatePointer}
-                          onDelete={handlers.deletePointer}
-                          highlightTicketId={state.highlightTicketId}
-                          onExpandChange={handlers.setExpandedId}
-                        />
+                  <div
+                    ref={listScrollRef}
+                    className="echly-feedback-list-scroll"
+                    style={{ overflowY: "auto", maxHeight: "100%" }}
+                    onWheel={(e) => e.stopPropagation()}
+                  >
+                    <div className="echly-feedback-list">
+                      {feedbackJobs?.filter((j) => j.status === "processing").map((job) => (
+                        <div key={job.id} id="processing_card_markup" className="echly-feedback-card echly-feedback-processing" aria-live="polite">
+                          <span className="echly-spinner" aria-hidden />
+                          <span className="echly-processing-text">
+                            Processing feedback...
+                          </span>
+                        </div>
                       ))}
+                      {feedbackJobs?.filter((j) => j.status === "failed").map((job) => (
+                        <div key={job.id} className="echly-feedback-card echly-feedback-failed" aria-live="polite">
+                          <span className="echly-failed-text">{job.errorMessage ?? "AI processing failed."}</span>
+                        </div>
+                      ))}
+                      {!feedbackJobs?.length && isProcessingFeedback && (
+                        <div id="processing_card_markup" className="echly-feedback-card echly-feedback-processing">
+                          <span className="echly-spinner" aria-hidden />
+                          <span className="echly-processing-text">
+                            Processing feedback...
+                          </span>
+                        </div>
+                      )}
+                      {hasTickets &&
+                        state.pointers.map((p) => (
+                          <FeedbackItem
+                            key={p.id}
+                            item={p}
+                            onUpdate={onUpdate ?? handlers.updatePointer}
+                            onDelete={handlers.deletePointer}
+                            highlightTicketId={state.highlightTicketId}
+                            onExpandChange={handlers.setExpandedId}
+                          />
+                        ))}
+                    </div>
                   </div>
                 )}
                 {sessionModeActive && !hasTickets && !isProcessingFeedback && !(feedbackJobs && feedbackJobs.length > 0) && !sessionLoading && (

@@ -12,11 +12,15 @@ export default function AppLayout({
   return (
     <WorkspaceSuspendedGuard>
       <BillingUsageProvider>
-        <div className="flex">
+        <div className="flex h-screen overflow-hidden">
           <GlobalRail />
-          <main className="flex-1 py-8 relative min-h-screen overflow-auto bg-white">
-            <FloatingUtilityActions />
-            <ErrorBoundary>{children}</ErrorBoundary>
+          <main className="flex-1 h-full overflow-y-auto min-h-0 relative bg-white">
+            <div className="h-full flex flex-col">
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <FloatingUtilityActions />
+                <ErrorBoundary>{children}</ErrorBoundary>
+              </div>
+            </div>
           </main>
         </div>
         <div className="fixed bottom-4 right-6 text-[11px] text-meta pointer-events-none">

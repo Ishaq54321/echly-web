@@ -180,7 +180,7 @@ export function ExecutionModeLayout({
       </div>
 
       {/* Top bar: Exit | Progress prominent */}
-      <header className="relative z-10 shrink-0 px-5 pt-4 pb-3">
+      <header className="sticky top-0 z-10 relative shrink-0 px-5 pt-4 pb-3 bg-[var(--layer-1-bg)] border-b border-[var(--layer-1-border)]">
         <div className="flex items-center justify-between gap-4">
           <button
             type="button"

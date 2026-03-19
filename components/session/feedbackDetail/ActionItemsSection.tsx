@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { formatActionStep } from "@/lib/formatters/formatActionStep";
-import { Section } from "./Section";
 import { Plus, Trash2 } from "lucide-react";
 
 interface ActionStepsSectionProps {
@@ -83,7 +82,7 @@ export function ActionItemsSection({
           <button
             type="button"
             onClick={startAdd}
-            className="flex items-center gap-2 px-3 py-2 text-[13px] text-secondary hover:text-neutral-700 transition-colors duration-150 cursor-pointer"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors duration-150 cursor-pointer"
           >
             <Plus size={14} />
             Add action step
@@ -100,7 +99,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 min-w-0 font-mono text-[13px] px-3 py-2 rounded-lg border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
+              className="flex-1 min-w-0 text-base leading-relaxed px-3 py-2 rounded-lg border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
               autoFocus
               aria-label="New action step"
             />
@@ -110,11 +109,11 @@ export function ActionItemsSection({
     );
   }
 
-  const numberClass =
-    "flex-shrink-0 text-[12px] font-medium tabular-nums text-[hsl(var(--text-tertiary))] leading-[1.4]";
+  const numberClass = "font-sans font-medium text-gray-700";
   return (
-    <Section title="ACTION STEPS" titleSemantic="attention">
-      <ul className="list-none space-y-2 p-0 m-0">
+    <section className="my-4">
+      <h2 className="text-sm font-semibold text-orange-500 tracking-wide mb-2">ACTION STEPS</h2>
+      <ul className="list-none space-y-1 p-0 m-0 text-base leading-relaxed">
         {items.map((text, i) => (
           <li key={i} className="group flex items-start gap-2">
             <span className={numberClass}>{i + 1}.</span>
@@ -129,14 +128,14 @@ export function ActionItemsSection({
                     if (e.key === "Enter") void saveEdit();
                     if (e.key === "Escape") cancelEdit();
                   }}
-                  className="flex-1 min-w-0 font-mono text-[13px] px-2 py-1 rounded border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
+                  className="flex-1 min-w-0 text-base leading-relaxed px-2 py-1 rounded border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
                   autoFocus
                   aria-label={`Edit action step ${i + 1}`}
                 />
                 <button
                   type="button"
                   onClick={() => void saveEdit()}
-                  className="text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] hover:underline cursor-pointer"
+                  className="text-sm font-medium text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] hover:underline cursor-pointer"
                 >
                   Save
                 </button>
@@ -146,10 +145,10 @@ export function ActionItemsSection({
                 <button
                   type="button"
                   onClick={() => startEdit(i)}
-                  className={`flex-1 text-left font-mono text-[13px] leading-[1.4] px-0 py-0 min-w-0 cursor-pointer ${
+                  className={`flex-1 text-left px-0 py-0 min-w-0 cursor-pointer font-medium leading-relaxed ${
                     isResolved
-                      ? "line-through text-[hsl(var(--text-tertiary))]"
-                      : "text-[hsl(var(--text-primary-strong))]"
+                      ? "line-through text-base text-gray-500"
+                      : "text-base text-gray-800"
                   }`}
                 >
                   {formatActionStep(text)}
@@ -179,7 +178,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 min-w-0 font-mono text-[13px] px-2 py-1 rounded border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
+              className="flex-1 min-w-0 text-base leading-relaxed px-2 py-1 rounded border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
               autoFocus
               aria-label="New action step"
             />
@@ -190,12 +189,12 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-2 flex items-center gap-2 px-0 py-1 text-[13px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] cursor-pointer"
+          className="mt-2 flex items-center gap-2 px-0 py-1 text-sm font-medium text-gray-600 hover:text-gray-800 cursor-pointer"
         >
           <Plus size={14} />
           Add action step
         </button>
       )}
-    </Section>
+    </section>
   );
 }

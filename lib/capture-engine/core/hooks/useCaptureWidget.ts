@@ -225,6 +225,8 @@ export function useCaptureWidget({
   const pointersPropRef = useRef<StructuredFeedback[] | undefined>(pointersProp);
   /** True when sessionFeedbackPending is set (capture UI visible); used to protect from spurious clears. */
   const sessionFeedbackPendingRef = useRef(false);
+  /** Prevent duplicate Start Session requests before React state updates land. */
+  const startSessionPendingRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
@@ -1073,8 +1075,9 @@ export function useCaptureWidget({
     console.log("[ECHLY DEBUG] startSession ENTER");
 
     // Prevent double-clicks while starting
-    if (sessionStatusRef.current === "starting") return;
+    if (startSessionPendingRef.current || sessionStatusRef.current === "starting") return;
     if (stateRef.current !== "idle" || sessionModeRef.current || globalSessionModeActive) return;
+    startSessionPendingRef.current = true;
 
     // STEP 1: INSTANT UI RESPONSE (do not switch screens or reset UI until API resolves)
     setSessionStatus("starting");
@@ -1090,7 +1093,30 @@ export function useCaptureWidget({
     logSession("start");
 
     try {
-      if (ensureAuthenticated && !(await ensureAuthenticated())) {
+      if (extensionMode && typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+        const authState = await new Promise<{ authenticated?: boolean } | null>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "GET_AUTH_STATE" },
+            (response: { authenticated?: boolean } | undefined) => {
+              if (chrome.runtime.lastError) {
+                resolve(null);
+                return;
+              }
+              resolve(response ?? null);
+            }
+          );
+        });
+
+        if (!authState?.authenticated) {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }, () => {
+              resolve();
+            });
+          });
+          setSessionStatus("idle");
+          return;
+        }
+      } else if (ensureAuthenticated && !(await ensureAuthenticated())) {
         setSessionStatus("idle");
         return;
       }
@@ -1133,6 +1159,8 @@ export function useCaptureWidget({
     } catch (e) {
       console.error("[ECHLY ERROR] startSession failed", e);
       setSessionStatus("idle");
+    } finally {
+      startSessionPendingRef.current = false;
     }
   }, [
     environment,

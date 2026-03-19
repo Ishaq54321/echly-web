@@ -36896,6 +36896,7 @@
     const recordingActiveRef = (0, import_react4.useRef)(false);
     const pointersPropRef = (0, import_react4.useRef)(pointersProp);
     const sessionFeedbackPendingRef = (0, import_react4.useRef)(false);
+    const startSessionPendingRef = (0, import_react4.useRef)(false);
     (0, import_react4.useEffect)(() => {
       stateRef.current = state;
     }, [state]);
@@ -37650,8 +37651,9 @@
     }, []);
     const startSession = (0, import_react4.useCallback)(async () => {
       console.log("[ECHLY DEBUG] startSession ENTER");
-      if (sessionStatusRef.current === "starting") return;
+      if (startSessionPendingRef.current || sessionStatusRef.current === "starting") return;
       if (stateRef.current !== "idle" || sessionModeRef.current || globalSessionModeActive) return;
+      startSessionPendingRef.current = true;
       setSessionStatus("starting");
       if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "startSession" });
       setPending(null);
@@ -37662,7 +37664,29 @@
       if (ECHLY_DEBUG) console.log("[Echly] Start New Feedback Session clicked");
       logSession("start");
       try {
-        if (ensureAuthenticated2 && !await ensureAuthenticated2()) {
+        if (extensionMode && typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+          const authState = await new Promise((resolve) => {
+            chrome.runtime.sendMessage(
+              { type: "GET_AUTH_STATE" },
+              (response) => {
+                if (chrome.runtime.lastError) {
+                  resolve(null);
+                  return;
+                }
+                resolve(response ?? null);
+              }
+            );
+          });
+          if (!authState?.authenticated) {
+            await new Promise((resolve) => {
+              chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }, () => {
+                resolve();
+              });
+            });
+            setSessionStatus("idle");
+            return;
+          }
+        } else if (ensureAuthenticated2 && !await ensureAuthenticated2()) {
           setSessionStatus("idle");
           return;
         }
@@ -37694,6 +37718,8 @@
       } catch (e) {
         console.error("[ECHLY ERROR] startSession failed", e);
         setSessionStatus("idle");
+      } finally {
+        startSessionPendingRef.current = false;
       }
     }, [
       environment,
@@ -39942,6 +39968,10 @@
     onPreviousSessionSelect,
     loadSessionWithPointers,
     pointers: pointersProp,
+    totalCount,
+    openCount,
+    skippedCount,
+    resolvedCount,
     sessionLoading = false,
     onSessionLoaded,
     onSessionEnd: onSessionEndCallback,
@@ -39979,7 +40009,6 @@
     const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
     const [showCommandScreen, setShowCommandScreen] = (0, import_react17.useState)(true);
     const [sessionTitle, setSessionTitle] = (0, import_react17.useState)("Untitled Session");
-    const [visibleTickets, setVisibleTickets] = (0, import_react17.useState)(10);
     const [microphones, setMicrophones] = (0, import_react17.useState)([]);
     const [selectedMicrophone, setSelectedMicrophone] = (0, import_react17.useState)("");
     const [micDropdownOpen, setMicDropdownOpen] = (0, import_react17.useState)(false);
@@ -40027,6 +40056,7 @@
     const isControlled = expanded !== void 0;
     const effectiveIsOpen = isControlled ? expanded : state.isOpen;
     const listScrollRef = (0, import_react17.useRef)(null);
+    const isFetchingRef = (0, import_react17.useRef)(false);
     const isInCaptureFlow = CAPTURE_FLOW_STATES2.includes(state.state) || state.pillExiting;
     const optimisticSessionActive = state.sessionStatus === "starting" || state.sessionStatus === "active";
     const hasStoredSession = Boolean(sessionId) || optimisticSessionActive;
@@ -40039,36 +40069,74 @@
     const sessionModeActive = globalSessionModeActive === true || globalSessionPaused === true || optimisticSessionActive;
     const showHomeScreen = !sessionModeActive;
     const isStartingSession = state.sessionStatus === "starting";
-    const openTicketsCount = state.pointers.filter((p) => {
+    const openTicketsCount = extensionMode ? typeof openCount === "number" ? openCount : 0 : state.pointers.filter((p) => {
       const status = p.status;
       const isResolved = p.isResolved;
       if (status === "resolved" || isResolved === true) return false;
       return true;
     }).length;
-    const ticketsToShow = state.pointers.slice(0, Math.min(visibleTickets, state.pointers.length));
-    const handleListScroll = import_react17.default.useCallback(() => {
-      const el = listScrollRef.current;
-      if (!el || state.pointers.length <= visibleTickets) return;
-      const { scrollTop, scrollHeight, clientHeight } = el;
-      const scrollRatio = (scrollTop + clientHeight) / scrollHeight;
-      if (scrollRatio > 0.8) {
-        setVisibleTickets((prev) => Math.min(prev + 10, state.pointers.length));
-      }
-    }, [state.pointers.length, visibleTickets]);
-    (0, import_react17.useEffect)(() => {
-      if (state.pointers.length < visibleTickets) {
-        setVisibleTickets((prev) => Math.min(prev, Math.max(10, state.pointers.length)));
-      }
-    }, [state.pointers.length, visibleTickets]);
+    const skippedTicketsCount = extensionMode ? typeof skippedCount === "number" ? skippedCount : 0 : state.pointers.filter((p) => p.status === "skipped").length;
+    const resolvedTicketsCount = extensionMode ? typeof resolvedCount === "number" ? resolvedCount : 0 : state.pointers.filter((p) => {
+      const status = p.status;
+      const isResolved = p.isResolved;
+      return status === "resolved" || isResolved === true;
+    }).length;
+    const sessionHeaderCount = extensionMode && typeof totalCount === "number" ? totalCount : openTicketsCount;
     const highPriorityCount = state.pointers.filter(
       (p) => /critical|bug|high|urgent/i.test(p.type || "")
     ).length;
-    const summary = openTicketsCount > 0 ? highPriorityCount > 0 ? `${highPriorityCount} need attention` : null : null;
+    const summary = extensionMode ? `${typeof totalCount === "number" ? totalCount : 0} total \xB7 ${openTicketsCount} open \xB7 ${skippedTicketsCount} skipped \xB7 ${resolvedTicketsCount} resolved` : openTicketsCount > 0 ? highPriorityCount > 0 ? `${highPriorityCount} need attention` : null : null;
     (0, import_react17.useEffect)(() => {
       if (state.highlightTicketId && listScrollRef.current) {
         listScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
       }
     }, [state.highlightTicketId]);
+    (0, import_react17.useEffect)(() => {
+      const el = listScrollRef.current;
+      if (!el) {
+        console.log("\u274C scrollRef not attached");
+        return;
+      }
+      console.log("\u2705 React scroll container ready", el);
+      let timeoutId = null;
+      const handleScroll = () => {
+        if (timeoutId != null) {
+          clearTimeout(timeoutId);
+        }
+        timeoutId = setTimeout(() => {
+          const { scrollTop, clientHeight, scrollHeight } = el;
+          const threshold = 200;
+          const isNearBottom = scrollTop + clientHeight >= scrollHeight - threshold;
+          console.log("SCROLL CHECK", {
+            scrollTop,
+            clientHeight,
+            scrollHeight,
+            isNearBottom
+          });
+          if (extensionMode && isNearBottom && !isFetchingRef.current && typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+            isFetchingRef.current = true;
+            console.log("\u{1F525} LOAD MORE (REACT)");
+            chrome.runtime.sendMessage({ type: "ECHLY_LOAD_MORE" }, () => {
+              isFetchingRef.current = false;
+            });
+          }
+        }, 50);
+      };
+      el.addEventListener("scroll", handleScroll, { passive: true });
+      return () => {
+        if (timeoutId != null) {
+          clearTimeout(timeoutId);
+        }
+        el.removeEventListener("scroll", handleScroll);
+      };
+    }, [
+      extensionMode,
+      hasTickets,
+      isProcessingFeedback,
+      feedbackJobs?.length,
+      sessionModeActive,
+      sessionLoading
+    ]);
     (0, import_react17.useEffect)(() => {
       if (loadSessionWithPointers?.sessionId) {
         setShowCommandScreen(false);
@@ -40209,7 +40277,7 @@
           showSessionTitle: !(effectiveSessionLimitReached && !sessionId) && (hasTickets || sessionModeActive || sessionLoading),
           sessionTitle: sessionTitleProp ?? sessionTitle ?? "Untitled Session",
           onSessionTitleChange: onSessionTitleChangeProp ?? setSessionTitle,
-          openTicketCount: openTicketsCount,
+          openTicketCount: sessionHeaderCount,
           title: void 0,
           summary,
           showHomeButton: extensionMode && !(effectiveSessionLimitReached && !sessionId),
@@ -40235,25 +40303,31 @@
       )) : /* @__PURE__ */ import_react17.default.createElement(
         "div",
         {
-          ref: listScrollRef,
           className: "echly-sidebar-body",
-          onScroll: handleListScroll,
-          onWheel: (e) => e.stopPropagation(),
           style: isStartingSession ? { pointerEvents: "none", opacity: 0.85 } : void 0
         },
         isStartingSession && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-session-loading-state", "aria-live": "polite", "aria-busy": "true" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-session-loading-text" }, "Starting session...")),
         sessionModeActive && sessionLoading && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-session-loading-state", "aria-live": "polite", "aria-busy": "true" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-session-loading-text" }, "Loading session...")),
-        (hasTickets || isProcessingFeedback || feedbackJobs && feedbackJobs.length > 0) && (sessionModeActive || !extensionMode) && !sessionLoading && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-feedback-list" }, feedbackJobs?.filter((j) => j.status === "processing").map((job) => /* @__PURE__ */ import_react17.default.createElement("div", { key: job.id, id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-processing-text" }, "Processing feedback..."))), feedbackJobs?.filter((j) => j.status === "failed").map((job) => /* @__PURE__ */ import_react17.default.createElement("div", { key: job.id, className: "echly-feedback-card echly-feedback-failed", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-failed-text" }, job.errorMessage ?? "AI processing failed."))), !feedbackJobs?.length && isProcessingFeedback && /* @__PURE__ */ import_react17.default.createElement("div", { id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-processing-text" }, "Processing feedback...")), hasTickets && ticketsToShow.map((p) => /* @__PURE__ */ import_react17.default.createElement(
-          FeedbackItem_default,
+        (hasTickets || isProcessingFeedback || feedbackJobs && feedbackJobs.length > 0) && (sessionModeActive || !extensionMode) && !sessionLoading && /* @__PURE__ */ import_react17.default.createElement(
+          "div",
           {
-            key: p.id,
-            item: p,
-            onUpdate: onUpdate ?? handlers.updatePointer,
-            onDelete: handlers.deletePointer,
-            highlightTicketId: state.highlightTicketId,
-            onExpandChange: handlers.setExpandedId
-          }
-        ))),
+            ref: listScrollRef,
+            className: "echly-feedback-list-scroll",
+            style: { overflowY: "auto", maxHeight: "100%" },
+            onWheel: (e) => e.stopPropagation()
+          },
+          /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-feedback-list" }, feedbackJobs?.filter((j) => j.status === "processing").map((job) => /* @__PURE__ */ import_react17.default.createElement("div", { key: job.id, id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-processing-text" }, "Processing feedback..."))), feedbackJobs?.filter((j) => j.status === "failed").map((job) => /* @__PURE__ */ import_react17.default.createElement("div", { key: job.id, className: "echly-feedback-card echly-feedback-failed", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-failed-text" }, job.errorMessage ?? "AI processing failed."))), !feedbackJobs?.length && isProcessingFeedback && /* @__PURE__ */ import_react17.default.createElement("div", { id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-processing-text" }, "Processing feedback...")), hasTickets && state.pointers.map((p) => /* @__PURE__ */ import_react17.default.createElement(
+            FeedbackItem_default,
+            {
+              key: p.id,
+              item: p,
+              onUpdate: onUpdate ?? handlers.updatePointer,
+              onDelete: handlers.deletePointer,
+              highlightTicketId: state.highlightTicketId,
+              onExpandChange: handlers.setExpandedId
+            }
+          )))
+        ),
         sessionModeActive && !hasTickets && !isProcessingFeedback && !(feedbackJobs && feedbackJobs.length > 0) && !sessionLoading && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-empty-session-state", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-empty-session-text" }, "No feedback yet. Add feedback from the page.")),
         extensionMode && showHomeScreen && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-container" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-header-block" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-ai-powered", "aria-hidden": true }, /* @__PURE__ */ import_react17.default.createElement(Zap, { size: 12, strokeWidth: 2, "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", null, "Powered by GPT-4 + Whisper")), /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-header" }, "Select feedback mode")), /* @__PURE__ */ import_react17.default.createElement(
           "div",
@@ -40495,11 +40569,9 @@
   function ensureAuthenticated() {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(
-        { type: "ECHLY_GET_AUTH_STATE" },
+        { type: "GET_AUTH_STATE" },
         (r) => {
           if (!r?.authenticated || !r?.user?.uid) {
-            chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {
-            });
             resolve(false);
             return;
           }
@@ -40522,8 +40594,8 @@
   }
   function ContentApp({ widgetRoot, initialTheme }) {
     const [user, setUser] = import_react18.default.useState(null);
+    const [authState, setAuthState] = import_react18.default.useState("loading");
     const [sessionMessage, setSessionMessage] = import_react18.default.useState(null);
-    const [authChecked, setAuthChecked] = import_react18.default.useState(false);
     const [theme, setTheme] = import_react18.default.useState(initialTheme);
     const [globalState, setGlobalState] = import_react18.default.useState({
       visible: false,
@@ -40534,7 +40606,14 @@
       sessionModeActive: false,
       sessionPaused: false,
       sessionLoading: false,
+      totalCount: 0,
+      openCount: 0,
+      skippedCount: 0,
+      resolvedCount: 0,
       pointers: [],
+      nextCursor: null,
+      hasMore: false,
+      isFetching: false,
       captureMode: "voice"
     });
     const [widgetResetKey, setWidgetResetKey] = import_react18.default.useState(0);
@@ -40725,8 +40804,9 @@
     }, [theme, widgetRoot]);
     import_react18.default.useEffect(() => {
       if (!globalState.visible) return;
+      setAuthState("loading");
       chrome.runtime.sendMessage(
-        { type: "ECHLY_GET_AUTH_STATE" },
+        { type: "GET_AUTH_STATE" },
         (response) => {
           if (response?.authenticated && response.user?.uid) {
             setUser({
@@ -40735,10 +40815,11 @@
               email: response.user.email ?? null,
               photoURL: response.user.photoURL ?? null
             });
+            setAuthState("authenticated");
           } else {
             setUser(null);
+            setAuthState("unauthenticated");
           }
-          setAuthChecked(true);
         }
       );
     }, [globalState.visible]);
@@ -41523,11 +41604,60 @@
         clarityTextareaRef.current.focus();
       }
     }, [isEditingFeedback]);
-    if (!authChecked) {
-      return null;
+    if (authState === "loading") {
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        "div",
+        {
+          style: {
+            minWidth: 280,
+            padding: "16px",
+            borderRadius: 12,
+            border: "1px solid #E6F0FF",
+            background: "#F8FBFF",
+            color: "#374151",
+            fontSize: 14,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.08)"
+          },
+          children: "Checking authentication..."
+        }
+      );
     }
-    if (!user) {
-      return null;
+    if (authState === "unauthenticated" || !user) {
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+        "div",
+        {
+          style: {
+            minWidth: 280,
+            padding: "16px",
+            borderRadius: 12,
+            border: "1px solid #E6F0FF",
+            background: "#F8FBFF",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.08)"
+          },
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { fontSize: 15, fontWeight: 600, color: "#111827", marginBottom: 8 }, children: "Sign in to use Echly" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { fontSize: 13, color: "#4B5563", marginBottom: 12 }, children: "You are not signed in on the dashboard." }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+              "button",
+              {
+                type: "button",
+                onClick: onTriggerLogin,
+                style: {
+                  background: "#3B82F6",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: "pointer"
+                },
+                children: "Login"
+              }
+            )
+          ]
+        }
+      );
     }
     const pending = extensionClarityPending;
     const captureWidgetPropsForDebug = {
@@ -41735,6 +41865,10 @@
             hasPreviousSessions,
             onPreviousSessionSelect,
             pointers: globalState.pointers ?? [],
+            totalCount: globalState.totalCount ?? 0,
+            openCount: globalState.openCount ?? 0,
+            skippedCount: globalState.skippedCount ?? 0,
+            resolvedCount: globalState.resolvedCount ?? 0,
             sessionLoading: globalState.sessionLoading ?? false,
             sessionTitleProp: globalState.sessionTitle ?? void 0,
             onSessionTitleChange,
@@ -41860,7 +41994,14 @@
       sessionModeActive: state.sessionModeActive ?? false,
       sessionPaused: state.sessionPaused ?? false,
       sessionLoading: state.sessionLoading ?? false,
+      totalCount: typeof state.totalCount === "number" ? state.totalCount : 0,
+      openCount: typeof state.openCount === "number" ? state.openCount : 0,
+      skippedCount: typeof state.skippedCount === "number" ? state.skippedCount : 0,
+      resolvedCount: typeof state.resolvedCount === "number" ? state.resolvedCount : 0,
       pointers: Array.isArray(state.pointers) ? state.pointers : [],
+      nextCursor: typeof state.nextCursor === "string" ? state.nextCursor : null,
+      hasMore: state.hasMore === true,
+      isFetching: state.isFetching === true,
       captureMode: state.captureMode === "text" ? "text" : "voice"
     };
   }
@@ -41942,11 +42083,9 @@
       }
       if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
         chrome.runtime.sendMessage(
-          { type: "ECHLY_GET_AUTH_STATE" },
+          { type: "GET_AUTH_STATE" },
           (r) => {
             if (!r?.authenticated || !r?.user?.uid) {
-              chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {
-              });
               return;
             }
             echlyLog("CONTENT", "dispatch event", { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });

@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useRef, memo, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { Expand, CheckCircle2, ExternalLink } from "lucide-react";
+import { Expand, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import type { Comment } from "@/lib/domain/comment";
 import type { CommentPosition } from "@/lib/domain/comment";
@@ -168,6 +168,19 @@ const ScreenshotWithPinsInner = ({
   const [draftPosition, setDraftPosition] = useState<CommentPosition | null>(null);
   const [draftMessage, setDraftMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(true);
+
+  // Prevent "ghost" screenshot during ticket switch: reset loading before paint.
+  useLayoutEffect(() => {
+    setIsImageLoading(true);
+  }, [screenshotUrl]);
+  useEffect(() => {
+    setIsImageLoading(true);
+    const timeout = window.setTimeout(() => {
+      setIsImageLoading(false);
+    }, 5000);
+    return () => window.clearTimeout(timeout);
+  }, [screenshotUrl]);
 
   const handleImageClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -281,16 +294,29 @@ const ScreenshotWithPinsInner = ({
         aria-label={isCommentMode ? "Click to add comment pin" : undefined}
       >
         <div className="relative w-full max-h-[317px] aspect-video overflow-hidden rounded-lg">
-          <Image
+          <img
+            key={screenshotUrl} // Hard reset the image element on ticket switch
             src={screenshotUrl}
             alt="Screenshot"
-            width={800}
-            height={317}
-            sizes="(max-width: 1024px) 100vw, 768px"
             className="w-full h-full object-contain max-h-[317px] pointer-events-none"
+            style={{
+              display: isImageLoading ? "none" : "block",
+              opacity: isImageLoading ? 0 : 1,
+              transition: "opacity 0.2s ease",
+            }}
             loading="lazy"
             draggable={false}
+            onLoad={() => {
+              setIsImageLoading(false);
+            }}
+            onError={() => setIsImageLoading(false)}
           />
+
+          {isImageLoading && (
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none z-10 bg-[var(--layer-2-bg)]">
+              <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--text-tertiary))]" strokeWidth={1.8} aria-hidden />
+            </div>
+          )}
         </div>
 
         {pinComments.map((c, idx) => (

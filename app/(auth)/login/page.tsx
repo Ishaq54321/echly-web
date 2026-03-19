@@ -107,7 +107,7 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#f9fafc] overflow-hidden">
+    <div className="relative h-full bg-[#f9fafc] overflow-hidden">
 
       {/* ===== Premium SaaS Gradient Background ===== */}
      {/* ===== Premium SaaS Gradient Background ===== */}
@@ -285,7 +285,7 @@ function LoginPageContent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="relative min-h-screen bg-[#f9fafc] flex items-center justify-center">
+      <div className="relative h-full bg-[#f9fafc] flex items-center justify-center">
         <div className="animate-pulse text-gray-500">Loading…</div>
       </div>
     }>

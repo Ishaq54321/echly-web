@@ -1,7 +1,7 @@
 /**
  * Content script: ultra-thin UI layer. Injected on demand when user clicks extension icon (Loom-style).
  * Single mount, visibility controlled by background (ECHLY_VISIBILITY). No blocking overlays.
- * Auth via /extension-auth broker; unauthenticated = no widget UI (no floating sign-in banner).
+ * Auth is resolved silently by background session checks; login opens only on explicit user action.
  */
 declare global {
   interface Window {
@@ -112,7 +112,14 @@ type GlobalUIState = {
   sessionModeActive: boolean;
   sessionPaused: boolean;
   sessionLoading: boolean;
+  totalCount: number;
+  openCount: number;
+  skippedCount: number;
+  resolvedCount: number;
   pointers: StructuredFeedback[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  isFetching: boolean;
   captureMode: "voice" | "text";
 };
 
@@ -146,10 +153,9 @@ function createUniqueId(): string {
 function ensureAuthenticated(): Promise<boolean> {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(
-      { type: "ECHLY_GET_AUTH_STATE" },
+      { type: "GET_AUTH_STATE" },
       (r: { authenticated?: boolean; user?: { uid: string } } | undefined) => {
         if (!r?.authenticated || !r?.user?.uid) {
-          chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {});
           resolve(false);
           return;
         }
@@ -179,8 +185,8 @@ type ContentAppProps = {
 
 function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
+  const [authState, setAuthState] = React.useState<"loading" | "authenticated" | "unauthenticated">("loading");
   const [sessionMessage, setSessionMessage] = React.useState<string | null>(null);
-  const [authChecked, setAuthChecked] = React.useState(false);
   const [theme, setTheme] = React.useState<"dark" | "light">(initialTheme);
   const [globalState, setGlobalState] = React.useState<GlobalUIState>({
     visible: false,
@@ -191,7 +197,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     sessionModeActive: false,
     sessionPaused: false,
     sessionLoading: false,
+    totalCount: 0,
+    openCount: 0,
+    skippedCount: 0,
+    resolvedCount: 0,
     pointers: [],
+    nextCursor: null,
+    hasMore: false,
+    isFetching: false,
     captureMode: "voice",
   });
   const [widgetResetKey, setWidgetResetKey] = React.useState(0);
@@ -242,6 +255,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   React.useEffect(() => {
     console.log("[ECHLY DEBUG] ContentApp mounted");
   }, []);
+
 
   React.useEffect(() => {
     console.log("[ECHLY DEBUG] openResumeModal state:", openResumeModalFromMessage);
@@ -429,8 +443,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   /* Auth only when widget is opened (Loom-style). Do NOT trigger auth on content script mount. */
   React.useEffect(() => {
     if (!globalState.visible) return;
+    setAuthState("loading");
     chrome.runtime.sendMessage(
-      { type: "ECHLY_GET_AUTH_STATE" },
+      { type: "GET_AUTH_STATE" },
       (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
         if (response?.authenticated && response.user?.uid) {
           setUser({
@@ -439,10 +454,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             email: response.user.email ?? null,
             photoURL: response.user.photoURL ?? null,
           });
+          setAuthState("authenticated");
         } else {
           setUser(null);
+          setAuthState("unauthenticated");
         }
-        setAuthChecked(true);
       }
     );
   }, [globalState.visible]);
@@ -1325,12 +1341,61 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     }
   }, [isEditingFeedback]);
 
-  if (!authChecked) {
-    return null;
+  if (authState === "loading") {
+    return (
+      <div
+        style={{
+          minWidth: 280,
+          padding: "16px",
+          borderRadius: 12,
+          border: "1px solid #E6F0FF",
+          background: "#F8FBFF",
+          color: "#374151",
+          fontSize: 14,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+        }}
+      >
+        Checking authentication...
+      </div>
+    );
   }
 
-  if (!user) {
-    return null;
+  if (authState === "unauthenticated" || !user) {
+    return (
+      <div
+        style={{
+          minWidth: 280,
+          padding: "16px",
+          borderRadius: 12,
+          border: "1px solid #E6F0FF",
+          background: "#F8FBFF",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 600, color: "#111827", marginBottom: 8 }}>
+          Sign in to use Echly
+        </div>
+        <div style={{ fontSize: 13, color: "#4B5563", marginBottom: 12 }}>
+          You are not signed in on the dashboard.
+        </div>
+        <button
+          type="button"
+          onClick={onTriggerLogin}
+          style={{
+            background: "#3B82F6",
+            color: "#FFFFFF",
+            border: "none",
+            borderRadius: 8,
+            padding: "8px 14px",
+            fontSize: 14,
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          Login
+        </button>
+      </div>
+    );
   }
 
   const pending = extensionClarityPending;
@@ -1543,6 +1608,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           hasPreviousSessions={hasPreviousSessions}
           onPreviousSessionSelect={onPreviousSessionSelect}
           pointers={globalState.pointers ?? []}
+          totalCount={globalState.totalCount ?? 0}
+          openCount={globalState.openCount ?? 0}
+          skippedCount={globalState.skippedCount ?? 0}
+          resolvedCount={globalState.resolvedCount ?? 0}
           sessionLoading={globalState.sessionLoading ?? false}
           sessionTitleProp={globalState.sessionTitle ?? undefined}
           onSessionTitleChange={onSessionTitleChange}
@@ -1676,7 +1745,14 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     sessionModeActive: state.sessionModeActive ?? false,
     sessionPaused: state.sessionPaused ?? false,
     sessionLoading: state.sessionLoading ?? false,
+    totalCount: typeof state.totalCount === "number" ? state.totalCount : 0,
+    openCount: typeof state.openCount === "number" ? state.openCount : 0,
+    skippedCount: typeof state.skippedCount === "number" ? state.skippedCount : 0,
+    resolvedCount: typeof state.resolvedCount === "number" ? state.resolvedCount : 0,
     pointers: Array.isArray(state.pointers) ? state.pointers : [],
+    nextCursor: typeof state.nextCursor === "string" ? state.nextCursor : null,
+    hasMore: state.hasMore === true,
+    isFetching: state.isFetching === true,
     captureMode: state.captureMode === "text" ? "text" : "voice",
   };
 }
@@ -1765,10 +1841,9 @@ function ensureMessageListener(host: HTMLDivElement): void {
     }
     if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
       chrome.runtime.sendMessage(
-        { type: "ECHLY_GET_AUTH_STATE" },
+        { type: "GET_AUTH_STATE" },
         (r: { authenticated?: boolean; user?: { uid: string } } | undefined) => {
           if (!r?.authenticated || !r?.user?.uid) {
-            chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {});
             return;
           }
           echlyLog("CONTENT", "dispatch event", { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });

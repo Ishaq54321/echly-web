@@ -1,16 +1,31 @@
 import { NextResponse } from "next/server";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { requireAuth } from "@/lib/server/auth";
-import { getSessionFeedbackCountsRepo } from "@/lib/repositories/feedbackRepository";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { getCachedWorkspace } from "@/lib/server/cache/workspaceCache";
+import { db } from "@/lib/firebase";
+
+type FeedbackStatus = "open" | "skipped" | "resolved";
+
+function normalizeFeedbackStatus(data: Record<string, unknown>): FeedbackStatus {
+  const rawStatus = typeof data.status === "string" ? data.status.trim().toLowerCase() : "";
+
+  if (rawStatus === "open" || rawStatus === "skipped" || rawStatus === "resolved") {
+    return rawStatus;
+  }
+
+  // Keep counts aligned with visible ticket behavior for legacy docs.
+  if (data.isSkipped === true) return "skipped";
+  if (data.isResolved === true || rawStatus === "done") return "resolved";
+  return "open";
+}
 
 /**
  * GET /api/feedback/counts?sessionId=ID
- * Lightweight: returns only total, openCount, resolvedCount for immediate display.
- * Use to avoid count flicker (0 → N) while paginated list loads.
+ * Returns Firestore-backed aggregation counts independent of pagination.
  */
 export async function GET(req: Request) {
   let user;
@@ -54,24 +69,56 @@ export async function GET(req: Request) {
   }
 
   try {
-    const hasCounters =
-      typeof session.openCount === "number" &&
-      typeof session.resolvedCount === "number";
-    let openCount: number;
-    let resolvedCount: number;
-    let skippedCount: number;
-    if (hasCounters) {
-      openCount = session.openCount ?? 0;
-      resolvedCount = session.resolvedCount ?? 0;
-      skippedCount = session.skippedCount ?? 0;
-    } else {
-      const counts = await getSessionFeedbackCountsRepo(sessionId);
-      openCount = counts.open;
-      resolvedCount = counts.resolved;
-      skippedCount = counts.skipped;
+    console.time("COUNT_ROUTE");
+    try {
+      // MUST mirror the same Firestore filters used by /api/feedback session query.
+      const q = query(
+        collection(db, "feedback"),
+        where("workspaceId", "==", workspaceId),
+        where("sessionId", "==", sessionId)
+      );
+      const snapshot = await getDocs(q);
+
+      let total = 0;
+      let open = 0;
+      let skipped = 0;
+      let resolved = 0;
+
+      snapshot.forEach((doc) => {
+        const data = doc.data() as Record<string, unknown>;
+        const status = normalizeFeedbackStatus(data);
+        total++;
+
+        if (status === "open") open++;
+        else if (status === "skipped") skipped++;
+        else if (status === "resolved") resolved++;
+      });
+
+      console.log("COUNT SUMMARY", {
+        total,
+        open,
+        skipped,
+        resolved,
+        valid: total === open + skipped + resolved,
+      });
+      if (total !== open + skipped + resolved) {
+        console.error("COUNT MISMATCH DETECTED", {
+          total,
+          open,
+          skipped,
+          resolved,
+        });
+      }
+
+      return NextResponse.json({
+        total,
+        open,
+        skipped,
+        resolved,
+      });
+    } finally {
+      console.timeEnd("COUNT_ROUTE");
     }
-    const total = openCount + resolvedCount + skippedCount;
-    return NextResponse.json({ total, openCount, resolvedCount, skippedCount });
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, { status: 403 });

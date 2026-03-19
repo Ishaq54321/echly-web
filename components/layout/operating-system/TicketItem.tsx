@@ -33,7 +33,7 @@ function TicketItemInner({
       type="button"
       onClick={handleClick}
       data-ticket-id={id}
-      className={`sidebar-row-interactive group relative flex w-full items-center gap-2 px-3 py-2.5 rounded-xl text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] ${
+      className={`sidebar-row-interactive group relative flex w-full items-center gap-2 px-3 py-2 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] border-b border-gray-100 last:border-b-0 hover:bg-gray-50 ${
         active
           ? "bg-[var(--layer-2-hover-bg)]"
           : ""
