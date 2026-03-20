@@ -2,14 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { getSessionRecentComments } from "@/lib/comments";
-import type { SessionFeedbackCounts } from "@/lib/feedback";
+import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import {
   getFeedbackByIds,
   getSessionFeedback,
   getSessionFeedbackByResolved,
-  getSessionFeedbackCounts,
-  getSessionFeedbackTotalCount,
 } from "@/lib/feedback";
+import {
+  getCounts,
+  setCounts as setStoreCounts,
+} from "@/lib/state/sessionCountsStore";
+import { fetchCountsDedup } from "@/lib/state/fetchCountsDedup";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getSessionById } from "@/lib/sessions";
 import type { Session } from "@/lib/domain/session";
@@ -39,7 +42,9 @@ export interface SessionOverviewData {
   tagCounts: { tag: string; count: number }[];
 }
 
-const defaultCounts: SessionFeedbackCounts = {
+/** Placeholder before `load()` completes; never used as a substitute for fetched counts. */
+const initialCountsPlaceholder: SessionFeedbackCounts = {
+  total: 0,
   open: 0,
   resolved: 0,
   skipped: 0,
@@ -80,7 +85,7 @@ function timestampToDate(
 export function useSessionOverview(sessionId: string | undefined) {
   const [data, setData] = useState<SessionOverviewData>({
     session: null,
-    countsByStatus: defaultCounts,
+    countsByStatus: initialCountsPlaceholder,
     totalCount: 0,
     recentFeedback: [],
     statusPreview: { open: [], resolved: [] },
@@ -103,18 +108,24 @@ export function useSessionOverview(sessionId: string | undefined) {
       setLoading(true);
       setError(null);
       try {
+        const countsPromise = (async (): Promise<SessionFeedbackCounts> => {
+          const cached = getCounts(sid);
+          if (cached) return cached;
+          const next = await fetchCountsDedup(sid);
+          setStoreCounts(sid, next);
+          return next;
+        })();
+
         const [
           session,
           countsByStatus,
-          totalCount,
           recentFeedback,
           openPreview,
           resolvedPreview,
           recentComments,
         ] = await Promise.all([
           getSessionById(sid),
-          getSessionFeedbackCounts(sid),
-          getSessionFeedbackTotalCount(sid),
+          countsPromise,
           getSessionFeedback(sid, RECENT_FEEDBACK_LIMIT),
           getSessionFeedbackByResolved(sid, false, 3),
           getSessionFeedbackByResolved(sid, true, 3),
@@ -148,7 +159,7 @@ export function useSessionOverview(sessionId: string | undefined) {
         setData({
           session: session ?? null,
           countsByStatus,
-          totalCount,
+          totalCount: countsByStatus.total,
           recentFeedback,
           statusPreview: {
             open: openPreview,

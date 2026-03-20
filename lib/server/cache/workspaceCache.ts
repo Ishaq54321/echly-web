@@ -16,10 +16,6 @@ export async function getCachedWorkspace(
   const hit = workspaceCache.get(workspaceId);
 
   if (hit && now - hit.cachedAt < WORKSPACE_TTL) {
-    console.log("[WORKSPACE CACHE]", {
-      hit: true,
-      workspaceId,
-    });
     return hit.workspace;
   }
 
@@ -28,11 +24,6 @@ export async function getCachedWorkspace(
   workspaceCache.set(workspaceId, {
     workspace,
     cachedAt: now,
-  });
-
-  console.log("[WORKSPACE CACHE]", {
-    hit: false,
-    workspaceId,
   });
 
   return workspace;

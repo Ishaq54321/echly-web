@@ -24,6 +24,7 @@ import {
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
+import { invalidateCounts } from "@/lib/server/cache/feedbackCountsCache";
 import {
   emptyWorkspaceInsightsDoc,
   workspaceInsightsRef,
@@ -80,10 +81,12 @@ export async function addFeedbackRepo(
   if (feedbackId != null && feedbackId !== "") {
     const docRef = doc(db, "feedback", feedbackId);
     await setDoc(docRef, payload);
+    invalidateCounts(sessionId);
     return docRef;
   }
 
   const docRef = await addDoc(collection(db, "feedback"), payload);
+  invalidateCounts(sessionId);
   return docRef;
 }
 
@@ -103,7 +106,7 @@ export async function addFeedbackWithSessionCountersRepo(
 
   const workspaceRef = doc(db, "workspaces", workspaceId);
   const insightsRef = workspaceInsightsRef(workspaceId);
-  return await runTransaction(db, async (tx) => {
+  const feedbackRef = await runTransaction(db, async (tx) => {
     const workspaceSnap = await tx.get(workspaceRef);
     const insightsSnap = await tx.get(insightsRef);
     const stats = (workspaceSnap.data()?.stats ?? {}) as Record<string, unknown>;
@@ -142,6 +145,8 @@ export async function addFeedbackWithSessionCountersRepo(
     } as Record<string, unknown>);
     return feedbackRef;
   });
+  invalidateCounts(sessionId);
+  return feedbackRef;
 }
 
 type FeedbackUpdate = Partial<{
@@ -188,7 +193,20 @@ export async function updateFeedbackRepo(
     updates.status = statusFromResolveAndSkip(isResolved, false);
   }
   if (Object.keys(updates).length === 0) return;
+  let sessionIdForInvalidation: string | null = null;
+  if (updates.status !== undefined) {
+    const feedbackSnap = await getDoc(doc(db, "feedback", feedbackId));
+    if (feedbackSnap.exists()) {
+      const sessionId = feedbackSnap.data().sessionId;
+      if (typeof sessionId === "string" && sessionId.trim() !== "") {
+        sessionIdForInvalidation = sessionId;
+      }
+    }
+  }
   await updateDoc(doc(db, "feedback", feedbackId), updates);
+  if (sessionIdForInvalidation) {
+    invalidateCounts(sessionIdForInvalidation);
+  }
 }
 
 type FeedbackStatus = "open" | "resolved" | "skipped";
@@ -226,9 +244,9 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     updates.status = toStatus;
   }
 
-  await runTransaction(db, async (tx) => {
+  const result = await runTransaction(db, async (tx) => {
     const feedbackSnap = await tx.get(feedbackRef);
-    if (!feedbackSnap.exists()) return;
+    if (!feedbackSnap.exists()) return null;
     const fd = feedbackSnap.data();
     const sessionId = fd.sessionId as string;
     const workspaceId = (fd.workspaceId as string | undefined) ?? undefined;
@@ -280,7 +298,11 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
         } as Record<string, unknown>);
       }
     }
+    return { sessionId };
   });
+  if (result?.sessionId) {
+    invalidateCounts(result.sessionId);
+  }
 }
 
 /** Cursor for server-side pagination. Opaque to callers; only repo uses it. */
@@ -502,7 +524,18 @@ export async function getSessionFeedbackCountRepo(sessionId: string): Promise<nu
 }
 
 export async function deleteFeedbackRepo(feedbackId: string): Promise<void> {
+  let sessionIdForInvalidation: string | null = null;
+  const feedbackSnap = await getDoc(doc(db, "feedback", feedbackId));
+  if (feedbackSnap.exists()) {
+    const sessionId = feedbackSnap.data().sessionId;
+    if (typeof sessionId === "string" && sessionId.trim() !== "") {
+      sessionIdForInvalidation = sessionId;
+    }
+  }
   await deleteDoc(doc(db, "feedback", feedbackId));
+  if (sessionIdForInvalidation) {
+    invalidateCounts(sessionIdForInvalidation);
+  }
 }
 
 /**
@@ -514,9 +547,9 @@ export async function deleteFeedbackWithSessionCountersRepo(
 ): Promise<void> {
   const feedbackRef = doc(db, "feedback", feedbackId);
 
-  await runTransaction(db, async (tx) => {
+  const result = await runTransaction(db, async (tx) => {
     const feedbackSnap = await tx.get(feedbackRef);
-    if (!feedbackSnap.exists()) return;
+    if (!feedbackSnap.exists()) return null;
     const data = feedbackSnap.data();
     const sessionId = data.sessionId as string;
     const workspaceId = data.workspaceId as string | undefined;
@@ -533,7 +566,8 @@ export async function deleteFeedbackWithSessionCountersRepo(
       0,
       ((s.skippedCount as number) ?? 0) - (status === "skipped" ? 1 : 0)
     );
-    const totalCount = Math.max(0, ((s.totalCount as number) ?? 0) - 1);
+    const currentTotalCount = (s.totalCount as number) ?? 0;
+    const totalCountUpdate = currentTotalCount <= 0 ? 0 : increment(-1);
     const feedbackCount = Math.max(0, ((s.feedbackCount as number) ?? 0) - 1);
 
     tx.delete(feedbackRef);
@@ -541,7 +575,7 @@ export async function deleteFeedbackWithSessionCountersRepo(
       openCount,
       resolvedCount,
       skippedCount,
-      totalCount,
+      totalCount: totalCountUpdate,
       feedbackCount,
       updatedAt: serverTimestamp(),
     });
@@ -551,58 +585,19 @@ export async function deleteFeedbackWithSessionCountersRepo(
         "stats.updatedAt": serverTimestamp(),
       });
     }
+    return { sessionId };
   });
+  if (result?.sessionId) {
+    invalidateCounts(result.sessionId);
+  }
 }
 
-export async function resolveFeedbackRepo(feedbackId: string): Promise<void> {
-  await updateDoc(doc(db, "feedback", feedbackId), { status: "resolved" });
-}
-
-/** Counts by status for one session. Each count uses aggregation (no unbounded reads). */
+/** Counts by status for one session (aligned with session doc + /api/feedback/counts). */
 export interface SessionFeedbackCounts {
+  total: number;
   open: number;
   resolved: number;
   skipped: number;
-}
-
-export async function getSessionFeedbackCountsRepo(
-  sessionId: string
-): Promise<SessionFeedbackCounts> {
-  console.log("USING COLLECTION TYPE:", "collection");
-  const coll = collection(db, "feedback");
-  const start = Date.now();
-  const [resolvedSnap, skippedSnap, totalSnap] = await Promise.all([
-    getCountFromServer(
-      query(coll, where("sessionId", "==", sessionId), where("status", "==", "resolved"))
-    ),
-    getCountFromServer(
-      query(coll, where("sessionId", "==", sessionId), where("status", "==", "skipped"))
-    ),
-    getSessionFeedbackTotalCountRepo(sessionId),
-  ]);
-  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
-  const resolved = resolvedSnap.data().count;
-  const skipped = skippedSnap.data().count;
-  const total = totalSnap;
-  return {
-    open: Math.max(0, total - resolved - skipped),
-    resolved,
-    skipped,
-  };
-}
-
-export async function getSessionFeedbackTotalCountRepo(
-  sessionId: string
-): Promise<number> {
-  console.log("USING COLLECTION TYPE:", "collection");
-  const q = query(
-    collection(db, "feedback"),
-    where("sessionId", "==", sessionId)
-  );
-  const start = Date.now();
-  const snap = await getCountFromServer(q);
-  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
-  return snap.data().count;
 }
 
 /**
@@ -639,6 +634,9 @@ export async function deleteAllFeedbackForSessionRepo(
   console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   const count = snapshot.docs.length;
   await Promise.all(snapshot.docs.map((d) => deleteDoc(d.ref)));
+  if (count > 0) {
+    invalidateCounts(sessionId);
+  }
   return count;
 }
 

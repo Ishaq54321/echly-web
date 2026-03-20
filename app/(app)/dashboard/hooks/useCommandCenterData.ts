@@ -19,24 +19,24 @@ import type {
 export function useCommandCenterData(sessions: SessionWithCounts[]) {
   const summary = useMemo((): AIExecutiveSummary => {
     const withOpen = sessions
-      .filter((s) => (s.session.openCount ?? s.counts.open) > 0)
-      .sort((a, b) => (b.session.openCount ?? b.counts.open) - (a.session.openCount ?? a.counts.open));
+      .filter((s) => s.counts.open > 0)
+      .sort((a, b) => b.counts.open - a.counts.open);
 
     const highImpactItems = withOpen.slice(0, 3).map((s) => ({
       id: s.session.id,
       title: s.session.title || "Untitled Session",
       sessionId: s.session.id,
-      impactScore: 50 + (s.session.openCount ?? s.counts.open) * 10,
+      impactScore: 50 + s.counts.open * 10,
     }));
 
     const riskAlerts = withOpen.slice(0, 2).map((s) => ({
       id: s.session.id,
       title: s.session.title || "Untitled Session",
       sessionId: s.session.id,
-      riskLevel: ((s.session.openCount ?? s.counts.open) > 5 ? "high" : "medium") as RiskLevel,
+      riskLevel: (s.counts.open > 5 ? "high" : "medium") as RiskLevel,
     }));
 
-    const openTotal = sessions.reduce((acc, s) => acc + (s.session.openCount ?? s.counts.open), 0);
+    const openTotal = sessions.reduce((acc, s) => acc + s.counts.open, 0);
     const momentum: MomentumDirection =
       openTotal === 0 ? "improving" : openTotal > 10 ? "slowing" : "stable";
 
@@ -48,8 +48,8 @@ export function useCommandCenterData(sessions: SessionWithCounts[]) {
           ? `${withOpen.length} sessions have open feedback.`
           : null,
       bottleneck:
-        withOpen[0] && (withOpen[0].session.openCount ?? withOpen[0].counts.open) > 3
-          ? `${withOpen[0].session.title || "Untitled"} has ${withOpen[0].session.openCount ?? withOpen[0].counts.open} open items.`
+        withOpen[0] && withOpen[0].counts.open > 3
+          ? `${withOpen[0].session.title || "Untitled"} has ${withOpen[0].counts.open} open items.`
           : null,
       momentum,
     };
@@ -57,8 +57,8 @@ export function useCommandCenterData(sessions: SessionWithCounts[]) {
 
   const priorityRadarGroups = useMemo((): PriorityRadarGroup[] => {
     const withOpen = sessions
-      .filter((s) => (s.session.openCount ?? s.counts.open) > 0)
-      .sort((a, b) => (b.session.openCount ?? b.counts.open) - (a.session.openCount ?? a.counts.open));
+      .filter((s) => s.counts.open > 0)
+      .sort((a, b) => b.counts.open - a.counts.open);
 
     const toSignal = (s: SessionWithCounts) => ({
       id: s.session.id,
@@ -66,14 +66,14 @@ export function useCommandCenterData(sessions: SessionWithCounts[]) {
       title: s.session.title || "Untitled Session",
     });
 
-    const critical = withOpen.filter((s) => (s.session.openCount ?? s.counts.open) >= 5);
+    const critical = withOpen.filter((s) => s.counts.open >= 5);
     const atRisk = withOpen.filter((s) => {
-      const o = s.session.openCount ?? s.counts.open;
+      const o = s.counts.open;
       return o >= 2 && o < 5;
     });
     const stalled = sessions.filter((s) => {
-      const o = s.session.openCount ?? s.counts.open;
-      const r = s.session.resolvedCount ?? s.counts.resolved;
+      const o = s.counts.open;
+      const r = s.counts.resolved;
       return o > 0 && r === 0;
     }).slice(0, 4);
     const trending = withOpen
@@ -89,8 +89,8 @@ export function useCommandCenterData(sessions: SessionWithCounts[]) {
   }, [sessions]);
 
   const momentum = useMemo((): ExecutionMomentum => {
-    const totalOpen = sessions.reduce((acc, s) => acc + (s.session.openCount ?? s.counts.open), 0);
-    const totalResolved = sessions.reduce((acc, s) => acc + (s.session.resolvedCount ?? s.counts.resolved), 0);
+    const totalOpen = sessions.reduce((acc, s) => acc + s.counts.open, 0);
+    const totalResolved = sessions.reduce((acc, s) => acc + s.counts.resolved, 0);
     return {
       resolutionVelocityTrend: totalResolved > totalOpen ? "up" : totalOpen > 0 ? "down" : "flat",
       avgResolutionTimeHours: null,
@@ -101,10 +101,10 @@ export function useCommandCenterData(sessions: SessionWithCounts[]) {
 
   const heatmapBuckets = useMemo((): SignalHeatmapBucket[] => {
     return sessions
-      .filter((s) => (s.session.openCount ?? s.counts.open) + (s.session.resolvedCount ?? s.counts.resolved) > 0)
+      .filter((s) => s.counts.total > 0)
       .map((s) => ({
         label: s.session.title || "Untitled",
-        count: (s.session.openCount ?? s.counts.open) + (s.session.resolvedCount ?? s.counts.resolved),
+        count: s.counts.total,
         sessionId: s.session.id,
       }))
       .sort((a, b) => b.count - a.count)

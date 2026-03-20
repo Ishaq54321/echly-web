@@ -3,12 +3,12 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { clearAuthTokenCache } from "@/lib/authFetch";
-import { getWorkspaceSessions, getUserSessions } from "@/lib/sessions";
+import { db } from "@/lib/firebase";
 import { Search, Folder, Loader2 } from "lucide-react";
-import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
+import {
+  useWorkspaceOverview,
+  type SessionWithCounts,
+} from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import SessionsTableSkeleton from "@/components/skeleton/SessionsTableSkeleton";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 
@@ -37,32 +37,6 @@ interface FolderData {
 }
 
 const FOLDERS_CACHE_KEY = "echly_folders";
-
-async function loadSessionsAndCounts(
-  uid: string
-): Promise<SessionWithCounts[]> {
-  const workspaceId = (await getUserWorkspaceIdRepo(uid)) ?? uid;
-  const workspaceSessions = await getWorkspaceSessions(workspaceId, SESSION_LIMIT, {
-    includeArchived: true,
-  });
-  const userSessions =
-    workspaceSessions.length > 0
-      ? workspaceSessions
-      : await getUserSessions(uid, SESSION_LIMIT, { includeArchived: true });
-  const withCounts = userSessions.map((session) => ({
-    session,
-    counts: {
-      open: session.openCount ?? 0,
-      resolved: session.resolvedCount ?? 0,
-      skipped: session.skippedCount ?? 0,
-    },
-  }));
-  return withCounts.sort((a, b) => {
-    const ta = a.session.updatedAt as { seconds?: number } | null | undefined;
-    const tb = b.session.updatedAt as { seconds?: number } | null | undefined;
-    return (tb?.seconds ?? 0) - (ta?.seconds ?? 0);
-  });
-}
 
 function FolderItem({
   folder,
@@ -94,35 +68,21 @@ function FolderItem({
 
 export default function SessionsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<{ uid: string } | null>(null);
-  const [sessions, setSessions] = useState<SessionWithCounts[]>([]);
+  const { user, sessions: sessionsWithCounts, loading: sessionsLoading } =
+    useWorkspaceOverview("all");
   const [folders, setFolders] = useState<FolderData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [foldersLoading, setFoldersLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        clearAuthTokenCache();
-        router.push("/login");
-        return;
-      }
-      setUser(currentUser);
+  const tableSessions = useMemo(() => {
+    const sorted = [...sessionsWithCounts].sort((a, b) => {
+      const ta = a.session.updatedAt as { seconds?: number } | null | undefined;
+      const tb = b.session.updatedAt as { seconds?: number } | null | undefined;
+      return (tb?.seconds ?? 0) - (ta?.seconds ?? 0);
     });
-    return () => unsubscribe();
-  }, [router]);
-
-  const loadSessions = useCallback(async (uid: string) => {
-    setLoading(true);
-    try {
-      const data = await loadSessionsAndCounts(uid);
-      setSessions(data);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    return sorted.slice(0, SESSION_LIMIT);
+  }, [sessionsWithCounts]);
 
   const loadFolders = useCallback(async (uid: string) => {
     setFoldersLoading(true);
@@ -163,21 +123,16 @@ export default function SessionsPage() {
 
   useEffect(() => {
     if (!user?.uid) return;
-    loadSessions(user.uid);
-  }, [user?.uid, loadSessions]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    loadFolders(user.uid);
+    void loadFolders(user.uid);
   }, [user?.uid, loadFolders]);
 
   const filteredSessions = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return sessions;
-    return sessions.filter(({ session }) =>
+    if (!q) return tableSessions;
+    return tableSessions.filter(({ session }) =>
       session.title.toLowerCase().includes(q)
     );
-  }, [sessions, search]);
+  }, [tableSessions, search]);
 
   const sessionIdToFolder = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>();
@@ -251,7 +206,7 @@ export default function SessionsPage() {
           Sessions
         </h2>
 
-        {loading ? (
+        {sessionsLoading ? (
           <SessionsTableSkeleton />
         ) : filteredSessions.length > 0 ? (
           <div className="max-w-[1200px] w-full">
@@ -280,16 +235,9 @@ export default function SessionsPage() {
               </thead>
               <tbody>
                 {filteredSessions.map(({ session, counts }) => {
-                  const open = session.openCount ?? counts.open;
-                  const resolved = session.resolvedCount ?? counts.resolved;
-                  const total =
-                    session.totalCount ??
-                    session.feedbackCount ??
-                    open + resolved + (session.skippedCount ?? counts.skipped);
-                  const hasStoredCounts =
-                    typeof session.openCount === "number" &&
-                    (typeof session.totalCount === "number" ||
-                      typeof session.feedbackCount === "number");
+                  const open = counts.open;
+                  const resolved = counts.resolved;
+                  const total = counts.total;
                   const progress = total > 0 ? Math.round((resolved / total) * 100) : 0;
                   const status = session.archived ? "Archived" : "Active";
                   const folder = sessionIdToFolder.get(session.id);
@@ -328,12 +276,7 @@ export default function SessionsPage() {
                             </p>
                           )}
                           <p className="text-xs text-secondary mt-1">
-                            Created by {createdBy} •{" "}
-                            {hasStoredCounts ? (
-                              `${total} feedback`
-                            ) : (
-                              <span className="inline-block h-3 w-14 rounded bg-neutral-200 animate-pulse align-middle" />
-                            )}
+                            Created by {createdBy} • {total} feedback
                           </p>
                         </div>
                       </td>
@@ -349,11 +292,7 @@ export default function SessionsPage() {
                         </span>
                       </td>
                       <td className="px-3 py-[12px] text-right tabular-nums text-[13px] text-secondary">
-                        {hasStoredCounts ? (
-                          open
-                        ) : (
-                          <span className="inline-block h-3 w-5 rounded bg-neutral-200 animate-pulse align-middle" />
-                        )}
+                        {open}
                       </td>
                       <td className="px-3 py-[12px] text-right tabular-nums text-[13px] text-secondary">
                         {resolved}
@@ -377,7 +316,7 @@ export default function SessionsPage() {
           </div>
         ) : null}
 
-        {!loading && filteredSessions.length === 0 && (
+        {!sessionsLoading && filteredSessions.length === 0 && (
           <p className="text-[14px] text-secondary py-8">
             {search.trim()
               ? "No sessions match your search."

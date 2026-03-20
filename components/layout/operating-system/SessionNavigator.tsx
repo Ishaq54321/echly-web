@@ -64,7 +64,7 @@ export function SessionNavigator({
   const activeUnpinned = active.filter((s) => !pinnedIds.has(s.session.id));
 
   const renderRow = (s: SessionWithCounts) => {
-    const open = s.session.openCount ?? s.counts.open;
+    const open = s.counts.open;
     const isCurrent = s.session.id === currentSessionId;
     const isUnread = open > 0;
     const isPinned = pinnedIds.has(s.session.id);

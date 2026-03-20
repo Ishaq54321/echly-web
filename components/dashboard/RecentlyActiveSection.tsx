@@ -14,7 +14,7 @@ const MAX_ITEMS = 5;
 export function RecentlyActiveSection({ sessions, onView }: RecentlyActiveSectionProps) {
   const sorted = useMemo(() => {
     return [...sessions]
-      .filter((s) => (s.session.openCount ?? s.counts.open) + (s.session.resolvedCount ?? s.counts.resolved) > 0)
+      .filter((s) => s.counts.total > 0)
       .sort((a, b) => {
         const ta = a.session.updatedAt as { seconds?: number } | null | undefined;
         const tb = b.session.updatedAt as { seconds?: number } | null | undefined;
@@ -35,9 +35,9 @@ export function RecentlyActiveSection({ sessions, onView }: RecentlyActiveSectio
       </h2>
       <ul className="flex flex-col gap-0.5">
         {sorted.map(({ session, counts }) => {
-          const open = session.openCount ?? counts.open;
-          const total = open + (session.resolvedCount ?? counts.resolved);
-          const pct = total > 0 ? Math.round(((session.resolvedCount ?? counts.resolved) / total) * 100) : 0;
+          const open = counts.open;
+          const total = counts.total;
+          const pct = total > 0 ? Math.round((counts.resolved / total) * 100) : 0;
           return (
             <li key={session.id}>
               <button

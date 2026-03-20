@@ -2,17 +2,15 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
+import type { Session } from "@/lib/domain/session";
 import { FileText } from "lucide-react";
 
-export type SessionOption = {
-  id: string;
-  title: string;
-  updatedAt?: string;
-  openCount?: number;
-  resolvedCount?: number;
-  feedbackCount?: number;
-  [key: string]: unknown;
-};
+export type SessionOption = Pick<Session, "id" | "title"> &
+  Partial<Pick<Session, "archived" | "updatedAt">> & {
+    /** From /api/feedback/counts only — not from session documents. */
+    counts?: { total: number };
+    [key: string]: unknown;
+  };
 
 export type ResumeSessionModalProps = {
   open: boolean;
@@ -29,6 +27,16 @@ export type ResumeSessionModalProps = {
 
 type FilterKey = "today" | "7days" | "30days" | "all";
 
+function sessionUpdatedAtToMs(value: SessionOption["updatedAt"]): number {
+  if (value == null) return 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "string") return new Date(value).getTime();
+  if (typeof value === "object" && typeof value.toDate === "function") {
+    return value.toDate().getTime();
+  }
+  return 0;
+}
+
 function filterSessions(
   sessions: SessionOption[],
   filter: FilterKey
@@ -38,14 +46,15 @@ function filterSessions(
   const ms = { today: 24 * 60 * 60 * 1000, "7days": 7 * 24 * 60 * 60 * 1000, "30days": 30 * 24 * 60 * 60 * 1000 };
   const cutoff = now - ms[filter];
   return sessions.filter((s) => {
-    const u = s.updatedAt ? new Date(s.updatedAt).getTime() : 0;
+    const u = sessionUpdatedAtToMs(s.updatedAt);
     return u >= cutoff;
   });
 }
 
-function formatLastUpdated(iso?: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
+function formatLastUpdated(value?: SessionOption["updatedAt"]): string {
+  const t = sessionUpdatedAtToMs(value);
+  if (!t) return "—";
+  const d = new Date(t);
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMins = Math.floor(diffMs / 60000);
@@ -136,13 +145,7 @@ export function ResumeSessionModal({
     return list;
   }, [sessions, filter, search]);
 
-  const feedbackCount = (s: SessionOption): number => {
-    if (typeof s.feedbackCount === "number") return s.feedbackCount;
-    const open = typeof s.openCount === "number" ? s.openCount : 0;
-    const resolved = typeof s.resolvedCount === "number" ? s.resolvedCount : 0;
-    const skipped = typeof (s as Record<string, unknown>).skippedCount === "number" ? (s as Record<string, unknown>).skippedCount as number : 0;
-    return open + resolved + skipped;
-  };
+  const feedbackCount = (s: SessionOption): number => s.counts?.total ?? 0;
 
   if (!open) return null;
 
@@ -378,7 +381,8 @@ export function ResumeSessionModal({
                         color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
                         marginTop: 4,
                       }}>
-                        {feedbackCount(s)} feedback items · {formatLastUpdated(s.updatedAt)}
+                        {feedbackCount(s)} feedback items ·{" "}
+                        {formatLastUpdated(s.updatedAt)}
                       </div>
                     </div>
                   </button>

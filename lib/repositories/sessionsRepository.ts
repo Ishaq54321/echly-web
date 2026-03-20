@@ -37,7 +37,6 @@ export async function createSessionRepo(
   userId: string,
   createdBy?: SessionCreatedBy | null
 ): Promise<string> {
-  const t_create_start = performance.now();
   const sessionRef = doc(collection(db, "sessions"));
   const workspaceRef = doc(db, "workspaces", workspaceId);
   const sessionData = {
@@ -56,7 +55,6 @@ export async function createSessionRepo(
     feedbackCount: 0,
   };
 
-  const t_tx_start = performance.now();
   await runTransaction(db, async (tx) => {
     tx.set(sessionRef, sessionData);
     tx.update(workspaceRef, {
@@ -67,9 +65,6 @@ export async function createSessionRepo(
       updatedAt: serverTimestamp(),
     });
   });
-  console.log("[ECHLY PERF] createSessionRepo.runTransaction:", performance.now() - t_tx_start);
-
-  console.log("[ECHLY PERF] createSessionRepo TOTAL:", performance.now() - t_create_start);
   return sessionRef.id;
 }
 
@@ -82,24 +77,20 @@ export async function getWorkspaceSessionCountRepo(
   workspaceId: string,
   workspace?: Workspace | null
 ): Promise<number> {
-  const t_count_start = performance.now();
   if (
     workspace &&
     typeof workspace.sessionCount === "number" &&
     typeof workspace.archivedCount === "number"
   ) {
     const active = Math.max(0, workspace.sessionCount - workspace.archivedCount);
-    console.log("[ECHLY PERF] getWorkspaceSessionCountRepo (workspace fields):", performance.now() - t_count_start);
     return active;
   }
 
   // Fallback: count queries (temporary until workspace.sessionCount/archivedCount are backfilled)
-  console.log("USING COLLECTION TYPE:", "collection");
   const baseQuery = query(
     collection(db, "sessions"),
     where("workspaceId", "==", workspaceId)
   );
-  const t_counts_start = performance.now();
   const [allSnap, archivedSnap] = await Promise.all([
     getCountFromServer(baseQuery),
     getCountFromServer(
@@ -110,11 +101,9 @@ export async function getWorkspaceSessionCountRepo(
       )
     ),
   ]);
-  console.log("[ECHLY PERF] getWorkspaceSessionCountRepo.getCountFromServer (fallback):", performance.now() - t_counts_start);
 
   const total = allSnap.data().count;
   const archived = archivedSnap.data().count;
-  console.log("[ECHLY PERF] getWorkspaceSessionCountRepo TOTAL:", performance.now() - t_count_start);
   return Math.max(0, total - archived);
 }
 

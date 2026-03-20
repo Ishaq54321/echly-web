@@ -6,9 +6,7 @@ import {
   deleteFeedbackWithSessionCountersRepo,
   getFeedbackByIdsRepo,
   getSessionFeedbackByResolvedRepo,
-  getSessionFeedbackCountsRepo,
   getSessionFeedbackPageRepo,
-  getSessionFeedbackTotalCountRepo,
   updateFeedbackRepo,
   updateFeedbackResolveAndSessionCountersRepo,
 } from "@/lib/repositories/feedbackRepository";
@@ -16,12 +14,10 @@ import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepositor
 import type {
   FeedbackPageCursor,
   FeedbackPageResult,
-  SessionFeedbackCounts,
 } from "@/lib/repositories/feedbackRepository";
 export type {
   FeedbackPageCursor,
   FeedbackPageResult,
-  SessionFeedbackCounts,
 } from "@/lib/repositories/feedbackRepository";
 
 /* ================================
@@ -97,13 +93,6 @@ export async function getSessionFeedback(
   return feedback;
 }
 
-/** Counts by resolution for overview. Uses aggregation (no unbounded reads). */
-export async function getSessionFeedbackCounts(
-  sessionId: string
-): Promise<SessionFeedbackCounts> {
-  return getSessionFeedbackCountsRepo(sessionId);
-}
-
 /** Up to N feedback items by resolution for overview preview. */
 export async function getSessionFeedbackByResolved(
   sessionId: string,
@@ -111,13 +100,6 @@ export async function getSessionFeedbackByResolved(
   max: number = 3
 ): Promise<Feedback[]> {
   return getSessionFeedbackByResolvedRepo(sessionId, isResolved, max);
-}
-
-/** Total feedback count for session (aggregation). */
-export async function getSessionFeedbackTotalCount(
-  sessionId: string
-): Promise<number> {
-  return getSessionFeedbackTotalCountRepo(sessionId);
 }
 
 /** Fetch feedback by IDs (e.g. for activity titles). Limited. */

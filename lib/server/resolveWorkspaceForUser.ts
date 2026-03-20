@@ -41,10 +41,8 @@ export async function resolveWorkspaceForUserLight(uid: string): Promise<{ works
   const now = Date.now();
   const entry = workspaceIdCache.get(uid);
   if (entry && now < entry.expiresAt) {
-    console.log("[ECHLY CACHE] workspaceId hit");
     return { workspaceId: entry.workspaceId };
   }
-  console.log("[ECHLY CACHE] workspaceId miss");
 
   const pending = resolveWorkspaceIdInFlight.get(uid);
   if (pending) {
@@ -58,7 +56,6 @@ export async function resolveWorkspaceForUserLight(uid: string): Promise<{ works
       workspaceId,
       expiresAt: Date.now() + WORKSPACE_ID_CACHE_TTL_MS,
     });
-    console.log("RESOLVED WORKSPACE ID:", { userId: uid, workspaceId });
     return workspaceId;
   })().finally(() => {
     resolveWorkspaceIdInFlight.delete(uid);
@@ -78,14 +75,8 @@ export async function resolveWorkspaceForUser(uid: string): Promise<ResolvedWork
   const now = Date.now();
   const entry = workspaceCache.get(uid);
   if (entry && now < entry.expiresAt) {
-    console.log("[ECHLY CACHE] workspace hit");
-    console.log("RESOLVED WORKSPACE:", {
-      userId: uid,
-      workspaceId: entry.data.workspaceId,
-    });
     return entry.data;
   }
-  console.log("[ECHLY CACHE] workspace miss");
 
   const pending = resolveInFlight.get(uid);
   if (pending) {
@@ -100,10 +91,6 @@ export async function resolveWorkspaceForUser(uid: string): Promise<ResolvedWork
     workspaceCache.set(uid, {
       data: result,
       expiresAt: Date.now() + WORKSPACE_CACHE_TTL_MS,
-    });
-    console.log("RESOLVED WORKSPACE:", {
-      userId: uid,
-      workspaceId,
     });
     return result;
   };

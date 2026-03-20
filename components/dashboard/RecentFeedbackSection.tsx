@@ -38,7 +38,7 @@ export function RecentFeedbackSection({ sessions, onView }: RecentFeedbackSectio
       </h2>
       <ul className="flex flex-col gap-0.5">
         {sorted.map(({ session, counts }) => {
-          const open = session.openCount ?? counts.open;
+          const open = counts.open;
           return (
             <li key={session.id}>
               <button

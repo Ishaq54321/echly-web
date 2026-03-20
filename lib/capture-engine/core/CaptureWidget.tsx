@@ -193,7 +193,7 @@ export default function CaptureWidget({
   useEffect(() => {
     const el = listScrollRef.current;
     if (!el) {
-      console.log("❌ scrollRef not attached");
+      console.debug("[ECHLY UI] scrollRef not ready yet");
       return;
     }
 

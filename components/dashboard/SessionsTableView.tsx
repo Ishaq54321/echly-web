@@ -52,9 +52,9 @@ export function SessionsTableView({ items, onView }: SessionsTableViewProps) {
         </thead>
         <tbody>
           {items.map(({ session, counts }) => {
-            const open = session.openCount ?? counts.open;
-            const resolved = session.resolvedCount ?? counts.resolved;
-            const total = open + resolved;
+            const open = counts.open;
+            const resolved = counts.resolved;
+            const total = counts.total;
             const progressPct = total > 0 ? Math.round((resolved / total) * 100) : 0;
             return (
               <tr

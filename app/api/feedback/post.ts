@@ -8,7 +8,6 @@ import {
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
-import { log } from "@/lib/utils/logger";
 import { updateScreenshotAttachedRepo } from "@/lib/repositories/screenshotsRepository";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
@@ -21,20 +20,24 @@ import { invalidateFeedbackCache } from "@/lib/server/cache/feedbackCache";
 const WORKSPACE_BY_ID_CACHE_TTL_MS = 30_000;
 const workspaceByIdCache = new Map<string, { workspace: unknown; expiresAt: number }>();
 
-function now() {
-  return Number(process.hrtime.bigint()) / 1e6; // ms with high precision
-}
-
 function unauthorized(): Response {
-  return new Response(
-    JSON.stringify({
+  return Response.json(
+    {
       success: false,
       error: "NOT_AUTHENTICATED",
       message: "User is not authenticated",
-    }),
+    },
     {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+    }
+  );
+}
+
+function missingExtensionToken(): Response {
+  return Response.json(
+    { error: "MISSING_EXTENSION_TOKEN" },
+    {
+      status: 401,
     }
   );
 }
@@ -58,6 +61,20 @@ function peekJwtPayload(token: string): Record<string, unknown> | null {
 }
 
 async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
+  const extensionToken = req.headers.get("x-extension-token")?.trim() ?? "";
+  const origin = req.headers.get("origin")?.toLowerCase() ?? "";
+  const isExtensionRequest = origin.startsWith("chrome-extension://");
+
+  if (isExtensionRequest && !extensionToken) {
+    throw missingExtensionToken();
+  }
+
+  if (extensionToken) {
+    const decoded = await verifyExtensionToken(extensionToken);
+    if (!decoded) throw unauthorized();
+    return { uid: decoded.uid, email: decoded.email ?? undefined };
+  }
+
   const authHeader = req.headers.get("Authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7).trim();
@@ -89,13 +106,6 @@ async function resolveWorkspaceByIdCached(workspaceId: string): Promise<{ worksp
 
 /** POST /api/feedback — create feedback (ticket) for a session. Returns same shape as GET /api/tickets/:id. */
 export async function POST(req: NextRequest) {
-  const requestStart = now();
-  console.log("[PIPELINE] START", {
-    at: requestStart,
-  });
-
-  const start = Date.now();
-  log("[API] POST /api/feedback start");
   let user;
   try {
     user = await requireAuthFast(req);
@@ -244,18 +254,12 @@ export async function POST(req: NextRequest) {
   try {
     const workspaceId = session.workspaceId ?? session.userId ?? ((await getUserWorkspaceIdRepo(user.uid)) ?? user.uid);
 
-    const dbStart = now();
-    console.log("[PIPELINE] DB_WRITE_START", { at: dbStart });
     const docRef = await addFeedbackWithSessionCountersRepo(
       workspaceId,
       sessionId,
       user.uid,
       structuredData
     );
-    const dbEnd = now();
-    console.log("[PIPELINE] DB_WRITE_END", {
-      duration: dbEnd - dbStart,
-    });
 
     const screenshotId =
       typeof body.screenshotId === "string" ? body.screenshotId.trim() : "";
@@ -274,12 +278,6 @@ export async function POST(req: NextRequest) {
 
     invalidateFeedbackCache(workspaceId, sessionId);
 
-    log("[API] POST /api/feedback duration:", Date.now() - start);
-
-    const responseStart = now();
-    console.log("[PIPELINE] RESPONSE_SENT", {
-      totalDuration: responseStart - requestStart,
-    });
     return NextResponse.json(
       {
         success: true,
@@ -295,7 +293,6 @@ export async function POST(req: NextRequest) {
       );
     }
     console.error("POST /api/feedback:", err);
-    log("[API] POST /api/feedback duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Server error" },
       { status: 500, headers: corsHeaders(req) }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { setDoc, updateDoc, deleteDoc, doc, serverTimestamp, arrayUnion } from "firebase/firestore";
@@ -8,11 +8,13 @@ import { db } from "@/lib/firebase";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { useWorkspaceOverview } from "./hooks/useWorkspaceOverview";
 import type { SessionWithCounts } from "./hooks/useWorkspaceOverview";
+import type { DashboardFolder } from "./hooks/useWorkspaceOverview";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { SessionsHeader } from "@/components/dashboard/SessionsHeader";
 import { FolderCard } from "@/components/dashboard/FolderCard";
 import EmptySessionsCard from "@/components/dashboard/EmptySessionsCard";
-import FolderSkeleton from "@/components/skeleton/FolderSkeleton";
+import FoldersSkeleton from "@/components/skeleton/FoldersSkeleton";
+import SessionSkeletonList from "@/components/skeleton/SessionSkeletonList";
 import { MoveSessionsModal } from "@/components/dashboard/MoveSessionsModal";
 import { DragSessionProvider, useDragSession } from "@/components/dashboard/context/DragSessionContext";
 import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
@@ -21,13 +23,6 @@ import { UpgradeModal } from "@/components/billing/UpgradeModal";
 import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
 import DashboardCaptureHost from "./components/DashboardCaptureHost";
 import type { Session } from "@/lib/domain/session";
-
-export interface DashboardFolder {
-  id: string;
-  name: string;
-  sessions?: string[];
-  sessionCount?: number;
-}
 
 function filterAndSortSessions(sessions: SessionWithCounts[], search: string): SessionWithCounts[] {
   const q = search.trim().toLowerCase();
@@ -55,20 +50,20 @@ function DashboardContent() {
   const {
     user,
     sessions,
-    loading,
+    folders,
+    loading: sessionsLoading,
+    foldersLoading,
+    expectedSessionCount,
+    expectedFolderCount,
+    refreshFolders,
     handleCreateSession,
     updateSession,
     removeSession,
     deleteSession,
   } = useWorkspaceOverview(viewMode);
   const [search, setSearch] = useState("");
-  type DashboardState = "loading" | "loaded" | "empty";
-  const [dashboardState, setDashboardState] = useState<DashboardState>("loading");
-  const [foldersTouched, setFoldersTouched] = useState(false);
-
-  const [folders, setFolders] = useState<DashboardFolder[]>([]);
-  const [foldersLoading, setFoldersLoading] = useState(true);
-  const prevFoldersRef = useRef(folders);
+  const hasFolders = folders.length > 0;
+  const sessionSkeletonCount = expectedSessionCount ?? 0;
   const [moveModalFolder, setMoveModalFolder] = useState<DashboardFolder | null>(null);
   const [moveToFolderSessionId, setMoveToFolderSessionId] = useState<string | null>(null);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
@@ -76,67 +71,11 @@ function DashboardContent() {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
-
-  // Deterministic dashboard state:
-  // - When either sessions or folders begin loading, show a stable spacer (no skeleton count logic).
-  // - Only once loading settles, transition to either `empty` or `loaded` based on sessions length.
-  useEffect(() => {
-    const isFetching = loading || foldersLoading;
-    if (isFetching) {
-      setDashboardState("loading");
-    } else {
-      const next: DashboardState = sessions.length === 0 ? "empty" : "loaded";
-      setDashboardState((prev) => (prev === next ? prev : next));
-    }
-  }, [loading, foldersLoading, sessions.length]);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setFoldersTouched(!foldersLoading);
-  }, [foldersLoading]);
-
-  useEffect(() => {
-    if (!foldersLoading) {
-      prevFoldersRef.current = folders;
-      return;
-    }
-
-    if (prevFoldersRef.current !== folders) {
-      setFoldersTouched(true);
-      prevFoldersRef.current = folders;
-    }
-  }, [folders, foldersLoading]);
-
-  const loadFolders = useCallback(async () => {
-    try {
-      setFoldersLoading(true);
-
-      const res = await fetch("/api/folders", {
-        credentials: "include",
-      });
-
-      const data = await res.json();
-      console.log("FOLDERS:", data.folders);
-
-      setFolders(data.folders || []);
-    } catch (err) {
-      console.error("Failed to load folders", err);
-      setFolders([]);
-    } finally {
-      setFoldersLoading(false);
-    }
+    setIsMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    let cancelled = false;
-    (async () => {
-      if (cancelled) return;
-      await loadFolders();
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.uid, loadFolders]);
 
   const createFolder = async () => {
     if (!user?.uid) return;
@@ -150,23 +89,21 @@ function DashboardContent() {
       workspaceId,
       createdAt: serverTimestamp(),
     });
-    await loadFolders();
+    await refreshFolders();
   };
 
   const updateFolder = async (id: string, updates: Partial<Pick<DashboardFolder, "name" | "sessions">>) => {
-    setFolders((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, ...updates } : f))
-    );
     const ref = doc(db, "folders", id);
     const payload: Record<string, unknown> = {};
     if (updates.name !== undefined) payload.name = updates.name;
     if (updates.sessions !== undefined) payload.sessionIds = updates.sessions;
     if (Object.keys(payload).length > 0) await updateDoc(ref, payload);
+    await refreshFolders();
   };
 
   const removeFolder = async (id: string) => {
-    setFolders((prev) => prev.filter((f) => f.id !== id));
     await deleteDoc(doc(db, "folders", id));
+    await refreshFolders();
   };
 
   const sessionIdsInFolders = useMemo(
@@ -188,7 +125,7 @@ function DashboardContent() {
     await updateDoc(doc(db, "folders", folderId), {
       sessionIds: arrayUnion(...sessionIds),
     });
-    if (user?.uid) await loadFolders();
+    if (user?.uid) await refreshFolders();
     const folder = folders.find((f) => f.id === folderId);
     if (folder) showToast(`Session${sessionIds.length > 1 ? "s" : ""} moved to ${folder.name}`);
   };
@@ -198,7 +135,7 @@ function DashboardContent() {
     await updateDoc(doc(db, "folders", folderId), {
       sessionIds: arrayUnion(draggedSessionId),
     });
-    if (user?.uid) await loadFolders();
+    if (user?.uid) await refreshFolders();
     setDraggedSessionId(null);
     setHoveredFolder(null);
     const folder = folders.find((f) => f.id === folderId);
@@ -246,95 +183,71 @@ function DashboardContent() {
 
         <main className="flex-1">
           <div className="pt-8">
-            {dashboardState === "loading" ? (
-              <div className="relative">
-                {foldersTouched && folders.length > 0 && (
-                  <div className="mb-8">
-                    <h2 className="text-sm font-semibold text-neutral-700 mb-3">
-                      Folders
-                    </h2>
-                    <div className="flex gap-4 flex-wrap">
-                      {Array.from({ length: folders.length }).map((_, i) => (
-                        <FolderSkeleton key={i} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {foldersTouched && folders.length > 0 && (
-                  <h2 className="text-sm font-semibold text-neutral-700 mb-3">
-                    Sessions
-                  </h2>
-                )}
-
-                {/* Stable spacer to avoid layout shift/flicker for the sessions list */}
-                <div className="h-[120px]" />
-              </div>
-            ) : null}
-
-            {dashboardState === "empty" ? <EmptySessionsCard /> : null}
-
-            {dashboardState === "loaded" ? (
-              <div className="relative">
-                {folders.length > 0 ? (
-                  <div className="mb-8">
-                    <h2 className="text-sm font-semibold text-neutral-700 mb-3">
-                      Folders
-                    </h2>
-                    <div className="flex gap-4 flex-wrap">
-                      {folders.map((folder) => (
-                        <FolderCard
-                          key={folder.id}
-                          folder={folder}
-                          onRename={(name) => updateFolder(folder.id, { name })}
-                          onDelete={() => removeFolder(folder.id)}
-                          onMoveSessionsClick={() => setMoveModalFolder(folder)}
-                          onDropSession={() => moveSessionToFolder(folder.id)}
-                          onDragEnter={() => setHoveredFolder(folder.id)}
-                          onDragLeave={() => setHoveredFolder(null)}
-                          hoveredFolderId={hoveredFolder}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                {folders.length > 0 && (
-                  <h2 className="text-sm font-semibold text-neutral-700 mb-3">
-                    Sessions
-                  </h2>
-                )}
-
-                <div className="transition-opacity duration-150">
-                  <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
-                    {filteredSessions.map((item, index) => (
-                      <WorkspaceCard
-                        key={item.session.id}
-                        item={item}
-                        onView={handleView}
-                        index={index}
-                        onRenameSuccess={(session) =>
-                          updateSession(session.id, { title: session.title })
-                        }
-                        onArchiveSuccess={removeSession}
-                        onRequestDelete={(session) => setDeleteTarget(session)}
-                        onOpenMoveToFolder={setMoveToFolderSessionId}
+            {hasFolders && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium mb-3">Folders</h3>
+                {foldersLoading ? (
+                  <FoldersSkeleton count={expectedFolderCount || 2} />
+                ) : (
+                  <div className="flex gap-4 flex-wrap">
+                    {folders.map((folder) => (
+                      <FolderCard
+                        key={folder.id}
+                        folder={folder}
+                        onRename={(name) => updateFolder(folder.id, { name })}
+                        onDelete={() => removeFolder(folder.id)}
+                        onMoveSessionsClick={() => setMoveModalFolder(folder)}
+                        onDropSession={() => moveSessionToFolder(folder.id)}
+                        onDragEnter={() => setHoveredFolder(folder.id)}
+                        onDragLeave={() => setHoveredFolder(null)}
+                        hoveredFolderId={hoveredFolder}
                       />
                     ))}
                   </div>
-
-                  {filteredSessions.length === 0 && (
-                    <p className="text-[14px] text-[hsl(var(--text-tertiary))] py-8">
-                      {search.trim()
-                        ? "No sessions match your search."
-                        : viewMode === "archived"
-                          ? "No archived sessions."
-                          : "No sessions yet. Create one to get started."}
-                    </p>
-                  )}
-                </div>
+                )}
               </div>
-            ) : null}
+            )}
+
+            {hasFolders && (
+              <h2 className="text-sm font-semibold text-neutral-700 mb-3">
+                Sessions
+              </h2>
+            )}
+
+            {isMounted && sessionsLoading && sessionSkeletonCount > 0 ? (
+              <SessionSkeletonList count={sessionSkeletonCount} />
+            ) : !isMounted ? null : sessions.length === 0 ? (
+              <EmptySessionsCard />
+            ) : (
+              <div className="transition-opacity duration-150">
+                <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
+                  {filteredSessions.map((item, index) => (
+                    <WorkspaceCard
+                      key={item.session.id}
+                      item={item}
+                      onView={handleView}
+                      index={index}
+                      onRenameSuccess={(session) =>
+                        updateSession(session.id, { title: session.title })
+                      }
+                      onArchiveSuccess={removeSession}
+                      onRequestDelete={(session) => setDeleteTarget(session)}
+                      onOpenMoveToFolder={setMoveToFolderSessionId}
+                    />
+                  ))}
+                </div>
+
+                {filteredSessions.length === 0 && (
+                  <p className="text-[14px] text-[hsl(var(--text-tertiary))] py-8">
+                    {search.trim()
+                      ? "No sessions match your search."
+                      : viewMode === "archived"
+                        ? "No archived sessions."
+                        : "No sessions yet. Create one to get started."}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </main>
       </div>

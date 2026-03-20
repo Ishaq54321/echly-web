@@ -5,6 +5,13 @@ import { cachedFetch } from "@/lib/client/requestCache";
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
 import type { Feedback } from "@/lib/domain/feedback";
 import {
+  getCounts,
+  setCounts as setStoreCounts,
+  subscribeCounts,
+  type Counts,
+} from "@/lib/state/sessionCountsStore";
+import { fetchCountsDedup } from "@/lib/state/fetchCountsDedup";
+import {
   subscribeFeedbackSession,
   useFeedbackRealtimeStore,
 } from "@/lib/realtime/feedbackStore";
@@ -13,11 +20,11 @@ const PAGE_SIZE = 20;
 /** Client-side read cap: stop loading more after this many items (cost protection). */
 const FEEDBACK_LOAD_CAP = 200;
 
-type SessionCounts = {
-  total: number;
-  open: number;
-  resolved: number;
-  skipped: number;
+const ZERO_COUNTS: Counts = {
+  total: 0,
+  open: 0,
+  resolved: 0,
+  skipped: 0,
 };
 
 export interface UseSessionFeedbackPaginatedResult {
@@ -63,12 +70,7 @@ export function useSessionFeedbackPaginated(
     return feedbackRealtime.items;
   }, [feedbackRealtime.sessionId, feedbackRealtime.items, sessionId]);
   const [apiItems, setApiItems] = useState<Feedback[]>([]);
-  const [counts, setCounts] = useState<SessionCounts>({
-    total: 0,
-    open: 0,
-    resolved: 0,
-    skipped: 0,
-  });
+  const [counts, setCountsState] = useState<Counts>(ZERO_COUNTS);
   const total = counts.total;
   const activeCount = counts.open;
   const resolvedCount = counts.resolved;
@@ -85,7 +87,6 @@ export function useSessionFeedbackPaginated(
   const hasFetchedRef = useRef(false);
   const countsLoadedRef = useRef(false);
   const sessionIdRef = useRef<string | undefined>(sessionId);
-  const countsRequestIdRef = useRef(0);
 
   // Keep a ref to the latest sessionId so in-flight async pagination
   // can't update state after the user switches sessions.
@@ -96,6 +97,7 @@ export function useSessionFeedbackPaginated(
   // Reset infinite scroll state when sessionId changes to avoid ghost items.
   useLayoutEffect(() => {
     setApiItems([]);
+    setCountsState(ZERO_COUNTS);
     setCursor(null);
     setHasMore(true);
     setLoadingMore(false);
@@ -321,6 +323,7 @@ export function useSessionFeedbackPaginated(
       hasUserScrolledRef.current = false;
       previousFeedbackCountRef.current = 0;
       setCountsLoading(false);
+      setCountsState(ZERO_COUNTS);
       setApiItems([]);
       setCursor(null);
       setHasMore(true);
@@ -331,58 +334,47 @@ export function useSessionFeedbackPaginated(
     setInitialLoadDone(false);
     hasFetchedRef.current = false;
     countsLoadedRef.current = false;
+    const cached = getCounts(sessionId);
+    if (cached) {
+      setCountsState(cached);
+      setCountsLoading(false);
+      countsLoadedRef.current = true;
+      subscribeFeedbackSession(sessionId);
+      return;
+    }
+
+    setCountsState(ZERO_COUNTS);
     setCountsLoading(true);
     setApiItems([]);
     setCursor(null);
     setHasMore(true);
     isFetchingRef.current = false;
-    let countsCancelled = false;
-    const requestId = ++countsRequestIdRef.current;
-    // Load aggregation-backed counts; do not derive counts from paginated items.
+    countsLoadedRef.current = true;
+
+    let cancelled = false;
     void (async () => {
       try {
-        const url = `/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`;
-        const res = await authFetch(url);
-        const data = (await res.json()) as {
-          total?: number;
-          open?: number;
-          resolved?: number;
-          skipped?: number;
-        };
-        if (countsCancelled) return;
-        if (sessionIdRef.current !== sessionId) return;
-        if (countsRequestIdRef.current !== requestId) return;
-        if (
-          typeof data.total !== "number" ||
-          typeof data.open !== "number" ||
-          typeof data.resolved !== "number" ||
-          typeof data.skipped !== "number"
-        ) {
-          return;
-        }
-        const apiCounts: SessionCounts = {
-          total: data.total,
-          open: data.open,
-          resolved: data.resolved,
-          skipped: data.skipped,
-        };
-        setCounts(apiCounts);
-        console.log("COUNTS SOURCE = API", apiCounts);
-        countsLoadedRef.current = true;
+        const next = await fetchCountsDedup(sessionId);
+        if (cancelled || sessionIdRef.current !== sessionId) return;
+        setStoreCounts(sessionId, next);
       } catch {
-        // Keep UI responsive; leave counts at their existing values on fetch failures.
-      } finally {
-        if (!countsCancelled && countsRequestIdRef.current === requestId) {
-          setCountsLoading(false);
-        }
+        if (!cancelled) setCountsLoading(false);
       }
     })();
 
     subscribeFeedbackSession(sessionId);
 
     return () => {
-      countsCancelled = true;
+      cancelled = true;
     };
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    return subscribeCounts(sessionId, (nextCounts) => {
+      setCountsState(nextCounts);
+      setCountsLoading(false);
+    });
   }, [sessionId]);
 
   useEffect(() => {

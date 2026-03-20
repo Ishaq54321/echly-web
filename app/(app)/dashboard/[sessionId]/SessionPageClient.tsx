@@ -16,6 +16,12 @@ import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController
 import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
+import {
+  getCounts as getCachedCounts,
+  setCounts as setCachedCounts,
+  updateCounts as updateCachedCounts,
+  type Counts,
+} from "@/lib/state/sessionCountsStore";
 import type { Session } from "@/lib/domain/session";
 import { ECHLY_DEBUG, log, warn } from "@/lib/utils/logger";
 import Image from "next/image";
@@ -238,6 +244,45 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const preloadedScreenshotUrlsRef = useRef<Set<string>>(new Set());
   const insightRequestKeyRef = useRef<string | null>(null);
 
+  const ensureCountsSeeded = useCallback((): Counts | null => {
+    if (!sessionId) return null;
+    const existing = getCachedCounts(sessionId);
+    if (existing) return existing;
+    const seed: Counts = {
+      total: feedbackTotal,
+      open: feedbackActiveCount,
+      resolved: feedbackResolvedCount,
+      skipped: feedbackSkippedCount,
+    };
+    setCachedCounts(sessionId, seed);
+    return seed;
+  }, [
+    sessionId,
+    feedbackTotal,
+    feedbackActiveCount,
+    feedbackResolvedCount,
+    feedbackSkippedCount,
+  ]);
+
+  const applyCountTransition = useCallback(
+    (previousStatus: "open" | "resolved" | "skipped", nextStatus: "open" | "resolved" | "skipped") => {
+      if (!sessionId || previousStatus === nextStatus) return;
+      ensureCountsSeeded();
+      updateCachedCounts(sessionId, (current) => {
+        const next = { ...current };
+        if (previousStatus === "open") next.open = Math.max(0, next.open - 1);
+        if (previousStatus === "resolved") next.resolved = Math.max(0, next.resolved - 1);
+        if (previousStatus === "skipped") next.skipped = Math.max(0, next.skipped - 1);
+
+        if (nextStatus === "open") next.open += 1;
+        if (nextStatus === "resolved") next.resolved += 1;
+        if (nextStatus === "skipped") next.skipped += 1;
+        return next;
+      });
+    },
+    [sessionId, ensureCountsSeeded]
+  );
+
   /* Escape exits comment mode (canvas-native: no panel open by default). */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -304,12 +349,19 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         clientTimestamp: Date.now(),
       };
       setFeedback((prev) => [newItem, ...prev]);
+      ensureCountsSeeded();
+      updateCachedCounts(evSessionId, (c) => ({
+        total: c.total + 1,
+        open: c.open + 1,
+        resolved: c.resolved,
+        skipped: c.skipped,
+      }));
       setSelectedId(ticket.id);
       setNewTicketId(ticket.id);
     };
     window.addEventListener("ECHLY_FEEDBACK_CREATED", handler);
     return () => window.removeEventListener("ECHLY_FEEDBACK_CREATED", handler);
-  }, [sessionId, session, setFeedback]);
+  }, [sessionId, session, setFeedback, ensureCountsSeeded]);
 
   /* ================= AUTH + LOAD SESSION (title/meta only) ================= */
   useEffect(() => {
@@ -392,8 +444,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const selectedIndex = feedback.findIndex((f) => f.id === selectedId);
   const selectedIndexInOpen = openFeedback.findIndex((f) => f.id === selectedId);
-  const executionModeTotal =
-    !feedbackCountsLoading && feedbackActiveCount > 0 ? feedbackActiveCount : openFeedback.length;
+  const executionModeTotal = feedbackActiveCount;
 
   // Preload only the next 1-2 ticket screenshots from the current selection.
   useEffect(() => {
@@ -420,11 +471,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             ? selectedIndex + 1
             : 1,
       total:
-        executionMode && openFeedback.length > 0
+        executionMode
           ? executionModeTotal
-          : feedbackTotal > 0
-            ? feedbackTotal
-            : 1,
+          : feedbackTotal,
     };
   })();
 
@@ -564,8 +613,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const saveResolved = async (isResolved: boolean) => {
     if (!selectedId) return;
+    const previousStatus = selectedItem ? getTicketStatus(selectedItem) : "open";
+    const nextStatus = isResolved ? "resolved" : "open";
     const previousResolved = Boolean(selectedItem?.isResolved);
     const previousSkipped = Boolean(selectedItem?.isSkipped);
+    const previousCounts = sessionId ? getCachedCounts(sessionId) : null;
 
     // Optimistic update: resolving/unresolving clears skipped state.
     setFeedback((prev) =>
@@ -573,6 +625,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         item.id === selectedId ? { ...item, isResolved, isSkipped: false } : item
       )
     );
+    applyCountTransition(previousStatus, nextStatus);
     try {
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
@@ -600,6 +653,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             : item
         )
       );
+      if (sessionId && previousCounts) {
+        setCachedCounts(sessionId, previousCounts);
+      }
     }
   };
 
@@ -617,6 +673,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const handleExecutionSkip = async () => {
     if (!selectedId) return;
+    const previousStatus = selectedItem ? getTicketStatus(selectedItem) : "open";
+    const previousResolved = Boolean(selectedItem?.isResolved);
+    const previousSkipped = Boolean(selectedItem?.isSkipped);
+    const previousCounts = sessionId ? getCachedCounts(sessionId) : null;
     setExecutionStreak(0);
     const openIdx = openFeedback.findIndex((f) => f.id === selectedId);
     const nextOpen = openIdx >= 0 ? openFeedback[openIdx + 1] ?? openFeedback[0] : undefined;
@@ -627,6 +687,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         item.id === selectedId ? { ...item, isSkipped: true, isResolved: false } : item
       )
     );
+    applyCountTransition(previousStatus, "skipped");
     setSelectedId(nextOpenId ?? null);
 
     try {
@@ -638,9 +699,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     } catch {
       setFeedback((prev) =>
         prev.map((item) =>
-          item.id === selectedId ? { ...item, isSkipped: false } : item
+          item.id === selectedId
+            ? { ...item, isSkipped: previousSkipped, isResolved: previousResolved }
+            : item
         )
       );
+      if (sessionId && previousCounts) {
+        setCachedCounts(sessionId, previousCounts);
+      }
       setSelectedId(selectedId);
     }
   };
@@ -705,6 +771,24 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const handleMarkAllResolved = useCallback(async () => {
     const active = feedback.filter((item) => getTicketStatus(item) === "open");
     if (active.length === 0) return;
+    const previousFeedback = feedback;
+    const previousCounts = sessionId ? getCachedCounts(sessionId) : null;
+    setFeedback((prev) =>
+      prev.map((item) =>
+        getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
+      )
+    );
+    ensureCountsSeeded();
+    if (sessionId) {
+      updateCachedCounts(sessionId, (current) => {
+        const moved = active.length;
+        return {
+          ...current,
+          open: Math.max(0, current.open - moved),
+          resolved: current.resolved + moved,
+        };
+      });
+    }
     try {
       await Promise.all(
         active.map((item) =>
@@ -718,18 +802,37 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       );
     } catch (err) {
       warn("Mark all resolved failed:", err);
+      setFeedback(previousFeedback);
+      if (sessionId && previousCounts) {
+        setCachedCounts(sessionId, previousCounts);
+      }
       return;
     }
-    setFeedback((prev) =>
-      prev.map((item) =>
-        getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
-      )
-    );
-  }, [feedback, setFeedback]);
+  }, [feedback, sessionId, setFeedback, ensureCountsSeeded]);
 
   const handleMarkAllUnresolved = useCallback(async () => {
     const resolved = feedback.filter((item) => getTicketStatus(item) === "resolved");
     if (resolved.length === 0) return;
+    const previousFeedback = feedback;
+    const previousCounts = sessionId ? getCachedCounts(sessionId) : null;
+    setFeedback((prev) =>
+      prev.map((item) =>
+        getTicketStatus(item) === "resolved"
+          ? { ...item, isResolved: false }
+          : item
+      )
+    );
+    ensureCountsSeeded();
+    if (sessionId) {
+      updateCachedCounts(sessionId, (current) => {
+        const moved = resolved.length;
+        return {
+          ...current,
+          open: current.open + moved,
+          resolved: Math.max(0, current.resolved - moved),
+        };
+      });
+    }
     try {
       await Promise.all(
         resolved.map((item) =>
@@ -743,16 +846,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       );
     } catch (err) {
       warn("Mark all unresolved failed:", err);
+      setFeedback(previousFeedback);
+      if (sessionId && previousCounts) {
+        setCachedCounts(sessionId, previousCounts);
+      }
       return;
     }
-    setFeedback((prev) =>
-      prev.map((item) =>
-        getTicketStatus(item) === "resolved"
-          ? { ...item, isResolved: false }
-          : item
-      )
-    );
-  }, [feedback, setFeedback]);
+  }, [feedback, sessionId, setFeedback, ensureCountsSeeded]);
 
   /* ================= AI SAVE (Structure Engine V2) ================= */
 
@@ -947,6 +1047,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         clientTimestamp: Date.now(),
       };
       setFeedback((prev) => [newItem, ...prev]);
+      ensureCountsSeeded();
+      updateCachedCounts(sessionId, (c) => ({
+        total: c.total + 1,
+        open: c.open + 1,
+        resolved: c.resolved,
+        skipped: c.skipped,
+      }));
       setSelectedId(newItem.id);
       return newItem;
     }
@@ -990,6 +1097,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (created.length === 0) return undefined;
 
     setFeedback((prev) => [...created, ...prev]);
+    ensureCountsSeeded();
+    updateCachedCounts(sessionId, (c) => ({
+      total: c.total + created.length,
+      open: c.open + created.length,
+      resolved: c.resolved,
+      skipped: c.skipped,
+    }));
     setSelectedId(created[0].id);
     return created[0];
   };
@@ -1029,6 +1143,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     );
     if (created.length === 0) return;
     setFeedback((prev) => [...created, ...prev]);
+    ensureCountsSeeded();
+    updateCachedCounts(sessionId, (c) => ({
+      total: c.total + created.length,
+      open: c.open + created.length,
+      resolved: c.resolved,
+      skipped: c.skipped,
+    }));
     setSelectedId(created[0].id);
   };
 
@@ -1054,17 +1175,32 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     );
     if (created.length === 0) return;
     setFeedback((prev) => [...created, ...prev]);
+    ensureCountsSeeded();
+    updateCachedCounts(sessionId, (c) => ({
+      total: c.total + created.length,
+      open: c.open + created.length,
+      resolved: c.resolved,
+      skipped: c.skipped,
+    }));
     setSelectedId(created[0].id);
   };
 
   const handleDeleteFeedback = async (id: string) => {
     const deletedItem = feedback.find((f) => f.id === id);
-    const wasResolved = deletedItem?.isResolved ?? false;
-    const wasSkipped = deletedItem?.isSkipped === true;
+    const deletedStatus = deletedItem ? getTicketStatus(deletedItem) : "open";
     const prevFeedback = feedback;
+    const prevCounts = sessionId ? getCachedCounts(sessionId) : null;
     const nextList = feedback.filter((item) => item.id !== id);
     const nextSelected = selectedId === id ? nextList[0]?.id ?? null : selectedId;
     setFeedback(nextList);
+    ensureCountsSeeded();
+    updateCachedCounts(sessionId, (c) => {
+      const next = { ...c, total: Math.max(0, c.total - 1) };
+      if (deletedStatus === "open") next.open = Math.max(0, next.open - 1);
+      if (deletedStatus === "resolved") next.resolved = Math.max(0, next.resolved - 1);
+      if (deletedStatus === "skipped") next.skipped = Math.max(0, next.skipped - 1);
+      return next;
+    });
     setSelectedId(nextSelected);
     setShowDeleteModal(false);
     try {
@@ -1074,6 +1210,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       router.push(`/dashboard/${sessionId}`);
     } catch {
       setFeedback(prevFeedback);
+      if (sessionId && prevCounts) {
+        setCachedCounts(sessionId, prevCounts);
+      }
       setSelectedId(selectedId);
     }
   };
@@ -1263,10 +1402,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         <aside className="hidden lg:flex w-[300px] h-full overflow-hidden shrink-0 min-h-0 flex-col">
           <TicketList
             sessionTitle={session?.title ?? "Session"}
-            totalCount={feedbackTotal}
-            openCount={feedbackActiveCount}
-            resolvedCount={feedbackResolvedCount}
-            skippedCount={feedbackSkippedCount}
+            counts={{
+              total: feedbackTotal,
+              open: feedbackActiveCount,
+              resolved: feedbackResolvedCount,
+              skipped: feedbackSkippedCount,
+            }}
             countsLoading={feedbackCountsLoading}
             isEditingSessionTitle={isEditingSessionTitle}
             sessionTitleDraft={sessionTitleDraft}
@@ -1310,7 +1451,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                   Tickets
                 </button>
               </div>
-              {openFeedback.length > 0 && (
+              {feedbackActiveCount > 0 && (
                 <button
                   type="button"
                   onClick={() => setExecutionMode(true)}
@@ -1436,11 +1577,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           >
             <TicketList
               sessionTitle={session?.title ?? "Session"}
-              totalCount={feedbackTotal}
-              openCount={feedbackActiveCount}
-              resolvedCount={feedbackResolvedCount}
-              skippedCount={feedbackSkippedCount}
-            countsLoading={feedbackCountsLoading}
+              counts={{
+                total: feedbackTotal,
+                open: feedbackActiveCount,
+                resolved: feedbackResolvedCount,
+                skipped: feedbackSkippedCount,
+              }}
+              countsLoading={feedbackCountsLoading}
               isEditingSessionTitle={isEditingSessionTitle}
               sessionTitleDraft={sessionTitleDraft}
               onSessionTitleChange={setSessionTitleDraft}

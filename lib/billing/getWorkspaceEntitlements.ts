@@ -17,12 +17,9 @@ export type WorkspaceEntitlements = PlanConfig;
 export async function getWorkspaceEntitlements(
   workspace: Workspace
 ): Promise<WorkspaceEntitlements> {
-  const t_entitlements_start = performance.now();
   const plan = (workspace.billing?.plan ?? "free") as PlanId;
 
-  const t_catalog_start = performance.now();
   const catalog = await getPlanCatalog();
-  console.log("[ECHLY PERF] getWorkspaceEntitlements.getPlanCatalog:", performance.now() - t_catalog_start);
   const entry = catalog[plan] ?? catalog.free;
   const fromCatalog: PlanConfig = {
     maxSessions: entry.maxSessions,
@@ -36,6 +33,5 @@ export async function getWorkspaceEntitlements(
     maxMembers: overrides?.maxMembers !== undefined ? overrides.maxMembers : fromCatalog.maxMembers,
     insightsAccess: overrides?.insightsAccess !== undefined ? overrides.insightsAccess : fromCatalog.insightsAccess,
   };
-  console.log("[ECHLY PERF] getWorkspaceEntitlements TOTAL:", performance.now() - t_entitlements_start);
   return result;
 }

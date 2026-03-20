@@ -6,7 +6,8 @@ import { getSessionByIdRepo, updateSessionAiInsightSummaryRepo } from "@/lib/rep
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
-import { getSessionFeedbackPageWithStringCursorRepo, getSessionFeedbackTotalCountRepo } from "@/lib/repositories/feedbackRepository";
+import { getSessionFeedbackPageWithStringCursorRepo } from "@/lib/repositories/feedbackRepository";
+import { resolveSessionFeedbackCounts } from "@/lib/server/resolveSessionFeedbackCounts";
 
 type SessionInsightBody = { sessionId?: unknown };
 
@@ -181,7 +182,10 @@ export async function POST(req: Request): Promise<Response> {
     throw err;
   }
 
-  const totalCount = await getSessionFeedbackTotalCountRepo(sessionId);
+  const { total: totalCount } = await resolveSessionFeedbackCounts(
+    sessionId,
+    session as unknown as Record<string, unknown>
+  );
   const cachedSummary =
     typeof (session as unknown as { aiInsightSummary?: unknown }).aiInsightSummary === "string"
       ? ((session as unknown as { aiInsightSummary: string }).aiInsightSummary ?? "").trim()

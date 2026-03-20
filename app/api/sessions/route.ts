@@ -5,7 +5,6 @@ import {
   createSessionRepo,
   getWorkspaceSessionCountRepo,
 } from "@/lib/repositories/sessionsRepository";
-import { log } from "@/lib/utils/logger";
 import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
@@ -25,8 +24,6 @@ export async function OPTIONS(req: NextRequest) {
 
 /** GET /api/sessions — list sessions for the authenticated user. */
 export async function GET(req: NextRequest) {
-  const start = Date.now();
-  log("[API] GET /api/sessions start");
   let user;
   try {
     user = await requireAuth(req);
@@ -53,11 +50,6 @@ export async function GET(req: NextRequest) {
         title?: string;
         updatedAt?: { toDate?: () => Date } | string | null;
         createdAt?: { toDate?: () => Date } | string | null;
-        openCount?: number;
-        resolvedCount?: number;
-        skippedCount?: number;
-        totalCount?: number;
-        feedbackCount?: number;
         archived?: boolean;
       };
       const toIsoString = (
@@ -78,20 +70,9 @@ export async function GET(req: NextRequest) {
         title: data.title ?? "Untitled Session",
         name: data.title ?? "Untitled Session",
         updatedAt,
-        openCount: typeof data.openCount === "number" ? data.openCount : 0,
-        resolvedCount: typeof data.resolvedCount === "number" ? data.resolvedCount : 0,
-        skippedCount: typeof data.skippedCount === "number" ? data.skippedCount : 0,
-        totalCount:
-          typeof data.totalCount === "number"
-            ? data.totalCount
-            : typeof data.feedbackCount === "number"
-              ? data.feedbackCount
-              : 0,
-        feedbackCount: typeof data.feedbackCount === "number" ? data.feedbackCount : 0,
         archived: data.archived === true,
       };
     });
-    log("[API] GET /api/sessions duration:", Date.now() - start);
     return NextResponse.json({ sessions }, { headers: corsHeaders(req) });
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
@@ -101,7 +82,6 @@ export async function GET(req: NextRequest) {
       });
     }
     console.error("GET /api/sessions:", err);
-    log("[API] GET /api/sessions duration (error):", Date.now() - start);
     return NextResponse.json(
       { success: false, error: "Failed to load sessions" },
       { status: 500, headers: corsHeaders(req) }
@@ -114,19 +94,10 @@ export async function GET(req: NextRequest) {
  * Session limit is enforced ONLY here (at creation). Reducing maxSessions never deletes existing sessions.
  */
 export async function POST(req: NextRequest) {
-  const start = performance.now();
-  console.log("[ECHLY PERF] /api/sessions START");
-
-  // ----------------------------------------
-  // AUTH CHECK
-  // ----------------------------------------
-  const t_auth_start = performance.now();
   let user;
   try {
     user = await requireAuth(req);
   } catch (res) {
-    const t_auth_end = performance.now();
-    console.log("[ECHLY PERF] auth:", t_auth_end - t_auth_start);
     const errRes = res as Response;
     return new NextResponse(errRes.body, {
       status: errRes.status,
@@ -134,30 +105,10 @@ export async function POST(req: NextRequest) {
       headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
     });
   }
-  const t_auth_end = performance.now();
-  console.log("[ECHLY PERF] auth:", t_auth_end - t_auth_start);
-
-  // ----------------------------------------
-  // REQUEST PARSING (no body for create session)
-  // ----------------------------------------
-  const t_parse_start = performance.now();
-  // no body parsing / validation for POST create session
-  const t_parse_end = performance.now();
-  console.log("[ECHLY PERF] parse:", t_parse_end - t_parse_start);
 
   try {
-    // ----------------------------------------
-    // RESOLVE WORKSPACE
-    // ----------------------------------------
-    const t_resolve_start = performance.now();
     const { workspaceId, workspace } = await resolveWorkspaceForUser(user.uid);
-    const t_resolve_end = performance.now();
-    console.log("[ECHLY PERF] resolve_workspace:", t_resolve_end - t_resolve_start);
 
-    // ----------------------------------------
-    // PLAN / LIMIT CHECK
-    // ----------------------------------------
-    const t_limit_start = performance.now();
     if (workspace) {
       const currentSessionCount = await getWorkspaceSessionCountRepo(workspaceId, workspace);
       try {
@@ -167,12 +118,8 @@ export async function POST(req: NextRequest) {
           currentUsage: currentSessionCount,
         });
       } catch (limitErr) {
-        const t_limit_end = performance.now();
-        console.log("[ECHLY PERF] limit check:", t_limit_end - t_limit_start);
         const planErr = limitErr as PlanLimitError;
         if (planErr.code === "PLAN_LIMIT_REACHED") {
-          const end = performance.now();
-          console.log("[ECHLY PERF] TOTAL:", end - start);
           return NextResponse.json(planLimitReachedBody(planErr), {
             status: 403,
             headers: corsHeaders(req),
@@ -181,26 +128,14 @@ export async function POST(req: NextRequest) {
         throw limitErr;
       }
     }
-    const t_limit_end = performance.now();
-    console.log("[ECHLY PERF] limit check:", t_limit_end - t_limit_start);
 
-    // ----------------------------------------
-    // DATABASE WRITE
-    // ----------------------------------------
-    const t_db_start = performance.now();
     const id = await createSessionRepo(workspaceId, user.uid, null);
-    const t_db_end = performance.now();
-    console.log("[ECHLY PERF] db write:", t_db_end - t_db_start);
 
-    const end = performance.now();
-    console.log("[ECHLY PERF] TOTAL:", end - start);
     return NextResponse.json(
       { success: true, session: { id } },
       { headers: corsHeaders(req) }
     );
   } catch (err) {
-    const end = performance.now();
-    console.log("[ECHLY PERF] TOTAL (error):", end - start);
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
         status: 403,

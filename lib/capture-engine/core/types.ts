@@ -103,7 +103,7 @@ export type CaptureWidgetProps = {
   /** Called when user clicks theme toggle. */
   onThemeToggle?: () => void;
   /** Extension: fetch sessions for Previous Sessions picker. */
-  fetchSessions?: () => Promise<Array<{ id: string; title: string; updatedAt?: string; openCount?: number; resolvedCount?: number; feedbackCount?: number; [key: string]: unknown }>>;
+  fetchSessions?: () => Promise<import("./ResumeSessionModal").SessionOption[]>;
   /** Extension: true when backend has at least one session (from /api/sessions?limit=1). Used to show Previous Sessions button only when sessions exist. */
   hasPreviousSessions?: boolean;
   /** Extension: when user selects a session from Previous Sessions picker. Parent should set active session, fetch feedback, then pass loadSessionWithPointers. If options.enterCaptureImmediately, parent should also start session mode (overlay) after load. */

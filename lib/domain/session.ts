@@ -47,3 +47,41 @@ export interface Session {
   isOptimistic?: boolean;
 }
 
+/** Narrow `/api/sessions`-shaped JSON into `Session` (no type assertions on callers). */
+export function sessionsArrayFromApiPayload(data: unknown): Session[] {
+  if (typeof data !== "object" || data === null) return [];
+  const raw = Reflect.get(data, "sessions");
+  if (!Array.isArray(raw)) return [];
+  const out: Session[] = [];
+  for (const item of raw) {
+    const s = sessionFromApiItem(item);
+    if (s) out.push(s);
+  }
+  return out;
+}
+
+export function sessionFromApiItem(item: unknown): Session | null {
+  if (typeof item !== "object" || item === null) return null;
+  const id = Reflect.get(item, "id");
+  if (typeof id !== "string") return null;
+  const titleRaw = Reflect.get(item, "title");
+  const title = typeof titleRaw === "string" ? titleRaw : "Untitled Session";
+  const session: Session = { id, title };
+
+  const archived = Reflect.get(item, "archived");
+  if (typeof archived === "boolean") {
+    session.archived = archived;
+  }
+
+  const updatedAt = Reflect.get(item, "updatedAt");
+  if (
+    typeof updatedAt === "string" ||
+    updatedAt instanceof Date ||
+    updatedAt === null
+  ) {
+    session.updatedAt = updatedAt;
+  }
+
+  return session;
+}
+

@@ -50,13 +50,10 @@ function buildDefaultCatalog(): PlanCatalog {
  * Fetches plan catalog from Firestore and merges with code defaults. Used by getPlanCatalog.
  */
 async function fetchPlans(): Promise<PlanCatalog> {
-  const t_catalog_start = performance.now();
   const catalog = buildDefaultCatalog();
 
   try {
-    const t_firestore_start = performance.now();
     const snapshot = await getDocs(collection(db, PLANS_COLLECTION));
-    console.log("[ECHLY PERF] getPlanCatalog.getDocs(plans):", performance.now() - t_firestore_start);
     snapshot.docs.forEach((docSnap) => {
       const id = docSnap.id as PlanId;
       if (!(id in catalog)) return;
@@ -85,11 +82,9 @@ async function fetchPlans(): Promise<PlanCatalog> {
             : current.insightsEnabled,
       };
     });
-    console.log("[ECHLY PERF] getPlanCatalog TOTAL:", performance.now() - t_catalog_start);
     return catalog;
   } catch {
     // Safety fallback: never crash because plans can't be fetched.
-    console.log("[ECHLY PERF] getPlanCatalog TOTAL (fallback):", performance.now() - t_catalog_start);
     return catalog;
   }
 }
@@ -101,16 +96,13 @@ async function fetchPlans(): Promise<PlanCatalog> {
 export async function getPlanCatalog(): Promise<PlanCatalog> {
   const now = Date.now();
   if (cachedCatalog && now - lastFetchTime < CACHE_TTL) {
-    console.log("[ECHLY CACHE] planCatalog HIT");
     return cachedCatalog;
   }
 
   if (inFlightCatalogFetch) {
-    console.log("[ECHLY CACHE] planCatalog IN-FLIGHT");
     return inFlightCatalogFetch;
   }
 
-  console.log("[ECHLY CACHE] planCatalog MISS");
   inFlightCatalogFetch = fetchPlans();
   try {
     const catalog = await inFlightCatalogFetch;

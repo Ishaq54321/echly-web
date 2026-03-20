@@ -166,16 +166,28 @@ function ensureAuthenticated(): Promise<boolean> {
   });
 }
 
-/** Notify background when content creates a ticket via apiFetch so globalUIState.pointers stays in sync. */
-function notifyFeedbackCreated(ticket: { id: string; title: string; actionSteps?: string[]; type?: string }): void {
+/** Notify background when content creates a ticket via apiFetch so globalUIState stays in sync. */
+function notifyFeedbackCreated(
+  ticket: { id: string; title: string; actionSteps?: string[]; type?: string },
+  sessionId?: string | null
+): void {
   chrome.runtime.sendMessage({
     type: "ECHLY_FEEDBACK_CREATED",
+    sessionId: sessionId ?? undefined,
     ticket: {
       id: ticket.id,
       title: ticket.title,
       actionSteps: ticket.actionSteps ?? [],
       type: ticket.type ?? "Feedback",
     },
+  }).catch(() => {});
+}
+
+function notifyFeedbackCountRefetch(sessionId?: string | null): void {
+  if (!sessionId) return;
+  chrome.runtime.sendMessage({
+    type: "ECHLY_REFETCH_FEEDBACK_COUNT",
+    sessionId,
   }).catch(() => {});
 }
 
@@ -244,6 +256,21 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [isProcessingFeedback, setIsProcessingFeedback] = React.useState(false);
   /** Job queue for concurrent feedback captures; each job shows its own Processing/failed card in the tray. */
   const [feedbackJobs, setFeedbackJobs] = React.useState<FeedbackJob[]>([]);
+
+  React.useEffect(() => {
+    if (!isProcessingFeedback) return;
+    const timeoutId = setTimeout(() => {
+      setIsProcessingFeedback((current) => {
+        if (current) {
+          console.warn("[ECHLY FAILSAFE] Resetting stuck state");
+          return false;
+        }
+        return current;
+      });
+    }, 5000);
+    return () => clearTimeout(timeoutId);
+  }, [isProcessingFeedback]);
+
   const getAssetUrl = React.useCallback((path: string) => {
     if (typeof chrome !== "undefined" && chrome.runtime?.getURL) {
       return chrome.runtime.getURL(path);
@@ -372,6 +399,47 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     };
   }, [globalState.visible]);
 
+  const readApiResponseSafely = React.useCallback(
+    async <T,>(response: Response): Promise<{ data: T | null; text: string | null }> => {
+      let data: T | null = null;
+      let text: string | null = null;
+
+      try {
+        text = await response.text();
+        try {
+          data = JSON.parse(text) as T;
+        } catch {
+          console.warn("[ECHLY WARN] Non-JSON response:", text);
+        }
+      } catch (err) {
+        console.error("[ECHLY ERROR] Failed to read response:", err);
+      }
+
+      return { data, text };
+    },
+    []
+  );
+
+  const isAuthFailureResponse = React.useCallback((text: string | null): boolean => {
+    return Boolean(
+      text?.includes("Not authenticated") ||
+      text?.includes("NOT_AUTHENTICATED")
+    );
+  }, []);
+
+  const getExtensionToken = React.useCallback(async () => {
+    const token = await new Promise<string | null>((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: "ECHLY_GET_EXTENSION_TOKEN" },
+        (response: { token?: string | null } | undefined) => {
+          resolve(response?.token ?? null);
+        }
+      );
+    });
+    console.log("[ECHLY TOKEN] Retrieved:", token ? "YES" : "NO");
+    return token;
+  }, []);
+
   /* Extension: when background forwards ECHLY_START_SESSION to this tab, run start-session flow. */
   React.useEffect(() => {
     const handler = () => {
@@ -488,7 +556,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       options?: { sessionMode?: boolean }
     ): Promise<StructuredFeedback | undefined> => {
       echlyLog("PIPELINE", "start");
-
       if (!effectiveSessionId || !user) {
         echlyLog("PIPELINE", "error");
         callbacks?.onError?.();
@@ -511,13 +578,30 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           if (ctx?.ocrImageDataUrl) {
             if (ECHLY_DEBUG) console.log("[ECHLY] OCR running on selection image");
           }
-          const visibleTextPromise = getVisibleTextFromScreenshot(imageForOcr);
+          let ocrResult: string | null = null;
+          try {
+            console.log("[ECHLY OCR] Starting OCR");
+            const ocrPromise = getVisibleTextFromScreenshot(imageForOcr);
+            const timeout = new Promise<string | null>((resolve) =>
+              setTimeout(() => resolve(null), 1500)
+            );
+            ocrResult = await Promise.race([ocrPromise, timeout]);
+            console.log("[ECHLY OCR] Result or timeout:", ocrResult);
+            if (ocrResult) {
+              console.log("[ECHLY OCR] Success");
+            } else {
+              console.warn("[ECHLY OCR] Skipped (CSP or timeout)");
+            }
+          } catch (err) {
+            console.error("[ECHLY OCR] Failed:", err);
+            ocrResult = null;
+          }
           const firstFeedbackId = generateFeedbackId();
           const screenshotId = generateScreenshotId();
           const uploadPromise = screenshot
             ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
             : Promise.resolve(null as string | null);
-          const visibleTextFromScreenshot = await visibleTextPromise;
+          const visibleTextFromScreenshot = ocrResult ?? "";
           if (ECHLY_DEBUG) console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
           if (imageForOcr) {
             if (ECHLY_DEBUG) console.log("[ECHLY] OCR result length:", visibleTextFromScreenshot?.length ?? 0);
@@ -534,7 +618,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           };
           delete (enrichedContext as Record<string, unknown>).ocrImageDataUrl;
           if (ECHLY_DEBUG) console.log("[ECHLY] AI payload:", { transcript, context: enrichedContext });
-          const structureBody = { transcript, context: enrichedContext };
+          const structureBody = {
+            transcript,
+            context: enrichedContext,
+            ocr: ocrResult,
+            ocrText: ocrResult || null,
+          };
           try {
             echlyLog("PIPELINE", "structure request");
             if (ECHLY_DEBUG) console.log("[VOICE] final transcript submitted", transcript);
@@ -622,7 +711,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               chrome.runtime.sendMessage(
                 {
                   type: "ECHLY_PROCESS_FEEDBACK",
-                  payload: { transcript, screenshotUrl: null, screenshotId, sessionId: effectiveSessionId, context: enrichedContext },
+                  payload: {
+                    transcript,
+                    screenshotUrl: null,
+                    screenshotId,
+                    sessionId: effectiveSessionId,
+                    context: enrichedContext,
+                    ocr: ocrResult,
+                    ocrText: ocrResult || null,
+                  },
                 },
                 (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] }; error?: string } | undefined) => {
                   if (chrome.runtime.lastError) {
@@ -689,16 +786,38 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 metadata: { clientTimestamp: Date.now() },
                 ...clarityMeta,
               };
+              const token = await getExtensionToken();
+              if (!token) {
+                console.error("[ECHLY AUTH] No extension token available");
+                setSessionMessage("Authentication expired. Please sign in again.");
+                setIsProcessingFeedback(false);
+                return;
+              }
+              console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
               const feedbackRes = await apiFetch("/api/feedback", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-extension-token": token,
+                },
                 body: JSON.stringify(body),
               });
-              const feedbackJson = (await feedbackRes.json()) as {
+              const { data: feedbackJson, text } = await readApiResponseSafely<{
                 success?: boolean;
                 ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
-              };
-              if (feedbackJson.success && feedbackJson.ticket) {
+              }>(feedbackRes);
+              if (!feedbackRes.ok) {
+                console.error("[ECHLY ERROR] API failed:", feedbackRes.status, text);
+                if (isAuthFailureResponse(text)) {
+                  console.warn("[ECHLY AUTH] Extension not authenticated");
+                  setFeedbackJobs((prev) =>
+                    prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "Not authenticated." } : j))
+                  );
+                  callbacks.onError();
+                  return;
+                }
+              }
+              if (feedbackJson?.success && feedbackJson.ticket) {
                 const tick = feedbackJson.ticket;
                 const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
                 if (!firstCreated)
@@ -709,7 +828,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               const ticketId = firstCreated.id;
               echlyLog("PIPELINE", "ticket created", { ticketId });
               setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
-              notifyFeedbackCreated(firstCreated);
+              notifyFeedbackCreated(firstCreated, effectiveSessionId);
               uploadPromise.then((url) => {
                 if (url) {
                   echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
@@ -730,6 +849,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               callbacks.onError();
             }
           } catch (err) {
+            console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
             console.error("[Echly] Structure or submit failed:", err);
             setFeedbackJobs((prev) =>
               prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "AI processing failed." } : j))
@@ -747,11 +867,29 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       if (ctx2?.ocrImageDataUrl) {
         if (ECHLY_DEBUG) console.log("[ECHLY] OCR running on selection image");
       }
+      let ocrResult: string | null = null;
+      try {
+        console.log("[ECHLY OCR] Starting OCR");
+        const ocrPromise = getVisibleTextFromScreenshot(imageForOcr);
+        const timeout = new Promise<string | null>((resolve) =>
+          setTimeout(() => resolve(null), 1500)
+        );
+        ocrResult = await Promise.race([ocrPromise, timeout]);
+        console.log("[ECHLY OCR] Result or timeout:", ocrResult);
+        if (ocrResult) {
+          console.log("[ECHLY OCR] Success");
+        } else {
+          console.warn("[ECHLY OCR] Skipped (CSP or timeout)");
+        }
+      } catch (err) {
+        console.error("[ECHLY OCR] Failed:", err);
+        ocrResult = null;
+      }
       const screenshotId = generateScreenshotId();
       const uploadPromise = screenshot
         ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId)
         : Promise.resolve(null as string | null);
-      const visibleTextFromScreenshot = await getVisibleTextFromScreenshot(imageForOcr);
+      const visibleTextFromScreenshot = ocrResult ?? "";
       if (ECHLY_DEBUG) console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
       if (imageForOcr) {
         if (ECHLY_DEBUG) console.log("[ECHLY] OCR result length:", visibleTextFromScreenshot?.length ?? 0);
@@ -771,6 +909,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       const structureBody = {
         transcript,
         context: enrichedContext,
+        ocr: ocrResult,
+        ocrText: ocrResult || null,
       };
       echlyLog("PIPELINE", "structure request");
       if (ECHLY_DEBUG) console.log("[VOICE] final transcript submitted", transcript);
@@ -820,16 +960,36 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           metadata: { clientTimestamp: Date.now() },
           ...clarityMeta,
         };
+        const token = await getExtensionToken();
+        if (!token) {
+          console.error("[ECHLY AUTH] No extension token available");
+          setSessionMessage("Authentication expired. Please sign in again.");
+          setIsProcessingFeedback(false);
+          return undefined;
+        }
+        console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
         const feedbackRes = await apiFetch("/api/feedback", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-extension-token": token,
+          },
           body: JSON.stringify(body),
         });
-        const feedbackJson = (await feedbackRes.json()) as {
+        console.log("[ECHLY FLOW] API response received");
+        const { data: feedbackJson, text } = await readApiResponseSafely<{
           success?: boolean;
           ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
-        };
-        if (feedbackJson.success && feedbackJson.ticket) {
+        }>(feedbackRes);
+        if (!feedbackRes.ok) {
+          console.error("[ECHLY ERROR] API failed:", feedbackRes.status, text);
+          if (isAuthFailureResponse(text)) {
+            console.warn("[ECHLY AUTH] Extension not authenticated");
+            setIsProcessingFeedback(false);
+            return undefined;
+          }
+        }
+        if (feedbackJson?.success && feedbackJson.ticket) {
           const tick = feedbackJson.ticket;
           const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
           if (!firstCreated)
@@ -838,7 +998,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       if (firstCreated) {
         const ticketId = firstCreated.id;
-        notifyFeedbackCreated(firstCreated);
+        notifyFeedbackCreated(firstCreated, effectiveSessionId);
         uploadPromise.then((url) => {
           if (url) {
             apiFetch(`/api/tickets/${ticketId}`, {
@@ -850,7 +1010,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }).catch(() => {});
       }
       return firstCreated;
+      } catch (err) {
+        console.error("[ECHLY FLOW ERROR]", err);
+        console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
+        setIsProcessingFeedback(false);
+        throw err;
       } finally {
+        console.log("[ECHLY FLOW] Ending processing state");
         setIsProcessingFeedback(false);
       }
     },
@@ -860,11 +1026,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const handleDelete = React.useCallback(async (id: string) => {
     try {
       await apiFetch(`/api/tickets/${id}`, { method: "DELETE" });
+      notifyFeedbackCountRefetch(effectiveSessionId);
     } catch (err) {
       console.error("[Echly] Delete ticket failed:", err);
       throw err;
     }
-  }, []);
+  }, [effectiveSessionId]);
 
   const handleUpdate = React.useCallback(
     async (id: string, payload: { title: string; actionSteps: string[] }) => {
@@ -1009,6 +1176,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     async (pending: ExtensionClarityPending) => {
       if (!effectiveSessionId) return;
       setIsProcessingFeedback(true);
+      try {
       if (pending.tickets.length === 0) {
         chrome.runtime.sendMessage(
           {
@@ -1019,6 +1187,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               screenshotId: pending.screenshotId,
               sessionId: effectiveSessionId,
               context: pending.context ?? {},
+              ocrText: null,
             },
           },
           (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string }; error?: string } | undefined) => {
@@ -1080,16 +1249,36 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           metadata: { clientTimestamp: Date.now() },
           ...clarityMeta,
         };
+        const token = await getExtensionToken();
+        if (!token) {
+          console.error("[ECHLY AUTH] No extension token available");
+          setSessionMessage("Authentication expired. Please sign in again.");
+          setIsProcessingFeedback(false);
+          return;
+        }
+        console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
         const feedbackRes = await apiFetch("/api/feedback", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-extension-token": token,
+          },
           body: JSON.stringify(body),
         });
-        const feedbackJson = (await feedbackRes.json()) as {
+        console.log("[ECHLY FLOW] API response received");
+        const { data: feedbackJson, text } = await readApiResponseSafely<{
           success?: boolean;
           ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
-        };
-        if (feedbackJson.success && feedbackJson.ticket) {
+        }>(feedbackRes);
+        if (!feedbackRes.ok) {
+          console.error("[ECHLY ERROR] API failed:", feedbackRes.status, text);
+          if (isAuthFailureResponse(text)) {
+            console.warn("[ECHLY AUTH] Extension not authenticated");
+            setIsProcessingFeedback(false);
+            return;
+          }
+        }
+        if (feedbackJson?.success && feedbackJson.ticket) {
           const tick = feedbackJson.ticket;
           const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
           if (!firstCreated)
@@ -1114,6 +1303,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         setIsProcessingFeedback(false);
         pending.callbacks.onError();
       }
+      } catch (err) {
+        console.error("[ECHLY FLOW ERROR]", err);
+        setIsProcessingFeedback(false);
+        pending.callbacks.onError();
+      } finally {
+        console.log("[ECHLY FLOW] Ending processing state");
+        setIsProcessingFeedback(false);
+      }
     },
     [effectiveSessionId]
   );
@@ -1121,7 +1318,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const submitEditedFeedback = React.useCallback(
     async (pending: ExtensionClarityPending, editedText: string) => {
       if (!effectiveSessionId) return;
-      setIsProcessingFeedback(true);
       const trimmed = editedText.trim();
       try {
         const structureBody = { transcript: trimmed, context: pending.context ?? {} };
@@ -1153,6 +1349,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 screenshotId: pending.screenshotId,
                 sessionId: effectiveSessionId,
                 context: pending.context ?? {},
+                ocrText: null,
               },
             },
             (response: { success?: boolean; ticket?: { id: string; title: string; description: string; type?: string } } | undefined) => {
@@ -1208,16 +1405,36 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             metadata: { clientTimestamp: Date.now() },
             ...clarityMeta,
           };
+          const token = await getExtensionToken();
+          if (!token) {
+            console.error("[ECHLY AUTH] No extension token available");
+            setSessionMessage("Authentication expired. Please sign in again.");
+            setIsProcessingFeedback(false);
+            return;
+          }
+          console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
           const feedbackRes = await apiFetch("/api/feedback", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-extension-token": token,
+            },
             body: JSON.stringify(body),
           });
-          const feedbackJson = (await feedbackRes.json()) as {
+          console.log("[ECHLY FLOW] API response received");
+          const { data: feedbackJson, text } = await readApiResponseSafely<{
             success?: boolean;
             ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
-          };
-          if (feedbackJson.success && feedbackJson.ticket) {
+          }>(feedbackRes);
+          if (!feedbackRes.ok) {
+            console.error("[ECHLY ERROR] API failed:", feedbackRes.status, text);
+            if (isAuthFailureResponse(text)) {
+              console.warn("[ECHLY AUTH] Extension not authenticated");
+              setIsProcessingFeedback(false);
+              return;
+            }
+          }
+          if (feedbackJson?.success && feedbackJson.ticket) {
             const tick = feedbackJson.ticket;
             const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
             if (!firstCreated)
@@ -1226,7 +1443,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
         if (firstCreated) {
           const ticketId = firstCreated.id;
-          notifyFeedbackCreated(firstCreated);
+          notifyFeedbackCreated(firstCreated, effectiveSessionId);
           pending.uploadPromise.then((url) => {
             if (url) {
               apiFetch(`/api/tickets/${ticketId}`, {
@@ -1244,10 +1461,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           pending.callbacks.onError();
         }
       } catch (err) {
+        console.error("[ECHLY FLOW ERROR]", err);
+        console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
         console.error("[Echly] Submit edited feedback failed:", err);
         echlyLog("PIPELINE", "error");
         setIsProcessingFeedback(false);
         pending.callbacks.onError();
+      } finally {
+        console.log("[ECHLY FLOW] Ending processing state");
+        setIsProcessingFeedback(false);
       }
     },
     [effectiveSessionId]
@@ -1293,16 +1515,36 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           metadata: { clientTimestamp: Date.now() },
           ...clarityMeta,
         };
+        const token = await getExtensionToken();
+        if (!token) {
+          console.error("[ECHLY AUTH] No extension token available");
+          setSessionMessage("Authentication expired. Please sign in again.");
+          setIsProcessingFeedback(false);
+          return;
+        }
+        console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
         const feedbackRes = await apiFetch("/api/feedback", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-extension-token": token,
+          },
           body: JSON.stringify(body),
         });
-        const feedbackJson = (await feedbackRes.json()) as {
+        console.log("[ECHLY FLOW] API response received");
+        const { data: feedbackJson, text } = await readApiResponseSafely<{
           success?: boolean;
           ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
-        };
-        if (feedbackJson.success && feedbackJson.ticket) {
+        }>(feedbackRes);
+        if (!feedbackRes.ok) {
+          console.error("[ECHLY ERROR] API failed:", feedbackRes.status, text);
+          if (isAuthFailureResponse(text)) {
+            console.warn("[ECHLY AUTH] Extension not authenticated");
+            setIsProcessingFeedback(false);
+            return;
+          }
+        }
+        if (feedbackJson?.success && feedbackJson.ticket) {
           const tick = feedbackJson.ticket;
           const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
           if (!firstCreated)
@@ -1311,7 +1553,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       if (firstCreated) {
         const ticketId = firstCreated.id;
-        notifyFeedbackCreated(firstCreated);
+        notifyFeedbackCreated(firstCreated, effectiveSessionId);
         pending.uploadPromise.then((url) => {
           if (url) {
             apiFetch(`/api/tickets/${ticketId}`, {
@@ -1329,10 +1571,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         pending.callbacks.onError();
       }
     } catch (err) {
+      console.error("[ECHLY FLOW ERROR]", err);
+      console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
       console.error("[Echly] Use suggestion failed:", err);
       echlyLog("PIPELINE", "error");
       setIsProcessingFeedback(false);
       pending.callbacks.onError();
+    } finally {
+      console.log("[ECHLY FLOW] Ending processing state");
+      setIsProcessingFeedback(false);
     }
   }, [extensionClarityPending, effectiveSessionId]);
 
@@ -1907,7 +2154,8 @@ function waitForBody(cb: () => void) {
  * Visibility via ECHLY_VISIBILITY from background. No re-mount, no injection logic.
  * Host is mounted only after document.body exists so the tray stays visible on all tabs.
  */
-function main(): void {
+function injectWidgetUI(): void {
+  console.log("[ECHLY INJECT] UI injected");
   if (window.__ECHLY_WIDGET_LOADED__) return;
   window.__ECHLY_WIDGET_LOADED__ = true;
 
@@ -1953,4 +2201,16 @@ function main(): void {
   ensureScrollDebugListeners();
 }
 
-main();
+function safeAutoInject() {
+  if (document.readyState === "complete") {
+    injectWidgetUI();
+  } else {
+    window.addEventListener("load", () => {
+      setTimeout(() => {
+        injectWidgetUI();
+      }, 50); // small delay to allow hydration
+    });
+  }
+}
+
+safeAutoInject();

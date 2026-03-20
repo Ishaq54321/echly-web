@@ -11,7 +11,7 @@ import {
   type AddCommentData,
   type UpdateCommentData,
 } from "@/lib/repositories/commentsRepository";
-import { resolveFeedbackRepo } from "@/lib/repositories/feedbackRepository";
+import { updateFeedbackResolveAndSessionCountersRepo } from "@/lib/repositories/feedbackRepository";
 import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
 
 export interface AddCommentOptions {
@@ -43,7 +43,9 @@ export async function updatePinPosition(
 }
 
 export async function resolveFeedback(feedbackId: string, sessionId?: string) {
-  await resolveFeedbackRepo(feedbackId);
+  await updateFeedbackResolveAndSessionCountersRepo(feedbackId, {
+    isResolved: true,
+  });
   if (sessionId) await updateSessionUpdatedAtRepo(sessionId);
 }
 

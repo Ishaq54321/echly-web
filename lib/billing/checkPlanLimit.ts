@@ -20,17 +20,12 @@ export async function checkPlanLimit(params: {
   metric: PlanLimitMetric;
   currentUsage: number;
 }): Promise<void> {
-  const t_check_start = performance.now();
-  const t_entitlements_start = performance.now();
   const entitlements = await getWorkspaceEntitlements(params.workspace);
-  console.log("[ECHLY PERF] checkPlanLimit.getWorkspaceEntitlements:", performance.now() - t_entitlements_start);
   const limit = entitlements[params.metric];
   if (limit == null) {
-    console.log("[ECHLY PERF] checkPlanLimit TOTAL:", performance.now() - t_check_start);
     return; // unlimited
   }
   if (params.currentUsage < limit) {
-    console.log("[ECHLY PERF] checkPlanLimit TOTAL:", performance.now() - t_check_start);
     return;
   }
 
@@ -47,6 +42,5 @@ export async function checkPlanLimit(params: {
   (err as PlanLimitError).code = "PLAN_LIMIT_REACHED";
   (err as PlanLimitError).metric = params.metric;
   (err as PlanLimitError).upgradePlan = upgradePlan;
-  console.log("[ECHLY PERF] checkPlanLimit TOTAL:", performance.now() - t_check_start);
   throw err;
 }

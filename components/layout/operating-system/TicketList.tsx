@@ -9,10 +9,12 @@ import { TicketItem } from "./TicketItem";
 export interface TicketListProps {
   /** Session header (left sidebar top) */
   sessionTitle?: string;
-  totalCount?: number;
-  openCount?: number;
-  resolvedCount?: number;
-  skippedCount?: number;
+  counts: {
+    total: number;
+    open: number;
+    resolved: number;
+    skipped: number;
+  };
   /** True while `/api/feedback/counts` is still loading aggregation counts. */
   countsLoading?: boolean;
   /** Optional: editable session title */
@@ -48,10 +50,7 @@ export interface TicketListProps {
 
 function TicketListInner({
   sessionTitle = "Session",
-  totalCount,
-  openCount,
-  resolvedCount,
-  skippedCount,
+  counts,
   countsLoading = false,
   isEditingSessionTitle = false,
   sessionTitleDraft,
@@ -103,16 +102,7 @@ function TicketListInner({
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const total = typeof totalCount === "number" ? totalCount : 0;
-  const open = typeof openCount === "number" ? openCount : 0;
-  const resolved = typeof resolvedCount === "number" ? resolvedCount : 0;
-  const skipped = typeof skippedCount === "number" ? skippedCount : 0;
-
-  console.log("SIDEBAR COUNTS RENDER", {
-    openCount: open,
-    skippedCount: skipped,
-    resolvedCount: resolved,
-  });
+  const { total, open, resolved, skipped } = counts;
 
   const meta = (() => {
     // Keep header pills consistent with the "…" loading treatment.

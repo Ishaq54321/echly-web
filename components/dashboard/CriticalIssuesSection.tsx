@@ -32,9 +32,7 @@ export function CriticalIssuesSection({
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         {items.map((item) => {
           const swc = sessionsById.get(item.sessionId);
-          const open = swc
-            ? swc.session.openCount ?? swc.counts.open
-            : 0;
+          const open = swc ? swc.counts.open : 0;
           return (
             <button
               key={item.id}

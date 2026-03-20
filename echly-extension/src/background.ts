@@ -7,6 +7,8 @@ import { ECHLY_DEBUG, warn } from "../../lib/utils/logger";
 import { echlyLog } from "../../lib/debug/echlyLogger";
 import { setExtensionToken, apiFetch } from "../utils/apiFetch";
 import { API_BASE, WEB_APP_URL } from "../config";
+import { fetchCountsDedup } from "./countsRequestStore";
+import { sessionsArrayFromApiPayload } from "@/lib/domain/session";
 
 const LOGIN_URL = `${WEB_APP_URL}/login`;
 /** Extension token TTL from backend is 15m; treat as valid for 14 min to avoid edge expiry. */
@@ -77,6 +79,32 @@ type FeedbackCountResponse = {
   skipped?: number;
   resolved?: number;
 };
+type CountStatus = "open" | "resolved" | "skipped";
+type SessionCounts = {
+  total: number;
+  open: number;
+  skipped: number;
+  resolved: number;
+};
+const COUNTS_TTL_MS = 5 * 60 * 1000;
+const countsBySessionId: Map<string, { counts: SessionCounts; at: number }> = new Map();
+
+function getCounts(sessionId: string): SessionCounts | null {
+  const cached = countsBySessionId.get(sessionId);
+  if (!cached) return null;
+  if (Date.now() - cached.at > COUNTS_TTL_MS) {
+    countsBySessionId.delete(sessionId);
+    return null;
+  }
+  return cached.counts;
+}
+
+function setCounts(sessionId: string, counts: SessionCounts): void {
+  countsBySessionId.set(sessionId, {
+    counts,
+    at: Date.now(),
+  });
+}
 
 /** Global message-router API: single source for extension token, user, capture mode (used by message handler). */
 const sw = globalThis as typeof globalThis & {
@@ -168,18 +196,24 @@ async function fetchFeedbackCount(sessionId: string): Promise<{
   skipped: number;
   resolved: number;
 }> {
+  const cached = getCounts(sessionId);
+  if (cached) {
+    return cached;
+  }
   try {
-    const res = await apiFetch(
-      `${API_BASE}/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`
-    );
-    const data = (await res.json()) as FeedbackCountResponse;
-    console.log("COUNT API RESULT", data);
-    return {
+    const data = (await fetchCountsDedup(sessionId, () =>
+      apiFetch(
+        `${API_BASE}/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`
+      )
+    )) as FeedbackCountResponse;
+    const counts: SessionCounts = {
       total: typeof data.total === "number" ? data.total : 0,
       open: typeof data.open === "number" ? data.open : 0,
       skipped: typeof data.skipped === "number" ? data.skipped : 0,
       resolved: typeof data.resolved === "number" ? data.resolved : 0,
     };
+    setCounts(sessionId, counts);
+    return counts;
   } catch (err) {
     console.warn("[ECHLY] feedback count fetch failed", err);
     return {
@@ -189,6 +223,53 @@ async function fetchFeedbackCount(sessionId: string): Promise<{
       resolved: 0,
     };
   }
+}
+
+function mutateGlobalCounts(
+  updater: (counts: {
+    total: number;
+    open: number;
+    skipped: number;
+    resolved: number;
+  }) => {
+    total: number;
+    open: number;
+    skipped: number;
+    resolved: number;
+  }
+): void {
+  const next = updater({
+    total: globalUIState.totalCount,
+    open: globalUIState.openCount,
+    skipped: globalUIState.skippedCount,
+    resolved: globalUIState.resolvedCount,
+  });
+  globalUIState.totalCount = Math.max(0, next.total);
+  globalUIState.openCount = Math.max(0, next.open);
+  globalUIState.skippedCount = Math.max(0, next.skipped);
+  globalUIState.resolvedCount = Math.max(0, next.resolved);
+  if (globalUIState.sessionId) {
+    setCounts(globalUIState.sessionId, {
+      total: globalUIState.totalCount,
+      open: globalUIState.openCount,
+      skipped: globalUIState.skippedCount,
+      resolved: globalUIState.resolvedCount,
+    });
+  }
+}
+
+function applyStatusTransition(previousStatus: CountStatus, nextStatus: CountStatus): void {
+  if (previousStatus === nextStatus) return;
+  mutateGlobalCounts((counts) => {
+    const next = { ...counts };
+    if (previousStatus === "open") next.open -= 1;
+    if (previousStatus === "resolved") next.resolved -= 1;
+    if (previousStatus === "skipped") next.skipped -= 1;
+    if (nextStatus === "open") next.open += 1;
+    if (nextStatus === "resolved") next.resolved += 1;
+    if (nextStatus === "skipped") next.skipped += 1;
+    return next;
+  });
 }
 
 async function loadMore(): Promise<void> {
@@ -424,6 +505,7 @@ async function getExtensionToken(): Promise<string> {
     extensionTokenExpiresAt != null &&
     now < extensionTokenExpiresAt
   ) {
+    console.log("[ECHLY TOKEN] Retrieved:", "YES");
     return extensionToken;
   }
 
@@ -438,9 +520,11 @@ async function getExtensionToken(): Promise<string> {
     sw.currentUser = null;
     cachedSessionUser = null;
     setExtensionToken(null);
+    console.log("[ECHLY TOKEN] Retrieved:", "NO");
     throw new Error("NOT_AUTHENTICATED");
   }
   if (!res.ok) {
+    console.log("[ECHLY TOKEN] Retrieved:", "NO");
     throw new Error("NOT_AUTHENTICATED");
   }
 
@@ -450,8 +534,10 @@ async function getExtensionToken(): Promise<string> {
   };
   const token = data?.extensionToken;
   if (!token) {
+    console.log("[ECHLY TOKEN] Retrieved:", "NO");
     throw new Error("NOT_AUTHENTICATED");
   }
+  console.log("[ECHLY TOKEN] Retrieved:", token ? "YES" : "NO");
 
   extensionToken = token;
   extensionTokenExpiresAt = Date.now() + EXTENSION_TOKEN_TTL_MS;
@@ -847,6 +933,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_FEEDBACK_CREATED") {
     const ticket = (request as { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } }).ticket;
+    const sessionId = (request as { sessionId?: string }).sessionId ?? globalUIState.sessionId;
     if (ticket?.id && ticket?.title) {
       const pointer: StructuredFeedback = {
         id: ticket.id,
@@ -855,9 +942,50 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         type: ticket.type ?? "Feedback",
       };
       globalUIState.pointers = [pointer, ...globalUIState.pointers];
-      globalUIState.totalCount += 1;
-      globalUIState.openCount += 1;
+      mutateGlobalCounts((counts) => ({
+        total: counts.total + 1,
+        open: counts.open + 1,
+        skipped: counts.skipped,
+        resolved: counts.resolved,
+      }));
       resetSessionIdleTimer();
+      broadcastUIState();
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_REFETCH_FEEDBACK_COUNT") {
+    const payload = request as {
+      sessionId?: string;
+      mutation?: {
+        kind?: "create" | "delete" | "transition";
+        deletedStatus?: CountStatus;
+        from?: CountStatus;
+        to?: CountStatus;
+      };
+    };
+    const sessionId = payload.sessionId ?? globalUIState.sessionId;
+    const mutation = payload.mutation;
+    if (mutation?.kind === "create") {
+      mutateGlobalCounts((counts) => ({
+        total: counts.total + 1,
+        open: counts.open + 1,
+        skipped: counts.skipped,
+        resolved: counts.resolved,
+      }));
+      broadcastUIState();
+    } else if (mutation?.kind === "delete" && mutation.deletedStatus) {
+      mutateGlobalCounts((counts) => {
+        const next = { ...counts, total: counts.total - 1 };
+        if (mutation.deletedStatus === "open") next.open -= 1;
+        if (mutation.deletedStatus === "resolved") next.resolved -= 1;
+        if (mutation.deletedStatus === "skipped") next.skipped -= 1;
+        return next;
+      });
+      broadcastUIState();
+    } else if (mutation?.kind === "transition" && mutation.from && mutation.to) {
+      applyStatusTransition(mutation.from, mutation.to);
       broadcastUIState();
     }
     sendResponse({ ok: true });
@@ -959,10 +1087,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             : null;
         globalUIState.hasMore = feedbackJson.hasMore === true;
         globalUIState.isFetching = false;
-        const sessionsJson = (await sessionsRes.json()) as { sessions?: Array<{ id: string; title?: string; name?: string }> };
-        if (sessionsRes.ok && Array.isArray(sessionsJson.sessions)) {
-          const match = sessionsJson.sessions.find((s) => s.id === sessionId);
-          globalUIState.sessionTitle = match?.title ?? match?.name ?? null;
+        const sessionsPayload: unknown = await sessionsRes.json();
+        if (sessionsRes.ok) {
+          const sessionsList = sessionsArrayFromApiPayload(sessionsPayload);
+          const match = sessionsList.find((s) => s.id === sessionId);
+          globalUIState.sessionTitle = match?.title ?? null;
         }
       } catch {
         globalUIState.pointers = [];
@@ -1086,7 +1215,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_GET_TOKEN") {
     (async () => {
       try {
-        const token = await getValidToken();
+        const token = await getExtensionToken();
         sendResponse({ token });
       } catch (error) {
         sendResponse({ error: "NOT_AUTHENTICATED" });
@@ -1098,11 +1227,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_GET_EXTENSION_TOKEN") {
     (async () => {
       try {
-        const token = await getValidToken();
+        const token = await getExtensionToken();
         sw.extensionToken = token;
         sendResponse({ token });
-      } catch {
-        sendResponse({ token: sw.extensionToken ?? null });
+      } catch (error) {
+        console.error("[ECHLY AUTH] Failed to get extension token", error);
+        sendResponse({ token: null, error: "NOT_AUTHENTICATED" });
       }
     })();
     return true;
@@ -1417,8 +1547,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             type: firstCreated.type,
           };
           globalUIState.pointers = [...globalUIState.pointers, pointer];
-          globalUIState.totalCount += 1;
-          globalUIState.openCount += 1;
+          mutateGlobalCounts((counts) => ({
+            total: counts.total + 1,
+            open: counts.open + 1,
+            skipped: counts.skipped,
+            resolved: counts.resolved,
+          }));
           resetSessionIdleTimer();
           broadcastUIState();
           sendResponse({ success: true, ticket: firstCreated });
@@ -1459,8 +1593,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
     (async () => {
       try {
-        await getValidToken();
-        console.log("API request using extension token");
+        const token = await getExtensionToken();
+        if (!token) {
+          throw new Error("NOT_AUTHENTICATED");
+        }
+        console.log("[ECHLY DEBUG] API request token present:", token ? "YES" : "NO");
         const res = await apiFetch(url, {
           method: method || "GET",
           headers: headers ?? {},
@@ -1478,8 +1615,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({
           ok: false,
           status: isAuth ? 401 : 0,
-          headers: {},
-          body: isAuth ? "Not authenticated" : message,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(
+            isAuth
+              ? { error: "NOT_AUTHENTICATED" }
+              : { error: "ECHLY_API_PROXY_ERROR", message }
+          ),
         });
       }
     })();

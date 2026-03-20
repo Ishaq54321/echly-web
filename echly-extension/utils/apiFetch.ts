@@ -9,13 +9,19 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
     throw new Error("Extension token missing");
   }
 
+  const existingHeaders = options.headers || {};
+  const mergedHeaders =
+    existingHeaders instanceof Headers
+      ? Object.fromEntries(existingHeaders)
+      : Array.isArray(existingHeaders)
+        ? Object.fromEntries(existingHeaders)
+        : { ...existingHeaders };
+
   const response = await fetch(url, {
     ...options,
-    credentials: "include",
     headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${extensionToken}`,
-      ...(options.headers || {}),
+      "x-extension-token": extensionToken,
+      ...mergedHeaders,
     },
   });
 

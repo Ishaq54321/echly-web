@@ -7,10 +7,7 @@ import { db } from "@/lib/firebase";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { clearAuthTokenCache, authFetch } from "@/lib/authFetch";
-import { getSessionFeedbackCounts } from "@/lib/feedback";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import type { Session } from "@/lib/domain/session";
-import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import { useWorkspaceOverview } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import { Folder, Loader2 } from "lucide-react";
@@ -26,35 +23,6 @@ interface FolderData {
   id: string;
   name: string;
   sessionIds: string[];
-}
-
-async function loadFolderSessions(
-  sessionIds: string[]
-): Promise<SessionWithCounts[]> {
-  if (sessionIds.length === 0) return [];
-
-  const sessionsAndCounts = await Promise.all(
-    sessionIds.map(async (id) => {
-      const session = await getSessionByIdRepo(id);
-      const counts: SessionFeedbackCounts = session
-        ? await getSessionFeedbackCounts(id)
-        : { open: 0, resolved: 0, skipped: 0 };
-      return { id, session, counts };
-    })
-  );
-
-  const valid = sessionsAndCounts.filter(
-    (x): x is { id: string; session: Session; counts: SessionFeedbackCounts } =>
-      x.session != null && !(x.session as Session & { archived?: boolean }).archived
-  );
-
-  const orderMap = new Map(sessionIds.map((id, i) => [id, i]));
-  return valid
-    .map(({ session, counts }) => ({ session, counts }))
-    .sort(
-      (a, b) =>
-        (orderMap.get(a.session.id) ?? 999) - (orderMap.get(b.session.id) ?? 999)
-    );
 }
 
 function FolderPageContent() {
@@ -74,7 +42,7 @@ function FolderPageContent() {
     message: string;
     upgradePlan: string | null;
   } | null>(null);
-  const { sessions: allSessions } = useWorkspaceOverview("all");
+  const { sessions: allSessions, loading: allSessionsLoading } = useWorkspaceOverview("all");
   const sessionsNotInFolder = useMemo(
     () =>
       folder
@@ -103,9 +71,6 @@ function FolderPageContent() {
       sessionIds: data.sessionIds ?? [],
     };
     setFolder(folderData);
-
-    const sessionsWithCounts = await loadFolderSessions(folderData.sessionIds);
-    setSessions(sessionsWithCounts);
     setLoading(false);
   }, [folderId]);
 
@@ -123,7 +88,7 @@ function FolderPageContent() {
   useEffect(() => {
     if (!folderId) return;
     initialSnapshotHandledRef.current = false;
-    const unsub = onSnapshot(doc(db, "folders", folderId), async (snap) => {
+    const unsub = onSnapshot(doc(db, "folders", folderId), (snap) => {
       if (!initialSnapshotHandledRef.current) {
         initialSnapshotHandledRef.current = true;
       }
@@ -140,12 +105,31 @@ function FolderPageContent() {
         sessionIds: data.sessionIds ?? [],
       };
       setFolder(folderData);
-      const sessionsWithCounts = await loadFolderSessions(folderData.sessionIds);
-      setSessions(sessionsWithCounts);
       setLoading(false);
     });
     return () => unsub();
   }, [folderId]);
+
+  useEffect(() => {
+    if (!folder) {
+      setSessions([]);
+      return;
+    }
+    const orderMap = new Map(folder.sessionIds.map((id, i) => [id, i]));
+    const mapped = allSessions
+      .filter(({ session }) => folder.sessionIds.includes(session.id) && !session.archived)
+      .sort(
+        (a, b) =>
+          (orderMap.get(a.session.id) ?? Number.MAX_SAFE_INTEGER) -
+          (orderMap.get(b.session.id) ?? Number.MAX_SAFE_INTEGER)
+      );
+    setSessions(mapped);
+  }, [folder, allSessions]);
+
+  useEffect(() => {
+    if (!folder) return;
+    setLoading(allSessionsLoading);
+  }, [folder, allSessionsLoading]);
 
   const handleCreateSession = useCallback(async () => {
     const currentUser = auth.currentUser;
@@ -161,7 +145,7 @@ function FolderPageContent() {
         updatedAt: new Date(),
         isOptimistic: true,
       },
-      counts: { open: 0, resolved: 0, skipped: 0 },
+      counts: { total: 0, open: 0, resolved: 0, skipped: 0 },
     };
     setSessions((prev) => [tempItem, ...prev]);
 

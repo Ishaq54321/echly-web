@@ -49,9 +49,9 @@ export function PriorityStack({ items, onView }: PriorityStackProps) {
       </h2>
       <ul className="divide-y divide-[var(--layer-1-border)]">
         {items.map(({ session, counts }) => {
-          const open = session.openCount ?? counts.open;
-          const resolved = session.resolvedCount ?? counts.resolved;
-          const total = open + resolved;
+          const open = counts.open;
+          const resolved = counts.resolved;
+          const total = counts.total;
           const progressPct = total > 0 ? Math.round((resolved / total) * 100) : 0;
           const urgency = open > 5 ? "High" : open > 2 ? "Medium" : "Low";
 

@@ -60,7 +60,6 @@ export function WorkspaceCard({
 }: WorkspaceCardProps) {
   const { setDraggedSessionId } = useDragSession();
   const { session, counts } = item;
-  console.log("SESSION DATA", session);
   const isOptimistic = Boolean(session.isOptimistic);
   const updatedAt = typeof session.updatedAt === "string" ? session.updatedAt : null;
   const updatedAtDate = updatedAt ? new Date(updatedAt) : null;
@@ -68,10 +67,8 @@ export function WorkspaceCard({
     updatedAtDate && !Number.isNaN(updatedAtDate.getTime())
       ? formatDistanceToNowStrict(updatedAtDate, { addSuffix: true })
       : "—";
-  const feedbackCount = counts.open + counts.resolved;
-  const openFeedbackCount = counts.open;
-  const openCount = openFeedbackCount;
-  const allCompleted = feedbackCount > 0 && counts.resolved === feedbackCount;
+  const feedbackCount = counts.total;
+  const openCount = counts.open;
   const viewCount = session.viewCount ?? 0;
   const commentCount = session.commentCount ?? 0;
 
