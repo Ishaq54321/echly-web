@@ -440,6 +440,22 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return token;
   }, []);
 
+  const resolveUploadedScreenshotId = React.useCallback(
+    async (
+      uploadPromise: Promise<string | null>,
+      screenshotId: string
+    ): Promise<string | undefined> => {
+      try {
+        const uploadedUrl = await uploadPromise;
+        return uploadedUrl ? screenshotId : undefined;
+      } catch (err) {
+        console.warn("[ECHLY] Screenshot upload failed before feedback create:", err);
+        return undefined;
+      }
+    },
+    []
+  );
+
   /* Extension: when background forwards ECHLY_START_SESSION to this tab, run start-session flow. */
   React.useEffect(() => {
     const handler = () => {
@@ -708,13 +724,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             }
 
             if (!data.success || tickets.length === 0) {
+              const uploadedScreenshotId = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
               chrome.runtime.sendMessage(
                 {
                   type: "ECHLY_PROCESS_FEEDBACK",
                   payload: {
                     transcript,
                     screenshotUrl: null,
-                    screenshotId,
+                    screenshotId: uploadedScreenshotId,
                     sessionId: effectiveSessionId,
                     context: enrichedContext,
                     ocr: ocrResult,
@@ -742,17 +759,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                       actionSteps,
                       type: t.type ?? "Feedback",
                     });
-                    uploadPromise.then((url) => {
-                      if (url) {
-                        echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
-                        echlyLog("PIPELINE", "screenshot patched", { ticketId });
-                        apiFetch(`/api/tickets/${ticketId}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ screenshotUrl: url }),
-                        }).catch(() => {});
-                      }
-                    }).catch(() => {});
                   } else {
                     echlyLog("PIPELINE", "error");
                     setFeedbackJobs((prev) =>
@@ -768,6 +774,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             /* clarityScore > 20: continue with normal submission to /api/feedback */
             const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
             const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
+            const uploadedScreenshotId = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
             let firstCreated: StructuredFeedback | undefined;
             for (let i = 0; i < tickets.length; i++) {
               const t = tickets[i];
@@ -782,7 +789,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 actionSteps,
                 suggestedTags: t.suggestedTags,
                 screenshotUrl: null,
-                screenshotId: i === 0 ? screenshotId : undefined,
+                screenshotId: i === 0 ? uploadedScreenshotId : undefined,
                 metadata: { clientTimestamp: Date.now() },
                 ...clarityMeta,
               };
@@ -829,17 +836,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               echlyLog("PIPELINE", "ticket created", { ticketId });
               setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
               notifyFeedbackCreated(firstCreated, effectiveSessionId);
-              uploadPromise.then((url) => {
-                if (url) {
-                  echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
-                  echlyLog("PIPELINE", "screenshot patched", { ticketId });
-                  apiFetch(`/api/tickets/${ticketId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ screenshotUrl: url }),
-                  }).catch(() => {});
-                }
-              }).catch(() => {});
               callbacks.onSuccess(firstCreated);
             } else {
               echlyLog("PIPELINE", "error");
@@ -943,6 +939,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
       const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
       const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
+      const uploadedScreenshotId = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
       let firstCreated: StructuredFeedback | undefined;
       for (let i = 0; i < tickets.length; i++) {
         const t = tickets[i];
@@ -956,7 +953,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
           suggestedTags: t.suggestedTags,
           screenshotUrl: null,
-          screenshotId: i === 0 ? screenshotId : undefined,
+          screenshotId: i === 0 ? uploadedScreenshotId : undefined,
           metadata: { clientTimestamp: Date.now() },
           ...clarityMeta,
         };
@@ -997,17 +994,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
       }
       if (firstCreated) {
-        const ticketId = firstCreated.id;
         notifyFeedbackCreated(firstCreated, effectiveSessionId);
-        uploadPromise.then((url) => {
-          if (url) {
-            apiFetch(`/api/tickets/${ticketId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ screenshotUrl: url }),
-            }).catch(() => {});
-          }
-        }).catch(() => {});
       }
       return firstCreated;
       } catch (err) {
@@ -1178,13 +1165,17 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       setIsProcessingFeedback(true);
       try {
       if (pending.tickets.length === 0) {
+        const uploadedScreenshotId = await resolveUploadedScreenshotId(
+          pending.uploadPromise,
+          pending.screenshotId
+        );
         chrome.runtime.sendMessage(
           {
             type: "ECHLY_PROCESS_FEEDBACK",
             payload: {
               transcript: pending.transcript,
               screenshotUrl: null,
-              screenshotId: pending.screenshotId,
+              screenshotId: uploadedScreenshotId,
               sessionId: effectiveSessionId,
               context: pending.context ?? {},
               ocrText: null,
@@ -1208,15 +1199,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 actionSteps,
                 type: t.type ?? "Feedback",
               });
-              pending.uploadPromise.then((url) => {
-                if (url) {
-                  apiFetch(`/api/tickets/${ticketId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ screenshotUrl: url }),
-                  }).catch(() => {});
-                }
-              }).catch(() => {});
             } else {
               echlyLog("PIPELINE", "error");
               pending.callbacks.onError();
@@ -1232,6 +1214,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         clarityConfidence: pending.confidence,
         clarityStatus: (pending.clarityScore >= 85 ? "clear" : pending.clarityScore >= 60 ? "needs_improvement" : "unclear") as "clear" | "needs_improvement" | "unclear",
       };
+      const uploadedScreenshotId = await resolveUploadedScreenshotId(
+        pending.uploadPromise,
+        pending.screenshotId
+      );
       let firstCreated: StructuredFeedback | undefined;
       for (let i = 0; i < pending.tickets.length; i++) {
         const t = pending.tickets[i];
@@ -1245,7 +1231,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
           suggestedTags: t.suggestedTags,
           screenshotUrl: null,
-          screenshotId: i === 0 ? pending.screenshotId : undefined,
+          screenshotId: i === 0 ? uploadedScreenshotId : undefined,
           metadata: { clientTimestamp: Date.now() },
           ...clarityMeta,
         };
@@ -1286,16 +1272,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
       }
       if (firstCreated) {
-        const ticketId = firstCreated.id;
-        pending.uploadPromise.then((url) => {
-          if (url) {
-            apiFetch(`/api/tickets/${ticketId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ screenshotUrl: url }),
-            }).catch(() => {});
-          }
-        }).catch(() => {});
         setIsProcessingFeedback(false);
         pending.callbacks.onSuccess(firstCreated);
       } else {
@@ -1340,13 +1316,17 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
 
         if (tickets.length === 0) {
+          const uploadedScreenshotId = await resolveUploadedScreenshotId(
+            pending.uploadPromise,
+            pending.screenshotId
+          );
           chrome.runtime.sendMessage(
             {
               type: "ECHLY_PROCESS_FEEDBACK",
               payload: {
                 transcript: trimmed,
                 screenshotUrl: null,
-                screenshotId: pending.screenshotId,
+                screenshotId: uploadedScreenshotId,
                 sessionId: effectiveSessionId,
                 context: pending.context ?? {},
                 ocrText: null,
@@ -1370,15 +1350,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   actionSteps,
                   type: t.type ?? "Feedback",
                 });
-                pending.uploadPromise.then((url) => {
-                  if (url) {
-                    apiFetch(`/api/tickets/${ticketId}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ screenshotUrl: url }),
-                    }).catch(() => {});
-                  }
-                }).catch(() => {});
               } else {
                 echlyLog("PIPELINE", "error");
                 pending.callbacks.onError();
@@ -1389,6 +1360,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
 
         let firstCreated: StructuredFeedback | undefined;
+        const uploadedScreenshotId = await resolveUploadedScreenshotId(
+          pending.uploadPromise,
+          pending.screenshotId
+        );
         for (let i = 0; i < tickets.length; i++) {
           const t = tickets[i];
           const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
@@ -1401,7 +1376,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
             suggestedTags: t.suggestedTags,
             screenshotUrl: null,
-            screenshotId: i === 0 ? pending.screenshotId : undefined,
+            screenshotId: i === 0 ? uploadedScreenshotId : undefined,
             metadata: { clientTimestamp: Date.now() },
             ...clarityMeta,
           };
@@ -1442,17 +1417,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           }
         }
         if (firstCreated) {
-          const ticketId = firstCreated.id;
           notifyFeedbackCreated(firstCreated, effectiveSessionId);
-          pending.uploadPromise.then((url) => {
-            if (url) {
-              apiFetch(`/api/tickets/${ticketId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ screenshotUrl: url }),
-              }).catch(() => {});
-            }
-          }).catch(() => {});
           setIsProcessingFeedback(false);
           pending.callbacks.onSuccess(firstCreated);
         } else {
@@ -1498,6 +1463,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       const confidence = data.confidence ?? 0.5;
       const clarityStatus = (clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear") as "clear" | "needs_improvement" | "unclear";
       const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
+      const uploadedScreenshotId = await resolveUploadedScreenshotId(
+        pending.uploadPromise,
+        pending.screenshotId
+      );
       let firstCreated: StructuredFeedback | undefined;
       for (let i = 0; i < tickets.length; i++) {
         const t = tickets[i];
@@ -1511,7 +1480,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
           suggestedTags: t.suggestedTags,
           screenshotUrl: null,
-          screenshotId: i === 0 ? pending.screenshotId : undefined,
+          screenshotId: i === 0 ? uploadedScreenshotId : undefined,
           metadata: { clientTimestamp: Date.now() },
           ...clarityMeta,
         };
@@ -1552,17 +1521,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
       }
       if (firstCreated) {
-        const ticketId = firstCreated.id;
         notifyFeedbackCreated(firstCreated, effectiveSessionId);
-        pending.uploadPromise.then((url) => {
-          if (url) {
-            apiFetch(`/api/tickets/${ticketId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ screenshotUrl: url }),
-            }).catch(() => {});
-          }
-        }).catch(() => {});
         setIsProcessingFeedback(false);
         pending.callbacks.onSuccess(firstCreated);
       } else {

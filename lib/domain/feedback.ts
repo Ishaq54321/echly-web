@@ -20,6 +20,8 @@ export interface StructuredFeedback {
 
   // Screenshot
   screenshotUrl?: string | null;
+  screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
+  status?: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
 
   // Clarity Guard (Phase 5.1)
   clarityScore?: number | null;
@@ -79,6 +81,8 @@ export interface Feedback {
 
   // Screenshot
   screenshotUrl?: string | null;
+  screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
+  status?: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
 
   // Clarity Guard (Phase 5.1)
   clarityScore?: number | null;

@@ -40919,6 +40919,18 @@
       console.log("[ECHLY TOKEN] Retrieved:", token ? "YES" : "NO");
       return token;
     }, []);
+    const resolveUploadedScreenshotId = import_react18.default.useCallback(
+      async (uploadPromise, screenshotId) => {
+        try {
+          const uploadedUrl = await uploadPromise;
+          return uploadedUrl ? screenshotId : void 0;
+        } catch (err) {
+          console.warn("[ECHLY] Screenshot upload failed before feedback create:", err);
+          return void 0;
+        }
+      },
+      []
+    );
     import_react18.default.useEffect(() => {
       const handler = () => {
         createSession().then((result) => {
@@ -41140,13 +41152,14 @@
                 }
               }
               if (!data.success || tickets.length === 0) {
+                const uploadedScreenshotId2 = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
                 chrome.runtime.sendMessage(
                   {
                     type: "ECHLY_PROCESS_FEEDBACK",
                     payload: {
                       transcript,
                       screenshotUrl: null,
-                      screenshotId,
+                      screenshotId: uploadedScreenshotId2,
                       sessionId: effectiveSessionId,
                       context: enrichedContext,
                       ocr: ocrResult,
@@ -41174,19 +41187,6 @@
                         actionSteps,
                         type: t.type ?? "Feedback"
                       });
-                      uploadPromise.then((url) => {
-                        if (url) {
-                          echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
-                          echlyLog("PIPELINE", "screenshot patched", { ticketId });
-                          apiFetch(`/api/tickets/${ticketId}`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ screenshotUrl: url })
-                          }).catch(() => {
-                          });
-                        }
-                      }).catch(() => {
-                      });
                     } else {
                       echlyLog("PIPELINE", "error");
                       setFeedbackJobs(
@@ -41200,6 +41200,7 @@
               }
               const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
               const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
+              const uploadedScreenshotId = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
               let firstCreated;
               for (let i = 0; i < tickets.length; i++) {
                 const t = tickets[i];
@@ -41214,7 +41215,7 @@
                   actionSteps,
                   suggestedTags: t.suggestedTags,
                   screenshotUrl: null,
-                  screenshotId: i === 0 ? screenshotId : void 0,
+                  screenshotId: i === 0 ? uploadedScreenshotId : void 0,
                   metadata: { clientTimestamp: Date.now() },
                   ...clarityMeta
                 };
@@ -41258,19 +41259,6 @@
                 echlyLog("PIPELINE", "ticket created", { ticketId });
                 setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
                 notifyFeedbackCreated(firstCreated, effectiveSessionId);
-                uploadPromise.then((url) => {
-                  if (url) {
-                    echlyLog("PIPELINE", "screenshot uploaded", { screenshotUrl: url });
-                    echlyLog("PIPELINE", "screenshot patched", { ticketId });
-                    apiFetch(`/api/tickets/${ticketId}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ screenshotUrl: url })
-                    }).catch(() => {
-                    });
-                  }
-                }).catch(() => {
-                });
                 callbacks.onSuccess(firstCreated);
               } else {
                 echlyLog("PIPELINE", "error");
@@ -41354,6 +41342,7 @@
           if (!data.success || tickets.length === 0) return void 0;
           const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
           const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
+          const uploadedScreenshotId = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
           let firstCreated;
           for (let i = 0; i < tickets.length; i++) {
             const t = tickets[i];
@@ -41367,7 +41356,7 @@
               actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
               suggestedTags: t.suggestedTags,
               screenshotUrl: null,
-              screenshotId: i === 0 ? screenshotId : void 0,
+              screenshotId: i === 0 ? uploadedScreenshotId : void 0,
               metadata: { clientTimestamp: Date.now() },
               ...clarityMeta
             };
@@ -41405,19 +41394,7 @@
             }
           }
           if (firstCreated) {
-            const ticketId = firstCreated.id;
             notifyFeedbackCreated(firstCreated, effectiveSessionId);
-            uploadPromise.then((url) => {
-              if (url) {
-                apiFetch(`/api/tickets/${ticketId}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ screenshotUrl: url })
-                }).catch(() => {
-                });
-              }
-            }).catch(() => {
-            });
           }
           return firstCreated;
         } catch (err) {
@@ -41573,13 +41550,17 @@
         setIsProcessingFeedback(true);
         try {
           if (pending2.tickets.length === 0) {
+            const uploadedScreenshotId2 = await resolveUploadedScreenshotId(
+              pending2.uploadPromise,
+              pending2.screenshotId
+            );
             chrome.runtime.sendMessage(
               {
                 type: "ECHLY_PROCESS_FEEDBACK",
                 payload: {
                   transcript: pending2.transcript,
                   screenshotUrl: null,
-                  screenshotId: pending2.screenshotId,
+                  screenshotId: uploadedScreenshotId2,
                   sessionId: effectiveSessionId,
                   context: pending2.context ?? {},
                   ocrText: null
@@ -41603,17 +41584,6 @@
                     actionSteps,
                     type: t.type ?? "Feedback"
                   });
-                  pending2.uploadPromise.then((url) => {
-                    if (url) {
-                      apiFetch(`/api/tickets/${ticketId}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ screenshotUrl: url })
-                      }).catch(() => {
-                      });
-                    }
-                  }).catch(() => {
-                  });
                 } else {
                   echlyLog("PIPELINE", "error");
                   pending2.callbacks.onError();
@@ -41628,6 +41598,10 @@
             clarityConfidence: pending2.confidence,
             clarityStatus: pending2.clarityScore >= 85 ? "clear" : pending2.clarityScore >= 60 ? "needs_improvement" : "unclear"
           };
+          const uploadedScreenshotId = await resolveUploadedScreenshotId(
+            pending2.uploadPromise,
+            pending2.screenshotId
+          );
           let firstCreated;
           for (let i = 0; i < pending2.tickets.length; i++) {
             const t = pending2.tickets[i];
@@ -41641,7 +41615,7 @@
               actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
               suggestedTags: t.suggestedTags,
               screenshotUrl: null,
-              screenshotId: i === 0 ? pending2.screenshotId : void 0,
+              screenshotId: i === 0 ? uploadedScreenshotId : void 0,
               metadata: { clientTimestamp: Date.now() },
               ...clarityMeta
             };
@@ -41679,18 +41653,6 @@
             }
           }
           if (firstCreated) {
-            const ticketId = firstCreated.id;
-            pending2.uploadPromise.then((url) => {
-              if (url) {
-                apiFetch(`/api/tickets/${ticketId}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ screenshotUrl: url })
-                }).catch(() => {
-                });
-              }
-            }).catch(() => {
-            });
             setIsProcessingFeedback(false);
             pending2.callbacks.onSuccess(firstCreated);
           } else {
@@ -41727,13 +41689,17 @@
           const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
           const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
           if (tickets.length === 0) {
+            const uploadedScreenshotId2 = await resolveUploadedScreenshotId(
+              pending2.uploadPromise,
+              pending2.screenshotId
+            );
             chrome.runtime.sendMessage(
               {
                 type: "ECHLY_PROCESS_FEEDBACK",
                 payload: {
                   transcript: trimmed,
                   screenshotUrl: null,
-                  screenshotId: pending2.screenshotId,
+                  screenshotId: uploadedScreenshotId2,
                   sessionId: effectiveSessionId,
                   context: pending2.context ?? {},
                   ocrText: null
@@ -41757,17 +41723,6 @@
                     actionSteps,
                     type: t.type ?? "Feedback"
                   });
-                  pending2.uploadPromise.then((url) => {
-                    if (url) {
-                      apiFetch(`/api/tickets/${ticketId}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ screenshotUrl: url })
-                      }).catch(() => {
-                      });
-                    }
-                  }).catch(() => {
-                  });
                 } else {
                   echlyLog("PIPELINE", "error");
                   pending2.callbacks.onError();
@@ -41777,6 +41732,10 @@
             return;
           }
           let firstCreated;
+          const uploadedScreenshotId = await resolveUploadedScreenshotId(
+            pending2.uploadPromise,
+            pending2.screenshotId
+          );
           for (let i = 0; i < tickets.length; i++) {
             const t = tickets[i];
             const desc = typeof t.description === "string" ? t.description : t.title ?? "";
@@ -41789,7 +41748,7 @@
               actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
               suggestedTags: t.suggestedTags,
               screenshotUrl: null,
-              screenshotId: i === 0 ? pending2.screenshotId : void 0,
+              screenshotId: i === 0 ? uploadedScreenshotId : void 0,
               metadata: { clientTimestamp: Date.now() },
               ...clarityMeta
             };
@@ -41827,19 +41786,7 @@
             }
           }
           if (firstCreated) {
-            const ticketId = firstCreated.id;
             notifyFeedbackCreated(firstCreated, effectiveSessionId);
-            pending2.uploadPromise.then((url) => {
-              if (url) {
-                apiFetch(`/api/tickets/${ticketId}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ screenshotUrl: url })
-                }).catch(() => {
-                });
-              }
-            }).catch(() => {
-            });
             setIsProcessingFeedback(false);
             pending2.callbacks.onSuccess(firstCreated);
           } else {
@@ -41878,6 +41825,10 @@
         const confidence = data.confidence ?? 0.5;
         const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
         const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
+        const uploadedScreenshotId = await resolveUploadedScreenshotId(
+          pending2.uploadPromise,
+          pending2.screenshotId
+        );
         let firstCreated;
         for (let i = 0; i < tickets.length; i++) {
           const t = tickets[i];
@@ -41891,7 +41842,7 @@
             actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
             suggestedTags: t.suggestedTags,
             screenshotUrl: null,
-            screenshotId: i === 0 ? pending2.screenshotId : void 0,
+            screenshotId: i === 0 ? uploadedScreenshotId : void 0,
             metadata: { clientTimestamp: Date.now() },
             ...clarityMeta
           };
@@ -41929,19 +41880,7 @@
           }
         }
         if (firstCreated) {
-          const ticketId = firstCreated.id;
           notifyFeedbackCreated(firstCreated, effectiveSessionId);
-          pending2.uploadPromise.then((url) => {
-            if (url) {
-              apiFetch(`/api/tickets/${ticketId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ screenshotUrl: url })
-              }).catch(() => {
-              });
-            }
-          }).catch(() => {
-          });
           setIsProcessingFeedback(false);
           pending2.callbacks.onSuccess(firstCreated);
         } else {

@@ -43,7 +43,7 @@ const feedbackPayload = (
   description: data.description,
   suggestion: data.suggestion ?? "",
   type: data.type,
-  status: "open" as const,
+  status: data.status ?? ("open" as const),
   createdAt: serverTimestamp(),
   commentCount: 0,
 
@@ -58,6 +58,7 @@ const feedbackPayload = (
   clientTimestamp: data.timestamp ?? null,
 
   screenshotUrl: data.screenshotUrl ?? null,
+  screenshotStatus: data.screenshotStatus ?? null,
 
   clarityScore: data.clarityScore ?? null,
   clarityStatus: data.clarityStatus ?? null,
@@ -153,8 +154,9 @@ type FeedbackUpdate = Partial<{
   title: string;
   description: string;
   type: string;
-  status: "open" | "resolved" | "skipped";
+  status: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
   screenshotUrl: string | null;
+  screenshotStatus: "attached" | "pending" | "none" | "failed" | null;
   actionSteps: string[] | null;
   suggestedTags: string[] | null;
 }>;
@@ -171,9 +173,11 @@ export async function updateFeedbackRepo(
     title: string;
     description: string;
     type: string;
+    status: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
     isResolved: boolean;
     isSkipped: boolean;
     screenshotUrl: string | null;
+    screenshotStatus: "attached" | "pending" | "none" | "failed" | null;
     actionSteps: string[] | null;
     suggestedTags: string[] | null;
   }>
@@ -182,7 +186,9 @@ export async function updateFeedbackRepo(
   if (typeof data.title === "string") updates.title = data.title;
   if (typeof data.description === "string") updates.description = data.description;
   if (typeof data.type === "string") updates.type = data.type;
+  if (typeof data.status === "string") updates.status = data.status;
   if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
+  if (data.screenshotStatus !== undefined) updates.screenshotStatus = data.screenshotStatus;
   if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
   const isResolved = (data as { isResolved?: boolean }).isResolved;

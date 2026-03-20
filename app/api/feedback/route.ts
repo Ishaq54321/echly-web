@@ -50,7 +50,8 @@ function peekJwtPayload(token: string): Record<string, unknown> | null {
     const json = base64UrlDecodeToString(parts[1] ?? "");
     const parsed = JSON.parse(json) as Record<string, unknown>;
     return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
+  } catch (err) {
+    console.error("[feedback] peekJwtPayload parse failed:", err);
     return null;
   }
 }
