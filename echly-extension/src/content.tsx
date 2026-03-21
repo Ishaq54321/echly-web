@@ -21,6 +21,7 @@ import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/lib/capt
 import { ExtensionCaptureEnvironment } from "@/lib/capture-engine/ExtensionCaptureEnvironment";
 import { ECHLY_DEBUG, log } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
+import { buildFeedbackPayload } from "@/utils/buildFeedbackPayload";
 
 let echlyEventDispatcher: ((type: string) => void) | null = null;
 
@@ -40,6 +41,7 @@ const SHADOW_HOST_ID = "echly-shadow-host";
 const THEME_STORAGE_KEY = "widget-theme";
 /** App origin for opening dashboard (same as API base). */
 const APP_ORIGIN = API_BASE;
+const inFlightFeedbackIds = new Set<string>();
 
 /** Error boundary to capture CaptureWidget render errors (OPEN_WIDGET crash trace). */
 class EchlyWidgetErrorBoundary extends React.Component<
@@ -680,26 +682,25 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               return;
             }
 
-            const uploadedScreenshotId = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
             let firstCreated: StructuredFeedback | undefined;
             for (let i = 0; i < tickets.length; i++) {
               const t = tickets[i];
               const feedbackId = generateFeedbackId();
-              const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
-              const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : [];
-              const body = {
+              let finalScreenshotId: string | undefined = undefined;
+
+              if (i === 0 && screenshot) {
+                finalScreenshotId = await resolveUploadedScreenshotId(
+                  uploadPromise,
+                  screenshotId
+                );
+              }
+
+              const body = buildFeedbackPayload({
                 sessionId: effectiveSessionId,
                 feedbackId,
-                title: t.title ?? "",
-                description: desc,
-                type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-                contextSummary: desc,
-                actionSteps,
-                suggestedTags: t.suggestedTags,
-                screenshotUrl: null,
-                screenshotId: i === 0 ? uploadedScreenshotId : undefined,
-                metadata: { clientTimestamp: Date.now() },
-              };
+                ticket: t,
+                screenshotId: finalScreenshotId,
+              });
               const token = await getExtensionToken();
               if (!token) {
                 console.error("[ECHLY AUTH] No extension token available");
@@ -707,30 +708,79 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 setIsProcessingFeedback(false);
                 return;
               }
+              if (screenshot && i === 0 && !finalScreenshotId) {
+                console.warn("[ECHLY] Screenshot expected but not ready — skipping feedback create");
+                continue;
+              }
+              if (inFlightFeedbackIds.has(feedbackId)) {
+                console.warn("[ECHLY] Duplicate feedback prevented (in-flight)", feedbackId);
+                continue;
+              }
+              inFlightFeedbackIds.add(feedbackId);
               console.log("[feedbackId generated]", feedbackId);
               console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
-              const feedbackRes = await apiFetch("/api/feedback", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "x-extension-token": token,
-                },
-                body: JSON.stringify(body),
-              });
-              const { data: feedbackJson, text } = await readApiResponseSafely<{
-                success?: boolean;
-                ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
-              }>(feedbackRes);
-              if (!feedbackRes.ok) {
-                console.error("[ECHLY ERROR] API failed:", feedbackRes.status, text);
-                if (isAuthFailureResponse(text)) {
-                  console.warn("[ECHLY AUTH] Extension not authenticated");
-                  setFeedbackJobs((prev) =>
-                    prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "Not authenticated." } : j))
+              let feedbackResponse:
+                | {
+                    success?: boolean;
+                    data?: {
+                      success?: boolean;
+                      ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
+                    };
+                    error?: string;
+                  }
+                | undefined;
+              try {
+                feedbackResponse = (await new Promise((resolve, reject) => {
+                  console.log("[TRACE] CONTENT sending feedback", {
+                    feedbackId,
+                    timestamp: Date.now(),
+                    stack: new Error().stack,
+                  });
+                  chrome.runtime.sendMessage(
+                    {
+                      type: "ECHLY_CREATE_FEEDBACK",
+                      payload: {
+                        sessionId: effectiveSessionId,
+                        feedbackId,
+                        ticket: t,
+                        screenshotId: finalScreenshotId,
+                      },
+                    },
+                    (response) => {
+                      if (chrome.runtime.lastError) {
+                        reject(chrome.runtime.lastError);
+                        return;
+                      }
+                      if (!response?.success) {
+                        reject(new Error(response?.error || "Failed to create feedback"));
+                        return;
+                      }
+                      resolve(response);
+                    }
                   );
-                  callbacks.onError();
-                  return;
-                }
+                })) as {
+                  success?: boolean;
+                  data?: {
+                    success?: boolean;
+                    ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
+                  };
+                  error?: string;
+                };
+              } catch (err) {
+                console.error("[ECHLY ERROR] feedback creation failed", err);
+                continue;
+              } finally {
+                inFlightFeedbackIds.delete(feedbackId);
+              }
+              const feedbackJson = feedbackResponse?.data;
+              const text = feedbackResponse?.error ?? "";
+              if (!feedbackResponse?.success && isAuthFailureResponse(text)) {
+                console.warn("[ECHLY AUTH] Extension not authenticated");
+                setFeedbackJobs((prev) =>
+                  prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "Not authenticated." } : j))
+                );
+                callbacks.onError();
+                return;
               }
               if (feedbackJson?.success && feedbackJson.ticket) {
                 const tick = feedbackJson.ticket;
@@ -837,25 +887,25 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
       if (!data.success || tickets.length === 0) return undefined;
 
-      const uploadedScreenshotId = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
       let firstCreated: StructuredFeedback | undefined;
       for (let i = 0; i < tickets.length; i++) {
         const t = tickets[i];
         const feedbackId = generateFeedbackId();
-        const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
-        const body = {
+        let finalScreenshotId: string | undefined = undefined;
+
+        if (i === 0 && screenshot) {
+          finalScreenshotId = await resolveUploadedScreenshotId(
+            uploadPromise,
+            screenshotId
+          );
+        }
+
+        const body = buildFeedbackPayload({
           sessionId: effectiveSessionId,
           feedbackId,
-          title: t.title ?? "",
-          description: desc,
-          type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-          contextSummary: desc,
-          actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-          suggestedTags: t.suggestedTags,
-          screenshotUrl: null,
-          screenshotId: i === 0 ? uploadedScreenshotId : undefined,
-          metadata: { clientTimestamp: Date.now() },
-        };
+          ticket: t,
+          screenshotId: finalScreenshotId,
+        });
         const token = await getExtensionToken();
         if (!token) {
           console.error("[ECHLY AUTH] No extension token available");
@@ -863,28 +913,77 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           setIsProcessingFeedback(false);
           return undefined;
         }
+        if (screenshot && i === 0 && !finalScreenshotId) {
+          console.warn("[ECHLY] Screenshot expected but not ready — skipping feedback create");
+          continue;
+        }
+        if (inFlightFeedbackIds.has(feedbackId)) {
+          console.warn("[ECHLY] Duplicate feedback prevented (in-flight)", feedbackId);
+          continue;
+        }
+        inFlightFeedbackIds.add(feedbackId);
         console.log("[feedbackId generated]", feedbackId);
         console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
-        const feedbackRes = await apiFetch("/api/feedback", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-extension-token": token,
-          },
-          body: JSON.stringify(body),
-        });
-        console.log("[ECHLY FLOW] API response received");
-        const { data: feedbackJson, text } = await readApiResponseSafely<{
-          success?: boolean;
-          ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
-        }>(feedbackRes);
-        if (!feedbackRes.ok) {
-          console.error("[ECHLY ERROR] API failed:", feedbackRes.status, text);
-          if (isAuthFailureResponse(text)) {
-            console.warn("[ECHLY AUTH] Extension not authenticated");
-            setIsProcessingFeedback(false);
-            return undefined;
-          }
+        let feedbackResponse:
+          | {
+              success?: boolean;
+              data?: {
+                success?: boolean;
+                ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
+              };
+              error?: string;
+            }
+          | undefined;
+        try {
+          feedbackResponse = (await new Promise((resolve, reject) => {
+            console.log("[TRACE] CONTENT sending feedback", {
+              feedbackId,
+              timestamp: Date.now(),
+              stack: new Error().stack,
+            });
+            chrome.runtime.sendMessage(
+              {
+                type: "ECHLY_CREATE_FEEDBACK",
+                payload: {
+                  sessionId: effectiveSessionId,
+                  feedbackId,
+                  ticket: t,
+                  screenshotId: finalScreenshotId,
+                },
+              },
+              (response) => {
+                if (chrome.runtime.lastError) {
+                  reject(chrome.runtime.lastError);
+                  return;
+                }
+                if (!response?.success) {
+                  reject(new Error(response?.error || "Failed to create feedback"));
+                  return;
+                }
+                resolve(response);
+              }
+            );
+          })) as {
+            success?: boolean;
+            data?: {
+              success?: boolean;
+              ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
+            };
+            error?: string;
+          };
+          console.log("[ECHLY FLOW] API response received");
+        } catch (err) {
+          console.error("[ECHLY ERROR] feedback creation failed", err);
+          continue;
+        } finally {
+          inFlightFeedbackIds.delete(feedbackId);
+        }
+        const feedbackJson = feedbackResponse?.data;
+        const text = feedbackResponse?.error ?? "";
+        if (!feedbackResponse?.success && isAuthFailureResponse(text)) {
+          console.warn("[ECHLY AUTH] Extension not authenticated");
+          setIsProcessingFeedback(false);
+          return undefined;
         }
         if (feedbackJson?.success && feedbackJson.ticket) {
           const tick = feedbackJson.ticket;

@@ -9,6 +9,7 @@ import { setExtensionToken, apiFetch } from "../utils/apiFetch";
 import { API_BASE, WEB_APP_URL } from "../config";
 import { fetchCountsDedup } from "./countsRequestStore";
 import { sessionsArrayFromApiPayload } from "@/lib/domain/session";
+import { buildFeedbackPayload } from "@/utils/buildFeedbackPayload";
 
 const LOGIN_URL = `${WEB_APP_URL}/login`;
 /** Extension token TTL from backend is 15m; treat as valid for 14 min to avoid edge expiry. */
@@ -88,6 +89,16 @@ type SessionCounts = {
 };
 const COUNTS_TTL_MS = 5 * 60 * 1000;
 const countsBySessionId: Map<string, { counts: SessionCounts; at: number }> = new Map();
+const processingFeedbackIds = new Set<string>();
+
+async function isFeedbackCompleted(feedbackId: string): Promise<boolean> {
+  const data = await chrome.storage.session.get(feedbackId);
+  return !!data[feedbackId];
+}
+
+async function markFeedbackCompleted(feedbackId: string): Promise<void> {
+  await chrome.storage.session.set({ [feedbackId]: true });
+}
 
 function getCounts(sessionId: string): SessionCounts | null {
   const cached = countsBySessionId.get(sessionId);
@@ -781,6 +792,49 @@ chrome.tabs.onCreated.addListener((tab) => {
     });
 });
 
+async function createFeedbackInternal({
+  sessionId,
+  feedbackId,
+  ticket,
+  screenshotId,
+}: {
+  sessionId: string;
+  feedbackId: string;
+  ticket: {
+    title?: string;
+    description?: string;
+    suggestedTags?: string[];
+    actionSteps?: string[];
+  };
+  screenshotId?: string;
+}): Promise<Response> {
+  const body = buildFeedbackPayload({
+    sessionId,
+    feedbackId,
+    ticket,
+    screenshotId,
+  });
+
+  console.log("[TRACE] BACKGROUND creating (API call)", {
+    feedbackId,
+    timestamp: Date.now(),
+  });
+
+  const res = await apiFetch(`${API_BASE}/api/feedback`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+  if (res.ok) {
+    console.log("[TRACE] BACKGROUND success", {
+      feedbackId,
+      timestamp: Date.now(),
+    });
+  }
+
+  return res;
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("[ECHLY][BACKGROUND] Message received:", request);
   console.log("[ECHLY] message received:", request.type);
@@ -1389,6 +1443,67 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === "ECHLY_CREATE_FEEDBACK") {
+    (async () => {
+      const { sessionId, feedbackId, ticket, screenshotId } = request.payload as {
+        sessionId: string;
+        feedbackId: string;
+        ticket: {
+          title?: string;
+          description?: string;
+          suggestedTags?: string[];
+          actionSteps?: string[];
+        };
+        screenshotId?: string;
+      };
+
+      console.log("[TRACE] BACKGROUND received", {
+        feedbackId,
+        timestamp: Date.now(),
+      });
+
+      if (processingFeedbackIds.has(feedbackId)) {
+        console.warn("[ECHLY] Duplicate blocked (processing)", feedbackId);
+        sendResponse({ success: true, skipped: true });
+        return;
+      }
+
+      processingFeedbackIds.add(feedbackId);
+      try {
+        if (await isFeedbackCompleted(feedbackId)) {
+          console.warn("[ECHLY] Duplicate blocked (already completed)", feedbackId);
+          sendResponse({ success: true, skipped: true });
+          return;
+        }
+
+        await getValidToken();
+        const feedbackRes = await createFeedbackInternal({
+          sessionId,
+          feedbackId,
+          ticket,
+          screenshotId,
+        });
+
+        const data = (await feedbackRes.json()) as { error?: string };
+
+        if (!feedbackRes.ok) {
+          sendResponse({ success: false, error: data?.error || "API failed" });
+          return;
+        }
+
+        await markFeedbackCompleted(feedbackId);
+        console.log("[ECHLY] Marked completed (durable)", feedbackId);
+        sendResponse({ success: true, data });
+      } catch (err) {
+        console.error("[ECHLY ERROR] background create failed", err);
+        sendResponse({ success: false });
+      } finally {
+        processingFeedbackIds.delete(feedbackId);
+      }
+    })();
+    return true; // REQUIRED for async response
+  }
+
   if (request.type === "ECHLY_PROCESS_FEEDBACK") {
     if (aiProcessing) {
       console.warn("[ECHLY] AI already processing, skipping duplicate");
@@ -1427,7 +1542,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       try {
         await getValidToken();
-        const screenshotUrl: string | null = payload.screenshotUrl ?? null;
         const screenshotId: string | null = payload.screenshotId ?? null;
 
         console.log("[ECHLY AI] Starting structure step");
@@ -1480,27 +1594,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
         for (let i = 0; i < tickets.length; i++) {
           const t = tickets[i];
-          const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
           const feedbackId = crypto.randomUUID();
-          const body = {
-            sessionId,
-            title: t.title ?? "",
-            description: desc,
-            type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-            contextSummary: desc,
-            actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-            suggestedTags: t.suggestedTags,
-            screenshotUrl: i === 0 ? screenshotUrl : null,
-            screenshotId: i === 0 && screenshotId ? screenshotId : undefined,
-            feedbackId,
-            metadata: { clientTimestamp: Date.now() },
-          };
 
           console.log("[background feedbackId]", feedbackId);
           console.log("[ECHLY AI] Creating feedback ticket");
-          const feedbackRes = await apiFetch(`${API_BASE}/api/feedback`, {
-            method: "POST",
-            body: JSON.stringify(body),
+          const feedbackRes = await createFeedbackInternal({
+            sessionId,
+            feedbackId,
+            ticket: t,
+            screenshotId: i === 0 && screenshotId ? screenshotId : undefined,
           });
           const raw = await feedbackRes.text();
 
