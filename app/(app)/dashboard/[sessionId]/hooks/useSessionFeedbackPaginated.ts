@@ -69,7 +69,7 @@ export function useSessionFeedbackPaginated(
     if (feedbackRealtime.sessionId !== sessionId) return [];
     return feedbackRealtime.items;
   }, [feedbackRealtime.sessionId, feedbackRealtime.items, sessionId]);
-  const [apiItems, setApiItems] = useState<Feedback[]>([]);
+  const [items, setItems] = useState<Feedback[]>([]);
   const [counts, setCountsState] = useState<Counts>(ZERO_COUNTS);
   const total = counts.total;
   const activeCount = counts.open;
@@ -87,6 +87,7 @@ export function useSessionFeedbackPaginated(
   const hasFetchedRef = useRef(false);
   const countsLoadedRef = useRef(false);
   const sessionIdRef = useRef<string | undefined>(sessionId);
+  const itemsRef = useRef<Feedback[]>([]);
 
   // Keep a ref to the latest sessionId so in-flight async pagination
   // can't update state after the user switches sessions.
@@ -94,9 +95,14 @@ export function useSessionFeedbackPaginated(
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
   // Reset infinite scroll state when sessionId changes to avoid ghost items.
   useLayoutEffect(() => {
-    setApiItems([]);
+    setItems([]);
+    itemsRef.current = [];
     setCountsState(ZERO_COUNTS);
     setCursor(null);
     setHasMore(true);
@@ -117,7 +123,7 @@ export function useSessionFeedbackPaginated(
   onNewTicketFromRealtimeRef.current = onNewTicketFromRealtime;
 
   const getTimestamp = useCallback((item: Feedback): number => {
-    if (!item?.createdAt) return 0;
+    if (!item) return 0;
 
     // ISO string (API)
     if (typeof item.createdAt === "string") {
@@ -135,33 +141,80 @@ export function useSessionFeedbackPaginated(
       return (item.createdAt as { seconds: number }).seconds * 1000;
     }
 
+    // Optimistic local inserts.
+    if (typeof item.clientTimestamp === "number" && Number.isFinite(item.clientTimestamp)) {
+      return item.clientTimestamp;
+    }
+
     return 0;
   }, []);
 
-  const items = useMemo(() => {
-    // Deterministic source-of-truth merge:
-    // 1) Insert realtime window first (authoritative for latest items).
-    // 2) Insert API pagination items only if absent.
-    // 3) Sort once by normalized createdAt timestamp.
-    const byId = new Map<string, Feedback>();
-    for (const f of realtimeItems) byId.set(f.id, f);
-    for (const f of apiItems) {
-      if (!byId.has(f.id)) byId.set(f.id, f);
-    }
-    const merged = Array.from(byId.values()).sort((a, b) => getTimestamp(b) - getTimestamp(a));
-    console.log("MERGE feedback", {
-      realtimeCount: realtimeItems.length,
-      apiCount: apiItems.length,
-      mergedCount: merged.length,
-    });
-    return merged;
-  }, [realtimeItems, apiItems, getTimestamp]);
+  const sortByCreatedAtDesc = useCallback(
+    (list: Feedback[]): Feedback[] =>
+      [...list].sort((a, b) => {
+        const diff = getTimestamp(b) - getTimestamp(a);
+        if (diff !== 0) return diff;
+        return b.id.localeCompare(a.id);
+      }),
+    [getTimestamp]
+  );
+
+  const setCanonicalFeedback = useCallback(
+    (updater: React.SetStateAction<Feedback[]>) => {
+      const current = itemsRef.current;
+      const next = typeof updater === "function" ? updater(current) : updater;
+      const byId = new Map<string, Feedback>();
+      for (const item of next) byId.set(item.id, item);
+      const normalized = sortByCreatedAtDesc(Array.from(byId.values()));
+      itemsRef.current = normalized;
+      setItems(normalized);
+    },
+    [sortByCreatedAtDesc]
+  );
+
+  const mergeRealtimeIntoCanonical = useCallback(
+    (incoming: Feedback[]) => {
+      if (incoming.length === 0) return;
+      const byId = new Map<string, Feedback>(itemsRef.current.map((item) => [item.id, item]));
+      let changed = false;
+      for (const item of incoming) {
+        const existing = byId.get(item.id);
+        if (existing !== item) {
+          byId.set(item.id, item);
+          changed = true;
+        }
+      }
+      if (!changed) return;
+      const normalized = sortByCreatedAtDesc(Array.from(byId.values()));
+      itemsRef.current = normalized;
+      setItems(normalized);
+    },
+    [sortByCreatedAtDesc]
+  );
+
+  const appendPaginationIntoCanonical = useCallback(
+    (incoming: Feedback[]): number => {
+      if (incoming.length === 0) return 0;
+      const byId = new Map<string, Feedback>(itemsRef.current.map((item) => [item.id, item]));
+      let appended = 0;
+      for (const item of incoming) {
+        if (byId.has(item.id)) continue;
+        byId.set(item.id, item);
+        appended += 1;
+      }
+      if (appended === 0) return 0;
+      const normalized = sortByCreatedAtDesc(Array.from(byId.values()));
+      itemsRef.current = normalized;
+      setItems(normalized);
+      return appended;
+    },
+    [sortByCreatedAtDesc]
+  );
 
   const hasReachedLimit = items.length >= FEEDBACK_LOAD_CAP;
 
   const stateRef = useRef({
-    realtimeItems,
-    apiItems,
+    items,
     total,
     cursor,
     hasMore,
@@ -169,8 +222,7 @@ export function useSessionFeedbackPaginated(
     initialLoadDone,
   });
   stateRef.current = {
-    realtimeItems,
-    apiItems,
+    items,
     total,
     cursor,
     hasMore,
@@ -184,7 +236,7 @@ export function useSessionFeedbackPaginated(
     const hasMore = s.hasMore;
     const isLoading = s.loadingMore;
     console.log("LOAD MORE TRIGGERED", { hasMore, isLoading });
-    const loadedCount = s.realtimeItems.length + s.apiItems.length;
+    const loadedCount = s.items.length;
     if (!sessionId || !s.initialLoadDone || s.loadingMore || isFetchingRef.current || loadedCount >= FEEDBACK_LOAD_CAP) return;
     if (s.total > 0 && loadedCount >= s.total) {
       setHasMore(false);
@@ -220,28 +272,14 @@ export function useSessionFeedbackPaginated(
         returnedCount: incoming.length,
       });
 
-      // De-dupe on the client. The server cursor pagination is correct, but realtime inserts can cause overlap.
-      const existingIds = new Set<string>();
-      for (const f of s.realtimeItems) existingIds.add(f.id);
-      for (const f of s.apiItems) existingIds.add(f.id);
-      const uniqueIncoming = incoming.filter((f) => !existingIds.has(f.id));
-
       if (incoming.length > 0) {
-        if (uniqueIncoming.length > 0) {
-          setApiItems((prev) => {
-            const existingIds = new Set<string>(prev.map((i) => i.id));
-            // Also prevent adding items already present in the realtime window.
-            for (const f of stateRef.current.realtimeItems) existingIds.add(f.id);
-            const newItems = incoming.filter((i) => !existingIds.has(i.id));
-            return [...prev, ...newItems];
-          });
-        }
+        const appended = appendPaginationIntoCanonical(incoming);
 
         setCursor(pageCursor);
 
         // If total isn't provided by the API, we rely on `data.hasMore`.
         const serverTotal = typeof data.total === "number" ? data.total : s.total;
-        const newLen = loadedCount + uniqueIncoming.length;
+        const newLen = loadedCount + appended;
         setHasMore(serverTotal > 0 ? newLen < serverTotal : data.hasMore ?? false);
       } else {
         setHasMore(false);
@@ -252,7 +290,7 @@ export function useSessionFeedbackPaginated(
       stateRef.current.loadingMore = false;
       setLoadingMore(false);
     }
-  }, [sessionId]);
+  }, [appendPaginationIntoCanonical, sessionId]);
 
   // On scroll near bottom: trigger load early using threshold + fetch lock.
   useEffect(() => {
@@ -268,7 +306,7 @@ export function useSessionFeedbackPaginated(
       hasUserScrolledRef.current = true;
       const s = stateRef.current;
       if (s.loadingMore || isFetchingRef.current) return;
-      const loadedCount = s.realtimeItems.length + s.apiItems.length;
+      const loadedCount = s.items.length;
       if (loadedCount >= FEEDBACK_LOAD_CAP) return;
       const totalCount = s.total;
       const hasMore = totalCount === 0 ? s.hasMore : loadedCount < totalCount;
@@ -296,13 +334,12 @@ export function useSessionFeedbackPaginated(
         if (!entry?.isIntersecting) return;
         if (!hasUserScrolledRef.current) return;
         const s = stateRef.current;
-        const hasMore =
-          s.total === 0 ? s.hasMore : s.realtimeItems.length + s.apiItems.length < s.total;
+        const hasMore = s.total === 0 ? s.hasMore : s.items.length < s.total;
         console.log("hasMore:", hasMore);
         const isLoading = s.loadingMore || isFetchingRef.current;
         if (!hasMore) return;
         if (isLoading) return;
-        const loadedCount = s.realtimeItems.length + s.apiItems.length;
+        const loadedCount = s.items.length;
         if (loadedCount >= FEEDBACK_LOAD_CAP) return;
         void loadMore();
       },
@@ -324,7 +361,8 @@ export function useSessionFeedbackPaginated(
       previousFeedbackCountRef.current = 0;
       setCountsLoading(false);
       setCountsState(ZERO_COUNTS);
-      setApiItems([]);
+      setItems([]);
+      itemsRef.current = [];
       setCursor(null);
       setHasMore(true);
       isFetchingRef.current = false;
@@ -345,7 +383,8 @@ export function useSessionFeedbackPaginated(
 
     setCountsState(ZERO_COUNTS);
     setCountsLoading(true);
-    setApiItems([]);
+    setItems([]);
+    itemsRef.current = [];
     setCursor(null);
     setHasMore(true);
     isFetchingRef.current = false;
@@ -392,6 +431,8 @@ export function useSessionFeedbackPaginated(
     }
     previousFeedbackCountRef.current = realtimeWindowCount;
 
+    mergeRealtimeIntoCanonical(snapshotList);
+
     const isFirstSnapshot = !stateRef.current.initialLoadDone;
     if (!isFirstSnapshot) return;
 
@@ -421,17 +462,7 @@ export function useSessionFeedbackPaginated(
         setCursor(pageCursor);
         setHasMore(data.hasMore ?? false);
         if (incoming.length > 0) {
-          setApiItems(() => {
-            const seen = new Set<string>();
-            for (const f of stateRef.current.realtimeItems) seen.add(f.id);
-            const next: Feedback[] = [];
-            for (const f of incoming) {
-              if (seen.has(f.id)) continue;
-              seen.add(f.id);
-              next.push(f);
-            }
-            return next;
-          });
+          appendPaginationIntoCanonical(incoming);
           console.log("SEED PAGE RESULT", {
             cursor: pageCursor,
             returnedCount: incoming.length,
@@ -444,9 +475,11 @@ export function useSessionFeedbackPaginated(
       }
     })();
   }, [
+    appendPaginationIntoCanonical,
     feedbackRealtime.loading,
     feedbackRealtime.sessionId,
     feedbackRealtime.version,
+    mergeRealtimeIntoCanonical,
     realtimeItems,
     sessionId,
   ]);
@@ -470,17 +503,7 @@ export function useSessionFeedbackPaginated(
       const incoming = data.feedback ?? [];
       const pageCursor = data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
       if (incoming.length) {
-        setApiItems(() => {
-          const seen = new Set<string>();
-          for (const f of stateRef.current.realtimeItems) seen.add(f.id);
-          const next: Feedback[] = [];
-          for (const f of incoming) {
-            if (seen.has(f.id)) continue;
-            seen.add(f.id);
-            next.push(f);
-          }
-          return next;
-        });
+        appendPaginationIntoCanonical(incoming);
         setCursor(pageCursor);
         setHasMore(data.hasMore ?? false);
         console.log("REFETCH PAGE RESULT", {
@@ -488,14 +511,15 @@ export function useSessionFeedbackPaginated(
           returnedCount: incoming.length,
         });
       } else {
-        setApiItems([]);
+        setItems([]);
+        itemsRef.current = [];
         setCursor(null);
         setHasMore(false);
       }
     } finally {
       // Do not set initialLoading: keep loading only for first mount and loadMore
     }
-  }, [sessionId]);
+  }, [appendPaginationIntoCanonical, sessionId]);
 
   return {
     feedback: items,
@@ -504,7 +528,7 @@ export function useSessionFeedbackPaginated(
     resolvedCount,
     skippedCount,
     countsLoading,
-    setFeedback: setApiItems,
+    setFeedback: setCanonicalFeedback,
     loading: initialLoading,
     hasMore,
     hasReachedLimit,
