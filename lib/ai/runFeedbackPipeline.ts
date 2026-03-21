@@ -38,12 +38,7 @@ export interface PipelineOutput {
   tickets: Array<Record<string, unknown>>;
   ticket?: { title: string; actionSteps: string[]; confidence: number };
   error?: string;
-  clarityScore?: number;
-  clarityIssues?: string[];
-  suggestedRewrite?: string | null;
   confidence?: number;
-  needsClarification?: boolean;
-  verificationIssues?: string[];
   verificationWarnings?: string[];
   instructionLimitWarning?: string | null;
   extractedInstructions?: unknown[];
@@ -97,11 +92,6 @@ export async function runFeedbackPipeline(
       actionSteps: result.ticket.actionSteps,
       confidence: result.ticket.confidence,
     },
-    clarityScore: result.clarityScore,
-    clarityIssues: result.clarityIssues,
-    suggestedRewrite: result.suggestedRewrite,
     confidence: result.ticket.confidence,
-    needsClarification: result.needsClarification,
-    verificationIssues: result.needsClarification ? result.clarityIssues : undefined,
   };
 }

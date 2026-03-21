@@ -40756,13 +40756,6 @@
     const [sessionLimitReached, setSessionLimitReached] = import_react18.default.useState(null);
     const effectiveSessionId = globalState.sessionId;
     const widgetToggleRef = import_react18.default.useRef(null);
-    const [extensionClarityPending, setExtensionClarityPending] = import_react18.default.useState(null);
-    const [showClarityAssistant, setShowClarityAssistant] = import_react18.default.useState(false);
-    const [isEditingFeedback, setIsEditingFeedback] = import_react18.default.useState(false);
-    const [editedTranscript, setEditedTranscript] = import_react18.default.useState("");
-    const clarityTextareaRef = import_react18.default.useRef(null);
-    const clarityAssistantSubmitLock = import_react18.default.useRef(false);
-    const [clarityAssistantSubmitting, setClarityAssistantSubmitting] = import_react18.default.useState(false);
     const [isProcessingFeedback, setIsProcessingFeedback] = import_react18.default.useState(false);
     const [feedbackJobs, setFeedbackJobs] = import_react18.default.useState([]);
     import_react18.default.useEffect(() => {
@@ -41091,63 +41084,6 @@
               });
               const data = await res.json();
               const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-              const clarityScore = typeof data.clarityScore === "number" ? data.clarityScore : data.clarityScore != null ? Number(data.clarityScore) : 100;
-              const clarityIssues = data.clarityIssues ?? [];
-              const suggestedRewrite = data.suggestedRewrite ?? null;
-              const confidence = data.confidence ?? 0.5;
-              const isSessionMode = Boolean(options?.sessionMode);
-              if (!isSessionMode) {
-                if (data.success && clarityScore <= 20) {
-                  if (ECHLY_DEBUG) console.log("CLARITY GUARD TRIGGERED", clarityScore);
-                  setExtensionClarityPending({
-                    tickets,
-                    screenshotUrl: null,
-                    screenshotId,
-                    uploadPromise,
-                    transcript,
-                    screenshot,
-                    clarityScore,
-                    clarityIssues,
-                    suggestedRewrite,
-                    confidence,
-                    callbacks,
-                    context: enrichedContext
-                  });
-                  setEditedTranscript(transcript);
-                  setIsEditingFeedback(false);
-                  clarityAssistantSubmitLock.current = false;
-                  setClarityAssistantSubmitting(false);
-                  setShowClarityAssistant(true);
-                  setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
-                  return;
-                }
-                const needsClarification = Boolean(data.needsClarification);
-                const verificationIssues = data.verificationIssues ?? [];
-                if (data.success && needsClarification && tickets.length === 0) {
-                  if (ECHLY_DEBUG) console.log("PIPELINE NEEDS CLARIFICATION", verificationIssues);
-                  setExtensionClarityPending({
-                    tickets: [],
-                    screenshotUrl: null,
-                    screenshotId,
-                    uploadPromise,
-                    transcript,
-                    screenshot,
-                    clarityScore,
-                    clarityIssues: verificationIssues.length > 0 ? verificationIssues : clarityIssues,
-                    suggestedRewrite,
-                    confidence,
-                    callbacks,
-                    context: enrichedContext
-                  });
-                  setEditedTranscript(transcript);
-                  setIsEditingFeedback(false);
-                  clarityAssistantSubmitLock.current = false;
-                  setClarityAssistantSubmitting(false);
-                  setShowClarityAssistant(true);
-                  setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
-                  return;
-                }
-              }
               if (!data.success || tickets.length === 0) {
                 const uploadedScreenshotId2 = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
                 chrome.runtime.sendMessage(
@@ -41195,8 +41131,6 @@
                 );
                 return;
               }
-              const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
-              const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
               const uploadedScreenshotId = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
               let firstCreated;
               for (let i = 0; i < tickets.length; i++) {
@@ -41215,8 +41149,7 @@
                   suggestedTags: t.suggestedTags,
                   screenshotUrl: null,
                   screenshotId: i === 0 ? uploadedScreenshotId : void 0,
-                  metadata: { clientTimestamp: Date.now() },
-                  ...clarityMeta
+                  metadata: { clientTimestamp: Date.now() }
                 };
                 const token = await getExtensionToken();
                 if (!token) {
@@ -41335,13 +41268,7 @@
           });
           const data = await res.json();
           const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-          const clarityScore = data.clarityScore ?? 100;
-          const clarityIssues = data.clarityIssues ?? [];
-          const suggestedRewrite = data.suggestedRewrite ?? null;
-          const confidence = data.confidence ?? 0.5;
           if (!data.success || tickets.length === 0) return void 0;
-          const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
-          const clarityMeta = { clarityScore, clarityIssues, clarityConfidence: confidence, clarityStatus };
           const uploadedScreenshotId = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
           let firstCreated;
           for (let i = 0; i < tickets.length; i++) {
@@ -41359,8 +41286,7 @@
               suggestedTags: t.suggestedTags,
               screenshotUrl: null,
               screenshotId: i === 0 ? uploadedScreenshotId : void 0,
-              metadata: { clientTimestamp: Date.now() },
-              ...clarityMeta
+              metadata: { clientTimestamp: Date.now() }
             };
             const token = await getExtensionToken();
             if (!token) {
@@ -41547,376 +41473,6 @@
       chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {
       });
     }, []);
-    const submitPendingFeedback = import_react18.default.useCallback(
-      async (pending2) => {
-        if (!effectiveSessionId) return;
-        setIsProcessingFeedback(true);
-        try {
-          if (pending2.tickets.length === 0) {
-            const uploadedScreenshotId2 = await resolveUploadedScreenshotId(
-              pending2.uploadPromise,
-              pending2.screenshotId
-            );
-            chrome.runtime.sendMessage(
-              {
-                type: "ECHLY_PROCESS_FEEDBACK",
-                payload: {
-                  transcript: pending2.transcript,
-                  screenshotUrl: null,
-                  screenshotId: uploadedScreenshotId2,
-                  sessionId: effectiveSessionId,
-                  context: pending2.context ?? {},
-                  ocrText: null
-                }
-              },
-              (response) => {
-                setIsProcessingFeedback(false);
-                if (chrome.runtime.lastError) {
-                  console.error("[Echly] Submit anyway failed:", chrome.runtime.lastError.message);
-                  echlyLog("PIPELINE", "error");
-                  pending2.callbacks.onError();
-                  return;
-                }
-                if (response?.success && response.ticket) {
-                  const t = response.ticket;
-                  const ticketId = t.id;
-                  const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : t.description ? t.description.split(/\n\s*\n/) : [];
-                  pending2.callbacks.onSuccess({
-                    id: ticketId,
-                    title: t.title,
-                    actionSteps,
-                    type: t.type ?? "Feedback"
-                  });
-                } else {
-                  echlyLog("PIPELINE", "error");
-                  pending2.callbacks.onError();
-                }
-              }
-            );
-            return;
-          }
-          const clarityMeta = {
-            clarityScore: pending2.clarityScore,
-            clarityIssues: pending2.clarityIssues,
-            clarityConfidence: pending2.confidence,
-            clarityStatus: pending2.clarityScore >= 85 ? "clear" : pending2.clarityScore >= 60 ? "needs_improvement" : "unclear"
-          };
-          const uploadedScreenshotId = await resolveUploadedScreenshotId(
-            pending2.uploadPromise,
-            pending2.screenshotId
-          );
-          let firstCreated;
-          for (let i = 0; i < pending2.tickets.length; i++) {
-            const t = pending2.tickets[i];
-            const feedbackId = generateFeedbackId();
-            const desc = typeof t.description === "string" ? t.description : t.title ?? "";
-            const body = {
-              sessionId: effectiveSessionId,
-              feedbackId,
-              title: t.title ?? "",
-              description: desc,
-              type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-              contextSummary: desc,
-              actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-              suggestedTags: t.suggestedTags,
-              screenshotUrl: null,
-              screenshotId: i === 0 ? uploadedScreenshotId : void 0,
-              metadata: { clientTimestamp: Date.now() },
-              ...clarityMeta
-            };
-            const token = await getExtensionToken();
-            if (!token) {
-              console.error("[ECHLY AUTH] No extension token available");
-              setSessionMessage("Authentication expired. Please sign in again.");
-              setIsProcessingFeedback(false);
-              return;
-            }
-            console.log("[feedbackId generated]", feedbackId);
-            console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
-            const feedbackRes = await apiFetch("/api/feedback", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-extension-token": token
-              },
-              body: JSON.stringify(body)
-            });
-            console.log("[ECHLY FLOW] API response received");
-            const { data: feedbackJson, text } = await readApiResponseSafely(feedbackRes);
-            if (!feedbackRes.ok) {
-              console.error("[ECHLY ERROR] API failed:", feedbackRes.status, text);
-              if (isAuthFailureResponse(text)) {
-                console.warn("[ECHLY AUTH] Extension not authenticated");
-                setIsProcessingFeedback(false);
-                return;
-              }
-            }
-            if (feedbackJson?.success && feedbackJson.ticket) {
-              const tick = feedbackJson.ticket;
-              const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
-              if (!firstCreated)
-                firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
-            }
-          }
-          if (firstCreated) {
-            setIsProcessingFeedback(false);
-            pending2.callbacks.onSuccess(firstCreated);
-          } else {
-            echlyLog("PIPELINE", "error");
-            setIsProcessingFeedback(false);
-            pending2.callbacks.onError();
-          }
-        } catch (err) {
-          console.error("[ECHLY FLOW ERROR]", err);
-          setIsProcessingFeedback(false);
-          pending2.callbacks.onError();
-        } finally {
-          console.log("[ECHLY FLOW] Ending processing state");
-          setIsProcessingFeedback(false);
-        }
-      },
-      [effectiveSessionId]
-    );
-    const submitEditedFeedback = import_react18.default.useCallback(
-      async (pending2, editedText) => {
-        if (!effectiveSessionId) return;
-        const trimmed = editedText.trim();
-        try {
-          const structureBody = { transcript: trimmed, context: pending2.context ?? {} };
-          const res = await apiFetch("/api/structure-feedback", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(structureBody)
-          });
-          const data = await res.json();
-          const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-          const clarityScore = data.clarityScore ?? 100;
-          const confidence = data.confidence ?? 0.5;
-          const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
-          const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
-          if (tickets.length === 0) {
-            const uploadedScreenshotId2 = await resolveUploadedScreenshotId(
-              pending2.uploadPromise,
-              pending2.screenshotId
-            );
-            chrome.runtime.sendMessage(
-              {
-                type: "ECHLY_PROCESS_FEEDBACK",
-                payload: {
-                  transcript: trimmed,
-                  screenshotUrl: null,
-                  screenshotId: uploadedScreenshotId2,
-                  sessionId: effectiveSessionId,
-                  context: pending2.context ?? {},
-                  ocrText: null
-                }
-              },
-              (response) => {
-                setIsProcessingFeedback(false);
-                if (chrome.runtime.lastError) {
-                  console.error("[Echly] Submit edited feedback failed:", chrome.runtime.lastError.message);
-                  echlyLog("PIPELINE", "error");
-                  pending2.callbacks.onError();
-                  return;
-                }
-                if (response?.success && response.ticket) {
-                  const t = response.ticket;
-                  const ticketId = t.id;
-                  const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : t.description ? t.description.split(/\n\s*\n/) : [];
-                  pending2.callbacks.onSuccess({
-                    id: ticketId,
-                    title: t.title,
-                    actionSteps,
-                    type: t.type ?? "Feedback"
-                  });
-                } else {
-                  echlyLog("PIPELINE", "error");
-                  pending2.callbacks.onError();
-                }
-              }
-            );
-            return;
-          }
-          let firstCreated;
-          const uploadedScreenshotId = await resolveUploadedScreenshotId(
-            pending2.uploadPromise,
-            pending2.screenshotId
-          );
-          for (let i = 0; i < tickets.length; i++) {
-            const t = tickets[i];
-            const feedbackId = generateFeedbackId();
-            const desc = typeof t.description === "string" ? t.description : t.title ?? "";
-            const body = {
-              sessionId: effectiveSessionId,
-              feedbackId,
-              title: t.title ?? "",
-              description: desc,
-              type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-              contextSummary: desc,
-              actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-              suggestedTags: t.suggestedTags,
-              screenshotUrl: null,
-              screenshotId: i === 0 ? uploadedScreenshotId : void 0,
-              metadata: { clientTimestamp: Date.now() },
-              ...clarityMeta
-            };
-            const token = await getExtensionToken();
-            if (!token) {
-              console.error("[ECHLY AUTH] No extension token available");
-              setSessionMessage("Authentication expired. Please sign in again.");
-              setIsProcessingFeedback(false);
-              return;
-            }
-            console.log("[feedbackId generated]", feedbackId);
-            console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
-            const feedbackRes = await apiFetch("/api/feedback", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-extension-token": token
-              },
-              body: JSON.stringify(body)
-            });
-            console.log("[ECHLY FLOW] API response received");
-            const { data: feedbackJson, text } = await readApiResponseSafely(feedbackRes);
-            if (!feedbackRes.ok) {
-              console.error("[ECHLY ERROR] API failed:", feedbackRes.status, text);
-              if (isAuthFailureResponse(text)) {
-                console.warn("[ECHLY AUTH] Extension not authenticated");
-                setIsProcessingFeedback(false);
-                return;
-              }
-            }
-            if (feedbackJson?.success && feedbackJson.ticket) {
-              const tick = feedbackJson.ticket;
-              const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
-              if (!firstCreated)
-                firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
-            }
-          }
-          if (firstCreated) {
-            notifyFeedbackCreated(firstCreated, effectiveSessionId);
-            setIsProcessingFeedback(false);
-            pending2.callbacks.onSuccess(firstCreated);
-          } else {
-            echlyLog("PIPELINE", "error");
-            setIsProcessingFeedback(false);
-            pending2.callbacks.onError();
-          }
-        } catch (err) {
-          console.error("[ECHLY FLOW ERROR]", err);
-          console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
-          console.error("[Echly] Submit edited feedback failed:", err);
-          echlyLog("PIPELINE", "error");
-          setIsProcessingFeedback(false);
-          pending2.callbacks.onError();
-        } finally {
-          console.log("[ECHLY FLOW] Ending processing state");
-          setIsProcessingFeedback(false);
-        }
-      },
-      [effectiveSessionId]
-    );
-    const handleExtensionClarityUseSuggestion = import_react18.default.useCallback(async () => {
-      const pending2 = extensionClarityPending;
-      if (!pending2?.suggestedRewrite?.trim() || !effectiveSessionId) return;
-      setExtensionClarityPending(null);
-      setIsProcessingFeedback(true);
-      try {
-        const res = await apiFetch("/api/structure-feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: pending2.suggestedRewrite.trim() })
-        });
-        const data = await res.json();
-        const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-        const clarityScore = data.clarityScore ?? 100;
-        const confidence = data.confidence ?? 0.5;
-        const clarityStatus = clarityScore >= 85 ? "clear" : clarityScore >= 60 ? "needs_improvement" : "unclear";
-        const clarityMeta = { clarityScore, clarityIssues: data.clarityIssues ?? [], clarityConfidence: confidence, clarityStatus };
-        const uploadedScreenshotId = await resolveUploadedScreenshotId(
-          pending2.uploadPromise,
-          pending2.screenshotId
-        );
-        let firstCreated;
-        for (let i = 0; i < tickets.length; i++) {
-          const t = tickets[i];
-          const feedbackId = generateFeedbackId();
-          const desc = typeof t.description === "string" ? t.description : t.title ?? "";
-          const body = {
-            sessionId: effectiveSessionId,
-            feedbackId,
-            title: t.title ?? "",
-            description: desc,
-            type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
-            contextSummary: desc,
-            actionSteps: Array.isArray(t.actionSteps) ? t.actionSteps : [],
-            suggestedTags: t.suggestedTags,
-            screenshotUrl: null,
-            screenshotId: i === 0 ? uploadedScreenshotId : void 0,
-            metadata: { clientTimestamp: Date.now() },
-            ...clarityMeta
-          };
-          const token = await getExtensionToken();
-          if (!token) {
-            console.error("[ECHLY AUTH] No extension token available");
-            setSessionMessage("Authentication expired. Please sign in again.");
-            setIsProcessingFeedback(false);
-            return;
-          }
-          console.log("[feedbackId generated]", feedbackId);
-          console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
-          const feedbackRes = await apiFetch("/api/feedback", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-extension-token": token
-            },
-            body: JSON.stringify(body)
-          });
-          console.log("[ECHLY FLOW] API response received");
-          const { data: feedbackJson, text } = await readApiResponseSafely(feedbackRes);
-          if (!feedbackRes.ok) {
-            console.error("[ECHLY ERROR] API failed:", feedbackRes.status, text);
-            if (isAuthFailureResponse(text)) {
-              console.warn("[ECHLY AUTH] Extension not authenticated");
-              setIsProcessingFeedback(false);
-              return;
-            }
-          }
-          if (feedbackJson?.success && feedbackJson.ticket) {
-            const tick = feedbackJson.ticket;
-            const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
-            if (!firstCreated)
-              firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
-          }
-        }
-        if (firstCreated) {
-          notifyFeedbackCreated(firstCreated, effectiveSessionId);
-          setIsProcessingFeedback(false);
-          pending2.callbacks.onSuccess(firstCreated);
-        } else {
-          echlyLog("PIPELINE", "error");
-          setIsProcessingFeedback(false);
-          pending2.callbacks.onError();
-        }
-      } catch (err) {
-        console.error("[ECHLY FLOW ERROR]", err);
-        console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
-        console.error("[Echly] Use suggestion failed:", err);
-        echlyLog("PIPELINE", "error");
-        setIsProcessingFeedback(false);
-        pending2.callbacks.onError();
-      } finally {
-        console.log("[ECHLY FLOW] Ending processing state");
-        setIsProcessingFeedback(false);
-      }
-    }, [extensionClarityPending, effectiveSessionId]);
-    import_react18.default.useEffect(() => {
-      if (isEditingFeedback && clarityTextareaRef.current) {
-        clarityTextareaRef.current.focus();
-      }
-    }, [isEditingFeedback]);
     if (authState === "loading") {
       return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "div",
@@ -41972,7 +41528,6 @@
         }
       );
     }
-    const pending = extensionClarityPending;
     const captureWidgetPropsForDebug = {
       onPreviousSessions: () => setOpenResumeModalFromMessage(true),
       onSetCaptureMode: (mode) => chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(() => {
@@ -41998,251 +41553,92 @@
       console.error("[ECHLY DEBUG LOG FAILED]", logErr);
     }
     try {
-      return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
-        showClarityAssistant && pending && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-          "div",
-          {
-            style: {
-              position: "fixed",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "rgba(0,0,0,0.15)",
-              zIndex: 999999,
-              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif',
-              pointerEvents: "none"
-            },
-            children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
-              "div",
-              {
-                style: {
-                  maxWidth: 420,
-                  width: "90%",
-                  background: "#F8FBFF",
-                  pointerEvents: "auto",
-                  borderRadius: 12,
-                  padding: 20,
-                  boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
-                  border: "1px solid #E6F0FF",
-                  animation: "echly-clarity-card-in 150ms ease-out"
-                },
-                children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { fontWeight: 600, fontSize: 15, marginBottom: 6, color: "#111" }, children: "Quick suggestion" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { fontSize: 14, color: "#374151", marginBottom: 8 }, children: "Your feedback may be unclear." }),
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { fontSize: 13, color: "#6b7280", marginBottom: 10 }, children: "Try specifying what looks wrong and what change you want." }),
-                  pending.suggestedRewrite && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { fontSize: 13, fontStyle: "italic", color: "#4b5563", marginBottom: 12, opacity: 0.9 }, children: [
-                    'Example: "',
-                    pending.suggestedRewrite,
-                    '"'
-                  ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                    "textarea",
-                    {
-                      ref: clarityTextareaRef,
-                      value: editedTranscript,
-                      onChange: (e) => setEditedTranscript(e.target.value),
-                      disabled: !isEditingFeedback,
-                      rows: 3,
-                      placeholder: "Your feedback",
-                      "aria-label": "Feedback message",
-                      style: {
-                        width: "100%",
-                        boxSizing: "border-box",
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        border: "1px solid #E6F0FF",
-                        fontSize: 14,
-                        resize: "vertical",
-                        minHeight: 72,
-                        marginBottom: 16,
-                        background: isEditingFeedback ? "#fff" : "#f3f4f6",
-                        color: "#111"
-                      }
-                    }
-                  ),
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: isEditingFeedback ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                    "button",
-                    {
-                      type: "button",
-                      disabled: clarityAssistantSubmitting,
-                      onClick: () => {
-                        if (clarityAssistantSubmitLock.current) return;
-                        if (!pending) return;
-                        clarityAssistantSubmitLock.current = true;
-                        setClarityAssistantSubmitting(true);
-                        setShowClarityAssistant(false);
-                        setExtensionClarityPending(null);
-                        setIsEditingFeedback(false);
-                        const snapshot = pending;
-                        const text = editedTranscript;
-                        submitEditedFeedback(snapshot, text).catch((err) => console.error("[Echly] Done submission failed:", err)).finally(() => {
-                          clarityAssistantSubmitLock.current = false;
-                          setClarityAssistantSubmitting(false);
-                        });
-                      },
-                      style: {
-                        background: "#3B82F6",
-                        color: "white",
-                        border: "none",
-                        borderRadius: 8,
-                        padding: "8px 14px",
-                        fontSize: 14,
-                        fontWeight: 500,
-                        cursor: clarityAssistantSubmitting ? "default" : "pointer",
-                        opacity: clarityAssistantSubmitting ? 0.8 : 1
-                      },
-                      children: "Done"
-                    }
-                  ) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                      "button",
-                      {
-                        type: "button",
-                        disabled: clarityAssistantSubmitting,
-                        onClick: () => setIsEditingFeedback(true),
-                        style: {
-                          background: "transparent",
-                          border: "1px solid #E6F0FF",
-                          borderRadius: 8,
-                          padding: "8px 14px",
-                          fontSize: 14,
-                          color: "#374151",
-                          cursor: clarityAssistantSubmitting ? "default" : "pointer",
-                          opacity: clarityAssistantSubmitting ? 0.7 : 1
-                        },
-                        children: "Edit feedback"
-                      }
-                    ),
-                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                      "button",
-                      {
-                        type: "button",
-                        disabled: clarityAssistantSubmitting,
-                        onClick: () => {
-                          if (clarityAssistantSubmitLock.current) return;
-                          if (!pending) return;
-                          clarityAssistantSubmitLock.current = true;
-                          setClarityAssistantSubmitting(true);
-                          setShowClarityAssistant(false);
-                          setExtensionClarityPending(null);
-                          setIsEditingFeedback(false);
-                          const snapshot = pending;
-                          submitPendingFeedback(snapshot).catch((err) => console.error("[Echly] Submit anyway failed:", err)).finally(() => {
-                            clarityAssistantSubmitLock.current = false;
-                            setClarityAssistantSubmitting(false);
-                          });
-                        },
-                        style: {
-                          background: "#3B82F6",
-                          color: "white",
-                          border: "none",
-                          borderRadius: 8,
-                          padding: "8px 14px",
-                          fontSize: 14,
-                          fontWeight: 500,
-                          cursor: clarityAssistantSubmitting ? "default" : "pointer",
-                          opacity: clarityAssistantSubmitting ? 0.8 : 1
-                        },
-                        children: "Submit anyway"
-                      }
-                    )
-                  ] }) })
-                ]
-              }
-            )
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(EchlyWidgetErrorBoundary, { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-          CaptureWidget,
-          {
-            sessionId: effectiveSessionId ?? "",
-            userId: user.uid,
-            extensionMode: true,
-            captureMode: globalState.captureMode ?? "voice",
-            onComplete: handleComplete,
-            onDelete: handleDelete,
-            onUpdate: handleUpdate,
-            widgetToggleRef,
-            onRecordingChange,
-            expanded: globalState.expanded,
-            onExpandRequest,
-            onCollapseRequest,
-            captureDisabled: false,
-            theme,
-            onThemeToggle,
-            fetchSessions,
-            hasPreviousSessions,
-            onPreviousSessionSelect,
-            pointers: globalState.pointers ?? [],
-            totalCount: globalState.totalCount ?? 0,
-            openCount: globalState.openCount ?? 0,
-            skippedCount: globalState.skippedCount ?? 0,
-            resolvedCount: globalState.resolvedCount ?? 0,
-            sessionLoading: globalState.sessionLoading ?? false,
-            sessionTitleProp: globalState.sessionTitle ?? void 0,
-            onSessionTitleChange,
-            isProcessingFeedback,
-            feedbackJobs,
-            onSessionEnd: () => {
-            },
-            onCreateSession: createSession,
-            onActiveSessionChange,
-            ensureAuthenticated,
-            verifySessionBeforeSessions,
-            onTriggerLogin,
-            globalSessionModeActive: globalState.sessionModeActive ?? false,
-            globalSessionPaused: globalState.sessionPaused ?? false,
-            onSessionModeStart: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {
-            }),
-            onSessionModePause: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {
-            }),
-            onSessionModeResume: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {
-            }),
-            onSessionActivity: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch(() => {
-            }),
-            onSessionModeEnd: () => {
-              const sessionId = globalState.sessionId;
-              (async () => {
-                await new Promise((resolve, reject) => {
-                  chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, (response) => {
-                    if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-                    else resolve();
-                  });
-                });
-                await new Promise((r) => setTimeout(r, 50));
-                if (sessionId) {
-                  const url = `${APP_ORIGIN}/dashboard/${sessionId}`;
-                  chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch(() => {
-                  });
-                }
-              })().catch(() => {
-              });
-            },
-            captureRootParent: widgetRoot,
-            launcherLogoUrl,
-            openResumeModal: openResumeModalFromMessage,
-            onResumeModalClose: () => setOpenResumeModalFromMessage(false),
-            sessionLimitReached,
-            environment,
-            onPreviousSessions: () => {
-              console.log("[ECHLY DEBUG] EXTENSION handler fired");
-              setOpenResumeModalFromMessage(true);
-              console.log("[ECHLY DEBUG] openResumeModal set TRUE");
-            },
-            onSetCaptureMode: (mode) => chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(() => {
-            }),
-            onOpenBilling: () => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {
-            }),
-            onOpenDashboard: () => environment.openDashboard(`${APP_ORIGIN}/dashboard`),
-            getAssetUrl
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_jsx_runtime11.Fragment, { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(EchlyWidgetErrorBoundary, { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        CaptureWidget,
+        {
+          sessionId: effectiveSessionId ?? "",
+          userId: user.uid,
+          extensionMode: true,
+          captureMode: globalState.captureMode ?? "voice",
+          onComplete: handleComplete,
+          onDelete: handleDelete,
+          onUpdate: handleUpdate,
+          widgetToggleRef,
+          onRecordingChange,
+          expanded: globalState.expanded,
+          onExpandRequest,
+          onCollapseRequest,
+          captureDisabled: false,
+          theme,
+          onThemeToggle,
+          fetchSessions,
+          hasPreviousSessions,
+          onPreviousSessionSelect,
+          pointers: globalState.pointers ?? [],
+          totalCount: globalState.totalCount ?? 0,
+          openCount: globalState.openCount ?? 0,
+          skippedCount: globalState.skippedCount ?? 0,
+          resolvedCount: globalState.resolvedCount ?? 0,
+          sessionLoading: globalState.sessionLoading ?? false,
+          sessionTitleProp: globalState.sessionTitle ?? void 0,
+          onSessionTitleChange,
+          isProcessingFeedback,
+          feedbackJobs,
+          onSessionEnd: () => {
           },
-          widgetResetKey
-        ) })
-      ] });
+          onCreateSession: createSession,
+          onActiveSessionChange,
+          ensureAuthenticated,
+          verifySessionBeforeSessions,
+          onTriggerLogin,
+          globalSessionModeActive: globalState.sessionModeActive ?? false,
+          globalSessionPaused: globalState.sessionPaused ?? false,
+          onSessionModeStart: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {
+          }),
+          onSessionModePause: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {
+          }),
+          onSessionModeResume: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {
+          }),
+          onSessionActivity: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch(() => {
+          }),
+          onSessionModeEnd: () => {
+            const sessionId = globalState.sessionId;
+            (async () => {
+              await new Promise((resolve, reject) => {
+                chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, (response) => {
+                  if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+                  else resolve();
+                });
+              });
+              await new Promise((r) => setTimeout(r, 50));
+              if (sessionId) {
+                const url = `${APP_ORIGIN}/dashboard/${sessionId}`;
+                chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch(() => {
+                });
+              }
+            })().catch(() => {
+            });
+          },
+          captureRootParent: widgetRoot,
+          launcherLogoUrl,
+          openResumeModal: openResumeModalFromMessage,
+          onResumeModalClose: () => setOpenResumeModalFromMessage(false),
+          sessionLimitReached,
+          environment,
+          onPreviousSessions: () => {
+            console.log("[ECHLY DEBUG] EXTENSION handler fired");
+            setOpenResumeModalFromMessage(true);
+            console.log("[ECHLY DEBUG] openResumeModal set TRUE");
+          },
+          onSetCaptureMode: (mode) => chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(() => {
+          }),
+          onOpenBilling: () => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {
+          }),
+          onOpenDashboard: () => environment.openDashboard(`${APP_ORIGIN}/dashboard`),
+          getAssetUrl
+        },
+        widgetResetKey
+      ) }) });
     } catch (e) {
       console.error("[ECHLY CRASH]", e);
       return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { "data-echly-crashed": true, children: "CRASHED" });

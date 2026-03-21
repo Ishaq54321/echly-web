@@ -15,14 +15,14 @@ For each ticket, CHECK:
 For each ticket, output one object in the results array:
 - isAccurate: true if the ticket correctly reflects the relevant instructions and preserves user meaning.
 - isActionable: true if a developer could implement every step.
-- needsClarification: true only if the ticket invents details, drops an instruction, or distorts intent.
+- hasVerificationGap: true only if the ticket invents details, drops an instruction, or distorts intent.
 - confidence: 0–1.
 
 OUTPUT: Return ONLY valid JSON. No markdown.
 {
   "results": [
-    { "isAccurate": true, "isActionable": true, "needsClarification": false, "confidence": 0.9 },
-    { "isAccurate": true, "isActionable": true, "needsClarification": false, "confidence": 0.85 }
+    { "isAccurate": true, "isActionable": true, "hasVerificationGap": false, "confidence": 0.9 },
+    { "isAccurate": true, "isActionable": true, "hasVerificationGap": false, "confidence": 0.85 }
   ]
 }
 Return exactly one "results" array with one object per ticket, in the same order as the input tickets.`;

@@ -66,14 +66,6 @@ function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback {
     userAgent: (data.userAgent as string | null) ?? null,
     clientTimestamp: (data.clientTimestamp as number | null) ?? null,
     screenshotUrl: (data.screenshotUrl as string | null) ?? null,
-    clarityScore: (data.clarityScore as number | null) ?? null,
-    clarityStatus: (() => {
-      const s = data.clarityStatus;
-      return s === "clear" || s === "needs_improvement" || s === "unclear" ? s : null;
-    })(),
-    clarityIssues: (data.clarityIssues as string[] | null) ?? null,
-    clarityConfidence: (data.clarityConfidence as number | null) ?? null,
-    clarityCheckedAt: (data.clarityCheckedAt as Timestamp | null) ?? null,
     commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
     lastCommentPreview: typeof data.lastCommentPreview === "string" ? data.lastCommentPreview : undefined,
     lastCommentAt: (data.lastCommentAt ?? null) as Timestamp | null,

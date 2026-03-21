@@ -52,7 +52,7 @@ export interface ExtractedInstruction {
 
 export interface ExtractionResult {
   instructions: ExtractedInstruction[];
-  needsClarification: boolean;
+  extractionUncertain: boolean;
   /** Estimated cost in USD for telemetry (only set when AI was called). */
   cost?: number;
 }
@@ -143,7 +143,7 @@ function normalizeInstruction(raw: unknown): ExtractedInstruction | null {
 
 /** Default when extraction returns nothing or fails. */
 function fallbackResult(): ExtractionResult {
-  return { instructions: [], needsClarification: true, cost: 0 };
+  return { instructions: [], extractionUncertain: true, cost: 0 };
 }
 
 /* ===== ACTION NORMALIZATION ===== */
@@ -257,15 +257,15 @@ export async function extractStructuredInstructions(
 
     const rawList = Array.isArray(parsed.instructions) ? parsed.instructions : [];
     const instructions = rawList.map(normalizeInstruction).filter((i): i is ExtractedInstruction => i !== null);
-    const needsClarification = instructions.length === 0 || instructions.every((i) => i.confidence < 0.5);
+    const extractionUncertain = instructions.length === 0 || instructions.every((i) => i.confidence < 0.5);
 
-    return { instructions, needsClarification, cost };
+    return { instructions, extractionUncertain, cost };
   };
 
   try {
     let result = await run();
     let totalCost = result.cost ?? 0;
-    if (retryOnce && result.instructions.length === 0 && result.needsClarification && cappedTranscript.length > 20) {
+    if (retryOnce && result.instructions.length === 0 && result.extractionUncertain && cappedTranscript.length > 20) {
       result = await run();
       totalCost += result.cost ?? 0;
     }

@@ -41,7 +41,7 @@
 
 Non-200 responses (`400`, `403`, `404`, `500`) return error/suspended payloads — not part of the “counts contract” for happy path; clients should not treat those as authoritative counts.
 
-**Note (client parse, not a contract break):** Web `parseSessionFeedbackCountsBody` coerces missing/non-numeric fields to `0`. Combined with no `res.ok` check in `fetchCountsDedup`, failed HTTP responses can surface as zeros instead of a hard error. That is **operational clarity**, not a second source of truth for successful loads.
+**Note (client parse, not a contract break):** Web `parseSessionFeedbackCountsBody` coerces missing/non-numeric fields to `0`. Combined with no `res.ok` check in `fetchCountsDedup`, failed HTTP responses can surface as zeros instead of a hard error. That is **operational transparency**, not a second source of truth for successful loads.
 
 ---
 

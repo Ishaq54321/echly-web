@@ -1,6 +1,6 @@
 /**
  * Context auto-capture for region feedback: URL, scroll, viewport, DOM path, nearby text.
- * Enables AI-level clarity: "On /pricing at 1440px, CTA under card #2 has alignment issue."
+ * Enables AI-level scene detail: "On /pricing at 1440px, CTA under card #2 has alignment issue."
  * Ensures domPath, nearbyText, subtreeText, visibleText are always populated when possible.
  */
 import { ECHLY_DEBUG } from "@/lib/utils/logger";

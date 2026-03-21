@@ -312,10 +312,6 @@ export async function runVoiceToTicket(
 ): Promise<{
   success: boolean;
   ticket: VoiceTicket;
-  needsClarification: boolean;
-  clarityScore: number;
-  clarityIssues: string[];
-  suggestedRewrite: string | null;
 }> {
   const runReviewThreshold = options.runReviewBelowConfidence ?? 0.85;
   const pipelineStart = Date.now();
@@ -326,10 +322,6 @@ export async function runVoiceToTicket(
     return {
       success: true,
       ticket: { title: "", actionSteps: [], confidence: 0 },
-      needsClarification: true,
-      clarityScore: 0,
-      clarityIssues: ["No transcript provided."],
-      suggestedRewrite: "Please provide your feedback in a few words.",
     };
   }
 
@@ -362,18 +354,11 @@ export async function runVoiceToTicket(
     notes: finalJson.notes || undefined,
   };
 
-  const clarityScore = Math.round(finalJson.confidence * 100);
-  const needsClarification = finalJson.confidence < 0.6;
-
   const pipelineDuration = Date.now() - pipelineStart;
   console.log(`[AI PIPELINE] runVoiceToTicket duration: ${pipelineDuration}ms`);
 
   return {
     success: true,
     ticket,
-    needsClarification,
-    clarityScore,
-    clarityIssues: needsClarification ? ["Low confidence; please rephrase if something was missed."] : [],
-    suggestedRewrite: needsClarification ? "Please rephrase your feedback so we can create a clearer ticket." : null,
   };
 }

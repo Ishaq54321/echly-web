@@ -59,15 +59,6 @@ const feedbackPayload = (
 
   screenshotUrl: data.screenshotUrl ?? null,
   screenshotStatus: data.screenshotStatus ?? null,
-
-  clarityScore: data.clarityScore ?? null,
-  clarityStatus: data.clarityStatus ?? null,
-  clarityIssues: data.clarityIssues ?? null,
-  clarityConfidence: data.clarityConfidence ?? null,
-  clarityCheckedAt:
-    data.clarityScore != null || data.clarityStatus != null
-      ? serverTimestamp()
-      : (data.clarityCheckedAt ?? null),
 });
 
 export async function addFeedbackRepo(
@@ -363,11 +354,6 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     userAgent: data.userAgent ?? null,
     clientTimestamp: data.clientTimestamp ?? null,
     screenshotUrl: data.screenshotUrl ?? null,
-    clarityScore: data.clarityScore ?? null,
-    clarityStatus: data.clarityStatus ?? null,
-    clarityIssues: data.clarityIssues ?? null,
-    clarityConfidence: data.clarityConfidence ?? null,
-    clarityCheckedAt: data.clarityCheckedAt ?? null,
     commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
     lastCommentPreview: typeof data.lastCommentPreview === "string" ? data.lastCommentPreview : undefined,
     lastCommentAt: (data.lastCommentAt ?? null) as Timestamp | null,

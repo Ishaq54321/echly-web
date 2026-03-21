@@ -54,7 +54,7 @@ export interface BuildInstructionGraphInput {
 
 export interface BuildInstructionGraphResult {
   graph: InstructionGraph;
-  needsClarification: boolean;
+  graphSignalsWeakExtraction: boolean;
 }
 
 /** Treat entity as ungrouped when empty or generic. */
@@ -110,7 +110,7 @@ export function buildInstructionGraph(input: BuildInstructionGraphInput): BuildI
   const noActionable =
     graph.targets.length === 0 ||
     graph.targets.every((t) => t.actions.every((a) => a.confidence < 0.5));
-  const needsClarification = noActionable && structuredInstructions.length > 0;
+  const graphSignalsWeakExtraction = noActionable && structuredInstructions.length > 0;
 
   echlyDebug("INSTRUCTION GRAPH", { targetCount: graph.targets.length });
   graph.targets.forEach((t, i) => {
@@ -120,7 +120,7 @@ export function buildInstructionGraph(input: BuildInstructionGraphInput): BuildI
     });
   });
 
-  return { graph, needsClarification };
+  return { graph, graphSignalsWeakExtraction };
 }
 
 // ---------------------------------------------------------------------------

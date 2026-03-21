@@ -12,7 +12,7 @@ import { VERIFICATION_SYSTEM } from "./prompts/verificationPrompt";
 export interface VerificationResult {
   isAccurate: boolean;
   isActionable: boolean;
-  needsClarification: boolean;
+  hasVerificationGap: boolean;
   confidence: number;
 }
 
@@ -35,7 +35,7 @@ function parseOneVerificationResult(r: unknown): VerificationResult {
   return {
     isAccurate: Boolean(o.isAccurate),
     isActionable: Boolean(o.isActionable),
-    needsClarification: Boolean(o.needsClarification),
+    hasVerificationGap: Boolean(o.hasVerificationGap),
     confidence: clamp(o.confidence),
   };
 }
@@ -141,15 +141,14 @@ function conservativeVerification(): VerificationResult {
   return {
     isAccurate: false,
     isActionable: false,
-    needsClarification: true,
+    hasVerificationGap: true,
     confidence: 0.5,
   };
 }
 
 /**
  * Returns verification results as-is. No overrides.
- * A ticket is valid iff: isAccurate === true && isActionable === true && needsClarification === false.
- * Otherwise the ticket is treated as needing clarification.
+ * A ticket is valid iff: isAccurate === true && isActionable === true && hasVerificationGap === false.
  */
 export function applyVerifierFinalDecision(
   rawVerifications: VerificationResult[]

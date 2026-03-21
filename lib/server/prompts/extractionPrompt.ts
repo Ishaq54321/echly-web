@@ -114,7 +114,7 @@ GENERAL_INVESTIGATION — user suspects a problem but does not specify the fix.
 
 CONFIDENCE RULES
 
-Set confidence to reflect entity clarity, action clarity, and context match:
+Set confidence to reflect entity resolution, action specificity, and context match:
 
 • 0.9+ — Entity matched in DOM or nearby text; action is explicit and unambiguous.
 • 0.7–0.9 — Inferred from context; element or action reasonably clear.

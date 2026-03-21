@@ -53,13 +53,6 @@ type StructureResponse = {
   tickets: Array<Record<string, unknown>>;
   ticket?: { title: string; actionSteps: string[]; confidence: number };
   error?: string;
-  clarityScore?: number;
-  clarityIssues?: string[];
-  suggestedRewrite?: string | null;
-  confidence?: number;
-  needsClarification?: boolean;
-  verificationIssues?: string[];
-  verificationWarnings?: string[];
 };
 
 /**
