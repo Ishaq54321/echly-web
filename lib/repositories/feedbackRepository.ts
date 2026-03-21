@@ -108,6 +108,20 @@ export async function addFeedbackWithSessionCountersRepo(
   const workspaceRef = doc(db, "workspaces", workspaceId);
   const insightsRef = workspaceInsightsRef(workspaceId);
   const feedbackRef = await runTransaction(db, async (tx) => {
+    const feedbackRef =
+      feedbackId != null && feedbackId !== ""
+        ? doc(db, "feedback", feedbackId)
+        : doc(collection(db, "feedback"));
+    if (feedbackId) {
+      const existing = await tx.get(feedbackRef);
+      if (existing.exists()) {
+        console.log("[idempotency] duplicate prevented", {
+          feedbackId,
+        });
+        return feedbackRef;
+      }
+    }
+
     const workspaceSnap = await tx.get(workspaceRef);
     const insightsSnap = await tx.get(insightsRef);
     const stats = (workspaceSnap.data()?.stats ?? {}) as Record<string, unknown>;
@@ -119,12 +133,8 @@ export async function addFeedbackWithSessionCountersRepo(
     if (!insightsSnap.exists()) {
       tx.set(insightsRef, emptyWorkspaceInsightsDoc());
     }
-
-    const feedbackRef =
-      feedbackId != null && feedbackId !== ""
-        ? doc(db, "feedback", feedbackId)
-        : doc(collection(db, "feedback"));
     tx.set(feedbackRef, payload);
+    console.log("[idempotency] created", { feedbackId: feedbackRef.id });
     tx.update(sessionRef, {
       openCount: increment(1),
       totalCount: increment(1),

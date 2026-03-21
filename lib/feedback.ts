@@ -1,8 +1,6 @@
-import type { DocumentReference } from "firebase/firestore";
 export type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
 import type { StructuredFeedback, Feedback } from "@/lib/domain/feedback";
 import {
-  addFeedbackWithSessionCountersRepo,
   deleteFeedbackWithSessionCountersRepo,
   getFeedbackByIdsRepo,
   getSessionFeedbackByResolvedRepo,
@@ -25,20 +23,6 @@ export type {
 ================================ */
 
 // Types live in `lib/domain/feedback.ts` and are re-exported above.
-
-/* ================================
-   ADD FEEDBACK
-================================ */
-
-export async function addFeedback(
-  workspaceId: string,
-  sessionId: string,
-  userId: string,
-  data: StructuredFeedback,
-  feedbackId?: string
-): Promise<DocumentReference> {
-  return addFeedbackWithSessionCountersRepo(workspaceId, sessionId, userId, data, feedbackId);
-}
 
 /* ================================
    UPDATE FEEDBACK

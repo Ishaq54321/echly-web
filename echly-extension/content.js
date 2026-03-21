@@ -41059,7 +41059,6 @@
               console.error("[ECHLY OCR] Failed:", err);
               ocrResult = null;
             }
-            const firstFeedbackId = generateFeedbackId();
             const screenshotId = generateScreenshotId();
             const uploadPromise = screenshot ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId) : Promise.resolve(null);
             const visibleTextFromScreenshot = ocrResult ?? "";
@@ -41107,7 +41106,6 @@
                     uploadPromise,
                     transcript,
                     screenshot,
-                    firstFeedbackId,
                     clarityScore,
                     clarityIssues,
                     suggestedRewrite,
@@ -41134,7 +41132,6 @@
                     uploadPromise,
                     transcript,
                     screenshot,
-                    firstFeedbackId,
                     clarityScore,
                     clarityIssues: verificationIssues.length > 0 ? verificationIssues : clarityIssues,
                     suggestedRewrite,
@@ -41204,10 +41201,12 @@
               let firstCreated;
               for (let i = 0; i < tickets.length; i++) {
                 const t = tickets[i];
+                const feedbackId = generateFeedbackId();
                 const desc = typeof t.description === "string" ? t.description : t.title ?? "";
                 const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : [];
                 const body = {
                   sessionId: effectiveSessionId,
+                  feedbackId,
                   title: t.title ?? "",
                   description: desc,
                   type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
@@ -41226,6 +41225,7 @@
                   setIsProcessingFeedback(false);
                   return;
                 }
+                console.log("[feedbackId generated]", feedbackId);
                 console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
                 const feedbackRes = await apiFetch("/api/feedback", {
                   method: "POST",
@@ -41346,9 +41346,11 @@
           let firstCreated;
           for (let i = 0; i < tickets.length; i++) {
             const t = tickets[i];
+            const feedbackId = generateFeedbackId();
             const desc = typeof t.description === "string" ? t.description : t.title ?? "";
             const body = {
               sessionId: effectiveSessionId,
+              feedbackId,
               title: t.title ?? "",
               description: desc,
               type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
@@ -41367,6 +41369,7 @@
               setIsProcessingFeedback(false);
               return void 0;
             }
+            console.log("[feedbackId generated]", feedbackId);
             console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
             const feedbackRes = await apiFetch("/api/feedback", {
               method: "POST",
@@ -41605,9 +41608,11 @@
           let firstCreated;
           for (let i = 0; i < pending2.tickets.length; i++) {
             const t = pending2.tickets[i];
+            const feedbackId = generateFeedbackId();
             const desc = typeof t.description === "string" ? t.description : t.title ?? "";
             const body = {
               sessionId: effectiveSessionId,
+              feedbackId,
               title: t.title ?? "",
               description: desc,
               type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
@@ -41626,6 +41631,7 @@
               setIsProcessingFeedback(false);
               return;
             }
+            console.log("[feedbackId generated]", feedbackId);
             console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
             const feedbackRes = await apiFetch("/api/feedback", {
               method: "POST",
@@ -41738,9 +41744,11 @@
           );
           for (let i = 0; i < tickets.length; i++) {
             const t = tickets[i];
+            const feedbackId = generateFeedbackId();
             const desc = typeof t.description === "string" ? t.description : t.title ?? "";
             const body = {
               sessionId: effectiveSessionId,
+              feedbackId,
               title: t.title ?? "",
               description: desc,
               type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
@@ -41759,6 +41767,7 @@
               setIsProcessingFeedback(false);
               return;
             }
+            console.log("[feedbackId generated]", feedbackId);
             console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
             const feedbackRes = await apiFetch("/api/feedback", {
               method: "POST",
@@ -41832,9 +41841,11 @@
         let firstCreated;
         for (let i = 0; i < tickets.length; i++) {
           const t = tickets[i];
+          const feedbackId = generateFeedbackId();
           const desc = typeof t.description === "string" ? t.description : t.title ?? "";
           const body = {
             sessionId: effectiveSessionId,
+            feedbackId,
             title: t.title ?? "",
             description: desc,
             type: Array.isArray(t.suggestedTags) && t.suggestedTags[0] ? t.suggestedTags[0] : "Feedback",
@@ -41853,6 +41864,7 @@
             setIsProcessingFeedback(false);
             return;
           }
+          console.log("[feedbackId generated]", feedbackId);
           console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
           const feedbackRes = await apiFetch("/api/feedback", {
             method: "POST",

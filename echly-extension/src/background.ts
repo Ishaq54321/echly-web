@@ -1481,6 +1481,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         for (let i = 0; i < tickets.length; i++) {
           const t = tickets[i];
           const desc = typeof t.description === "string" ? t.description : (t.title ?? "");
+          const feedbackId = crypto.randomUUID();
           const body = {
             sessionId,
             title: t.title ?? "",
@@ -1491,9 +1492,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             suggestedTags: t.suggestedTags,
             screenshotUrl: i === 0 ? screenshotUrl : null,
             screenshotId: i === 0 && screenshotId ? screenshotId : undefined,
+            feedbackId,
             metadata: { clientTimestamp: Date.now() },
           };
 
+          console.log("[background feedbackId]", feedbackId);
           console.log("[ECHLY AI] Creating feedback ticket");
           const feedbackRes = await apiFetch(`${API_BASE}/api/feedback`, {
             method: "POST",

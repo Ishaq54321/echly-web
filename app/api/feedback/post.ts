@@ -153,6 +153,7 @@ export async function POST(req: NextRequest) {
 
   let body: {
     sessionId?: string;
+    feedbackId?: string;
     title?: string;
     description?: string;
     suggestion?: string;
@@ -191,6 +192,10 @@ export async function POST(req: NextRequest) {
 
   const sessionId =
     typeof body.sessionId === "string" ? body.sessionId.trim() : "";
+  const feedbackIdRaw =
+    typeof body.feedbackId === "string" ? body.feedbackId.trim() : "";
+  const feedbackId =
+    feedbackIdRaw.length > 0 ? feedbackIdRaw : undefined;
   if (!sessionId) {
     return NextResponse.json(
       { success: false, error: "sessionId is required" },
@@ -306,7 +311,8 @@ export async function POST(req: NextRequest) {
       workspaceId,
       sessionId,
       user.uid,
-      structuredData
+      structuredData,
+      feedbackId
     );
     console.log("[feedback lifecycle] created", {
       feedbackId: docRef.id,
