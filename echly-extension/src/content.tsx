@@ -21,6 +21,7 @@ import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/lib/capt
 import { ExtensionCaptureEnvironment } from "@/lib/capture-engine/ExtensionCaptureEnvironment";
 import { ECHLY_DEBUG, log } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
+import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
 
 let echlyEventDispatcher: ((type: string) => void) | null = null;
 
@@ -645,6 +646,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 callbacks.onError();
                 return;
               }
+              if (ECHLY_STRICT_MODE && !finalScreenshotId) {
+                console.error("[GUARDRAIL] Attempted create without screenshot");
+                callbacks.onError();
+                return;
+              }
               const token = await getExtensionToken();
               if (!token) {
                 console.error("[ECHLY AUTH] No extension token available");
@@ -671,11 +677,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 | undefined;
               try {
                 feedbackResponse = (await new Promise((resolve, reject) => {
-                  console.log("[TRACE] CONTENT sending feedback", {
-                    feedbackId,
-                    timestamp: Date.now(),
-                    stack: new Error().stack,
-                  });
                   chrome.runtime.sendMessage(
                     {
                       type: "ECHLY_CREATE_FEEDBACK",
@@ -842,6 +843,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           setIsProcessingFeedback(false);
           return undefined;
         }
+        if (ECHLY_STRICT_MODE && !finalScreenshotId) {
+          console.error("[GUARDRAIL] Attempted create without screenshot");
+          setIsProcessingFeedback(false);
+          return undefined;
+        }
         const token = await getExtensionToken();
         if (!token) {
           console.error("[ECHLY AUTH] No extension token available");
@@ -868,11 +874,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           | undefined;
         try {
           feedbackResponse = (await new Promise((resolve, reject) => {
-            console.log("[TRACE] CONTENT sending feedback", {
-              feedbackId,
-              timestamp: Date.now(),
-              stack: new Error().stack,
-            });
             chrome.runtime.sendMessage(
               {
                 type: "ECHLY_CREATE_FEEDBACK",

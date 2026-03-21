@@ -20,6 +20,7 @@ import { getSessionUser } from "@/lib/server/session";
 import { invalidateFeedbackCache } from "@/lib/server/cache/feedbackCache";
 import { getDownloadURL, ref } from "firebase/storage";
 import { storage } from "@/lib/firebase";
+import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
 
 const WORKSPACE_BY_ID_CACHE_TTL_MS = 30_000;
 const workspaceByIdCache = new Map<string, { workspace: unknown; expiresAt: number }>();
@@ -217,6 +218,17 @@ export async function POST(req: NextRequest) {
   const hasScreenshotId = screenshotIdRaw.length > 0;
   const normalizedScreenshotId = hasScreenshotId ? screenshotIdRaw : "";
   if (!hasScreenshotId) {
+    if (ECHLY_STRICT_MODE) {
+      console.error("[GUARDRAIL] Invalid feedback create attempt", { feedbackId });
+      try {
+        assert(hasScreenshotId, "ARCHITECTURE VIOLATION: screenshotId required");
+      } catch {
+        return NextResponse.json(
+          { success: false, error: "ARCHITECTURE VIOLATION: screenshotId required" },
+          { status: 400, headers: corsHeaders(req) }
+        );
+      }
+    }
     return NextResponse.json(
       { success: false, error: "Atomic violation: screenshotId required" },
       { status: 400, headers: corsHeaders(req) }
@@ -258,6 +270,23 @@ export async function POST(req: NextRequest) {
   const meta = body.metadata;
   const resolvedScreenshotUrl = await resolveScreenshotDownloadUrl(normalizedScreenshotId, sessionId);
   if (!resolvedScreenshotUrl) {
+    if (ECHLY_STRICT_MODE) {
+      console.error("[GUARDRAIL] Invalid feedback create attempt", { feedbackId });
+      try {
+        assert(
+          Boolean(resolvedScreenshotUrl),
+          "ARCHITECTURE VIOLATION: screenshot must exist before create"
+        );
+      } catch {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "ARCHITECTURE VIOLATION: screenshot must exist before create",
+          },
+          { status: 409, headers: corsHeaders(req) }
+        );
+      }
+    }
     return NextResponse.json(
       { success: false, error: "Atomic violation: screenshot URL unavailable" },
       { status: 409, headers: corsHeaders(req) }

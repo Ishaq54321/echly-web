@@ -14035,6 +14035,15 @@
     countsCache = /* @__PURE__ */ new Map();
   }
 
+  // lib/guardrails.ts
+  var ECHLY_STRICT_MODE = true;
+  function assert(condition, message) {
+    if (!ECHLY_STRICT_MODE) return;
+    if (condition) return;
+    console.error("[GUARDRAIL]", message);
+    throw new Error(message);
+  }
+
   // lib/uploadScreenshot.ts
   function createScreenshotId() {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -14053,15 +14062,21 @@
     }
     const screenshotIdRaw = typeof input.screenshotId === "string" ? input.screenshotId.trim() : "";
     const screenshotId = screenshotIdRaw || createScreenshotId();
-    const response = await executeUpload({
+    const result = await executeUpload({
       screenshotId,
       imageDataUrl,
       sessionId
     });
-    const resolvedScreenshotId = typeof response?.screenshotId === "string" && response.screenshotId.trim() ? response.screenshotId.trim() : screenshotId;
+    if (ECHLY_STRICT_MODE) {
+      assert(
+        Boolean(typeof result?.screenshotId === "string" && result.screenshotId.trim()),
+        "[GUARDRAIL] Screenshot upload must return screenshotId"
+      );
+    }
+    const resolvedScreenshotId = typeof result?.screenshotId === "string" && result.screenshotId.trim() ? result.screenshotId.trim() : screenshotId;
     return {
       screenshotId: resolvedScreenshotId,
-      url: response?.url
+      url: result?.url
     };
   }
 
@@ -41141,6 +41156,11 @@
                   callbacks.onError();
                   return;
                 }
+                if (ECHLY_STRICT_MODE && !finalScreenshotId) {
+                  console.error("[GUARDRAIL] Attempted create without screenshot");
+                  callbacks.onError();
+                  return;
+                }
                 const token = await getExtensionToken();
                 if (!token) {
                   console.error("[ECHLY AUTH] No extension token available");
@@ -41158,11 +41178,6 @@
                 let feedbackResponse;
                 try {
                   feedbackResponse = await new Promise((resolve, reject) => {
-                    console.log("[TRACE] CONTENT sending feedback", {
-                      feedbackId,
-                      timestamp: Date.now(),
-                      stack: new Error().stack
-                    });
                     chrome.runtime.sendMessage(
                       {
                         type: "ECHLY_CREATE_FEEDBACK",
@@ -41308,6 +41323,11 @@
               setIsProcessingFeedback(false);
               return void 0;
             }
+            if (ECHLY_STRICT_MODE && !finalScreenshotId) {
+              console.error("[GUARDRAIL] Attempted create without screenshot");
+              setIsProcessingFeedback(false);
+              return void 0;
+            }
             const token = await getExtensionToken();
             if (!token) {
               console.error("[ECHLY AUTH] No extension token available");
@@ -41325,11 +41345,6 @@
             let feedbackResponse;
             try {
               feedbackResponse = await new Promise((resolve, reject) => {
-                console.log("[TRACE] CONTENT sending feedback", {
-                  feedbackId,
-                  timestamp: Date.now(),
-                  stack: new Error().stack
-                });
                 chrome.runtime.sendMessage(
                   {
                     type: "ECHLY_CREATE_FEEDBACK",

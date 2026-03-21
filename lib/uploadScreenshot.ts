@@ -1,3 +1,5 @@
+import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
+
 export type UploadScreenshotPayload = {
   imageDataUrl: string;
   sessionId: string;
@@ -42,19 +44,25 @@ export async function uploadScreenshot(
     typeof input.screenshotId === "string" ? input.screenshotId.trim() : "";
   const screenshotId = screenshotIdRaw || createScreenshotId();
 
-  const response = await executeUpload({
+  const result = await executeUpload({
     screenshotId,
     imageDataUrl,
     sessionId,
   });
+  if (ECHLY_STRICT_MODE) {
+    assert(
+      Boolean(typeof result?.screenshotId === "string" && result.screenshotId.trim()),
+      "[GUARDRAIL] Screenshot upload must return screenshotId"
+    );
+  }
 
   const resolvedScreenshotId =
-    typeof response?.screenshotId === "string" && response.screenshotId.trim()
-      ? response.screenshotId.trim()
+    typeof result?.screenshotId === "string" && result.screenshotId.trim()
+      ? result.screenshotId.trim()
       : screenshotId;
 
   return {
     screenshotId: resolvedScreenshotId,
-    url: response?.url,
+    url: result?.url,
   };
 }

@@ -142,7 +142,7 @@ export function createMarker(
 }
 
 /**
- * Update an existing marker's id and/or title (e.g. when async processing completes).
+ * Update an existing marker's id and/or title (e.g. when server id/title is known).
  */
 export function updateMarker(
   markerId: string,
@@ -156,7 +156,7 @@ export function updateMarker(
 }
 
 /**
- * Remove a single marker by id. Used when async processing fails.
+ * Remove a single marker by id (e.g. when capture is cancelled or submission fails).
  */
 export function removeMarker(markerId: string): void {
   const idx = markers.findIndex((m) => m.id === markerId);

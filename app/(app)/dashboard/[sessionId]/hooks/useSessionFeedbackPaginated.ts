@@ -15,6 +15,7 @@ import {
   subscribeFeedbackSession,
   useFeedbackRealtimeStore,
 } from "@/lib/realtime/feedbackStore";
+import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
 
 const PAGE_SIZE = 20;
 /** Client-side read cap: stop loading more after this many items (cost protection). */
@@ -88,6 +89,27 @@ export function useSessionFeedbackPaginated(
   const countsLoadedRef = useRef(false);
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const itemsRef = useRef<Feedback[]>([]);
+  const guardMultipleSources = useCallback(
+    (apiItems: Feedback[]) => {
+      if (ECHLY_STRICT_MODE) {
+        if (
+          Array.isArray(realtimeItems) &&
+          Array.isArray(apiItems) &&
+          realtimeItems.length > 0 &&
+          apiItems.length > 0
+        ) {
+          console.warn("[GUARDRAIL] Multiple sources present (expected during hydration)");
+        }
+      }
+
+      if (ECHLY_STRICT_MODE) {
+        if (!Array.isArray(items)) {
+          console.error("[GUARDRAIL] Canonical items list missing — CRITICAL");
+        }
+      }
+    },
+    [realtimeItems, items]
+  );
 
   // Keep a ref to the latest sessionId so in-flight async pagination
   // can't update state after the user switches sessions.
@@ -233,9 +255,6 @@ export function useSessionFeedbackPaginated(
   const loadMore = useCallback(async () => {
     const startedSessionId = sessionId;
     const s = stateRef.current;
-    const hasMore = s.hasMore;
-    const isLoading = s.loadingMore;
-    console.log("LOAD MORE TRIGGERED", { hasMore, isLoading });
     const loadedCount = s.items.length;
     if (!sessionId || !s.initialLoadDone || s.loadingMore || isFetchingRef.current || loadedCount >= FEEDBACK_LOAD_CAP) return;
     if (s.total > 0 && loadedCount >= s.total) {
@@ -250,7 +269,6 @@ export function useSessionFeedbackPaginated(
     setLoadingMore(true);
     try {
       const cursor = s.cursor;
-      console.log("Fetching next page with cursor:", cursor);
       const url = `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=${encodeURIComponent(cursor ?? "")}&limit=${PAGE_SIZE}`;
       const res = await cachedFetch(url, () => authFetch(url));
       const data = (await res.json()) as {
@@ -265,12 +283,10 @@ export function useSessionFeedbackPaginated(
       // If the user switched sessions while this request was in flight, ignore this response.
       if (sessionIdRef.current !== startedSessionId) return;
 
-      const incoming = data.feedback ?? [];
+      const apiItems = data.feedback ?? [];
+      guardMultipleSources(apiItems);
+      const incoming = apiItems;
       const pageCursor = data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
-      console.log("LOAD MORE RESULT", {
-        cursor,
-        returnedCount: incoming.length,
-      });
 
       if (incoming.length > 0) {
         const appended = appendPaginationIntoCanonical(incoming);
@@ -290,7 +306,7 @@ export function useSessionFeedbackPaginated(
       stateRef.current.loadingMore = false;
       setLoadingMore(false);
     }
-  }, [appendPaginationIntoCanonical, sessionId]);
+  }, [appendPaginationIntoCanonical, guardMultipleSources, sessionId]);
 
   // On scroll near bottom: trigger load early using threshold + fetch lock.
   useEffect(() => {
@@ -330,12 +346,10 @@ export function useSessionFeedbackPaginated(
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
-        console.log("Observer triggered", Boolean(entry?.isIntersecting));
         if (!entry?.isIntersecting) return;
         if (!hasUserScrolledRef.current) return;
         const s = stateRef.current;
         const hasMore = s.total === 0 ? s.hasMore : s.items.length < s.total;
-        console.log("hasMore:", hasMore);
         const isLoading = s.loadingMore || isFetchingRef.current;
         if (!hasMore) return;
         if (isLoading) return;
@@ -457,16 +471,14 @@ export function useSessionFeedbackPaginated(
         };
         // Ignore stale API seeding if the user switched sessions.
         if (sessionIdRef.current !== effectSessionId) return;
-        const incoming = data.feedback ?? [];
+        const apiItems = data.feedback ?? [];
+        guardMultipleSources(apiItems);
+        const incoming = apiItems;
         const pageCursor = data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
         setCursor(pageCursor);
         setHasMore(data.hasMore ?? false);
         if (incoming.length > 0) {
           appendPaginationIntoCanonical(incoming);
-          console.log("SEED PAGE RESULT", {
-            cursor: pageCursor,
-            returnedCount: incoming.length,
-          });
         }
       } catch {
         // If API seeding fails, realtime list still works; pagination will remain unavailable.
@@ -479,6 +491,7 @@ export function useSessionFeedbackPaginated(
     feedbackRealtime.loading,
     feedbackRealtime.sessionId,
     feedbackRealtime.version,
+    guardMultipleSources,
     mergeRealtimeIntoCanonical,
     realtimeItems,
     sessionId,
@@ -500,16 +513,14 @@ export function useSessionFeedbackPaginated(
         skippedCount?: number;
       };
       if (sessionIdRef.current !== startedSessionId) return;
-      const incoming = data.feedback ?? [];
+      const apiItems = data.feedback ?? [];
+      guardMultipleSources(apiItems);
+      const incoming = apiItems;
       const pageCursor = data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
       if (incoming.length) {
         appendPaginationIntoCanonical(incoming);
         setCursor(pageCursor);
         setHasMore(data.hasMore ?? false);
-        console.log("REFETCH PAGE RESULT", {
-          cursor: pageCursor,
-          returnedCount: incoming.length,
-        });
       } else {
         setItems([]);
         itemsRef.current = [];
@@ -519,7 +530,7 @@ export function useSessionFeedbackPaginated(
     } finally {
       // Do not set initialLoading: keep loading only for first mount and loadMore
     }
-  }, [appendPaginationIntoCanonical, sessionId]);
+  }, [appendPaginationIntoCanonical, guardMultipleSources, sessionId]);
 
   return {
     feedback: items,

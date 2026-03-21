@@ -1,5 +1,4 @@
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -11,7 +10,6 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   startAfter,
   updateDoc,
   where,
@@ -60,27 +58,6 @@ const feedbackPayload = (
   screenshotUrl: data.screenshotUrl ?? null,
   screenshotStatus: data.screenshotStatus ?? null,
 });
-
-export async function addFeedbackRepo(
-  workspaceId: string,
-  sessionId: string,
-  userId: string,
-  data: StructuredFeedback,
-  feedbackId?: string
-): Promise<DocumentReference> {
-  const payload = feedbackPayload(workspaceId, sessionId, userId, data);
-
-  if (feedbackId != null && feedbackId !== "") {
-    const docRef = doc(db, "feedback", feedbackId);
-    await setDoc(docRef, payload);
-    invalidateCounts(sessionId);
-    return docRef;
-  }
-
-  const docRef = await addDoc(collection(db, "feedback"), payload);
-  invalidateCounts(sessionId);
-  return docRef;
-}
 
 /**
  * Creates feedback and updates session denormalized counters in one transaction.
@@ -384,7 +361,6 @@ export async function getSessionFeedbackPageRepo(
   const pageSize = opts.limit ?? FEEDBACK_PAGE_SIZE_DEFAULT;
   assertQueryLimit(pageSize, "getSessionFeedbackPageRepo");
 
-  console.log("USING COLLECTION TYPE:", "collection");
   const coll = collection(db, "feedback");
   const baseConstraints = [
     where("sessionId", "==", sessionId),
@@ -466,8 +442,6 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
 ): Promise<{ feedback: Feedback[]; nextCursor: string | null; hasMore: boolean }> {
   const { workspaceId, sessionId, userId, limit: pageSize, cursor } = args;
   assertQueryLimit(pageSize, "getSessionFeedbackPageForUserWithStringCursorRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
-
   const trimmed = cursor?.trim();
   const cursorSnap: DocumentSnapshot | null =
     trimmed && trimmed.length > 0 ? await getDoc(doc(db, "feedback", trimmed)) : null;
@@ -501,16 +475,6 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
     throw err;
   }
 
-  console.log("[INDEX CHECK]", {
-    query: "workspaceId+sessionId+createdAt",
-    docs: snapshot.size,
-  });
-
-  console.log("[FIRESTORE QUERY STATS]", {
-    docs: snapshot.size,
-    hasCursor: !!cursor,
-  });
-
   const feedback = snapshot.docs.map(docToFeedback);
   const lastVisibleDoc = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
   const hasMore = snapshot.size === pageSize;
@@ -524,12 +488,9 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
 
 /** Total count of feedback for a session (for sidebar display). */
 export async function getSessionFeedbackCountRepo(sessionId: string): Promise<number> {
-  console.log("USING COLLECTION TYPE:", "collection");
   const coll = collection(db, "feedback");
   const q = query(coll, where("sessionId", "==", sessionId));
-  const start = Date.now();
   const snapshot = await getCountFromServer(q);
-  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   return snapshot.data().count;
 }
 
@@ -614,7 +575,6 @@ export interface SessionFeedbackCounts {
  * Returns the total number of feedback items in a workspace. Used for usage/billing.
  */
 export async function getWorkspaceFeedbackCountRepo(workspaceId: string): Promise<number> {
-  console.log("USING COLLECTION TYPE:", "collection");
   const q = query(
     collection(db, "feedback"),
     where("workspaceId", "==", workspaceId)
@@ -633,15 +593,12 @@ const DELETE_SESSION_FEEDBACK_LIMIT = 500;
 export async function deleteAllFeedbackForSessionRepo(
   sessionId: string
 ): Promise<number> {
-  console.log("USING COLLECTION TYPE:", "collection");
   const q = query(
     collection(db, "feedback"),
     where("sessionId", "==", sessionId),
     limit(DELETE_SESSION_FEEDBACK_LIMIT)
   );
-  const start = Date.now();
   const snapshot = await getDocs(q);
-  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   const count = snapshot.docs.length;
   await Promise.all(snapshot.docs.map((d) => deleteDoc(d.ref)));
   if (count > 0) {
@@ -662,7 +619,6 @@ export async function getSessionFeedbackByResolvedRepo(
   max: number = OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT
 ): Promise<Feedback[]> {
   assertQueryLimit(max, "getSessionFeedbackByResolvedRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   const status = isResolved ? "resolved" : "open";
   const q = query(
     collection(db, "feedback"),
@@ -671,9 +627,7 @@ export async function getSessionFeedbackByResolvedRepo(
     orderBy("createdAt", "desc"),
     limit(max)
   );
-  const start = Date.now();
   const snapshot = await getDocs(q);
-  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   return snapshot.docs.map(docToFeedback);
 }
 
@@ -683,9 +637,7 @@ const OVERVIEW_FEEDBACK_BY_IDS_LIMIT = 10;
 export async function getFeedbackByIdRepo(
   feedbackId: string
 ): Promise<Feedback | null> {
-  const start = Date.now();
   const snap = await getDoc(doc(db, "feedback", feedbackId));
-  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   if (!snap.exists()) return null;
   return docToFeedback(snap as QueryDocumentSnapshot);
 }
@@ -701,7 +653,6 @@ export async function getUserFeedbackAllRepo(
   max: number = USER_FEEDBACK_ALL_LIMIT
 ): Promise<Feedback[]> {
   assertQueryLimit(max, "getUserFeedbackAllRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   const coll = collection(db, "feedback");
   const q = query(
     coll,
@@ -709,9 +660,7 @@ export async function getUserFeedbackAllRepo(
     orderBy("createdAt", "desc"),
     limit(max)
   );
-  const start = Date.now();
   const snapshot = await getDocs(q);
-  console.log(`[FIRESTORE] getUserFeedbackAllRepo duration: ${Date.now() - start}ms`);
   return snapshot.docs.map(docToFeedback);
 }
 
@@ -724,7 +673,6 @@ export async function getWorkspaceFeedbackAllRepo(
   max: number = USER_FEEDBACK_ALL_LIMIT
 ): Promise<Feedback[]> {
   assertQueryLimit(max, "getWorkspaceFeedbackAllRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   const coll = collection(db, "feedback");
   const q = query(
     coll,
@@ -732,9 +680,7 @@ export async function getWorkspaceFeedbackAllRepo(
     orderBy("createdAt", "desc"),
     limit(max)
   );
-  const start = Date.now();
   const snapshot = await getDocs(q);
-  console.log(`[FIRESTORE] getWorkspaceFeedbackAllRepo duration: ${Date.now() - start}ms`);
   return snapshot.docs.map(docToFeedback);
 }
 
@@ -749,16 +695,8 @@ export async function getWorkspaceFeedbackForInsightsRepo(
   workspaceId: string
 ): Promise<Feedback[]> {
   assertQueryLimit(INSIGHTS_FEEDBACK_LIMIT, "getWorkspaceFeedbackForInsightsRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   const isSimple = process.env.INSIGHTS_SIMPLE_QUERY === "1";
   const limitValue = isSimple ? 10 : INSIGHTS_FEEDBACK_LIMIT;
-  console.log("INSIGHTS QUERY:", {
-    workspaceId,
-    hasWhere: !isSimple,
-    hasOrderBy: isSimple ? false : "createdAt desc",
-    limit: limitValue,
-    simpleMode: isSimple,
-  });
 
   const q = isSimple
     ? query(collection(db, "feedback"), limit(10))
@@ -770,11 +708,6 @@ export async function getWorkspaceFeedbackForInsightsRepo(
       );
 
   const snapshot = await getDocs(q);
-  console.log("QUERY METRICS:", {
-    collection: "feedback",
-    count: snapshot.docs.length,
-    limit: limitValue,
-  });
   return snapshot.docs.map(docToFeedback);
 }
 
@@ -805,7 +738,6 @@ export async function getUserFeedbackWithCommentsRepo(
   max: number = USER_FEEDBACK_ALL_LIMIT
 ): Promise<Feedback[]> {
   assertQueryLimit(max, "getUserFeedbackWithCommentsRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   const coll = collection(db, "feedback");
   const q = query(
     coll,
@@ -814,9 +746,7 @@ export async function getUserFeedbackWithCommentsRepo(
     orderBy("commentCount", "desc"),
     limit(max)
   );
-  const start = Date.now();
   const snapshot = await getDocs(q);
-  console.log(`[FIRESTORE] getUserFeedbackWithCommentsRepo duration: ${Date.now() - start}ms`);
   return snapshot.docs.map(docToFeedback);
 }
 
@@ -833,7 +763,6 @@ export async function getWorkspaceFeedbackWithCommentsRepo(
 ): Promise<Feedback[]> {
   const { workspaceId, limit: pageSize, cursor } = args;
   assertQueryLimit(pageSize, "getWorkspaceFeedbackWithCommentsRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   const coll = collection(db, "feedback");
   const trimmedCursor = cursor?.trim();
   const cursorSnap: DocumentSnapshot | null =
@@ -849,9 +778,7 @@ export async function getWorkspaceFeedbackWithCommentsRepo(
     ...(cursorSnap && cursorSnap.exists() ? [startAfter(cursorSnap)] : []),
     limit(pageSize)
   );
-  const start = Date.now();
   const snapshot = await getDocs(q);
-  console.log(`[FIRESTORE] getWorkspaceFeedbackWithCommentsRepo duration: ${Date.now() - start}ms`);
   return snapshot.docs.map(docToFeedback);
 }
 
@@ -863,11 +790,9 @@ export async function getFeedbackByIdsRepo(
   if (feedbackIds.length === 0) return [];
   const limited = feedbackIds.slice(0, max);
   assertQueryLimit(limited.length, "getFeedbackByIdsRepo");
-  const start = Date.now();
   const snaps = await Promise.all(
     limited.map((id) => getDoc(doc(db, "feedback", id)))
   );
-  console.log(`[FIRESTORE] query duration: ${Date.now() - start}ms`);
   return snaps
     .filter((s) => s.exists())
     .map((s) => docToFeedback(s as QueryDocumentSnapshot));

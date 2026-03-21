@@ -10,6 +10,7 @@ import { API_BASE, WEB_APP_URL } from "../config";
 import { fetchCountsDedup } from "./countsRequestStore";
 import { sessionsArrayFromApiPayload } from "@/lib/domain/session";
 import { buildFeedbackPayload } from "@/utils/buildFeedbackPayload";
+import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
 
 const LOGIN_URL = `${WEB_APP_URL}/login`;
 /** Extension token TTL from backend is 15m; treat as valid for 14 min to avoid edge expiry. */
@@ -143,9 +144,6 @@ let cachedSessionUser: StoredUser | null = null;
 
 /** Tray toggle state: icon click opens when false, closes when true (Loom-style). */
 let trayOpen = false;
-
-/** Global lock: only one ECHLY_PROCESS_FEEDBACK pipeline at a time to avoid ECONNRESET. */
-let aiProcessing = false;
 
 /** Minimal ticket shape for global tray; matches StructuredFeedback. */
 type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string };
@@ -829,32 +827,16 @@ async function createFeedbackInternal({
     screenshotId,
   });
 
-  console.log("[TRACE] BACKGROUND creating (API call)", {
-    feedbackId,
-    timestamp: Date.now(),
-  });
-
   const res = await apiFetch(`${API_BASE}/api/feedback`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 
-  if (res.ok) {
-    console.log("[TRACE] BACKGROUND success", {
-      feedbackId,
-      timestamp: Date.now(),
-    });
-  }
-
   return res;
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log("[ECHLY][BACKGROUND] Message received:", request);
-  console.log("[ECHLY] message received:", request.type);
-  console.log("BACKGROUND RECEIVED MESSAGE", request.type);
-  console.log("BACKGROUND MESSAGE RECEIVED:", request);
-  echlyLog("MESSAGE", "received", request.type);
+  if (ECHLY_DEBUG) echlyLog("MESSAGE", "received", request.type);
 
   if (request.type === "ECHLY_EXTENSION_TOKEN") {
     const token = (request as { token?: string; user?: { uid: string; email?: string | null } }).token;
@@ -1463,6 +1445,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_CREATE_FEEDBACK") {
     (async () => {
+      if (ECHLY_STRICT_MODE && request.type !== "ECHLY_CREATE_FEEDBACK") {
+        console.error("[GUARDRAIL] Invalid create path attempted");
+      }
       const { sessionId, feedbackId, ticket, screenshotId } = request.payload as {
         sessionId: string;
         feedbackId: string;
@@ -1475,14 +1460,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         screenshotId?: string;
       };
       if (!screenshotId) {
-        try {
-          throw new Error("Atomic violation: screenshotId required");
-        } catch (err) {
-          console.error("[ECHLY]", err);
-          const message =
-            err instanceof Error ? err.message : "Atomic violation: screenshotId required";
-          sendResponse({ success: false, error: message });
+        if (ECHLY_STRICT_MODE) {
+          console.error("[GUARDRAIL] Missing screenshotId — blocked");
+          sendResponse({ success: false, error: "guardrail_violation" });
+          return;
         }
+
+        console.warn("[ECHLY] Missing screenshotId — blocked");
+        sendResponse({ success: false, error: "missing_screenshot_id" });
         return;
       }
       console.log("[ECHLY] Unified create path", {
@@ -1526,10 +1511,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       processingFeedbackIds.add(feedbackId);
       console.log("[ECHLY] Lock acquired", feedbackId);
-      console.log("[TRACE] BACKGROUND received", {
-        feedbackId,
-        timestamp: Date.now(),
-      });
       try {
         if (await isFeedbackCompleted(feedbackId)) {
           console.warn("[ECHLY] Duplicate blocked (already completed)", feedbackId);
@@ -1566,13 +1547,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     })();
     return true; // REQUIRED for async response
-  }
-
-  if (request.type === "ECHLY_PROCESS_FEEDBACK") {
-    console.warn("[ECHLY] PROCESS_FEEDBACK is deprecated - ignored");
-    console.warn("[ECHLY] BLOCKED deprecated PROCESS_FEEDBACK");
-    sendResponse({ success: false, error: "deprecated_path" });
-    return false;
   }
 
   if (request.type === "echly-api") {
