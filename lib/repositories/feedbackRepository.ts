@@ -91,7 +91,8 @@ export async function addFeedbackWithSessionCountersRepo(
   sessionId: string,
   userId: string,
   data: StructuredFeedback,
-  feedbackId?: string
+  feedbackId?: string,
+  screenshotId?: string
 ): Promise<DocumentReference> {
   const payload = feedbackPayload(workspaceId, sessionId, userId, data);
   const sessionRef = doc(db, "sessions", sessionId);
@@ -125,6 +126,13 @@ export async function addFeedbackWithSessionCountersRepo(
       tx.set(insightsRef, emptyWorkspaceInsightsDoc());
     }
     tx.set(feedbackRef, payload);
+    if (typeof screenshotId === "string" && screenshotId.trim() !== "") {
+      tx.set(
+        doc(db, "screenshots", screenshotId),
+        { status: "ATTACHED", feedbackId: feedbackRef.id },
+        { merge: true }
+      );
+    }
     console.log("[idempotency] created", { feedbackId: feedbackRef.id });
     tx.update(sessionRef, {
       openCount: increment(1),

@@ -90,6 +90,7 @@ type SessionCounts = {
 const COUNTS_TTL_MS = 5 * 60 * 1000;
 const countsBySessionId: Map<string, { counts: SessionCounts; at: number }> = new Map();
 const processingFeedbackIds = new Set<string>();
+const feedbackJobOwners = new Map<string, number>();
 
 async function isFeedbackCompleted(feedbackId: string): Promise<boolean> {
   const data = await chrome.storage.session.get(feedbackId);
@@ -131,6 +132,7 @@ sw.captureMode = "voice";
 sw.lastUserTabId = null;
 
 let activeSessionId: string | null = null;
+let activeOwnerTabId: number | null = null;
 
 /** In-memory extension token (from auth broker page). Never stored in chrome.storage or localStorage. */
 let extensionToken: string | null = null;
@@ -769,6 +771,18 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   }
 });
 
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  activeOwnerTabId = tabId;
+  console.log("[ECHLY] Active owner tab set:", tabId);
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (activeOwnerTabId === tabId) {
+    activeOwnerTabId = null;
+    console.log("[ECHLY] Owner tab closed, reset ownership");
+  }
+});
+
 /** Loom-style: when a page finishes loading and Echly is active, inject content script so widget appears. */
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
   if (changeInfo.status !== "complete") return;
@@ -806,7 +820,7 @@ async function createFeedbackInternal({
     suggestedTags?: string[];
     actionSteps?: string[];
   };
-  screenshotId?: string;
+  screenshotId: string;
 }): Promise<Response> {
   const body = buildFeedbackPayload({
     sessionId,
@@ -1413,7 +1427,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const { imageDataUrl, sessionId, screenshotId } = request as {
           imageDataUrl: string;
           sessionId: string;
-          screenshotId: string;
+          screenshotId?: string;
         };
 
         await getValidToken();
@@ -1421,20 +1435,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const res = await apiFetch(`${API_BASE}/api/upload-screenshot`, {
           method: "POST",
           body: JSON.stringify({
-            screenshotId,
             imageDataUrl,
             sessionId,
+            screenshotId,
           }),
         });
 
-        const data = (await res.json()) as { url?: string; error?: string };
+        const data = (await res.json()) as {
+          screenshotId?: string;
+          url?: string;
+          error?: string;
+        };
 
         if (!res.ok) {
           sendResponse({ error: data.error || "Upload failed" });
           return;
         }
 
-        sendResponse({ url: data.url });
+        sendResponse({ screenshotId: data.screenshotId, url: data.url });
       } catch (err) {
         console.error("ECHLY_UPLOAD_SCREENSHOT error:", err);
         sendResponse({ error: String(err) });
@@ -1456,19 +1474,62 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         };
         screenshotId?: string;
       };
-
-      console.log("[TRACE] BACKGROUND received", {
+      if (!screenshotId) {
+        try {
+          throw new Error("Atomic violation: screenshotId required");
+        } catch (err) {
+          console.error("[ECHLY]", err);
+          const message =
+            err instanceof Error ? err.message : "Atomic violation: screenshotId required";
+          sendResponse({ success: false, error: message });
+        }
+        return;
+      }
+      console.log("[ECHLY] Unified create path", {
         feedbackId,
-        timestamp: Date.now(),
+        source: "CREATE_FEEDBACK_ONLY",
       });
+      const senderTabId = sender?.tab?.id;
+
+      if (!senderTabId) {
+        console.warn("[ECHLY] Missing sender tabId for feedback", feedbackId);
+        sendResponse({ success: false, error: "missing_tab" });
+        return;
+      }
+
+      if (!feedbackJobOwners.has(feedbackId)) {
+        feedbackJobOwners.set(feedbackId, senderTabId);
+        console.log("[ECHLY] Job owner assigned", {
+          feedbackId,
+          ownerTabId: senderTabId,
+        });
+      }
+
+      const ownerTabId = feedbackJobOwners.get(feedbackId);
+
+      if (ownerTabId !== senderTabId) {
+        console.warn("[ECHLY] Blocked: not job owner", {
+          feedbackId,
+          senderTabId,
+          ownerTabId,
+        });
+
+        sendResponse({ success: true, skipped: true, reason: "not_job_owner" });
+        return;
+      }
 
       if (processingFeedbackIds.has(feedbackId)) {
-        console.warn("[ECHLY] Duplicate blocked (processing)", feedbackId);
-        sendResponse({ success: true, skipped: true });
+        console.warn("[ECHLY] Duplicate blocked (atomic lock)", feedbackId);
+        sendResponse({ success: true, skipped: true, reason: "locked" });
         return;
       }
 
       processingFeedbackIds.add(feedbackId);
+      console.log("[ECHLY] Lock acquired", feedbackId);
+      console.log("[TRACE] BACKGROUND received", {
+        feedbackId,
+        timestamp: Date.now(),
+      });
       try {
         if (await isFeedbackCompleted(feedbackId)) {
           console.warn("[ECHLY] Duplicate blocked (already completed)", feedbackId);
@@ -1477,6 +1538,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         await getValidToken();
+        console.log("[ECHLY] Creating feedback with screenshotId", screenshotId);
         const feedbackRes = await createFeedbackInternal({
           sessionId,
           feedbackId,
@@ -1499,193 +1561,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false });
       } finally {
         processingFeedbackIds.delete(feedbackId);
+        feedbackJobOwners.delete(feedbackId);
+        console.log("[ECHLY] Lock released", feedbackId);
       }
     })();
     return true; // REQUIRED for async response
   }
 
   if (request.type === "ECHLY_PROCESS_FEEDBACK") {
-    if (aiProcessing) {
-      console.warn("[ECHLY] AI already processing, skipping duplicate");
-      sendResponse({ success: false, error: "AI already processing" });
-      return false;
-    }
-    aiProcessing = true;
-
-    const payload = request.payload as {
-      transcript: string;
-      screenshotUrl: string | null;
-      screenshotId: string | null;
-      sessionId: string;
-      context?: {
-        url?: string;
-        viewportWidth?: number;
-        viewportHeight?: number;
-        domPath?: string | null;
-        nearbyText?: string | null;
-        subtreeText?: string | null;
-      } | null;
-    };
-    const { transcript, sessionId, context } = payload;
-    if (!sessionId) {
-      console.error("[ECHLY_PROCESS_FEEDBACK] sessionId is null/empty:", sessionId);
-    }
-    if (!transcript?.trim() || !sessionId) {
-      aiProcessing = false;
-      warn("[Echly BG] Invalid payload: missing transcript or sessionId", {
-        hasTranscript: !!transcript?.trim(),
-        hasSessionId: !!sessionId,
-      });
-      sendResponse({ success: false, error: "Missing transcript or sessionId" });
-      return false;
-    }
-    (async () => {
-      try {
-        await getValidToken();
-        const screenshotId: string | null = payload.screenshotId ?? null;
-
-        console.log("[ECHLY AI] Starting structure step");
-        const structurePayload = context ? { transcript, context } : { transcript };
-        const structureRes = await apiFetch(`${API_BASE}/api/structure-feedback`, {
-          method: "POST",
-          body: JSON.stringify(structurePayload),
-        });
-
-        if (!structureRes.ok) {
-          const raw = await structureRes.text();
-          console.error("[STRUCTURE FAILED RAW]", structureRes.status, raw);
-          sendResponse({ success: false, error: "Structure fetch failed" });
-          return;
-        }
-        const data = (await structureRes.json()) as {
-          success?: boolean;
-          tickets?: Array<{
-            title?: string;
-            description?: string;
-            suggestedTags?: string[];
-            actionSteps?: string[];
-          }>;
-          error?: string;
-        };
-        console.log("[ECHLY AI] structure parsed:", data);
-        if (!data || typeof data !== "object") {
-          console.error("[ECHLY AI] Invalid structure response", data);
-          sendResponse({ success: false, error: "Invalid AI response" });
-          return;
-        }
-        if (!data.success) {
-          sendResponse({
-            success: false,
-            error: data.error || "Structure API failed",
-          });
-          return;
-        }
-
-        const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-        if (tickets.length === 0) {
-          tickets.push({
-            title: transcript.slice(0, 80),
-            description: transcript,
-            actionSteps: [],
-            suggestedTags: ["Feedback"],
-          });
-        }
-
-        let firstCreated: { id: string; title: string; description: string; type: string } | undefined;
-        for (let i = 0; i < tickets.length; i++) {
-          const t = tickets[i];
-          const feedbackId = crypto.randomUUID();
-
-          console.log("[background feedbackId]", feedbackId);
-          console.log("[ECHLY AI] Creating feedback ticket");
-          const feedbackRes = await createFeedbackInternal({
-            sessionId,
-            feedbackId,
-            ticket: t,
-            screenshotId: i === 0 && screenshotId ? screenshotId : undefined,
-          });
-          const raw = await feedbackRes.text();
-
-          if (!feedbackRes.ok) {
-            console.error("[CREATE] FAILED:", feedbackRes.status, raw);
-            sendResponse({ success: false, error: "Feedback API failed" });
-            return;
-          }
-
-          let feedbackJson: {
-            success?: boolean;
-            ticket?: { id: string; title: string; description: string; type?: string };
-          };
-          try {
-            feedbackJson = JSON.parse(raw) as {
-              success?: boolean;
-              ticket?: { id: string; title: string; description: string; type?: string };
-            };
-          } catch (err) {
-            console.error("[CREATE] JSON parse failed:", err, raw);
-            sendResponse({ success: false, error: "Feedback API failed" });
-            return;
-          }
-
-          // parsed JSON only after ok + parse success
-          const typedFeedbackJson = feedbackJson as {
-            success?: boolean;
-            ticket?: { id: string; title: string; description: string; type?: string };
-          };
-          if (typedFeedbackJson.success && typedFeedbackJson.ticket) {
-            const tick = typedFeedbackJson.ticket;
-            if (!firstCreated)
-              firstCreated = {
-                id: tick.id,
-                title: tick.title,
-                description: tick.description,
-                type: tick.type ?? "Feedback",
-              };
-          }
-        }
-        if (firstCreated) {
-          console.log("[ECHLY AI] Ticket created successfully");
-          const pointer: StructuredFeedback = {
-            id: firstCreated.id,
-            title: firstCreated.title,
-            actionSteps: [],
-            type: firstCreated.type,
-          };
-          globalUIState.pointers = [...globalUIState.pointers, pointer];
-          mutateGlobalCounts((counts) => ({
-            total: counts.total + 1,
-            open: counts.open + 1,
-            skipped: counts.skipped,
-            resolved: counts.resolved,
-          }));
-          resetSessionIdleTimer();
-          broadcastUIState();
-          sendResponse({ success: true, ticket: firstCreated });
-          chrome.tabs.query({}, (tabs) => {
-            tabs.forEach((tab) => {
-              if (tab.id) {
-                chrome.tabs.sendMessage(tab.id, {
-                  type: "ECHLY_FEEDBACK_CREATED",
-                  ticket: firstCreated,
-                  sessionId,
-                }).catch(() => {});
-              }
-            });
-          });
-        } else {
-          sendResponse({ success: false, error: "No ticket created" });
-        }
-      } catch (error) {
-        console.error("ECHLY_PROCESS_FEEDBACK error:", error);
-        sendResponse({
-          success: false,
-          error: String(error),
-        });
-      } finally {
-        aiProcessing = false;
-      }
-    })();
-    return true;
+    console.warn("[ECHLY] PROCESS_FEEDBACK is deprecated - ignored");
+    console.warn("[ECHLY] BLOCKED deprecated PROCESS_FEEDBACK");
+    sendResponse({ success: false, error: "deprecated_path" });
+    return false;
   }
 
   if (request.type === "echly-api") {

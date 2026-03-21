@@ -4,14 +4,12 @@ import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
   addFeedbackWithSessionCountersRepo,
   getFeedbackByIdRepo,
-  updateFeedbackRepo,
 } from "@/lib/repositories/feedbackRepository";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import {
   getScreenshotByIdRepo,
-  updateScreenshotAttachedRepo,
 } from "@/lib/repositories/screenshotsRepository";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
@@ -157,7 +155,6 @@ export async function POST(req: NextRequest) {
     title?: string;
     description?: string;
     suggestion?: string;
-    screenshotUrl?: string;
     contextSummary?: string;
     actionSteps?: string[];
     suggestedTags?: string[];
@@ -215,17 +212,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const screenshotUrlRaw =
-    typeof body.screenshotUrl === "string" ? body.screenshotUrl.trim() : "";
   const screenshotIdRaw =
     typeof body.screenshotId === "string" ? body.screenshotId.trim() : "";
-  const hasScreenshotUrl = screenshotUrlRaw.length > 0;
   const hasScreenshotId = screenshotIdRaw.length > 0;
-  const normalizedScreenshotUrl = hasScreenshotUrl ? screenshotUrlRaw : undefined;
   const normalizedScreenshotId = hasScreenshotId ? screenshotIdRaw : "";
-  const hasAnyScreenshotData = hasScreenshotId || hasScreenshotUrl;
-  const screenshotStatus: "attached" | "pending" | "none" =
-    hasAnyScreenshotData ? "pending" : "none";
+  if (!hasScreenshotId) {
+    return NextResponse.json(
+      { success: false, error: "Atomic violation: screenshotId required" },
+      { status: 400, headers: corsHeaders(req) }
+    );
+  }
 
   const session = await getSessionByIdRepo(sessionId);
   if (!session) {
@@ -260,6 +256,13 @@ export async function POST(req: NextRequest) {
   }
 
   const meta = body.metadata;
+  const resolvedScreenshotUrl = await resolveScreenshotDownloadUrl(normalizedScreenshotId, sessionId);
+  if (!resolvedScreenshotUrl) {
+    return NextResponse.json(
+      { success: false, error: "Atomic violation: screenshot URL unavailable" },
+      { status: 409, headers: corsHeaders(req) }
+    );
+  }
 
   const structuredData = {
     title,
@@ -272,10 +275,9 @@ export async function POST(req: NextRequest) {
     suggestedTags: Array.isArray(body.suggestedTags)
       ? body.suggestedTags
       : undefined,
-    screenshotUrl:
-      normalizedScreenshotUrl,
-    status: "processing" as const,
-    screenshotStatus,
+    screenshotUrl: resolvedScreenshotUrl,
+    status: "open" as const,
+    screenshotStatus: "attached" as const,
     url: meta?.url,
     viewportWidth: meta?.viewportWidth,
     viewportHeight: meta?.viewportHeight,
@@ -291,66 +293,14 @@ export async function POST(req: NextRequest) {
       sessionId,
       user.uid,
       structuredData,
-      feedbackId
+      feedbackId,
+      normalizedScreenshotId
     );
     console.log("[feedback lifecycle] created", {
       feedbackId: docRef.id,
       sessionId,
       hasScreenshotId,
-      hasScreenshotUrl,
     });
-
-    try {
-      if (hasScreenshotId) {
-        await updateScreenshotAttachedRepo(normalizedScreenshotId, docRef.id);
-        const resolvedScreenshotUrl = await resolveScreenshotDownloadUrl(normalizedScreenshotId, sessionId);
-        if (!resolvedScreenshotUrl) {
-          await updateFeedbackRepo(docRef.id, {
-            screenshotStatus: "failed",
-            status: "failed",
-          });
-          console.error("[feedback lifecycle] screenshot URL missing after attach", {
-            feedbackId: docRef.id,
-            screenshotId: normalizedScreenshotId,
-          });
-        } else {
-          await updateFeedbackRepo(docRef.id, {
-            screenshotStatus: "attached",
-            screenshotUrl: resolvedScreenshotUrl,
-            status: "complete",
-          });
-          console.log("[feedback lifecycle] screenshot attached", {
-            feedbackId: docRef.id,
-            method: "screenshotId",
-            hasScreenshotUrl: true,
-          });
-        }
-      } else if (hasScreenshotUrl) {
-        await updateFeedbackRepo(docRef.id, { screenshotStatus: "attached", status: "complete" });
-        console.log("[feedback lifecycle] screenshot attached", {
-          feedbackId: docRef.id,
-          method: "screenshotUrl",
-        });
-      } else {
-        await updateFeedbackRepo(docRef.id, { status: "complete" });
-      }
-    } catch (lifecycleErr) {
-      console.error("[feedback lifecycle] failed", {
-        feedbackId: docRef.id,
-        error: lifecycleErr,
-      });
-      try {
-        await updateFeedbackRepo(docRef.id, {
-          screenshotStatus: hasAnyScreenshotData ? "failed" : "none",
-          status: "failed",
-        });
-      } catch (finalizeErr) {
-        console.error("[feedback lifecycle] failed to persist failed state", {
-          feedbackId: docRef.id,
-          error: finalizeErr,
-        });
-      }
-    }
     const created = await getFeedbackByIdRepo(docRef.id);
     if (!created) {
       return NextResponse.json(

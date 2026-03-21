@@ -58,21 +58,6 @@ export async function getScreenshotByIdRepo(
 }
 
 /**
- * Update screenshot to ATTACHED when feedback is created.
- */
-export async function updateScreenshotAttachedRepo(
-  screenshotId: string,
-  feedbackId: string
-): Promise<void> {
-  const ref = doc(db, "screenshots", screenshotId);
-  await setDoc(
-    ref,
-    { status: "ATTACHED", feedbackId },
-    { merge: true }
-  );
-}
-
-/**
  * List TEMP screenshots with createdAt older than the given timestamp (ms).
  * Used by cleanup job to delete orphans.
  */

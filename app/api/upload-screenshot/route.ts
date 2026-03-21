@@ -13,6 +13,7 @@ import {
   getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
 import { corsHeaders } from "@/lib/server/cors";
+import { createScreenshotId } from "@/lib/uploadScreenshot";
 
 export async function OPTIONS(req: NextRequest) {
   return new Response(null, {
@@ -23,8 +24,8 @@ export async function OPTIONS(req: NextRequest) {
 
 /**
  * POST /api/upload-screenshot
- * Body: { screenshotId: string, imageDataUrl: string, sessionId: string }
- * Creates a TEMP screenshot record, uploads to Storage, returns { url }.
+ * Body: { imageDataUrl: string, sessionId: string, screenshotId?: string }
+ * Creates a TEMP screenshot record, uploads to Storage, returns { screenshotId, url }.
  * When feedback is created with this screenshotId, the record is updated to ATTACHED.
  * TEMP screenshots never attached are cleaned up by a scheduled job.
  */
@@ -46,21 +47,21 @@ export async function POST(req: NextRequest) {
     const { screenshotId, imageDataUrl, sessionId } = body;
 
     if (
-      typeof screenshotId !== "string" ||
-      !screenshotId.trim() ||
       typeof imageDataUrl !== "string" ||
       !imageDataUrl.trim() ||
       typeof sessionId !== "string" ||
       !sessionId.trim()
     ) {
       return NextResponse.json(
-        { error: "Missing required fields: screenshotId, imageDataUrl, sessionId" },
+        { error: "Missing required fields: imageDataUrl, sessionId" },
         { status: 400, headers: corsHeaders(req) }
       );
     }
 
     const sid = sessionId.trim();
-    const ssId = screenshotId.trim();
+    const screenshotIdRaw =
+      typeof screenshotId === "string" ? screenshotId.trim() : "";
+    const ssId = screenshotIdRaw || createScreenshotId();
 
     const session = await getSessionByIdRepo(sid);
     if (!session) {
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
     const uploadDuration = Date.now() - uploadStart;
     console.log(`[UPLOAD] screenshot upload duration: ${uploadDuration}ms`);
 
-    return NextResponse.json({ url }, { headers: corsHeaders(req) });
+    return NextResponse.json({ screenshotId: ssId, url }, { headers: corsHeaders(req) });
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {

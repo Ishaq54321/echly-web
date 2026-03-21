@@ -1,5 +1,7 @@
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { storage } from "./firebase";
+import { authFetch } from "./authFetch";
+import {
+  uploadScreenshot as uploadScreenshotContract,
+} from "./uploadScreenshot";
 
 /** Generate a unique id for new feedback (use before upload when feedback doc does not exist yet). */
 export function generateFeedbackId(): string {
@@ -9,31 +11,38 @@ export function generateFeedbackId(): string {
   return `fb-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-/**
- * Upload a screenshot to Firebase Storage.
- * Path format: sessions/{sessionId}/feedback/{feedbackId}/{timestamp}.png
- * @param feedbackId - Must be the Firestore feedback doc id (existing or pre-generated via generateFeedbackId()).
- */
+/** Upload screenshot through the unified `/api/upload-screenshot` contract. */
 export async function uploadScreenshot(
   imageDataUrl: string,
   sessionId: string,
-  feedbackId: string
+  screenshotId?: string
 ): Promise<string> {
-  const timestamp = Date.now();
-  const path = `sessions/${sessionId}/feedback/${feedbackId}/${timestamp}.png`;
-
-  const screenshotRef = ref(storage, path);
-
-  await uploadString(
-    screenshotRef,
-    imageDataUrl,
-    "data_url",
+  const result = await uploadScreenshotContract(
     {
-      contentType: "image/png",
-      cacheControl: "public, max-age=31536000, immutable",
+      imageDataUrl,
+      sessionId,
+      screenshotId,
+    },
+    async (payload) => {
+      const res = await authFetch("/api/upload-screenshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await res.json()) as {
+        screenshotId?: string;
+        url?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data?.error || "Upload failed");
+      }
+      return {
+        screenshotId: data.screenshotId || payload.screenshotId,
+        url: data.url,
+      };
     }
   );
-  console.log("UPLOAD CACHE CONTROL APPLIED");
 
-  return await getDownloadURL(screenshotRef);
+  return result.screenshotId;
 }

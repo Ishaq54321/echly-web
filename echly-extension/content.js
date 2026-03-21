@@ -14035,6 +14035,36 @@
     countsCache = /* @__PURE__ */ new Map();
   }
 
+  // lib/uploadScreenshot.ts
+  function createScreenshotId() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return `ss-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  }
+  async function uploadScreenshot(input, executeUpload) {
+    const imageDataUrl = typeof input.imageDataUrl === "string" ? input.imageDataUrl.trim() : "";
+    const sessionId = typeof input.sessionId === "string" ? input.sessionId.trim() : "";
+    if (!imageDataUrl) {
+      throw new Error("Missing required field: imageDataUrl");
+    }
+    if (!sessionId) {
+      throw new Error("Missing required field: sessionId");
+    }
+    const screenshotIdRaw = typeof input.screenshotId === "string" ? input.screenshotId.trim() : "";
+    const screenshotId = screenshotIdRaw || createScreenshotId();
+    const response = await executeUpload({
+      screenshotId,
+      imageDataUrl,
+      sessionId
+    });
+    const resolvedScreenshotId = typeof response?.screenshotId === "string" && response.screenshotId.trim() ? response.screenshotId.trim() : screenshotId;
+    return {
+      screenshotId: resolvedScreenshotId,
+      url: response?.url
+    };
+  }
+
   // echly-extension/src/contentScreenshot.ts
   function generateFeedbackId() {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -14042,30 +14072,38 @@
     }
     return `fb-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   }
-  function generateScreenshotId() {
-    return generateFeedbackId();
-  }
-  function uploadScreenshot(imageDataUrl, sessionId, screenshotId) {
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(
-        { type: "ECHLY_UPLOAD_SCREENSHOT", imageDataUrl, sessionId, screenshotId },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-            return;
+  function uploadScreenshot2(imageDataUrl, sessionId) {
+    return uploadScreenshot(
+      {
+        imageDataUrl,
+        sessionId
+      },
+      async (payload) => await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "ECHLY_UPLOAD_SCREENSHOT",
+            imageDataUrl: payload.imageDataUrl,
+            sessionId: payload.sessionId,
+            screenshotId: payload.screenshotId
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            if (response?.error) {
+              reject(new Error(response.error));
+              return;
+            }
+            if (response?.screenshotId) {
+              resolve({ screenshotId: response.screenshotId, url: response.url });
+              return;
+            }
+            reject(new Error("No screenshotId from background"));
           }
-          if (response?.error) {
-            reject(new Error(response.error));
-            return;
-          }
-          if (response?.url) {
-            resolve(response.url);
-            return;
-          }
-          reject(new Error("No URL from background"));
-        }
-      );
-    });
+        );
+      })
+    );
   }
 
   // echly-extension/src/ocr.ts
@@ -40614,31 +40652,6 @@
     }
   };
 
-  // echly-extension/src/utils/buildFeedbackPayload.ts
-  function buildFeedbackPayload({
-    sessionId,
-    feedbackId,
-    ticket,
-    screenshotId
-  }) {
-    const desc = typeof ticket.description === "string" ? ticket.description : ticket.title ?? "";
-    return {
-      sessionId,
-      feedbackId,
-      title: ticket.title ?? "",
-      description: desc,
-      type: Array.isArray(ticket.suggestedTags) && ticket.suggestedTags[0] ? ticket.suggestedTags[0] : "Feedback",
-      contextSummary: desc,
-      actionSteps: Array.isArray(ticket.actionSteps) ? ticket.actionSteps : [],
-      suggestedTags: ticket.suggestedTags,
-      screenshotId,
-      screenshotUrl: null,
-      metadata: {
-        clientTimestamp: Date.now()
-      }
-    };
-  }
-
   // echly-extension/src/content.tsx
   var import_react18 = __toESM(require_react());
   var import_client = __toESM(require_client());
@@ -40938,18 +40951,6 @@
       console.log("[ECHLY TOKEN] Retrieved:", token ? "YES" : "NO");
       return token;
     }, []);
-    const resolveUploadedScreenshotId = import_react18.default.useCallback(
-      async (uploadPromise, screenshotId) => {
-        try {
-          const uploadedUrl = await uploadPromise;
-          return uploadedUrl ? screenshotId : void 0;
-        } catch (err) {
-          console.warn("[ECHLY] Screenshot upload failed before feedback create:", err);
-          return void 0;
-        }
-      },
-      []
-    );
     import_react18.default.useEffect(() => {
       const handler = () => {
         createSession().then((result) => {
@@ -41078,8 +41079,6 @@
               console.error("[ECHLY OCR] Failed:", err);
               ocrResult = null;
             }
-            const screenshotId = generateScreenshotId();
-            const uploadPromise = screenshot ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId) : Promise.resolve(null);
             const visibleTextFromScreenshot = ocrResult ?? "";
             if (ECHLY_DEBUG) console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
             if (imageForOcr) {
@@ -41111,79 +41110,43 @@
               const data = await res.json();
               const tickets = Array.isArray(data.tickets) ? data.tickets : [];
               if (!data.success || tickets.length === 0) {
-                const uploadedScreenshotId = await resolveUploadedScreenshotId(uploadPromise, screenshotId);
-                chrome.runtime.sendMessage(
-                  {
-                    type: "ECHLY_PROCESS_FEEDBACK",
-                    payload: {
-                      transcript,
-                      screenshotUrl: null,
-                      screenshotId: uploadedScreenshotId,
-                      sessionId: effectiveSessionId,
-                      context: enrichedContext,
-                      ocr: ocrResult,
-                      ocrText: ocrResult || null
-                    }
-                  },
-                  (response) => {
-                    if (chrome.runtime.lastError) {
-                      echlyLog("PIPELINE", "error");
-                      setFeedbackJobs(
-                        (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "AI processing failed." } : j)
-                      );
-                      callbacks.onError();
-                      return;
-                    }
-                    if (response?.success && response.ticket) {
-                      const ticketId = response.ticket.id;
-                      const t = response.ticket;
-                      const actionSteps = Array.isArray(t.actionSteps) ? t.actionSteps : t.description ? t.description.split(/\n\s*\n/) : [];
-                      echlyLog("PIPELINE", "ticket created", { ticketId });
-                      setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
-                      callbacks.onSuccess({
-                        id: ticketId,
-                        title: t.title,
-                        actionSteps,
-                        type: t.type ?? "Feedback"
-                      });
-                    } else {
-                      echlyLog("PIPELINE", "error");
-                      setFeedbackJobs(
-                        (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "AI processing failed." } : j)
-                      );
-                      callbacks.onError();
-                    }
-                  }
-                );
-                return;
+                tickets.push({
+                  title: "Feedback",
+                  description: transcript,
+                  actionSteps: [transcript]
+                });
               }
               let firstCreated;
               for (let i = 0; i < tickets.length; i++) {
                 const t = tickets[i];
                 const feedbackId = generateFeedbackId();
-                let finalScreenshotId = void 0;
-                if (i === 0 && screenshot) {
-                  finalScreenshotId = await resolveUploadedScreenshotId(
-                    uploadPromise,
-                    screenshotId
+                let finalScreenshotId;
+                if (!screenshot) {
+                  console.error("[ECHLY] Missing screenshot \u2014 blocking feedback");
+                  setFeedbackJobs(
+                    (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "Screenshot is required." } : j)
                   );
+                  callbacks.onError();
+                  return;
                 }
-                const body = buildFeedbackPayload({
-                  sessionId: effectiveSessionId,
-                  feedbackId,
-                  ticket: t,
-                  screenshotId: finalScreenshotId
-                });
+                console.log("[ECHLY] Uploading screenshot FIRST");
+                try {
+                  const uploadResult = await uploadScreenshot2(screenshot, effectiveSessionId);
+                  finalScreenshotId = uploadResult.screenshotId;
+                } catch (err) {
+                  console.error("[ECHLY] Screenshot upload failed \u2014 blocking feedback", err);
+                  setFeedbackJobs(
+                    (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "Screenshot upload failed." } : j)
+                  );
+                  callbacks.onError();
+                  return;
+                }
                 const token = await getExtensionToken();
                 if (!token) {
                   console.error("[ECHLY AUTH] No extension token available");
                   setSessionMessage("Authentication expired. Please sign in again.");
                   setIsProcessingFeedback(false);
                   return;
-                }
-                if (screenshot && i === 0 && !finalScreenshotId) {
-                  console.warn("[ECHLY] Screenshot expected but not ready \u2014 skipping feedback create");
-                  continue;
                 }
                 if (inFlightFeedbackIds.has(feedbackId)) {
                   console.warn("[ECHLY] Duplicate feedback prevented (in-flight)", feedbackId);
@@ -41296,8 +41259,6 @@
             console.error("[ECHLY OCR] Failed:", err);
             ocrResult = null;
           }
-          const screenshotId = generateScreenshotId();
-          const uploadPromise = screenshot ? uploadScreenshot(screenshot, effectiveSessionId, screenshotId) : Promise.resolve(null);
           const visibleTextFromScreenshot = ocrResult ?? "";
           if (ECHLY_DEBUG) console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
           if (imageForOcr) {
@@ -41332,29 +41293,27 @@
           for (let i = 0; i < tickets.length; i++) {
             const t = tickets[i];
             const feedbackId = generateFeedbackId();
-            let finalScreenshotId = void 0;
-            if (i === 0 && screenshot) {
-              finalScreenshotId = await resolveUploadedScreenshotId(
-                uploadPromise,
-                screenshotId
-              );
+            let finalScreenshotId;
+            if (!screenshot) {
+              console.error("[ECHLY] Missing screenshot \u2014 blocking feedback");
+              setIsProcessingFeedback(false);
+              return void 0;
             }
-            const body = buildFeedbackPayload({
-              sessionId: effectiveSessionId,
-              feedbackId,
-              ticket: t,
-              screenshotId: finalScreenshotId
-            });
+            console.log("[ECHLY] Uploading screenshot FIRST");
+            try {
+              const uploadResult = await uploadScreenshot2(screenshot, effectiveSessionId);
+              finalScreenshotId = uploadResult.screenshotId;
+            } catch (err) {
+              console.error("[ECHLY] Screenshot upload failed \u2014 blocking feedback", err);
+              setIsProcessingFeedback(false);
+              return void 0;
+            }
             const token = await getExtensionToken();
             if (!token) {
               console.error("[ECHLY AUTH] No extension token available");
               setSessionMessage("Authentication expired. Please sign in again.");
               setIsProcessingFeedback(false);
               return void 0;
-            }
-            if (screenshot && i === 0 && !finalScreenshotId) {
-              console.warn("[ECHLY] Screenshot expected but not ready \u2014 skipping feedback create");
-              continue;
             }
             if (inFlightFeedbackIds.has(feedbackId)) {
               console.warn("[ECHLY] Duplicate feedback prevented (in-flight)", feedbackId);
