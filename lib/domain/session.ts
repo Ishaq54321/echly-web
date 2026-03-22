@@ -23,12 +23,6 @@ export interface Session {
   viewCount?: number;
   /** Total comment count across all feedback in this session. */
   commentCount?: number;
-  /** Optional session-level AI insight summary (plain text). */
-  aiInsightSummary?: string | null;
-  /** Feedback count at the time aiInsightSummary was generated. */
-  aiInsightSummaryFeedbackCount?: number;
-  /** Timestamp when aiInsightSummary was last generated. */
-  aiInsightSummaryUpdatedAt?: Timestamp | null;
   /** Denormalized: total open feedback (WAVE 1 structural). */
   openCount?: number;
   /** Denormalized: total resolved feedback (WAVE 1 structural). */

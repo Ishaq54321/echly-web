@@ -30,11 +30,6 @@ import {
   CommentPanel,
 } from "@/components/layout/operating-system";
 
-/** Response shape from POST /api/session-insight. */
-type SummaryResponse = {
-  summary?: string;
-};
-
 /** Broadcast ticket update to extension tray so tray stays in sync. */
 function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps?: string[] | null; type?: string }) {
   if (typeof window === "undefined" || !("chrome" in window)) return;
@@ -181,10 +176,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [sessionTitleDraft, setSessionTitleDraft] = useState("");
   const [isSavingSessionTitle, setIsSavingSessionTitle] = useState(false);
   const [saveSessionTitleSuccess, setSaveSessionTitleSuccess] = useState(false);
-  const [insightRevealed, setInsightRevealed] = useState(false);
 
   const preloadedScreenshotUrlsRef = useRef<Set<string>>(new Set());
-  const insightRequestKeyRef = useRef<string | null>(null);
 
   const ensureCountsSeeded = useCallback((): Counts | null => {
     if (!sessionId) return null;
@@ -232,6 +225,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    console.log("[SESSION_INSIGHT_REMOVED]", {
+      status: "complete",
+      tracesRemaining: false,
+    });
   }, []);
 
   /* Sync active session to extension when user opens this session page. */
@@ -828,94 +828,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setSelectedId(selectedId);
     }
   };
-
-  // Non-intrusive: fetch session insight after main content renders (no spinners).
-  // Must be declared before any conditional returns (React hook ordering).
-  useEffect(() => {
-    if (authLoading) return;
-    if (!authUser || !sessionId) return;
-    if (!session) return;
-    if (feedbackLoading) return;
-
-    const existing =
-      typeof session.aiInsightSummary === "string"
-        ? session.aiInsightSummary.trim()
-        : "";
-    const existingCount =
-      typeof session.aiInsightSummaryFeedbackCount === "number"
-        ? session.aiInsightSummaryFeedbackCount
-        : null;
-    const currentCount = typeof feedbackTotal === "number" ? feedbackTotal : 0;
-
-    if (currentCount <= 0) return;
-
-    const shouldFetch =
-      !existing || (existingCount != null && existingCount !== currentCount);
-    if (!shouldFetch) return;
-
-    const requestKey = `${sessionId}:${currentCount}`;
-    if (insightRequestKeyRef.current === requestKey) return;
-    insightRequestKeyRef.current = requestKey;
-
-    let cancelled = false;
-    let idleHandle: ReturnType<typeof setTimeout> | number | null = null;
-    const runInsightFetch = () => {
-      authFetch("/api/session-insight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      })
-        .then(async (res) => (await res.json()) as SummaryResponse)
-        .then((data) => {
-          if (cancelled) return;
-          const summary = data.summary;
-          if (typeof summary === "string" && summary.trim() !== "") {
-            setSession((prev) =>
-              prev
-                ? ({
-                    ...prev,
-                    aiInsightSummary: summary.trim(),
-                    aiInsightSummaryFeedbackCount: currentCount,
-                  } as Session)
-                : prev
-            );
-          }
-        })
-        .catch(() => {
-          // Allow retry on next render cycle if background fetch fails.
-          insightRequestKeyRef.current = null;
-        });
-    };
-
-    const windowWithIdle = window as Window & {
-      requestIdleCallback?: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    if (typeof windowWithIdle.requestIdleCallback === "function") {
-      idleHandle = windowWithIdle.requestIdleCallback(runInsightFetch, { timeout: 1500 });
-    } else {
-      idleHandle = setTimeout(runInsightFetch, 350);
-    }
-
-    return () => {
-      cancelled = true;
-      if (idleHandle != null) {
-        if (typeof windowWithIdle.cancelIdleCallback === "function") {
-          windowWithIdle.cancelIdleCallback(Number(idleHandle));
-        } else {
-          clearTimeout(idleHandle);
-        }
-      }
-    };
-  }, [
-    authLoading,
-    authUser,
-    sessionId,
-    session?.aiInsightSummary,
-    session?.aiInsightSummaryFeedbackCount,
-    feedbackLoading,
-    feedbackTotal,
-  ]);
 
   // If auth is still settling, keep the UI stable but show a lightweight skeleton.
   if (authLoading) return <SessionPageSkeleton />;

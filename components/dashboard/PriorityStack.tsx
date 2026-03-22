@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { Sparkles } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 
 function formatLastActivity(updatedAt: unknown): string {
@@ -67,13 +66,6 @@ export function PriorityStack({ items, onView }: PriorityStackProps) {
                     <span className="text-[14px] font-medium text-[hsl(var(--text-primary-strong))] truncate">
                       {session.title || "Untitled Session"}
                     </span>
-                    {session.aiInsightSummary && (
-                      <Sparkles
-                        className="h-3.5 w-3.5 shrink-0 text-[var(--accent-operational)]"
-                        strokeWidth={1.5}
-                        aria-label="AI insights"
-                      />
-                    )}
                   </div>
                   <div className="flex items-center gap-3 mt-1">
                     <div className="flex-1 min-w-0 max-w-[160px] h-1.5 rounded-full bg-[var(--layer-2-bg)] overflow-hidden">

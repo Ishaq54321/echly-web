@@ -48,10 +48,6 @@ Constraints respected: **no code modified**, **no dependencies installed**, **on
   - **Where**: `app/api/feedback/route.ts` (no `sessionId` path)  
   - **Impact**: For up to `limit` feedback items, it fetches sessions for unique `sessionId`s via `Promise.all(sessionIds.map(getSessionByIdRepo))`.
 
-- **AI endpoint `/api/session-insight` reads up to 200 feedback items then calls OpenAI**  
-  - **Where**: `app/api/session-insight/route.ts`  
-  - **Impact**: Firestore reads + OpenAI cost. It does caching (stored on session doc), but the trigger logic in `SessionPageClient.tsx` will call it when counts drift.
-
 ---
 
 ## 2. API Performance Table (All `/app/api/*` routes)
@@ -74,7 +70,6 @@ Estimates assume a “typical” Firestore region roundtrip and small documents.
 | `POST /api/feedback` | `app/api/feedback/route.ts` | 600ms–3s | session read (**1**) + workspace read (**1**) + **transaction write** (feedback+session+workspace+insights) + reread feedback (**1**) | Multi-doc transaction and denormalized updates | CRITICAL |
 | `GET /api/feedback/counts` | `app/api/feedback/counts/route.ts` | 200–900ms | session read (**1**) + workspace read (**1**) + optional 3 aggregation queries | Used by some UI flows; can be expensive if counters not present | HIGH |
 | `POST /api/structure-feedback` | `app/api/structure-feedback/route.ts` | 1s–15s | workspace resolve (**1–2**) + OpenAI calls via pipeline | AI latency dominates; rate limit is in-memory only | CRITICAL |
-| `POST /api/session-insight` | `app/api/session-insight/route.ts` | 800ms–8s | session read (**1**) + workspace read (**1**) + feedback count (**1 aggregation**) + feedback page (limit 200) + OpenAI + session update (**1 write**) | Can be triggered repeatedly when counts drift; OpenAI cost | HIGH |
 | `GET /api/billing/usage` | `app/api/billing/usage/route.ts` | 200–1200ms | workspace resolve (**1–2**) + session count (fast if fields, else 2 aggs) + entitlements lookups | Client has shared cache (`lib/cachedBillingUsage.ts`) but server is uncached | MEDIUM |
 | `GET /api/plans/catalog` | `app/api/plans/catalog/route.ts` | 50–300ms | depends on `getPlanCatalog()` (may read Firestore plans) | Fine; should be cacheable (catalog rarely changes) | LOW |
 | `POST /api/upload-screenshot` | `app/api/upload-screenshot/route.ts` | 1s–10s | session read + workspace read + screenshot doc read/write + Storage upload | Storage upload dominates; Firestore adds overhead | HIGH |
@@ -131,7 +126,7 @@ Firestore SDK returns whole documents; the code frequently pulls full docs even 
 
 - **LOW**: `auth/logout`, `extension/session`, `plans/catalog` (depending on catalog backend)
 - **MEDIUM**: `insights`, `sessions GET`, `billing/usage`, `workspace/status`
-- **HIGH**: `tickets GET`, `tickets PATCH/DELETE`, `feedback GET/POST`, `session-insight`, `upload-screenshot`
+- **HIGH**: `tickets GET`, `tickets PATCH/DELETE`, `feedback GET/POST`, `upload-screenshot`
 - **CRITICAL**: admin scans (`admin/usage`, `admin/workspaces`), session delete, structure-feedback (AI + pipeline), any route that triggers multi-doc transactions frequently at scale
 
 ---
