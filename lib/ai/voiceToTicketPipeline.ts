@@ -15,6 +15,7 @@ import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 /** DOM context sent to the AI. Limited to <1000 tokens total. */
 export interface DomContextForAI {
   elementHTML: string | null;
+  elementType: string | null;
   nearbyText: string | null;
   visibleText: string | null;
   domPath: string | null;
@@ -51,16 +52,18 @@ export interface VoiceTicket {
 
 function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomContextForAI {
   if (!ctx) {
-    return { elementHTML: null, nearbyText: null, visibleText: null, domPath: null, pageURL: "" };
+    return { elementHTML: null, elementType: null, nearbyText: null, visibleText: null, domPath: null, pageURL: "" };
   }
   const url = typeof ctx.url === "string" ? ctx.url : "";
   const domPath = ctx.domPath ?? null;
+  const elementType = ctx.elementType ?? null;
   const nearbyText = ctx.nearbyText ?? null;
   const visibleText = ctx.visibleText ?? ctx.screenshotOCRText ?? null;
   const subtreeText = ctx.subtreeText ?? null;
   const elementHTML = subtreeText ?? null;
   return {
     elementHTML,
+    elementType,
     nearbyText,
     visibleText,
     domPath,
@@ -88,6 +91,7 @@ function truncateDomContextToBudget(ctx: DomContextForAI): DomContextForAI {
     elementHTML: ctx.elementHTML
       ? truncateForTokenBudget(ctx.elementHTML, budgetElement)
       : null,
+    elementType: ctx.elementType ?? null,
     nearbyText: ctx.nearbyText
       ? truncateForTokenBudget(ctx.nearbyText, budgetNearby)
       : null,
@@ -124,6 +128,7 @@ function normalizeRawContext(raw: unknown): PipelineContext | null {
     visibleText: o.visibleText != null && typeof o.visibleText === "string" ? o.visibleText : null,
     screenshotOCRText: o.screenshotOCRText != null && typeof o.screenshotOCRText === "string" ? o.screenshotOCRText : null,
     subtreeText: o.subtreeText != null && typeof o.subtreeText === "string" ? o.subtreeText : null,
+    elementType: o.elementType != null && typeof o.elementType === "string" ? o.elementType : null,
   };
 }
 
@@ -149,20 +154,42 @@ function limitText(text: string | null, max = 1500): string | null {
   return text.slice(0, max);
 }
 
-function buildUserMessage(transcript: string, domContext: DomContextForAI): string {
+function buildUserMessage(
+  transcript: string,
+  domContext: DomContextForAI,
+  shouldUseOCR: boolean,
+  ocrText: string | null
+): string {
   const elementHTMLChars = (domContext.elementHTML ?? "").length;
   const nearbyTextChars = (domContext.nearbyText ?? "").length;
   const visibleTextChars = (domContext.visibleText ?? "").length;
   console.log(
     `[DOM CONTEXT] elementHTML chars=${elementHTMLChars} nearbyText chars=${nearbyTextChars} visibleText chars=${visibleTextChars}`
   );
-  const parts: string[] = [`Transcript:\n${transcript.trim()}`];
-  parts.push("\nContext (use only to correct UI names):");
-  if (domContext.pageURL) parts.push(`Page URL: ${domContext.pageURL}`);
-  if (domContext.domPath) parts.push(`DOM path: ${domContext.domPath}`);
-  if (domContext.elementHTML) parts.push(`Selected element text:\n${domContext.elementHTML}`);
-  if (domContext.nearbyText) parts.push(`Nearby text:\n${domContext.nearbyText}`);
-  if (domContext.visibleText) parts.push(`Visible text:\n${domContext.visibleText}`);
+  const parts: string[] = [];
+
+  parts.push("USER INTENT (SOURCE OF TRUTH):");
+  parts.push(transcript.trim());
+
+  parts.push("\nREFERENCE CONTEXT (DO NOT USE FOR DECISIONS):");
+
+  parts.push("Selected element:");
+  parts.push(domContext.elementHTML || "None");
+
+  parts.push("\nElement type:");
+  parts.push(domContext.elementType || "None");
+
+  parts.push("\nNearby text:");
+  parts.push(domContext.nearbyText || "None");
+
+  parts.push("\nVisible text:");
+  parts.push(domContext.visibleText || "None");
+
+  if (shouldUseOCR) {
+    parts.push("\nVISUAL TEXT (OCR - REFERENCE ONLY):");
+    parts.push(ocrText || "None");
+  }
+
   return parts.join("\n");
 }
 
@@ -260,9 +287,32 @@ function sanitizeTitle(title: string): string {
 export async function extractStructuredFeedback(
   client: OpenAI,
   transcript: string,
-  domContext: DomContextForAI
+  domContext: DomContextForAI,
+  context?: { ocrText?: string | null; screenshotOCRText?: string | null } | null
 ): Promise<{ json: StructuredFeedbackJSON; raw: string }> {
-  const userMessage = buildUserMessage(transcript, domContext);
+  const ocrText =
+    context?.ocrText ||
+    context?.screenshotOCRText ||
+    null;
+  const shouldUseOCR =
+    (!domContext.elementHTML || domContext.elementHTML.length < 10) &&
+    !!ocrText &&
+    ocrText.length > 20;
+  console.log("[OCR_DECISION]", {
+    hasElement: !!domContext.elementHTML,
+    elementLength: domContext.elementHTML?.length || 0,
+    ocrLength: ocrText?.length || 0,
+    shouldUseOCR
+  });
+  console.log("[AI_PHASE2_INPUT]", {
+    transcriptPreview: transcript.slice(0, 100),
+    elementPreview: domContext.elementHTML?.slice(0, 100),
+    elementType: domContext.elementType || null,
+    nearbyPreview: domContext.nearbyText?.slice(0, 100),
+    visiblePreview: domContext.visibleText?.slice(0, 100),
+    ocrPreview: shouldUseOCR ? ocrText?.slice(0, 100) : null
+  });
+  const userMessage = buildUserMessage(transcript, domContext, shouldUseOCR, ocrText);
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: userMessage },
@@ -294,6 +344,11 @@ export async function extractStructuredFeedback(
   console.log(`[AI TOKENS] prompt=${promptTokens} completion=${completionTokens}`);
   const raw = completion.choices[0]?.message?.content?.trim() ?? "";
   const json = parseStructuredResponse(raw);
+  console.log("[AI_PHASE2_OUTPUT]", {
+    title: json?.title,
+    actionsCount: json?.actions?.length,
+    firstAction: json?.actions?.[0]?.description
+  });
   if (!json || !Array.isArray(json.actions) || json.actions.length === 0) {
     return { json: fallbackStructuredFeedback(transcript), raw };
   }
@@ -407,7 +462,10 @@ export async function runVoiceToTicket(
     nearbyText: normalizedInput.nearbyText,
     visibleText: normalizedInput.visibleText || null,
   };
-  const { json } = await extractStructuredFeedback(client, normalizedInput.transcript, aiContext);
+  const { json } = await extractStructuredFeedback(client, normalizedInput.transcript, aiContext, {
+    ocrText: normalizedInput.ocrText,
+    screenshotOCRText: typeof rawCtx?.screenshotOCRText === "string" ? rawCtx.screenshotOCRText : null,
+  });
 
   let finalJson = json;
   if (json.confidence < runReviewThreshold) {

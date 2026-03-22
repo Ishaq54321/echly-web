@@ -43,6 +43,22 @@ const THEME_STORAGE_KEY = "widget-theme";
 const APP_ORIGIN = API_BASE;
 const inFlightFeedbackIds = new Set<string>();
 
+const detectElementType = (el: HTMLElement | null): string | null => {
+  if (!el) return null;
+
+  const tag = el.tagName.toLowerCase();
+
+  if (tag === "button") return "button";
+  if (tag === "img") return "image";
+  if (tag === "svg") return "icon";
+
+  if (tag === "h1" || tag === "h2" || tag === "h3") return "heading";
+
+  if (tag === "a") return "link";
+
+  return null;
+};
+
 /** Error boundary to capture CaptureWidget render errors (OPEN_WIDGET crash trace). */
 class EchlyWidgetErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -573,11 +589,24 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       });
 
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+      let selectedElement: HTMLElement | null = null;
+      if (context?.domPath && typeof document !== "undefined") {
+        try {
+          selectedElement = document.querySelector(context.domPath) as HTMLElement | null;
+        } catch {
+          selectedElement = null;
+        }
+      }
+      const elementType = detectElementType(selectedElement);
+      console.log("[ELEMENT_TYPE]", {
+        detected: elementType
+      });
       const { ocrImageDataUrl: _ocrImg, ...contextForApi } = (context ?? {}) as Record<string, unknown>;
       const enrichedContext: CaptureContext = {
         ...(contextForApi as Omit<CaptureContext, "visibleText" | "url">),
         visibleText: (ocrText?.trim() && ocrText) || (context as CaptureContext | null)?.visibleText || null,
         url: (context as CaptureContext | null)?.url ?? currentUrl,
+        elementType: elementType || null,
       };
       delete (enrichedContext as Record<string, unknown>).ocrImageDataUrl;
       const domText = context?.visibleText || "";

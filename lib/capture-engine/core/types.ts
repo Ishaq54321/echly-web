@@ -39,6 +39,8 @@ export type CaptureContext = {
   subtreeText?: string | null;
   /** Visible viewport text (readable text in viewport). */
   visibleText?: string | null;
+  /** Weak reference hint for selected element kind; never a decision input. */
+  elementType?: string | null;
   capturedAt: number;
   /** When set, OCR should run on this image (e.g. selection crop) instead of the UI screenshot. */
   ocrImageDataUrl?: string | null;

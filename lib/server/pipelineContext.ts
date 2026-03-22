@@ -28,6 +28,8 @@ export interface PipelineContext {
   screenshotOCRText?: string | null;
   /** Client-sent text for the DOM subtree at domPath (spatial scope). */
   subtreeText?: string | null;
+  /** Weak selected element type hint for wording only. */
+  elementType?: string | null;
   /** Structured DOM elements for disambiguation; prefer over visibleText when present */
   elements?: PipelineContextElement[];
   /** Legacy/compat: same as elements if needed */

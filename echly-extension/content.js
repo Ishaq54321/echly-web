@@ -40686,6 +40686,16 @@
   var THEME_STORAGE_KEY = "widget-theme";
   var APP_ORIGIN = API_BASE;
   var inFlightFeedbackIds = /* @__PURE__ */ new Set();
+  var detectElementType = (el) => {
+    if (!el) return null;
+    const tag = el.tagName.toLowerCase();
+    if (tag === "button") return "button";
+    if (tag === "img") return "image";
+    if (tag === "svg") return "icon";
+    if (tag === "h1" || tag === "h2" || tag === "h3") return "heading";
+    if (tag === "a") return "link";
+    return null;
+  };
   var EchlyWidgetErrorBoundary = class extends import_react18.default.Component {
     constructor(props) {
       super(props);
@@ -41099,11 +41109,24 @@
           length: ocrText?.length ?? 0
         });
         const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+        let selectedElement = null;
+        if (context?.domPath && typeof document !== "undefined") {
+          try {
+            selectedElement = document.querySelector(context.domPath);
+          } catch {
+            selectedElement = null;
+          }
+        }
+        const elementType = detectElementType(selectedElement);
+        console.log("[ELEMENT_TYPE]", {
+          detected: elementType
+        });
         const { ocrImageDataUrl: _ocrImg, ...contextForApi } = context ?? {};
         const enrichedContext = {
           ...contextForApi,
           visibleText: ocrText?.trim() && ocrText || context?.visibleText || null,
-          url: context?.url ?? currentUrl
+          url: context?.url ?? currentUrl,
+          elementType: elementType || null
         };
         delete enrichedContext.ocrImageDataUrl;
         const domText = context?.visibleText || "";
