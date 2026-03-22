@@ -814,6 +814,7 @@ async function createFeedbackInternal({
   feedbackId: string;
   ticket: {
     title?: string;
+    instruction?: string;
     description?: string;
     suggestedTags?: string[];
     actionSteps?: string[];
@@ -1453,6 +1454,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         feedbackId: string;
         ticket: {
           title?: string;
+          instruction?: string;
           description?: string;
           suggestedTags?: string[];
           actionSteps?: string[];

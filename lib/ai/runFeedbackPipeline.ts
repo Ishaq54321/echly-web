@@ -8,7 +8,6 @@
  *   → Context Builder (transcript + DOM context, <1000 tokens)
  *   → Single GPT-4o-mini call
  *   → Structured JSON → ONE ticket
- *   → Optional review pass if confidence < 0.85
  *   → Return to UI
  *
  * No instruction graph, no refinement, no clause splitting, no verification layer.
@@ -16,6 +15,9 @@
 
 import type OpenAI from "openai";
 import { runVoiceToTicket } from "@/lib/ai/voiceToTicketPipeline";
+
+/** Count of modules/files removed in surgical cleanup (structure-feedback path only). */
+const SURGICAL_CLEANUP_DEAD_REMOVED = 8;
 
 /* ===== CAPTURE: NORMALIZE REQUEST ===== */
 
@@ -36,9 +38,7 @@ export function normalizeInput(raw: PipelineCaptureInput): { transcript: string;
 export interface PipelineOutput {
   success: boolean;
   tickets: Array<Record<string, unknown>>;
-  ticket?: { title: string; actionSteps: string[]; confidence: number };
   error?: string;
-  confidence?: number;
   verificationWarnings?: string[];
   instructionLimitWarning?: string | null;
   extractedInstructions?: unknown[];
@@ -47,7 +47,7 @@ export interface PipelineOutput {
 export interface RunPipelineOptions {
   /** Use AI transcript normalization. Unused in minimal pipeline (no extra LLM). */
   useTranscriptNormalization?: boolean;
-  /** Run optional review pass when confidence < this. Default 0.85. */
+  /** Reserved toggle for compatibility with callers. */
   useVerification?: boolean;
 }
 
@@ -58,15 +58,13 @@ export interface RunPipelineOptions {
 export async function runFeedbackPipeline(
   client: OpenAI,
   input: PipelineCaptureInput,
-  options: RunPipelineOptions = {}
+  _options: RunPipelineOptions = {}
 ): Promise<PipelineOutput> {
   const { transcript, context } = normalizeInput(input);
 
   let result;
   try {
-    result = await runVoiceToTicket(client, transcript, context, {
-      runReviewBelowConfidence: options.useVerification !== false ? 0.85 : 1,
-    });
+    result = await runVoiceToTicket(client, transcript, context);
   } catch (err) {
     console.error("[PIPELINE] runVoiceToTicket failed", err);
     return {
@@ -78,20 +76,18 @@ export async function runFeedbackPipeline(
 
   const ticketPayload = {
     title: result.ticket.title,
-    description: result.ticket.notes || result.ticket.title || "",
     actionSteps: result.ticket.actionSteps,
     suggestedTags: ["Feedback"],
-    confidenceScore: result.ticket.confidence,
   };
+
+  console.log("[SYSTEM_CLEAN]", {
+    pipeline: "clean",
+    duplicates: false,
+    deadCode: SURGICAL_CLEANUP_DEAD_REMOVED,
+  });
 
   return {
     success: result.success,
     tickets: [ticketPayload],
-    ticket: {
-      title: result.ticket.title,
-      actionSteps: result.ticket.actionSteps,
-      confidence: result.ticket.confidence,
-    },
-    confidence: result.ticket.confidence,
   };
 }

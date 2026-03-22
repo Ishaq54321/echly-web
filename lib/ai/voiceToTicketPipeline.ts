@@ -1,12 +1,11 @@
 /**
  * Minimal voice → ticket pipeline: one transcript, one GPT-4o-mini call, one ticket.
- * No instruction graph, no refinement, no verification (except optional low-confidence review).
+ * No instruction graph, no refinement, no verification.
  */
 
 import type OpenAI from "openai";
 import { truncateForTokenBudget } from "@/lib/ai/pipelineTokenBudget";
 import { SYSTEM_PROMPT } from "@/lib/ai/prompts/interpreterPrompt";
-import { REVIEW_PROMPT } from "@/lib/ai/prompts/reviewPrompt";
 import type { PipelineContext } from "@/lib/server/pipelineContext";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 
@@ -29,25 +28,21 @@ const CHARS_PER_TOKEN = 4;
 /** One action from the LLM. */
 export interface ExtractedAction {
   step: number;
-  description: string;
+  instruction: string;
+  description?: string;
   entity: string;
-  confidence: number;
 }
 
 /** Raw JSON shape returned by the LLM. */
 export interface StructuredFeedbackJSON {
   title?: string;
   actions: ExtractedAction[];
-  confidence: number;
-  notes: string;
 }
 
 /** Normalized ticket for API response. */
 export interface VoiceTicket {
   title: string;
   actionSteps: string[];
-  confidence: number;
-  notes?: string;
 }
 
 function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomContextForAI {
@@ -160,12 +155,6 @@ function buildUserMessage(
   shouldUseOCR: boolean,
   ocrText: string | null
 ): string {
-  const elementHTMLChars = (domContext.elementHTML ?? "").length;
-  const nearbyTextChars = (domContext.nearbyText ?? "").length;
-  const visibleTextChars = (domContext.visibleText ?? "").length;
-  console.log(
-    `[DOM CONTEXT] elementHTML chars=${elementHTMLChars} nearbyText chars=${nearbyTextChars} visibleText chars=${visibleTextChars}`
-  );
   const parts: string[] = [];
 
   parts.push("USER INTENT (SOURCE OF TRUTH):");
@@ -210,15 +199,12 @@ const FEEDBACK_JSON_SCHEMA = {
           step: { type: "number" },
           description: { type: "string" },
           entity: { type: "string" },
-          confidence: { type: "number" },
         },
-        required: ["step", "description", "entity", "confidence"],
+        required: ["step", "description", "entity"],
       },
     },
-    confidence: { type: "number" },
-    notes: { type: "string" },
   },
-  required: ["title", "actions", "confidence", "notes"],
+  required: ["title", "actions"],
 } as const;
 
 /** Fallback when parsing fails or actions array is missing. */
@@ -227,13 +213,10 @@ function fallbackStructuredFeedback(transcript: string): StructuredFeedbackJSON 
     actions: [
       {
         step: 1,
-        description: transcript.trim() || "Update UI element",
+        instruction: transcript.trim() || "Update UI element",
         entity: "general",
-        confidence: 0.5,
       },
     ],
-    confidence: 0.5,
-    notes: "Fallback action created due to parsing failure",
   };
 }
 
@@ -249,21 +232,23 @@ function parseStructuredResponse(text: string): StructuredFeedbackJSON | null {
     if (!Array.isArray(o.actions)) return null;
     const actions: ExtractedAction[] = [];
     for (const item of o.actions) {
-      if (item && typeof item === "object" && "description" in item) {
+      if (item && typeof item === "object") {
         const a = item as Record<string, unknown>;
+        const instruction =
+          typeof a.description === "string"
+            ? a.description
+            : typeof a.instruction === "string"
+              ? a.instruction
+              : String(a.description ?? a.instruction ?? "");
         actions.push({
           step: typeof a.step === "number" ? a.step : actions.length + 1,
-          description: typeof a.description === "string" ? a.description : String(a.description ?? ""),
+          instruction,
           entity: typeof a.entity === "string" ? a.entity : "",
-          confidence: typeof a.confidence === "number" && a.confidence >= 0 && a.confidence <= 1 ? a.confidence : 0.8,
         });
       }
     }
-    const confidence =
-      typeof o.confidence === "number" && o.confidence >= 0 && o.confidence <= 1 ? o.confidence : 0.8;
-    const notes = typeof o.notes === "string" ? o.notes : "";
     const title = typeof o.title === "string" ? o.title.trim() : "";
-    return { title, actions, confidence, notes };
+    return { title, actions };
   } catch {
     return null;
   }
@@ -317,12 +302,6 @@ export async function extractStructuredFeedback(
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: userMessage },
   ];
-  /* TEMP AI audit — remove after input audit */
-  console.log("[AI_FINAL_INPUT]", {
-    systemPrompt: SYSTEM_PROMPT,
-    messages,
-  });
-  const start = Date.now();
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.2,
@@ -337,17 +316,19 @@ export async function extractStructuredFeedback(
     },
     messages,
   });
-  const duration = Date.now() - start;
-  console.log(`[AI PIPELINE] extractStructuredFeedback duration: ${duration}ms`);
-  const promptTokens = completion.usage?.prompt_tokens ?? 0;
-  const completionTokens = completion.usage?.completion_tokens ?? 0;
-  console.log(`[AI TOKENS] prompt=${promptTokens} completion=${completionTokens}`);
   const raw = completion.choices[0]?.message?.content?.trim() ?? "";
   const json = parseStructuredResponse(raw);
   console.log("[AI_PHASE2_OUTPUT]", {
     title: json?.title,
     actionsCount: json?.actions?.length,
-    firstAction: json?.actions?.[0]?.description
+    firstAction: json?.actions?.[0]?.instruction
+  });
+  const actionStepsForRenameCheck = (json?.actions ?? []).map((action) => ({
+    instruction: action.instruction,
+  }));
+  console.log("[STEP_RENAME_CHECK]", {
+    hasInstruction: !!actionStepsForRenameCheck?.[0]?.instruction,
+    hasDescription: !!(actionStepsForRenameCheck?.[0] as { description?: string } | undefined)?.description,
   });
   if (!json || !Array.isArray(json.actions) || json.actions.length === 0) {
     return { json: fallbackStructuredFeedback(transcript), raw };
@@ -355,56 +336,24 @@ export async function extractStructuredFeedback(
   return { json, raw };
 }
 
-/**
- * Optional second pass when confidence < 0.85.
- */
-export async function reviewStructuredFeedback(
-  client: OpenAI,
-  transcript: string,
-  current: StructuredFeedbackJSON
-): Promise<StructuredFeedbackJSON> {
-  const actionsStr = JSON.stringify(current.actions);
-  const userMessage = `Transcript:\n${transcript}\n\nCurrent actions:\n${actionsStr}\n\n${REVIEW_PROMPT}`;
-  try {
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      max_tokens: 300,
-      messages: [{ role: "user", content: userMessage }],
-    });
-    const raw = completion.choices[0]?.message?.content?.trim() ?? "";
-    const parsed = parseStructuredResponse(raw);
-    return parsed ?? current;
-  } catch {
-    return current;
-  }
-}
-
 /* ===== PUBLIC API ===== */
 
 /**
  * Run the minimal pipeline: transcript + context → one ticket.
  * One transcript → one ticket. Multiple actions become actionSteps on that ticket; never multiple tickets.
- * Optionally runs a review pass when confidence < 0.85.
  */
 export async function runVoiceToTicket(
   client: OpenAI,
   transcript: string,
-  rawContext: unknown,
-  options: { runReviewBelowConfidence?: number } = {}
+  rawContext: unknown
 ): Promise<{
   success: boolean;
   ticket: VoiceTicket;
 }> {
-  const runReviewThreshold = options.runReviewBelowConfidence ?? 0.85;
-  const pipelineStart = Date.now();
-
   if (!transcript || !transcript.trim()) {
-    const pipelineDuration = Date.now() - pipelineStart;
-    console.log(`[AI PIPELINE] runVoiceToTicket duration: ${pipelineDuration}ms`);
     return {
       success: true,
-      ticket: { title: "", actionSteps: [], confidence: 0 },
+      ticket: { title: "", actionSteps: [] },
     };
   }
 
@@ -441,21 +390,6 @@ export async function runVoiceToTicket(
     normalizedInput.ocrText = null;
   }
 
-  console.log("[AI_NORMALIZED_INPUT]", {
-    transcriptLength: normalizedInput.transcript.length,
-    elementLength: normalizedInput.elementText?.length || 0,
-    nearbyLength: normalizedInput.nearbyText?.length || 0,
-    visibleLength: normalizedInput.visibleText.length,
-    ocrLength: normalizedInput.ocrText?.length || 0
-  });
-
-  console.log("[AI_INPUT_PREVIEW]", {
-    transcript: normalizedInput.transcript.slice(0, 120),
-    element: normalizedInput.elementText?.slice(0, 120),
-    nearby: normalizedInput.nearbyText?.slice(0, 120),
-    visible: normalizedInput.visibleText.slice(0, 120)
-  });
-
   const aiContext: DomContextForAI = {
     ...domContext,
     elementHTML: normalizedInput.elementText,
@@ -467,19 +401,14 @@ export async function runVoiceToTicket(
     screenshotOCRText: typeof rawCtx?.screenshotOCRText === "string" ? rawCtx.screenshotOCRText : null,
   });
 
-  let finalJson = json;
-  if (json.confidence < runReviewThreshold) {
-    finalJson = await reviewStructuredFeedback(client, transcript, json);
-  }
-
-  const actionSteps = finalJson.actions
+  const actionSteps = json.actions
     .sort((a, b) => a.step - b.step)
-    .map((a) => a.description.trim())
+    .map((a) => a.instruction.trim())
     .filter(Boolean);
 
   const aiTitle =
-    typeof finalJson.title === "string"
-      ? sanitizeTitle(finalJson.title)
+    typeof json.title === "string"
+      ? sanitizeTitle(json.title)
       : "";
   const title =
     aiTitle.length > 0
@@ -489,12 +418,7 @@ export async function runVoiceToTicket(
   const ticket: VoiceTicket = {
     title,
     actionSteps,
-    confidence: finalJson.confidence,
-    notes: finalJson.notes || undefined,
   };
-
-  const pipelineDuration = Date.now() - pipelineStart;
-  console.log(`[AI PIPELINE] runVoiceToTicket duration: ${pipelineDuration}ms`);
 
   return {
     success: true,

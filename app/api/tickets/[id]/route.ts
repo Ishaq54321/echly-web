@@ -82,7 +82,7 @@ export async function GET(
   }
 }
 
-/** PATCH /api/tickets/:id — update ticket; body: { title?, description?, actionSteps?, suggestedTags?, isResolved? }. */
+/** PATCH /api/tickets/:id — update ticket; body: { title?, instruction?, actionSteps?, suggestedTags?, isResolved? }. */
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -104,6 +104,7 @@ export async function PATCH(
   }
   let body: {
     title?: string;
+    instruction?: string;
     description?: string;
     actionSteps?: string[];
     suggestedTags?: string[];
@@ -147,7 +148,8 @@ export async function PATCH(
   }
   const updates: Parameters<typeof updateFeedbackRepo>[1] = {};
   if (typeof body.title === "string") updates.title = body.title;
-  if (typeof body.description === "string") updates.description = body.description;
+  if (typeof body.instruction === "string") updates.instruction = body.instruction;
+  else if (typeof body.description === "string") updates.instruction = body.description;
   if (Array.isArray(body.actionSteps)) updates.actionSteps = body.actionSteps;
   if (Array.isArray(body.suggestedTags)) updates.suggestedTags = body.suggestedTags;
   if (typeof body.status === "string") {

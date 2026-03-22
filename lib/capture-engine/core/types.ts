@@ -4,6 +4,7 @@ import type { CaptureEnvironment } from "../CaptureEnvironment";
 export type StructuredFeedback = {
   id: string;
   title: string;
+  instruction?: string;
   actionSteps: string[];
   type?: string;
 };

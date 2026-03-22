@@ -2,7 +2,8 @@ import type { Timestamp } from "firebase/firestore";
 
 export interface StructuredFeedback {
   title: string;
-  description: string;
+  instruction?: string;
+  description?: string;
   suggestion?: string;
   type: string;
 
@@ -46,7 +47,8 @@ export interface Feedback {
   /** Legacy scope (pre-workspaces). */
   userId?: string;
   title: string;
-  description: string;
+  instruction?: string;
+  description?: string;
   suggestion?: string;
   type: string;
   isResolved: boolean;

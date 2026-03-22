@@ -51,6 +51,7 @@ function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback {
     sessionId: data.sessionId as string,
     userId: data.userId as string,
     title: (data.title as string) ?? "",
+    instruction: ((data.instruction as string) ?? (data.description as string)) ?? "",
     description: (data.description as string) ?? "",
     suggestion: (data.suggestion as string) ?? "",
     type: (data.type as string) ?? "Feedback",

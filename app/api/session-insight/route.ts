@@ -253,7 +253,7 @@ export async function POST(req: Request): Promise<Response> {
   ];
   feedback.forEach((f, i) => {
     const title = (f.title ?? "").trim() || "—";
-    const context = truncate((f.contextSummary ?? f.description ?? "").trim(), CONTEXT_MAX_CHARS);
+    const context = truncate((f.contextSummary ?? f.instruction ?? f.description ?? "").trim(), CONTEXT_MAX_CHARS);
     const tagList = Array.isArray(f.suggestedTags) ? (f.suggestedTags as string[]).join(", ") : "";
     const steps = Array.isArray(f.actionSteps) ? (f.actionSteps as string[]).join(" ") : "";
     const stepsShort = steps ? truncate(steps, ACTION_SUMMARY_MAX_CHARS) : "";

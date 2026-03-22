@@ -131,6 +131,7 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
 
     // Fields used by capture widget + discussion UI
     title: item.title,
+    instruction: item.instruction ?? item.description,
     description: item.description,
     type: item.type,
     actionSteps: item.actionSteps ?? undefined,

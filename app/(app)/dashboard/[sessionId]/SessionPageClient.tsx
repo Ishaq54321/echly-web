@@ -59,6 +59,7 @@ function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps
 type TicketFromApi = {
   id: string;
   title: string;
+  instruction?: string;
   description?: string;
   type: string;
   isResolved?: boolean;
@@ -273,7 +274,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (!sessionId || !session) return;
     const handler = (e: Event) => {
       const ev = e as CustomEvent<{
-        ticket: { id: string; title: string; description: string; type?: string };
+        ticket: { id: string; title: string; instruction?: string; description?: string; type?: string };
         sessionId: string;
       }>;
       const { ticket, sessionId: evSessionId } = ev.detail ?? {};
@@ -283,7 +284,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         sessionId: evSessionId,
         userId: session.userId,
         title: ticket.title,
-        description: ticket.description,
+        instruction: ticket.instruction ?? ticket.description,
+        description: ticket.description ?? ticket.instruction,
         type: ticket.type ?? "Feedback",
         isResolved: false,
         createdAt: null,

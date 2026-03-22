@@ -37334,7 +37334,7 @@
           existing.map((item) => ({
             id: item.id,
             title: item.title ?? "",
-            actionSteps: item.actionSteps ?? (item.description ? item.description.split("\n") : []),
+            actionSteps: item.actionSteps ?? (item.instruction ?? item.description ? (item.instruction ?? item.description ?? "").split("\n") : []),
             type: item.type ?? "bug"
           }))
         );
@@ -37530,7 +37530,7 @@
                 if (!extensionMode) {
                   const t = ticket;
                   setPointers((prev) => [
-                    { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []), type: t.type },
+                    { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.instruction ?? t.description ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
                     ...prev
                   ]);
                 }
@@ -37562,7 +37562,7 @@
             if (!extensionMode) {
               const t = ticket;
               setPointers((prev) => [
-                { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []), type: t.type },
+                { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.instruction ?? t.description ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
                 ...prev
               ]);
             }
@@ -38180,7 +38180,7 @@
               if (!extensionMode) {
                 const t = ticket;
                 setPointers((prev) => [
-                  { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []), type: t.type },
+                  { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.instruction ?? t.description ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
                   ...prev
                 ]);
               }
@@ -41068,31 +41068,18 @@
         screenshot,
         context,
         callbacks,
-        sessionMode
+        sessionMode: _sessionMode
       }) => {
-        console.log("[PIPELINE] START", { transcriptLength: transcript?.length, sessionMode, hasCallbacks: !!callbacks });
-        console.log("[PIPELINE] INPUT_OVERVIEW", {
-          transcriptLength: transcript?.length,
-          hasContext: !!context,
-          contextKeys: context ? Object.keys(context) : []
-        });
         const fallbackTicket = {
           title: transcript?.slice(0, 80) || "User Feedback",
-          description: transcript || "",
           actionSteps: transcript ? [transcript] : [],
-          suggestedTags: [],
-          confidenceScore: 0
+          suggestedTags: []
         };
         if (!effectiveSessionId || !user) {
           throw new Error("Missing session or user");
         }
         const ctx = context;
         const imageForOcr = ctx?.ocrImageDataUrl ?? screenshot ?? null;
-        if (ctx?.ocrImageDataUrl && ECHLY_DEBUG) {
-          console.log("[ECHLY] OCR running on selection image");
-        }
-        console.log("[PIPELINE] OCR_START");
-        const ocrStart = Date.now();
         let ocrText = "";
         try {
           const result = await Promise.race([
@@ -41100,14 +41087,9 @@
             new Promise((resolve) => setTimeout(() => resolve(""), 1500))
           ]);
           ocrText = result ?? "";
-        } catch (e) {
-          console.log("[PIPELINE] OCR_ERROR", e);
+        } catch {
           ocrText = "";
         }
-        console.log("[PIPELINE] OCR_DONE", {
-          duration: Date.now() - ocrStart,
-          length: ocrText?.length ?? 0
-        });
         const currentUrl = typeof window !== "undefined" ? window.location.href : "";
         let selectedElement = null;
         if (context?.domPath && typeof document !== "undefined") {
@@ -41118,9 +41100,6 @@
           }
         }
         const elementType = detectElementType(selectedElement);
-        console.log("[ELEMENT_TYPE]", {
-          detected: elementType
-        });
         const { ocrImageDataUrl: _ocrImg, ...contextForApi } = context ?? {};
         const enrichedContext = {
           ...contextForApi,
@@ -41129,31 +41108,8 @@
           elementType: elementType || null
         };
         delete enrichedContext.ocrImageDataUrl;
-        const domText = context?.visibleText || "";
-        console.log("[PIPELINE] DOM_ANALYSIS", {
-          length: domText.length,
-          preview: domText.slice(0, 200),
-          isEmpty: domText.length === 0
-        });
-        let domSizeCategory = "none";
-        if (domText.length > 0 && domText.length < 500) {
-          domSizeCategory = "small";
-        } else if (domText.length < 2e3) {
-          domSizeCategory = "medium";
-        } else if (domText.length >= 2e3) {
-          domSizeCategory = "large";
-        }
-        console.log("[PIPELINE] DOM_SIZE_CATEGORY", domSizeCategory);
-        console.log("[PIPELINE] AI_START");
-        const aiStart = Date.now();
         let structured = null;
         try {
-          echlyLog("PIPELINE", "structure request");
-          console.log("[PIPELINE] AI_INPUT_SUMMARY", {
-            transcriptLength: transcript?.length,
-            domLength: domText.length,
-            ocrLength: ocrText.length
-          });
           const res = await apiFetch("/api/structure-feedback", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -41165,27 +41121,14 @@
             })
           });
           structured = await res.json();
-        } catch (e) {
-          console.log("[PIPELINE] AI_ERROR", e);
+        } catch {
           structured = null;
         }
-        console.log("[PIPELINE] AI_DONE", {
-          duration: Date.now() - aiStart,
-          success: !!structured?.success,
-          tickets: structured?.tickets?.length ?? 0
-        });
         const normalized = structured?.success && structured.tickets?.length ? structured.tickets[0] : fallbackTicket;
-        if (structured?.success && structured.tickets?.length) {
-          console.log("[PIPELINE] USING_AI_OUTPUT");
-        } else {
-          console.log("[PIPELINE] FALLBACK_TRIGGERED");
-        }
-        console.log("[PIPELINE] CREATE_START");
         try {
           if (!screenshot) {
             throw new Error("Screenshot is required.");
           }
-          console.log("[ECHLY] Uploading screenshot FIRST");
           const uploadResult = await uploadScreenshot2(screenshot, effectiveSessionId);
           const finalScreenshotId = uploadResult.screenshotId;
           if (ECHLY_STRICT_MODE && !finalScreenshotId) {
@@ -41212,7 +41155,6 @@
                     feedbackId,
                     ticket: {
                       title: normalized.title,
-                      description: normalized.description ?? transcript,
                       suggestedTags: normalized.suggestedTags ?? [],
                       actionSteps: normalized.actionSteps ?? []
                     },
@@ -41245,18 +41187,15 @@
             const created = {
               id: tick.id,
               title: tick.title,
-              actionSteps: tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []),
+              actionSteps: tick.actionSteps ?? (tick.instruction ? tick.instruction.split(/\n\s*\n/) : tick.description ? tick.description.split(/\n\s*\n/) : []),
               type: tick.type ?? "Feedback"
             };
             notifyFeedbackCreated(created, effectiveSessionId);
-            console.log("[PIPELINE] CREATE_SUCCESS");
-            console.log("[PIPELINE] END");
             return created;
           }
           throw new Error("Feedback creation returned no ticket.");
         } catch (e) {
-          console.log("[PIPELINE] CREATE_ERROR", e);
-          console.log("[PIPELINE] END");
+          console.error("[ECHLY] Feedback create failed:", e);
           throw e;
         }
       },
@@ -41264,12 +41203,6 @@
     );
     const handleComplete = import_react18.default.useCallback(
       async (transcript, screenshot, callbacks, context, options) => {
-        console.log("[HANDLE_COMPLETE] START", {
-          transcriptLength: transcript?.length,
-          hasScreenshot: !!screenshot,
-          sessionMode: options?.sessionMode
-        });
-        echlyLog("PIPELINE", "start");
         const fallbackResult = {
           id: `local-${createUniqueId()}`,
           title: transcript?.slice(0, 80) || "User Feedback",
@@ -41296,13 +41229,11 @@
             callbacks,
             sessionMode: options?.sessionMode
           });
-          echlyLog("PIPELINE", "ticket created", { ticketId: ticket.id });
           if (jobId) setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
           callbacks?.onSuccess?.(ticket);
           return ticket;
         } catch (err) {
           console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
-          echlyLog("PIPELINE", "error");
           if (jobId) {
             setFeedbackJobs(
               (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "AI processing failed." } : j)
@@ -41332,7 +41263,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: payload.title,
-            description: payload.actionSteps?.join("\n") ?? "",
+            instruction: payload.actionSteps?.join("\n") ?? "",
             actionSteps: payload.actionSteps ?? []
           })
         });

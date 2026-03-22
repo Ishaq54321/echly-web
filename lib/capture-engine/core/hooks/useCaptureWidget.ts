@@ -526,6 +526,7 @@ export function useCaptureWidget({
         id: string;
         title?: string;
         actionSteps?: string[];
+        instruction?: string;
         description?: string;
         type?: string;
       }>;
@@ -533,7 +534,7 @@ export function useCaptureWidget({
         existing.map((item) => ({
           id: item.id,
           title: item.title ?? "",
-          actionSteps: item.actionSteps ?? (item.description ? item.description.split("\n") : []),
+          actionSteps: item.actionSteps ?? ((item.instruction ?? item.description) ? (item.instruction ?? item.description ?? "").split("\n") : []),
           type: item.type ?? "bug",
         }))
       );
@@ -742,9 +743,9 @@ export function useCaptureWidget({
               setSessionFeedbackSaving(false);
               if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
               if (!extensionMode) {
-                const t = ticket as StructuredFeedback & { description?: string };
+              const t = ticket as StructuredFeedback & { instruction?: string; description?: string };
                 setPointers((prev) => [
-                  { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []), type: t.type },
+                  { id: t.id, title: t.title, actionSteps: t.actionSteps ?? ((t.instruction ?? t.description) ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
                   ...prev,
                 ]);
               }
@@ -774,9 +775,9 @@ export function useCaptureWidget({
         onSuccess: (ticket) => {
           pipelineActiveRef.current = false;
           if (!extensionMode) {
-            const t = ticket as StructuredFeedback & { description?: string };
+            const t = ticket as StructuredFeedback & { instruction?: string; description?: string };
             setPointers((prev) => [
-              { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []), type: t.type },
+              { id: t.id, title: t.title, actionSteps: t.actionSteps ?? ((t.instruction ?? t.description) ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
               ...prev,
             ]);
           }
@@ -1484,9 +1485,9 @@ export function useCaptureWidget({
               updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
             }
             if (!extensionMode) {
-              const t = ticket as StructuredFeedback & { description?: string };
+              const t = ticket as StructuredFeedback & { instruction?: string; description?: string };
               setPointers((prev) => [
-                { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.description ? t.description.split("\n") : []), type: t.type },
+                { id: t.id, title: t.title, actionSteps: t.actionSteps ?? ((t.instruction ?? t.description) ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
                 ...prev,
               ]);
             }

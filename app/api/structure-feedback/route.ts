@@ -4,7 +4,6 @@ import OpenAI from "openai";
 import { requireAuth } from "@/lib/server/auth";
 import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
-import { echlyDebug } from "@/lib/utils/logger";
 import { runFeedbackPipeline } from "@/lib/ai/runFeedbackPipeline";
 import { corsHeaders } from "@/lib/server/cors";
 
@@ -51,7 +50,6 @@ function checkRateLimit(uid: string): boolean {
 type StructureResponse = {
   success: boolean;
   tickets: Array<Record<string, unknown>>;
-  ticket?: { title: string; actionSteps: string[]; confidence: number };
   error?: string;
 };
 
@@ -111,10 +109,6 @@ export async function POST(req: NextRequest): Promise<Response> {
   let body: { transcript?: unknown; context?: unknown };
   try {
     body = await req.json();
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[STRUCTURE] transcript present:", !!body?.transcript);
-      console.log("[STRUCTURE] context keys:", body?.context && typeof body.context === "object" ? Object.keys(body.context as object) : []);
-    }
   } catch {
     return stableFailure("Invalid request body");
   }
@@ -126,38 +120,14 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 
-  /* TEMP AI audit — remove after input audit (optional client auditCase + top-level ocr* ignored by pipeline) */
-  {
-    const b = body as Record<string, unknown>;
-    const ctx = b.context && typeof b.context === "object" ? (b.context as Record<string, unknown>) : null;
-    const topOcr =
-      typeof b.ocrText === "string" ? b.ocrText : typeof b.ocr === "string" ? b.ocr : "";
-    console.log("[AI_INPUT_CASE]", {
-      auditCase: typeof b.auditCase === "string" ? b.auditCase : null,
-      transcriptLength: transcript.length,
-      topLevelOcrLength: topOcr.length,
-      contextKeys: ctx ? Object.keys(ctx) : [],
-      contextVisibleLen: typeof ctx?.visibleText === "string" ? ctx.visibleText.length : 0,
-      contextNearbyLen:
-        typeof ctx?.nearbyText === "string"
-          ? ctx.nearbyText.length
-          : Array.isArray(ctx?.nearbyText)
-            ? (ctx.nearbyText as unknown[]).filter((x): x is string => typeof x === "string").join("\n").length
-            : 0,
-      contextSubtreeLen: typeof ctx?.subtreeText === "string" ? ctx.subtreeText.length : 0,
-    });
-  }
-
-  echlyDebug("RAW TRANSCRIPT", transcript);
-
   try {
     const result = await runFeedbackPipeline(client, { transcript, context: body?.context }, {
       useVerification: true,
     });
 
-    echlyDebug("PIPELINE RESULT", { success: result.success, ticketCount: result.tickets?.length ?? 0 });
-
-    console.log("STRUCTURE API RESPONSE:", result);
+    console.log("[PHASE3_FINAL]", {
+      fields: Object.keys(result.tickets?.[0] || {}),
+    });
 
     return NextResponse.json(
       {

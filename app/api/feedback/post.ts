@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
     sessionId?: string;
     feedbackId?: string;
     title?: string;
-    description?: string;
+    instruction?: string;
     suggestion?: string;
     contextSummary?: string;
     actionSteps?: string[];
@@ -170,7 +170,6 @@ export async function POST(req: NextRequest) {
       intent?: string;
       entity?: string;
       action?: string;
-      confidence?: number;
     }>;
     screenshotId?: string;
   };
@@ -224,8 +223,6 @@ export async function POST(req: NextRequest) {
     actionSteps.length > 0
       ? generateTicketTitle(actionSteps)
       : (typeof body.title === "string" ? body.title.trim() : "");
-  const description =
-    typeof body.description === "string" ? body.description.trim() : "";
   if (!title) {
     return NextResponse.json(
       { success: false, error: "title is required (or provide actionSteps)" },
@@ -315,7 +312,12 @@ export async function POST(req: NextRequest) {
 
   const structuredData = {
     title,
-    description: description || title,
+    instruction:
+      typeof body.instruction === "string"
+        ? body.instruction
+        : typeof (body as { description?: unknown }).description === "string"
+          ? ((body as { description?: string }).description ?? undefined)
+        : undefined,
     suggestion: typeof body.suggestion === "string" ? body.suggestion : undefined,
     type: "general" as const,
     contextSummary:
@@ -337,11 +339,6 @@ export async function POST(req: NextRequest) {
   try {
     const workspaceId = session.workspaceId ?? session.userId ?? ((await getUserWorkspaceIdRepo(user.uid)) ?? user.uid);
 
-    console.log("[IDEMPOTENCY CHECK]", {
-      feedbackId: normalizedFeedbackId,
-      willUseAsDocId: true,
-    });
-
     const docRef = await addFeedbackWithSessionCountersRepo(
       workspaceId,
       sessionId,
@@ -350,11 +347,6 @@ export async function POST(req: NextRequest) {
       normalizedFeedbackId,
       normalizedScreenshotId
     );
-    console.log("[feedback lifecycle] created", {
-      feedbackId: docRef.id,
-      sessionId,
-      hasScreenshotId,
-    });
     const created = await getFeedbackByIdRepo(docRef.id);
     if (!created) {
       return NextResponse.json(

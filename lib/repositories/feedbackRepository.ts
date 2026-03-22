@@ -38,7 +38,7 @@ const feedbackPayload = (
   sessionId,
   userId,
   title: data.title,
-  description: data.description,
+  instruction: data.instruction ?? data.description ?? null,
   suggestion: data.suggestion ?? "",
   type: data.type,
   status: data.status ?? ("open" as const),
@@ -138,7 +138,7 @@ export async function addFeedbackWithSessionCountersRepo(
 
 type FeedbackUpdate = Partial<{
   title: string;
-  description: string;
+  instruction: string;
   type: string;
   status: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
   screenshotUrl: string | null;
@@ -157,6 +157,7 @@ export async function updateFeedbackRepo(
   feedbackId: string,
   data: Partial<{
     title: string;
+    instruction: string;
     description: string;
     type: string;
     status: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
@@ -170,7 +171,8 @@ export async function updateFeedbackRepo(
 ): Promise<void> {
   const updates: FeedbackUpdate = {};
   if (typeof data.title === "string") updates.title = data.title;
-  if (typeof data.description === "string") updates.description = data.description;
+  if (typeof data.instruction === "string") updates.instruction = data.instruction;
+  else if (typeof data.description === "string") updates.instruction = data.description;
   if (typeof data.type === "string") updates.type = data.type;
   if (typeof data.status === "string") updates.status = data.status;
   if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
@@ -211,6 +213,7 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
   feedbackId: string,
   data: Partial<{
     title: string;
+    instruction: string;
     description: string;
     type: string;
     screenshotUrl: string | null;
@@ -227,7 +230,8 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
 
   const updates: FeedbackUpdate = {};
   if (typeof data.title === "string") updates.title = data.title;
-  if (typeof data.description === "string") updates.description = data.description;
+  if (typeof data.instruction === "string") updates.instruction = data.instruction;
+  else if (typeof data.description === "string") updates.instruction = data.description;
   if (typeof data.type === "string") updates.type = data.type;
   if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
   if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
@@ -324,7 +328,18 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     sessionId: data.sessionId,
     userId: data.userId,
     title: data.title,
-    description: data.description,
+    instruction:
+      typeof data.instruction === "string"
+        ? data.instruction
+        : typeof data.description === "string"
+          ? data.description
+          : undefined,
+    description:
+      typeof data.description === "string"
+        ? data.description
+        : typeof data.instruction === "string"
+          ? data.instruction
+          : undefined,
     suggestion: data.suggestion ?? "",
     type: data.type,
     isResolved,

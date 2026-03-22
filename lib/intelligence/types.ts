@@ -7,6 +7,7 @@ export interface SignalInput {
   id: string;
   sessionId: string;
   title: string;
+  instruction?: string;
   description?: string;
   createdAtMs: number | null;
   updatedAtMs?: number | null;

@@ -154,9 +154,7 @@ Ensure the response JSON includes: "title": "..."
 Example full response:
 {
   "title": "Hero Layout Adjustment",
-  "actions": [...],
-  "confidence": 0.93,
-  "notes": ""
+  "actions": [...]
 }
 
 Return JSON only.`;

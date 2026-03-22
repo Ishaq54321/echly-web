@@ -534,7 +534,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       screenshot,
       context,
       callbacks,
-      sessionMode,
+      sessionMode: _sessionMode,
     }: {
       transcript: string;
       screenshot: string | null;
@@ -545,19 +545,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       };
       sessionMode?: boolean;
     }): Promise<StructuredFeedback> => {
-      console.log("[PIPELINE] START", { transcriptLength: transcript?.length, sessionMode, hasCallbacks: !!callbacks });
-      console.log("[PIPELINE] INPUT_OVERVIEW", {
-        transcriptLength: transcript?.length,
-        hasContext: !!context,
-        contextKeys: context ? Object.keys(context) : [],
-      });
-
       const fallbackTicket = {
         title: transcript?.slice(0, 80) || "User Feedback",
-        description: transcript || "",
         actionSteps: transcript ? [transcript] : [],
         suggestedTags: [] as string[],
-        confidenceScore: 0,
       };
 
       if (!effectiveSessionId || !user) {
@@ -566,12 +557,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
       const ctx = context as CaptureContext | null | undefined;
       const imageForOcr = ctx?.ocrImageDataUrl ?? screenshot ?? null;
-      if (ctx?.ocrImageDataUrl && ECHLY_DEBUG) {
-        console.log("[ECHLY] OCR running on selection image");
-      }
-
-      console.log("[PIPELINE] OCR_START");
-      const ocrStart = Date.now();
       let ocrText = "";
       try {
         const result = await Promise.race([
@@ -579,14 +564,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           new Promise<string>((resolve) => setTimeout(() => resolve(""), 1500)),
         ]);
         ocrText = result ?? "";
-      } catch (e) {
-        console.log("[PIPELINE] OCR_ERROR", e);
+      } catch {
         ocrText = "";
       }
-      console.log("[PIPELINE] OCR_DONE", {
-        duration: Date.now() - ocrStart,
-        length: ocrText?.length ?? 0,
-      });
 
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
       let selectedElement: HTMLElement | null = null;
@@ -598,9 +578,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
       }
       const elementType = detectElementType(selectedElement);
-      console.log("[ELEMENT_TYPE]", {
-        detected: elementType
-      });
       const { ocrImageDataUrl: _ocrImg, ...contextForApi } = (context ?? {}) as Record<string, unknown>;
       const enrichedContext: CaptureContext = {
         ...(contextForApi as Omit<CaptureContext, "visibleText" | "url">),
@@ -609,45 +586,20 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         elementType: elementType || null,
       };
       delete (enrichedContext as Record<string, unknown>).ocrImageDataUrl;
-      const domText = context?.visibleText || "";
-      console.log("[PIPELINE] DOM_ANALYSIS", {
-        length: domText.length,
-        preview: domText.slice(0, 200),
-        isEmpty: domText.length === 0,
-      });
 
-      let domSizeCategory = "none";
-      if (domText.length > 0 && domText.length < 500) {
-        domSizeCategory = "small";
-      } else if (domText.length < 2000) {
-        domSizeCategory = "medium";
-      } else if (domText.length >= 2000) {
-        domSizeCategory = "large";
-      }
-      console.log("[PIPELINE] DOM_SIZE_CATEGORY", domSizeCategory);
-
-      console.log("[PIPELINE] AI_START");
-      const aiStart = Date.now();
+      type StructureTicket = {
+        title?: string;
+        suggestedTags?: string[];
+        actionSteps?: string[];
+      };
       let structured:
         | {
             success?: boolean;
-            tickets?: Array<{
-              title?: string;
-              description?: string;
-              suggestedTags?: string[];
-              actionSteps?: string[];
-              confidenceScore?: number;
-            }>;
+            tickets?: StructureTicket[];
             error?: string;
           }
         | null = null;
       try {
-        echlyLog("PIPELINE", "structure request");
-        console.log("[PIPELINE] AI_INPUT_SUMMARY", {
-          transcriptLength: transcript?.length,
-          domLength: domText.length,
-          ocrLength: ocrText.length,
-        });
         const res = await apiFetch("/api/structure-feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -660,41 +612,22 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         });
         structured = (await res.json()) as {
           success?: boolean;
-          tickets?: Array<{
-            title?: string;
-            description?: string;
-            suggestedTags?: string[];
-            actionSteps?: string[];
-            confidenceScore?: number;
-          }>;
+          tickets?: StructureTicket[];
           error?: string;
         };
-      } catch (e) {
-        console.log("[PIPELINE] AI_ERROR", e);
+      } catch {
         structured = null;
       }
-      console.log("[PIPELINE] AI_DONE", {
-        duration: Date.now() - aiStart,
-        success: !!structured?.success,
-        tickets: structured?.tickets?.length ?? 0,
-      });
 
       const normalized = structured?.success && structured.tickets?.length
         ? structured.tickets[0]
         : fallbackTicket;
-      if (structured?.success && structured.tickets?.length) {
-        console.log("[PIPELINE] USING_AI_OUTPUT");
-      } else {
-        console.log("[PIPELINE] FALLBACK_TRIGGERED");
-      }
 
-      console.log("[PIPELINE] CREATE_START");
       try {
         if (!screenshot) {
           throw new Error("Screenshot is required.");
         }
 
-        console.log("[ECHLY] Uploading screenshot FIRST");
         const uploadResult = await uploadScreenshot(screenshot, effectiveSessionId);
         const finalScreenshotId = uploadResult.screenshotId;
         if (ECHLY_STRICT_MODE && !finalScreenshotId) {
@@ -718,7 +651,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               success?: boolean;
               data?: {
                 success?: boolean;
-                ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
+                ticket?: { id: string; title: string; instruction?: string; description?: string; type?: string; actionSteps?: string[] };
               };
               error?: string;
             }
@@ -733,7 +666,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   feedbackId,
                   ticket: {
                     title: normalized.title,
-                    description: normalized.description ?? transcript,
                     suggestedTags: normalized.suggestedTags ?? [],
                     actionSteps: normalized.actionSteps ?? [],
                   },
@@ -756,7 +688,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             success?: boolean;
             data?: {
               success?: boolean;
-              ticket?: { id: string; title: string; description: string; type?: string; actionSteps?: string[] };
+              ticket?: { id: string; title: string; instruction?: string; description?: string; type?: string; actionSteps?: string[] };
             };
             error?: string;
           };
@@ -774,19 +706,22 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           const created: StructuredFeedback = {
             id: tick.id,
             title: tick.title,
-            actionSteps: tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []),
+            actionSteps:
+              tick.actionSteps ??
+              (tick.instruction
+                ? tick.instruction.split(/\n\s*\n/)
+                : tick.description
+                  ? tick.description.split(/\n\s*\n/)
+                  : []),
             type: tick.type ?? "Feedback",
           };
           notifyFeedbackCreated(created, effectiveSessionId);
-          console.log("[PIPELINE] CREATE_SUCCESS");
-          console.log("[PIPELINE] END");
           return created;
         }
 
         throw new Error("Feedback creation returned no ticket.");
       } catch (e) {
-        console.log("[PIPELINE] CREATE_ERROR", e);
-        console.log("[PIPELINE] END");
+        console.error("[ECHLY] Feedback create failed:", e);
         throw e;
       }
     },
@@ -816,13 +751,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       } | null,
       options?: { sessionMode?: boolean }
     ): Promise<StructuredFeedback> => {
-      console.log("[HANDLE_COMPLETE] START", {
-        transcriptLength: transcript?.length,
-        hasScreenshot: !!screenshot,
-        sessionMode: options?.sessionMode,
-      });
-      echlyLog("PIPELINE", "start");
-
       const fallbackResult: StructuredFeedback = {
         id: `local-${createUniqueId()}`,
         title: transcript?.slice(0, 80) || "User Feedback",
@@ -851,13 +779,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           callbacks,
           sessionMode: options?.sessionMode,
         });
-        echlyLog("PIPELINE", "ticket created", { ticketId: ticket.id });
         if (jobId) setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
         callbacks?.onSuccess?.(ticket);
         return ticket;
       } catch (err) {
         console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
-        echlyLog("PIPELINE", "error");
         if (jobId) {
           setFeedbackJobs((prev) =>
             prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "AI processing failed." } : j))
@@ -889,7 +815,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: payload.title,
-          description: payload.actionSteps?.join("\n") ?? "",
+          instruction: payload.actionSteps?.join("\n") ?? "",
           actionSteps: payload.actionSteps ?? [],
         }),
       });
@@ -1317,7 +1243,7 @@ function ensureMessageListener(host: HTMLDivElement): void {
   const win = window as Window & { __ECHLY_MESSAGE_LISTENER__?: boolean };
   if (win.__ECHLY_MESSAGE_LISTENER__) return;
   win.__ECHLY_MESSAGE_LISTENER__ = true;
-  chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; description: string; type?: string }; sessionId?: string }) => {
+  chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; instruction?: string; description?: string; type?: string }; sessionId?: string }) => {
     console.log("[ECHLY CONTENT] message received:", msg.type);
     if (msg.type === "ECHLY_OPEN_WIDGET") console.log("[ECHLY CONTENT] OPEN_WIDGET (message)");
     if (msg.type === "ECHLY_GLOBAL_STATE") console.log("[ECHLY CONTENT] ECHLY_GLOBAL_STATE (message)");

@@ -9,21 +9,17 @@ export function buildFeedbackPayload({
   ticket: any;
   screenshotId?: string;
 }) {
-  const desc =
-    typeof ticket.description === "string"
-      ? ticket.description
-      : ticket.title ?? "";
-
   return {
     sessionId,
     feedbackId,
     title: ticket.title ?? "",
-    description: desc,
+    instruction: ticket.instruction ?? ticket.description ?? "",
+    description: "",
     type:
       Array.isArray(ticket.suggestedTags) && ticket.suggestedTags[0]
         ? ticket.suggestedTags[0]
         : "Feedback",
-    contextSummary: desc,
+    contextSummary: "",
     actionSteps: Array.isArray(ticket.actionSteps)
       ? ticket.actionSteps
       : [],

@@ -3,13 +3,7 @@
  * Run: node scripts/verify-graph-entities.mjs
  */
 
-// Dynamic import for ESM (Next/TS project)
-const path = await import("path");
-const { pathToFileURL } = await import("url");
-const base = path.resolve(process.cwd(), "lib/server/instructionGraph.ts");
-
 async function run() {
-  // Use dynamic import of compiled output if available, or inline the logic
   const structuredInstructions = [
     {
       intent: "PERFORMANCE_OPTIMIZATION",
@@ -25,7 +19,7 @@ async function run() {
     },
   ];
 
-  // Inline minimal graph build (same logic as instructionGraph.ts)
+  // Inline minimal graph build (legacy entity grouping check)
   function normalizeElementKey(candidate) {
     return candidate.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 80);
   }

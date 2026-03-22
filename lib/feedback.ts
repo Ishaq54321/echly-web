@@ -32,6 +32,7 @@ export async function updateFeedback(
   feedbackId: string,
   data: Partial<{
     title: string;
+    instruction: string;
     description: string;
     type: string;
     isResolved: boolean;

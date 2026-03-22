@@ -166,7 +166,7 @@ export function buildSpatialContext(input: SpatialContextInput | null | undefine
 
 /**
  * Return combined text from all scopes for search, in priority order.
- * Used by element-resolver and copy-correction to search in order.
+ * Used by downstream AI text-matching helpers.
  */
 export function getSpatialScopeLines(ctx: SpatialContext): { text: string; source: "dom" | "nearby" | "viewport" | "ocr" }[] {
   const lines: { text: string; source: "dom" | "nearby" | "viewport" | "ocr" }[] = [];

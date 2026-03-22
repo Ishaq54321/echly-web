@@ -34,9 +34,7 @@ async function main() {
 
   for (let i = 0; i < tests.length; i++) {
     const { transcript, expectedDescription } = tests[i];
-    const result = await runVoiceToTicket(client, transcript, null, {
-      runReviewBelowConfidence: 1,
-    });
+    const result = await runVoiceToTicket(client, transcript, null);
     const actual = result.ticket.actionSteps[0] ?? result.ticket.title ?? "(no action)";
     const match = actual.toLowerCase().includes(expectedDescription.toLowerCase().slice(0, 30));
     console.log(`Test ${i + 1}: "${transcript}"`);
