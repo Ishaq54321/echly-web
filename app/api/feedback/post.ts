@@ -184,11 +184,31 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const feedbackId = body?.feedbackId;
+  if (!feedbackId) {
+    console.warn("[IDEMPOTENCY WARNING] Missing feedbackId in request", {
+      time: new Date().toISOString(),
+      route: "/api/feedback",
+      bodyKeys: Object.keys(body || {}),
+    });
+  }
+  if (feedbackId && typeof feedbackId !== "string") {
+    console.warn("[IDEMPOTENCY WARNING] Invalid feedbackId type", {
+      feedbackId,
+      type: typeof feedbackId,
+    });
+  }
+  if (typeof feedbackId === "string" && feedbackId.startsWith("fb-")) {
+    console.warn("[IDEMPOTENCY NOTICE] Fallback ID detected (non-UUID)", {
+      feedbackId,
+    });
+  }
+
   const sessionId =
     typeof body.sessionId === "string" ? body.sessionId.trim() : "";
   const feedbackIdRaw =
     typeof body.feedbackId === "string" ? body.feedbackId.trim() : "";
-  const feedbackId =
+  const normalizedFeedbackId =
     feedbackIdRaw.length > 0 ? feedbackIdRaw : undefined;
   if (!sessionId) {
     return NextResponse.json(
@@ -219,7 +239,7 @@ export async function POST(req: NextRequest) {
   const normalizedScreenshotId = hasScreenshotId ? screenshotIdRaw : "";
   if (!hasScreenshotId) {
     if (ECHLY_STRICT_MODE) {
-      console.error("[GUARDRAIL] Invalid feedback create attempt", { feedbackId });
+      console.error("[GUARDRAIL] Invalid feedback create attempt", { feedbackId: normalizedFeedbackId });
       try {
         assert(hasScreenshotId, "ARCHITECTURE VIOLATION: screenshotId required");
       } catch {
@@ -271,7 +291,7 @@ export async function POST(req: NextRequest) {
   const resolvedScreenshotUrl = await resolveScreenshotDownloadUrl(normalizedScreenshotId, sessionId);
   if (!resolvedScreenshotUrl) {
     if (ECHLY_STRICT_MODE) {
-      console.error("[GUARDRAIL] Invalid feedback create attempt", { feedbackId });
+      console.error("[GUARDRAIL] Invalid feedback create attempt", { feedbackId: normalizedFeedbackId });
       try {
         assert(
           Boolean(resolvedScreenshotUrl),
@@ -317,12 +337,17 @@ export async function POST(req: NextRequest) {
   try {
     const workspaceId = session.workspaceId ?? session.userId ?? ((await getUserWorkspaceIdRepo(user.uid)) ?? user.uid);
 
+    console.log("[IDEMPOTENCY CHECK]", {
+      feedbackId: normalizedFeedbackId,
+      willUseAsDocId: true,
+    });
+
     const docRef = await addFeedbackWithSessionCountersRepo(
       workspaceId,
       sessionId,
       user.uid,
       structuredData,
-      feedbackId,
+      normalizedFeedbackId,
       normalizedScreenshotId
     );
     console.log("[feedback lifecycle] created", {

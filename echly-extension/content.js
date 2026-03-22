@@ -41052,16 +41052,209 @@
         }
       );
     }, [globalState.visible]);
+    const processFeedbackPipeline = import_react18.default.useCallback(
+      async ({
+        transcript,
+        screenshot,
+        context,
+        callbacks,
+        sessionMode
+      }) => {
+        console.log("[PIPELINE] START", { transcriptLength: transcript?.length, sessionMode, hasCallbacks: !!callbacks });
+        console.log("[PIPELINE] INPUT_OVERVIEW", {
+          transcriptLength: transcript?.length,
+          hasContext: !!context,
+          contextKeys: context ? Object.keys(context) : []
+        });
+        const fallbackTicket = {
+          title: transcript?.slice(0, 80) || "User Feedback",
+          description: transcript || "",
+          actionSteps: transcript ? [transcript] : [],
+          suggestedTags: [],
+          confidenceScore: 0
+        };
+        if (!effectiveSessionId || !user) {
+          throw new Error("Missing session or user");
+        }
+        const ctx = context;
+        const imageForOcr = ctx?.ocrImageDataUrl ?? screenshot ?? null;
+        if (ctx?.ocrImageDataUrl && ECHLY_DEBUG) {
+          console.log("[ECHLY] OCR running on selection image");
+        }
+        console.log("[PIPELINE] OCR_START");
+        const ocrStart = Date.now();
+        let ocrText = "";
+        try {
+          const result = await Promise.race([
+            getVisibleTextFromScreenshot(imageForOcr),
+            new Promise((resolve) => setTimeout(() => resolve(""), 1500))
+          ]);
+          ocrText = result ?? "";
+        } catch (e) {
+          console.log("[PIPELINE] OCR_ERROR", e);
+          ocrText = "";
+        }
+        console.log("[PIPELINE] OCR_DONE", {
+          duration: Date.now() - ocrStart,
+          length: ocrText?.length ?? 0
+        });
+        const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+        const { ocrImageDataUrl: _ocrImg, ...contextForApi } = context ?? {};
+        const enrichedContext = {
+          ...contextForApi,
+          visibleText: ocrText?.trim() && ocrText || context?.visibleText || null,
+          url: context?.url ?? currentUrl
+        };
+        delete enrichedContext.ocrImageDataUrl;
+        const domText = context?.visibleText || "";
+        console.log("[PIPELINE] DOM_ANALYSIS", {
+          length: domText.length,
+          preview: domText.slice(0, 200),
+          isEmpty: domText.length === 0
+        });
+        let domSizeCategory = "none";
+        if (domText.length > 0 && domText.length < 500) {
+          domSizeCategory = "small";
+        } else if (domText.length < 2e3) {
+          domSizeCategory = "medium";
+        } else if (domText.length >= 2e3) {
+          domSizeCategory = "large";
+        }
+        console.log("[PIPELINE] DOM_SIZE_CATEGORY", domSizeCategory);
+        console.log("[PIPELINE] AI_START");
+        const aiStart = Date.now();
+        let structured = null;
+        try {
+          echlyLog("PIPELINE", "structure request");
+          console.log("[PIPELINE] AI_INPUT_SUMMARY", {
+            transcriptLength: transcript?.length,
+            domLength: domText.length,
+            ocrLength: ocrText.length
+          });
+          const res = await apiFetch("/api/structure-feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              transcript,
+              context: enrichedContext,
+              ocr: ocrText || null,
+              ocrText: ocrText || null
+            })
+          });
+          structured = await res.json();
+        } catch (e) {
+          console.log("[PIPELINE] AI_ERROR", e);
+          structured = null;
+        }
+        console.log("[PIPELINE] AI_DONE", {
+          duration: Date.now() - aiStart,
+          success: !!structured?.success,
+          tickets: structured?.tickets?.length ?? 0
+        });
+        const normalized = structured?.success && structured.tickets?.length ? structured.tickets[0] : fallbackTicket;
+        if (structured?.success && structured.tickets?.length) {
+          console.log("[PIPELINE] USING_AI_OUTPUT");
+        } else {
+          console.log("[PIPELINE] FALLBACK_TRIGGERED");
+        }
+        console.log("[PIPELINE] CREATE_START");
+        try {
+          if (!screenshot) {
+            throw new Error("Screenshot is required.");
+          }
+          console.log("[ECHLY] Uploading screenshot FIRST");
+          const uploadResult = await uploadScreenshot2(screenshot, effectiveSessionId);
+          const finalScreenshotId = uploadResult.screenshotId;
+          if (ECHLY_STRICT_MODE && !finalScreenshotId) {
+            throw new Error("Attempted create without screenshot");
+          }
+          const token = await getExtensionToken();
+          if (!token) {
+            setSessionMessage("Authentication expired. Please sign in again.");
+            throw new Error("No extension token available");
+          }
+          const feedbackId = generateFeedbackId();
+          if (inFlightFeedbackIds.has(feedbackId)) {
+            throw new Error(`Duplicate feedback prevented (in-flight): ${feedbackId}`);
+          }
+          inFlightFeedbackIds.add(feedbackId);
+          let feedbackResponse;
+          try {
+            feedbackResponse = await new Promise((resolve, reject) => {
+              chrome.runtime.sendMessage(
+                {
+                  type: "ECHLY_CREATE_FEEDBACK",
+                  payload: {
+                    sessionId: effectiveSessionId,
+                    feedbackId,
+                    ticket: {
+                      title: normalized.title,
+                      description: normalized.description ?? transcript,
+                      suggestedTags: normalized.suggestedTags ?? [],
+                      actionSteps: normalized.actionSteps ?? []
+                    },
+                    screenshotId: finalScreenshotId
+                  }
+                },
+                (response) => {
+                  if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                    return;
+                  }
+                  if (!response?.success) {
+                    reject(new Error(response?.error || "Failed to create feedback"));
+                    return;
+                  }
+                  resolve(response);
+                }
+              );
+            });
+          } finally {
+            inFlightFeedbackIds.delete(feedbackId);
+          }
+          const feedbackJson = feedbackResponse?.data;
+          const text = feedbackResponse?.error ?? "";
+          if (!feedbackResponse?.success && isAuthFailureResponse(text)) {
+            throw new Error("Not authenticated.");
+          }
+          if (feedbackJson?.success && feedbackJson.ticket) {
+            const tick = feedbackJson.ticket;
+            const created = {
+              id: tick.id,
+              title: tick.title,
+              actionSteps: tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []),
+              type: tick.type ?? "Feedback"
+            };
+            notifyFeedbackCreated(created, effectiveSessionId);
+            console.log("[PIPELINE] CREATE_SUCCESS");
+            console.log("[PIPELINE] END");
+            return created;
+          }
+          throw new Error("Feedback creation returned no ticket.");
+        } catch (e) {
+          console.log("[PIPELINE] CREATE_ERROR", e);
+          console.log("[PIPELINE] END");
+          throw e;
+        }
+      },
+      [effectiveSessionId, getExtensionToken, isAuthFailureResponse, user]
+    );
     const handleComplete = import_react18.default.useCallback(
       async (transcript, screenshot, callbacks, context, options) => {
+        console.log("[HANDLE_COMPLETE] START", {
+          transcriptLength: transcript?.length,
+          hasScreenshot: !!screenshot,
+          sessionMode: options?.sessionMode
+        });
         echlyLog("PIPELINE", "start");
-        if (!effectiveSessionId || !user) {
-          echlyLog("PIPELINE", "error");
-          callbacks?.onError?.();
-          return void 0;
-        }
-        if (callbacks) {
-          const jobId = createUniqueId();
+        const fallbackResult = {
+          id: `local-${createUniqueId()}`,
+          title: transcript?.slice(0, 80) || "User Feedback",
+          actionSteps: transcript ? [transcript] : [],
+          type: "Feedback"
+        };
+        const jobId = callbacks ? createUniqueId() : null;
+        if (jobId) {
           const job = {
             id: jobId,
             status: "processing",
@@ -41070,340 +41263,35 @@
             createdAt: Date.now()
           };
           setFeedbackJobs((prev) => [job, ...prev]);
-          (async () => {
-            const ctx = context;
-            const imageForOcr = ctx?.ocrImageDataUrl ?? screenshot ?? null;
-            if (ctx?.ocrImageDataUrl) {
-              if (ECHLY_DEBUG) console.log("[ECHLY] OCR running on selection image");
-            }
-            let ocrResult = null;
-            try {
-              console.log("[ECHLY OCR] Starting OCR");
-              const ocrPromise = getVisibleTextFromScreenshot(imageForOcr);
-              const timeout = new Promise(
-                (resolve) => setTimeout(() => resolve(null), 1500)
-              );
-              ocrResult = await Promise.race([ocrPromise, timeout]);
-              console.log("[ECHLY OCR] Result or timeout:", ocrResult);
-              if (ocrResult) {
-                console.log("[ECHLY OCR] Success");
-              } else {
-                console.warn("[ECHLY OCR] Skipped (CSP or timeout)");
-              }
-            } catch (err) {
-              console.error("[ECHLY OCR] Failed:", err);
-              ocrResult = null;
-            }
-            const visibleTextFromScreenshot = ocrResult ?? "";
-            if (ECHLY_DEBUG) console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
-            if (imageForOcr) {
-              if (ECHLY_DEBUG) console.log("[ECHLY] OCR result length:", visibleTextFromScreenshot?.length ?? 0);
-            }
-            const currentUrl = typeof window !== "undefined" ? window.location.href : "";
-            const { ocrImageDataUrl: _ocrImg, ...contextForApi } = context ?? {};
-            const enrichedContext = {
-              ...contextForApi,
-              visibleText: visibleTextFromScreenshot?.trim() && visibleTextFromScreenshot || context?.visibleText || null,
-              url: context?.url ?? currentUrl
-            };
-            delete enrichedContext.ocrImageDataUrl;
-            if (ECHLY_DEBUG) console.log("[ECHLY] AI payload:", { transcript, context: enrichedContext });
-            const structureBody = {
-              transcript,
-              context: enrichedContext,
-              ocr: ocrResult,
-              ocrText: ocrResult || null
-            };
-            try {
-              echlyLog("PIPELINE", "structure request");
-              if (ECHLY_DEBUG) console.log("[VOICE] final transcript submitted", transcript);
-              const res = await apiFetch("/api/structure-feedback", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(structureBody)
-              });
-              const data = await res.json();
-              const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-              if (!data.success || tickets.length === 0) {
-                tickets.push({
-                  title: "Feedback",
-                  description: transcript,
-                  actionSteps: [transcript]
-                });
-              }
-              let firstCreated;
-              for (let i = 0; i < tickets.length; i++) {
-                const t = tickets[i];
-                const feedbackId = generateFeedbackId();
-                let finalScreenshotId;
-                if (!screenshot) {
-                  console.error("[ECHLY] Missing screenshot \u2014 blocking feedback");
-                  setFeedbackJobs(
-                    (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "Screenshot is required." } : j)
-                  );
-                  callbacks.onError();
-                  return;
-                }
-                console.log("[ECHLY] Uploading screenshot FIRST");
-                try {
-                  const uploadResult = await uploadScreenshot2(screenshot, effectiveSessionId);
-                  finalScreenshotId = uploadResult.screenshotId;
-                } catch (err) {
-                  console.error("[ECHLY] Screenshot upload failed \u2014 blocking feedback", err);
-                  setFeedbackJobs(
-                    (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "Screenshot upload failed." } : j)
-                  );
-                  callbacks.onError();
-                  return;
-                }
-                if (ECHLY_STRICT_MODE && !finalScreenshotId) {
-                  console.error("[GUARDRAIL] Attempted create without screenshot");
-                  callbacks.onError();
-                  return;
-                }
-                const token = await getExtensionToken();
-                if (!token) {
-                  console.error("[ECHLY AUTH] No extension token available");
-                  setSessionMessage("Authentication expired. Please sign in again.");
-                  setIsProcessingFeedback(false);
-                  return;
-                }
-                if (inFlightFeedbackIds.has(feedbackId)) {
-                  console.warn("[ECHLY] Duplicate feedback prevented (in-flight)", feedbackId);
-                  continue;
-                }
-                inFlightFeedbackIds.add(feedbackId);
-                console.log("[feedbackId generated]", feedbackId);
-                console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
-                let feedbackResponse;
-                try {
-                  feedbackResponse = await new Promise((resolve, reject) => {
-                    chrome.runtime.sendMessage(
-                      {
-                        type: "ECHLY_CREATE_FEEDBACK",
-                        payload: {
-                          sessionId: effectiveSessionId,
-                          feedbackId,
-                          ticket: t,
-                          screenshotId: finalScreenshotId
-                        }
-                      },
-                      (response) => {
-                        if (chrome.runtime.lastError) {
-                          reject(chrome.runtime.lastError);
-                          return;
-                        }
-                        if (!response?.success) {
-                          reject(new Error(response?.error || "Failed to create feedback"));
-                          return;
-                        }
-                        resolve(response);
-                      }
-                    );
-                  });
-                } catch (err) {
-                  console.error("[ECHLY ERROR] feedback creation failed", err);
-                  continue;
-                } finally {
-                  inFlightFeedbackIds.delete(feedbackId);
-                }
-                const feedbackJson = feedbackResponse?.data;
-                const text = feedbackResponse?.error ?? "";
-                if (!feedbackResponse?.success && isAuthFailureResponse(text)) {
-                  console.warn("[ECHLY AUTH] Extension not authenticated");
-                  setFeedbackJobs(
-                    (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "Not authenticated." } : j)
-                  );
-                  callbacks.onError();
-                  return;
-                }
-                if (feedbackJson?.success && feedbackJson.ticket) {
-                  const tick = feedbackJson.ticket;
-                  const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
-                  if (!firstCreated)
-                    firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
-                }
-              }
-              if (firstCreated) {
-                const ticketId = firstCreated.id;
-                echlyLog("PIPELINE", "ticket created", { ticketId });
-                setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
-                notifyFeedbackCreated(firstCreated, effectiveSessionId);
-                callbacks.onSuccess(firstCreated);
-              } else {
-                echlyLog("PIPELINE", "error");
-                setFeedbackJobs(
-                  (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "AI processing failed." } : j)
-                );
-                callbacks.onError();
-              }
-            } catch (err) {
-              console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
-              console.error("[Echly] Structure or submit failed:", err);
-              setFeedbackJobs(
-                (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "AI processing failed." } : j)
-              );
-              echlyLog("PIPELINE", "error");
-              callbacks.onError();
-            }
-          })();
-          return;
         }
         try {
           setIsProcessingFeedback(true);
-          const ctx2 = context;
-          const imageForOcr = ctx2?.ocrImageDataUrl ?? screenshot ?? null;
-          if (ctx2?.ocrImageDataUrl) {
-            if (ECHLY_DEBUG) console.log("[ECHLY] OCR running on selection image");
-          }
-          let ocrResult = null;
-          try {
-            console.log("[ECHLY OCR] Starting OCR");
-            const ocrPromise = getVisibleTextFromScreenshot(imageForOcr);
-            const timeout = new Promise(
-              (resolve) => setTimeout(() => resolve(null), 1500)
-            );
-            ocrResult = await Promise.race([ocrPromise, timeout]);
-            console.log("[ECHLY OCR] Result or timeout:", ocrResult);
-            if (ocrResult) {
-              console.log("[ECHLY OCR] Success");
-            } else {
-              console.warn("[ECHLY OCR] Skipped (CSP or timeout)");
-            }
-          } catch (err) {
-            console.error("[ECHLY OCR] Failed:", err);
-            ocrResult = null;
-          }
-          const visibleTextFromScreenshot = ocrResult ?? "";
-          if (ECHLY_DEBUG) console.log("[OCR] Extracted visibleText:", visibleTextFromScreenshot);
-          if (imageForOcr) {
-            if (ECHLY_DEBUG) console.log("[ECHLY] OCR result length:", visibleTextFromScreenshot?.length ?? 0);
-          }
-          const currentUrl = typeof window !== "undefined" ? window.location.href : "";
-          const { ocrImageDataUrl: _ocrImg2, ...contextForApi2 } = context ?? {};
-          const enrichedContext = {
-            ...contextForApi2,
-            visibleText: visibleTextFromScreenshot?.trim() && visibleTextFromScreenshot || context?.visibleText || null,
-            url: context?.url ?? currentUrl
-          };
-          delete enrichedContext.ocrImageDataUrl;
-          if (ECHLY_DEBUG) console.log("[ECHLY] AI payload:", { transcript, context: enrichedContext });
-          const structureBody = {
+          const ticket = await processFeedbackPipeline({
             transcript,
-            context: enrichedContext,
-            ocr: ocrResult,
-            ocrText: ocrResult || null
-          };
-          echlyLog("PIPELINE", "structure request");
-          if (ECHLY_DEBUG) console.log("[VOICE] final transcript submitted", transcript);
-          const res = await apiFetch("/api/structure-feedback", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(structureBody)
+            screenshot,
+            context: context ?? null,
+            callbacks,
+            sessionMode: options?.sessionMode
           });
-          const data = await res.json();
-          const tickets = Array.isArray(data.tickets) ? data.tickets : [];
-          if (!data.success || tickets.length === 0) return void 0;
-          let firstCreated;
-          for (let i = 0; i < tickets.length; i++) {
-            const t = tickets[i];
-            const feedbackId = generateFeedbackId();
-            let finalScreenshotId;
-            if (!screenshot) {
-              console.error("[ECHLY] Missing screenshot \u2014 blocking feedback");
-              setIsProcessingFeedback(false);
-              return void 0;
-            }
-            console.log("[ECHLY] Uploading screenshot FIRST");
-            try {
-              const uploadResult = await uploadScreenshot2(screenshot, effectiveSessionId);
-              finalScreenshotId = uploadResult.screenshotId;
-            } catch (err) {
-              console.error("[ECHLY] Screenshot upload failed \u2014 blocking feedback", err);
-              setIsProcessingFeedback(false);
-              return void 0;
-            }
-            if (ECHLY_STRICT_MODE && !finalScreenshotId) {
-              console.error("[GUARDRAIL] Attempted create without screenshot");
-              setIsProcessingFeedback(false);
-              return void 0;
-            }
-            const token = await getExtensionToken();
-            if (!token) {
-              console.error("[ECHLY AUTH] No extension token available");
-              setSessionMessage("Authentication expired. Please sign in again.");
-              setIsProcessingFeedback(false);
-              return void 0;
-            }
-            if (inFlightFeedbackIds.has(feedbackId)) {
-              console.warn("[ECHLY] Duplicate feedback prevented (in-flight)", feedbackId);
-              continue;
-            }
-            inFlightFeedbackIds.add(feedbackId);
-            console.log("[feedbackId generated]", feedbackId);
-            console.log("[ECHLY DEBUG] Sending feedback with extension token:", token);
-            let feedbackResponse;
-            try {
-              feedbackResponse = await new Promise((resolve, reject) => {
-                chrome.runtime.sendMessage(
-                  {
-                    type: "ECHLY_CREATE_FEEDBACK",
-                    payload: {
-                      sessionId: effectiveSessionId,
-                      feedbackId,
-                      ticket: t,
-                      screenshotId: finalScreenshotId
-                    }
-                  },
-                  (response) => {
-                    if (chrome.runtime.lastError) {
-                      reject(chrome.runtime.lastError);
-                      return;
-                    }
-                    if (!response?.success) {
-                      reject(new Error(response?.error || "Failed to create feedback"));
-                      return;
-                    }
-                    resolve(response);
-                  }
-                );
-              });
-              console.log("[ECHLY FLOW] API response received");
-            } catch (err) {
-              console.error("[ECHLY ERROR] feedback creation failed", err);
-              continue;
-            } finally {
-              inFlightFeedbackIds.delete(feedbackId);
-            }
-            const feedbackJson = feedbackResponse?.data;
-            const text = feedbackResponse?.error ?? "";
-            if (!feedbackResponse?.success && isAuthFailureResponse(text)) {
-              console.warn("[ECHLY AUTH] Extension not authenticated");
-              setIsProcessingFeedback(false);
-              return void 0;
-            }
-            if (feedbackJson?.success && feedbackJson.ticket) {
-              const tick = feedbackJson.ticket;
-              const steps = tick.actionSteps ?? (tick.description ? tick.description.split(/\n\s*\n/) : []);
-              if (!firstCreated)
-                firstCreated = { id: tick.id, title: tick.title, actionSteps: steps, type: tick.type ?? "Feedback" };
-            }
-          }
-          if (firstCreated) {
-            notifyFeedbackCreated(firstCreated, effectiveSessionId);
-          }
-          return firstCreated;
+          echlyLog("PIPELINE", "ticket created", { ticketId: ticket.id });
+          if (jobId) setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
+          callbacks?.onSuccess?.(ticket);
+          return ticket;
         } catch (err) {
-          console.error("[ECHLY FLOW ERROR]", err);
           console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
-          setIsProcessingFeedback(false);
-          throw err;
+          echlyLog("PIPELINE", "error");
+          if (jobId) {
+            setFeedbackJobs(
+              (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "AI processing failed." } : j)
+            );
+          }
+          callbacks?.onError?.();
+          return fallbackResult;
         } finally {
-          console.log("[ECHLY FLOW] Ending processing state");
           setIsProcessingFeedback(false);
         }
       },
-      [effectiveSessionId, user]
+      [processFeedbackPipeline]
     );
     const handleDelete = import_react18.default.useCallback(async (id) => {
       try {

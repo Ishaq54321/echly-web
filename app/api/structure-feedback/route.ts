@@ -126,6 +126,28 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 
+  /* TEMP AI audit — remove after input audit (optional client auditCase + top-level ocr* ignored by pipeline) */
+  {
+    const b = body as Record<string, unknown>;
+    const ctx = b.context && typeof b.context === "object" ? (b.context as Record<string, unknown>) : null;
+    const topOcr =
+      typeof b.ocrText === "string" ? b.ocrText : typeof b.ocr === "string" ? b.ocr : "";
+    console.log("[AI_INPUT_CASE]", {
+      auditCase: typeof b.auditCase === "string" ? b.auditCase : null,
+      transcriptLength: transcript.length,
+      topLevelOcrLength: topOcr.length,
+      contextKeys: ctx ? Object.keys(ctx) : [],
+      contextVisibleLen: typeof ctx?.visibleText === "string" ? ctx.visibleText.length : 0,
+      contextNearbyLen:
+        typeof ctx?.nearbyText === "string"
+          ? ctx.nearbyText.length
+          : Array.isArray(ctx?.nearbyText)
+            ? (ctx.nearbyText as unknown[]).filter((x): x is string => typeof x === "string").join("\n").length
+            : 0,
+      contextSubtreeLen: typeof ctx?.subtreeText === "string" ? ctx.subtreeText.length : 0,
+    });
+  }
+
   echlyDebug("RAW TRANSCRIPT", transcript);
 
   try {

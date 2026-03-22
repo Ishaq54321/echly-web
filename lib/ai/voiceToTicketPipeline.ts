@@ -127,6 +127,28 @@ function normalizeRawContext(raw: unknown): PipelineContext | null {
   };
 }
 
+function dedupeLines(text: string | null): string | null {
+  if (!text) return text;
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  return [...new Set(lines)].join("\n");
+}
+
+function cleanVisibleText(text: string | null): string | null {
+  if (!text) return text;
+
+  return text
+    .replace(/[^\x20-\x7E\n]/g, " ")
+    .replace(/\b[a-zA-Z]{1,2}\b/g, " ")
+    .replace(/(.)\1{3,}/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function limitText(text: string | null, max = 1500): string | null {
+  if (!text) return text;
+  return text.slice(0, max);
+}
+
 function buildUserMessage(transcript: string, domContext: DomContextForAI): string {
   const elementHTMLChars = (domContext.elementHTML ?? "").length;
   const nearbyTextChars = (domContext.nearbyText ?? "").length;
@@ -241,6 +263,15 @@ export async function extractStructuredFeedback(
   domContext: DomContextForAI
 ): Promise<{ json: StructuredFeedbackJSON; raw: string }> {
   const userMessage = buildUserMessage(transcript, domContext);
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: userMessage },
+  ];
+  /* TEMP AI audit — remove after input audit */
+  console.log("[AI_FINAL_INPUT]", {
+    systemPrompt: SYSTEM_PROMPT,
+    messages,
+  });
   const start = Date.now();
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
@@ -254,10 +285,7 @@ export async function extractStructuredFeedback(
         strict: true,
       },
     },
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: userMessage },
-    ],
+    messages,
   });
   const duration = Date.now() - start;
   console.log(`[AI PIPELINE] extractStructuredFeedback duration: ${duration}ms`);
@@ -326,7 +354,60 @@ export async function runVoiceToTicket(
   }
 
   const domContext = buildDomContextForPipeline(rawContext);
-  const { json } = await extractStructuredFeedback(client, transcript, domContext);
+  const rawCtx = rawContext != null && typeof rawContext === "object"
+    ? (rawContext as Record<string, unknown>)
+    : null;
+  const normalizedInput = {
+    transcript: transcript || "",
+    elementText: domContext?.elementHTML || null,
+    nearbyText: domContext?.nearbyText || null,
+    visibleText: domContext?.visibleText || "",
+    ocrText:
+      (typeof rawCtx?.ocrText === "string" ? rawCtx.ocrText : null) ||
+      (typeof rawCtx?.screenshotOCRText === "string" ? rawCtx.screenshotOCRText : null),
+  };
+
+  normalizedInput.elementText = dedupeLines(normalizedInput.elementText);
+  normalizedInput.nearbyText = dedupeLines(normalizedInput.nearbyText);
+  normalizedInput.visibleText = dedupeLines(normalizedInput.visibleText) ?? "";
+  normalizedInput.visibleText = cleanVisibleText(normalizedInput.visibleText) ?? "";
+  normalizedInput.visibleText = limitText(normalizedInput.visibleText, 1500) ?? "";
+  normalizedInput.nearbyText = limitText(normalizedInput.nearbyText, 1500);
+
+  if (!normalizedInput.elementText) {
+    normalizedInput.elementText = null;
+  }
+
+  if (!normalizedInput.nearbyText) {
+    normalizedInput.nearbyText = null;
+  }
+
+  if (!normalizedInput.ocrText) {
+    normalizedInput.ocrText = null;
+  }
+
+  console.log("[AI_NORMALIZED_INPUT]", {
+    transcriptLength: normalizedInput.transcript.length,
+    elementLength: normalizedInput.elementText?.length || 0,
+    nearbyLength: normalizedInput.nearbyText?.length || 0,
+    visibleLength: normalizedInput.visibleText.length,
+    ocrLength: normalizedInput.ocrText?.length || 0
+  });
+
+  console.log("[AI_INPUT_PREVIEW]", {
+    transcript: normalizedInput.transcript.slice(0, 120),
+    element: normalizedInput.elementText?.slice(0, 120),
+    nearby: normalizedInput.nearbyText?.slice(0, 120),
+    visible: normalizedInput.visibleText.slice(0, 120)
+  });
+
+  const aiContext: DomContextForAI = {
+    ...domContext,
+    elementHTML: normalizedInput.elementText,
+    nearbyText: normalizedInput.nearbyText,
+    visibleText: normalizedInput.visibleText || null,
+  };
+  const { json } = await extractStructuredFeedback(client, normalizedInput.transcript, aiContext);
 
   let finalJson = json;
   if (json.confidence < runReviewThreshold) {
