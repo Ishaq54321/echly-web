@@ -36249,10 +36249,10 @@
     while (element && isEchlyElement(element)) {
       element = element.parentElement;
     }
-    let domPath = element ? getDomPath(element) : null;
+    const domPath = element ? getDomPath(element) : null;
     let subtreeText = element ? extractSubtreeText(element) : null;
     let nearbyText = element ? extractNearbyText(element) : null;
-    let visibleText = extractVisibleText(win);
+    const visibleText = extractVisibleText(win);
     if (element && !isEchlyElement(element) && element !== win.document?.body) {
       if (!subtreeText?.trim()) {
         const raw = element.innerText ?? element.textContent ?? "";

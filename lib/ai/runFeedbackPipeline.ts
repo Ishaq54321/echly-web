@@ -16,9 +16,6 @@
 import type OpenAI from "openai";
 import { runVoiceToTicket } from "@/lib/ai/voiceToTicketPipeline";
 
-/** Count of modules/files removed in surgical cleanup (structure-feedback path only). */
-const SURGICAL_CLEANUP_DEAD_REMOVED = 8;
-
 /* ===== CAPTURE: NORMALIZE REQUEST ===== */
 
 export interface PipelineCaptureInput {
@@ -39,16 +36,6 @@ export interface PipelineOutput {
   success: boolean;
   tickets: Array<Record<string, unknown>>;
   error?: string;
-  verificationWarnings?: string[];
-  instructionLimitWarning?: string | null;
-  extractedInstructions?: unknown[];
-}
-
-export interface RunPipelineOptions {
-  /** Use AI transcript normalization. Unused in minimal pipeline (no extra LLM). */
-  useTranscriptNormalization?: boolean;
-  /** Reserved toggle for compatibility with callers. */
-  useVerification?: boolean;
 }
 
 function generateSmartTags(transcript: string, elementType: string | null) {
@@ -72,10 +59,6 @@ function generateSmartTags(transcript: string, elementType: string | null) {
     tags.push("Image");
   }
 
-  if (text.includes("section")) {
-    tags.push("Section");
-  }
-
   // ACTION THIRD
   if (
     text.includes("size") ||
@@ -87,6 +70,15 @@ function generateSmartTags(transcript: string, elementType: string | null) {
 
   if (text.includes("color") || text.includes("colour")) {
     tags.push("Color");
+  }
+
+  // Replace section-based intent with Layout
+  if (
+    text.includes("section") ||
+    text.includes("layout") ||
+    text.includes("block")
+  ) {
+    tags.push("Layout");
   }
 
   // SECONDARY CONTEXT
@@ -119,8 +111,7 @@ function generateSmartTags(transcript: string, elementType: string | null) {
  */
 export async function runFeedbackPipeline(
   client: OpenAI,
-  input: PipelineCaptureInput,
-  _options: RunPipelineOptions = {}
+  input: PipelineCaptureInput
 ): Promise<PipelineOutput> {
   const { transcript, context } = normalizeInput(input);
 
@@ -150,12 +141,6 @@ export async function runFeedbackPipeline(
     elementType: (context as { elementType?: string } | null)?.elementType || null,
     tagCount: ticketPayload.suggestedTags.length,
     tags: ticketPayload.suggestedTags,
-  });
-
-  console.log("[SYSTEM_CLEAN]", {
-    pipeline: "clean",
-    duplicates: false,
-    deadCode: SURGICAL_CLEANUP_DEAD_REMOVED,
   });
 
   return {

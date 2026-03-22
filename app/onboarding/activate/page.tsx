@@ -1169,7 +1169,7 @@ function VoiceFeedbackPopup({
         <div className="mt-4">
           <div className="voice-wave">
             {bars.map((_, i) => (
-              // eslint-disable-next-line react/no-array-index-key
+               
               <span key={i} className="wave-bar" />
             ))}
           </div>

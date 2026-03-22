@@ -166,11 +166,6 @@ export async function POST(req: NextRequest) {
       userAgent?: string;
       clientTimestamp?: number;
     };
-    extractedInstructions?: Array<{
-      intent?: string;
-      entity?: string;
-      action?: string;
-    }>;
     screenshotId?: string;
   };
   try {

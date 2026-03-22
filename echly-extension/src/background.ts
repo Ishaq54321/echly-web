@@ -148,7 +148,7 @@ let trayOpen = false;
 /** Minimal ticket shape for global tray; matches StructuredFeedback. */
 type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string };
 
-let globalUIState: {
+const globalUIState: {
   visible: boolean;
   expanded: boolean;
   isRecording: boolean;

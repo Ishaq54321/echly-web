@@ -260,10 +260,10 @@ export function buildCaptureContext(
     element = element.parentElement;
   }
 
-  let domPath: string | null = element ? getDomPath(element) : null;
+  const domPath: string | null = element ? getDomPath(element) : null;
   let subtreeText: string | null = element ? extractSubtreeText(element) : null;
   let nearbyText: string | null = element ? extractNearbyText(element) : null;
-  let visibleText: string | null = extractVisibleText(win);
+  const visibleText: string | null = extractVisibleText(win);
 
   if (element && !isEchlyElement(element) && element !== win.document?.body) {
     if (!subtreeText?.trim()) {

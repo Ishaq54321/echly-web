@@ -29,7 +29,6 @@ const CHARS_PER_TOKEN = 4;
 export interface ExtractedAction {
   step: number;
   instruction: string;
-  description?: string;
   entity: string;
 }
 
@@ -322,13 +321,6 @@ export async function extractStructuredFeedback(
     title: json?.title,
     actionsCount: json?.actions?.length,
     firstAction: json?.actions?.[0]?.instruction
-  });
-  const actionStepsForRenameCheck = (json?.actions ?? []).map((action) => ({
-    instruction: action.instruction,
-  }));
-  console.log("[STEP_RENAME_CHECK]", {
-    hasInstruction: !!actionStepsForRenameCheck?.[0]?.instruction,
-    hasDescription: !!(actionStepsForRenameCheck?.[0] as { description?: string } | undefined)?.description,
   });
   if (!json || !Array.isArray(json.actions) || json.actions.length === 0) {
     return { json: fallbackStructuredFeedback(transcript), raw };

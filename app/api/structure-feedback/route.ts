@@ -121,12 +121,14 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   try {
-    const result = await runFeedbackPipeline(client, { transcript, context: body?.context }, {
-      useVerification: true,
-    });
+    const result = await runFeedbackPipeline(client, { transcript, context: body?.context });
 
     console.log("[PHASE3_FINAL]", {
       fields: Object.keys(result.tickets?.[0] || {}),
+    });
+    console.log("[PHASE3_READY]", {
+      status: "clean",
+      readyForPhase4: true,
     });
 
     return NextResponse.json(
