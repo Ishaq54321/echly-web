@@ -14,6 +14,18 @@ export type ApiFetchOptions = RequestInit & {
   skipAuth?: boolean;
 };
 
+function hasHeaderCaseInsensitive(headers: Record<string, string>, headerName: string): boolean {
+  const target = headerName.toLowerCase();
+  return Object.keys(headers).some((key) => key.toLowerCase() === target);
+}
+
+function omitHeaderCaseInsensitive(headers: Record<string, string>, headerName: string): Record<string, string> {
+  const target = headerName.toLowerCase();
+  return Object.fromEntries(
+    Object.entries(headers).filter(([key]) => key.toLowerCase() !== target)
+  );
+}
+
 /**
  * Fetch helper: sends request to background via echly-api message.
  * Background adds Bearer token. No Firebase.
@@ -34,6 +46,37 @@ export async function apiFetch(
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
   const method = (rest.method as string) || "GET";
   const body = rest.body ?? null;
+  const isFormDataBody = typeof FormData !== "undefined" && body instanceof FormData;
+
+  // FormData must bypass message-based body transformations so browser can set multipart boundary.
+  if (isFormDataBody) {
+    const token = skipAuth
+      ? null
+      : await new Promise<string | null>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "ECHLY_GET_EXTENSION_TOKEN" },
+            (res: { token?: string | null } | undefined) => resolve(res?.token ?? null)
+          );
+        });
+
+    const formHeaders = omitHeaderCaseInsensitive(headersRecord, "Content-Type");
+    if (!skipAuth && token) {
+      formHeaders.Authorization = `Bearer ${token}`;
+    }
+
+    return fetch(url, {
+      ...rest,
+      method,
+      body,
+      credentials: "include",
+      headers: formHeaders,
+    });
+  }
+
+  // JSON fallback: set explicit content type only for non-FormData request bodies.
+  if (body != null && !hasHeaderCaseInsensitive(headersRecord, "Content-Type")) {
+    headersRecord["Content-Type"] = "application/json";
+  }
 
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(

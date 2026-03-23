@@ -26,6 +26,7 @@ import {
   removeMarker,
 } from "../internal/domHelpers";
 import { echlyLog } from "@/lib/debug/echlyLogger";
+import { logger } from "@/lib/logger";
 
 const SAFE_MARGIN = 24;
 const ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
@@ -50,46 +51,6 @@ function getSentimentFromTranscript(transcript: string): SentimentGlow {
     return negCount > posCount ? "negative" : posCount > negCount ? "positive" : "neutral";
   }
   return "neutral";
-}
-
-type SpeechRecognitionInstance = { start(): void; stop(): void };
-
-/** One result item: first alternative at index 0 has transcript. */
-interface SpeechRecognitionResultItem {
-  0: { transcript: string };
-  length: number;
-  isFinal: boolean;
-}
-
-/** Web Speech API result event (for recognition.onresult). */
-interface SpeechRecognitionResultEvent {
-  resultIndex: number;
-  results: Array<SpeechRecognitionResultItem>;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognitionInstance & {
-      continuous: boolean;
-      interimResults: boolean;
-      lang: string;
-      onresult: ((e: SpeechRecognitionResultEvent) => void) | null;
-      onend: (() => void) | null;
-      onstart?: (() => void) | null;
-      onspeechstart?: (() => void) | null;
-      onaudiostart?: (() => void) | null;
-    };
-    webkitSpeechRecognition?: new () => SpeechRecognitionInstance & {
-      continuous: boolean;
-      interimResults: boolean;
-      lang: string;
-      onresult: ((e: SpeechRecognitionResultEvent) => void) | null;
-      onend: (() => void) | null;
-      onstart?: (() => void) | null;
-      onspeechstart?: (() => void) | null;
-      onaudiostart?: (() => void) | null;
-    };
-  }
 }
 
 function generateRecordingId(): string {
@@ -198,13 +159,13 @@ export function useCaptureWidget({
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
   const captureRootRef = useRef<HTMLDivElement | null>(null);
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
   const activeRecordingIdRef = useRef<string | null>(null);
   const recordingsRef = useRef<Recording[]>(recordings);
   const stateRef = useRef<CaptureState>(state);
   const pipelineActiveRef = useRef(false);
-  const manualStopRef = useRef(false);
   const editingIdRef = useRef<string | null>(null);
   const trayLockedRef = useRef(false);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -215,10 +176,6 @@ export function useCaptureWidget({
   const endWaitTimeoutRef = useRef<number | null>(null);
   /** [VOICE] Diagnostic: timestamp when UI recording started (startListening called). */
   const voiceStartTimeRef = useRef<number | null>(null);
-  /** [VOICE] Diagnostic: timestamp when recognition.onstart fired. */
-  const recognitionOnstartTimeRef = useRef<number | null>(null);
-  /** [VOICE] Diagnostic: whether first transcript chunk has been logged for this session. */
-  const hasReceivedFirstTranscriptRef = useRef(false);
   /** True while in voice_listening (or equivalent) so overlay/effects do not tear down during recording. */
   const recordingActiveRef = useRef(false);
   /** Latest pointers from background so we can sync when recording ends (callbacks have stale closure). */
@@ -245,7 +202,7 @@ export function useCaptureWidget({
   /** Restore persisted capture state on mount (e.g. after widget remount). */
   useEffect(() => {
     if (captureState.pending) {
-      if (ECHLY_DEBUG) console.log("ECHLY restoring pending capture state");
+      logger.debug("extension", "restoring_pending_capture_state");
       setPending(captureState.pending);
     }
   }, []);
@@ -401,10 +358,10 @@ export function useCaptureWidget({
     }
     if (ECHLY_DEBUG) console.debug("ECHLY createCaptureRoot");
     if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "createCaptureRoot" });
+      logger.debug("extension", "pending_cleared", { reason: "create_capture_root" });
       setPending(null);
     } else {
-      if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
+      logger.debug("extension", "pending_clear_skipped");
     }
     const captureEl = document.createElement("div");
     captureEl.id = OVERLAY_ROOT_ID;
@@ -468,7 +425,7 @@ export function useCaptureWidget({
       try {
         captureRootRef.current.remove();
       } catch (err) {
-        console.error("CaptureWidget error:", err);
+        logger.error("error", "capture_widget_error", err);
       }
       captureRootRef.current = null;
     }
@@ -517,7 +474,7 @@ export function useCaptureWidget({
       throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for loading feedback).");
     }
     const loadFeedback = async () => {
-      console.log("[ECHLY CORE] fetch via environment");
+      logger.debug("extension", "api_fetch_feedback");
       const res = await environment.authenticatedFetch(
         `/api/feedback?sessionId=${sessionId}&limit=20`
       );
@@ -542,105 +499,13 @@ export function useCaptureWidget({
     loadFeedback();
   }, [extensionMode, sessionId, initialPointers, environment]);
 
-  /* ================= SPEECH ================= */
-
-  useEffect(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-    recognition.onstart = () => {
-      const t = Date.now();
-      recognitionOnstartTimeRef.current = t;
-      if (ECHLY_DEBUG) console.log("[VOICE] recognition.onstart", t);
-      const startTime = voiceStartTimeRef.current;
-      if (ECHLY_DEBUG && startTime != null) {
-        console.log("[VOICE] delay UI recording start→onstart:", t - startTime, "ms");
-      }
-    };
-    recognition.onspeechstart = () => {
-      if (ECHLY_DEBUG) console.log("[VOICE] speech detected", Date.now());
-    };
-    recognition.onaudiostart = () => {
-      if (ECHLY_DEBUG) console.log("[VOICE] audio start", Date.now());
-    };
-    recognition.onresult = (event: SpeechRecognitionResultEvent) => {
-      let text = "";
-      for (let i = 0; i < event.results.length; ++i) {
-        const result: SpeechRecognitionResultItem = event.results[i];
-        const item = result[0];
-        if (!item) continue;
-
-        text += item.transcript + " ";
-      }
-      text = text.replace(/\s+/g, " ").trim();
-      const t = Date.now();
-      echlyLog("RECORDING", "result", { transcript: text });
-      if (ECHLY_DEBUG) console.log("[VOICE] transcript received", t, text);
-      if (text && !hasReceivedFirstTranscriptRef.current) {
-        hasReceivedFirstTranscriptRef.current = true;
-        if (ECHLY_DEBUG) {
-          console.log("[VOICE] first transcript chunk:", text, "length:", text.length);
-          const startTime = voiceStartTimeRef.current;
-          const onstartTime = recognitionOnstartTimeRef.current;
-          if (startTime != null) console.log("[VOICE] delay UI→first transcript:", t - startTime, "ms");
-          if (onstartTime != null) console.log("[VOICE] delay onstart→first transcript:", t - onstartTime, "ms");
-        }
-      }
-      const activeId = activeRecordingIdRef.current;
-      if (activeId) {
-        setRecordings((prev) =>
-          prev.map((r) =>
-            r.id === activeId ? { ...r, transcript: text } : r
-          )
-        );
-      }
-    };
-    recognition.onend = () => {
-      if (!manualStopRef.current) {
-        echlyLog("RECORDING", "unexpected end");
-        if (stateRef.current === "voice_listening") {
-          recordingActiveRef.current = false;
-          if (extensionMode && pointersPropRef.current) {
-            setPointers(pointersPropRef.current);
-          }
-          setState("idle");
-        }
-        return;
-      }
-
-      manualStopRef.current = false;
-      recordingActiveRef.current = false;
-      if (extensionMode && pointersPropRef.current) {
-        setPointers(pointersPropRef.current);
-      }
-
-      const s = stateRef.current;
-      if (s === "processing" || s === "success") return;
-      setState("idle");
-    };
-    recognitionRef.current = recognition;
-    return () => {
-      try {
-        recognition.stop();
-      } catch (err) {
-        console.error("CaptureWidget error:", err);
-      }
-    };
-  }, []);
-
   /* ================= LISTEN ================= */
 
   const startListening = useCallback(async () => {
     echlyLog("RECORDING", "start");
     const startTime = Date.now();
     voiceStartTimeRef.current = startTime;
-    recognitionOnstartTimeRef.current = null;
-    hasReceivedFirstTranscriptRef.current = false;
-    if (ECHLY_DEBUG) console.log("[VOICE] UI recording started", startTime);
+    logger.debug("voice", "recording_started", { startTime });
     try {
       // Enumerate devices only when user starts voice (user gesture); avoids permission popup on page load.
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -664,13 +529,22 @@ export function useCaptureWidget({
       audioContextRef.current = ctx;
       analyserRef.current = analyser;
       setAudioAnalyser(analyser);
-      if (ECHLY_DEBUG) console.log("[VOICE] recognition.start() called", Date.now());
-      recognitionRef.current?.start();
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      mediaRecorder.onerror = (event) => {
+        logger.error("error", "voice_recording_error", event);
+      };
+      mediaRecorder.start();
+      logger.debug("voice", "recording_started");
       recordingActiveRef.current = true;
       setState("voice_listening");
       setListeningAudioLevel(0);
     } catch (err) {
-      console.error("Microphone permission denied:", err);
+      logger.error("error", "microphone_permission_denied", err);
       recordingActiveRef.current = false;
       if (extensionMode && pointersPropRef.current) {
         setPointers(pointersPropRef.current);
@@ -688,102 +562,193 @@ export function useCaptureWidget({
     if (extensionMode && pointersPropRef.current) {
       setPointers(pointersPropRef.current);
     }
-    manualStopRef.current = true;
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(8);
     }
     playDoneClick();
-    recognitionRef.current?.stop();
+    const mediaRecorder = mediaRecorderRef.current;
+    if (!mediaRecorder) {
+      setState("idle");
+      return;
+    }
     const activeId = activeRecordingIdRef.current;
     if (!activeId) {
+      try {
+        if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      } catch {}
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = null;
       setState("idle");
       return;
     }
-    const currentRecordings = recordingsRef.current;
-    const active = currentRecordings.find((r) => r.id === activeId);
-    if (ECHLY_DEBUG) console.log("[VOICE] finishListening transcript:", active?.transcript);
-    if (!active || !active.transcript || active.transcript.trim().length < 5) {
-      if (ECHLY_DEBUG) console.warn("[VOICE] transcript too short, skipping pipeline");
-      setState("idle");
-      return;
-    }
-    if (extensionMode) {
-      const isSessionFeedback = sessionModeRef.current;
-      if (isSessionFeedback) {
-        /* Session mode: create marker immediately, clear state so user can click another element, process async. */
-        const root = captureRootRef.current;
-        const element = lastSessionClickedElementRef.current ?? undefined;
-        const placeholderId = `pending-${Date.now()}`;
-        if (root) {
-          createMarker(
-            root,
-            { id: placeholderId, x: 0, y: 0, element, title: "Saving feedback…" },
-            {
-              getSessionPaused: () => sessionPausedRef.current,
-              onMarkerClick: (marker) => {
-                setHighlightTicketId(marker.id);
-                setExpandedId(marker.id);
-              },
-            }
-          );
+    mediaRecorder.onstop = async () => {
+      logger.debug("voice", "recording_stopped");
+      const audioFile = new File(audioChunksRef.current, "recording.webm", {
+        type: "audio/webm",
+      });
+      logger.debug("voice", "file_created", {
+        size: audioFile.size,
+        type: audioFile.type,
+        isFile: audioFile instanceof File,
+      });
+      try {
+        const formData = new FormData();
+        formData.append("file", audioFile);
+        logger.debug("voice", "transcription_started");
+        if (!environment?.authenticatedFetch) {
+          throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for transcription).");
         }
-        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "finishListening session mode" });
-        setPending(null);
-        setSessionFeedbackSaving(true);
-        setRecordings((prev) => prev.filter((r) => r.id !== activeId));
-        setActiveRecordingId(null);
-        setState("idle");
-        lastSessionClickedElementRef.current = null;
-        if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
-        try {
-          pipelineActiveRef.current = true;
-          onComplete(active.transcript, active.screenshot, {
-            onSuccess: (ticket) => {
+        const res = await environment.authenticatedFetch("/api/transcribe-audio", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) {
+          logger.error("error", "voice_transcription_http_failed", { status: res.status });
+          logger.error("voice", "transcription_failed", { status: res.status });
+          setState("idle");
+          return;
+        }
+        const data = await res.json();
+        const transcript = data?.transcript;
+        if (typeof transcript !== "string" || transcript.trim().length === 0) {
+          logger.error("error", "voice_invalid_transcript");
+          logger.error("voice", "transcription_failed");
+          setState("idle");
+          return;
+        }
+        logger.debug("voice", "transcription_success", { length: transcript.length });
+
+        const currentRecordings = recordingsRef.current;
+        const active = currentRecordings.find((r) => r.id === activeId);
+        if (!active) {
+          setState("idle");
+          return;
+        }
+        setRecordings((prev) =>
+          prev.map((r) => (r.id === activeId ? { ...r, transcript } : r))
+        );
+
+        if (extensionMode) {
+          const isSessionFeedback = sessionModeRef.current;
+          if (isSessionFeedback) {
+            /* Session mode: create marker immediately, clear state so user can click another element, process async. */
+            const root = captureRootRef.current;
+            const element = lastSessionClickedElementRef.current ?? undefined;
+            const placeholderId = `pending-${Date.now()}`;
+            if (root) {
+              createMarker(
+                root,
+                { id: placeholderId, x: 0, y: 0, element, title: "Saving feedback…" },
+                {
+                  getSessionPaused: () => sessionPausedRef.current,
+                  onMarkerClick: (marker) => {
+                    setHighlightTicketId(marker.id);
+                    setExpandedId(marker.id);
+                  },
+                }
+              );
+            }
+            setPending(null);
+            setSessionFeedbackSaving(true);
+            setRecordings((prev) => prev.filter((r) => r.id !== activeId));
+            setActiveRecordingId(null);
+            setState("idle");
+            lastSessionClickedElementRef.current = null;
+            try {
+              pipelineActiveRef.current = true;
+              logger.debug("ai", "processing_started", { source: "voice_session_mode" });
+              onComplete(transcript, active.screenshot, {
+                onSuccess: (ticket) => {
+                  pipelineActiveRef.current = false;
+                  logger.debug("ai", "processing_success", { ticketId: ticket.id });
+                  setSessionFeedbackSaving(false);
+                  if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
+                  if (!extensionMode) {
+                    const t = ticket as StructuredFeedback & { instruction?: string; description?: string };
+                    setPointers((prev) => [
+                      { id: t.id, title: t.title, actionSteps: t.actionSteps ?? ((t.instruction ?? t.description) ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
+                      ...prev,
+                    ]);
+                  }
+                  setHighlightTicketId(ticket.id);
+                  setTimeout(() => setHighlightTicketId(null), 1200);
+                },
+                onError: () => {
+                  pipelineActiveRef.current = false;
+                  logger.error("ai", "processing_failed");
+                  setSessionFeedbackSaving(false);
+                  if (root) removeMarker(placeholderId);
+                  setErrorMessage("AI processing failed.");
+                },
+              }, active.context ?? undefined, { sessionMode: true });
+            } catch (error) {
               pipelineActiveRef.current = false;
               setSessionFeedbackSaving(false);
-              if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
+              if (root) removeMarker(placeholderId);
+              logger.error("error", "ai_processing_failed", error);
+              logger.error("ai", "processing_failed");
+              setErrorMessage("AI processing failed.");
+            }
+            return;
+          }
+          setState("processing");
+          pipelineActiveRef.current = true;
+          logger.debug("ai", "processing_started", { source: "voice" });
+          onComplete(transcript, active.screenshot, {
+            onSuccess: (ticket) => {
+              pipelineActiveRef.current = false;
+              logger.debug("ai", "processing_success", { ticketId: ticket.id });
               if (!extensionMode) {
-              const t = ticket as StructuredFeedback & { instruction?: string; description?: string };
+                const t = ticket as StructuredFeedback & { instruction?: string; description?: string };
                 setPointers((prev) => [
                   { id: t.id, title: t.title, actionSteps: t.actionSteps ?? ((t.instruction ?? t.description) ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
                   ...prev,
                 ]);
               }
+              setRecordings((prev) => prev.filter((r) => r.id !== activeId));
+              setActiveRecordingId(null);
               setHighlightTicketId(ticket.id);
               setTimeout(() => setHighlightTicketId(null), 1200);
+              setOrbSuccess(true);
+              setTimeout(() => setOrbSuccess(false), 200);
+              setPillExiting(true);
+              setTimeout(() => {
+                removeCaptureRoot();
+                restoreWidget();
+                setPillExiting(false);
+              }, 120);
             },
             onError: () => {
               pipelineActiveRef.current = false;
-              setSessionFeedbackSaving(false);
-              if (root) removeMarker(placeholderId);
+              logger.error("ai", "processing_failed");
               setErrorMessage("AI processing failed.");
+              setState("voice_listening");
             },
-          }, active.context ?? undefined, { sessionMode: true });
-        } catch (error) {
-          pipelineActiveRef.current = false;
-          setSessionFeedbackSaving(false);
-          if (root) removeMarker(placeholderId);
-          console.error(error);
-          setErrorMessage("AI processing failed.");
+          }, active.context ?? undefined);
+          return;
         }
-        return;
-      }
-      setState("processing");
-      if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
-      pipelineActiveRef.current = true;
-      onComplete(active.transcript, active.screenshot, {
-        onSuccess: (ticket) => {
-          pipelineActiveRef.current = false;
+        setState("processing");
+        logger.debug("ai", "processing_started", { source: "voice" });
+        try {
+          const structured = await onComplete(transcript, active.screenshot);
+          if (!structured) {
+            logger.error("ai", "processing_failed");
+            setState("idle");
+            removeCaptureRoot();
+            restoreWidget();
+            return;
+          }
+          logger.debug("ai", "processing_success", { ticketId: structured.id });
           if (!extensionMode) {
-            const t = ticket as StructuredFeedback & { instruction?: string; description?: string };
             setPointers((prev) => [
-              { id: t.id, title: t.title, actionSteps: t.actionSteps ?? ((t.instruction ?? t.description) ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
+              { id: structured.id, title: structured.title, actionSteps: structured.actionSteps ?? [], type: structured.type },
               ...prev,
             ]);
           }
           setRecordings((prev) => prev.filter((r) => r.id !== activeId));
           setActiveRecordingId(null);
-          setHighlightTicketId(ticket.id);
+          setHighlightTicketId(structured.id);
           setTimeout(() => setHighlightTicketId(null), 1200);
           setOrbSuccess(true);
           setTimeout(() => setOrbSuccess(false), 200);
@@ -793,49 +758,30 @@ export function useCaptureWidget({
             restoreWidget();
             setPillExiting(false);
           }, 120);
-        },
-        onError: () => {
-          pipelineActiveRef.current = false;
+        } catch (err) {
+          logger.error("error", "ai_processing_failed", err);
+          logger.error("ai", "processing_failed");
           setErrorMessage("AI processing failed.");
           setState("voice_listening");
-        },
-      }, active.context ?? undefined);
-      return;
-    }
-    setState("processing");
-    if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
-    try {
-      const structured = await onComplete(active.transcript, active.screenshot);
-      if (!structured) {
+        }
+      } catch (error) {
+        logger.error("error", "voice_transcription_failed", error);
+        logger.error("voice", "transcription_failed");
         setState("idle");
-        removeCaptureRoot();
-        restoreWidget();
-        return;
+      } finally {
+        audioChunksRef.current = [];
+        mediaRecorderRef.current = null;
       }
-      if (!extensionMode) {
-        setPointers((prev) => [
-          { id: structured.id, title: structured.title, actionSteps: structured.actionSteps ?? [], type: structured.type },
-          ...prev,
-        ]);
-      }
-      setRecordings((prev) => prev.filter((r) => r.id !== activeId));
-      setActiveRecordingId(null);
-      setHighlightTicketId(structured.id);
-      setTimeout(() => setHighlightTicketId(null), 1200);
-      setOrbSuccess(true);
-      setTimeout(() => setOrbSuccess(false), 200);
-      setPillExiting(true);
-      setTimeout(() => {
-        removeCaptureRoot();
-        restoreWidget();
-        setPillExiting(false);
-      }, 120);
-    } catch (err) {
-      console.error(err);
-      setErrorMessage("AI processing failed.");
-      setState("voice_listening");
+    };
+    try {
+      if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
+    } catch (error) {
+      logger.error("error", "voice_stop_failed", error);
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = null;
+      setState("idle");
     }
-  }, [onComplete, extensionMode, removeCaptureRoot, restoreWidget]);
+  }, [onComplete, extensionMode, removeCaptureRoot, restoreWidget, environment]);
 
   const discardListening = useCallback(() => {
     echlyLog("RECORDING", "discard");
@@ -843,7 +789,16 @@ export function useCaptureWidget({
     if (extensionMode && pointersPropRef.current) {
       setPointers(pointersPropRef.current);
     }
-    recognitionRef.current?.stop();
+    const recorder = mediaRecorderRef.current;
+    try {
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+    } catch (error) {
+      logger.error("error", "voice_stop_failed", error);
+    }
+    audioChunksRef.current = [];
+    mediaRecorderRef.current = null;
     const activeId = activeRecordingIdRef.current;
     setRecordings((prev) => prev.filter((r) => r.id !== activeId));
     setActiveRecordingId(null);
@@ -905,7 +860,7 @@ export function useCaptureWidget({
       await onDelete(id);
       setPointers((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
-      console.error("Delete failed:", err);
+      logger.error("error", "delete_failed", err);
     }
   }, [onDelete]);
 
@@ -931,7 +886,7 @@ export function useCaptureWidget({
       throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for saveEdit).");
     }
     try {
-      console.log("[ECHLY CORE] fetch via environment");
+      logger.debug("extension", "api_fetch_feedback");
       const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -949,7 +904,7 @@ export function useCaptureWidget({
         );
       }
     } catch (err) {
-      console.error("Save edit failed:", err);
+      logger.error("error", "save_edit_failed", err);
     }
   }, [editedTitle, editedSteps, environment]);
 
@@ -970,7 +925,7 @@ export function useCaptureWidget({
         if (!environment?.authenticatedFetch) {
           throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch or onUpdate required).");
         }
-        console.log("[ECHLY CORE] fetch via environment");
+        logger.debug("extension", "api_fetch_feedback");
         const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -997,7 +952,7 @@ export function useCaptureWidget({
           )
         );
       } catch (err) {
-        console.error("Ticket update failed:", err);
+        logger.error("error", "ticket_update_failed", err);
         throw err;
       }
     },
@@ -1008,10 +963,10 @@ export function useCaptureWidget({
 
   const getFullTabImage = useCallback(async (): Promise<string | null> => {
     if (!environment?.captureTabScreenshot) {
-      console.error("[ECHLY CORE] No capture environment available (captureTabScreenshot required).");
+      logger.error("error", "capture_environment_missing_for_screenshot");
       return null;
     }
-    console.log("[ECHLY CORE] screenshot via environment");
+    logger.debug("extension", "screenshot_capture_started");
     const hidden = hideEchlyUI();
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
@@ -1020,7 +975,7 @@ export function useCaptureWidget({
       const screenshot = await environment.captureTabScreenshot();
       return screenshot ?? null;
     } catch (err) {
-      console.warn("Screenshot error ignored:", err);
+      logger.warn("extension", "screenshot_capture_failed", err);
       return null;
     } finally {
       restoreEchlyUI(hidden);
@@ -1029,10 +984,10 @@ export function useCaptureWidget({
 
   const captureScreenshot = useCallback(async (): Promise<string | null> => {
     if (!environment?.captureTabScreenshot) {
-      console.error("[ECHLY CORE] No capture environment available (captureTabScreenshot required).");
+      logger.error("error", "capture_environment_missing_for_screenshot");
       return null;
     }
-    console.log("[ECHLY CORE] screenshot via environment");
+    logger.debug("extension", "screenshot_capture_started");
     return getFullTabImage();
   }, [environment, getFullTabImage]);
 
@@ -1073,8 +1028,6 @@ export function useCaptureWidget({
   }, []);
 
   const startSession = useCallback(async () => {
-    console.log("[ECHLY DEBUG] startSession ENTER");
-
     // Prevent double-clicks while starting
     if (startSessionPendingRef.current || sessionStatusRef.current === "starting") return;
     if (stateRef.current !== "idle" || sessionModeRef.current || globalSessionModeActive) return;
@@ -1083,14 +1036,12 @@ export function useCaptureWidget({
     // STEP 1: INSTANT UI RESPONSE (do not switch screens or reset UI until API resolves)
     setSessionStatus("starting");
 
-    if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "startSession" });
     setPending(null);
     setSessionFeedbackSaving(false);
     setPausePending(false);
     setEndPending(false);
 
     echlyLog("SESSION", "start");
-    if (ECHLY_DEBUG) console.log("[Echly] Start New Feedback Session clicked");
     logSession("start");
 
     try {
@@ -1130,7 +1081,7 @@ export function useCaptureWidget({
 
       // 403 / session limit: trigger existing upgrade flow immediately (no blink, no silent fail)
       if (result && "limitReached" in result && result.limitReached) {
-        console.log("[ECHLY DEBUG] session limit reached → triggering upgrade view");
+        logger.debug("extension", "session_limit_reached");
         setSessionStatus("idle");
         setSessionLimitReached({
           message: result.message ?? "You've reached your session limit.",
@@ -1158,7 +1109,7 @@ export function useCaptureWidget({
       setSessionLimitReached(null);
       setSessionStatus("active");
     } catch (e) {
-      console.error("[ECHLY ERROR] startSession failed", e);
+      logger.error("error", "session_start_failed", e);
       setSessionStatus("idle");
     } finally {
       startSessionPendingRef.current = false;
@@ -1242,7 +1193,6 @@ export function useCaptureWidget({
       logSession("end");
       setPausePending(false);
       setEndPending(false);
-      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "endSession finalizeEnd" });
       setPending(null);
       setSessionFeedbackSaving(false);
       setPointers([]);
@@ -1291,10 +1241,7 @@ export function useCaptureWidget({
       setSessionPaused(globalSessionPaused ?? false);
       setSessionStatus("active");
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "global sync (session active)" });
         setPending(null);
-      } else {
-        if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
       }
       setEndPending(false);
     }
@@ -1309,10 +1256,7 @@ export function useCaptureWidget({
       setPausePending(false);
       setEndPending(false);
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "global sync (session ended)" });
         setPending(null);
-      } else {
-        if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
       }
       setSessionFeedbackSaving(false);
       removeAllMarkers();
@@ -1343,10 +1287,7 @@ export function useCaptureWidget({
     pointersPropRef.current = pointersProp;
     setPointers(pointersProp);
     if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "pointers sync effect" });
       setPending(null);
-    } else {
-      if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
     }
   }, [extensionMode, pointersProp]);
 
@@ -1355,28 +1296,17 @@ export function useCaptureWidget({
     if (!extensionMode || !loadSessionWithPointers?.sessionId) return;
     setPointers(loadSessionWithPointers.pointers ?? []);
     if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "loadSessionWithPointers" });
       setPending(null);
-    } else {
-      if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
     }
     onSessionLoaded?.();
   }, [extensionMode, loadSessionWithPointers, onSessionLoaded]);
 
   const handleSessionElementClicked = useCallback(
     async (element: Element) => {
-      console.log("=== [ECHLY DEBUG] CLICK DETECTED ===");
-      console.log("State:", {
-        sessionMode,
-        sessionPaused,
-        sessionFeedbackPending,
-      });
       if (sessionFeedbackPending && !captureRootRef.current) {
-        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionElementClicked (no root)" });
         setPending(null);
         return;
       }
-      console.log("=== [ECHLY DEBUG] BLOCK CHECK ===", { getFullTabImage: !!getFullTabImage, sessionFeedbackPending });
       if (!getFullTabImage || sessionFeedbackPending != null) return;
       logSession("element clicked");
       playShutterSound();
@@ -1384,17 +1314,10 @@ export function useCaptureWidget({
       try {
         fullImage = await getFullTabImage();
       } catch (err) {
-        console.warn("Screenshot error ignored:", err);
+        logger.warn("extension", "screenshot_capture_failed", err);
         fullImage = null;
       }
-      console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT ===", {
-        exists: !!fullImage,
-        length: fullImage?.length,
-      });
-      console.log("=== [ECHLY DEBUG] CONTINUING TO FEEDBACK UI ===");
-      console.log("Screenshot captured:", !!fullImage);
       let screenshot: string | undefined = undefined;
-      console.log("=== [ECHLY DEBUG] BLOCK CHECK ===", fullImage);
       if (fullImage) {
         const containerRect = detectVisualContainer(element);
         const safeRect = clampRect({
@@ -1403,15 +1326,11 @@ export function useCaptureWidget({
           w: containerRect.width,
           h: containerRect.height,
         });
-        if (ECHLY_DEBUG) {
-          console.log("ECHLY ELEMENT DETECTED", element);
-          console.log("ECHLY CONTAINER RECT", safeRect);
-        }
         try {
           const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
           screenshot = await cropImageToRegion(fullImage, safeRect, dpr);
         } catch (err) {
-          console.warn("Crop failed — continuing without screenshot", err);
+          logger.warn("extension", "screenshot_crop_failed", err);
         }
       }
       const context = buildCaptureContext(window, element);
@@ -1425,7 +1344,6 @@ export function useCaptureWidget({
         height: rect.height,
       };
       lastSessionClickedElementRef.current = element instanceof HTMLElement ? element : null;
-      if (ECHLY_DEBUG) console.log("ECHLY pending SET", { screenshot: !!screenshot, context });
       sessionFeedbackPendingRef.current = true;
       setPending({ screenshot: screenshot || undefined, context, elementRect });
       onSessionActivity?.();
@@ -1437,7 +1355,6 @@ export function useCaptureWidget({
     (transcript: string) => {
       const pending = sessionFeedbackPending;
       if (!pending || !transcript || transcript.trim().length === 0) {
-        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackSubmit (invalid)" });
         setPending(null);
         return;
       }
@@ -1467,19 +1384,19 @@ export function useCaptureWidget({
         );
       }
 
-      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackSubmit (submit)" });
       setPending(null);
       setSessionFeedbackSaving(true);
       setState("idle");
       lastSessionClickedElementRef.current = null;
 
       /* Send to structure-feedback async; update marker and list when done. */
-      if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", transcript);
       try {
         pipelineActiveRef.current = true;
+        logger.debug("ai", "processing_started", { source: "text_session_mode" });
         onComplete(transcript, pending.screenshot ?? null, {
           onSuccess: (ticket) => {
             pipelineActiveRef.current = false;
+            logger.debug("ai", "processing_success", { ticketId: ticket.id });
             setSessionFeedbackSaving(false);
             if (root) {
               updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
@@ -1496,6 +1413,7 @@ export function useCaptureWidget({
           },
           onError: () => {
             pipelineActiveRef.current = false;
+            logger.error("ai", "processing_failed");
             setSessionFeedbackSaving(false);
             if (root) removeMarker(placeholderId);
             setErrorMessage("AI processing failed.");
@@ -1505,7 +1423,8 @@ export function useCaptureWidget({
         pipelineActiveRef.current = false;
         setSessionFeedbackSaving(false);
         if (root) removeMarker(placeholderId);
-        console.error(error);
+        logger.error("error", "ai_processing_failed", error);
+        logger.error("ai", "processing_failed");
         setErrorMessage("AI processing failed.");
       }
     },
@@ -1513,8 +1432,16 @@ export function useCaptureWidget({
   );
 
   const handleSessionFeedbackCancel = useCallback(() => {
-    if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackCancel" });
-    recognitionRef.current?.stop();
+    const recorder = mediaRecorderRef.current;
+    try {
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+    } catch (error) {
+      logger.error("error", "voice_stop_failed", error);
+    }
+    audioChunksRef.current = [];
+    mediaRecorderRef.current = null;
     recordingActiveRef.current = false;
     pipelineActiveRef.current = false;
     const activeId = activeRecordingIdRef.current;
@@ -1548,7 +1475,16 @@ export function useCaptureWidget({
   const startCapture = useCallback(() => {
     if (stateRef.current !== "idle") return;
     setErrorMessage(null);
-    recognitionRef.current?.stop();
+    const recorder = mediaRecorderRef.current;
+    try {
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+    } catch (error) {
+      logger.error("error", "voice_stop_failed", error);
+    }
+    audioChunksRef.current = [];
+    mediaRecorderRef.current = null;
     setWidgetOpenBeforeCapture(isOpen);
     setIsOpenState(false);
     createCaptureRoot();
@@ -1558,7 +1494,16 @@ export function useCaptureWidget({
   const handleAddFeedback = useCallback(async () => {
     if (stateRef.current !== "idle") return;
     setErrorMessage(null);
-    recognitionRef.current?.stop();
+    const recorder = mediaRecorderRef.current;
+    try {
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+    } catch (error) {
+      logger.error("error", "voice_stop_failed", error);
+    }
+    audioChunksRef.current = [];
+    mediaRecorderRef.current = null;
     setWidgetOpenBeforeCapture(isOpen);
     setIsOpenState(false);
     createCaptureRoot();
@@ -1570,10 +1515,10 @@ export function useCaptureWidget({
     try {
       screenshot = await captureScreenshot();
     } catch (err) {
-      console.warn("Screenshot error ignored:", err);
+      logger.warn("extension", "screenshot_capture_failed", err);
       screenshot = null;
     }
-    console.log("Screenshot captured:", !!screenshot);
+    logger.debug("extension", "screenshot_captured", { exists: !!screenshot });
     const id = generateRecordingId();
     const newRecording: Recording = {
       id,

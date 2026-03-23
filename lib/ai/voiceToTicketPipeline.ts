@@ -8,6 +8,7 @@ import { truncateForTokenBudget } from "@/lib/ai/pipelineTokenBudget";
 import { SYSTEM_PROMPT } from "@/lib/ai/prompts/interpreterPrompt";
 import type { PipelineContext } from "@/lib/server/pipelineContext";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
+import { logger } from "@/lib/logger";
 
 /* ===== DOM CONTEXT & TYPES ===== */
 
@@ -151,8 +152,7 @@ function limitText(text: string | null, max = 1500): string | null {
 function buildUserMessage(
   transcript: string,
   domContext: DomContextForAI,
-  shouldUseOCR: boolean,
-  ocrText: string | null
+  shouldUseOCR: boolean
 ): string {
   const parts: string[] = [];
 
@@ -171,12 +171,10 @@ function buildUserMessage(
   parts.push(domContext.nearbyText || "None");
 
   parts.push("\nVisible text:");
-  parts.push(domContext.visibleText || "None");
-
   if (shouldUseOCR) {
-    parts.push("\nVISUAL TEXT (OCR - REFERENCE ONLY):");
-    parts.push(ocrText || "None");
+    parts.push("(Includes screenshot OCR — reference only; may be noisy.)");
   }
+  parts.push(domContext.visibleText || "None");
 
   return parts.join("\n");
 }
@@ -271,32 +269,20 @@ function sanitizeTitle(title: string): string {
 export async function extractStructuredFeedback(
   client: OpenAI,
   transcript: string,
-  domContext: DomContextForAI,
-  context?: { ocrText?: string | null; screenshotOCRText?: string | null } | null
+  domContext: DomContextForAI
 ): Promise<{ json: StructuredFeedbackJSON; raw: string }> {
-  const ocrText =
-    context?.ocrText ||
-    context?.screenshotOCRText ||
-    null;
+  const vt = domContext.visibleText;
   const shouldUseOCR =
     (!domContext.elementHTML || domContext.elementHTML.length < 10) &&
-    !!ocrText &&
-    ocrText.length > 20;
-  console.log("[OCR_DECISION]", {
+    !!vt &&
+    vt.length > 20;
+  logger.debug("ai", "processing_started", {
     hasElement: !!domContext.elementHTML,
     elementLength: domContext.elementHTML?.length || 0,
-    ocrLength: ocrText?.length || 0,
+    visibleTextLength: vt?.length || 0,
     shouldUseOCR
   });
-  console.log("[AI_PHASE2_INPUT]", {
-    transcriptPreview: transcript.slice(0, 100),
-    elementPreview: domContext.elementHTML?.slice(0, 100),
-    elementType: domContext.elementType || null,
-    nearbyPreview: domContext.nearbyText?.slice(0, 100),
-    visiblePreview: domContext.visibleText?.slice(0, 100),
-    ocrPreview: shouldUseOCR ? ocrText?.slice(0, 100) : null
-  });
-  const userMessage = buildUserMessage(transcript, domContext, shouldUseOCR, ocrText);
+  const userMessage = buildUserMessage(transcript, domContext, shouldUseOCR);
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: userMessage },
@@ -317,7 +303,7 @@ export async function extractStructuredFeedback(
   });
   const raw = completion.choices[0]?.message?.content?.trim() ?? "";
   const json = parseStructuredResponse(raw);
-  console.log("[AI_PHASE2_OUTPUT]", {
+  logger.debug("ai", "processing_success", {
     title: json?.title,
     actionsCount: json?.actions?.length,
     firstAction: json?.actions?.[0]?.instruction
@@ -350,17 +336,11 @@ export async function runVoiceToTicket(
   }
 
   const domContext = buildDomContextForPipeline(rawContext);
-  const rawCtx = rawContext != null && typeof rawContext === "object"
-    ? (rawContext as Record<string, unknown>)
-    : null;
   const normalizedInput = {
     transcript: transcript || "",
     elementText: domContext?.elementHTML || null,
     nearbyText: domContext?.nearbyText || null,
     visibleText: domContext?.visibleText || "",
-    ocrText:
-      (typeof rawCtx?.ocrText === "string" ? rawCtx.ocrText : null) ||
-      (typeof rawCtx?.screenshotOCRText === "string" ? rawCtx.screenshotOCRText : null),
   };
 
   normalizedInput.elementText = dedupeLines(normalizedInput.elementText);
@@ -378,20 +358,13 @@ export async function runVoiceToTicket(
     normalizedInput.nearbyText = null;
   }
 
-  if (!normalizedInput.ocrText) {
-    normalizedInput.ocrText = null;
-  }
-
   const aiContext: DomContextForAI = {
     ...domContext,
     elementHTML: normalizedInput.elementText,
     nearbyText: normalizedInput.nearbyText,
     visibleText: normalizedInput.visibleText || null,
   };
-  const { json } = await extractStructuredFeedback(client, normalizedInput.transcript, aiContext, {
-    ocrText: normalizedInput.ocrText,
-    screenshotOCRText: typeof rawCtx?.screenshotOCRText === "string" ? rawCtx.screenshotOCRText : null,
-  });
+  const { json } = await extractStructuredFeedback(client, normalizedInput.transcript, aiContext);
 
   const actionSteps = json.actions
     .sort((a, b) => a.step - b.step)

@@ -13479,7 +13479,7 @@
       module.exports = async (langs = "eng", oem = OEM.LSTM_ONLY, _options = {}, config = {}) => {
         const id = getId("Worker", workerCounter);
         const {
-          logger,
+          logger: logger2,
           errorHandler,
           ...options
         } = resolvePaths({
@@ -13623,7 +13623,7 @@
               throw Error(data);
             }
           } else if (status === "progress") {
-            logger({ ...data, userJobId: jobId });
+            logger2({ ...data, userJobId: jobId });
           }
         });
         const resolveObj = {
@@ -13853,12 +13853,45 @@
 
   // echly-extension/src/api.ts
   if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
+  function hasHeaderCaseInsensitive(headers, headerName) {
+    const target = headerName.toLowerCase();
+    return Object.keys(headers).some((key) => key.toLowerCase() === target);
+  }
+  function omitHeaderCaseInsensitive(headers, headerName) {
+    const target = headerName.toLowerCase();
+    return Object.fromEntries(
+      Object.entries(headers).filter(([key]) => key.toLowerCase() !== target)
+    );
+  }
   async function apiFetch(path, options = {}) {
     const { skipAuth = false, headers = {}, ...rest } = options;
     const headersRecord = headers instanceof Headers ? Object.fromEntries(headers) : Array.isArray(headers) ? Object.fromEntries(headers) : { ...headers };
     const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
     const method = rest.method || "GET";
     const body = rest.body ?? null;
+    const isFormDataBody = typeof FormData !== "undefined" && body instanceof FormData;
+    if (isFormDataBody) {
+      const token = skipAuth ? null : await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "ECHLY_GET_EXTENSION_TOKEN" },
+          (res) => resolve(res?.token ?? null)
+        );
+      });
+      const formHeaders = omitHeaderCaseInsensitive(headersRecord, "Content-Type");
+      if (!skipAuth && token) {
+        formHeaders.Authorization = `Bearer ${token}`;
+      }
+      return fetch(url, {
+        ...rest,
+        method,
+        body,
+        credentials: "include",
+        headers: formHeaders
+      });
+    }
+    if (body != null && !hasHeaderCaseInsensitive(headersRecord, "Content-Type")) {
+      headersRecord["Content-Type"] = "application/json";
+    }
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(
         { type: "echly-api", url, method, headers: headersRecord, body },
@@ -13881,19 +13914,37 @@
     });
   }
 
+  // lib/logger.ts
+  var isDev2 = false;
+  function log2(level, scope, message, data) {
+    if (level === "debug" && !isDev2) return;
+    const prefix = `[ECHLY:${scope.toUpperCase()}]`;
+    if (data !== void 0) {
+      console[level](`${prefix} ${message}`, data);
+    } else {
+      console[level](`${prefix} ${message}`);
+    }
+  }
+  var logger = {
+    debug: (scope, msg, data) => log2("debug", scope, msg, data),
+    info: (scope, msg, data) => log2("info", scope, msg, data),
+    warn: (scope, msg, data) => log2("warn", scope, msg, data),
+    error: (scope, msg, data) => log2("error", scope, msg, data)
+  };
+
   // echly-extension/src/sessionRelay.ts
   (function initSessionRelay() {
     if (window.__ECHLY_RELAY_INITIALIZED__) return;
     window.__ECHLY_RELAY_INITIALIZED__ = true;
     window.addEventListener("message", (event) => {
       if (event.data?.type === "ECHLY_EXTENSION_PING") {
-        console.log("[ECHLY][CONTENT] Received PING");
+        logger.debug("extension", "ping_received");
         window.postMessage({ type: "ECHLY_EXTENSION_PONG" }, "*");
       }
       if (event.data?.type === "ECHLY_OPEN_RECORDER") {
-        console.log("[ECHLY][CONTENT] Received OPEN_RECORDER from dashboard");
+        logger.debug("extension", "open_recorder_requested");
         chrome.runtime.sendMessage({ type: "OPEN_RECORDER" }, (response) => {
-          console.log("[ECHLY][CONTENT] Sent OPEN_RECORDER to background, response:", response);
+          logger.debug("extension", "open_recorder_dispatched", response);
         });
         window.postMessage({ type: "ECHLY_RECORDER_OPENED" }, "*");
       }
@@ -37048,13 +37099,13 @@
     const dragOffset = (0, import_react4.useRef)({ x: 0, y: 0 });
     const widgetRef = (0, import_react4.useRef)(null);
     const captureRootRef = (0, import_react4.useRef)(null);
-    const recognitionRef = (0, import_react4.useRef)(null);
+    const mediaRecorderRef = (0, import_react4.useRef)(null);
+    const audioChunksRef = (0, import_react4.useRef)([]);
     const menuRef = (0, import_react4.useRef)(null);
     const activeRecordingIdRef = (0, import_react4.useRef)(null);
     const recordingsRef = (0, import_react4.useRef)(recordings);
     const stateRef = (0, import_react4.useRef)(state);
     const pipelineActiveRef = (0, import_react4.useRef)(false);
-    const manualStopRef = (0, import_react4.useRef)(false);
     const editingIdRef = (0, import_react4.useRef)(null);
     const trayLockedRef = (0, import_react4.useRef)(false);
     const mediaStreamRef = (0, import_react4.useRef)(null);
@@ -37064,8 +37115,6 @@
     const pauseWaitTimeoutRef = (0, import_react4.useRef)(null);
     const endWaitTimeoutRef = (0, import_react4.useRef)(null);
     const voiceStartTimeRef = (0, import_react4.useRef)(null);
-    const recognitionOnstartTimeRef = (0, import_react4.useRef)(null);
-    const hasReceivedFirstTranscriptRef = (0, import_react4.useRef)(false);
     const recordingActiveRef = (0, import_react4.useRef)(false);
     const pointersPropRef = (0, import_react4.useRef)(pointersProp);
     const sessionFeedbackPendingRef = (0, import_react4.useRef)(false);
@@ -37082,7 +37131,7 @@
     }, []);
     (0, import_react4.useEffect)(() => {
       if (captureState.pending) {
-        if (ECHLY_DEBUG) console.log("ECHLY restoring pending capture state");
+        logger.debug("extension", "restoring_pending_capture_state");
         setPending(captureState.pending);
       }
     }, []);
@@ -37221,10 +37270,10 @@
       }
       if (ECHLY_DEBUG) console.debug("ECHLY createCaptureRoot");
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "createCaptureRoot" });
+        logger.debug("extension", "pending_cleared", { reason: "create_capture_root" });
         setPending(null);
       } else {
-        if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
+        logger.debug("extension", "pending_clear_skipped");
       }
       const captureEl = document.createElement("div");
       captureEl.id = OVERLAY_ROOT_ID;
@@ -37283,7 +37332,7 @@
         try {
           captureRootRef.current.remove();
         } catch (err) {
-          console.error("CaptureWidget error:", err);
+          logger.error("error", "capture_widget_error", err);
         }
         captureRootRef.current = null;
       }
@@ -37324,7 +37373,7 @@
         throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for loading feedback).");
       }
       const loadFeedback = async () => {
-        console.log("[ECHLY CORE] fetch via environment");
+        logger.debug("extension", "api_fetch_feedback");
         const res = await environment.authenticatedFetch(
           `/api/feedback?sessionId=${sessionId}&limit=20`
         );
@@ -37341,96 +37390,11 @@
       };
       loadFeedback();
     }, [extensionMode, sessionId, initialPointers, environment]);
-    (0, import_react4.useEffect)(() => {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) return;
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
-      recognition.onstart = () => {
-        const t = Date.now();
-        recognitionOnstartTimeRef.current = t;
-        if (ECHLY_DEBUG) console.log("[VOICE] recognition.onstart", t);
-        const startTime = voiceStartTimeRef.current;
-        if (ECHLY_DEBUG && startTime != null) {
-          console.log("[VOICE] delay UI recording start\u2192onstart:", t - startTime, "ms");
-        }
-      };
-      recognition.onspeechstart = () => {
-        if (ECHLY_DEBUG) console.log("[VOICE] speech detected", Date.now());
-      };
-      recognition.onaudiostart = () => {
-        if (ECHLY_DEBUG) console.log("[VOICE] audio start", Date.now());
-      };
-      recognition.onresult = (event) => {
-        let text = "";
-        for (let i = 0; i < event.results.length; ++i) {
-          const result = event.results[i];
-          const item = result[0];
-          if (!item) continue;
-          text += item.transcript + " ";
-        }
-        text = text.replace(/\s+/g, " ").trim();
-        const t = Date.now();
-        echlyLog("RECORDING", "result", { transcript: text });
-        if (ECHLY_DEBUG) console.log("[VOICE] transcript received", t, text);
-        if (text && !hasReceivedFirstTranscriptRef.current) {
-          hasReceivedFirstTranscriptRef.current = true;
-          if (ECHLY_DEBUG) {
-            console.log("[VOICE] first transcript chunk:", text, "length:", text.length);
-            const startTime = voiceStartTimeRef.current;
-            const onstartTime = recognitionOnstartTimeRef.current;
-            if (startTime != null) console.log("[VOICE] delay UI\u2192first transcript:", t - startTime, "ms");
-            if (onstartTime != null) console.log("[VOICE] delay onstart\u2192first transcript:", t - onstartTime, "ms");
-          }
-        }
-        const activeId = activeRecordingIdRef.current;
-        if (activeId) {
-          setRecordings(
-            (prev) => prev.map(
-              (r) => r.id === activeId ? { ...r, transcript: text } : r
-            )
-          );
-        }
-      };
-      recognition.onend = () => {
-        if (!manualStopRef.current) {
-          echlyLog("RECORDING", "unexpected end");
-          if (stateRef.current === "voice_listening") {
-            recordingActiveRef.current = false;
-            if (extensionMode && pointersPropRef.current) {
-              setPointers(pointersPropRef.current);
-            }
-            setState("idle");
-          }
-          return;
-        }
-        manualStopRef.current = false;
-        recordingActiveRef.current = false;
-        if (extensionMode && pointersPropRef.current) {
-          setPointers(pointersPropRef.current);
-        }
-        const s = stateRef.current;
-        if (s === "processing" || s === "success") return;
-        setState("idle");
-      };
-      recognitionRef.current = recognition;
-      return () => {
-        try {
-          recognition.stop();
-        } catch (err) {
-          console.error("CaptureWidget error:", err);
-        }
-      };
-    }, []);
     const startListening = (0, import_react4.useCallback)(async () => {
       echlyLog("RECORDING", "start");
       const startTime = Date.now();
       voiceStartTimeRef.current = startTime;
-      recognitionOnstartTimeRef.current = null;
-      hasReceivedFirstTranscriptRef.current = false;
-      if (ECHLY_DEBUG) console.log("[VOICE] UI recording started", startTime);
+      logger.debug("voice", "recording_started", { startTime });
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const inputs = devices.filter((d) => d.kind === "audioinput");
@@ -37451,13 +37415,22 @@
         audioContextRef.current = ctx;
         analyserRef.current = analyser;
         setAudioAnalyser(analyser);
-        if (ECHLY_DEBUG) console.log("[VOICE] recognition.start() called", Date.now());
-        recognitionRef.current?.start();
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) audioChunksRef.current.push(event.data);
+        };
+        mediaRecorder.onerror = (event) => {
+          logger.error("error", "voice_recording_error", event);
+        };
+        mediaRecorder.start();
+        logger.debug("voice", "recording_started");
         recordingActiveRef.current = true;
         setState("voice_listening");
         setListeningAudioLevel(0);
       } catch (err) {
-        console.error("Microphone permission denied:", err);
+        logger.error("error", "microphone_permission_denied", err);
         recordingActiveRef.current = false;
         if (extensionMode && pointersPropRef.current) {
           setPointers(pointersPropRef.current);
@@ -37474,59 +37447,141 @@
       if (extensionMode && pointersPropRef.current) {
         setPointers(pointersPropRef.current);
       }
-      manualStopRef.current = true;
       if (typeof navigator !== "undefined" && navigator.vibrate) {
         navigator.vibrate(8);
       }
       playDoneClick();
-      recognitionRef.current?.stop();
+      const mediaRecorder = mediaRecorderRef.current;
+      if (!mediaRecorder) {
+        setState("idle");
+        return;
+      }
       const activeId = activeRecordingIdRef.current;
       if (!activeId) {
+        try {
+          if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
+        } catch {
+        }
+        audioChunksRef.current = [];
+        mediaRecorderRef.current = null;
         setState("idle");
         return;
       }
-      const currentRecordings = recordingsRef.current;
-      const active = currentRecordings.find((r) => r.id === activeId);
-      if (ECHLY_DEBUG) console.log("[VOICE] finishListening transcript:", active?.transcript);
-      if (!active || !active.transcript || active.transcript.trim().length < 5) {
-        if (ECHLY_DEBUG) console.warn("[VOICE] transcript too short, skipping pipeline");
-        setState("idle");
-        return;
-      }
-      if (extensionMode) {
-        const isSessionFeedback = sessionModeRef.current;
-        if (isSessionFeedback) {
-          const root = captureRootRef.current;
-          const element = lastSessionClickedElementRef.current ?? void 0;
-          const placeholderId = `pending-${Date.now()}`;
-          if (root) {
-            createMarker(
-              root,
-              { id: placeholderId, x: 0, y: 0, element, title: "Saving feedback\u2026" },
-              {
-                getSessionPaused: () => sessionPausedRef.current,
-                onMarkerClick: (marker) => {
-                  setHighlightTicketId(marker.id);
-                  setExpandedId(marker.id);
-                }
-              }
-            );
+      mediaRecorder.onstop = async () => {
+        logger.debug("voice", "recording_stopped");
+        const audioFile = new File(audioChunksRef.current, "recording.webm", {
+          type: "audio/webm"
+        });
+        logger.debug("voice", "file_created", {
+          size: audioFile.size,
+          type: audioFile.type,
+          isFile: audioFile instanceof File
+        });
+        try {
+          const formData = new FormData();
+          formData.append("file", audioFile);
+          logger.debug("voice", "transcription_started");
+          if (!environment?.authenticatedFetch) {
+            throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for transcription).");
           }
-          if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "finishListening session mode" });
-          setPending(null);
-          setSessionFeedbackSaving(true);
-          setRecordings((prev) => prev.filter((r) => r.id !== activeId));
-          setActiveRecordingId(null);
-          setState("idle");
-          lastSessionClickedElementRef.current = null;
-          if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
-          try {
-            pipelineActiveRef.current = true;
-            onComplete(active.transcript, active.screenshot, {
-              onSuccess: (ticket) => {
+          const res = await environment.authenticatedFetch("/api/transcribe-audio", {
+            method: "POST",
+            body: formData,
+            credentials: "include"
+          });
+          if (!res.ok) {
+            logger.error("error", "voice_transcription_http_failed", { status: res.status });
+            logger.error("voice", "transcription_failed", { status: res.status });
+            setState("idle");
+            return;
+          }
+          const data = await res.json();
+          const transcript = data?.transcript;
+          if (typeof transcript !== "string" || transcript.trim().length === 0) {
+            logger.error("error", "voice_invalid_transcript");
+            logger.error("voice", "transcription_failed");
+            setState("idle");
+            return;
+          }
+          logger.debug("voice", "transcription_success", { length: transcript.length });
+          const currentRecordings = recordingsRef.current;
+          const active = currentRecordings.find((r) => r.id === activeId);
+          if (!active) {
+            setState("idle");
+            return;
+          }
+          setRecordings(
+            (prev) => prev.map((r) => r.id === activeId ? { ...r, transcript } : r)
+          );
+          if (extensionMode) {
+            const isSessionFeedback = sessionModeRef.current;
+            if (isSessionFeedback) {
+              const root = captureRootRef.current;
+              const element = lastSessionClickedElementRef.current ?? void 0;
+              const placeholderId = `pending-${Date.now()}`;
+              if (root) {
+                createMarker(
+                  root,
+                  { id: placeholderId, x: 0, y: 0, element, title: "Saving feedback\u2026" },
+                  {
+                    getSessionPaused: () => sessionPausedRef.current,
+                    onMarkerClick: (marker) => {
+                      setHighlightTicketId(marker.id);
+                      setExpandedId(marker.id);
+                    }
+                  }
+                );
+              }
+              setPending(null);
+              setSessionFeedbackSaving(true);
+              setRecordings((prev) => prev.filter((r) => r.id !== activeId));
+              setActiveRecordingId(null);
+              setState("idle");
+              lastSessionClickedElementRef.current = null;
+              try {
+                pipelineActiveRef.current = true;
+                logger.debug("ai", "processing_started", { source: "voice_session_mode" });
+                onComplete(transcript, active.screenshot, {
+                  onSuccess: (ticket) => {
+                    pipelineActiveRef.current = false;
+                    logger.debug("ai", "processing_success", { ticketId: ticket.id });
+                    setSessionFeedbackSaving(false);
+                    if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
+                    if (!extensionMode) {
+                      const t = ticket;
+                      setPointers((prev) => [
+                        { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.instruction ?? t.description ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
+                        ...prev
+                      ]);
+                    }
+                    setHighlightTicketId(ticket.id);
+                    setTimeout(() => setHighlightTicketId(null), 1200);
+                  },
+                  onError: () => {
+                    pipelineActiveRef.current = false;
+                    logger.error("ai", "processing_failed");
+                    setSessionFeedbackSaving(false);
+                    if (root) removeMarker(placeholderId);
+                    setErrorMessage("AI processing failed.");
+                  }
+                }, active.context ?? void 0, { sessionMode: true });
+              } catch (error) {
                 pipelineActiveRef.current = false;
                 setSessionFeedbackSaving(false);
-                if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
+                if (root) removeMarker(placeholderId);
+                logger.error("error", "ai_processing_failed", error);
+                logger.error("ai", "processing_failed");
+                setErrorMessage("AI processing failed.");
+              }
+              return;
+            }
+            setState("processing");
+            pipelineActiveRef.current = true;
+            logger.debug("ai", "processing_started", { source: "voice" });
+            onComplete(transcript, active.screenshot, {
+              onSuccess: (ticket) => {
+                pipelineActiveRef.current = false;
+                logger.debug("ai", "processing_success", { ticketId: ticket.id });
                 if (!extensionMode) {
                   const t = ticket;
                   setPointers((prev) => [
@@ -37534,41 +37589,49 @@
                     ...prev
                   ]);
                 }
+                setRecordings((prev) => prev.filter((r) => r.id !== activeId));
+                setActiveRecordingId(null);
                 setHighlightTicketId(ticket.id);
                 setTimeout(() => setHighlightTicketId(null), 1200);
+                setOrbSuccess(true);
+                setTimeout(() => setOrbSuccess(false), 200);
+                setPillExiting(true);
+                setTimeout(() => {
+                  removeCaptureRoot();
+                  restoreWidget();
+                  setPillExiting(false);
+                }, 120);
               },
               onError: () => {
                 pipelineActiveRef.current = false;
-                setSessionFeedbackSaving(false);
-                if (root) removeMarker(placeholderId);
+                logger.error("ai", "processing_failed");
                 setErrorMessage("AI processing failed.");
+                setState("voice_listening");
               }
-            }, active.context ?? void 0, { sessionMode: true });
-          } catch (error) {
-            pipelineActiveRef.current = false;
-            setSessionFeedbackSaving(false);
-            if (root) removeMarker(placeholderId);
-            console.error(error);
-            setErrorMessage("AI processing failed.");
+            }, active.context ?? void 0);
+            return;
           }
-          return;
-        }
-        setState("processing");
-        if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
-        pipelineActiveRef.current = true;
-        onComplete(active.transcript, active.screenshot, {
-          onSuccess: (ticket) => {
-            pipelineActiveRef.current = false;
+          setState("processing");
+          logger.debug("ai", "processing_started", { source: "voice" });
+          try {
+            const structured = await onComplete(transcript, active.screenshot);
+            if (!structured) {
+              logger.error("ai", "processing_failed");
+              setState("idle");
+              removeCaptureRoot();
+              restoreWidget();
+              return;
+            }
+            logger.debug("ai", "processing_success", { ticketId: structured.id });
             if (!extensionMode) {
-              const t = ticket;
               setPointers((prev) => [
-                { id: t.id, title: t.title, actionSteps: t.actionSteps ?? (t.instruction ?? t.description ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
+                { id: structured.id, title: structured.title, actionSteps: structured.actionSteps ?? [], type: structured.type },
                 ...prev
               ]);
             }
             setRecordings((prev) => prev.filter((r) => r.id !== activeId));
             setActiveRecordingId(null);
-            setHighlightTicketId(ticket.id);
+            setHighlightTicketId(structured.id);
             setTimeout(() => setHighlightTicketId(null), 1200);
             setOrbSuccess(true);
             setTimeout(() => setOrbSuccess(false), 200);
@@ -37578,56 +37641,46 @@
               restoreWidget();
               setPillExiting(false);
             }, 120);
-          },
-          onError: () => {
-            pipelineActiveRef.current = false;
+          } catch (err) {
+            logger.error("error", "ai_processing_failed", err);
+            logger.error("ai", "processing_failed");
             setErrorMessage("AI processing failed.");
             setState("voice_listening");
           }
-        }, active.context ?? void 0);
-        return;
-      }
-      setState("processing");
-      if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", active.transcript);
-      try {
-        const structured = await onComplete(active.transcript, active.screenshot);
-        if (!structured) {
+        } catch (error) {
+          logger.error("error", "voice_transcription_failed", error);
+          logger.error("voice", "transcription_failed");
           setState("idle");
-          removeCaptureRoot();
-          restoreWidget();
-          return;
+        } finally {
+          audioChunksRef.current = [];
+          mediaRecorderRef.current = null;
         }
-        if (!extensionMode) {
-          setPointers((prev) => [
-            { id: structured.id, title: structured.title, actionSteps: structured.actionSteps ?? [], type: structured.type },
-            ...prev
-          ]);
-        }
-        setRecordings((prev) => prev.filter((r) => r.id !== activeId));
-        setActiveRecordingId(null);
-        setHighlightTicketId(structured.id);
-        setTimeout(() => setHighlightTicketId(null), 1200);
-        setOrbSuccess(true);
-        setTimeout(() => setOrbSuccess(false), 200);
-        setPillExiting(true);
-        setTimeout(() => {
-          removeCaptureRoot();
-          restoreWidget();
-          setPillExiting(false);
-        }, 120);
-      } catch (err) {
-        console.error(err);
-        setErrorMessage("AI processing failed.");
-        setState("voice_listening");
+      };
+      try {
+        if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      } catch (error) {
+        logger.error("error", "voice_stop_failed", error);
+        audioChunksRef.current = [];
+        mediaRecorderRef.current = null;
+        setState("idle");
       }
-    }, [onComplete, extensionMode, removeCaptureRoot, restoreWidget]);
+    }, [onComplete, extensionMode, removeCaptureRoot, restoreWidget, environment]);
     const discardListening = (0, import_react4.useCallback)(() => {
       echlyLog("RECORDING", "discard");
       recordingActiveRef.current = false;
       if (extensionMode && pointersPropRef.current) {
         setPointers(pointersPropRef.current);
       }
-      recognitionRef.current?.stop();
+      const recorder = mediaRecorderRef.current;
+      try {
+        if (recorder && recorder.state !== "inactive") {
+          recorder.stop();
+        }
+      } catch (error) {
+        logger.error("error", "voice_stop_failed", error);
+      }
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = null;
       const activeId = activeRecordingIdRef.current;
       setRecordings((prev) => prev.filter((r) => r.id !== activeId));
       setActiveRecordingId(null);
@@ -37679,7 +37732,7 @@
         await onDelete(id);
         setPointers((prev) => prev.filter((p) => p.id !== id));
       } catch (err) {
-        console.error("Delete failed:", err);
+        logger.error("error", "delete_failed", err);
       }
     }, [onDelete]);
     const startEditing = (0, import_react4.useCallback)((p) => {
@@ -37700,7 +37753,7 @@
         throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for saveEdit).");
       }
       try {
-        console.log("[ECHLY CORE] fetch via environment");
+        logger.debug("extension", "api_fetch_feedback");
         const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -37716,7 +37769,7 @@
           );
         }
       } catch (err) {
-        console.error("Save edit failed:", err);
+        logger.error("error", "save_edit_failed", err);
       }
     }, [editedTitle, editedSteps, environment]);
     const updatePointer = (0, import_react4.useCallback)(
@@ -37734,7 +37787,7 @@
           if (!environment?.authenticatedFetch) {
             throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch or onUpdate required).");
           }
-          console.log("[ECHLY CORE] fetch via environment");
+          logger.debug("extension", "api_fetch_feedback");
           const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -37756,7 +37809,7 @@
             )
           );
         } catch (err) {
-          console.error("Ticket update failed:", err);
+          logger.error("error", "ticket_update_failed", err);
           throw err;
         }
       },
@@ -37764,10 +37817,10 @@
     );
     const getFullTabImage = (0, import_react4.useCallback)(async () => {
       if (!environment?.captureTabScreenshot) {
-        console.error("[ECHLY CORE] No capture environment available (captureTabScreenshot required).");
+        logger.error("error", "capture_environment_missing_for_screenshot");
         return null;
       }
-      console.log("[ECHLY CORE] screenshot via environment");
+      logger.debug("extension", "screenshot_capture_started");
       const hidden = hideEchlyUI();
       await new Promise(
         (resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
@@ -37776,7 +37829,7 @@
         const screenshot = await environment.captureTabScreenshot();
         return screenshot ?? null;
       } catch (err) {
-        console.warn("Screenshot error ignored:", err);
+        logger.warn("extension", "screenshot_capture_failed", err);
         return null;
       } finally {
         restoreEchlyUI(hidden);
@@ -37784,10 +37837,10 @@
     }, [environment]);
     const captureScreenshot = (0, import_react4.useCallback)(async () => {
       if (!environment?.captureTabScreenshot) {
-        console.error("[ECHLY CORE] No capture environment available (captureTabScreenshot required).");
+        logger.error("error", "capture_environment_missing_for_screenshot");
         return null;
       }
-      console.log("[ECHLY CORE] screenshot via environment");
+      logger.debug("extension", "screenshot_capture_started");
       return getFullTabImage();
     }, [environment, getFullTabImage]);
     const handleRegionSelectStart = (0, import_react4.useCallback)(() => {
@@ -37823,18 +37876,15 @@
       );
     }, []);
     const startSession = (0, import_react4.useCallback)(async () => {
-      console.log("[ECHLY DEBUG] startSession ENTER");
       if (startSessionPendingRef.current || sessionStatusRef.current === "starting") return;
       if (stateRef.current !== "idle" || sessionModeRef.current || globalSessionModeActive) return;
       startSessionPendingRef.current = true;
       setSessionStatus("starting");
-      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "startSession" });
       setPending(null);
       setSessionFeedbackSaving(false);
       setPausePending(false);
       setEndPending(false);
       echlyLog("SESSION", "start");
-      if (ECHLY_DEBUG) console.log("[Echly] Start New Feedback Session clicked");
       logSession("start");
       try {
         if (extensionMode && typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
@@ -37865,7 +37915,7 @@
         }
         const result = environment ? await environment.createSession() : extensionMode && onCreateSession ? await onCreateSession() : null;
         if (result && "limitReached" in result && result.limitReached) {
-          console.log("[ECHLY DEBUG] session limit reached \u2192 triggering upgrade view");
+          logger.debug("extension", "session_limit_reached");
           setSessionStatus("idle");
           setSessionLimitReached({
             message: result.message ?? "You've reached your session limit.",
@@ -37889,7 +37939,7 @@
         setSessionLimitReached(null);
         setSessionStatus("active");
       } catch (e) {
-        console.error("[ECHLY ERROR] startSession failed", e);
+        logger.error("error", "session_start_failed", e);
         setSessionStatus("idle");
       } finally {
         startSessionPendingRef.current = false;
@@ -37958,7 +38008,6 @@
         logSession("end");
         setPausePending(false);
         setEndPending(false);
-        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "endSession finalizeEnd" });
         setPending(null);
         setSessionFeedbackSaving(false);
         setPointers([]);
@@ -37998,10 +38047,7 @@
         setSessionPaused(globalSessionPaused ?? false);
         setSessionStatus("active");
         if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-          if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "global sync (session active)" });
           setPending(null);
-        } else {
-          if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
         }
         setEndPending(false);
       }
@@ -38016,10 +38062,7 @@
         setPausePending(false);
         setEndPending(false);
         if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-          if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "global sync (session ended)" });
           setPending(null);
-        } else {
-          if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
         }
         setSessionFeedbackSaving(false);
         removeAllMarkers();
@@ -38045,37 +38088,23 @@
       pointersPropRef.current = pointersProp;
       setPointers(pointersProp);
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "pointers sync effect" });
         setPending(null);
-      } else {
-        if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
       }
     }, [extensionMode, pointersProp]);
     (0, import_react4.useEffect)(() => {
       if (!extensionMode || !loadSessionWithPointers?.sessionId) return;
       setPointers(loadSessionWithPointers.pointers ?? []);
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "loadSessionWithPointers" });
         setPending(null);
-      } else {
-        if (ECHLY_DEBUG) console.log("ECHLY pending clear skipped during capture");
       }
       onSessionLoaded?.();
     }, [extensionMode, loadSessionWithPointers, onSessionLoaded]);
     const handleSessionElementClicked = (0, import_react4.useCallback)(
       async (element) => {
-        console.log("=== [ECHLY DEBUG] CLICK DETECTED ===");
-        console.log("State:", {
-          sessionMode,
-          sessionPaused,
-          sessionFeedbackPending
-        });
         if (sessionFeedbackPending && !captureRootRef.current) {
-          if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionElementClicked (no root)" });
           setPending(null);
           return;
         }
-        console.log("=== [ECHLY DEBUG] BLOCK CHECK ===", { getFullTabImage: !!getFullTabImage, sessionFeedbackPending });
         if (!getFullTabImage || sessionFeedbackPending != null) return;
         logSession("element clicked");
         playShutterSound();
@@ -38083,17 +38112,10 @@
         try {
           fullImage = await getFullTabImage();
         } catch (err) {
-          console.warn("Screenshot error ignored:", err);
+          logger.warn("extension", "screenshot_capture_failed", err);
           fullImage = null;
         }
-        console.log("=== [ECHLY DEBUG] SCREENSHOT RESULT ===", {
-          exists: !!fullImage,
-          length: fullImage?.length
-        });
-        console.log("=== [ECHLY DEBUG] CONTINUING TO FEEDBACK UI ===");
-        console.log("Screenshot captured:", !!fullImage);
         let screenshot = void 0;
-        console.log("=== [ECHLY DEBUG] BLOCK CHECK ===", fullImage);
         if (fullImage) {
           const containerRect = detectVisualContainer(element);
           const safeRect = clampRect({
@@ -38102,15 +38124,11 @@
             w: containerRect.width,
             h: containerRect.height
           });
-          if (ECHLY_DEBUG) {
-            console.log("ECHLY ELEMENT DETECTED", element);
-            console.log("ECHLY CONTAINER RECT", safeRect);
-          }
           try {
             const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
             screenshot = await cropImageToRegion(fullImage, safeRect, dpr);
           } catch (err) {
-            console.warn("Crop failed \u2014 continuing without screenshot", err);
+            logger.warn("extension", "screenshot_crop_failed", err);
           }
         }
         const context = buildCaptureContext(window, element);
@@ -38124,7 +38142,6 @@
           height: rect.height
         };
         lastSessionClickedElementRef.current = element instanceof HTMLElement ? element : null;
-        if (ECHLY_DEBUG) console.log("ECHLY pending SET", { screenshot: !!screenshot, context });
         sessionFeedbackPendingRef.current = true;
         setPending({ screenshot: screenshot || void 0, context, elementRect });
         onSessionActivity?.();
@@ -38135,7 +38152,6 @@
       (transcript) => {
         const pending = sessionFeedbackPending;
         if (!pending || !transcript || transcript.trim().length === 0) {
-          if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackSubmit (invalid)" });
           setPending(null);
           return;
         }
@@ -38162,17 +38178,17 @@
             }
           );
         }
-        if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackSubmit (submit)" });
         setPending(null);
         setSessionFeedbackSaving(true);
         setState("idle");
         lastSessionClickedElementRef.current = null;
-        if (ECHLY_DEBUG) console.log("[VOICE] final transcript sent to pipeline:", transcript);
         try {
           pipelineActiveRef.current = true;
+          logger.debug("ai", "processing_started", { source: "text_session_mode" });
           onComplete(transcript, pending.screenshot ?? null, {
             onSuccess: (ticket) => {
               pipelineActiveRef.current = false;
+              logger.debug("ai", "processing_success", { ticketId: ticket.id });
               setSessionFeedbackSaving(false);
               if (root) {
                 updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
@@ -38189,6 +38205,7 @@
             },
             onError: () => {
               pipelineActiveRef.current = false;
+              logger.error("ai", "processing_failed");
               setSessionFeedbackSaving(false);
               if (root) removeMarker(placeholderId);
               setErrorMessage("AI processing failed.");
@@ -38198,15 +38215,24 @@
           pipelineActiveRef.current = false;
           setSessionFeedbackSaving(false);
           if (root) removeMarker(placeholderId);
-          console.error(error);
+          logger.error("error", "ai_processing_failed", error);
+          logger.error("ai", "processing_failed");
           setErrorMessage("AI processing failed.");
         }
       },
       [sessionFeedbackPending, onComplete]
     );
     const handleSessionFeedbackCancel = (0, import_react4.useCallback)(() => {
-      if (ECHLY_DEBUG) console.log("ECHLY pending CLEARED", { reason: "handleSessionFeedbackCancel" });
-      recognitionRef.current?.stop();
+      const recorder = mediaRecorderRef.current;
+      try {
+        if (recorder && recorder.state !== "inactive") {
+          recorder.stop();
+        }
+      } catch (error) {
+        logger.error("error", "voice_stop_failed", error);
+      }
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = null;
       recordingActiveRef.current = false;
       pipelineActiveRef.current = false;
       const activeId = activeRecordingIdRef.current;
@@ -38237,7 +38263,16 @@
     const startCapture = (0, import_react4.useCallback)(() => {
       if (stateRef.current !== "idle") return;
       setErrorMessage(null);
-      recognitionRef.current?.stop();
+      const recorder = mediaRecorderRef.current;
+      try {
+        if (recorder && recorder.state !== "inactive") {
+          recorder.stop();
+        }
+      } catch (error) {
+        logger.error("error", "voice_stop_failed", error);
+      }
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = null;
       setWidgetOpenBeforeCapture(isOpen);
       setIsOpenState(false);
       createCaptureRoot();
@@ -38246,7 +38281,16 @@
     const handleAddFeedback = (0, import_react4.useCallback)(async () => {
       if (stateRef.current !== "idle") return;
       setErrorMessage(null);
-      recognitionRef.current?.stop();
+      const recorder = mediaRecorderRef.current;
+      try {
+        if (recorder && recorder.state !== "inactive") {
+          recorder.stop();
+        }
+      } catch (error) {
+        logger.error("error", "voice_stop_failed", error);
+      }
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = null;
       setWidgetOpenBeforeCapture(isOpen);
       setIsOpenState(false);
       createCaptureRoot();
@@ -38258,10 +38302,10 @@
       try {
         screenshot = await captureScreenshot();
       } catch (err) {
-        console.warn("Screenshot error ignored:", err);
+        logger.warn("extension", "screenshot_capture_failed", err);
         screenshot = null;
       }
-      console.log("Screenshot captured:", !!screenshot);
+      logger.debug("extension", "screenshot_captured", { exists: !!screenshot });
       const id = generateRecordingId();
       const newRecording = {
         id,
@@ -40670,11 +40714,12 @@
   // echly-extension/src/content.tsx
   var import_react18 = __toESM(require_react());
   var import_client = __toESM(require_client());
+  logger.debug("extension", "content_script_loaded", { href: window.location.href });
   var echlyEventDispatcher = null;
   if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
-        console.log("[ECHLY CONTENT] received ECHLY_OPEN_PREVIOUS_SESSIONS");
+        logger.debug("extension", "open_previous_sessions_requested");
         if (echlyEventDispatcher) {
           echlyEventDispatcher("ECHLY_OPEN_PREVIOUS_SESSIONS");
         }
@@ -40705,8 +40750,8 @@
       return { hasError: true, error };
     }
     componentDidCatch(error, errorInfo) {
-      console.error("[ECHLY ERROR BOUNDARY]", error);
-      console.error("[ECHLY ERROR BOUNDARY] componentStack:", errorInfo.componentStack);
+      logger.error("error", "content_error_boundary", error);
+      logger.error("error", "content_error_boundary_component_stack", errorInfo.componentStack);
     }
     render() {
       if (this.state.hasError && this.state.error) {
@@ -40732,7 +40777,7 @@
     }
   }
   function setHostVisibility(visible) {
-    console.log("[ECHLY CONTENT] tray visibility:", visible);
+    logger.debug("extension", "tray_visibility_changed", { visible });
     const host = document.getElementById(SHADOW_HOST_ID3);
     if (host) {
       host.style.display = visible ? "block" : "none";
@@ -40793,7 +40838,6 @@
   function ContentApp({ widgetRoot, initialTheme }) {
     const [user, setUser] = import_react18.default.useState(null);
     const [authState, setAuthState] = import_react18.default.useState("loading");
-    const [sessionMessage, setSessionMessage] = import_react18.default.useState(null);
     const [theme, setTheme] = import_react18.default.useState(initialTheme);
     const [globalState, setGlobalState] = import_react18.default.useState({
       visible: false,
@@ -40827,7 +40871,7 @@
       const timeoutId = setTimeout(() => {
         setIsProcessingFeedback((current) => {
           if (current) {
-            console.warn("[ECHLY FAILSAFE] Resetting stuck state");
+            logger.warn("extension", "failsafe_reset_stuck_state");
             return false;
           }
           return current;
@@ -40843,13 +40887,13 @@
     }, []);
     const launcherLogoUrl = getAssetUrl("assets/Echly_logo_launcher.svg");
     import_react18.default.useEffect(() => {
-      console.log("[ECHLY DEBUG] ContentApp mounted");
+      logger.debug("extension", "content_app_mounted");
     }, []);
     import_react18.default.useEffect(() => {
-      console.log("[ECHLY DEBUG] openResumeModal state:", openResumeModalFromMessage);
+      logger.debug("extension", "resume_modal_state", { openResumeModalFromMessage });
     }, [openResumeModalFromMessage]);
     import_react18.default.useEffect(() => {
-      console.log("[ECHLY DEBUG] hasPreviousSessions state:", hasPreviousSessions);
+      logger.debug("extension", "previous_sessions_state", { hasPreviousSessions });
     }, [hasPreviousSessions]);
     import_react18.default.useEffect(() => {
       echlyEventDispatcher = (type) => {
@@ -40941,24 +40985,6 @@
         cancelled = true;
       };
     }, [globalState.visible]);
-    const readApiResponseSafely = import_react18.default.useCallback(
-      async (response) => {
-        let data = null;
-        let text = null;
-        try {
-          text = await response.text();
-          try {
-            data = JSON.parse(text);
-          } catch {
-            console.warn("[ECHLY WARN] Non-JSON response:", text);
-          }
-        } catch (err) {
-          console.error("[ECHLY ERROR] Failed to read response:", err);
-        }
-        return { data, text };
-      },
-      []
-    );
     const isAuthFailureResponse = import_react18.default.useCallback((text) => {
       return Boolean(
         text?.includes("Not authenticated") || text?.includes("NOT_AUTHENTICATED")
@@ -40973,7 +40999,7 @@
           }
         );
       });
-      console.log("[ECHLY TOKEN] Retrieved:", token ? "YES" : "NO");
+      logger.debug("extension", "token_retrieved", { hasToken: !!token });
       return token;
     }, []);
     import_react18.default.useEffect(() => {
@@ -41001,7 +41027,7 @@
     }, []);
     import_react18.default.useEffect(() => {
       const handler = () => {
-        console.log("[ECHLY CONTENT] OPEN_WIDGET event received in DOM");
+        logger.debug("extension", "open_widget_dom_event_received");
         chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {
         });
       };
@@ -41014,11 +41040,10 @@
           { type: "START_RECORDING" },
           (response) => {
             if (chrome.runtime.lastError) {
-              setSessionMessage(chrome.runtime.lastError.message || "Failed to start recording");
               return;
             }
             if (!response?.ok) {
-              setSessionMessage(response?.error || "No active session selected.");
+              return;
             }
           }
         );
@@ -41080,15 +41105,15 @@
         }
         const ctx = context;
         const imageForOcr = ctx?.ocrImageDataUrl ?? screenshot ?? null;
-        let ocrText = "";
+        let extractedVisibleText = "";
         try {
           const result = await Promise.race([
             getVisibleTextFromScreenshot(imageForOcr),
             new Promise((resolve) => setTimeout(() => resolve(""), 1500))
           ]);
-          ocrText = result ?? "";
+          extractedVisibleText = result ?? "";
         } catch {
-          ocrText = "";
+          extractedVisibleText = "";
         }
         const currentUrl = typeof window !== "undefined" ? window.location.href : "";
         let selectedElement = null;
@@ -41103,7 +41128,7 @@
         const { ocrImageDataUrl: _ocrImg, ...contextForApi } = context ?? {};
         const enrichedContext = {
           ...contextForApi,
-          visibleText: ocrText?.trim() && ocrText || context?.visibleText || null,
+          visibleText: extractedVisibleText?.trim() && extractedVisibleText || context?.visibleText || null,
           url: context?.url ?? currentUrl,
           elementType: elementType || null
         };
@@ -41115,9 +41140,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               transcript,
-              context: enrichedContext,
-              ocr: ocrText || null,
-              ocrText: ocrText || null
+              context: enrichedContext
             })
           });
           structured = await res.json();
@@ -41136,7 +41159,6 @@
           }
           const token = await getExtensionToken();
           if (!token) {
-            setSessionMessage("Authentication expired. Please sign in again.");
             throw new Error("No extension token available");
           }
           const feedbackId = generateFeedbackId();
@@ -41195,7 +41217,7 @@
           }
           throw new Error("Feedback creation returned no ticket.");
         } catch (e) {
-          console.error("[ECHLY] Feedback create failed:", e);
+          logger.error("error", "feedback_create_failed", e);
           throw e;
         }
       },
@@ -41233,7 +41255,7 @@
           callbacks?.onSuccess?.(ticket);
           return ticket;
         } catch (err) {
-          console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
+          logger.error("error", "feedback_pipeline_failed", err);
           if (jobId) {
             setFeedbackJobs(
               (prev) => prev.map((j) => j.id === jobId ? { ...j, status: "failed", errorMessage: "AI processing failed." } : j)
@@ -41252,7 +41274,7 @@
         await apiFetch(`/api/tickets/${id}`, { method: "DELETE" });
         notifyFeedbackCountRefetch(effectiveSessionId);
       } catch (err) {
-        console.error("[Echly] Delete ticket failed:", err);
+        logger.error("error", "delete_ticket_failed", err);
         throw err;
       }
     }, [effectiveSessionId]);
@@ -41303,27 +41325,33 @@
             });
           }
         } catch (err) {
-          console.error("[Echly] Session title update failed:", err);
+          logger.error("error", "session_title_update_failed", err);
         }
       },
       [effectiveSessionId]
     );
     const fetchSessions = import_react18.default.useCallback(async () => {
       const sessions = await getSessionsCached(apiFetch);
-      if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", { count: sessions.length, sessions });
+      if (ECHLY_DEBUG) logger.debug("extension", "sessions_returned", { count: sessions.length });
       return sessions;
     }, []);
     import_react18.default.useEffect(() => {
       fetchSessions?.();
     }, [fetchSessions]);
     async function createSession() {
-      if (ECHLY_DEBUG) console.log("[Echly] Creating session");
+      if (ECHLY_DEBUG) logger.debug("extension", "session_create_started");
       try {
         const res = await apiFetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
         const data = await res.json();
-        console.log("[ECHLY DEBUG] startSession response:", res.status, { ok: res.ok, success: data.success, sessionId: data.session?.id, error: data.error });
+        logger.debug("extension", "session_create_response", {
+          status: res.status,
+          ok: res.ok,
+          success: data.success,
+          sessionId: data.session?.id,
+          error: data.error
+        });
         if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
-          console.log("[ECHLY DEBUG] session limit reached \u2192 returning limitReached for upgrade view");
+          logger.debug("extension", "session_limit_reached");
           return {
             limitReached: true,
             message: data.message ?? "You've reached your session limit.",
@@ -41334,7 +41362,7 @@
         invalidateSessionsCache();
         return { id: data.session.id };
       } catch (err) {
-        console.error("[Echly] Failed to create session:", err);
+        logger.error("error", "session_create_failed", err);
         return null;
       }
     }
@@ -41448,8 +41476,8 @@
       environment
     };
     try {
-      console.log("[ECHLY DEBUG PROPS]", captureWidgetPropsForDebug);
-      console.log("[ECHLY DEBUG ENV]", {
+      logger.debug("extension", "capture_widget_props", {
+        props: captureWidgetPropsForDebug,
         hasEnv: !!environment,
         methods: {
           createSession: !!environment?.createSession,
@@ -41459,7 +41487,7 @@
         }
       });
     } catch (logErr) {
-      console.error("[ECHLY DEBUG LOG FAILED]", logErr);
+      logger.error("error", "debug_log_failed", logErr);
     }
     try {
       return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_jsx_runtime11.Fragment, { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(EchlyWidgetErrorBoundary, { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
@@ -41514,7 +41542,7 @@
             const sessionId = globalState.sessionId;
             (async () => {
               await new Promise((resolve, reject) => {
-                chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, (response) => {
+                chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, () => {
                   if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
                   else resolve();
                 });
@@ -41535,9 +41563,9 @@
           sessionLimitReached,
           environment,
           onPreviousSessions: () => {
-            console.log("[ECHLY DEBUG] EXTENSION handler fired");
+            logger.debug("extension", "previous_sessions_handler_fired");
             setOpenResumeModalFromMessage(true);
-            console.log("[ECHLY DEBUG] openResumeModal set TRUE");
+            logger.debug("extension", "resume_modal_opened");
           },
           onSetCaptureMode: (mode) => chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(() => {
           }),
@@ -41549,7 +41577,7 @@
         widgetResetKey
       ) }) });
     } catch (e) {
-      console.error("[ECHLY CRASH]", e);
+      logger.error("error", "extension_crash", e);
       return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { "data-echly-crashed": true, children: "CRASHED" });
     }
   }
@@ -41597,7 +41625,7 @@
     const initialTheme = getPreferredTheme();
     container2.setAttribute("data-theme", initialTheme);
     shadowRoot.appendChild(container2);
-    console.log("[ECHLY CONTENT] mounting widget root");
+    logger.debug("extension", "mounting_widget_root");
     const reactRoot = (0, import_client.createRoot)(container2);
     reactRoot.render(/* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ContentApp, { widgetRoot: container2, initialTheme }));
   }
@@ -41629,7 +41657,7 @@
       new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } })
     );
   }
-  function syncInitialGlobalState(host) {
+  function syncInitialGlobalState() {
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_GLOBAL_STATE" },
       (response) => {
@@ -41653,23 +41681,19 @@
       );
     });
   }
-  function ensureMessageListener(host) {
+  function ensureMessageListener() {
     const win = window;
     if (win.__ECHLY_MESSAGE_LISTENER__) return;
     win.__ECHLY_MESSAGE_LISTENER__ = true;
     chrome.runtime.onMessage.addListener((msg) => {
-      console.log("[ECHLY CONTENT] message received:", msg.type);
-      if (msg.type === "ECHLY_OPEN_WIDGET") console.log("[ECHLY CONTENT] OPEN_WIDGET (message)");
-      if (msg.type === "ECHLY_GLOBAL_STATE") console.log("[ECHLY CONTENT] ECHLY_GLOBAL_STATE (message)");
-      if (msg.type === "ECHLY_START_SESSION") console.log("[ECHLY CONTENT] ECHLY_START_SESSION (message)");
-      if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") console.log("[ECHLY CONTENT] ECHLY_OPEN_PREVIOUS_SESSIONS (message)");
+      logger.debug("extension", "runtime_message_received", { type: msg.type });
       if (msg.type === "ECHLY_FEEDBACK_CREATED" && msg.ticket && msg.sessionId) {
         echlyLog("CONTENT", "dispatch event", { type: "ECHLY_FEEDBACK_CREATED" });
         window.dispatchEvent(new CustomEvent("ECHLY_FEEDBACK_CREATED", { detail: { ticket: msg.ticket, sessionId: msg.sessionId } }));
         return;
       }
       if (msg.type === "ECHLY_OPEN_WIDGET") {
-        console.log("[ECHLY CONTENT] OPEN_WIDGET event dispatching");
+        logger.debug("extension", "open_widget_event_dispatching");
         setHostVisibility(true);
         window.dispatchEvent(new CustomEvent("ECHLY_OPEN_WIDGET"));
         return;
@@ -41755,7 +41779,7 @@
     observer.observe(document.documentElement, { childList: true });
   }
   function injectWidgetUI() {
-    console.log("[ECHLY INJECT] UI injected");
+    logger.debug("extension", "ui_injected");
     if (window.__ECHLY_WIDGET_LOADED__) return;
     window.__ECHLY_WIDGET_LOADED__ = true;
     let host = document.getElementById(SHADOW_HOST_ID3);
@@ -41775,7 +41799,7 @@
       waitForBody(() => {
         document.body.appendChild(host);
         mountReactApp(host);
-        ensureMessageListener(host);
+        ensureMessageListener();
         chrome.runtime.sendMessage(
           { type: "ECHLY_GET_GLOBAL_STATE" },
           (response) => {
@@ -41791,8 +41815,8 @@
         );
       });
     } else {
-      ensureMessageListener(host);
-      syncInitialGlobalState(host);
+      ensureMessageListener();
+      syncInitialGlobalState();
     }
     ensureVisibilityStateRefresh();
     ensureScrollDebugListeners();

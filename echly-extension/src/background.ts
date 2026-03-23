@@ -3,7 +3,7 @@
  * Uses backend session: POST /api/extension/session (credentials: include) for extensionToken.
  * Content scripts never hold tokens; all API requests go through background with Bearer token.
  */
-import { ECHLY_DEBUG, warn } from "../../lib/utils/logger";
+import { ECHLY_DEBUG } from "../../lib/utils/logger";
 import { echlyLog } from "../../lib/debug/echlyLogger";
 import { setExtensionToken, apiFetch } from "../utils/apiFetch";
 import { API_BASE, WEB_APP_URL } from "../config";
@@ -984,7 +984,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === "ECHLY_FEEDBACK_CREATED") {
     const ticket = (request as { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } }).ticket;
-    const sessionId = (request as { sessionId?: string }).sessionId ?? globalUIState.sessionId;
     if (ticket?.id && ticket?.title) {
       const pointer: StructuredFeedback = {
         id: ticket.id,
@@ -1016,7 +1015,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         to?: CountStatus;
       };
     };
-    const sessionId = payload.sessionId ?? globalUIState.sessionId;
     const mutation = payload.mutation;
     if (mutation?.kind === "create") {
       mutateGlobalCounts((counts) => ({

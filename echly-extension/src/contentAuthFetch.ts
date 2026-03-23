@@ -30,14 +30,30 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
     });
 
     const url = getFullUrl(input);
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(init.headers instanceof Headers
+    const headers: Record<string, string> =
+      init.headers instanceof Headers
         ? Object.fromEntries(init.headers)
         : Array.isArray(init.headers)
           ? Object.fromEntries(init.headers)
-          : (init.headers as Record<string, string>) ?? {}),
-    };
+          : (init.headers as Record<string, string>) ?? {};
+    const body = init.body;
+    const isFormDataBody = typeof FormData !== "undefined" && body instanceof FormData;
+
+    if (!isFormDataBody && body != null) {
+      const hasContentType = Object.keys(headers).some(
+        (headerName) => headerName.toLowerCase() === "content-type"
+      );
+      if (!hasContentType) {
+        headers["Content-Type"] = "application/json";
+      }
+    }
+
+    if (isFormDataBody) {
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === "content-type") delete headers[key];
+      }
+    }
+
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }

@@ -16,6 +16,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Let transcribe-audio route own its CORS policy entirely.
+  if (pathname === "/api/transcribe-audio") {
+    return NextResponse.next();
+  }
+
   const headers = corsHeaders(request);
 
   // Handle OPTIONS preflight: return 200 immediately with CORS headers (exact origin for credentials: include)

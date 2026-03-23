@@ -3,7 +3,6 @@ import { NextRequest } from "next/server";
 const allowedOrigins = [
   "http://localhost:3000",
   "https://echly-web.vercel.app",
-  "https://www.bearitgroup.com",
 ];
 
 export function corsHeaders(req: NextRequest) {
@@ -21,7 +20,7 @@ export function corsHeaders(req: NextRequest) {
 
   const allowOrigin = allowedOrigins.includes(origin)
     ? origin
-    : allowedOrigins[0];
+    : "null";
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,

@@ -19,16 +19,19 @@ import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/lib/capture-engine/core/CaptureWidget";
 import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/lib/capture-engine/core/types";
 import { ExtensionCaptureEnvironment } from "@/lib/capture-engine/ExtensionCaptureEnvironment";
-import { ECHLY_DEBUG, log } from "@/lib/utils/logger";
+import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
+import { logger } from "@/lib/logger";
+
+logger.debug("extension", "content_script_loaded", { href: window.location.href });
 
 let echlyEventDispatcher: ((type: string) => void) | null = null;
 
 if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
     if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
-      console.log("[ECHLY CONTENT] received ECHLY_OPEN_PREVIOUS_SESSIONS");
+      logger.debug("extension", "open_previous_sessions_requested");
       if (echlyEventDispatcher) {
         echlyEventDispatcher("ECHLY_OPEN_PREVIOUS_SESSIONS");
       }
@@ -72,8 +75,8 @@ class EchlyWidgetErrorBoundary extends React.Component<
     return { hasError: true, error };
   }
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("[ECHLY ERROR BOUNDARY]", error);
-    console.error("[ECHLY ERROR BOUNDARY] componentStack:", errorInfo.componentStack);
+    logger.error("error", "content_error_boundary", error);
+    logger.error("error", "content_error_boundary_component_stack", errorInfo.componentStack);
   }
   render() {
     if (this.state.hasError && this.state.error) {
@@ -101,7 +104,7 @@ function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
 }
 
 function setHostVisibility(visible: boolean): void {
-  console.log("[ECHLY CONTENT] tray visibility:", visible);
+  logger.debug("extension", "tray_visibility_changed", { visible });
   const host = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
   if (host) {
     host.style.display = visible ? "block" : "none";
@@ -217,7 +220,6 @@ type ContentAppProps = {
 function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [authState, setAuthState] = React.useState<"loading" | "authenticated" | "unauthenticated">("loading");
-  const [sessionMessage, setSessionMessage] = React.useState<string | null>(null);
   const [theme, setTheme] = React.useState<"dark" | "light">(initialTheme);
   const [globalState, setGlobalState] = React.useState<GlobalUIState>({
     visible: false,
@@ -258,7 +260,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     const timeoutId = setTimeout(() => {
       setIsProcessingFeedback((current) => {
         if (current) {
-          console.warn("[ECHLY FAILSAFE] Resetting stuck state");
+          logger.warn("extension", "failsafe_reset_stuck_state");
           return false;
         }
         return current;
@@ -277,16 +279,16 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const launcherLogoUrl = getAssetUrl("assets/Echly_logo_launcher.svg");
 
   React.useEffect(() => {
-    console.log("[ECHLY DEBUG] ContentApp mounted");
+    logger.debug("extension", "content_app_mounted");
   }, []);
 
 
   React.useEffect(() => {
-    console.log("[ECHLY DEBUG] openResumeModal state:", openResumeModalFromMessage);
+    logger.debug("extension", "resume_modal_state", { openResumeModalFromMessage });
   }, [openResumeModalFromMessage]);
 
   React.useEffect(() => {
-    console.log("[ECHLY DEBUG] hasPreviousSessions state:", hasPreviousSessions);
+    logger.debug("extension", "previous_sessions_state", { hasPreviousSessions });
   }, [hasPreviousSessions]);
 
   React.useEffect(() => {
@@ -395,27 +397,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     };
   }, [globalState.visible]);
 
-  const readApiResponseSafely = React.useCallback(
-    async <T,>(response: Response): Promise<{ data: T | null; text: string | null }> => {
-      let data: T | null = null;
-      let text: string | null = null;
-
-      try {
-        text = await response.text();
-        try {
-          data = JSON.parse(text) as T;
-        } catch {
-          console.warn("[ECHLY WARN] Non-JSON response:", text);
-        }
-      } catch (err) {
-        console.error("[ECHLY ERROR] Failed to read response:", err);
-      }
-
-      return { data, text };
-    },
-    []
-  );
-
   const isAuthFailureResponse = React.useCallback((text: string | null): boolean => {
     return Boolean(
       text?.includes("Not authenticated") ||
@@ -432,7 +413,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
       );
     });
-    console.log("[ECHLY TOKEN] Retrieved:", token ? "YES" : "NO");
+    logger.debug("extension", "token_retrieved", { hasToken: !!token });
     return token;
   }, []);
 
@@ -465,7 +446,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   /* Extension: open widget (icon or popup) → request expand so background keeps state in sync. */
   React.useEffect(() => {
     const handler = () => {
-      console.log("[ECHLY CONTENT] OPEN_WIDGET event received in DOM");
+      logger.debug("extension", "open_widget_dom_event_received");
       chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {});
     };
     window.addEventListener("ECHLY_OPEN_WIDGET", handler);
@@ -478,11 +459,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         { type: "START_RECORDING" },
         (response: { ok?: boolean; error?: string } | undefined) => {
           if (chrome.runtime.lastError) {
-            setSessionMessage(chrome.runtime.lastError.message || "Failed to start recording");
             return;
           }
           if (!response?.ok) {
-            setSessionMessage(response?.error || "No active session selected.");
+            return;
           }
         }
       );
@@ -557,15 +537,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
       const ctx = context as CaptureContext | null | undefined;
       const imageForOcr = ctx?.ocrImageDataUrl ?? screenshot ?? null;
-      let ocrText = "";
+      let extractedVisibleText = "";
       try {
         const result = await Promise.race([
           getVisibleTextFromScreenshot(imageForOcr),
           new Promise<string>((resolve) => setTimeout(() => resolve(""), 1500)),
         ]);
-        ocrText = result ?? "";
+        extractedVisibleText = result ?? "";
       } catch {
-        ocrText = "";
+        extractedVisibleText = "";
       }
 
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
@@ -581,7 +561,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       const { ocrImageDataUrl: _ocrImg, ...contextForApi } = (context ?? {}) as Record<string, unknown>;
       const enrichedContext: CaptureContext = {
         ...(contextForApi as Omit<CaptureContext, "visibleText" | "url">),
-        visibleText: (ocrText?.trim() && ocrText) || (context as CaptureContext | null)?.visibleText || null,
+        visibleText:
+          (extractedVisibleText?.trim() && extractedVisibleText) ||
+          (context as CaptureContext | null)?.visibleText ||
+          null,
         url: (context as CaptureContext | null)?.url ?? currentUrl,
         elementType: elementType || null,
       };
@@ -606,8 +589,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           body: JSON.stringify({
             transcript,
             context: enrichedContext,
-            ocr: ocrText || null,
-            ocrText: ocrText || null,
           }),
         });
         structured = (await res.json()) as {
@@ -636,7 +617,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
         const token = await getExtensionToken();
         if (!token) {
-          setSessionMessage("Authentication expired. Please sign in again.");
           throw new Error("No extension token available");
         }
 
@@ -721,7 +701,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
         throw new Error("Feedback creation returned no ticket.");
       } catch (e) {
-        console.error("[ECHLY] Feedback create failed:", e);
+        logger.error("error", "feedback_create_failed", e);
         throw e;
       }
     },
@@ -783,7 +763,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         callbacks?.onSuccess?.(ticket);
         return ticket;
       } catch (err) {
-        console.error("[ECHLY ERROR] Feedback pipeline failed:", err);
+        logger.error("error", "feedback_pipeline_failed", err);
         if (jobId) {
           setFeedbackJobs((prev) =>
             prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "AI processing failed." } : j))
@@ -803,7 +783,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       await apiFetch(`/api/tickets/${id}`, { method: "DELETE" });
       notifyFeedbackCountRefetch(effectiveSessionId);
     } catch (err) {
-      console.error("[Echly] Delete ticket failed:", err);
+      logger.error("error", "delete_ticket_failed", err);
       throw err;
     }
   }, [effectiveSessionId]);
@@ -854,7 +834,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           }).catch(() => {});
         }
       } catch (err) {
-        console.error("[Echly] Session title update failed:", err);
+        logger.error("error", "session_title_update_failed", err);
       }
     },
     [effectiveSessionId]
@@ -862,7 +842,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   const fetchSessions = React.useCallback(async () => {
     const sessions = await getSessionsCached(apiFetch);
-    if (ECHLY_DEBUG) console.log("[Echly] Sessions returned:", { count: sessions.length, sessions });
+    if (ECHLY_DEBUG) logger.debug("extension", "sessions_returned", { count: sessions.length });
     return sessions;
   }, []);
 
@@ -874,7 +854,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   async function createSession(): Promise<
     { id: string } | { limitReached: true; message: string; upgradePlan: unknown } | null
   > {
-    if (ECHLY_DEBUG) console.log("[Echly] Creating session");
+    if (ECHLY_DEBUG) logger.debug("extension", "session_create_started");
     try {
       const res = await apiFetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const data = (await res.json()) as {
@@ -884,9 +864,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         message?: string;
         upgradePlan?: unknown;
       };
-      console.log("[ECHLY DEBUG] startSession response:", res.status, { ok: res.ok, success: data.success, sessionId: data.session?.id, error: data.error });
+      logger.debug("extension", "session_create_response", {
+        status: res.status,
+        ok: res.ok,
+        success: data.success,
+        sessionId: data.session?.id,
+        error: data.error,
+      });
       if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
-        console.log("[ECHLY DEBUG] session limit reached → returning limitReached for upgrade view");
+        logger.debug("extension", "session_limit_reached");
         return {
           limitReached: true,
           message: data.message ?? "You've reached your session limit.",
@@ -897,7 +883,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       invalidateSessionsCache();
       return { id: data.session.id };
     } catch (err) {
-      console.error("[Echly] Failed to create session:", err);
+      logger.error("error", "session_create_failed", err);
       return null;
     }
   }
@@ -1015,8 +1001,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   };
 
   try {
-    console.log("[ECHLY DEBUG PROPS]", captureWidgetPropsForDebug);
-    console.log("[ECHLY DEBUG ENV]", {
+    logger.debug("extension", "capture_widget_props", {
+      props: captureWidgetPropsForDebug,
       hasEnv: !!environment,
       methods: {
         createSession: !!environment?.createSession,
@@ -1026,7 +1012,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       },
     });
   } catch (logErr) {
-    console.error("[ECHLY DEBUG LOG FAILED]", logErr);
+    logger.error("error", "debug_log_failed", logErr);
   }
 
   try {
@@ -1079,7 +1065,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             const sessionId = globalState.sessionId;
             (async () => {
               await new Promise<void>((resolve, reject) => {
-                chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, (response) => {
+                chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, () => {
                   if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
                   else resolve();
                 });
@@ -1098,9 +1084,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           sessionLimitReached={sessionLimitReached}
           environment={environment}
           onPreviousSessions={() => {
-            console.log("[ECHLY DEBUG] EXTENSION handler fired");
+            logger.debug("extension", "previous_sessions_handler_fired");
             setOpenResumeModalFromMessage(true);
-            console.log("[ECHLY DEBUG] openResumeModal set TRUE");
+            logger.debug("extension", "resume_modal_opened");
           }}
           onSetCaptureMode={(mode) => chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(() => {})}
           onOpenBilling={() => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {})}
@@ -1111,7 +1097,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     </>
   );
   } catch (e) {
-    console.error("[ECHLY CRASH]", e);
+    logger.error("error", "extension_crash", e);
     return <div data-echly-crashed>CRASHED</div>;
   }
 }
@@ -1171,7 +1157,7 @@ function mountReactApp(host: HTMLDivElement): void {
   container.setAttribute("data-theme", initialTheme);
   shadowRoot.appendChild(container);
 
-  console.log("[ECHLY CONTENT] mounting widget root");
+  logger.debug("extension", "mounting_widget_root");
   const reactRoot = createRoot(container);
   reactRoot.render(<ContentApp widgetRoot={container} initialTheme={initialTheme} />);
 }
@@ -1211,7 +1197,7 @@ function dispatchGlobalState(state: GlobalUIState): void {
 }
 
 /** Request initial global state from background; visibility is applied via setHostVisibilityFromState when state is received. */
-function syncInitialGlobalState(host: HTMLDivElement): void {
+function syncInitialGlobalState(): void {
   chrome.runtime.sendMessage(
     { type: "ECHLY_GET_GLOBAL_STATE" },
     (response: GlobalStateResponse) => {
@@ -1239,23 +1225,19 @@ function ensureVisibilityStateRefresh(): void {
 }
 
 /** Listen for global state; single listener. Background is source of truth. */
-function ensureMessageListener(host: HTMLDivElement): void {
+function ensureMessageListener(): void {
   const win = window as Window & { __ECHLY_MESSAGE_LISTENER__?: boolean };
   if (win.__ECHLY_MESSAGE_LISTENER__) return;
   win.__ECHLY_MESSAGE_LISTENER__ = true;
   chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; instruction?: string; description?: string; type?: string }; sessionId?: string }) => {
-    console.log("[ECHLY CONTENT] message received:", msg.type);
-    if (msg.type === "ECHLY_OPEN_WIDGET") console.log("[ECHLY CONTENT] OPEN_WIDGET (message)");
-    if (msg.type === "ECHLY_GLOBAL_STATE") console.log("[ECHLY CONTENT] ECHLY_GLOBAL_STATE (message)");
-    if (msg.type === "ECHLY_START_SESSION") console.log("[ECHLY CONTENT] ECHLY_START_SESSION (message)");
-    if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") console.log("[ECHLY CONTENT] ECHLY_OPEN_PREVIOUS_SESSIONS (message)");
+    logger.debug("extension", "runtime_message_received", { type: msg.type });
     if (msg.type === "ECHLY_FEEDBACK_CREATED" && msg.ticket && msg.sessionId) {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_FEEDBACK_CREATED" });
       window.dispatchEvent(new CustomEvent("ECHLY_FEEDBACK_CREATED", { detail: { ticket: msg.ticket, sessionId: msg.sessionId } }));
       return;
     }
     if (msg.type === "ECHLY_OPEN_WIDGET") {
-      console.log("[ECHLY CONTENT] OPEN_WIDGET event dispatching");
+      logger.debug("extension", "open_widget_event_dispatching");
       setHostVisibility(true);
       window.dispatchEvent(new CustomEvent("ECHLY_OPEN_WIDGET"));
       return;
@@ -1353,7 +1335,7 @@ function waitForBody(cb: () => void) {
  * Host is mounted only after document.body exists so the tray stays visible on all tabs.
  */
 function injectWidgetUI(): void {
-  console.log("[ECHLY INJECT] UI injected");
+  logger.debug("extension", "ui_injected");
   if (window.__ECHLY_WIDGET_LOADED__) return;
   window.__ECHLY_WIDGET_LOADED__ = true;
 
@@ -1375,7 +1357,7 @@ function injectWidgetUI(): void {
     waitForBody(() => {
       document.body.appendChild(host!);
       mountReactApp(host!);
-      ensureMessageListener(host!);
+      ensureMessageListener();
       /* Force state sync after mount so tray appears on every page when global state is visible. */
       chrome.runtime.sendMessage(
         { type: "ECHLY_GET_GLOBAL_STATE" },
@@ -1392,8 +1374,8 @@ function injectWidgetUI(): void {
       );
     });
   } else {
-    ensureMessageListener(host);
-    syncInitialGlobalState(host);
+    ensureMessageListener();
+    syncInitialGlobalState();
   }
   ensureVisibilityStateRefresh();
   ensureScrollDebugListeners();
