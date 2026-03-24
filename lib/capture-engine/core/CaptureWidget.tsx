@@ -121,6 +121,9 @@ export default function CaptureWidget({
           if (devices.length && !selectedMicrophone) setSelectedMicrophone(devices[0].deviceId || "");
         }
       : undefined,
+    onVoiceMicrophoneSelect: (deviceId) => {
+      setSelectedMicrophone(deviceId);
+    },
     captureRootParent,
     environment,
   });
@@ -324,10 +327,15 @@ export default function CaptureWidget({
             sessionPaused={state.sessionPaused}
             pausePending={state.pausePending}
             endPending={state.endPending}
+            isFinishing={state.isFinishing}
             sessionFeedbackPending={state.sessionFeedbackPending}
             captureMode={captureMode}
             listeningAudioLevel={state.listeningAudioLevel ?? 0}
             audioAnalyser={state.audioAnalyser ?? null}
+            voiceError={state.voiceError}
+            onRetryVoice={handlers.retryVoiceCapture}
+            onSelectMicrophone={handlers.selectVoiceMicrophone}
+            voiceMicDeviceId={state.voiceMicDeviceId}
             onSessionElementClicked={handlers.handleSessionElementClicked}
             onSessionPause={() => {
               handlers.pauseSession();
@@ -346,6 +354,7 @@ export default function CaptureWidget({
             onSessionDoneVoice={handlers.finishListening}
             onSessionSaveText={handlers.handleSessionFeedbackSubmit}
             onSessionFeedbackCancel={handlers.handleSessionFeedbackCancel}
+            theme={theme}
           />
         )}
 

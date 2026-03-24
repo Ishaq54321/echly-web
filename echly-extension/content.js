@@ -789,7 +789,7 @@
   var require_react_dom_production = __commonJS({
     "node_modules/react-dom/cjs/react-dom.production.js"(exports) {
       "use strict";
-      var React16 = require_react();
+      var React15 = require_react();
       function formatProdErrorMessage(code) {
         var url = "https://react.dev/errors/" + code;
         if (1 < arguments.length) {
@@ -828,7 +828,7 @@
           implementation
         };
       }
-      var ReactSharedInternals = React16.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+      var ReactSharedInternals = React15.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
       function getCrossOriginStringAs(as, input) {
         if ("font" === as) return "";
         if ("string" === typeof input)
@@ -963,7 +963,7 @@
   var require_react_dom_client_production = __commonJS({
     "node_modules/react-dom/cjs/react-dom-client.production.js"(exports) {
       "use strict";
-      var Scheduler = require_scheduler(), React16 = require_react(), ReactDOM = require_react_dom();
+      var Scheduler = require_scheduler(), React15 = require_react(), ReactDOM = require_react_dom();
       function formatProdErrorMessage(code) {
         var url = "https://react.dev/errors/" + code;
         if (1 < arguments.length) {
@@ -1143,7 +1143,7 @@
           }
         return null;
       }
-      var isArrayImpl = Array.isArray, ReactSharedInternals = React16.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, sharedNotPendingObject = {
+      var isArrayImpl = Array.isArray, ReactSharedInternals = React15.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, sharedNotPendingObject = {
         pending: false,
         data: null,
         method: null,
@@ -12383,7 +12383,7 @@
           0 === i && attemptExplicitHydrationTarget(target);
         }
       };
-      var isomorphicReactPackageVersion$jscomp$inline_1840 = React16.version;
+      var isomorphicReactPackageVersion$jscomp$inline_1840 = React15.version;
       if ("19.2.3" !== isomorphicReactPackageVersion$jscomp$inline_1840)
         throw Error(
           formatProdErrorMessage(
@@ -37004,6 +37004,9 @@
     }
     return "neutral";
   }
+  function isTranscriptUsable(transcript) {
+    return typeof transcript === "string" && transcript.trim().length >= 3;
+  }
   function generateRecordingId() {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
       return crypto.randomUUID();
@@ -37041,6 +37044,7 @@
     captureMode = "voice",
     selectedMicrophoneId,
     onDevicesEnumerated,
+    onVoiceMicrophoneSelect,
     captureRootParent,
     environment
   }) {
@@ -37082,7 +37086,10 @@
     const [endPending, setEndPending] = (0, import_react4.useState)(false);
     const [sessionFeedbackPending, setSessionFeedbackPending] = (0, import_react4.useState)(captureState.pending);
     const [sessionFeedbackSaving, setSessionFeedbackSaving] = (0, import_react4.useState)(false);
+    const [isFinishing, setIsFinishing] = (0, import_react4.useState)(false);
     const [sessionLimitReached, setSessionLimitReached] = (0, import_react4.useState)(null);
+    const [voiceError, setVoiceError] = (0, import_react4.useState)(null);
+    const [micDeviceOverride, setMicDeviceOverride] = (0, import_react4.useState)(null);
     const sessionModeRef = (0, import_react4.useRef)(false);
     const sessionPausedRef = (0, import_react4.useRef)(false);
     const sessionStatusRef = (0, import_react4.useRef)("idle");
@@ -37125,6 +37132,11 @@
     (0, import_react4.useEffect)(() => {
       sessionFeedbackPendingRef.current = sessionFeedbackPending != null;
     }, [sessionFeedbackPending]);
+    (0, import_react4.useEffect)(() => {
+      if (!sessionFeedbackPending) {
+        setIsFinishing(false);
+      }
+    }, [sessionFeedbackPending]);
     const setPending = (0, import_react4.useCallback)((value) => {
       captureState.pending = value;
       setSessionFeedbackPending(value);
@@ -37145,20 +37157,23 @@
         document.documentElement.style.filter = "";
       };
     }, [state]);
+    const stopListeningAudio = (0, import_react4.useCallback)(() => {
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+      audioContextRef.current?.close().catch(() => {
+      });
+      audioContextRef.current = null;
+      analyserRef.current = null;
+      setAudioAnalyser(null);
+      setListeningAudioLevel(0);
+    }, []);
     (0, import_react4.useEffect)(() => {
-      if (state !== "voice_listening") {
-        if (rafRef.current != null) {
-          cancelAnimationFrame(rafRef.current);
-          rafRef.current = null;
-        }
-        mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
-        mediaStreamRef.current = null;
-        audioContextRef.current?.close().catch(() => {
-        });
-        audioContextRef.current = null;
-        analyserRef.current = null;
-        setAudioAnalyser(null);
-        setListeningAudioLevel(0);
+      if (state !== "voice_listening" || isFinishing) {
+        stopListeningAudio();
         return;
       }
       const analyser = analyserRef.current;
@@ -37179,7 +37194,7 @@
         cancelAnimationFrame(rafId);
         rafRef.current = null;
       };
-    }, [state]);
+    }, [state, isFinishing, stopListeningAudio]);
     (0, import_react4.useEffect)(() => {
       editingIdRef.current = editingId;
     }, [editingId]);
@@ -37392,6 +37407,7 @@
     }, [extensionMode, sessionId, initialPointers, environment]);
     const startListening = (0, import_react4.useCallback)(async () => {
       echlyLog("RECORDING", "start");
+      setVoiceError(null);
       const startTime = Date.now();
       voiceStartTimeRef.current = startTime;
       logger.debug("voice", "recording_started", { startTime });
@@ -37403,8 +37419,10 @@
           label: d.label || `Microphone ${inputs.indexOf(d) + 1}`
         }));
         onDevicesEnumerated?.(deviceList);
-        const audioConstraints = selectedMicrophoneId ? { deviceId: { exact: selectedMicrophoneId } } : true;
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+        const effectiveMicId = micDeviceOverride ?? selectedMicrophoneId ?? void 0;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: effectiveMicId && effectiveMicId.length > 0 ? { deviceId: { exact: effectiveMicId } } : true
+        });
         mediaStreamRef.current = stream;
         const ctx = new AudioContext();
         const analyser = ctx.createAnalyser();
@@ -37427,6 +37445,7 @@
         mediaRecorder.start();
         logger.debug("voice", "recording_started");
         recordingActiveRef.current = true;
+        setIsFinishing(false);
         setState("voice_listening");
         setListeningAudioLevel(0);
       } catch (err) {
@@ -37435,13 +37454,33 @@
         if (extensionMode && pointersPropRef.current) {
           setPointers(pointersPropRef.current);
         }
+        if (sessionFeedbackPendingRef.current) {
+          setVoiceError("mic_permission");
+          setState("idle");
+          return;
+        }
         setErrorMessage("Microphone permission denied.");
         setState("error");
         removeCaptureRoot();
         restoreWidget();
       }
-    }, [selectedMicrophoneId, onDevicesEnumerated]);
+    }, [selectedMicrophoneId, micDeviceOverride, onDevicesEnumerated, extensionMode, removeCaptureRoot, restoreWidget]);
+    const retryVoiceCapture = (0, import_react4.useCallback)(() => {
+      setVoiceError(null);
+      setErrorMessage(null);
+      startListening();
+    }, [startListening]);
+    const selectVoiceMicrophone = (0, import_react4.useCallback)(
+      (deviceId) => {
+        if (!deviceId) return;
+        onVoiceMicrophoneSelect?.(deviceId);
+        setMicDeviceOverride(deviceId);
+      },
+      [onVoiceMicrophoneSelect]
+    );
     const finishListening = (0, import_react4.useCallback)(async () => {
+      if (isFinishing) return;
+      setIsFinishing(true);
       echlyLog("RECORDING", "finish requested");
       recordingActiveRef.current = false;
       if (extensionMode && pointersPropRef.current) {
@@ -37453,7 +37492,9 @@
       playDoneClick();
       const mediaRecorder = mediaRecorderRef.current;
       if (!mediaRecorder) {
+        stopListeningAudio();
         setState("idle");
+        setIsFinishing(false);
         return;
       }
       const activeId = activeRecordingIdRef.current;
@@ -37462,9 +37503,11 @@
           if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
         } catch {
         }
+        stopListeningAudio();
         audioChunksRef.current = [];
         mediaRecorderRef.current = null;
         setState("idle");
+        setIsFinishing(false);
         return;
       }
       mediaRecorder.onstop = async () => {
@@ -37472,6 +37515,7 @@
         const audioFile = new File(audioChunksRef.current, "recording.webm", {
           type: "audio/webm"
         });
+        const voiceFailurePanelOpen = sessionFeedbackPendingRef.current;
         logger.debug("voice", "file_created", {
           size: audioFile.size,
           type: audioFile.type,
@@ -37489,17 +37533,35 @@
             body: formData,
             credentials: "include"
           });
+          let data = {};
+          try {
+            data = await res.json();
+          } catch {
+            data = {};
+          }
           if (!res.ok) {
             logger.error("error", "voice_transcription_http_failed", { status: res.status });
             logger.error("voice", "transcription_failed", { status: res.status });
+            const noSpeech = res.status === 400 && data?.error === "NO_SPEECH_DETECTED";
+            if (voiceFailurePanelOpen) {
+              setVoiceError(noSpeech ? "no_audio" : "transcription_failed");
+            } else {
+              setErrorMessage(
+                noSpeech ? "We didn't detect clear audio. Try again." : "Transcription failed. Try again."
+              );
+            }
             setState("idle");
             return;
           }
-          const data = await res.json();
           const transcript = data?.transcript;
-          if (typeof transcript !== "string" || transcript.trim().length === 0) {
+          if (!isTranscriptUsable(transcript)) {
             logger.error("error", "voice_invalid_transcript");
             logger.error("voice", "transcription_failed");
+            if (voiceFailurePanelOpen) {
+              setVoiceError("no_audio");
+            } else {
+              setErrorMessage("We didn't detect clear audio. Try again.");
+            }
             setState("idle");
             return;
           }
@@ -37516,6 +37578,7 @@
           if (extensionMode) {
             const isSessionFeedback = sessionModeRef.current;
             if (isSessionFeedback) {
+              setPending(null);
               const root = captureRootRef.current;
               const element = lastSessionClickedElementRef.current ?? void 0;
               const placeholderId = `pending-${Date.now()}`;
@@ -37532,7 +37595,6 @@
                   }
                 );
               }
-              setPending(null);
               setSessionFeedbackSaving(true);
               setRecordings((prev) => prev.filter((r) => r.id !== activeId));
               setActiveRecordingId(null);
@@ -37650,24 +37712,35 @@
         } catch (error) {
           logger.error("error", "voice_transcription_failed", error);
           logger.error("voice", "transcription_failed");
+          if (voiceFailurePanelOpen) {
+            setVoiceError("transcription_failed");
+          } else {
+            setErrorMessage("Transcription failed. Try again.");
+          }
           setState("idle");
         } finally {
           audioChunksRef.current = [];
           mediaRecorderRef.current = null;
+          setIsFinishing(false);
         }
       };
       try {
         if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
+        stopListeningAudio();
       } catch (error) {
         logger.error("error", "voice_stop_failed", error);
+        stopListeningAudio();
         audioChunksRef.current = [];
         mediaRecorderRef.current = null;
         setState("idle");
+        setIsFinishing(false);
       }
-    }, [onComplete, extensionMode, removeCaptureRoot, restoreWidget, environment]);
+    }, [isFinishing, onComplete, extensionMode, removeCaptureRoot, restoreWidget, environment, setPending, stopListeningAudio]);
     const discardListening = (0, import_react4.useCallback)(() => {
       echlyLog("RECORDING", "discard");
+      setVoiceError(null);
       recordingActiveRef.current = false;
+      setIsFinishing(false);
       if (extensionMode && pointersPropRef.current) {
         setPointers(pointersPropRef.current);
       }
@@ -37679,6 +37752,7 @@
       } catch (error) {
         logger.error("error", "voice_stop_failed", error);
       }
+      stopListeningAudio();
       audioChunksRef.current = [];
       mediaRecorderRef.current = null;
       const activeId = activeRecordingIdRef.current;
@@ -37687,7 +37761,7 @@
       setState("cancelled");
       removeCaptureRoot();
       restoreWidget();
-    }, [extensionMode, removeCaptureRoot, restoreWidget]);
+    }, [extensionMode, removeCaptureRoot, restoreWidget, stopListeningAudio]);
     (0, import_react4.useEffect)(() => {
       if (!captureRootReady) return;
       const onKeyDown = (e) => {
@@ -38223,6 +38297,8 @@
       [sessionFeedbackPending, onComplete]
     );
     const handleSessionFeedbackCancel = (0, import_react4.useCallback)(() => {
+      setVoiceError(null);
+      setIsFinishing(false);
       const recorder = mediaRecorderRef.current;
       try {
         if (recorder && recorder.state !== "inactive") {
@@ -38231,6 +38307,7 @@
       } catch (error) {
         logger.error("error", "voice_stop_failed", error);
       }
+      stopListeningAudio();
       audioChunksRef.current = [];
       mediaRecorderRef.current = null;
       recordingActiveRef.current = false;
@@ -38243,7 +38320,7 @@
       setPending(null);
       setSessionFeedbackSaving(false);
       setState("idle");
-    }, [setPending]);
+    }, [setPending, stopListeningAudio]);
     const handleSessionStartVoice = (0, import_react4.useCallback)(() => {
       const pending = sessionFeedbackPending;
       if (!pending) return;
@@ -38357,7 +38434,9 @@
         handleSessionElementClicked,
         handleSessionFeedbackSubmit,
         handleSessionFeedbackCancel,
-        handleSessionStartVoice
+        handleSessionStartVoice,
+        retryVoiceCapture,
+        selectVoiceMicrophone
       }),
       [
         setIsOpen,
@@ -38390,7 +38469,9 @@
         handleSessionElementClicked,
         handleSessionFeedbackSubmit,
         handleSessionFeedbackCancel,
-        handleSessionStartVoice
+        handleSessionStartVoice,
+        retryVoiceCapture,
+        selectVoiceMicrophone
       ]
     );
     const activeRecording = (0, import_react4.useMemo)(
@@ -38425,9 +38506,12 @@
         sessionPaused,
         pausePending,
         endPending,
+        isFinishing,
         sessionFeedbackPending,
         sessionLimitReached,
-        audioAnalyser
+        audioAnalyser,
+        voiceError,
+        voiceMicDeviceId: micDeviceOverride ?? selectedMicrophoneId ?? ""
       },
       handlers,
       refs: {
@@ -39097,201 +39181,479 @@
 
   // components/CaptureWidget/VoiceCapturePanel.tsx
   var import_jsx_runtime5 = __toESM(require_jsx_runtime());
-
-  // components/ChatGPTWaveform.tsx
   var import_react9 = __toESM(require_react());
-  var BAR_COUNT = 120;
-  var BAR_WIDTH = 2;
-  var GAP = 2;
-  var MAX_HEIGHT = 26;
-  var MIN_HEIGHT = 2;
-  var SILENCE_THRESHOLD = 0.02;
-  var BASELINE_BAR_HEIGHT = 1;
-  function ChatGPTWaveform({ analyser }) {
-    const canvasRef = (0, import_react9.useRef)(null);
-    (0, import_react9.useEffect)(() => {
-      if (!analyser) return;
-      const node = analyser;
-      const canvasEl = canvasRef.current;
-      if (!canvasEl) return;
-      const ctx2d = canvasEl.getContext("2d");
-      if (!ctx2d) return;
-      const bufferLength = node.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-      const totalWidth = BAR_COUNT * (BAR_WIDTH + GAP) - GAP;
-      const canvasWidth = totalWidth;
-      const canvasHeight = 52;
-      let rafId;
-      let smoothedAmplitude = 0;
-      function draw(ctx, canvas) {
-        rafId = requestAnimationFrame(() => draw(ctx, canvas));
-        node.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-        const rawAvg = dataArray.length ? sum / dataArray.length / 255 : 0;
-        const amplitude = rawAvg < SILENCE_THRESHOLD ? 0 : rawAvg;
-        smoothedAmplitude = smoothedAmplitude * 0.8 + amplitude * 0.2;
-        const isSilent = smoothedAmplitude < SILENCE_THRESHOLD;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const centerY = canvasHeight / 2;
-        for (let i = 0; i < BAR_COUNT; i++) {
-          const value = dataArray[Math.floor(i / BAR_COUNT * bufferLength)] ?? 0;
-          const normalized = value / 255;
-          const barBelowThreshold = normalized < SILENCE_THRESHOLD;
-          let height;
-          let opacity;
-          if (isSilent || barBelowThreshold) {
-            height = BASELINE_BAR_HEIGHT;
-            opacity = 0.4;
-          } else {
-            const scale = Math.max(0, (normalized - SILENCE_THRESHOLD) / (1 - SILENCE_THRESHOLD));
-            height = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, MIN_HEIGHT + scale * (MAX_HEIGHT - MIN_HEIGHT)));
-            opacity = 1;
-          }
-          const x = i * (BAR_WIDTH + GAP);
-          const halfH = height / 2;
-          ctx.fillStyle = `rgba(59, 130, 246, ${opacity})`;
-          roundRect(ctx, x, centerY - halfH, BAR_WIDTH, height, 2);
-          ctx.fill();
-        }
-      }
-      function roundRect(c, x, y, w, h, r) {
-        if (r <= 0) {
-          c.rect(x, y, w, h);
-          return;
-        }
-        c.beginPath();
-        c.moveTo(x + r, y);
-        c.lineTo(x + w - r, y);
-        c.quadraticCurveTo(x + w, y, x + w, y + r);
-        c.lineTo(x + w, y + h - r);
-        c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        c.lineTo(x + r, y + h);
-        c.quadraticCurveTo(x, y + h, x, y + h - r);
-        c.lineTo(x, y + r);
-        c.quadraticCurveTo(x, y, x + r, y);
-        c.closePath();
-      }
-      draw(ctx2d, canvasEl);
-      return () => cancelAnimationFrame(rafId);
-    }, [analyser]);
-    if (!analyser) {
-      return /* @__PURE__ */ import_react9.default.createElement("div", { className: "waveform-placeholder" });
-    }
-    return /* @__PURE__ */ import_react9.default.createElement(
-      "canvas",
-      {
-        ref: canvasRef,
-        width: BAR_COUNT * (BAR_WIDTH + GAP) - GAP,
-        height: 52,
-        className: "echly-chatgpt-waveform"
-      }
-    );
-  }
-
-  // components/CaptureWidget/VoiceCapturePanel.tsx
-  var import_react10 = __toESM(require_react());
   var import_react_dom = __toESM(require_react_dom());
+  var BAR_WIDTH = 2;
+  var WAVEFORM_SAMPLE_MS = 50;
+  var RMS_TO_BYTE = 3;
+  function formatMicLabel(label) {
+    if (!label?.trim()) return "Unknown device";
+    let s = label.trim();
+    const wrapped = /^Microphone\s*\(\s*(.+?)\s*\)\s*$/i.exec(s);
+    if (wrapped) {
+      const inner = wrapped[1].trim();
+      return inner || "Unknown device";
+    }
+    const numbered = /^Microphone\s+(\d+)$/i.exec(s);
+    if (numbered) {
+      return `Input ${numbered[1]}`;
+    }
+    s = s.replace(/^Microphone\s+/i, "").trim();
+    return s || "Unknown device";
+  }
+  function getMicType(label) {
+    const lower = label.toLowerCase();
+    if (lower.includes("default")) return "System Default";
+    if (lower.includes("webcam")) return "Webcam Mic";
+    if (lower.includes("headset")) return "Headset";
+    return "Microphone";
+  }
   function VoiceCapturePanel({
+    audioLevel: _audioLevel,
     onFinish,
     onCancel,
     screenshot,
     isListening = true,
+    isFinishing = false,
     analyser = null,
-    captureRoot = null
+    captureRoot = null,
+    voiceError = null,
+    onRetryVoice,
+    onSelectMicrophone,
+    voiceMicDeviceId = ""
   }) {
-    const [voiceActive, setVoiceActive] = (0, import_react10.useState)(false);
-    const voiceActiveRef = (0, import_react10.useRef)(false);
-    const [recordingStarted, setRecordingStarted] = (0, import_react10.useState)(false);
-    (0, import_react10.useEffect)(() => {
-      voiceActiveRef.current = voiceActive;
-    }, [voiceActive]);
-    (0, import_react10.useEffect)(() => {
-      if (!analyser) {
-        setVoiceActive(false);
-        return;
-      }
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      let rafId;
-      const tick = () => {
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-        const avg = dataArray.length ? sum / dataArray.length : 0;
-        const isSpeaking = avg > 20;
-        if (isSpeaking !== voiceActiveRef.current) {
-          voiceActiveRef.current = isSpeaking;
-          setVoiceActive(isSpeaking);
-        }
-        rafId = requestAnimationFrame(tick);
+    const [recordingStarted, setRecordingStarted] = (0, import_react9.useState)(false);
+    const [micPickerOpen, setMicPickerOpen] = (0, import_react9.useState)(false);
+    const [micDevices, setMicDevices] = (0, import_react9.useState)([]);
+    const [micDropdownRect, setMicDropdownRect] = (0, import_react9.useState)(null);
+    const [micSelecting, setMicSelecting] = (0, import_react9.useState)(false);
+    const micPickerRef = (0, import_react9.useRef)(null);
+    const micTriggerRef = (0, import_react9.useRef)(null);
+    const micClosingRef = (0, import_react9.useRef)(false);
+    const micCloseTimerRef = (0, import_react9.useRef)(null);
+    const [bars, setBars] = (0, import_react9.useState)([]);
+    const [barCount, setBarCount] = (0, import_react9.useState)(48);
+    const waveformRef = (0, import_react9.useRef)(null);
+    const barCountRef = (0, import_react9.useRef)(48);
+    const waveformRafRef = (0, import_react9.useRef)(0);
+    const lastWaveformSampleRef = (0, import_react9.useRef)(0);
+    (0, import_react9.useEffect)(() => {
+      barCountRef.current = barCount;
+    }, [barCount]);
+    (0, import_react9.useLayoutEffect)(() => {
+      const el = waveformRef.current;
+      if (!el) return;
+      const updateBarCount = () => {
+        const w = el.clientWidth;
+        if (w <= 0) return;
+        const n = Math.max(1, Math.floor(w / BAR_WIDTH));
+        setBarCount((prev) => prev === n ? prev : n);
       };
-      rafId = requestAnimationFrame(tick);
-      return () => cancelAnimationFrame(rafId);
-    }, [analyser]);
-    (0, import_react10.useEffect)(() => {
-      if (analyser && !recordingStarted) {
+      updateBarCount();
+      const ro = new ResizeObserver(() => {
+        updateBarCount();
+      });
+      ro.observe(el);
+      return () => ro.disconnect();
+    }, [isListening, isFinishing]);
+    const clearMicCloseTimer = (0, import_react9.useCallback)(() => {
+      if (micCloseTimerRef.current != null) {
+        clearTimeout(micCloseTimerRef.current);
+        micCloseTimerRef.current = null;
+      }
+      micClosingRef.current = false;
+      setMicSelecting(false);
+    }, []);
+    const showFailure = Boolean(voiceError);
+    const cardVisible = recordingStarted || showFailure;
+    (0, import_react9.useEffect)(() => {
+      if (analyser && !recordingStarted && !showFailure) {
         setRecordingStarted(true);
       }
-    }, [analyser, recordingStarted]);
-    (0, import_react10.useEffect)(() => {
+    }, [analyser, recordingStarted, showFailure]);
+    (0, import_react9.useEffect)(() => {
+      if (showFailure) {
+        setRecordingStarted(true);
+      }
+    }, [showFailure]);
+    const updateMicDropdownPosition = (0, import_react9.useCallback)(() => {
+      const btn = micTriggerRef.current;
+      if (!btn || !micPickerOpen) return;
+      const rect = btn.getBoundingClientRect();
+      const margin = 8;
+      const maxScroll = 260;
+      const spaceAbove = rect.top - margin;
+      const spaceBelow = window.innerHeight - rect.bottom - margin;
+      const canFitFullMenuUp = spaceAbove >= maxScroll + margin;
+      const preferUp = canFitFullMenuUp || spaceAbove >= spaceBelow && spaceAbove >= Math.min(maxScroll, 80);
+      let top;
+      let maxHeight;
+      let width = rect.width;
+      if (preferUp) {
+        maxHeight = Math.min(maxScroll, Math.max(margin * 2, spaceAbove));
+        top = rect.top - margin - maxHeight;
+        if (top < margin) {
+          maxHeight = Math.max(margin * 2, rect.top - margin * 2);
+          top = margin;
+        }
+      } else {
+        maxHeight = Math.min(maxScroll, Math.max(margin * 2, spaceBelow));
+        top = rect.bottom + margin;
+        if (top + maxHeight > window.innerHeight - margin) {
+          maxHeight = Math.max(margin * 2, window.innerHeight - margin - top);
+        }
+      }
+      width = Math.min(Math.max(width * 1.05, 320), window.innerWidth - 2 * margin);
+      const half = width / 2;
+      let anchorX = rect.left + rect.width / 2;
+      anchorX = Math.max(margin + half, Math.min(anchorX, window.innerWidth - margin - half));
+      setMicDropdownRect({ top, anchorX, width, maxHeight });
+    }, [micPickerOpen]);
+    (0, import_react9.useLayoutEffect)(() => {
+      if (!micPickerOpen || micDevices.length === 0) {
+        setMicDropdownRect(null);
+        return;
+      }
+      updateMicDropdownPosition();
+      const onResizeOrScroll = () => updateMicDropdownPosition();
+      window.addEventListener("resize", onResizeOrScroll);
+      window.addEventListener("scroll", onResizeOrScroll, true);
+      return () => {
+        window.removeEventListener("resize", onResizeOrScroll);
+        window.removeEventListener("scroll", onResizeOrScroll, true);
+      };
+    }, [micPickerOpen, micDevices.length, updateMicDropdownPosition]);
+    (0, import_react9.useEffect)(() => {
       if (!onCancel) return;
       const onKeyDown = (e) => {
         if (e.key === "Escape") {
+          if (micPickerOpen) {
+            e.preventDefault();
+            e.stopPropagation();
+            clearMicCloseTimer();
+            setMicPickerOpen(false);
+            return;
+          }
           e.preventDefault();
           onCancel();
         }
       };
       window.addEventListener("keydown", onKeyDown);
       return () => window.removeEventListener("keydown", onKeyDown);
-    }, [onCancel]);
+    }, [onCancel, micPickerOpen, clearMicCloseTimer]);
+    (0, import_react9.useEffect)(() => {
+      if (!micPickerOpen) return;
+      const onPointerDownOutside = (e) => {
+        if (e.button !== 0) return;
+        if (micClosingRef.current) return;
+        const root = micPickerRef.current;
+        const trigger = micTriggerRef.current;
+        const path = e.composedPath();
+        if (root && path.includes(root)) return;
+        if (trigger && path.includes(trigger)) return;
+        setMicPickerOpen(false);
+      };
+      document.addEventListener("pointerdown", onPointerDownOutside, true);
+      return () => document.removeEventListener("pointerdown", onPointerDownOutside, true);
+    }, [micPickerOpen]);
+    (0, import_react9.useEffect)(() => {
+      if (!micPickerOpen) {
+        clearMicCloseTimer();
+      }
+    }, [micPickerOpen, clearMicCloseTimer]);
+    (0, import_react9.useEffect)(() => () => clearMicCloseTimer(), [clearMicCloseTimer]);
+    (0, import_react9.useEffect)(() => {
+      setBars((prev) => {
+        const cap = barCount;
+        if (cap <= 0) return [];
+        if (prev.length === cap) return prev;
+        if (prev.length < cap) {
+          return [...prev, ...Array(cap - prev.length).fill(0)];
+        }
+        return prev.slice(0, cap);
+      });
+    }, [barCount]);
+    (0, import_react9.useEffect)(() => {
+      if (!analyser || !isListening || isFinishing) {
+        setBars([]);
+        lastWaveformSampleRef.current = 0;
+        return;
+      }
+      const bufferLen = analyser.fftSize;
+      const dataArray = new Uint8Array(bufferLen);
+      const tick = (t) => {
+        waveformRafRef.current = requestAnimationFrame(tick);
+        if (t - lastWaveformSampleRef.current < WAVEFORM_SAMPLE_MS) return;
+        lastWaveformSampleRef.current = t;
+        analyser.getByteTimeDomainData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < bufferLen; i++) {
+          const v = (dataArray[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / bufferLen);
+        const value = Math.min(255, Math.max(0, rms * 255 * RMS_TO_BYTE));
+        const normalized = value / 255;
+        const finalAmplitude = Math.min(normalized * 1.25, 1);
+        const cap = barCountRef.current;
+        if (cap < 1) return;
+        setBars((prev) => {
+          let next = [finalAmplitude, ...prev];
+          while (next.length > cap) next.pop();
+          while (next.length < cap) next.push(0);
+          return next;
+        });
+      };
+      waveformRafRef.current = requestAnimationFrame(tick);
+      return () => {
+        cancelAnimationFrame(waveformRafRef.current);
+      };
+    }, [analyser, isListening, isFinishing]);
+    const openMicPicker = (0, import_react9.useCallback)(async () => {
+      clearMicCloseTimer();
+      try {
+        const list = await navigator.mediaDevices.enumerateDevices();
+        const inputs = list.filter((d) => d.kind === "audioinput");
+        setMicDevices(
+          inputs.map((d, i) => ({
+            deviceId: d.deviceId,
+            label: d.label?.trim() || `Microphone ${i + 1}`
+          }))
+        );
+        setMicPickerOpen(true);
+      } catch {
+        setMicDevices([]);
+      }
+    }, [clearMicCloseTimer]);
+    const micDropdownPortalTarget = (0, import_react9.useMemo)(() => {
+      if (typeof document === "undefined") return null;
+      return captureRoot ?? document.getElementById("echly-root");
+    }, [captureRoot]);
+    const micDropdownMenu = micPickerOpen && micDevices.length > 0 && micDropdownRect && micDropdownPortalTarget ? (0, import_react_dom.createPortal)(
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        "div",
+        {
+          ref: micPickerRef,
+          className: `echly-voice-mic-dropdown${micSelecting ? " echly-voice-mic-dropdown--selecting" : ""}`,
+          style: {
+            position: "fixed",
+            top: micDropdownRect.top,
+            left: micDropdownRect.anchorX,
+            width: micDropdownRect.width,
+            maxHeight: micDropdownRect.maxHeight,
+            transform: "translateX(-50%)"
+          },
+          role: "listbox",
+          "aria-label": "Microphones",
+          onMouseDown: (e) => {
+            e.stopPropagation();
+          },
+          onClick: (e) => {
+            e.stopPropagation();
+          },
+          onWheel: (e) => {
+            e.stopPropagation();
+          },
+          children: micDevices.map((d) => {
+            const isActive = d.deviceId === voiceMicDeviceId;
+            const cleanLabel = formatMicLabel(d.label);
+            const micType = getMicType(d.label);
+            return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+              "button",
+              {
+                type: "button",
+                role: "option",
+                "aria-selected": isActive,
+                "aria-label": `${cleanLabel}, ${micType}`,
+                className: `echly-mic-item ${isActive ? "is-active" : ""}`,
+                onClick: (e) => {
+                  e.stopPropagation();
+                  if (!d.deviceId || micClosingRef.current) return;
+                  onSelectMicrophone?.(d.deviceId);
+                  setMicSelecting(true);
+                  micClosingRef.current = true;
+                  micCloseTimerRef.current = setTimeout(() => {
+                    micCloseTimerRef.current = null;
+                    micClosingRef.current = false;
+                    setMicSelecting(false);
+                    setMicPickerOpen(false);
+                  }, 2e3);
+                },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "echly-mic-text", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-mic-title", children: cleanLabel }),
+                    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-mic-sub", children: micType })
+                  ] }),
+                  isActive && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-mic-check", "aria-hidden": true, children: "\u2713" })
+                ]
+              },
+              d.deviceId
+            );
+          })
+        }
+      ),
+      micDropdownPortalTarget
+    ) : null;
+    const failureCopy = (() => {
+      if (voiceError === "mic_permission") {
+        return {
+          title: "Microphone access is required",
+          description: "Allow microphone access in your browser settings to record voice feedback."
+        };
+      }
+      if (voiceError === "transcription_failed") {
+        return {
+          title: "Couldn't transcribe that",
+          description: "Something went wrong while processing audio. Try speaking again or check your connection."
+        };
+      }
+      return {
+        title: "Couldn't hear anything",
+        description: "We didn't detect clear audio. Check your microphone and try again."
+      };
+    })();
     const dimLayer = /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       "div",
       {
-        className: `echly-dim-layer ${recordingStarted ? "echly-dim-layer--visible" : ""}`,
+        className: `echly-dim-layer ${cardVisible ? "echly-dim-layer--visible" : ""}`,
         "aria-hidden": true
       }
     );
+    const failureBody = showFailure && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "echly-voice-failure-body", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-voice-failure-icon-wrap", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(MicOff, { size: 40, strokeWidth: 1.5 }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "echly-capture-header echly-voice-failure-header", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h2", { className: "echly-capture-title", children: failureCopy.title }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "echly-capture-instruction", children: failureCopy.description })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "echly-voice-failure-actions", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          "button",
+          {
+            type: "button",
+            className: "echly-finish-btn",
+            onClick: () => onRetryVoice?.(),
+            children: "Try Again"
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-voice-failure-secondary-wrap", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          "button",
+          {
+            ref: micTriggerRef,
+            type: "button",
+            className: "echly-voice-failure-secondary",
+            onClick: () => void openMicPicker(),
+            "aria-expanded": micPickerOpen,
+            "aria-haspopup": "listbox",
+            children: "Select Microphone"
+          }
+        ) })
+      ] })
+    ] });
+    const normalBody = !showFailure && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "echly-voice-header", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-voice-status", children: !isFinishing && isListening ? /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "echly-dot", "aria-hidden": true }),
+          "Capturing feedback\u2026"
+        ] }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "echly-dot echly-dot--idle", "aria-hidden": true }),
+          "Wrapping up\u2026"
+        ] }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-voice-cancel", children: isFinishing ? "Finishing\u2026" : "Press Esc to cancel" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "echly-capture-header", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h2", { className: "echly-capture-title", children: "Voice feedback" }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "echly-capture-instruction", children: "Describe what you noticed\u2014Echly structures it for your team." })
+      ] }),
+      isListening && !isFinishing ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-capture-visualizer", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-waveform-container", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { ref: waveformRef, className: "echly-waveform", "aria-hidden": true, children: bars.map((value, i) => {
+        const n = bars.length;
+        const fade = n <= 1 ? 1 : 0.4 + 0.6 * (1 - i / (n - 1));
+        return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          "div",
+          {
+            className: "echly-bar",
+            style: {
+              height: `${value * 100}%`,
+              opacity: fade
+            }
+          },
+          i
+        );
+      }) }) }) }) : null,
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        "button",
+        {
+          type: "button",
+          className: "echly-finish-btn",
+          onClick: onFinish,
+          disabled: isFinishing,
+          children: isFinishing ? "Finishing..." : "Finish"
+        }
+      )
+    ] });
     const card = /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "div",
       {
-        className: `echly-capture-card ${recordingStarted ? "echly-capture-card--visible" : ""}`,
+        className: `echly-capture-card panel ${cardVisible ? "echly-capture-card--visible" : ""}`,
         "data-echly-ui": "true",
         children: [
-          screenshot && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-capture-screenshot-preview", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("img", { src: screenshot, alt: "Capture" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h2", { className: "echly-capture-title", children: "Voice Feedback" }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "echly-capture-instruction", children: "Describe the issue \u2014 Echly will structure it." }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-capture-visualizer", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-waveform-container", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ChatGPTWaveform, { analyser }) }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-capture-status", children: isListening ? "Listening\u2026" : "Paused" }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { type: "button", className: "echly-finish-btn", onClick: onFinish, children: "Finish" }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "echly-capture-cancel-hint", children: "(Press Esc. to cancel)" })
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-capture-card-blur-bg panel-bg", "aria-hidden": true }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "echly-capture-card-content panel-content", children: [
+            screenshot && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "echly-capture-screenshot-preview", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("img", { src: screenshot, alt: "Capture" }) }),
+            failureBody,
+            normalBody
+          ] })
         ]
       }
     );
-    if (captureRoot) {
-      return (0, import_react_dom.createPortal)(
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+      captureRoot ? (0, import_react_dom.createPortal)(
         /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
           dimLayer,
           card
         ] }),
         captureRoot
-      );
-    }
-    return card;
+      ) : card,
+      micDropdownMenu
+    ] });
   }
 
   // components/CaptureWidget/TextFeedbackPanel.tsx
   var import_jsx_runtime6 = __toESM(require_jsx_runtime());
-  var import_react11 = __toESM(require_react());
+  var import_react10 = __toESM(require_react());
+  function subscribeEchlyRootTheme(onChange) {
+    if (typeof document === "undefined") return () => {
+    };
+    const root = document.getElementById("echly-root");
+    if (!root) return () => {
+    };
+    const obs = new MutationObserver(onChange);
+    obs.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }
+  function getEchlyRootThemeSnapshot() {
+    const t = document.getElementById("echly-root")?.getAttribute("data-theme");
+    return t === "light" ? "light" : "dark";
+  }
+  function getEchlyRootThemeServerSnapshot() {
+    return "dark";
+  }
+  function useResolvedTheme(prop) {
+    const fromDom = (0, import_react10.useSyncExternalStore)(
+      subscribeEchlyRootTheme,
+      getEchlyRootThemeSnapshot,
+      getEchlyRootThemeServerSnapshot
+    );
+    return prop ?? fromDom;
+  }
   function TextFeedbackPanel({
     screenshot,
     onSubmit,
-    onCancel
+    onCancel,
+    theme: themeProp
   }) {
-    const [text, setText] = (0, import_react11.useState)("");
+    const [text, setText] = (0, import_react10.useState)("");
+    const theme = useResolvedTheme(themeProp);
+    const isDark = theme === "dark";
     const handleSubmit = () => {
       const t = text.trim();
       if (t) onSubmit(t);
@@ -39299,51 +39661,18 @@
     return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
       "div",
       {
-        className: "text-feedback",
+        className: `echly-text-modal ${isDark ? "dark" : "light"}`,
         "data-echly-ui": "true",
-        style: {
-          position: "fixed",
-          pointerEvents: "auto",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: "min(380px, 92vw)",
-          borderRadius: 14,
-          background: "rgba(20,22,28,0.92)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          zIndex: 2147483647,
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif'
-        },
         children: [
-          screenshot && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { padding: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-            "div",
+          screenshot && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "echly-text-modal__shot-wrap", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "echly-text-modal__shot-frame", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            "img",
             {
-              style: {
-                borderRadius: 14,
-                overflow: "hidden",
-                background: "rgba(0,0,0,0.3)",
-                aspectRatio: "16/10",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              },
-              children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                "img",
-                {
-                  src: screenshot,
-                  alt: "Capture",
-                  style: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }
-                }
-              )
+              src: screenshot,
+              alt: "Capture",
+              style: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }
             }
-          ) }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: { padding: 20, display: "flex", flexDirection: "column", gap: 12 }, children: [
+          ) }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "echly-text-modal__body", children: [
             /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
               "textarea",
               {
@@ -39352,57 +39681,18 @@
                 placeholder: "Describe the feedback...",
                 "aria-label": "Feedback text",
                 rows: 3,
-                className: "text-feedback-textarea",
-                style: {
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  background: "rgba(255,255,255,0.06)",
-                  color: "#F3F4F6",
-                  fontSize: 14,
-                  resize: "vertical",
-                  minHeight: 80
-                }
+                className: "echly-textarea"
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
-              onCancel && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                "button",
-                {
-                  type: "button",
-                  onClick: onCancel,
-                  style: {
-                    padding: "8px 14px",
-                    borderRadius: 8,
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    background: "transparent",
-                    color: "#A1A1AA",
-                    fontSize: 14,
-                    fontWeight: 500,
-                    cursor: "pointer"
-                  },
-                  children: "Cancel"
-                }
-              ),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "echly-text-actions", children: [
+              onCancel && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "button", onClick: onCancel, className: "echly-btn-cancel", children: "Cancel" }),
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
                 "button",
                 {
                   type: "button",
-                  className: "submit-feedback",
+                  className: "echly-btn-save submit-feedback",
                   onClick: handleSubmit,
                   disabled: !text.trim(),
-                  style: {
-                    padding: "12px 20px",
-                    borderRadius: 10,
-                    border: "none",
-                    background: text.trim() ? "#155DFC" : "rgba(255,255,255,0.08)",
-                    color: "#fff",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: text.trim() ? "pointer" : "default"
-                  },
                   children: "Save Feedback"
                 }
               )
@@ -39414,7 +39704,7 @@
   }
 
   // components/CaptureWidget/SessionOverlay.tsx
-  var import_react12 = __toESM(require_react());
+  var import_react11 = __toESM(require_react());
   var import_react_dom2 = __toESM(require_react_dom());
   function createCommentCursor() {
     const svg = [
@@ -39431,6 +39721,7 @@
     sessionPaused,
     pausePending = false,
     endPending = false,
+    isFinishing = false,
     sessionFeedbackPending,
     state,
     onElementClicked,
@@ -39443,13 +39734,18 @@
     onCancel,
     captureMode = "voice",
     listeningAudioLevel = 0,
-    audioAnalyser = null
+    audioAnalyser = null,
+    voiceError = null,
+    onRetryVoice,
+    onSelectMicrophone,
+    voiceMicDeviceId = "",
+    theme = "dark"
   }) {
-    const cleanupRef = (0, import_react12.useRef)([]);
-    const voiceStartedForPendingRef = (0, import_react12.useRef)(false);
+    const cleanupRef = (0, import_react11.useRef)([]);
+    const voiceStartedForPendingRef = (0, import_react11.useRef)(false);
     const sessionActionPending = pausePending || endPending;
     const sessionCursorActive = sessionMode && !sessionPaused && !sessionActionPending;
-    (0, import_react12.useEffect)(() => {
+    (0, import_react11.useEffect)(() => {
       if (!sessionMode || !captureRoot) return;
       const getActive = () => sessionMode && !sessionPaused && !sessionActionPending && sessionFeedbackPending == null;
       cleanupRef.current.push(
@@ -39475,7 +39771,7 @@
       sessionFeedbackPending,
       onElementClicked
     ]);
-    (0, import_react12.useEffect)(() => {
+    (0, import_react11.useEffect)(() => {
       if (!captureRoot?.isConnected) return;
       const previousCursor = document.body.style.cursor;
       document.body.style.cursor = sessionCursorActive ? COMMENT_CURSOR : "";
@@ -39483,22 +39779,22 @@
         document.body.style.cursor = previousCursor;
       };
     }, [sessionCursorActive, captureRoot]);
-    (0, import_react12.useEffect)(() => {
+    (0, import_react11.useEffect)(() => {
       if (!sessionFeedbackPending || captureMode !== "voice" || voiceStartedForPendingRef.current) return;
       voiceStartedForPendingRef.current = true;
       onRecordVoice();
     }, [sessionFeedbackPending, captureMode, onRecordVoice]);
-    (0, import_react12.useEffect)(() => {
+    (0, import_react11.useEffect)(() => {
       if (!sessionFeedbackPending) voiceStartedForPendingRef.current = false;
     }, [sessionFeedbackPending]);
     if (!sessionMode || !captureRoot) return null;
-    const content = /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, sessionFeedbackPending && /* @__PURE__ */ import_react12.default.createElement(
+    const content = /* @__PURE__ */ import_react11.default.createElement(import_react11.default.Fragment, null, sessionFeedbackPending && /* @__PURE__ */ import_react11.default.createElement(
       "div",
       {
         className: "echly-dim-layer echly-dim-layer--visible",
         "aria-hidden": true
       }
-    ), /* @__PURE__ */ import_react12.default.createElement(
+    ), /* @__PURE__ */ import_react11.default.createElement(
       "div",
       {
         "aria-hidden": true,
@@ -39511,7 +39807,7 @@
           cursor: sessionCursorActive ? COMMENT_CURSOR : "default"
         }
       }
-    ), /* @__PURE__ */ import_react12.default.createElement(
+    ), /* @__PURE__ */ import_react11.default.createElement(
       SessionControlPanel,
       {
         sessionPaused,
@@ -39521,23 +39817,29 @@
         onResume,
         onEnd
       }
-    ), sessionFeedbackPending && captureMode === "voice" && /* @__PURE__ */ import_react12.default.createElement(
+    ), sessionFeedbackPending && captureMode === "voice" && /* @__PURE__ */ import_react11.default.createElement(
       VoiceCapturePanel,
       {
         captureRoot,
         screenshot: sessionFeedbackPending.screenshot ?? void 0,
         audioLevel: listeningAudioLevel,
-        isListening: state === "voice_listening",
+        isListening: state === "voice_listening" && !isFinishing && !voiceError,
+        isFinishing,
         onFinish: onDoneVoice,
         onCancel,
-        analyser: audioAnalyser ?? null
+        analyser: !isFinishing && !voiceError ? audioAnalyser ?? null : null,
+        voiceError,
+        onRetryVoice,
+        onSelectMicrophone,
+        voiceMicDeviceId
       }
-    ), sessionFeedbackPending && captureMode === "text" && /* @__PURE__ */ import_react12.default.createElement(
+    ), sessionFeedbackPending && captureMode === "text" && /* @__PURE__ */ import_react11.default.createElement(
       TextFeedbackPanel,
       {
         screenshot: sessionFeedbackPending.screenshot ?? void 0,
         onSubmit: onSaveText,
-        onCancel
+        onCancel,
+        theme
       }
     ));
     return (0, import_react_dom2.createPortal)(content, captureRoot);
@@ -39561,6 +39863,7 @@
     sessionPaused = false,
     pausePending = false,
     endPending = false,
+    isFinishing = false,
     sessionFeedbackPending = null,
     onSessionElementClicked,
     onSessionPause,
@@ -39573,7 +39876,12 @@
     },
     captureMode = "voice",
     listeningAudioLevel = 0,
-    audioAnalyser = null
+    audioAnalyser = null,
+    voiceError = null,
+    onRetryVoice,
+    onSelectMicrophone,
+    voiceMicDeviceId = "",
+    theme = "dark"
   }) {
     if (extensionMode && (!sessionMode || !sessionIdProp && !optimisticSessionStarting)) return null;
     const showSessionOverlay = sessionMode && extensionMode && (!!globalSessionModeActive && !!sessionIdProp || optimisticSessionStarting);
@@ -39588,11 +39896,16 @@
           sessionPaused,
           pausePending,
           endPending,
+          isFinishing,
           sessionFeedbackPending: sessionFeedbackPending ?? null,
           state,
           captureMode,
           listeningAudioLevel,
           audioAnalyser: audioAnalyser ?? null,
+          voiceError,
+          onRetryVoice,
+          onSelectMicrophone,
+          voiceMicDeviceId,
           onElementClicked: onSessionElementClicked,
           onPause: onSessionPause,
           onResume: onSessionResume,
@@ -39600,7 +39913,8 @@
           onRecordVoice: onSessionRecordVoice,
           onDoneVoice: onSessionDoneVoice,
           onSaveText: onSessionSaveText,
-          onCancel: onSessionFeedbackCancel
+          onCancel: onSessionFeedbackCancel,
+          theme
         }
       ),
       showDimOverlay && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
@@ -39634,7 +39948,7 @@
 
   // lib/capture-engine/core/ResumeSessionModal.tsx
   var import_jsx_runtime8 = __toESM(require_jsx_runtime());
-  var import_react14 = __toESM(require_react());
+  var import_react13 = __toESM(require_react());
   function sessionUpdatedAtToMs(value) {
     if (value == null) return 0;
     if (value instanceof Date) return value.getTime();
@@ -39685,14 +39999,14 @@
     checkAuth,
     onOpenLogin
   }) {
-    const [sessions, setSessions] = (0, import_react14.useState)([]);
-    const [loading, setLoading] = (0, import_react14.useState)(false);
-    const [error, setError] = (0, import_react14.useState)(null);
-    const [search, setSearch] = (0, import_react14.useState)("");
-    const [filter, setFilter] = (0, import_react14.useState)("all");
-    const [loginRequired, setLoginRequired] = (0, import_react14.useState)(false);
+    const [sessions, setSessions] = (0, import_react13.useState)([]);
+    const [loading, setLoading] = (0, import_react13.useState)(false);
+    const [error, setError] = (0, import_react13.useState)(null);
+    const [search, setSearch] = (0, import_react13.useState)("");
+    const [filter, setFilter] = (0, import_react13.useState)("all");
+    const [loginRequired, setLoginRequired] = (0, import_react13.useState)(false);
     const isLight = theme === "light";
-    (0, import_react14.useEffect)(() => {
+    (0, import_react13.useEffect)(() => {
       if (!open) return;
       setSearch("");
       setFilter("all");
@@ -39729,7 +40043,7 @@
         isMounted = false;
       };
     }, [open, fetchSessions, checkAuth]);
-    const filtered = (0, import_react14.useMemo)(() => {
+    const filtered = (0, import_react13.useMemo)(() => {
       let list = filterSessions(sessions, filter);
       if (search.trim()) {
         const q = search.trim().toLowerCase();
@@ -40023,15 +40337,15 @@
   }
 
   // lib/capture-engine/core/MicrophonePanel.tsx
-  var import_react15 = __toESM(require_react());
+  var import_react14 = __toESM(require_react());
   function MicrophonePanel({
     devices,
     selectedDeviceId,
     onSelect,
     onClose
   }) {
-    const panelRef = (0, import_react15.useRef)(null);
-    (0, import_react15.useEffect)(() => {
+    const panelRef = (0, import_react14.useRef)(null);
+    (0, import_react14.useEffect)(() => {
       const onMouseDown = (e) => {
         if (panelRef.current && !panelRef.current.contains(e.target)) {
           onClose();
@@ -40167,7 +40481,7 @@
   }
 
   // lib/capture-engine/core/CaptureWidget.tsx
-  var import_react17 = __toESM(require_react());
+  var import_react16 = __toESM(require_react());
   var CAPTURE_FLOW_STATES2 = ["focus_mode", "region_selecting", "voice_listening", "processing"];
   function CaptureWidget({
     sessionId,
@@ -40227,13 +40541,13 @@
     onOpenDashboard,
     getAssetUrl
   }) {
-    const [resumeModalOpen, setResumeModalOpen] = (0, import_react17.useState)(false);
+    const [resumeModalOpen, setResumeModalOpen] = (0, import_react16.useState)(false);
     const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
-    const [showCommandScreen, setShowCommandScreen] = (0, import_react17.useState)(true);
-    const [sessionTitle, setSessionTitle] = (0, import_react17.useState)("Untitled Session");
-    const [microphones, setMicrophones] = (0, import_react17.useState)([]);
-    const [selectedMicrophone, setSelectedMicrophone] = (0, import_react17.useState)("");
-    const [micDropdownOpen, setMicDropdownOpen] = (0, import_react17.useState)(false);
+    const [showCommandScreen, setShowCommandScreen] = (0, import_react16.useState)(true);
+    const [sessionTitle, setSessionTitle] = (0, import_react16.useState)("Untitled Session");
+    const [microphones, setMicrophones] = (0, import_react16.useState)([]);
+    const [selectedMicrophone, setSelectedMicrophone] = (0, import_react16.useState)("");
+    const [micDropdownOpen, setMicDropdownOpen] = (0, import_react16.useState)(false);
     const {
       state,
       handlers,
@@ -40271,14 +40585,17 @@
         setMicrophones(devices);
         if (devices.length && !selectedMicrophone) setSelectedMicrophone(devices[0].deviceId || "");
       } : void 0,
+      onVoiceMicrophoneSelect: (deviceId) => {
+        setSelectedMicrophone(deviceId);
+      },
       captureRootParent,
       environment
     });
     const effectiveSessionLimitReached = sessionLimitReached ?? state.sessionLimitReached;
     const isControlled = expanded !== void 0;
     const effectiveIsOpen = isControlled ? expanded : state.isOpen;
-    const listScrollRef = (0, import_react17.useRef)(null);
-    const isFetchingRef = (0, import_react17.useRef)(false);
+    const listScrollRef = (0, import_react16.useRef)(null);
+    const isFetchingRef = (0, import_react16.useRef)(false);
     const isInCaptureFlow = CAPTURE_FLOW_STATES2.includes(state.state) || state.pillExiting;
     const optimisticSessionActive = state.sessionStatus === "starting" || state.sessionStatus === "active";
     const hasStoredSession = Boolean(sessionId) || optimisticSessionActive;
@@ -40308,12 +40625,12 @@
       (p) => /critical|bug|high|urgent/i.test(p.type || "")
     ).length;
     const summary = extensionMode ? `${typeof totalCount === "number" ? totalCount : 0} total \xB7 ${openTicketsCount} open \xB7 ${skippedTicketsCount} skipped \xB7 ${resolvedTicketsCount} resolved` : openTicketsCount > 0 ? highPriorityCount > 0 ? `${highPriorityCount} need attention` : null : null;
-    (0, import_react17.useEffect)(() => {
+    (0, import_react16.useEffect)(() => {
       if (state.highlightTicketId && listScrollRef.current) {
         listScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
       }
     }, [state.highlightTicketId]);
-    (0, import_react17.useEffect)(() => {
+    (0, import_react16.useEffect)(() => {
       const el = listScrollRef.current;
       if (!el) {
         console.debug("[ECHLY UI] scrollRef not ready yet");
@@ -40359,24 +40676,24 @@
       sessionModeActive,
       sessionLoading
     ]);
-    (0, import_react17.useEffect)(() => {
+    (0, import_react16.useEffect)(() => {
       if (loadSessionWithPointers?.sessionId) {
         setShowCommandScreen(false);
       }
     }, [loadSessionWithPointers?.sessionId]);
-    (0, import_react17.useEffect)(() => {
+    (0, import_react16.useEffect)(() => {
       if (effectiveSessionLimitReached && !sessionId) {
         console.log("[ECHLY DEBUG] Rendering SessionLimitUpgradeView");
       }
     }, [effectiveSessionLimitReached, sessionId]);
-    import_react17.default.useEffect(() => {
+    import_react16.default.useEffect(() => {
       if (!widgetToggleRef) return;
       widgetToggleRef.current = handlers.toggleOpen;
       return () => {
         widgetToggleRef.current = null;
       };
     }, [handlers, widgetToggleRef]);
-    const handlePreviousSessions = import_react17.default.useCallback(() => {
+    const handlePreviousSessions = import_react16.default.useCallback(() => {
       console.log("[ECHLY UX] Opening modal instantly");
       onPreviousSessions?.();
       setResumeModalOpen(true);
@@ -40388,7 +40705,7 @@
         onCaptureModeChange?.(mode);
       }
     }
-    return /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, extensionMode && fetchSessions && onPreviousSessionSelect && /* @__PURE__ */ import_react17.default.createElement(
+    return /* @__PURE__ */ import_react16.default.createElement(import_react16.default.Fragment, null, extensionMode && fetchSessions && onPreviousSessionSelect && /* @__PURE__ */ import_react16.default.createElement(
       ResumeSessionModal,
       {
         open: showResumeModal,
@@ -40406,7 +40723,7 @@
         checkAuth: verifySessionBeforeSessions,
         onOpenLogin: onTriggerLogin
       }
-    ), captureRootEl && /* @__PURE__ */ import_react17.default.createElement(
+    ), captureRootEl && /* @__PURE__ */ import_react16.default.createElement(
       CaptureLayer,
       {
         captureRoot: captureRootEl,
@@ -40424,10 +40741,15 @@
         sessionPaused: state.sessionPaused,
         pausePending: state.pausePending,
         endPending: state.endPending,
+        isFinishing: state.isFinishing,
         sessionFeedbackPending: state.sessionFeedbackPending,
         captureMode,
         listeningAudioLevel: state.listeningAudioLevel ?? 0,
         audioAnalyser: state.audioAnalyser ?? null,
+        voiceError: state.voiceError,
+        onRetryVoice: handlers.retryVoiceCapture,
+        onSelectMicrophone: handlers.selectVoiceMicrophone,
+        voiceMicDeviceId: state.voiceMicDeviceId,
         onSessionElementClicked: handlers.handleSessionElementClicked,
         onSessionPause: () => {
           handlers.pauseSession();
@@ -40445,9 +40767,10 @@
         onSessionRecordVoice: handlers.handleSessionStartVoice,
         onSessionDoneVoice: handlers.finishListening,
         onSessionSaveText: handlers.handleSessionFeedbackSubmit,
-        onSessionFeedbackCancel: handlers.handleSessionFeedbackCancel
+        onSessionFeedbackCancel: handlers.handleSessionFeedbackCancel,
+        theme
       }
-    ), showFloatingButton && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-floating-trigger-wrapper" }, /* @__PURE__ */ import_react17.default.createElement(
+    ), showFloatingButton && /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-floating-trigger-wrapper" }, /* @__PURE__ */ import_react16.default.createElement(
       "button",
       {
         type: "button",
@@ -40456,7 +40779,7 @@
         className: `echly-floating-trigger${extensionMode && launcherLogoUrl ? " echly-launcher" : ""}`,
         "aria-label": "Open Echly"
       },
-      extensionMode && launcherLogoUrl ? /* @__PURE__ */ import_react17.default.createElement(
+      extensionMode && launcherLogoUrl ? /* @__PURE__ */ import_react16.default.createElement(
         "img",
         {
           src: launcherLogoUrl,
@@ -40464,14 +40787,14 @@
           alt: "Echly"
         }
       ) : extensionMode ? "Echly" : "Capture feedback"
-    )), showPanel && /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, !extensionMode && /* @__PURE__ */ import_react17.default.createElement(
+    )), showPanel && /* @__PURE__ */ import_react16.default.createElement(import_react16.default.Fragment, null, !extensionMode && /* @__PURE__ */ import_react16.default.createElement(
       "div",
       {
         className: "echly-backdrop",
         style: { position: "fixed", inset: 0, zIndex: 2147483646, background: "rgba(0,0,0,0.06)", pointerEvents: "auto" },
         "aria-hidden": true
       }
-    ), /* @__PURE__ */ import_react17.default.createElement(
+    ), /* @__PURE__ */ import_react16.default.createElement(
       "div",
       {
         ref: refs.widgetRef,
@@ -40483,7 +40806,7 @@
           pointerEvents: "auto"
         } : void 0
       },
-      extensionMode && captureMode === "voice" && micDropdownOpen && /* @__PURE__ */ import_react17.default.createElement(
+      extensionMode && captureMode === "voice" && micDropdownOpen && /* @__PURE__ */ import_react16.default.createElement(
         MicrophonePanel,
         {
           devices: microphones,
@@ -40492,7 +40815,7 @@
           onClose: () => setMicDropdownOpen(false)
         }
       ),
-      /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-sidebar-surface", "data-theme": theme }, /* @__PURE__ */ import_react17.default.createElement(
+      /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-sidebar-surface", "data-theme": theme }, /* @__PURE__ */ import_react16.default.createElement(
         CaptureHeader,
         {
           onClose: () => onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false),
@@ -40511,7 +40834,7 @@
           showOnlyClose: Boolean(effectiveSessionLimitReached && !sessionId),
           onOpenDashboard
         }
-      ), effectiveSessionLimitReached && !sessionId ? /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-sidebar-body echly-upgrade-card-body" }, /* @__PURE__ */ import_react17.default.createElement(
+      ), effectiveSessionLimitReached && !sessionId ? /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-sidebar-body echly-upgrade-card-body" }, /* @__PURE__ */ import_react16.default.createElement(
         SessionLimitUpgradeView,
         {
           limitMessage: effectiveSessionLimitReached.message ?? "",
@@ -40522,15 +40845,15 @@
           },
           getAssetUrl
         }
-      )) : /* @__PURE__ */ import_react17.default.createElement(
+      )) : /* @__PURE__ */ import_react16.default.createElement(
         "div",
         {
           className: "echly-sidebar-body",
           style: isStartingSession ? { pointerEvents: "none", opacity: 0.85 } : void 0
         },
-        isStartingSession && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-session-loading-state", "aria-live": "polite", "aria-busy": "true" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-session-loading-text" }, "Starting session...")),
-        sessionModeActive && sessionLoading && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-session-loading-state", "aria-live": "polite", "aria-busy": "true" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-session-loading-text" }, "Loading session...")),
-        (hasTickets || isProcessingFeedback || feedbackJobs && feedbackJobs.length > 0) && (sessionModeActive || !extensionMode) && !sessionLoading && /* @__PURE__ */ import_react17.default.createElement(
+        isStartingSession && /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-session-loading-state", "aria-live": "polite", "aria-busy": "true" }, /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-session-loading-text" }, "Starting session...")),
+        sessionModeActive && sessionLoading && /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-session-loading-state", "aria-live": "polite", "aria-busy": "true" }, /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-session-loading-text" }, "Loading session...")),
+        (hasTickets || isProcessingFeedback || feedbackJobs && feedbackJobs.length > 0) && (sessionModeActive || !extensionMode) && !sessionLoading && /* @__PURE__ */ import_react16.default.createElement(
           "div",
           {
             ref: listScrollRef,
@@ -40538,7 +40861,7 @@
             style: { overflowY: "auto", maxHeight: "100%" },
             onWheel: (e) => e.stopPropagation()
           },
-          /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-feedback-list" }, feedbackJobs?.filter((j) => j.status === "processing").map((job) => /* @__PURE__ */ import_react17.default.createElement("div", { key: job.id, id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-processing-text" }, "Processing feedback..."))), feedbackJobs?.filter((j) => j.status === "failed").map((job) => /* @__PURE__ */ import_react17.default.createElement("div", { key: job.id, className: "echly-feedback-card echly-feedback-failed", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-failed-text" }, job.errorMessage ?? "AI processing failed."))), !feedbackJobs?.length && isProcessingFeedback && /* @__PURE__ */ import_react17.default.createElement("div", { id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-processing-text" }, "Processing feedback...")), hasTickets && state.pointers.map((p) => /* @__PURE__ */ import_react17.default.createElement(
+          /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-feedback-list" }, feedbackJobs?.filter((j) => j.status === "processing").map((job) => /* @__PURE__ */ import_react16.default.createElement("div", { key: job.id, id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing", "aria-live": "polite" }, /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-processing-text" }, "Processing feedback..."))), feedbackJobs?.filter((j) => j.status === "failed").map((job) => /* @__PURE__ */ import_react16.default.createElement("div", { key: job.id, className: "echly-feedback-card echly-feedback-failed", "aria-live": "polite" }, /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-failed-text" }, job.errorMessage ?? "AI processing failed."))), !feedbackJobs?.length && isProcessingFeedback && /* @__PURE__ */ import_react16.default.createElement("div", { id: "processing_card_markup", className: "echly-feedback-card echly-feedback-processing" }, /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-spinner", "aria-hidden": true }), /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-processing-text" }, "Processing feedback...")), hasTickets && state.pointers.map((p) => /* @__PURE__ */ import_react16.default.createElement(
             FeedbackItem_default,
             {
               key: p.id,
@@ -40550,8 +40873,8 @@
             }
           )))
         ),
-        sessionModeActive && !hasTickets && !isProcessingFeedback && !(feedbackJobs && feedbackJobs.length > 0) && !sessionLoading && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-empty-session-state", "aria-live": "polite" }, /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-empty-session-text" }, "No feedback yet. Add feedback from the page.")),
-        extensionMode && showHomeScreen && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-container" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-header-block" }, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-ai-powered", "aria-hidden": true }, /* @__PURE__ */ import_react17.default.createElement(Zap, { size: 12, strokeWidth: 2, "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement("span", null, "Powered by GPT-4 + Whisper")), /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-mode-header" }, "Select feedback mode")), /* @__PURE__ */ import_react17.default.createElement(
+        sessionModeActive && !hasTickets && !isProcessingFeedback && !(feedbackJobs && feedbackJobs.length > 0) && !sessionLoading && /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-empty-session-state", "aria-live": "polite" }, /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-empty-session-text" }, "No feedback yet. Add feedback from the page.")),
+        extensionMode && showHomeScreen && /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-mode-container" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-mode-header-block" }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-ai-powered", "aria-hidden": true }, /* @__PURE__ */ import_react16.default.createElement(Zap, { size: 12, strokeWidth: 2, "aria-hidden": true }), /* @__PURE__ */ import_react16.default.createElement("span", null, "Powered by GPT-4 + Whisper")), /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-mode-header" }, "Select feedback mode")), /* @__PURE__ */ import_react16.default.createElement(
           "div",
           {
             className: `echly-mode-tile echly-mode-card voice-mode ${captureMode === "voice" ? "selected" : ""}`,
@@ -40578,9 +40901,9 @@
             "aria-pressed": captureMode === "voice",
             "aria-label": captureMode === "voice" ? "Voice (Recommended). Click to select microphone." : "Voice (Recommended)"
           },
-          /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-mode-card-icon echly-mic-trigger", "aria-hidden": true }, /* @__PURE__ */ import_react17.default.createElement(Mic, { size: 18, strokeWidth: 2 })),
-          /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-mode-card-title" }, "Voice (Recommended)")
-        ), /* @__PURE__ */ import_react17.default.createElement(
+          /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-mode-card-icon echly-mic-trigger", "aria-hidden": true }, /* @__PURE__ */ import_react16.default.createElement(Mic, { size: 18, strokeWidth: 2 })),
+          /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-mode-card-title" }, "Voice (Recommended)")
+        ), /* @__PURE__ */ import_react16.default.createElement(
           "div",
           {
             className: `echly-mode-tile echly-mode-card text-mode ${captureMode === "text" ? "selected" : ""}`,
@@ -40596,11 +40919,11 @@
             tabIndex: 0,
             "aria-pressed": captureMode === "text"
           },
-          /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-mode-card-icon" }, /* @__PURE__ */ import_react17.default.createElement(PenLine, { className: "mode-icon", size: 18, strokeWidth: 2 })),
-          /* @__PURE__ */ import_react17.default.createElement("span", { className: "echly-mode-card-title" }, "Write")
+          /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-mode-card-icon" }, /* @__PURE__ */ import_react16.default.createElement(PenLine, { className: "mode-icon", size: 18, strokeWidth: 2 })),
+          /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-mode-card-title" }, "Write")
         )),
-        state.errorMessage && /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-sidebar-error" }, state.errorMessage)
-      ), !(effectiveSessionLimitReached && !sessionId) && showHomeScreen && /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, /* @__PURE__ */ import_react17.default.createElement("div", { className: "echly-command-divider", "aria-hidden": true }), /* @__PURE__ */ import_react17.default.createElement(
+        state.errorMessage && /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-sidebar-error" }, state.errorMessage)
+      ), !(effectiveSessionLimitReached && !sessionId) && showHomeScreen && /* @__PURE__ */ import_react16.default.createElement(import_react16.default.Fragment, null, /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-command-divider", "aria-hidden": true }), /* @__PURE__ */ import_react16.default.createElement(
         WidgetFooter,
         {
           isIdle: !isStartingSession,
@@ -40712,7 +41035,7 @@
   };
 
   // echly-extension/src/content.tsx
-  var import_react18 = __toESM(require_react());
+  var import_react17 = __toESM(require_react());
   var import_client = __toESM(require_client());
   logger.debug("extension", "content_script_loaded", { href: window.location.href });
   var echlyEventDispatcher = null;
@@ -40741,7 +41064,7 @@
     if (tag === "a") return "link";
     return null;
   };
-  var EchlyWidgetErrorBoundary = class extends import_react18.default.Component {
+  var EchlyWidgetErrorBoundary = class extends import_react17.default.Component {
     constructor(props) {
       super(props);
       this.state = { hasError: false, error: null };
@@ -40836,10 +41159,10 @@
     });
   }
   function ContentApp({ widgetRoot, initialTheme }) {
-    const [user, setUser] = import_react18.default.useState(null);
-    const [authState, setAuthState] = import_react18.default.useState("loading");
-    const [theme, setTheme] = import_react18.default.useState(initialTheme);
-    const [globalState, setGlobalState] = import_react18.default.useState({
+    const [user, setUser] = import_react17.default.useState(null);
+    const [authState, setAuthState] = import_react17.default.useState("loading");
+    const [theme, setTheme] = import_react17.default.useState(initialTheme);
+    const [globalState, setGlobalState] = import_react17.default.useState({
       visible: false,
       expanded: false,
       isRecording: false,
@@ -40858,15 +41181,15 @@
       isFetching: false,
       captureMode: "voice"
     });
-    const [widgetResetKey, setWidgetResetKey] = import_react18.default.useState(0);
-    const [hasPreviousSessions, setHasPreviousSessions] = import_react18.default.useState(false);
-    const [openResumeModalFromMessage, setOpenResumeModalFromMessage] = import_react18.default.useState(false);
-    const [sessionLimitReached, setSessionLimitReached] = import_react18.default.useState(null);
+    const [widgetResetKey, setWidgetResetKey] = import_react17.default.useState(0);
+    const [hasPreviousSessions, setHasPreviousSessions] = import_react17.default.useState(false);
+    const [openResumeModalFromMessage, setOpenResumeModalFromMessage] = import_react17.default.useState(false);
+    const [sessionLimitReached, setSessionLimitReached] = import_react17.default.useState(null);
     const effectiveSessionId = globalState.sessionId;
-    const widgetToggleRef = import_react18.default.useRef(null);
-    const [isProcessingFeedback, setIsProcessingFeedback] = import_react18.default.useState(false);
-    const [feedbackJobs, setFeedbackJobs] = import_react18.default.useState([]);
-    import_react18.default.useEffect(() => {
+    const widgetToggleRef = import_react17.default.useRef(null);
+    const [isProcessingFeedback, setIsProcessingFeedback] = import_react17.default.useState(false);
+    const [feedbackJobs, setFeedbackJobs] = import_react17.default.useState([]);
+    import_react17.default.useEffect(() => {
       if (!isProcessingFeedback) return;
       const timeoutId = setTimeout(() => {
         setIsProcessingFeedback((current) => {
@@ -40879,23 +41202,23 @@
       }, 5e3);
       return () => clearTimeout(timeoutId);
     }, [isProcessingFeedback]);
-    const getAssetUrl = import_react18.default.useCallback((path) => {
+    const getAssetUrl = import_react17.default.useCallback((path) => {
       if (typeof chrome !== "undefined" && chrome.runtime?.getURL) {
         return chrome.runtime.getURL(path);
       }
       return `/${path.replace(/^assets\//, "")}`;
     }, []);
     const launcherLogoUrl = getAssetUrl("assets/Echly_logo_launcher.svg");
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       logger.debug("extension", "content_app_mounted");
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       logger.debug("extension", "resume_modal_state", { openResumeModalFromMessage });
     }, [openResumeModalFromMessage]);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       logger.debug("extension", "previous_sessions_state", { hasPreviousSessions });
     }, [hasPreviousSessions]);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       echlyEventDispatcher = (type) => {
         if (type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
           setOpenResumeModalFromMessage(true);
@@ -40905,7 +41228,7 @@
         echlyEventDispatcher = null;
       };
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       const toggleHandler = () => {
         widgetToggleRef.current?.();
       };
@@ -40914,7 +41237,7 @@
         window.removeEventListener("ECHLY_TOGGLE_WIDGET", toggleHandler);
       };
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       const handler = () => {
         setGlobalState((prev) => ({ ...prev, expanded: false }));
         setWidgetResetKey((k) => k + 1);
@@ -40922,7 +41245,7 @@
       window.addEventListener("ECHLY_RESET_WIDGET", handler);
       return () => window.removeEventListener("ECHLY_RESET_WIDGET", handler);
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       const applyGlobalState = (state) => {
         setHostVisibilityFromState(state);
         setGlobalState((prev) => mergeWithPointerProtection(prev, state));
@@ -40932,7 +41255,7 @@
         delete window.__ECHLY_APPLY_GLOBAL_STATE__;
       };
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       const handler = (e) => {
         const s = e.detail?.state;
         if (!s) return;
@@ -40943,7 +41266,7 @@
       window.addEventListener("ECHLY_GLOBAL_STATE", handler);
       return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler);
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       chrome.runtime.sendMessage(
         { type: "ECHLY_GET_GLOBAL_STATE" },
         (response) => {
@@ -40954,7 +41277,7 @@
         }
       );
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       const handler = () => {
         if (document.hidden) return;
         chrome.runtime.sendMessage(
@@ -40973,7 +41296,7 @@
       document.addEventListener("visibilitychange", handler);
       return () => document.removeEventListener("visibilitychange", handler);
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       if (!globalState.visible) return;
       let cancelled = false;
       getSessionsCached(apiFetch).then((sessions) => {
@@ -40985,12 +41308,12 @@
         cancelled = true;
       };
     }, [globalState.visible]);
-    const isAuthFailureResponse = import_react18.default.useCallback((text) => {
+    const isAuthFailureResponse = import_react17.default.useCallback((text) => {
       return Boolean(
         text?.includes("Not authenticated") || text?.includes("NOT_AUTHENTICATED")
       );
     }, []);
-    const getExtensionToken = import_react18.default.useCallback(async () => {
+    const getExtensionToken = import_react17.default.useCallback(async () => {
       const token = await new Promise((resolve) => {
         chrome.runtime.sendMessage(
           { type: "ECHLY_GET_EXTENSION_TOKEN" },
@@ -41002,7 +41325,7 @@
       logger.debug("extension", "token_retrieved", { hasToken: !!token });
       return token;
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       const handler = () => {
         createSession().then((result) => {
           if (result && "id" in result && result.id) {
@@ -41020,12 +41343,12 @@
       window.addEventListener("ECHLY_START_SESSION_REQUEST", handler);
       return () => window.removeEventListener("ECHLY_START_SESSION_REQUEST", handler);
     }, [createSession, onActiveSessionChange, onExpandRequest]);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       const handler = () => setOpenResumeModalFromMessage(true);
       window.addEventListener("ECHLY_OPEN_PREVIOUS_SESSIONS", handler);
       return () => window.removeEventListener("ECHLY_OPEN_PREVIOUS_SESSIONS", handler);
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       const handler = () => {
         logger.debug("extension", "open_widget_dom_event_received");
         chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {
@@ -41034,7 +41357,7 @@
       window.addEventListener("ECHLY_OPEN_WIDGET", handler);
       return () => window.removeEventListener("ECHLY_OPEN_WIDGET", handler);
     }, []);
-    const onRecordingChange = import_react18.default.useCallback((recording) => {
+    const onRecordingChange = import_react17.default.useCallback((recording) => {
       if (recording) {
         chrome.runtime.sendMessage(
           { type: "START_RECORDING" },
@@ -41056,17 +41379,17 @@
       chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {
       });
     }
-    const onCollapseRequest = import_react18.default.useCallback(() => {
+    const onCollapseRequest = import_react17.default.useCallback(() => {
       setSessionLimitReached(null);
       chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {
       });
     }, []);
-    const onThemeToggle = import_react18.default.useCallback(() => {
+    const onThemeToggle = import_react17.default.useCallback(() => {
       const next = theme === "dark" ? "light" : "dark";
       setTheme(next);
       applyThemeToRoot(widgetRoot, next);
     }, [theme, widgetRoot]);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       if (!globalState.visible) return;
       setAuthState("loading");
       chrome.runtime.sendMessage(
@@ -41087,7 +41410,7 @@
         }
       );
     }, [globalState.visible]);
-    const processFeedbackPipeline = import_react18.default.useCallback(
+    const processFeedbackPipeline = import_react17.default.useCallback(
       async ({
         transcript,
         screenshot,
@@ -41223,7 +41546,7 @@
       },
       [effectiveSessionId, getExtensionToken, isAuthFailureResponse, user]
     );
-    const handleComplete = import_react18.default.useCallback(
+    const handleComplete = import_react17.default.useCallback(
       async (transcript, screenshot, callbacks, context, options) => {
         const fallbackResult = {
           id: `local-${createUniqueId()}`,
@@ -41269,7 +41592,7 @@
       },
       [processFeedbackPipeline]
     );
-    const handleDelete = import_react18.default.useCallback(async (id) => {
+    const handleDelete = import_react17.default.useCallback(async (id) => {
       try {
         await apiFetch(`/api/tickets/${id}`, { method: "DELETE" });
         notifyFeedbackCountRefetch(effectiveSessionId);
@@ -41278,7 +41601,7 @@
         throw err;
       }
     }, [effectiveSessionId]);
-    const handleUpdate = import_react18.default.useCallback(
+    const handleUpdate = import_react17.default.useCallback(
       async (id, payload) => {
         const res = await apiFetch(`/api/tickets/${id}`, {
           method: "PATCH",
@@ -41306,7 +41629,7 @@
       },
       []
     );
-    const onSessionTitleChange = import_react18.default.useCallback(
+    const onSessionTitleChange = import_react17.default.useCallback(
       async (newTitle) => {
         if (!effectiveSessionId) return;
         try {
@@ -41330,12 +41653,12 @@
       },
       [effectiveSessionId]
     );
-    const fetchSessions = import_react18.default.useCallback(async () => {
+    const fetchSessions = import_react17.default.useCallback(async () => {
       const sessions = await getSessionsCached(apiFetch);
       if (ECHLY_DEBUG) logger.debug("extension", "sessions_returned", { count: sessions.length });
       return sessions;
     }, []);
-    import_react18.default.useEffect(() => {
+    import_react17.default.useEffect(() => {
       fetchSessions?.();
     }, [fetchSessions]);
     async function createSession() {
@@ -41375,7 +41698,7 @@
       chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {
       });
     }
-    const onPreviousSessionSelect = import_react18.default.useCallback(
+    const onPreviousSessionSelect = import_react17.default.useCallback(
       async (sessionId, _options) => {
         chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {
         });
@@ -41396,7 +41719,7 @@
       },
       []
     );
-    const verifySessionBeforeSessions = import_react18.default.useCallback(() => {
+    const verifySessionBeforeSessions = import_react17.default.useCallback(() => {
       return new Promise((resolve) => {
         chrome.runtime.sendMessage(
           { type: "ECHLY_VERIFY_DASHBOARD_SESSION" },
@@ -41406,7 +41729,7 @@
         );
       });
     }, []);
-    const onTriggerLogin = import_react18.default.useCallback(() => {
+    const onTriggerLogin = import_react17.default.useCallback(() => {
       chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {
       });
     }, []);

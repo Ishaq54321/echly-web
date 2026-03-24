@@ -7,7 +7,7 @@ import { attachClickCapture, detachClickCapture } from "./session/clickCapture";
 import { SessionControlPanel } from "./SessionControlPanel";
 import { VoiceCapturePanel } from "./VoiceCapturePanel";
 import { TextFeedbackPanel } from "./TextFeedbackPanel";
-import type { CaptureContext, SessionFeedbackPending } from "@/lib/capture-engine/core/types";
+import type { CaptureContext, SessionFeedbackPending, VoiceCaptureError } from "@/lib/capture-engine/core/types";
 
 function createCommentCursor() {
   const svg = [
@@ -26,6 +26,7 @@ export type SessionOverlayProps = {
   sessionPaused: boolean;
   pausePending?: boolean;
   endPending?: boolean;
+  isFinishing?: boolean;
   sessionFeedbackPending: SessionFeedbackPending | null;
   state: string;
   onElementClicked: (element: Element) => void;
@@ -39,6 +40,11 @@ export type SessionOverlayProps = {
   captureMode?: "voice" | "text";
   listeningAudioLevel?: number;
   audioAnalyser?: AnalyserNode | null;
+  voiceError?: VoiceCaptureError;
+  onRetryVoice?: () => void;
+  onSelectMicrophone?: (deviceId: string) => void;
+  voiceMicDeviceId?: string;
+  theme?: "light" | "dark";
 };
 
 /**
@@ -52,6 +58,7 @@ export function SessionOverlay({
   sessionPaused,
   pausePending = false,
   endPending = false,
+  isFinishing = false,
   sessionFeedbackPending,
   state,
   onElementClicked,
@@ -65,6 +72,11 @@ export function SessionOverlay({
   captureMode = "voice",
   listeningAudioLevel = 0,
   audioAnalyser = null,
+  voiceError = null,
+  onRetryVoice,
+  onSelectMicrophone,
+  voiceMicDeviceId = "",
+  theme = "dark",
 }: SessionOverlayProps) {
   const cleanupRef = useRef<(() => void)[]>([]);
   const voiceStartedForPendingRef = useRef(false);
@@ -157,10 +169,15 @@ export function SessionOverlay({
           captureRoot={captureRoot}
           screenshot={sessionFeedbackPending.screenshot ?? undefined}
           audioLevel={listeningAudioLevel}
-          isListening={state === "voice_listening"}
+          isListening={state === "voice_listening" && !isFinishing && !voiceError}
+          isFinishing={isFinishing}
           onFinish={onDoneVoice}
           onCancel={onCancel}
-          analyser={audioAnalyser ?? null}
+          analyser={!isFinishing && !voiceError ? (audioAnalyser ?? null) : null}
+          voiceError={voiceError}
+          onRetryVoice={onRetryVoice}
+          onSelectMicrophone={onSelectMicrophone}
+          voiceMicDeviceId={voiceMicDeviceId}
         />
       )}
       {sessionFeedbackPending && captureMode === "text" && (
@@ -168,6 +185,7 @@ export function SessionOverlay({
           screenshot={sessionFeedbackPending.screenshot ?? undefined}
           onSubmit={onSaveText}
           onCancel={onCancel}
+          theme={theme}
         />
       )}
     </>

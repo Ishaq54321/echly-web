@@ -3,7 +3,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { RegionCaptureOverlay, SessionOverlay } from "./internal/overlayHelpers";
-import type { CaptureContext, SessionFeedbackPending } from "./types";
+import type { CaptureContext, SessionFeedbackPending, VoiceCaptureError } from "./types";
 
 export type CaptureLayerState =
   | "focus_mode"
@@ -36,6 +36,7 @@ export type CaptureLayerProps = {
   sessionPaused?: boolean;
   pausePending?: boolean;
   endPending?: boolean;
+  isFinishing?: boolean;
   sessionFeedbackPending?: SessionFeedbackPending | null;
   onSessionElementClicked?: (element: Element) => void;
   onSessionPause?: () => void;
@@ -51,6 +52,12 @@ export type CaptureLayerProps = {
   listeningAudioLevel?: number;
   /** AnalyserNode for real-time audio visualizer (from useCaptureWidget state). */
   audioAnalyser?: AnalyserNode | null;
+  voiceError?: VoiceCaptureError;
+  onRetryVoice?: () => void;
+  onSelectMicrophone?: (deviceId: string) => void;
+  voiceMicDeviceId?: string;
+  /** Matches widget theme for text feedback modal (light/dark glass). */
+  theme?: "light" | "dark";
 };
 
 /**
@@ -73,6 +80,7 @@ export function CaptureLayer({
   sessionPaused = false,
   pausePending = false,
   endPending = false,
+  isFinishing = false,
   sessionFeedbackPending = null,
   onSessionElementClicked,
   onSessionPause,
@@ -85,6 +93,11 @@ export function CaptureLayer({
   captureMode = "voice",
   listeningAudioLevel = 0,
   audioAnalyser = null,
+  voiceError = null,
+  onRetryVoice,
+  onSelectMicrophone,
+  voiceMicDeviceId = "",
+  theme = "dark",
 }: CaptureLayerProps) {
   if (extensionMode && (!sessionMode || (!sessionIdProp && !optimisticSessionStarting))) return null;
   const showSessionOverlay =
@@ -108,11 +121,16 @@ export function CaptureLayer({
           sessionPaused={sessionPaused}
           pausePending={pausePending}
           endPending={endPending}
+          isFinishing={isFinishing}
           sessionFeedbackPending={sessionFeedbackPending ?? null}
           state={state}
           captureMode={captureMode}
           listeningAudioLevel={listeningAudioLevel}
           audioAnalyser={audioAnalyser ?? null}
+          voiceError={voiceError}
+          onRetryVoice={onRetryVoice}
+          onSelectMicrophone={onSelectMicrophone}
+          voiceMicDeviceId={voiceMicDeviceId}
           onElementClicked={onSessionElementClicked}
           onPause={onSessionPause}
           onResume={onSessionResume}
@@ -121,6 +139,7 @@ export function CaptureLayer({
           onDoneVoice={onSessionDoneVoice}
           onSaveText={onSessionSaveText}
           onCancel={onSessionFeedbackCancel}
+          theme={theme}
         />
       )}
       {showDimOverlay && (

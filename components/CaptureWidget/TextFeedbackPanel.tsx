@@ -1,19 +1,51 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useSyncExternalStore } from "react";
 
 export type TextFeedbackPanelProps = {
   screenshot?: string;
   onSubmit: (text: string) => void;
   onCancel?: () => void;
+  /** When set, drives modal light/dark. When omitted, syncs from `#echly-root[data-theme]`. */
+  theme?: "light" | "dark";
 };
+
+function subscribeEchlyRootTheme(onChange: () => void): () => void {
+  if (typeof document === "undefined") return () => {};
+  const root = document.getElementById("echly-root");
+  if (!root) return () => {};
+  const obs = new MutationObserver(onChange);
+  obs.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => obs.disconnect();
+}
+
+function getEchlyRootThemeSnapshot(): "light" | "dark" {
+  const t = document.getElementById("echly-root")?.getAttribute("data-theme");
+  return t === "light" ? "light" : "dark";
+}
+
+function getEchlyRootThemeServerSnapshot(): "light" | "dark" {
+  return "dark";
+}
+
+function useResolvedTheme(prop?: "light" | "dark"): "light" | "dark" {
+  const fromDom = useSyncExternalStore(
+    subscribeEchlyRootTheme,
+    getEchlyRootThemeSnapshot,
+    getEchlyRootThemeServerSnapshot
+  );
+  return prop ?? fromDom;
+}
 
 export function TextFeedbackPanel({
   screenshot,
   onSubmit,
   onCancel,
+  theme: themeProp,
 }: TextFeedbackPanelProps) {
   const [text, setText] = useState("");
+  const theme = useResolvedTheme(themeProp);
+  const isDark = theme === "dark";
 
   const handleSubmit = () => {
     const t = text.trim();
@@ -22,41 +54,13 @@ export function TextFeedbackPanel({
 
   return (
     <div
-      className="text-feedback"
+      className={`echly-text-modal ${isDark ? "dark" : "light"}`}
       data-echly-ui="true"
-      style={{
-        position: "fixed",
-        pointerEvents: "auto",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "min(380px, 92vw)",
-        borderRadius: 14,
-        background: "rgba(20,22,28,0.92)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        zIndex: 2147483647,
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
-      }}
     >
       {screenshot && (
-        <div style={{ padding: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <div
-            style={{
-              borderRadius: 14,
-              overflow: "hidden",
-              background: "rgba(0,0,0,0.3)",
-              aspectRatio: "16/10",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+        <div className="echly-text-modal__shot-wrap">
+          <div className="echly-text-modal__shot-frame">
+            {/* eslint-disable-next-line @next/next/no-img-element -- session capture data URL */}
             <img
               src={screenshot}
               alt="Capture"
@@ -65,61 +69,26 @@ export function TextFeedbackPanel({
           </div>
         </div>
       )}
-      <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="echly-text-modal__body">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Describe the feedback..."
           aria-label="Feedback text"
           rows={3}
-          className="text-feedback-textarea"
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            padding: "12px 14px",
-            borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "rgba(255,255,255,0.06)",
-            color: "#F3F4F6",
-            fontSize: 14,
-            resize: "vertical",
-            minHeight: 80,
-          }}
+          className="echly-textarea"
         />
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <div className="echly-text-actions">
           {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 8,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: "transparent",
-                color: "#A1A1AA",
-                fontSize: 14,
-                fontWeight: 500,
-                cursor: "pointer",
-              }}
-            >
+            <button type="button" onClick={onCancel} className="echly-btn-cancel">
               Cancel
             </button>
           )}
           <button
             type="button"
-            className="submit-feedback"
+            className="echly-btn-save submit-feedback"
             onClick={handleSubmit}
             disabled={!text.trim()}
-            style={{
-              padding: "12px 20px",
-              borderRadius: 10,
-              border: "none",
-              background: text.trim() ? "#155DFC" : "rgba(255,255,255,0.08)",
-              color: "#fff",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: text.trim() ? "pointer" : "default",
-            }}
           >
             Save Feedback
           </button>

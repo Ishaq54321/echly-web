@@ -59,6 +59,13 @@ export interface Recording {
   createdAt: number;
 }
 
+/** Voice capture failure shown in VoiceCapturePanel (session / overlay). */
+export type VoiceCaptureError =
+  | null
+  | "no_audio"
+  | "transcription_failed"
+  | "mic_permission";
+
 /** Explicit capture flow state machine. */
 export type CaptureState =
   | "idle"
@@ -163,6 +170,8 @@ export type CaptureWidgetProps = {
   selectedMicrophoneId?: string;
   /** Called when devices are enumerated at start of voice recording (user-initiated). Use to populate microphone list. */
   onDevicesEnumerated?: (devices: Array<{ deviceId: string; label: string }>) => void;
+  /** When user selects a microphone from voice failure UI or picker; keep parent device list in sync (e.g. extension tray). */
+  onVoiceMicrophoneSelect?: (deviceId: string) => void;
   /** When set (e.g. extension shadow root container), capture root is appended here so it receives shadow DOM styles; otherwise appended to document.body. */
   captureRootParent?: HTMLElement | null;
   /** When true, show a loading indicator above the feedback tray while a ticket is being processed (e.g. after submit). */

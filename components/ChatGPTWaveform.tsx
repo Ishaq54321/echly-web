@@ -2,15 +2,20 @@
 
 import React, { useEffect, useRef } from "react";
 
-const BAR_COUNT = 120;
-const BAR_WIDTH = 2;
+const BAR_COUNT = 110;
+const BAR_WIDTH = 3;
 const GAP = 2;
-const MAX_HEIGHT = 26;
-const MIN_HEIGHT = 2;
+const CANVAS_HEIGHT = 64;
+const MAX_HEIGHT = 48;
+const MIN_HEIGHT = 4;
 /** Normalized 0–1. Below this = silence: flat bar (BASELINE_BAR_HEIGHT), no animation. */
 const SILENCE_THRESHOLD = 0.02;
 /** Bar height when amplitude is 0 or below threshold (flat/silent). */
-const BASELINE_BAR_HEIGHT = 1;
+const BASELINE_BAR_HEIGHT = 3;
+
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
 
 export type ChatGPTWaveformProps = {
   analyser: AnalyserNode | null;
@@ -31,16 +36,21 @@ export default function ChatGPTWaveform({ analyser }: ChatGPTWaveformProps) {
 
     const bufferLength = node.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
-    const totalWidth = BAR_COUNT * (BAR_WIDTH + GAP) - GAP;
-    const canvasWidth = totalWidth;
-    const canvasHeight = 52;
+    const canvasHeight = CANVAS_HEIGHT;
 
     let rafId: number;
+    let frame = 0;
     /** Smoothed average amplitude (0–1) to avoid flicker at speech start/end. */
     let smoothedAmplitude = 0;
+    const renderedHeights = new Array<number>(BAR_COUNT).fill(BASELINE_BAR_HEIGHT);
 
     function draw(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
       rafId = requestAnimationFrame(() => draw(ctx, canvas));
+      frame += 1;
+
+      const fill =
+        getComputedStyle(canvas).getPropertyValue("--echly-waveform-fill").trim() ||
+        getComputedStyle(canvas).getPropertyValue("--color-primary").trim();
 
       node.getByteFrequencyData(dataArray);
 
@@ -50,7 +60,7 @@ export default function ChatGPTWaveform({ analyser }: ChatGPTWaveformProps) {
       }
       const rawAvg = dataArray.length ? sum / dataArray.length / 255 : 0;
       const amplitude = rawAvg < SILENCE_THRESHOLD ? 0 : rawAvg;
-      smoothedAmplitude = smoothedAmplitude * 0.8 + amplitude * 0.2;
+      smoothedAmplitude = smoothedAmplitude * 0.84 + amplitude * 0.16;
 
       const isSilent = smoothedAmplitude < SILENCE_THRESHOLD;
 
@@ -63,25 +73,37 @@ export default function ChatGPTWaveform({ analyser }: ChatGPTWaveformProps) {
         const normalized = value / 255;
         const barBelowThreshold = normalized < SILENCE_THRESHOLD;
 
-        let height: number;
+        let targetHeight: number;
         let opacity: number;
 
         if (isSilent || barBelowThreshold) {
-          height = BASELINE_BAR_HEIGHT;
-          opacity = 0.4;
+          const idleMotion = Math.sin(frame * 0.06 + i * 0.22) * 0.9;
+          targetHeight = BASELINE_BAR_HEIGHT + idleMotion;
+          opacity = 0.26;
         } else {
           const scale = Math.max(0, (normalized - SILENCE_THRESHOLD) / (1 - SILENCE_THRESHOLD));
-          height = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, MIN_HEIGHT + scale * (MAX_HEIGHT - MIN_HEIGHT)));
-          opacity = 1;
+          const easedScale = easeInOutCubic(scale);
+          targetHeight = Math.max(
+            MIN_HEIGHT,
+            Math.min(MAX_HEIGHT, MIN_HEIGHT + easedScale * (MAX_HEIGHT - MIN_HEIGHT) * 0.82)
+          );
+          opacity = 0.9;
         }
+
+        const previousHeight = renderedHeights[i] ?? BASELINE_BAR_HEIGHT;
+        const easing = isSilent ? 0.1 : 0.18;
+        const height = previousHeight + (targetHeight - previousHeight) * easing;
+        renderedHeights[i] = height;
 
         const x = i * (BAR_WIDTH + GAP);
         const halfH = height / 2;
 
-        ctx.fillStyle = `rgba(59, 130, 246, ${opacity})`;
-        roundRect(ctx, x, centerY - halfH, BAR_WIDTH, height, 2);
+        ctx.fillStyle = fill || "currentColor";
+        ctx.globalAlpha = opacity;
+        roundRect(ctx, x, centerY - halfH, BAR_WIDTH, height, BAR_WIDTH / 2);
         ctx.fill();
       }
+      ctx.globalAlpha = 1;
     }
 
     function roundRect(
@@ -122,7 +144,7 @@ export default function ChatGPTWaveform({ analyser }: ChatGPTWaveformProps) {
     <canvas
       ref={canvasRef}
       width={BAR_COUNT * (BAR_WIDTH + GAP) - GAP}
-      height={52}
+      height={CANVAS_HEIGHT}
       className="echly-chatgpt-waveform"
     />
   );

@@ -266,13 +266,10 @@ export async function POST(req: NextRequest): Promise<Response> {
     })();
 
     const transcript = typeof response.text === "string" ? response.text.trim() : "";
-    if (!transcript) {
+    if (!transcript || transcript.length < 3) {
       logger.error("error", "transcription_failed_empty_transcript");
       logger.error("transcribe", "failure");
-      return NextResponse.json(
-        { error: "Transcription produced no text" },
-        { status: 500, headers }
-      );
+      return NextResponse.json({ error: "NO_SPEECH_DETECTED" }, { status: 400, headers });
     }
 
     logger.debug("transcribe", "success", { charCount: transcript.length });

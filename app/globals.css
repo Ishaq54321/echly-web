@@ -50,7 +50,7 @@
   /* Radius: soft but precise */
   --radius: 14px;
   --radius-md: 14px;
-  --radius-lg: 18px;
+  --radius-lg: 16px;
   --radius-card: 22px;
   --radius-xl: 24px;
   --radius-pill: 9999px;
@@ -65,6 +65,7 @@
   --brand-blue: #155DFC;
 
   /* Legacy/alias for existing usage */
+  --accent: var(--color-primary);
   --accent-operational: #1a56db;
   --accent-operational-border: rgba(26, 86, 219, 0.25);
   --accent-operational-muted: rgba(26, 86, 219, 0.08);
@@ -138,6 +139,8 @@
   --shadow-level-3-lift: 0 2px 4px rgba(0, 0, 0, 0.04);
   --shadow-level-4: 0 8px 24px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
   --shadow-level-5: 0 12px 32px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05);
+  /* Elevated menus / popovers (alias) */
+  --shadow-lg: var(--shadow-level-4);
   /* Card-specific: dual stack + inner highlight */
   --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.04);
   --elevation-2: 0 4px 12px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.03);
@@ -151,6 +154,39 @@
   --text-primary-strong: 220 14% 7%;
   --text-secondary-soft: 220 10% 36%;
   --text-tertiary: 220 9% 48%;
+
+  /* Voice capture (portaled to body): glass + dim + waveform — align with widget via same var names */
+  --glass-voice-capture-bg: rgba(255, 255, 255, 0.65);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.15);
+  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  --voice-capture-screenshot-fade: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.9) 100%
+  );
+  --echly-waveform-fill: rgba(26, 86, 219, 0.85);
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --button-primary-bg: #155dfc;
+  --button-primary-text: #ffffff;
+  --color-alert: #ef4444;
+}
+
+/* App dark mode (next-themes: class "dark" on <html>) — same tokens as #echly-root[data-theme="dark"] */
+html.dark {
+  --glass-voice-capture-bg: rgba(20, 20, 20, 0.6);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.45);
+  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --voice-capture-screenshot-fade: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, 0) 0%,
+    rgba(20, 20, 20, 0.92) 100%
+  );
+  --echly-waveform-fill: rgba(96, 165, 250, 0.75);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --button-primary-bg: #155dfc;
+  --button-primary-text: #ffffff;
+  --color-alert: #ef4444;
+  color-scheme: dark;
 }
 
 /* Text hierarchy utilities: use vars for secondary/meta only; primary stays default or explicit */
@@ -1180,7 +1216,7 @@ textarea:focus-visible {
 ====================================== */
 
 :root {
-  --radius-lg: 18px;
+  --radius-lg: 16px;
   --radius-card: 14px;
   --radius-btn: 10px;
   --transition-fast: 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -1230,6 +1266,15 @@ textarea:focus-visible {
   --priority-low: rgba(255, 255, 255, 0.25);
   --confirm-icon-hover-bg: rgba(255, 255, 255, 0.08);
   --confirm-icon-active-bg: rgba(255, 255, 255, 0.12);
+  --glass-voice-capture-bg: rgba(20, 20, 20, 0.6);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.45);
+  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --voice-capture-screenshot-fade: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, 0) 0%,
+    rgba(20, 20, 20, 0.92) 100%
+  );
+  --echly-waveform-fill: rgba(96, 165, 250, 0.75);
 }
 
 #echly-root[data-theme="light"] {
@@ -1272,6 +1317,15 @@ textarea:focus-visible {
   --priority-low: rgba(0, 0, 0, 0.25);
   --confirm-icon-hover-bg: rgba(0, 0, 0, 0.06);
   --confirm-icon-active-bg: rgba(0, 0, 0, 0.1);
+  --glass-voice-capture-bg: rgba(255, 255, 255, 0.65);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.15);
+  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  --voice-capture-screenshot-fade: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.9) 100%
+  );
+  --echly-waveform-fill: rgba(26, 86, 219, 0.85);
 }
 
 /* Fallback when widget is used without data-theme (e.g. app embed): default dark */
@@ -1315,6 +1369,15 @@ textarea:focus-visible {
   --priority-low: rgba(255, 255, 255, 0.25);
   --confirm-icon-hover-bg: rgba(255, 255, 255, 0.08);
   --confirm-icon-active-bg: rgba(255, 255, 255, 0.12);
+  --glass-voice-capture-bg: rgba(20, 20, 20, 0.6);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.45);
+  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --voice-capture-screenshot-fade: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, 0) 0%,
+    rgba(20, 20, 20, 0.92) 100%
+  );
+  --echly-waveform-fill: rgba(96, 165, 250, 0.75);
   color-scheme: dark;
 }
 
@@ -2127,7 +2190,7 @@ textarea:focus-visible {
   font-size: 14px;
   font-weight: 500;
   margin-bottom: 14px;
-  text-align: center;
+  text-align: left;
 }
 .voice-orb-container {
   display: flex;
@@ -2161,20 +2224,205 @@ textarea:focus-visible {
 #echly-capture-root {
   pointer-events: none;
 }
+/* Portaled mic list: reset inherited pointer-events from #echly-capture-root (none). */
+#echly-capture-root .echly-voice-mic-dropdown {
+  pointer-events: auto !important;
+}
 
 .echly-dim-layer {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  /* Fade without opacity — opacity would affect backdrop-filter strength */
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   pointer-events: none;
   z-index: 2147483644;
-  opacity: 0;
-  transition: opacity 120ms ease;
+  transition: background 180ms ease, backdrop-filter 180ms ease, -webkit-backdrop-filter 180ms ease;
 }
 .echly-dim-layer.echly-dim-layer--visible {
-  opacity: 1;
+  background: var(--voice-capture-dim-bg);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+/* Text feedback modal — lighter glass than voice capture; readability-first */
+.echly-text-modal {
+  position: fixed;
+  pointer-events: auto;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(380px, 92vw);
+  z-index: 2147483647;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  border-radius: 16px;
+  padding: 20px;
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  transition: all 160ms ease;
+
+  font-family: var(
+    --echly-font,
+    "Plus Jakarta Sans",
+    "SF Pro Display",
+    Inter,
+    system-ui,
+    sans-serif
+  );
+}
+
+.echly-text-modal.dark {
+  background: rgba(18, 18, 20, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.echly-text-modal.light {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.echly-text-modal__shot-wrap {
+  margin: -20px -20px 20px;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.echly-text-modal.light .echly-text-modal__shot-wrap {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+.echly-text-modal__shot-frame {
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  aspect-ratio: 16 / 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.echly-text-modal.light .echly-text-modal__shot-frame {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.echly-text-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.echly-textarea {
+  width: 100%;
+  border-radius: 14px;
+
+  padding: 14px 16px;
+
+  font-size: 14px;
+  line-height: 1.5;
+
+  border: 1px solid transparent;
+  outline: none;
+
+  transition: all 120ms ease;
+
+  resize: vertical;
+  min-height: 80px;
+  box-sizing: border-box;
+}
+
+.echly-text-modal.dark .echly-textarea {
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.echly-text-modal.light .echly-textarea {
+  background: rgba(0, 0, 0, 0.03);
+  color: #111;
+
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.echly-text-modal.dark .echly-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.echly-text-modal.light .echly-textarea::placeholder {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.echly-textarea:focus {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.echly-text-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.echly-btn-cancel {
+  background: transparent;
+  border-radius: 12px;
+
+  padding: 10px 16px;
+
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+}
+
+.echly-text-modal.dark .echly-btn-cancel {
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.echly-text-modal.light .echly-btn-cancel {
+  color: var(--text-secondary, #6b7280);
+}
+
+.echly-btn-save {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  color: white;
+
+  border-radius: 12px;
+  padding: 10px 18px;
+
+  font-weight: 500;
+}
+
+.echly-text-modal.dark .echly-btn-save:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.45);
+  cursor: not-allowed;
+}
+
+.echly-text-modal.light .echly-btn-save:disabled {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.35);
+  cursor: not-allowed;
 }
 
 .echly-capture-card {
@@ -2183,60 +2431,69 @@ textarea:focus-visible {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 2147483646;
-  width: 420px;
+  width: min(440px, calc(100vw - 32px));
   padding: 24px;
-  border-radius: 14px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 14px;
+  border-radius: 18px;
+  box-shadow: var(--voice-capture-card-shadow);
+  display: block;
   font-family: var(--echly-font);
-  opacity: 0;
-  /* Default dark theme (e.g. when portaled outside #echly-root) */
-  background: #0f172a;
-  color: #e5e7eb;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  pointer-events: auto;
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  /* Never use opacity on the panel — it fades all descendants. Hide until ready with visibility. */
+  visibility: hidden;
+  pointer-events: none;
+}
+/* Portaled to document.body under next-themes dark: scoped text tokens (widget uses #echly-root vars) */
+html.dark .echly-capture-card {
+  --text-primary: #f3f4f6;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: 240 5% 52%;
 }
 .echly-capture-card.echly-capture-card--visible {
-  animation: echly-capture-card-enter 140ms ease-out forwards;
+  visibility: visible;
+  pointer-events: auto;
+  animation: echly-capture-card-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 @keyframes echly-capture-card-enter {
   from {
-    opacity: 0;
-    transform: translate(-50%, -55%);
+    transform: translate(-50%, -50%) scale(0.98);
   }
   to {
-    opacity: 1;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%) scale(1);
   }
 }
 
-#echly-root[data-theme="light"] .echly-capture-card {
-  background: #ffffff;
-  color: #111827;
-  border: 1px solid #e5e7eb;
+.echly-capture-card-blur-bg,
+.panel-bg {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: var(--glass-voice-capture-bg);
+  border-radius: inherit;
+  z-index: 0;
+  pointer-events: none;
 }
-#echly-root[data-theme="dark"] .echly-capture-card,
-#echly-root:not([data-theme]) .echly-capture-card {
-  background: #0f172a;
-  color: #e5e7eb;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+
+.echly-capture-card-content,
+.panel-content {
+  position: relative;
+  z-index: 1;
+  opacity: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
 }
 
 .echly-capture-screenshot-preview {
+  position: relative;
   width: 100%;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-#echly-root[data-theme="light"] .echly-capture-screenshot-preview {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-}
-#echly-root[data-theme="dark"] .echly-capture-screenshot-preview,
-#echly-root:not([data-theme]) .echly-capture-screenshot-preview {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
 }
 .echly-capture-screenshot-preview img {
   width: 100%;
@@ -2244,90 +2501,399 @@ textarea:focus-visible {
   display: block;
 }
 
+.echly-capture-screenshot-preview::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 46%;
+  pointer-events: none;
+  background: var(--voice-capture-screenshot-fade);
+}
+
 .echly-capture-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   margin: 0;
-  color: #e5e7eb;
-}
-#echly-root[data-theme="light"] .echly-capture-title {
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .echly-capture-instruction {
-  font-size: 13px;
+  font-size: 12px;
   margin: 0;
-  color: #94a3b8;
+  color: var(--text-secondary);
 }
-#echly-root[data-theme="light"] .echly-capture-instruction {
-  color: #6b7280;
+
+.echly-capture-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  text-align: left;
+}
+
+.echly-voice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.echly-voice-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.echly-dot {
+  width: 6px;
+  height: 6px;
+  background: #ff4d4f;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.echly-dot.echly-dot--idle {
+  background: color-mix(in srgb, var(--text-secondary) 55%, transparent);
+}
+
+.echly-voice-cancel {
+  font-size: 11px;
+  color: hsl(var(--text-tertiary, 220 9% 46%));
 }
 
 .echly-capture-visualizer {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  justify-content: stretch;
+  align-items: stretch;
+  margin-top: 0;
+  width: 100%;
 }
 
 .echly-waveform-container {
   width: 100%;
-  height: 60px;
   overflow: hidden;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: stretch;
+  box-sizing: border-box;
+  min-height: 52px;
+  height: 52px;
+  padding: 4px 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-lg);
+}
+
+html.dark .echly-waveform-container {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.echly-waveform {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
+.echly-bar {
+  flex-shrink: 0;
+  width: 2px;
+  min-height: 2px;
+  background: #3b82f6;
+  border-radius: 2px;
+  transition: height 80ms ease-out;
+  align-self: center;
+  will-change: height;
 }
 
 .echly-chatgpt-waveform {
   display: block;
   width: 100%;
   max-width: 100%;
+  filter: none;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 1) 7%,
+    rgba(0, 0, 0, 1) 93%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 1) 7%,
+    rgba(0, 0, 0, 1) 93%,
+    transparent 100%
+  );
 }
 
 .waveform-placeholder {
-  height: 52px;
+  height: 64px;
   width: 100%;
-  opacity: 0.4;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .echly-capture-status {
-  font-size: 12px;
-  color: #64748b;
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-top: 0;
 }
-#echly-root[data-theme="light"] .echly-capture-status {
-  color: #6b7280;
+
+.echly-recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-alert);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-alert) 45%, transparent);
+  animation: echly-recording-pulse 1.4s ease-out infinite;
+}
+
+@keyframes echly-recording-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-alert) 42%, transparent);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-alert) 0%, transparent);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-alert) 0%, transparent);
+  }
 }
 
 .echly-finish-btn {
-  height: 40px;
-  padding: 0 18px;
-  border-radius: 10px;
+  height: 50px;
+  padding: 0 22px;
+  border-radius: var(--radius-lg);
   font-weight: 500;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   border: none;
   font-family: var(--echly-font);
-  transition: background 120ms ease-out;
-  background: #3b82f6;
-  color: white;
-}
-#echly-root[data-theme="light"] .echly-finish-btn {
-  background: #2563eb;
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+  background: var(--button-primary-bg);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--button-primary-bg) 30%, transparent);
+  color: var(--button-primary-text);
 }
 .echly-finish-btn:hover {
-  background: #1d4ed8 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--button-primary-bg) 34%, transparent);
+}
+.echly-finish-btn:active {
+  transform: scale(0.98);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--button-primary-bg) 26%, transparent);
+}
+.echly-finish-btn[aria-busy="true"] {
+  opacity: 0.92;
+  cursor: wait;
+}
+.echly-finish-btn:disabled {
+  cursor: default;
 }
 
 .echly-capture-cancel-hint {
   font-size: 12px;
-  opacity: 0.65;
-  margin-top: 6px;
+  margin-top: 12px;
   margin-bottom: 0;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.7);
+  text-align: left;
+  color: color-mix(in srgb, var(--text-secondary) 72%, transparent);
 }
-#echly-root[data-theme="light"] .echly-capture-cancel-hint {
-  color: rgba(0, 0, 0, 0.55);
+
+/* Voice capture failure (recoverable) — mic off */
+.echly-voice-failure-icon-wrap {
+  width: 72px;
+  height: 72px;
+  margin: 4px auto 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: rgba(255, 80, 80, 0.8);
+}
+html.dark .echly-voice-failure-icon-wrap {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(248, 113, 113, 0.85);
+}
+.echly-voice-failure-body {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+.echly-voice-failure-header {
+  margin-top: 4px;
+}
+.echly-voice-failure-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+.echly-voice-failure-secondary-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.echly-voice-failure-secondary {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  font-family: var(--echly-font);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  color: var(--text-primary);
+  transition: background 120ms ease, transform 120ms ease;
+  width: 100%;
+}
+.echly-voice-failure-secondary:hover {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+.echly-voice-failure-secondary:active {
+  transform: scale(0.99);
+}
+/* Mic list: portaled to #echly-capture-root with position:fixed + measured top/left (viewport-safe).
+   Card has overflow:hidden — menu is not a descendant of the card. */
+.echly-voice-mic-dropdown {
+  box-sizing: border-box;
+  position: fixed;
+  pointer-events: auto;
+  isolation: isolate;
+  padding: 6px;
+  border-radius: 16px;
+  background: #ffffff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 320px;
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  font-family: var(--echly-font);
+  text-align: left;
+  /* Above .echly-capture-card (2147483646); below global modal chrome if any uses higher layers */
+  z-index: 2147483648;
+}
+.echly-voice-mic-dropdown--selecting .echly-mic-item {
+  pointer-events: none;
+  cursor: default;
+}
+.echly-voice-mic-dropdown--selecting .echly-mic-item:hover,
+html.dark .echly-voice-mic-dropdown--selecting .echly-mic-item:hover,
+#echly-root[data-theme="dark"] .echly-voice-mic-dropdown--selecting .echly-mic-item:hover {
+  background: transparent;
+}
+html.dark .echly-voice-mic-dropdown,
+#echly-root[data-theme="dark"] .echly-voice-mic-dropdown {
+  background: #1f1f1f;
+}
+.echly-voice-mic-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+.echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+.echly-voice-mic-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
+#echly-root[data-theme="dark"] .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.echly-mic-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.echly-mic-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+html.dark .echly-mic-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.echly-mic-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.echly-mic-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.echly-mic-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.echly-mic-item.is-active {
+  background: rgba(59, 130, 246, 0.1);
+}
+html.dark .echly-mic-item.is-active {
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.echly-mic-check {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  opacity: 0.6;
+  color: var(--text-primary);
 }
 
 /* Legacy capture-preview (kept for compatibility) */

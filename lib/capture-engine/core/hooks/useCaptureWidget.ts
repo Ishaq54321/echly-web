@@ -10,6 +10,7 @@ import type {
   Position,
   CaptureContext,
   SessionFeedbackPending,
+  VoiceCaptureError,
 } from "../types";
 import { buildCaptureContext } from "../internal/contextHelpers";
 import { playDoneClick, playShutterSound } from "../internal/audioHelpers";
@@ -53,6 +54,10 @@ function getSentimentFromTranscript(transcript: string): SentimentGlow {
   return "neutral";
 }
 
+function isTranscriptUsable(transcript: unknown): transcript is string {
+  return typeof transcript === "string" && transcript.trim().length >= 3;
+}
+
 function generateRecordingId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -92,6 +97,7 @@ export function useCaptureWidget({
   captureMode = "voice",
   selectedMicrophoneId,
   onDevicesEnumerated,
+  onVoiceMicrophoneSelect,
   captureRootParent,
   environment,
 }: CaptureWidgetProps) {
@@ -137,10 +143,13 @@ export function useCaptureWidget({
   const [endPending, setEndPending] = useState(false);
   const [sessionFeedbackPending, setSessionFeedbackPending] = useState<SessionFeedbackPending | null>(captureState.pending);
   const [sessionFeedbackSaving, setSessionFeedbackSaving] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
   const [sessionLimitReached, setSessionLimitReached] = useState<{
     message?: string;
     upgradePlan?: unknown;
   } | null>(null);
+  const [voiceError, setVoiceError] = useState<VoiceCaptureError>(null);
+  const [micDeviceOverride, setMicDeviceOverride] = useState<string | null>(null);
 
   const sessionModeRef = useRef(false);
   const sessionPausedRef = useRef(false);
@@ -193,6 +202,12 @@ export function useCaptureWidget({
     sessionFeedbackPendingRef.current = sessionFeedbackPending != null;
   }, [sessionFeedbackPending]);
 
+  useEffect(() => {
+    if (!sessionFeedbackPending) {
+      setIsFinishing(false);
+    }
+  }, [sessionFeedbackPending]);
+
   /** Sync pending to global store so it survives React remounts. */
   const setPending = useCallback((value: SessionFeedbackPending | null) => {
     captureState.pending = value;
@@ -219,20 +234,24 @@ export function useCaptureWidget({
     };
   }, [state]);
 
-  /** Audio level loop while voice_listening */
+  const stopListeningAudio = useCallback(() => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+    mediaStreamRef.current = null;
+    audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
+    analyserRef.current = null;
+    setAudioAnalyser(null);
+    setListeningAudioLevel(0);
+  }, []);
+
+  /** Audio level loop while voice_listening and not finishing */
   useEffect(() => {
-    if (state !== "voice_listening") {
-      if (rafRef.current != null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
-      mediaStreamRef.current = null;
-      audioContextRef.current?.close().catch(() => {});
-      audioContextRef.current = null;
-      analyserRef.current = null;
-      setAudioAnalyser(null);
-      setListeningAudioLevel(0);
+    if (state !== "voice_listening" || isFinishing) {
+      stopListeningAudio();
       return;
     }
     const analyser = analyserRef.current;
@@ -253,7 +272,7 @@ export function useCaptureWidget({
       cancelAnimationFrame(rafId);
       rafRef.current = null;
     };
-  }, [state]);
+  }, [state, isFinishing, stopListeningAudio]);
 
   useEffect(() => {
     editingIdRef.current = editingId;
@@ -503,6 +522,7 @@ export function useCaptureWidget({
 
   const startListening = useCallback(async () => {
     echlyLog("RECORDING", "start");
+    setVoiceError(null);
     const startTime = Date.now();
     voiceStartTimeRef.current = startTime;
     logger.debug("voice", "recording_started", { startTime });
@@ -515,10 +535,13 @@ export function useCaptureWidget({
         label: d.label || `Microphone ${inputs.indexOf(d) + 1}`,
       }));
       onDevicesEnumerated?.(deviceList);
-      const audioConstraints: boolean | MediaTrackConstraints = selectedMicrophoneId
-        ? { deviceId: { exact: selectedMicrophoneId } }
-        : true;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      const effectiveMicId = micDeviceOverride ?? selectedMicrophoneId ?? undefined;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio:
+          effectiveMicId && effectiveMicId.length > 0
+            ? { deviceId: { exact: effectiveMicId } }
+            : true,
+      });
       mediaStreamRef.current = stream;
       const ctx = new AudioContext();
       const analyser = ctx.createAnalyser();
@@ -541,6 +564,7 @@ export function useCaptureWidget({
       mediaRecorder.start();
       logger.debug("voice", "recording_started");
       recordingActiveRef.current = true;
+      setIsFinishing(false);
       setState("voice_listening");
       setListeningAudioLevel(0);
     } catch (err) {
@@ -549,14 +573,36 @@ export function useCaptureWidget({
       if (extensionMode && pointersPropRef.current) {
         setPointers(pointersPropRef.current);
       }
+      if (sessionFeedbackPendingRef.current) {
+        setVoiceError("mic_permission");
+        setState("idle");
+        return;
+      }
       setErrorMessage("Microphone permission denied.");
       setState("error");
       removeCaptureRoot();
       restoreWidget();
     }
-  }, [selectedMicrophoneId, onDevicesEnumerated]);
+  }, [selectedMicrophoneId, micDeviceOverride, onDevicesEnumerated, extensionMode, removeCaptureRoot, restoreWidget]);
+
+  const retryVoiceCapture = useCallback(() => {
+    setVoiceError(null);
+    setErrorMessage(null);
+    startListening();
+  }, [startListening]);
+
+  const selectVoiceMicrophone = useCallback(
+    (deviceId: string) => {
+      if (!deviceId) return;
+      onVoiceMicrophoneSelect?.(deviceId);
+      setMicDeviceOverride(deviceId);
+    },
+    [onVoiceMicrophoneSelect]
+  );
 
   const finishListening = useCallback(async () => {
+    if (isFinishing) return;
+    setIsFinishing(true);
     echlyLog("RECORDING", "finish requested");
     recordingActiveRef.current = false;
     if (extensionMode && pointersPropRef.current) {
@@ -568,7 +614,9 @@ export function useCaptureWidget({
     playDoneClick();
     const mediaRecorder = mediaRecorderRef.current;
     if (!mediaRecorder) {
+      stopListeningAudio();
       setState("idle");
+      setIsFinishing(false);
       return;
     }
     const activeId = activeRecordingIdRef.current;
@@ -576,9 +624,11 @@ export function useCaptureWidget({
       try {
         if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
       } catch {}
+      stopListeningAudio();
       audioChunksRef.current = [];
       mediaRecorderRef.current = null;
       setState("idle");
+      setIsFinishing(false);
       return;
     }
     mediaRecorder.onstop = async () => {
@@ -586,6 +636,7 @@ export function useCaptureWidget({
       const audioFile = new File(audioChunksRef.current, "recording.webm", {
         type: "audio/webm",
       });
+      const voiceFailurePanelOpen = sessionFeedbackPendingRef.current;
       logger.debug("voice", "file_created", {
         size: audioFile.size,
         type: audioFile.type,
@@ -603,17 +654,38 @@ export function useCaptureWidget({
           body: formData,
           credentials: "include",
         });
+        let data: { transcript?: string; error?: string } = {};
+        try {
+          data = (await res.json()) as { transcript?: string; error?: string };
+        } catch {
+          data = {};
+        }
         if (!res.ok) {
           logger.error("error", "voice_transcription_http_failed", { status: res.status });
           logger.error("voice", "transcription_failed", { status: res.status });
+          const noSpeech =
+            res.status === 400 && data?.error === "NO_SPEECH_DETECTED";
+          if (voiceFailurePanelOpen) {
+            setVoiceError(noSpeech ? "no_audio" : "transcription_failed");
+          } else {
+            setErrorMessage(
+              noSpeech
+                ? "We didn't detect clear audio. Try again."
+                : "Transcription failed. Try again."
+            );
+          }
           setState("idle");
           return;
         }
-        const data = await res.json();
         const transcript = data?.transcript;
-        if (typeof transcript !== "string" || transcript.trim().length === 0) {
+        if (!isTranscriptUsable(transcript)) {
           logger.error("error", "voice_invalid_transcript");
           logger.error("voice", "transcription_failed");
+          if (voiceFailurePanelOpen) {
+            setVoiceError("no_audio");
+          } else {
+            setErrorMessage("We didn't detect clear audio. Try again.");
+          }
           setState("idle");
           return;
         }
@@ -632,6 +704,7 @@ export function useCaptureWidget({
         if (extensionMode) {
           const isSessionFeedback = sessionModeRef.current;
           if (isSessionFeedback) {
+            setPending(null);
             /* Session mode: create marker immediately, clear state so user can click another element, process async. */
             const root = captureRootRef.current;
             const element = lastSessionClickedElementRef.current ?? undefined;
@@ -649,7 +722,6 @@ export function useCaptureWidget({
                 }
               );
             }
-            setPending(null);
             setSessionFeedbackSaving(true);
             setRecordings((prev) => prev.filter((r) => r.id !== activeId));
             setActiveRecordingId(null);
@@ -767,25 +839,36 @@ export function useCaptureWidget({
       } catch (error) {
         logger.error("error", "voice_transcription_failed", error);
         logger.error("voice", "transcription_failed");
+        if (voiceFailurePanelOpen) {
+          setVoiceError("transcription_failed");
+        } else {
+          setErrorMessage("Transcription failed. Try again.");
+        }
         setState("idle");
       } finally {
         audioChunksRef.current = [];
         mediaRecorderRef.current = null;
+        setIsFinishing(false);
       }
     };
     try {
       if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      stopListeningAudio();
     } catch (error) {
       logger.error("error", "voice_stop_failed", error);
+      stopListeningAudio();
       audioChunksRef.current = [];
       mediaRecorderRef.current = null;
       setState("idle");
+      setIsFinishing(false);
     }
-  }, [onComplete, extensionMode, removeCaptureRoot, restoreWidget, environment]);
+  }, [isFinishing, onComplete, extensionMode, removeCaptureRoot, restoreWidget, environment, setPending, stopListeningAudio]);
 
   const discardListening = useCallback(() => {
     echlyLog("RECORDING", "discard");
+    setVoiceError(null);
     recordingActiveRef.current = false;
+    setIsFinishing(false);
     if (extensionMode && pointersPropRef.current) {
       setPointers(pointersPropRef.current);
     }
@@ -797,6 +880,7 @@ export function useCaptureWidget({
     } catch (error) {
       logger.error("error", "voice_stop_failed", error);
     }
+    stopListeningAudio();
     audioChunksRef.current = [];
     mediaRecorderRef.current = null;
     const activeId = activeRecordingIdRef.current;
@@ -805,7 +889,7 @@ export function useCaptureWidget({
     setState("cancelled");
     removeCaptureRoot();
     restoreWidget();
-  }, [extensionMode, removeCaptureRoot, restoreWidget]);
+  }, [extensionMode, removeCaptureRoot, restoreWidget, stopListeningAudio]);
 
   /** ESC: any capture flow → cancelled */
   useEffect(() => {
@@ -1432,6 +1516,8 @@ export function useCaptureWidget({
   );
 
   const handleSessionFeedbackCancel = useCallback(() => {
+    setVoiceError(null);
+    setIsFinishing(false);
     const recorder = mediaRecorderRef.current;
     try {
       if (recorder && recorder.state !== "inactive") {
@@ -1440,6 +1526,7 @@ export function useCaptureWidget({
     } catch (error) {
       logger.error("error", "voice_stop_failed", error);
     }
+    stopListeningAudio();
     audioChunksRef.current = [];
     mediaRecorderRef.current = null;
     recordingActiveRef.current = false;
@@ -1452,7 +1539,7 @@ export function useCaptureWidget({
     setPending(null);
     setSessionFeedbackSaving(false);
     setState("idle");
-  }, [setPending]);
+  }, [setPending, stopListeningAudio]);
 
   const handleSessionStartVoice = useCallback(() => {
     const pending = sessionFeedbackPending;
@@ -1572,6 +1659,8 @@ export function useCaptureWidget({
       handleSessionFeedbackSubmit,
       handleSessionFeedbackCancel,
       handleSessionStartVoice,
+      retryVoiceCapture,
+      selectVoiceMicrophone,
     }),
     [
       setIsOpen,
@@ -1605,6 +1694,8 @@ export function useCaptureWidget({
       handleSessionFeedbackSubmit,
       handleSessionFeedbackCancel,
       handleSessionStartVoice,
+      retryVoiceCapture,
+      selectVoiceMicrophone,
     ]
   );
 
@@ -1642,9 +1733,12 @@ export function useCaptureWidget({
       sessionPaused,
       pausePending,
       endPending,
+      isFinishing,
       sessionFeedbackPending,
       sessionLimitReached,
       audioAnalyser,
+      voiceError,
+      voiceMicDeviceId: micDeviceOverride ?? selectedMicrophoneId ?? "",
     },
     handlers,
     refs: {
