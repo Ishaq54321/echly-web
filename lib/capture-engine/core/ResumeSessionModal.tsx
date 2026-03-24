@@ -101,7 +101,7 @@ export function ResumeSessionModal({
     let isMounted = true;
 
     const load = async () => {
-      console.log("[ECHLY UX] fetching sessions inside modal");
+      if (ECHLY_DEBUG) console.debug("[ECHLY UX] fetching sessions inside modal");
       setLoading(true);
       try {
         if (checkAuth) {
@@ -116,7 +116,7 @@ export function ResumeSessionModal({
         const data = await fetchSessions?.();
         if (isMounted) {
           setSessions(data ?? []);
-          console.log("[ECHLY UX] sessions loaded:", data?.length ?? 0);
+          if (ECHLY_DEBUG) console.debug("[ECHLY UX] sessions loaded:", data?.length ?? 0);
         }
       } catch (e) {
         console.error("[ECHLY UX] failed to load sessions", e);

@@ -92,9 +92,7 @@ async function loadSessionsAndCounts(): Promise<SessionsLoadPayload> {
   }
   sessionsLoadInFlight = (async () => {
     try {
-      const res = await fetch("/api/sessions", {
-        credentials: "include",
-      });
+      const res = await authFetch("/api/sessions");
       if (!res.ok) {
         throw new Error(`Failed to fetch sessions: ${res.status}`);
       }
@@ -184,9 +182,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
   const loadFolders = useCallback(async () => {
     try {
       setFoldersLoading(true);
-      const res = await fetch("/api/folders", {
-        credentials: "include",
-      });
+      const res = await authFetch("/api/folders");
       if (!res.ok) {
         throw new Error(`Failed to fetch folders: ${res.status}`);
       }

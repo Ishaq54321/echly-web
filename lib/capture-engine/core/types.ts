@@ -132,6 +132,12 @@ export type CaptureWidgetProps = {
   resolvedCount?: number;
   /** Extension: true while loading a previous session's feedback; show spinner instead of empty state. */
   sessionLoading?: boolean;
+  /** Extension: true while pagination recovery loop is actively retrying rehydrate. */
+  feedbackRecovering?: boolean;
+  /** Extension: number of recovery attempts made for pagination self-healing. */
+  feedbackRecoveryAttempts?: number;
+  /** Extension: true when a recovery cycle exhausted retries and is waiting for a future trigger. */
+  feedbackFetchFailed?: boolean;
   /** Extension: session title from globalUIState. When provided, overrides internal sessionTitle for display. */
   sessionTitleProp?: string | null;
   /** Extension: when session title is saved in tray. When provided, called instead of internal setSessionTitle (enables PATCH + broadcast). */
@@ -192,6 +198,10 @@ export type CaptureWidgetProps = {
   onTriggerLogin?: () => void;
   /** Extension: when set (POST /api/sessions returned 403 PLAN_LIMIT_REACHED), show upgrade view instead of session controls. */
   sessionLimitReached?: { message: string; upgradePlan: unknown } | null;
+  /** Extension: transient banner when session start failed (e.g. background-triggered createSession). */
+  sessionStartErrorBanner?: string | null;
+  /** Extension: clear session start error banner (e.g. after user dismisses or retries). */
+  onSessionStartErrorDismiss?: () => void;
   /** Optional capture environment adapter (extension, dashboard, etc.). When provided, useCaptureWidget uses it instead of direct props/callbacks. */
   environment?: CaptureEnvironment;
   /** Extension: open Previous Sessions modal. Replaces chrome.runtime.sendMessage ECHLY_OPEN_PREVIOUS_SESSIONS. */

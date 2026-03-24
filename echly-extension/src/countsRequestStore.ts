@@ -27,6 +27,9 @@ export async function fetchCountsDedup(
   const promise = (async () => {
     try {
       const res = await fetchResponse();
+      if (!res.ok) {
+        throw new Error("API_ERROR_" + res.status);
+      }
       return await res.json();
     } finally {
       clearPendingRequest(sessionId);

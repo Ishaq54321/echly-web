@@ -44,40 +44,42 @@ export async function getSessionsCached(
   const promise = (async () => {
     try {
       const res = await fetchFn("/api/sessions");
+      if (!res.ok) {
+        console.error("[ECHLY] getSessionsCached /api/sessions failed", res.status);
+        return [];
+      }
       const data: unknown = await res.json();
       const baseSessions = sessionsArrayFromApiPayload(data);
-      if (res.ok) {
-        const sessions = await Promise.all(
-          baseSessions.map(async (session) => {
-            const sessionId = session.id;
-            const cached = getCounts(sessionId);
-            if (cached) {
-              return {
-                ...session,
-                counts: { total: cached.total },
-              };
-            }
-            try {
-              const countsJson = (await fetchCountsDedup(sessionId, () =>
-                fetchFn(
-                  `/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`
-                )
-              )) as { total?: number };
-              const total = typeof countsJson.total === "number" ? countsJson.total : 0;
-              setCounts(sessionId, total);
-              return {
-                ...session,
-                counts: { total },
-              };
-            } catch {
-              return { ...session, counts: { total: 0 } };
-            }
-          })
-        );
-        cached = { sessions, at: Date.now() };
-        return sessions;
-      }
-      return [];
+      const sessions = await Promise.all(
+        baseSessions.map(async (session) => {
+          const sessionId = session.id;
+          const cached = getCounts(sessionId);
+          if (cached) {
+            return {
+              ...session,
+              counts: { total: cached.total },
+            };
+          }
+          try {
+            const countsJson = (await fetchCountsDedup(sessionId, () =>
+              fetchFn(
+                `/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`
+              )
+            )) as { total?: number };
+            const total = typeof countsJson.total === "number" ? countsJson.total : 0;
+            setCounts(sessionId, total);
+            return {
+              ...session,
+              counts: { total },
+            };
+          } catch (countsErr) {
+            console.error("[ECHLY] getSessionsCached counts for session failed", sessionId, countsErr);
+            return { ...session, counts: { total: 0 } };
+          }
+        })
+      );
+      cached = { sessions, at: Date.now() };
+      return sessions;
     } finally {
       inFlight = null;
     }

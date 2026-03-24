@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { ECHLY_DEBUG } from "@/lib/utils/logger";
 
 type WidgetFooterProps = {
   isIdle: boolean;
@@ -33,13 +34,12 @@ export default function WidgetFooter({
 
   if (extensionMode) {
     const handleStartSessionClick = () => {
-      console.log("[ECHLY DEBUG] StartSession CLICKED", performance.now());
+      if (ECHLY_DEBUG) console.debug("[ECHLY] StartSession clicked", performance.now());
       onStartSession?.();
     };
     const handlePreviousSessionsClick = () => {
-      console.log("[ECHLY DEBUG] PreviousSessions CLICKED");
       if (!onOpenPreviousSession) {
-        console.log("[ECHLY DEBUG] PreviousSessions handler missing (onOpenPreviousSession is undefined)");
+        if (ECHLY_DEBUG) console.debug("[ECHLY] PreviousSessions handler missing");
         return;
       }
       onOpenPreviousSession();

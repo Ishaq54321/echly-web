@@ -3,10 +3,7 @@
  * Authorization: Bearer <token> on all API requests so /api/structure-feedback
  * and other authenticated endpoints pass requireAuth().
  */
-import { ECHLY_DEBUG } from "../../lib/utils/logger";
 import { API_BASE } from "../config";
-
-if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 export function clearAuthTokenCache(): void {
   // No-op: token cache lives in background.

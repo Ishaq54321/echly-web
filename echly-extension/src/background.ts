@@ -7,7 +7,6 @@ import { ECHLY_DEBUG } from "../../lib/utils/logger";
 import { echlyLog } from "../../lib/debug/echlyLogger";
 import { setExtensionToken, apiFetch } from "../utils/apiFetch";
 import { API_BASE, WEB_APP_URL } from "../config";
-import { fetchCountsDedup } from "./countsRequestStore";
 import { sessionsArrayFromApiPayload } from "@/lib/domain/session";
 import { buildFeedbackPayload } from "@/utils/buildFeedbackPayload";
 import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
@@ -29,8 +28,20 @@ async function openOrFocusLoginTab(): Promise<void> {
   await chrome.tabs.create({ url: LOGIN_URL });
 }
 
-console.log("ECHLY background script loaded");
-if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
+function clearAuthState(): void {
+  extensionToken = null;
+  extensionTokenExpiresAt = null;
+  sw.extensionToken = null;
+  sw.currentUser = null;
+  cachedSessionUser = null;
+  setExtensionToken(null);
+}
+
+function logMessageDeliveryError(context: string, error: unknown): void {
+  console.error(`[ECHLY MESSAGE] ${context} failed`, error);
+}
+
+if (ECHLY_DEBUG) console.log("[EXTENSION] background ready", API_BASE);
 
 /** Verify dashboard session (cookie) is still valid. Does not use extension token. */
 async function verifyDashboardSession(): Promise<boolean> {
@@ -40,7 +51,7 @@ async function verifyDashboardSession(): Promise<boolean> {
       credentials: "include",
     });
     if (res.status === 401) return false;
-    return true;
+    return res.ok;
   } catch (err) {
     console.warn("[ECHLY] Session verification failed", err);
     return false;
@@ -59,7 +70,9 @@ chrome.action.onClicked.addListener(() => {
       await chrome.storage.local.set({ echlyActive: false });
       broadcastUIState();
       if (tab?.id) {
-        chrome.tabs.sendMessage(tab.id, { type: "ECHLY_CLOSE_WIDGET" }).catch(() => {});
+        chrome.tabs
+          .sendMessage(tab.id, { type: "ECHLY_CLOSE_WIDGET" })
+          .catch((error) => logMessageDeliveryError("ECHLY_CLOSE_WIDGET", error));
       }
       return;
     }
@@ -147,6 +160,34 @@ let trayOpen = false;
 
 /** Minimal ticket shape for global tray; matches StructuredFeedback. */
 type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string };
+type CanonicalGlobalState = {
+  visible: boolean;
+  expanded: boolean;
+  isRecording: boolean;
+  sessionTitle: string | null;
+  sessionLoading: boolean;
+  captureMode: "voice" | "text";
+  session: {
+    id: string | null;
+    status: "idle" | "active" | "paused";
+  };
+  feedback: {
+    items: StructuredFeedback[];
+    nextCursor: string | null;
+    hasMore: boolean;
+    isFetching: boolean;
+    recovering: boolean;
+    recoveryAttempts: number;
+  };
+  counts: {
+    total: number;
+  };
+  lastSyncedAt: number | null;
+  /** Last successful paginated page fetch; combined with lastSyncedAt for freshness. */
+  lastPaginationAt: number | null;
+  /** max(lastSyncedAt, lastPaginationAt); null when neither set. */
+  lastActivityAt: number | null;
+};
 
 const globalUIState: {
   visible: boolean;
@@ -165,7 +206,11 @@ const globalUIState: {
   nextCursor: string | null;
   hasMore: boolean;
   isFetching: boolean;
+  recovering: boolean;
+  recoveryAttempts: number;
   captureMode: "voice" | "text";
+  lastSyncedAt: number | null;
+  lastPaginationAt: number | null;
 } = {
   visible: false,
   expanded: false,
@@ -183,7 +228,11 @@ const globalUIState: {
   nextCursor: null,
   hasMore: false,
   isFetching: false,
+  recovering: false,
+  recoveryAttempts: 0,
   captureMode: "voice",
+  lastSyncedAt: null,
+  lastPaginationAt: null,
 };
 
 function mapFeedbackToPointers(feedback: FeedbackApiItem[]): StructuredFeedback[] {
@@ -199,41 +248,138 @@ function resetPaginationState(): void {
   globalUIState.nextCursor = null;
   globalUIState.hasMore = false;
   globalUIState.isFetching = false;
+  globalUIState.recovering = false;
+  globalUIState.recoveryAttempts = 0;
 }
 
-async function fetchFeedbackCount(sessionId: string): Promise<{
-  total: number;
-  open: number;
-  skipped: number;
-  resolved: number;
-}> {
-  const cached = getCounts(sessionId);
-  if (cached) {
-    return cached;
+let rehydrationPromise: Promise<void> | null = null;
+const LOAD_MORE_RECOVERY_DELAYS_MS = [0, 500, 1000, 2000, 4000] as const;
+let loadMoreRecoveryPromise: Promise<void> | null = null;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** True when there is no list to show for the current in-memory session. */
+function isStateEmptyForSession(): boolean {
+  return globalUIState.sessionId == null || globalUIState.pointers.length === 0;
+}
+
+/**
+ * Wall-clock freshness for optional soft-refresh logic: max(lastSyncedAt, lastPaginationAt).
+ * Force rehydrate does not use time-only staleness (see shouldForceRehydrate).
+ */
+function effectiveFreshnessAt(): number {
+  return Math.max(globalUIState.lastSyncedAt ?? 0, globalUIState.lastPaginationAt ?? 0);
+}
+
+/**
+ * Only force a full rehydrate when there is no cached list, the target session differs, or
+ * explicit recovery — not purely because lastSyncedAt aged without pagination updating it.
+ */
+function shouldForceRehydrate(sessionIdForRehydrate: string): boolean {
+  if (globalUIState.sessionId != null && globalUIState.sessionId !== sessionIdForRehydrate) {
+    return true;
   }
+  return isStateEmptyForSession();
+}
+
+type RehydrateMode = "cold" | "forced_recovery" | "stale_soft";
+
+function setRehydratingLoadingState(sessionId: string, mode: RehydrateMode = "cold"): void {
+  activeSessionId = sessionId;
+  globalUIState.sessionId = sessionId;
+  globalUIState.sessionModeActive = true;
+  globalUIState.sessionPaused = false;
+  globalUIState.sessionLoading = true;
+  globalUIState.isFetching = true;
+  const clearList = mode === "cold" || mode === "forced_recovery";
+  if (clearList) {
+    // Never show stale in-memory feedback during cold start or explicit recovery.
+    globalUIState.pointers = [];
+    globalUIState.totalCount = 0;
+    globalUIState.openCount = 0;
+    globalUIState.skippedCount = 0;
+    globalUIState.resolvedCount = 0;
+    globalUIState.nextCursor = null;
+    globalUIState.hasMore = false;
+  }
+}
+
+async function rehydrateSession(sessionId: string, mode: RehydrateMode = "cold"): Promise<void> {
+  if (!sessionId) return;
+  if (rehydrationPromise) {
+    await rehydrationPromise;
+    return;
+  }
+
+  rehydrationPromise = (async () => {
+    setRehydratingLoadingState(sessionId, mode);
+    broadcastUIState();
+
+    try {
+      await getOrRefreshToken();
+      const [feedbackRes, counts] = await Promise.all([
+        apiFetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=20`),
+        fetchFeedbackCountFresh(sessionId),
+      ]);
+
+      const feedbackJson = (await feedbackRes.json()) as FeedbackListResponse;
+      globalUIState.pointers = mapFeedbackToPointers(feedbackJson.feedback ?? []);
+      globalUIState.nextCursor =
+        typeof feedbackJson.nextCursor === "string" && feedbackJson.nextCursor.length > 0
+          ? feedbackJson.nextCursor
+          : null;
+      globalUIState.hasMore = feedbackJson.hasMore === true;
+      globalUIState.totalCount = counts.total;
+      globalUIState.openCount = counts.open;
+      globalUIState.skippedCount = counts.skipped;
+      globalUIState.resolvedCount = counts.resolved;
+      const now = Date.now();
+      globalUIState.lastSyncedAt = now;
+      globalUIState.lastPaginationAt = null;
+      globalUIState.sessionModeActive = true;
+      globalUIState.sessionPaused = false;
+    } catch (error) {
+      console.error("[ECHLY] rehydrateSession failed", { sessionId, mode, error });
+      if (mode === "stale_soft") {
+        // Keep existing list/cursors until a successful fetch replaces them.
+      } else {
+        globalUIState.pointers = [];
+        globalUIState.totalCount = 0;
+        globalUIState.openCount = 0;
+        globalUIState.skippedCount = 0;
+        globalUIState.resolvedCount = 0;
+        globalUIState.nextCursor = null;
+        globalUIState.hasMore = false;
+        globalUIState.lastSyncedAt = null;
+        globalUIState.lastPaginationAt = null;
+      }
+    } finally {
+      globalUIState.isFetching = false;
+      globalUIState.sessionLoading = false;
+      broadcastUIState();
+    }
+  })();
+
   try {
-    const data = (await fetchCountsDedup(sessionId, () =>
-      apiFetch(
-        `${API_BASE}/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`
-      )
-    )) as FeedbackCountResponse;
-    const counts: SessionCounts = {
-      total: typeof data.total === "number" ? data.total : 0,
-      open: typeof data.open === "number" ? data.open : 0,
-      skipped: typeof data.skipped === "number" ? data.skipped : 0,
-      resolved: typeof data.resolved === "number" ? data.resolved : 0,
-    };
-    setCounts(sessionId, counts);
-    return counts;
-  } catch (err) {
-    console.warn("[ECHLY] feedback count fetch failed", err);
-    return {
-      total: 0,
-      open: 0,
-      skipped: 0,
-      resolved: 0,
-    };
+    await rehydrationPromise;
+  } finally {
+    rehydrationPromise = null;
   }
+}
+
+async function fetchFeedbackCountFresh(sessionId: string): Promise<SessionCounts> {
+  const res = await apiFetch(`${API_BASE}/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`);
+  const data = (await res.json()) as FeedbackCountResponse;
+  const counts: SessionCounts = {
+    total: typeof data.total === "number" ? data.total : 0,
+    open: typeof data.open === "number" ? data.open : 0,
+    skipped: typeof data.skipped === "number" ? data.skipped : 0,
+    resolved: typeof data.resolved === "number" ? data.resolved : 0,
+  };
+  setCounts(sessionId, counts);
+  return counts;
 }
 
 function mutateGlobalCounts(
@@ -285,16 +431,6 @@ function applyStatusTransition(previousStatus: CountStatus, nextStatus: CountSta
 
 async function loadMore(): Promise<void> {
   const sessionId = activeSessionId ?? globalUIState.sessionId;
-  console.log("loadMore ENTRY", {
-    isFetching: globalUIState.isFetching,
-    hasMore: globalUIState.hasMore,
-    nextCursor: globalUIState.nextCursor,
-  });
-  console.log("loadMore called", {
-    isFetching: globalUIState.isFetching,
-    hasMore: globalUIState.hasMore,
-    nextCursor: globalUIState.nextCursor,
-  });
   if (!sessionId) return;
   if (globalUIState.isFetching || !globalUIState.hasMore || !globalUIState.nextCursor) return;
 
@@ -302,9 +438,7 @@ async function loadMore(): Promise<void> {
   broadcastUIState();
 
   try {
-    await getValidToken();
-    console.log("CALLING API WITH CURSOR:", globalUIState.nextCursor);
-    console.log("FETCHING NEXT PAGE", globalUIState.nextCursor);
+    await getOrRefreshToken();
     const res = await apiFetch(
       `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=${encodeURIComponent(globalUIState.nextCursor)}&limit=20`
     );
@@ -313,36 +447,79 @@ async function loadMore(): Promise<void> {
     const newItems = mapFeedbackToPointers(rawItems);
     const existingIds = new Set(globalUIState.pointers.map((p) => p.id));
     const filteredItems = newItems.filter((item) => !existingIds.has(item.id));
-    console.log("DEDUPED ITEMS", {
-      before: existingIds.size,
-      incoming: rawItems.length,
-      after: filteredItems.length,
-    });
     if (filteredItems.length > 0) {
       globalUIState.pointers = [...globalUIState.pointers, ...filteredItems];
-      console.log("POINTERS UPDATED:", globalUIState.pointers.length);
-      console.log("UPDATED POINTER COUNT", globalUIState.pointers.length);
     }
     globalUIState.nextCursor =
       typeof json.nextCursor === "string" && json.nextCursor.length > 0
         ? json.nextCursor
         : null;
     globalUIState.hasMore = json.hasMore === true;
-    console.log("API RESPONSE", {
-      count: rawItems.length,
-      nextCursor: globalUIState.nextCursor,
-      hasMore: globalUIState.hasMore,
+    const now = Date.now();
+    globalUIState.lastSyncedAt = now;
+    globalUIState.lastPaginationAt = now;
+  } catch (error) {
+    console.error("[ECHLY] loadMore failed", {
+      sessionId,
+      cursor: globalUIState.nextCursor,
+      error,
     });
-    console.log("LOAD MORE RESULT", {
-      count: newItems.length,
-      nextCursor: globalUIState.nextCursor,
-      hasMore: globalUIState.hasMore,
-    });
-  } catch {
-    // Keep existing pointers unchanged on pagination errors.
+    globalUIState.recovering = true;
+    globalUIState.recoveryAttempts += 1;
+    globalUIState.hasMore = true;
+    broadcastUIState();
+    void retryRehydrateWithBackoff(sessionId);
   } finally {
     globalUIState.isFetching = false;
     broadcastUIState();
+  }
+}
+
+async function retryRehydrateWithBackoff(sessionId: string): Promise<void> {
+  if (loadMoreRecoveryPromise) {
+    return loadMoreRecoveryPromise;
+  }
+
+  loadMoreRecoveryPromise = (async () => {
+    for (let attemptIndex = 0; attemptIndex < LOAD_MORE_RECOVERY_DELAYS_MS.length; attemptIndex += 1) {
+      const delayMs = LOAD_MORE_RECOVERY_DELAYS_MS[attemptIndex];
+      if (delayMs > 0) {
+        await sleep(delayMs);
+      }
+
+      globalUIState.recovering = true;
+      globalUIState.recoveryAttempts = attemptIndex + 1;
+      broadcastUIState();
+
+      try {
+        await rehydrateSession(sessionId, "forced_recovery");
+        if (globalUIState.lastSyncedAt != null && globalUIState.sessionId === sessionId) {
+          globalUIState.recovering = false;
+          globalUIState.recoveryAttempts = 0;
+          broadcastUIState();
+          return;
+        }
+      } catch (rehydrateError) {
+        console.error("[ECHLY] loadMore recovery rehydrate failed", {
+          sessionId,
+          attempt: attemptIndex + 1,
+          rehydrateError,
+        });
+      }
+    }
+
+    console.warn("[ECHLY] loadMore recovery exhausted all attempts", {
+      sessionId,
+      maxAttempts: LOAD_MORE_RECOVERY_DELAYS_MS.length,
+    });
+    globalUIState.recovering = false;
+    broadcastUIState();
+  })();
+
+  try {
+    await loadMoreRecoveryPromise;
+  } finally {
+    loadMoreRecoveryPromise = null;
   }
 }
 
@@ -372,6 +549,8 @@ function endSessionFromIdle(): void {
   globalUIState.resolvedCount = 0;
   globalUIState.pointers = [];
   resetPaginationState();
+  globalUIState.lastSyncedAt = null;
+  globalUIState.lastPaginationAt = null;
   chrome.storage.local.set({
     activeSessionId: null,
     sessionModeActive: false,
@@ -381,7 +560,9 @@ function endSessionFromIdle(): void {
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
       if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" }).catch(() => {});
+        chrome.tabs
+          .sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" })
+          .catch((error) => logMessageDeliveryError("ECHLY_RESET_WIDGET", error));
       }
     });
   });
@@ -417,56 +598,22 @@ async function initializeSessionState(): Promise<void> {
         globalUIState.sessionModeActive = result.sessionModeActive === true;
         globalUIState.sessionPaused = result.sessionPaused === true;
 
-        const shouldReloadPointers =
-          globalUIState.sessionModeActive === true && activeSessionId != null;
+        const isColdStartRestart = activeSessionId != null && globalUIState.lastSyncedAt == null;
+        const shouldReloadPointers = isColdStartRestart;
 
         if (shouldReloadPointers) {
-          resetPaginationState();
-          globalUIState.totalCount = 0;
-          globalUIState.openCount = 0;
-          globalUIState.skippedCount = 0;
-          globalUIState.resolvedCount = 0;
-          getValidToken()
-            .then(() =>
-              Promise.all([
-                apiFetch(
-                  `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(activeSessionId!)}&limit=20`
-                ),
-                fetchFeedbackCount(activeSessionId!),
-              ])
-            )
-            .then(async ([res, counts]) => {
-              const json = (await res.json()) as FeedbackListResponse;
-              globalUIState.pointers = mapFeedbackToPointers(json.feedback ?? []);
-              globalUIState.totalCount = counts.total;
-              globalUIState.openCount = counts.open;
-              globalUIState.skippedCount = counts.skipped;
-              globalUIState.resolvedCount = counts.resolved;
-              globalUIState.nextCursor =
-                typeof json.nextCursor === "string" && json.nextCursor.length > 0
-                  ? json.nextCursor
-                  : null;
-              globalUIState.hasMore = json.hasMore === true;
-              globalUIState.isFetching = false;
-              broadcastUIState();
-              resolve();
-            })
-            .catch(() => {
-              globalUIState.pointers = [];
-              globalUIState.totalCount = 0;
-              globalUIState.openCount = 0;
-              globalUIState.skippedCount = 0;
-              globalUIState.resolvedCount = 0;
-              resetPaginationState();
-              broadcastUIState();
-              resolve();
-            });
+          void rehydrateSession(activeSessionId!).finally(() => {
+            resolve();
+          });
         } else {
+          globalUIState.sessionModeActive = false;
           globalUIState.totalCount = 0;
           globalUIState.openCount = 0;
           globalUIState.skippedCount = 0;
           globalUIState.resolvedCount = 0;
           resetPaginationState();
+          globalUIState.lastSyncedAt = null;
+          globalUIState.lastPaginationAt = null;
           resolve();
         }
       }
@@ -475,11 +622,11 @@ async function initializeSessionState(): Promise<void> {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("[ECHLY] extension installed or updated");
+  if (ECHLY_DEBUG) console.log("[ECHLY] extension installed or updated");
 });
 
 self.addEventListener("activate", () => {
-  console.log("[ECHLY] service worker activated");
+  if (ECHLY_DEBUG) console.log("[ECHLY] service worker activated");
 });
 
 (async () => {
@@ -499,24 +646,35 @@ self.addEventListener("activate", () => {
 
     broadcastUIState();
 
-    console.log("[ECHLY] service worker initialized");
+    if (ECHLY_DEBUG) console.log("[ECHLY] service worker initialized");
   } catch (err) {
     console.warn("[ECHLY] worker startup recovery failed", err);
   }
 })();
 
 /**
- * Resolve extension auth silently using dashboard cookies.
- * Never opens login or extension-auth routes automatically.
+ * Single token path:
+ * - valid in-memory token -> return
+ * - expired/missing token -> refresh from extension session endpoint
+ * - any failure -> throw NOT_AUTHENTICATED
  */
-async function getExtensionToken(): Promise<string> {
+async function getOrRefreshToken(): Promise<string> {
   const now = Date.now();
+
   if (
     extensionToken &&
     extensionTokenExpiresAt != null &&
     now < extensionTokenExpiresAt
   ) {
-    console.log("[ECHLY TOKEN] Retrieved:", "YES");
+    const sessionOk = await verifyDashboardSession();
+
+    if (!sessionOk) {
+      clearAuthState();
+      throw new Error("NOT_AUTHENTICATED");
+    }
+
+    setExtensionToken(extensionToken);
+    sw.extensionToken = extensionToken;
     return extensionToken;
   }
 
@@ -524,18 +682,9 @@ async function getExtensionToken(): Promise<string> {
     method: "POST",
     credentials: "include",
   });
-  if (res.status === 401) {
-    extensionToken = null;
-    extensionTokenExpiresAt = null;
-    sw.extensionToken = null;
-    sw.currentUser = null;
-    cachedSessionUser = null;
-    setExtensionToken(null);
-    console.log("[ECHLY TOKEN] Retrieved:", "NO");
-    throw new Error("NOT_AUTHENTICATED");
-  }
-  if (!res.ok) {
-    console.log("[ECHLY TOKEN] Retrieved:", "NO");
+
+  if (res.status === 401 || !res.ok) {
+    clearAuthState();
     throw new Error("NOT_AUTHENTICATED");
   }
 
@@ -545,10 +694,9 @@ async function getExtensionToken(): Promise<string> {
   };
   const token = data?.extensionToken;
   if (!token) {
-    console.log("[ECHLY TOKEN] Retrieved:", "NO");
+    clearAuthState();
     throw new Error("NOT_AUTHENTICATED");
   }
-  console.log("[ECHLY TOKEN] Retrieved:", token ? "YES" : "NO");
 
   extensionToken = token;
   extensionTokenExpiresAt = Date.now() + EXTENSION_TOKEN_TTL_MS;
@@ -563,32 +711,7 @@ async function getExtensionToken(): Promise<string> {
     };
     cachedSessionUser = sw.currentUser;
   }
-
   return token;
-}
-
-/** Returns valid extension token from cache if not expired and dashboard session valid. Throws NOT_AUTHENTICATED if no valid token. */
-async function getValidToken(): Promise<string> {
-  const now = Date.now();
-
-  if (
-    extensionToken &&
-    extensionTokenExpiresAt != null &&
-    now < extensionTokenExpiresAt
-  ) {
-    const sessionOk = await verifyDashboardSession();
-
-    if (!sessionOk) {
-      extensionToken = null;
-      extensionTokenExpiresAt = null;
-      setExtensionToken(null);
-      throw new Error("NOT_AUTHENTICATED");
-    }
-
-    return extensionToken;
-  }
-
-  throw new Error("NOT_AUTHENTICATED");
 }
 
 /**
@@ -596,30 +719,11 @@ async function getValidToken(): Promise<string> {
  * Used by auth-state requests to report authenticated state from in-memory user/token or session cookie.
  */
 async function hydrateAuthState(): Promise<boolean> {
-  // Already authenticated in memory
-  if (sw.currentUser && sw.extensionToken) {
-    return true;
-  }
-
-  // Verify dashboard session cookie
-  const sessionValid = await verifyDashboardSession();
-
-  // If no dashboard session exists, clear auth state
-  if (!sessionValid) {
-    extensionToken = null;
-    extensionTokenExpiresAt = null;
-    sw.extensionToken = null;
-    sw.currentUser = null;
-    cachedSessionUser = null;
-    setExtensionToken(null);
-    return false;
-  }
-
-  // Dashboard session exists — obtain extension token silently
   try {
-    const token = await getExtensionToken();
-    return !!token;
-  } catch {
+    await getOrRefreshToken();
+    return !!(sw.currentUser?.uid && sw.extensionToken);
+  } catch (error) {
+    console.error("[ECHLY] hydrateAuthState failed (no stale auth)", error);
     return false;
   }
 }
@@ -652,18 +756,54 @@ async function requireAuthForExplicitOpen(): Promise<boolean> {
 }
 
 function broadcastUIState(): void {
-  echlyLog("BACKGROUND", "broadcast global state", globalUIState);
+  const state = getCanonicalGlobalState();
+  echlyLog("BACKGROUND", "broadcast global state", state);
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
       if (tab.id) {
         chrome.tabs
-          .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
-          .catch(() => {
-            if (ECHLY_DEBUG) console.debug("ECHLY broadcast skipped tab", tab.id);
+          .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state })
+          .catch((error) => {
+            console.error("[ECHLY] broadcast ECHLY_GLOBAL_STATE to tab failed", tab.id, error);
           });
       }
     });
   });
+}
+
+function getCanonicalGlobalState(): CanonicalGlobalState {
+  const status: "idle" | "active" | "paused" = globalUIState.sessionModeActive
+    ? (globalUIState.sessionPaused ? "paused" : "active")
+    : "idle";
+  return {
+    visible: globalUIState.visible,
+    expanded: globalUIState.expanded,
+    isRecording: globalUIState.isRecording,
+    sessionTitle: globalUIState.sessionTitle,
+    sessionLoading: globalUIState.sessionLoading,
+    captureMode: globalUIState.captureMode,
+    session: {
+      id: globalUIState.sessionId,
+      status,
+    },
+    feedback: {
+      items: globalUIState.pointers,
+      nextCursor: globalUIState.nextCursor,
+      hasMore: globalUIState.hasMore,
+      isFetching: globalUIState.isFetching,
+      recovering: globalUIState.recovering,
+      recoveryAttempts: globalUIState.recoveryAttempts,
+    },
+    counts: {
+      total: globalUIState.totalCount,
+    },
+    lastSyncedAt: globalUIState.lastSyncedAt,
+    lastPaginationAt: globalUIState.lastPaginationAt,
+    lastActivityAt: (() => {
+      const t = effectiveFreshnessAt();
+      return t === 0 ? null : t;
+    })(),
+  };
 }
 
 /**
@@ -678,8 +818,9 @@ async function ensureContentScriptInjected(tabId: number): Promise<boolean> {
       func: () => (window as Window & { __ECHLY_WIDGET_LOADED__?: boolean }).__ECHLY_WIDGET_LOADED__ === true,
     });
     if (results?.[0]?.result === true) return true;
-  } catch {
-    // Page may not allow script execution (e.g. chrome://) or script not loaded yet
+  } catch (error) {
+    console.warn("[ECHLY] Pre-injection probe failed", { tabId, error });
+    // Page may not allow script execution (e.g. chrome://) or script not loaded yet.
   }
   try {
     await chrome.scripting.executeScript({
@@ -707,7 +848,6 @@ async function openWidgetInActiveTab(): Promise<void> {
   });
 
   const tabId = tabs[0]?.id;
-  console.log("[ECHLY][INJECTION] Injecting recorder UI into tab:", tabId);
 
   if (!tabId) {
     console.warn("[ECHLY BG] No active tab found");
@@ -725,7 +865,7 @@ async function openWidgetInActiveTab(): Promise<void> {
     .sendMessage(tabId, {
       type: "ECHLY_OPEN_WIDGET",
     })
-    .catch(() => {});
+    .catch((error) => logMessageDeliveryError("ECHLY_OPEN_WIDGET", error));
 }
 
 async function openRecorderUI(tabId?: number): Promise<boolean> {
@@ -752,10 +892,14 @@ async function openRecorderUI(tabId?: number): Promise<boolean> {
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   const { echlyActive } = await chrome.storage.local.get("echlyActive");
   if (!echlyActive) return;
+  const sessionIdForRehydrate = activeSessionId ?? globalUIState.sessionId;
+  if (sessionIdForRehydrate && shouldForceRehydrate(sessionIdForRehydrate)) {
+    await rehydrateSession(sessionIdForRehydrate);
+  }
   try {
     await ensureContentScriptInjected(activeInfo.tabId);
     chrome.tabs
-      .sendMessage(activeInfo.tabId, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
+      .sendMessage(activeInfo.tabId, { type: "ECHLY_GLOBAL_STATE", state: getCanonicalGlobalState() })
       .catch((e) => {
         if (ECHLY_DEBUG) console.debug("ECHLY tab activation sync failed", e);
       });
@@ -771,13 +915,11 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   activeOwnerTabId = tabId;
-  console.log("[ECHLY] Active owner tab set:", tabId);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (activeOwnerTabId === tabId) {
     activeOwnerTabId = null;
-    console.log("[ECHLY] Owner tab closed, reset ownership");
   }
 });
 
@@ -788,7 +930,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
   if (!echlyActive) return;
   try {
     await ensureContentScriptInjected(tabId);
-    chrome.tabs.sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: globalUIState }).catch(() => {});
+    chrome.tabs
+      .sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: getCanonicalGlobalState() })
+      .catch((error) => logMessageDeliveryError("ECHLY_GLOBAL_STATE", error));
   } catch (e) {
     if (ECHLY_DEBUG) console.debug("ECHLY onUpdated inject failed", tabId, e);
   }
@@ -798,9 +942,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
 chrome.tabs.onCreated.addListener((tab) => {
   if (!tab.id) return;
   chrome.tabs
-    .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: globalUIState })
+    .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: getCanonicalGlobalState() })
     .catch((e) => {
-      if (ECHLY_DEBUG) console.debug("ECHLY tab creation sync failed", e);
+      console.error("[ECHLY] ECHLY_GLOBAL_STATE to new tab failed", tab.id, e);
     });
 });
 
@@ -859,6 +1003,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       trayOpen = true;
       globalUIState.visible = true;
       void (async () => {
+        const sessionIdForRehydrate = activeSessionId ?? globalUIState.sessionId;
+        if (sessionIdForRehydrate) {
+          await rehydrateSession(sessionIdForRehydrate);
+        }
         await openWidgetInActiveTab();
         broadcastUIState();
       })();
@@ -869,7 +1017,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_START_SESSION") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: "ECHLY_START_SESSION" }).catch(() => {});
+        chrome.tabs
+          .sendMessage(tabs[0].id, { type: "ECHLY_START_SESSION" })
+          .catch((error) => logMessageDeliveryError("ECHLY_START_SESSION", error));
       }
     });
     sendResponse({ ok: true });
@@ -879,7 +1029,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" }).catch(() => {});
+        chrome.tabs
+          .sendMessage(tabs[0].id, { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" })
+          .catch((error) => logMessageDeliveryError("ECHLY_OPEN_PREVIOUS_SESSIONS", error));
       }
     });
     sendResponse({ ok: true });
@@ -887,7 +1039,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_OPEN_WIDGET") {
-    console.log("[ECHLY BG] OPEN_WIDGET received");
     (async () => {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       const tabId = tabs[0]?.id;
@@ -902,16 +1053,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "OPEN_RECORDER") {
-    console.log("[ECHLY][BACKGROUND] Handling OPEN_RECORDER");
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
-      console.log("[ECHLY][BACKGROUND] Active tab:", tab);
       (async () => {
-        console.log("[ECHLY][BACKGROUND] Calling openRecorderUI");
         const opened = await openRecorderUI(tab?.id);
         if (opened && tab?.id) {
-          console.log("[ECHLY][BACKGROUND] Recorder UI triggered");
-          chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RECORDER_OPENED" }).catch(() => {});
+          chrome.tabs
+            .sendMessage(tab.id, { type: "ECHLY_RECORDER_OPENED" })
+            .catch((error) => logMessageDeliveryError("ECHLY_RECORDER_OPENED", error));
         }
         sendResponse({ ok: opened });
       })();
@@ -924,7 +1073,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     broadcastUIState();
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: "ECHLY_WIDGET_EXPAND" }).catch(() => {});
+        chrome.tabs
+          .sendMessage(tabs[0].id, { type: "ECHLY_WIDGET_EXPAND" })
+          .catch((error) => logMessageDeliveryError("ECHLY_WIDGET_EXPAND", error));
       }
     });
     sendResponse({ ok: true });
@@ -936,7 +1087,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     broadcastUIState();
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: "ECHLY_WIDGET_COLLAPSE" }).catch(() => {});
+        chrome.tabs
+          .sendMessage(tabs[0].id, { type: "ECHLY_WIDGET_COLLAPSE" })
+          .catch((error) => logMessageDeliveryError("ECHLY_WIDGET_COLLAPSE", error));
       }
     });
     sendResponse({ ok: true });
@@ -944,7 +1097,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_GET_GLOBAL_STATE") {
-    sendResponse({ state: { ...globalUIState } });
+    void (async () => {
+      const stored = await chrome.storage.local.get(["activeSessionId"]);
+      const storedSessionId =
+        typeof stored.activeSessionId === "string" ? stored.activeSessionId : null;
+      const sessionIdForRehydrate = activeSessionId ?? globalUIState.sessionId ?? storedSessionId;
+      if (sessionIdForRehydrate && shouldForceRehydrate(sessionIdForRehydrate)) {
+        await rehydrateSession(sessionIdForRehydrate);
+      }
+      sendResponse({ state: getCanonicalGlobalState() });
+    })();
     return true;
   }
 
@@ -973,9 +1135,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
 
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: "ECHLY_CLOSE_WIDGET",
-        }).catch(() => {});
+        chrome.tabs
+          .sendMessage(tabs[0].id, {
+            type: "ECHLY_CLOSE_WIDGET",
+          })
+          .catch((error) => logMessageDeliveryError("ECHLY_CLOSE_WIDGET", error));
       }
       sendResponse({ ok: true });
     })();
@@ -1046,7 +1210,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (mode === "voice" || mode === "text") {
       globalUIState.captureMode = mode;
       sw.captureMode = mode;
-      console.log("[ECHLY] capture mode:", mode);
       broadcastUIState();
     }
     sendResponse({ success: true });
@@ -1094,6 +1257,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.skippedCount = 0;
     globalUIState.resolvedCount = 0;
     resetPaginationState();
+    globalUIState.lastSyncedAt = null;
+    globalUIState.lastPaginationAt = null;
     chrome.storage.local.set({
       activeSessionId: sessionId,
       sessionModeActive: true,
@@ -1112,43 +1277,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         globalUIState.skippedCount = 0;
         globalUIState.resolvedCount = 0;
         resetPaginationState();
+        globalUIState.lastSyncedAt = null;
+        globalUIState.lastPaginationAt = null;
         globalUIState.sessionLoading = false;
         broadcastUIState();
         sendResponse({ success: true });
         return;
       }
       try {
-        await getValidToken();
-        const [feedbackRes, sessionsRes, counts] = await Promise.all([
-          apiFetch(`${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&limit=20`),
-          apiFetch(`${API_BASE}/api/sessions`),
-          fetchFeedbackCount(sessionId),
-        ]);
-        const feedbackJson = (await feedbackRes.json()) as FeedbackListResponse;
-        globalUIState.pointers = mapFeedbackToPointers(feedbackJson.feedback ?? []);
-        globalUIState.totalCount = counts.total;
-        globalUIState.openCount = counts.open;
-        globalUIState.skippedCount = counts.skipped;
-        globalUIState.resolvedCount = counts.resolved;
-        globalUIState.nextCursor =
-          typeof feedbackJson.nextCursor === "string" && feedbackJson.nextCursor.length > 0
-            ? feedbackJson.nextCursor
-            : null;
-        globalUIState.hasMore = feedbackJson.hasMore === true;
-        globalUIState.isFetching = false;
+        await rehydrateSession(sessionId);
+        const sessionsRes = await apiFetch(`${API_BASE}/api/sessions`);
         const sessionsPayload: unknown = await sessionsRes.json();
         if (sessionsRes.ok) {
           const sessionsList = sessionsArrayFromApiPayload(sessionsPayload);
           const match = sessionsList.find((s) => s.id === sessionId);
           globalUIState.sessionTitle = match?.title ?? null;
         }
-      } catch {
+      } catch (error) {
+        console.error("[ECHLY] set active session rehydrate failed", { sessionId, error });
         globalUIState.pointers = [];
         globalUIState.totalCount = 0;
         globalUIState.openCount = 0;
         globalUIState.skippedCount = 0;
         globalUIState.resolvedCount = 0;
         resetPaginationState();
+        globalUIState.lastSyncedAt = null;
+        globalUIState.lastPaginationAt = null;
       }
       globalUIState.sessionLoading = false;
       broadcastUIState();
@@ -1158,8 +1312,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_LOAD_MORE") {
-    console.log("LOAD MORE TRIGGERED IN BACKGROUND");
-    console.log("TRIGGERING loadMore");
     void loadMore();
     sendResponse({ ok: true });
     return false;
@@ -1244,6 +1396,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.resolvedCount = 0;
     globalUIState.pointers = [];
     resetPaginationState();
+    globalUIState.lastSyncedAt = null;
+    globalUIState.lastPaginationAt = null;
     chrome.storage.local.set({
       activeSessionId: null,
       sessionModeActive: false,
@@ -1253,7 +1407,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.tabs.query({}, (tabs) => {
       tabs.forEach((tab) => {
         if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" }).catch(() => {});
+          chrome.tabs
+            .sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" })
+            .catch((error) => logMessageDeliveryError("ECHLY_RESET_WIDGET", error));
         }
       });
     });
@@ -1261,22 +1417,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request.type === "ECHLY_GET_TOKEN") {
-    (async () => {
-      try {
-        const token = await getExtensionToken();
-        sendResponse({ token });
-      } catch (error) {
-        sendResponse({ error: "NOT_AUTHENTICATED" });
-      }
-    })();
-    return true;
-  }
-
   if (request.type === "ECHLY_GET_EXTENSION_TOKEN") {
     (async () => {
       try {
-        const token = await getExtensionToken();
+        const token = await getOrRefreshToken();
         sw.extensionToken = token;
         sendResponse({ token });
       } catch (error) {
@@ -1294,6 +1438,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
     if (tok) {
       extensionToken = tok;
+      extensionTokenExpiresAt = Date.now() + EXTENSION_TOKEN_TTL_MS;
       setExtensionToken(tok);
       sw.extensionToken = tok;
       if (u?.uid) {
@@ -1304,6 +1449,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           photoURL: null,
         };
         sw.currentUser = cachedSessionUser;
+      }
+      const sessionIdForRehydrate = activeSessionId ?? globalUIState.sessionId;
+      if (sessionIdForRehydrate) {
+        void rehydrateSession(sessionIdForRehydrate);
       }
     }
     sendResponse({ ok: true });
@@ -1356,7 +1505,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         await openOrFocusLoginTab();
         sendResponse({ ok: true });
-      } catch {
+      } catch (error) {
+        console.error("[ECHLY] trigger login failed", error);
         sendResponse({ ok: false });
       }
     })();
@@ -1411,7 +1561,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           screenshotId?: string;
         };
 
-        await getValidToken();
+        await getOrRefreshToken();
 
         const res = await apiFetch(`${API_BASE}/api/upload-screenshot`, {
           method: "POST",
@@ -1470,10 +1620,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: "missing_screenshot_id" });
         return;
       }
-      console.log("[ECHLY] Unified create path", {
-        feedbackId,
-        source: "CREATE_FEEDBACK_ONLY",
-      });
       const senderTabId = sender?.tab?.id;
 
       if (!senderTabId) {
@@ -1484,10 +1630,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       if (!feedbackJobOwners.has(feedbackId)) {
         feedbackJobOwners.set(feedbackId, senderTabId);
-        console.log("[ECHLY] Job owner assigned", {
-          feedbackId,
-          ownerTabId: senderTabId,
-        });
       }
 
       const ownerTabId = feedbackJobOwners.get(feedbackId);
@@ -1510,7 +1652,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       processingFeedbackIds.add(feedbackId);
-      console.log("[ECHLY] Lock acquired", feedbackId);
       try {
         if (await isFeedbackCompleted(feedbackId)) {
           console.warn("[ECHLY] Duplicate blocked (already completed)", feedbackId);
@@ -1518,8 +1659,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
 
-        await getValidToken();
-        console.log("[ECHLY] Creating feedback with screenshotId", screenshotId);
+        await getOrRefreshToken();
         const feedbackRes = await createFeedbackInternal({
           sessionId,
           feedbackId,
@@ -1535,7 +1675,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         await markFeedbackCompleted(feedbackId);
-        console.log("[ECHLY] Marked completed (durable)", feedbackId);
         sendResponse({ success: true, data });
       } catch (err) {
         console.error("[ECHLY ERROR] background create failed", err);
@@ -1543,7 +1682,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } finally {
         processingFeedbackIds.delete(feedbackId);
         feedbackJobOwners.delete(feedbackId);
-        console.log("[ECHLY] Lock released", feedbackId);
       }
     })();
     return true; // REQUIRED for async response
@@ -1559,11 +1697,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
     (async () => {
       try {
-        const token = await getExtensionToken();
+        const token = await getOrRefreshToken();
         if (!token) {
           throw new Error("NOT_AUTHENTICATED");
         }
-        console.log("[ECHLY DEBUG] API request token present:", token ? "YES" : "NO");
         const res = await apiFetch(url, {
           method: method || "GET",
           headers: headers ?? {},

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, PenLine, Zap } from "lucide-react";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
@@ -11,6 +11,7 @@ import { ResumeSessionModal } from "./ResumeSessionModal";
 import { MicrophonePanel } from "./MicrophonePanel";
 import { SessionLimitUpgradeView } from "./SessionLimitUpgradeView";
 import type { CaptureWidgetProps, CaptureState } from "./types";
+import { ECHLY_DEBUG } from "@/lib/utils/logger";
 
 const CAPTURE_FLOW_STATES: CaptureState[] = ["focus_mode", "region_selecting", "voice_listening", "processing"];
 
@@ -40,6 +41,9 @@ export default function CaptureWidget({
   skippedCount,
   resolvedCount,
   sessionLoading = false,
+  feedbackRecovering = false,
+  feedbackRecoveryAttempts = 0,
+  feedbackFetchFailed = false,
   onSessionLoaded,
   onSessionEnd: onSessionEndCallback,
   onCreateSession,
@@ -65,6 +69,8 @@ export default function CaptureWidget({
   verifySessionBeforeSessions,
   onTriggerLogin,
   sessionLimitReached,
+  sessionStartErrorBanner,
+  onSessionStartErrorDismiss,
   environment,
   onPreviousSessions,
   onSetCaptureMode,
@@ -102,7 +108,7 @@ export default function CaptureWidget({
     ensureAuthenticated,
     onSessionViewRequested: extensionMode
       ? () => {
-          console.log("[ECHLY DEBUG] UI entering session mode", performance.now());
+          if (ECHLY_DEBUG) console.debug("[ECHLY] UI entering session mode", performance.now());
           setShowCommandScreen(false);
         }
       : undefined,
@@ -133,8 +139,17 @@ export default function CaptureWidget({
 
   const isControlled = expanded !== undefined;
   const effectiveIsOpen = isControlled ? expanded : state.isOpen;
-  const listScrollRef = useRef<HTMLDivElement>(null);
+  const listScrollRef = useRef<HTMLDivElement | null>(null);
+  /** Bumps when the scroll list DOM mounts so the scroll listener effect reattaches after tray minimize/reopen or conditional remount. */
+  const [scrollListMountEpoch, setScrollListMountEpoch] = useState(0);
   const isFetchingRef = useRef(false);
+
+  const listScrollRefCallback = useCallback((node: HTMLDivElement | null) => {
+    listScrollRef.current = node;
+    if (node) {
+      setScrollListMountEpoch((e) => e + 1);
+    }
+  }, []);
 
   const isInCaptureFlow = CAPTURE_FLOW_STATES.includes(state.state) || state.pillExiting;
   const optimisticSessionActive = state.sessionStatus === "starting" || state.sessionStatus === "active";
@@ -196,11 +211,10 @@ export default function CaptureWidget({
   useEffect(() => {
     const el = listScrollRef.current;
     if (!el) {
-      console.debug("[ECHLY UI] scrollRef not ready yet");
       return;
     }
 
-    console.log("✅ React scroll container ready", el);
+    if (ECHLY_DEBUG) console.debug("[ECHLY UI] scroll listener attached");
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -213,13 +227,6 @@ export default function CaptureWidget({
         const threshold = 200;
         const isNearBottom = scrollTop + clientHeight >= scrollHeight - threshold;
 
-        console.log("SCROLL CHECK", {
-          scrollTop,
-          clientHeight,
-          scrollHeight,
-          isNearBottom,
-        });
-
         if (
           extensionMode &&
           isNearBottom &&
@@ -228,7 +235,6 @@ export default function CaptureWidget({
           chrome.runtime?.sendMessage
         ) {
           isFetchingRef.current = true;
-          console.log("🔥 LOAD MORE (REACT)");
           chrome.runtime.sendMessage({ type: "ECHLY_LOAD_MORE" }, () => {
             isFetchingRef.current = false;
           });
@@ -239,6 +245,7 @@ export default function CaptureWidget({
     el.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
+      if (ECHLY_DEBUG) console.debug("[ECHLY UI] scroll listener removed");
       if (timeoutId != null) {
         clearTimeout(timeoutId);
       }
@@ -251,6 +258,8 @@ export default function CaptureWidget({
     feedbackJobs?.length,
     sessionModeActive,
     sessionLoading,
+    showPanel,
+    scrollListMountEpoch,
   ]);
 
   /** When session is loaded explicitly (user selected from Previous Sessions), transition to session view. */
@@ -259,13 +268,6 @@ export default function CaptureWidget({
       setShowCommandScreen(false);
     }
   }, [loadSessionWithPointers?.sessionId]);
-
-  /** Safety log when rendering SessionLimitUpgradeView (session limit reached). */
-  useEffect(() => {
-    if (effectiveSessionLimitReached && !sessionId) {
-      console.log("[ECHLY DEBUG] Rendering SessionLimitUpgradeView");
-    }
-  }, [effectiveSessionLimitReached, sessionId]);
 
   React.useEffect(() => {
     if (!widgetToggleRef) return;
@@ -276,7 +278,6 @@ export default function CaptureWidget({
   }, [handlers, widgetToggleRef]);
 
   const handlePreviousSessions = React.useCallback(() => {
-    console.log("[ECHLY UX] Opening modal instantly");
     onPreviousSessions?.();
     setResumeModalOpen(true);
   }, [onPreviousSessions]);
@@ -461,9 +462,24 @@ export default function CaptureWidget({
                     <span className="echly-session-loading-text">Loading session...</span>
                   </div>
                 )}
+                {sessionModeActive && !sessionLoading && feedbackRecovering && (
+                  <div className="echly-session-loading-state echly-recovery-loading-state" aria-live="polite" aria-busy="true">
+                    <span className="echly-spinner" aria-hidden />
+                    <span className="echly-session-loading-text">
+                      Retrying feedback sync... (attempt {Math.max(1, feedbackRecoveryAttempts)}/5)
+                    </span>
+                  </div>
+                )}
+                {sessionModeActive && !sessionLoading && !feedbackRecovering && feedbackFetchFailed && (
+                  <div className="echly-feedback-failed echly-recovery-failed-banner" aria-live="polite">
+                    <span className="echly-failed-text">
+                      Temporary sync issue. We will retry on your next scroll or refresh.
+                    </span>
+                  </div>
+                )}
                 {((hasTickets || isProcessingFeedback || (feedbackJobs && feedbackJobs.length > 0)) && (sessionModeActive || !extensionMode) && !sessionLoading) && (
                   <div
-                    ref={listScrollRef}
+                    ref={listScrollRefCallback}
                     className="echly-feedback-list-scroll"
                     style={{ overflowY: "auto", maxHeight: "100%" }}
                     onWheel={(e) => e.stopPropagation()}
@@ -507,6 +523,32 @@ export default function CaptureWidget({
                 {sessionModeActive && !hasTickets && !isProcessingFeedback && !(feedbackJobs && feedbackJobs.length > 0) && !sessionLoading && (
                   <div className="echly-empty-session-state" aria-live="polite">
                     <span className="echly-empty-session-text">No feedback yet. Add feedback from the page.</span>
+                  </div>
+                )}
+                {extensionMode && sessionStartErrorBanner && showHomeScreen && (
+                  <div
+                    className="echly-feedback-failed echly-recovery-failed-banner"
+                    role="alert"
+                    style={{ marginBottom: 12 }}
+                  >
+                    <span className="echly-failed-text">{sessionStartErrorBanner}</span>
+                    {onSessionStartErrorDismiss && (
+                      <button
+                        type="button"
+                        onClick={onSessionStartErrorDismiss}
+                        style={{
+                          marginLeft: 8,
+                          background: "transparent",
+                          border: "none",
+                          color: "inherit",
+                          textDecoration: "underline",
+                          cursor: "pointer",
+                          fontSize: 13,
+                        }}
+                      >
+                        Dismiss
+                      </button>
+                    )}
                   </div>
                 )}
                 {extensionMode && showHomeScreen && (

@@ -101,8 +101,6 @@ export function useCaptureWidget({
   captureRootParent,
   environment,
 }: CaptureWidgetProps) {
-  if (ECHLY_DEBUG) console.count("useCaptureWidget render");
-
   if (typeof window !== "undefined" && !(window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__) {
     (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__ = {
       pending: null,
@@ -116,11 +114,8 @@ export function useCaptureWidget({
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
   const [isOpen, setIsOpenState] = useState(false);
   const [state, setState] = useState<CaptureState>("idle");
-  const [sessionStatus, setSessionStatus] = useState<"idle" | "starting" | "active">("idle");
+  const [startSessionPending, setStartSessionPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [pointers, setPointers] = useState<StructuredFeedback[]>(
-    initialPointers ?? []
-  );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
@@ -137,8 +132,6 @@ export function useCaptureWidget({
   const [captureRootReady, setCaptureRootReady] = useState(false);
   const [captureRootEl, setCaptureRootEl] = useState<HTMLDivElement | null>(null);
   const [orbSuccess, setOrbSuccess] = useState(false);
-  const [sessionMode, setSessionMode] = useState(false);
-  const [sessionPaused, setSessionPaused] = useState(false);
   const [pausePending, setPausePending] = useState(false);
   const [endPending, setEndPending] = useState(false);
   const [sessionFeedbackPending, setSessionFeedbackPending] = useState<SessionFeedbackPending | null>(captureState.pending);
@@ -151,9 +144,15 @@ export function useCaptureWidget({
   const [voiceError, setVoiceError] = useState<VoiceCaptureError>(null);
   const [micDeviceOverride, setMicDeviceOverride] = useState<string | null>(null);
 
-  const sessionModeRef = useRef(false);
-  const sessionPausedRef = useRef(false);
-  const sessionStatusRef = useRef<"idle" | "starting" | "active">("idle");
+  const sessionMode = globalSessionModeActive ?? false;
+  const sessionPaused = globalSessionPaused ?? false;
+  const sessionStatus: "idle" | "starting" | "active" = sessionMode
+    ? "active"
+    : startSessionPending
+      ? "starting"
+      : "idle";
+  const sessionModeRef = useRef(sessionMode);
+  const sessionPausedRef = useRef(sessionPaused);
   const lastSessionClickedElementRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     sessionModeRef.current = sessionMode;
@@ -161,10 +160,6 @@ export function useCaptureWidget({
   useEffect(() => {
     sessionPausedRef.current = sessionPaused;
   }, [sessionPaused]);
-  useEffect(() => {
-    sessionStatusRef.current = sessionStatus;
-  }, [sessionStatus]);
-
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
   const captureRootRef = useRef<HTMLDivElement | null>(null);
@@ -187,8 +182,6 @@ export function useCaptureWidget({
   const voiceStartTimeRef = useRef<number | null>(null);
   /** True while in voice_listening (or equivalent) so overlay/effects do not tear down during recording. */
   const recordingActiveRef = useRef(false);
-  /** Latest pointers from background so we can sync when recording ends (callbacks have stale closure). */
-  const pointersPropRef = useRef<StructuredFeedback[] | undefined>(pointersProp);
   /** True when sessionFeedbackPending is set (capture UI visible); used to protect from spurious clears. */
   const sessionFeedbackPendingRef = useRef(false);
   /** Prevent duplicate Start Session requests before React state updates land. */
@@ -241,7 +234,9 @@ export function useCaptureWidget({
     }
     mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
     mediaStreamRef.current = null;
-    audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current?.close().catch((err) => {
+      logger.error("error", "audio_context_close_failed", err);
+    });
     audioContextRef.current = null;
     analyserRef.current = null;
     setAudioAnalyser(null);
@@ -479,44 +474,10 @@ export function useCaptureWidget({
     };
   }, []);
 
-  /* ================= SYNC / LOAD SESSION FEEDBACK ================= */
-
-  useEffect(() => {
-    if (initialPointers != null) {
-      setPointers(initialPointers);
-      return;
-    }
-    /* Extension: never auto-load session from sessionId. Session loads only when user clicks Resume (loadSessionWithPointers). */
-    if (extensionMode) return;
-    if (!sessionId) return;
-    if (!environment?.authenticatedFetch) {
-      throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for loading feedback).");
-    }
-    const loadFeedback = async () => {
-      logger.debug("extension", "api_fetch_feedback");
-      const res = await environment.authenticatedFetch(
-        `/api/feedback?sessionId=${sessionId}&limit=20`
-      );
-      const data = await res.json();
-      const existing = (data?.feedback ?? []) as Array<{
-        id: string;
-        title?: string;
-        actionSteps?: string[];
-        instruction?: string;
-        description?: string;
-        type?: string;
-      }>;
-      setPointers(
-        existing.map((item) => ({
-          id: item.id,
-          title: item.title ?? "",
-          actionSteps: item.actionSteps ?? ((item.instruction ?? item.description) ? (item.instruction ?? item.description ?? "").split("\n") : []),
-          type: item.type ?? "bug",
-        }))
-      );
-    };
-    loadFeedback();
-  }, [extensionMode, sessionId, initialPointers, environment]);
+  const pointers = useMemo(
+    () => pointersProp ?? loadSessionWithPointers?.pointers ?? initialPointers ?? [],
+    [pointersProp, loadSessionWithPointers?.pointers, initialPointers]
+  );
 
   /* ================= LISTEN ================= */
 
@@ -570,9 +531,6 @@ export function useCaptureWidget({
     } catch (err) {
       logger.error("error", "microphone_permission_denied", err);
       recordingActiveRef.current = false;
-      if (extensionMode && pointersPropRef.current) {
-        setPointers(pointersPropRef.current);
-      }
       if (sessionFeedbackPendingRef.current) {
         setVoiceError("mic_permission");
         setState("idle");
@@ -583,7 +541,7 @@ export function useCaptureWidget({
       removeCaptureRoot();
       restoreWidget();
     }
-  }, [selectedMicrophoneId, micDeviceOverride, onDevicesEnumerated, extensionMode, removeCaptureRoot, restoreWidget]);
+  }, [selectedMicrophoneId, micDeviceOverride, onDevicesEnumerated, removeCaptureRoot, restoreWidget]);
 
   const retryVoiceCapture = useCallback(() => {
     setVoiceError(null);
@@ -605,9 +563,6 @@ export function useCaptureWidget({
     setIsFinishing(true);
     echlyLog("RECORDING", "finish requested");
     recordingActiveRef.current = false;
-    if (extensionMode && pointersPropRef.current) {
-      setPointers(pointersPropRef.current);
-    }
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(8);
     }
@@ -623,7 +578,9 @@ export function useCaptureWidget({
     if (!activeId) {
       try {
         if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
-      } catch {}
+      } catch (err) {
+        logger.error("error", "media_recorder_stop_failed", err);
+      }
       stopListeningAudio();
       audioChunksRef.current = [];
       mediaRecorderRef.current = null;
@@ -736,13 +693,6 @@ export function useCaptureWidget({
                   logger.debug("ai", "processing_success", { ticketId: ticket.id });
                   setSessionFeedbackSaving(false);
                   if (root) updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
-                  if (!extensionMode) {
-                    const t = ticket as StructuredFeedback & { instruction?: string; description?: string };
-                    setPointers((prev) => [
-                      { id: t.id, title: t.title, actionSteps: t.actionSteps ?? ((t.instruction ?? t.description) ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
-                      ...prev,
-                    ]);
-                  }
                   setHighlightTicketId(ticket.id);
                   setTimeout(() => setHighlightTicketId(null), 1200);
                 },
@@ -771,13 +721,6 @@ export function useCaptureWidget({
             onSuccess: (ticket) => {
               pipelineActiveRef.current = false;
               logger.debug("ai", "processing_success", { ticketId: ticket.id });
-              if (!extensionMode) {
-                const t = ticket as StructuredFeedback & { instruction?: string; description?: string };
-                setPointers((prev) => [
-                  { id: t.id, title: t.title, actionSteps: t.actionSteps ?? ((t.instruction ?? t.description) ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
-                  ...prev,
-                ]);
-              }
               setRecordings((prev) => prev.filter((r) => r.id !== activeId));
               setActiveRecordingId(null);
               setHighlightTicketId(ticket.id);
@@ -812,12 +755,6 @@ export function useCaptureWidget({
             return;
           }
           logger.debug("ai", "processing_success", { ticketId: structured.id });
-          if (!extensionMode) {
-            setPointers((prev) => [
-              { id: structured.id, title: structured.title, actionSteps: structured.actionSteps ?? [], type: structured.type },
-              ...prev,
-            ]);
-          }
           setRecordings((prev) => prev.filter((r) => r.id !== activeId));
           setActiveRecordingId(null);
           setHighlightTicketId(structured.id);
@@ -869,9 +806,6 @@ export function useCaptureWidget({
     setVoiceError(null);
     recordingActiveRef.current = false;
     setIsFinishing(false);
-    if (extensionMode && pointersPropRef.current) {
-      setPointers(pointersPropRef.current);
-    }
     const recorder = mediaRecorderRef.current;
     try {
       if (recorder && recorder.state !== "inactive") {
@@ -889,7 +823,7 @@ export function useCaptureWidget({
     setState("cancelled");
     removeCaptureRoot();
     restoreWidget();
-  }, [extensionMode, removeCaptureRoot, restoreWidget, stopListeningAudio]);
+  }, [removeCaptureRoot, restoreWidget, stopListeningAudio]);
 
   /** ESC: any capture flow → cancelled */
   useEffect(() => {
@@ -911,11 +845,12 @@ export function useCaptureWidget({
   const handleShare = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
-    } catch {}
+    } catch (err) {
+      logger.error("error", "share_clipboard_failed", err);
+    }
   }, []);
 
   const resetSession = useCallback(() => {
-    setPointers([]);
     setRecordings([]);
     setActiveRecordingId(null);
     setState("idle");
@@ -942,7 +877,6 @@ export function useCaptureWidget({
   const deletePointer = useCallback(async (id: string) => {
     try {
       await onDelete(id);
-      setPointers((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       logger.error("error", "delete_failed", err);
     }
@@ -958,14 +892,6 @@ export function useCaptureWidget({
     const title = editedTitle.trim() || editedTitle;
     const actionSteps = editedSteps;
 
-    /* Optimistic update: persist to local state and exit edit mode immediately so the UI updates on click. */
-    setPointers((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, title: title || p.title, actionSteps } : p
-      )
-    );
-    setEditingId(null);
-
     if (!environment?.authenticatedFetch) {
       throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for saveEdit).");
     }
@@ -977,18 +903,14 @@ export function useCaptureWidget({
         body: JSON.stringify({ title: title || editedTitle, actionSteps }),
       });
       const data = (await res.json()) as { success?: boolean; ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } };
-      if (res.ok && data.success && data.ticket) {
-        const t = data.ticket;
-        setPointers((prev) =>
-          prev.map((p) =>
-            p.id === id
-              ? { ...p, title: t.title, actionSteps: t.actionSteps ?? p.actionSteps, type: t.type ?? p.type }
-              : p
-          )
-        );
+      if (!res.ok || !data.success || !data.ticket) {
+        throw new Error("Save failed: API_ERROR_" + res.status);
       }
+      setEditingId(null);
     } catch (err) {
       logger.error("error", "save_edit_failed", err);
+      setEditingId(id);
+      setErrorMessage("Could not save changes. Try again.");
     }
   }, [editedTitle, editedSteps, environment]);
 
@@ -997,13 +919,6 @@ export function useCaptureWidget({
       try {
         if (onUpdate) {
           await onUpdate(id, payload);
-          setPointers((prev) =>
-            prev.map((p) =>
-              p.id === id
-                ? { ...p, title: payload.title, actionSteps: payload.actionSteps }
-                : p
-            )
-          );
           return;
         }
         if (!environment?.authenticatedFetch) {
@@ -1023,18 +938,6 @@ export function useCaptureWidget({
           ticket?: { id: string; title: string; actionSteps?: string[]; type?: string };
         };
         if (!res.ok || !data.success) throw new Error("Update failed");
-        const t = data.ticket;
-        setPointers((prev) =>
-          prev.map((p) =>
-            p.id === id
-              ? {
-                  ...p,
-                  title: t?.title ?? p.title,
-                  actionSteps: t?.actionSteps ?? payload.actionSteps,
-                }
-              : p
-          )
-        );
       } catch (err) {
         logger.error("error", "ticket_update_failed", err);
         throw err;
@@ -1113,12 +1016,13 @@ export function useCaptureWidget({
 
   const startSession = useCallback(async () => {
     // Prevent double-clicks while starting
-    if (startSessionPendingRef.current || sessionStatusRef.current === "starting") return;
+    if (startSessionPendingRef.current) return;
     if (stateRef.current !== "idle" || sessionModeRef.current || globalSessionModeActive) return;
     startSessionPendingRef.current = true;
 
     // STEP 1: INSTANT UI RESPONSE (do not switch screens or reset UI until API resolves)
-    setSessionStatus("starting");
+    setStartSessionPending(true);
+    setErrorMessage(null);
 
     setPending(null);
     setSessionFeedbackSaving(false);
@@ -1149,11 +1053,11 @@ export function useCaptureWidget({
               resolve();
             });
           });
-          setSessionStatus("idle");
+          setStartSessionPending(false);
           return;
         }
       } else if (ensureAuthenticated && !(await ensureAuthenticated())) {
-        setSessionStatus("idle");
+        setStartSessionPending(false);
         return;
       }
 
@@ -1166,7 +1070,7 @@ export function useCaptureWidget({
       // 403 / session limit: trigger existing upgrade flow immediately (no blink, no silent fail)
       if (result && "limitReached" in result && result.limitReached) {
         logger.debug("extension", "session_limit_reached");
-        setSessionStatus("idle");
+        setStartSessionPending(false);
         setSessionLimitReached({
           message: result.message ?? "You've reached your session limit.",
           upgradePlan: result.upgradePlan,
@@ -1181,22 +1085,20 @@ export function useCaptureWidget({
       // STEP 2: FINALIZE only after successful session creation (prevents UI blink)
       if (environment) {
         await environment.setActiveSession?.(result.id);
-        setPointers([]);
         await environment.startSessionMode?.();
       } else if (extensionMode && onActiveSessionChange) {
         onActiveSessionChange(result.id);
-        setPointers([]);
         onSessionModeStart?.();
       }
 
       onSessionViewRequested?.();
       setSessionLimitReached(null);
-      setSessionStatus("active");
     } catch (e) {
       logger.error("error", "session_start_failed", e);
-      setSessionStatus("idle");
+      setErrorMessage("Could not start session. Try again.");
     } finally {
       startSessionPendingRef.current = false;
+      setStartSessionPending(false);
     }
   }, [
     environment,
@@ -1279,7 +1181,6 @@ export function useCaptureWidget({
       setEndPending(false);
       setPending(null);
       setSessionFeedbackSaving(false);
-      setPointers([]);
       onSessionModeEnd?.();
       afterEnd?.();
     };
@@ -1314,29 +1215,22 @@ export function useCaptureWidget({
   }, [globalSessionModeActive, extensionMode, createCaptureRoot, removeCaptureRoot]);
 
   /**
-   * Sync session mode from global state (ECHLY_GLOBAL_STATE).
+   * React to global session state changes from background.
    * Root lifecycle is handled by the dedicated effect above.
    */
   useEffect(() => {
     if (!extensionMode || globalSessionModeActive === undefined) return;
     echlyLog("SESSION", "global sync", { active: globalSessionModeActive, paused: globalSessionPaused });
     if (globalSessionModeActive === true) {
-      setSessionMode(true);
-      setSessionPaused(globalSessionPaused ?? false);
-      setSessionStatus("active");
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
         setPending(null);
       }
       setEndPending(false);
     }
     if (globalSessionPaused === true) {
-      setSessionPaused(true);
       setPausePending(false);
     }
     if (globalSessionModeActive === false) {
-      setSessionMode(false);
-      setSessionPaused(false);
-      setSessionStatus("idle");
       setPausePending(false);
       setEndPending(false);
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
@@ -1347,20 +1241,13 @@ export function useCaptureWidget({
     }
   }, [extensionMode, globalSessionModeActive, globalSessionPaused]);
 
-  /** When globalSessionPaused changes while session mode is active, sync local paused state. */
+  /** When session is globally paused, clear pause-pending UI and focus state. */
   useEffect(() => {
     if (extensionMode && globalSessionModeActive && globalSessionPaused !== undefined) {
-      setSessionPaused(globalSessionPaused);
       if (globalSessionPaused) {
         setPausePending(false);
         setExpandedId(null);
         setHighlightTicketId(null);
-        /* Force tray to refresh with latest pointers from background (fixes Pause → tray not updating). */
-        if (pointersPropRef.current) {
-          setTimeout(() => {
-            setPointers([...(pointersPropRef.current ?? [])]);
-          }, 50);
-        }
       }
     }
   }, [extensionMode, globalSessionModeActive, globalSessionPaused]);
@@ -1368,8 +1255,6 @@ export function useCaptureWidget({
   /** Extension: sync global pointers from background so tray updates in real time. Background is source of truth; content notifies via ECHLY_FEEDBACK_CREATED when tickets are created. */
   useEffect(() => {
     if (!extensionMode || pointersProp === undefined) return;
-    pointersPropRef.current = pointersProp;
-    setPointers(pointersProp);
     if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
       setPending(null);
     }
@@ -1378,10 +1263,7 @@ export function useCaptureWidget({
   /** When parent passes loadSessionWithPointers (e.g. after Resume picker), apply once and notify. */
   useEffect(() => {
     if (!extensionMode || !loadSessionWithPointers?.sessionId) return;
-    setPointers(loadSessionWithPointers.pointers ?? []);
-    if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
-      setPending(null);
-    }
+    // Render-only model in extension mode: pointers are always sourced from background props.
     onSessionLoaded?.();
   }, [extensionMode, loadSessionWithPointers, onSessionLoaded]);
 
@@ -1484,13 +1366,6 @@ export function useCaptureWidget({
             setSessionFeedbackSaving(false);
             if (root) {
               updateMarker(placeholderId, { id: ticket.id, title: ticket.title });
-            }
-            if (!extensionMode) {
-              const t = ticket as StructuredFeedback & { instruction?: string; description?: string };
-              setPointers((prev) => [
-                { id: t.id, title: t.title, actionSteps: t.actionSteps ?? ((t.instruction ?? t.description) ? (t.instruction ?? t.description ?? "").split("\n") : []), type: t.type },
-                ...prev,
-              ]);
             }
             setHighlightTicketId(ticket.id);
             setTimeout(() => setHighlightTicketId(null), 1200);

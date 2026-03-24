@@ -33,5 +33,9 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
     throw new Error("NOT_AUTHENTICATED");
   }
 
+  if (!response.ok) {
+    throw new Error("API_ERROR_" + response.status);
+  }
+
   return response;
 }

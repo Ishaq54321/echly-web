@@ -11,7 +11,7 @@ declare global {
 
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { apiFetch, API_BASE } from "./api";
+import { apiFetch, API_BASE, throwIfHttpError } from "./api";
 import "./sessionRelay";
 import { getSessionsCached, invalidateSessionsCache } from "./cachedSessions";
 import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
@@ -25,6 +25,18 @@ import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
 import { logger } from "@/lib/logger";
 
 logger.debug("extension", "content_script_loaded", { href: window.location.href });
+
+/** Log promise rejections from chrome.runtime.sendMessage (no silent failures). */
+function logSendMessageRejection(context: string, err: unknown): void {
+  console.error(`[ECHLY] ${context}`, err);
+}
+
+function logRuntimeLastError(context: string): void {
+  const err = chrome.runtime.lastError;
+  if (err) {
+    console.error(`[ECHLY] ${context}`, err.message ?? String(err));
+  }
+}
 
 let echlyEventDispatcher: ((type: string) => void) | null = null;
 
@@ -91,7 +103,8 @@ function getPreferredTheme(): "dark" | "light" {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
     if (saved === "dark" || saved === "light") return saved;
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  } catch {
+  } catch (e) {
+    console.error("[ECHLY] getPreferredTheme failed", e);
     return "dark";
   }
 }
@@ -100,7 +113,9 @@ function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
   root.setAttribute("data-theme", theme);
   try {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {}
+  } catch (e) {
+    console.error("[ECHLY] applyThemeToRoot persistence failed", e);
+  }
 }
 
 function setHostVisibility(visible: boolean): void {
@@ -120,7 +135,7 @@ function setHostVisibilityFromState(state: GlobalUIState): void {
 
 /** Tray remains visible when session is active or paused; hide only when session ends. */
 function getShouldShowTray(state: GlobalUIState): boolean {
-  return state.visible === true || state.sessionModeActive === true || state.sessionPaused === true;
+  return state.visible === true || state.session.status !== "idle";
 }
 
 type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
@@ -129,37 +144,28 @@ type GlobalUIState = {
   visible: boolean;
   expanded: boolean;
   isRecording: boolean;
-  sessionId: string | null;
+  session: {
+    id: string | null;
+    status: "idle" | "active" | "paused";
+  };
   sessionTitle: string | null;
-  sessionModeActive: boolean;
-  sessionPaused: boolean;
   sessionLoading: boolean;
-  totalCount: number;
+  feedback: {
+    items: StructuredFeedback[];
+    nextCursor: string | null;
+    hasMore: boolean;
+    isFetching: boolean;
+    recovering: boolean;
+    recoveryAttempts: number;
+  };
+  counts: {
+    total: number;
+  };
+  captureMode: "voice" | "text";
   openCount: number;
   skippedCount: number;
   resolvedCount: number;
-  pointers: StructuredFeedback[];
-  nextCursor: string | null;
-  hasMore: boolean;
-  isFetching: boolean;
-  captureMode: "voice" | "text";
 };
-
-/** Prevent overwriting a valid pointer list with empty when session has not changed (Pause → Minimize → Resume). */
-function mergeWithPointerProtection(
-  prev: GlobalUIState | null | undefined,
-  next: GlobalUIState
-): GlobalUIState {
-  if (
-    prev?.sessionId != null &&
-    prev.sessionId === next?.sessionId &&
-    (prev?.pointers?.length ?? 0) > 0 &&
-    (!next?.pointers || next.pointers.length === 0)
-  ) {
-    return { ...next, pointers: prev.pointers };
-  }
-  return next;
-}
 
 /** Generate a unique id for a feedback job (used for concurrent job queue). */
 function createUniqueId(): string {
@@ -177,6 +183,7 @@ function ensureAuthenticated(): Promise<boolean> {
     chrome.runtime.sendMessage(
       { type: "GET_AUTH_STATE" },
       (r: { authenticated?: boolean; user?: { uid: string } } | undefined) => {
+        logRuntimeLastError("GET_AUTH_STATE (ensureAuthenticated)");
         if (!r?.authenticated || !r?.user?.uid) {
           resolve(false);
           return;
@@ -201,7 +208,7 @@ function notifyFeedbackCreated(
       actionSteps: ticket.actionSteps ?? [],
       type: ticket.type ?? "Feedback",
     },
-  }).catch(() => {});
+  }).catch((err) => logSendMessageRejection("ECHLY_FEEDBACK_CREATED", err));
 }
 
 function notifyFeedbackCountRefetch(sessionId?: string | null): void {
@@ -209,7 +216,7 @@ function notifyFeedbackCountRefetch(sessionId?: string | null): void {
   chrome.runtime.sendMessage({
     type: "ECHLY_REFETCH_FEEDBACK_COUNT",
     sessionId,
-  }).catch(() => {});
+  }).catch((err) => logSendMessageRejection("ECHLY_REFETCH_FEEDBACK_COUNT", err));
 }
 
 type ContentAppProps = {
@@ -221,25 +228,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [authState, setAuthState] = React.useState<"loading" | "authenticated" | "unauthenticated">("loading");
   const [theme, setTheme] = React.useState<"dark" | "light">(initialTheme);
-  const [globalState, setGlobalState] = React.useState<GlobalUIState>({
-    visible: false,
-    expanded: false,
-    isRecording: false,
-    sessionId: null,
-    sessionTitle: null,
-    sessionModeActive: false,
-    sessionPaused: false,
-    sessionLoading: false,
-    totalCount: 0,
-    openCount: 0,
-    skippedCount: 0,
-    resolvedCount: 0,
-    pointers: [],
-    nextCursor: null,
-    hasMore: false,
-    isFetching: false,
-    captureMode: "voice",
-  });
+  /** Null until first confirmed state from background (ECHLY_GET_GLOBAL_STATE or ECHLY_GLOBAL_STATE). No placeholder “last known” UI. */
+  const [globalState, setGlobalState] = React.useState<GlobalUIState | null>(null);
   const [widgetResetKey, setWidgetResetKey] = React.useState(0);
   const [hasPreviousSessions, setHasPreviousSessions] = React.useState(false);
   const [openResumeModalFromMessage, setOpenResumeModalFromMessage] = React.useState(false);
@@ -248,8 +238,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     message: string;
     upgradePlan: unknown;
   } | null>(null);
-  const effectiveSessionId = globalState.sessionId;
+  /** When background or DOM triggers start session and POST fails (distinct from hook startSession errors). */
+  const [sessionStartErrorBanner, setSessionStartErrorBanner] = React.useState<string | null>(null);
+  const effectiveSessionId = globalState?.session.id ?? null;
   const widgetToggleRef = React.useRef<(() => void) | null>(null);
+
+  React.useEffect(() => {
+    if (effectiveSessionId) setSessionStartErrorBanner(null);
+  }, [effectiveSessionId]);
 
   const [isProcessingFeedback, setIsProcessingFeedback] = React.useState(false);
   /** Job queue for concurrent feedback captures; each job shows its own Processing/failed card in the tray. */
@@ -317,7 +313,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   React.useEffect(() => {
     const handler = () => {
-      setGlobalState((prev) => ({ ...prev, expanded: false }));
       setWidgetResetKey((k) => k + 1);
     };
     window.addEventListener("ECHLY_RESET_WIDGET", handler as EventListener);
@@ -327,8 +322,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). No local source of truth. */
   React.useEffect(() => {
     const applyGlobalState = (state: GlobalUIState) => {
-      setHostVisibilityFromState(state);
-      setGlobalState((prev) => mergeWithPointerProtection(prev, state));
+      const normalized = normalizeGlobalState(state);
+      if (!normalized) return;
+      setHostVisibilityFromState(normalized);
+      setGlobalState(normalized);
     };
     (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (state: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__ = applyGlobalState;
     return () => {
@@ -336,14 +333,16 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     };
   }, []);
 
-  /* Global UI state: always overwrite from background; protect pointers when session unchanged (Pause → Minimize → Resume). */
+  /* Global UI state: always overwrite from background (full replacement model). */
   React.useEffect(() => {
     const handler = (e: CustomEvent<{ state: GlobalUIState }>) => {
       const s = e.detail?.state;
       if (!s) return;
       echlyLog("CONTENT", "global state received", s);
-      setHostVisibilityFromState(s);
-      setGlobalState((prev) => mergeWithPointerProtection(prev, s));
+      const normalized = normalizeGlobalState(s);
+      if (!normalized) return;
+      setHostVisibilityFromState(normalized);
+      setGlobalState(normalized);
     };
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
@@ -354,10 +353,19 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_GLOBAL_STATE" },
       (response: GlobalStateResponse) => {
+        logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (mount)");
         const state = response?.state;
-        if (state) {
-          setGlobalState((prev) => mergeWithPointerProtection(prev, state));
+        if (!state) {
+          console.error("[ECHLY] ECHLY_GET_GLOBAL_STATE returned no state");
+          return;
         }
+        const normalized = normalizeGlobalState(state);
+        if (!normalized) {
+          console.error("[ECHLY] ECHLY_GET_GLOBAL_STATE returned invalid state");
+          return;
+        }
+        setHostVisibilityFromState(normalized);
+        setGlobalState(normalized);
       }
     );
   }, []);
@@ -369,13 +377,18 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       chrome.runtime.sendMessage(
         { type: "ECHLY_GET_GLOBAL_STATE" },
         (response: GlobalStateResponse) => {
-          if (response?.state) {
-            const normalized = normalizeGlobalState(response.state);
-            if (normalized) {
-              setHostVisibilityFromState(normalized);
-              setGlobalState((prev) => mergeWithPointerProtection(prev, normalized));
-            }
+          logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (visibilitychange)");
+          if (!response?.state) {
+            console.error("[ECHLY] ECHLY_GET_GLOBAL_STATE (visibilitychange) returned no state");
+            return;
           }
+          const normalized = normalizeGlobalState(response.state);
+          if (!normalized) {
+            console.error("[ECHLY] ECHLY_GET_GLOBAL_STATE (visibilitychange) invalid state");
+            return;
+          }
+          setHostVisibilityFromState(normalized);
+          setGlobalState(normalized);
         }
       );
     };
@@ -385,17 +398,17 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   /* On widget open, use shared sessions cache so we don't duplicate GET /api/sessions with preload. */
   React.useEffect(() => {
-    if (!globalState.visible) return;
+    if (!globalState?.visible) return;
     let cancelled = false;
     getSessionsCached(apiFetch).then((sessions) => {
       if (!cancelled) setHasPreviousSessions(sessions.length > 0);
-    }).catch(() => {
-      if (!cancelled) setHasPreviousSessions(false);
+    }).catch((err) => {
+      console.error("[ECHLY] getSessionsCached failed", err);
     });
     return () => {
       cancelled = true;
     };
-  }, [globalState.visible]);
+  }, [globalState?.visible]);
 
   const isAuthFailureResponse = React.useCallback((text: string | null): boolean => {
     return Boolean(
@@ -409,6 +422,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       chrome.runtime.sendMessage(
         { type: "ECHLY_GET_EXTENSION_TOKEN" },
         (response: { token?: string | null } | undefined) => {
+          logRuntimeLastError("ECHLY_GET_EXTENSION_TOKEN");
           resolve(response?.token ?? null);
         }
       );
@@ -420,17 +434,25 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   /* Extension: when background forwards ECHLY_START_SESSION to this tab, run start-session flow. */
   React.useEffect(() => {
     const handler = () => {
-      createSession().then((result) => {
-        if (result && "id" in result && result.id) {
-          onActiveSessionChange(result.id);
-          chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
-          onExpandRequest();
-          setSessionLimitReached(null);
-        } else if (result && "limitReached" in result && result.limitReached) {
-          setSessionLimitReached({ message: result.message, upgradePlan: result.upgradePlan });
-          onExpandRequest();
-        }
-      });
+      setSessionStartErrorBanner(null);
+      createSession()
+        .then((result) => {
+          if (result && "id" in result && result.id) {
+            onActiveSessionChange(result.id);
+            chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch((err) =>
+              logSendMessageRejection("ECHLY_SESSION_MODE_START (ECHLY_START_SESSION_REQUEST)", err)
+            );
+            onExpandRequest();
+            setSessionLimitReached(null);
+          } else if (result && "limitReached" in result && result.limitReached) {
+            setSessionLimitReached({ message: result.message, upgradePlan: result.upgradePlan });
+            onExpandRequest();
+          }
+        })
+        .catch((err) => {
+          console.error("[ECHLY] ECHLY_START_SESSION_REQUEST createSession failed", err);
+          setSessionStartErrorBanner("Could not start session. Try again.");
+        });
     };
     window.addEventListener("ECHLY_START_SESSION_REQUEST", handler);
     return () => window.removeEventListener("ECHLY_START_SESSION_REQUEST", handler);
@@ -447,7 +469,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   React.useEffect(() => {
     const handler = () => {
       logger.debug("extension", "open_widget_dom_event_received");
-      chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {});
+      chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch((err) =>
+        logSendMessageRejection("ECHLY_EXPAND_WIDGET (ECHLY_OPEN_WIDGET)", err)
+      );
     };
     window.addEventListener("ECHLY_OPEN_WIDGET", handler);
     return () => window.removeEventListener("ECHLY_OPEN_WIDGET", handler);
@@ -459,24 +483,31 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         { type: "START_RECORDING" },
         (response: { ok?: boolean; error?: string } | undefined) => {
           if (chrome.runtime.lastError) {
+            logRuntimeLastError("START_RECORDING");
             return;
           }
           if (!response?.ok) {
-            return;
+            console.error("[ECHLY] START_RECORDING rejected", response?.error ?? "unknown");
           }
         }
       );
     } else {
-      chrome.runtime.sendMessage({ type: "STOP_RECORDING" }).catch(() => {});
+      chrome.runtime.sendMessage({ type: "STOP_RECORDING" }).catch((err) =>
+        logSendMessageRejection("STOP_RECORDING", err)
+      );
     }
   }, []);
 
   function onExpandRequest() {
-    chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch(() => {});
+    chrome.runtime.sendMessage({ type: "ECHLY_EXPAND_WIDGET" }).catch((err) =>
+      logSendMessageRejection("ECHLY_EXPAND_WIDGET (onExpandRequest)", err)
+    );
   }
   const onCollapseRequest = React.useCallback(() => {
     setSessionLimitReached(null);
-    chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch(() => {});
+    chrome.runtime.sendMessage({ type: "ECHLY_COLLAPSE_WIDGET" }).catch((err) =>
+      logSendMessageRejection("ECHLY_COLLAPSE_WIDGET", err)
+    );
   }, []);
 
   const onThemeToggle = React.useCallback(() => {
@@ -487,11 +518,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   /* Auth only when widget is opened (Loom-style). Do NOT trigger auth on content script mount. */
   React.useEffect(() => {
-    if (!globalState.visible) return;
+    if (!globalState?.visible) return;
     setAuthState("loading");
     chrome.runtime.sendMessage(
       { type: "GET_AUTH_STATE" },
       (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
+        logRuntimeLastError("GET_AUTH_STATE");
         if (response?.authenticated && response.user?.uid) {
           setUser({
             uid: response.user.uid,
@@ -506,7 +538,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
       }
     );
-  }, [globalState.visible]);
+  }, [globalState?.visible]);
 
   const processFeedbackPipeline = React.useCallback(
     async ({
@@ -525,12 +557,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       };
       sessionMode?: boolean;
     }): Promise<StructuredFeedback> => {
-      const fallbackTicket = {
-        title: transcript?.slice(0, 80) || "User Feedback",
-        actionSteps: transcript ? [transcript] : [],
-        suggestedTags: [] as string[],
-      };
-
       if (!effectiveSessionId || !user) {
         throw new Error("Missing session or user");
       }
@@ -544,7 +570,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           new Promise<string>((resolve) => setTimeout(() => resolve(""), 1500)),
         ]);
         extractedVisibleText = result ?? "";
-      } catch {
+      } catch (e) {
+        console.error("[ECHLY] OCR failed", e);
         extractedVisibleText = "";
       }
 
@@ -553,7 +580,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       if (context?.domPath && typeof document !== "undefined") {
         try {
           selectedElement = document.querySelector(context.domPath) as HTMLElement | null;
-        } catch {
+        } catch (e) {
+          console.error("[ECHLY] domPath querySelector failed", e);
           selectedElement = null;
         }
       }
@@ -591,18 +619,21 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             context: enrichedContext,
           }),
         });
+        throwIfHttpError(res, "structure-feedback");
         structured = (await res.json()) as {
           success?: boolean;
           tickets?: StructureTicket[];
           error?: string;
         };
-      } catch {
-        structured = null;
+      } catch (e) {
+        console.error("[ECHLY] structure-feedback request failed", e);
+        throw e;
       }
 
-      const normalized = structured?.success && structured.tickets?.length
-        ? structured.tickets[0]
-        : fallbackTicket;
+      if (!structured?.success || !structured.tickets?.length) {
+        throw new Error(structured?.error ?? "Structure feedback did not return a ticket");
+      }
+      const normalized = structured.tickets[0];
 
       try {
         if (!screenshot) {
@@ -731,13 +762,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       } | null,
       options?: { sessionMode?: boolean }
     ): Promise<StructuredFeedback> => {
-      const fallbackResult: StructuredFeedback = {
-        id: `local-${createUniqueId()}`,
-        title: transcript?.slice(0, 80) || "User Feedback",
-        actionSteps: transcript ? [transcript] : [],
-        type: "Feedback",
-      };
-
       const jobId = callbacks ? createUniqueId() : null;
       if (jobId) {
         const job: FeedbackJob = {
@@ -765,12 +789,18 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       } catch (err) {
         logger.error("error", "feedback_pipeline_failed", err);
         if (jobId) {
+          const failMsg =
+            err instanceof Error
+              ? err.message.startsWith("API_ERROR_")
+                ? "Could not reach the server. Try again."
+                : err.message
+              : "AI processing failed.";
           setFeedbackJobs((prev) =>
-            prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: "AI processing failed." } : j))
+            prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: failMsg } : j))
           );
         }
         callbacks?.onError?.();
-        return fallbackResult;
+        throw err;
       } finally {
         setIsProcessingFeedback(false);
       }
@@ -780,7 +810,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   const handleDelete = React.useCallback(async (id: string) => {
     try {
-      await apiFetch(`/api/tickets/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/tickets/${id}`, { method: "DELETE" });
+      throwIfHttpError(res, "DELETE ticket");
       notifyFeedbackCountRefetch(effectiveSessionId);
     } catch (err) {
       logger.error("error", "delete_ticket_failed", err);
@@ -799,8 +830,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           actionSteps: payload.actionSteps ?? [],
         }),
       });
+      throwIfHttpError(res, "PATCH ticket");
       const data = (await res.json()) as { success?: boolean; ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } };
-      if (res.ok && data.success && data.ticket) {
+      if (data.success && data.ticket) {
         const ticket = data.ticket;
         chrome.runtime.sendMessage({
           type: "ECHLY_TICKET_UPDATED",
@@ -810,7 +842,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             actionSteps: ticket.actionSteps ?? [],
             type: ticket.type ?? "Feedback",
           },
-        }).catch(() => {});
+        }).catch((err) => logSendMessageRejection("ECHLY_TICKET_UPDATED", err));
       }
     },
     []
@@ -825,13 +857,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: newTitle.trim() || "Untitled Session" }),
         });
+        throwIfHttpError(res, "PATCH session title");
         const data = (await res.json()) as { success?: boolean };
-        if (res.ok && data.success) {
+        if (data.success) {
           chrome.runtime.sendMessage({
             type: "ECHLY_SESSION_UPDATED",
             sessionId: effectiveSessionId,
             title: newTitle.trim() || "Untitled Session",
-          }).catch(() => {});
+          }).catch((err) => logSendMessageRejection("ECHLY_SESSION_UPDATED", err));
         }
       } catch (err) {
         logger.error("error", "session_title_update_failed", err);
@@ -855,37 +888,38 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     { id: string } | { limitReached: true; message: string; upgradePlan: unknown } | null
   > {
     if (ECHLY_DEBUG) logger.debug("extension", "session_create_started");
-    try {
-      const res = await apiFetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      const data = (await res.json()) as {
-        success?: boolean;
-        session?: { id: string };
-        error?: string;
-        message?: string;
-        upgradePlan?: unknown;
+    const res = await apiFetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const data = (await res.json()) as {
+      success?: boolean;
+      session?: { id: string };
+      error?: string;
+      message?: string;
+      upgradePlan?: unknown;
+    };
+    logger.debug("extension", "session_create_response", {
+      status: res.status,
+      ok: res.ok,
+      success: data.success,
+      sessionId: data.session?.id,
+      error: data.error,
+    });
+    if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
+      logger.debug("extension", "session_limit_reached");
+      return {
+        limitReached: true,
+        message: data.message ?? "You've reached your session limit.",
+        upgradePlan: data.upgradePlan,
       };
-      logger.debug("extension", "session_create_response", {
-        status: res.status,
-        ok: res.ok,
-        success: data.success,
-        sessionId: data.session?.id,
-        error: data.error,
-      });
-      if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
-        logger.debug("extension", "session_limit_reached");
-        return {
-          limitReached: true,
-          message: data.message ?? "You've reached your session limit.",
-          upgradePlan: data.upgradePlan,
-        };
-      }
-      if (!res.ok || !data.success || !data.session?.id) return null;
-      invalidateSessionsCache();
-      return { id: data.session.id };
-    } catch (err) {
-      logger.error("error", "session_create_failed", err);
-      return null;
     }
+    if (!res.ok || !data.success || !data.session?.id) {
+      throw new Error("API_ERROR_" + res.status);
+    }
+    invalidateSessionsCache();
+    return { id: data.session.id };
   }
 
   const environment = new ExtensionCaptureEnvironment({
@@ -895,24 +929,31 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   });
 
   function onActiveSessionChange(newSessionId: string) {
-    chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {});
+    chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId: newSessionId }, () => {
+      logRuntimeLastError("ECHLY_SET_ACTIVE_SESSION (onActiveSessionChange)");
+    });
   }
 
   const onPreviousSessionSelect = React.useCallback(
     async (sessionId: string, _options?: { enterCaptureImmediately?: boolean }) => {
-      chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {});
-      chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {});
+      chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {
+        logRuntimeLastError("ECHLY_SET_ACTIVE_SESSION (onPreviousSessionSelect)");
+      });
+      chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch((err) =>
+        logSendMessageRejection("ECHLY_SESSION_MODE_START (onPreviousSessionSelect)", err)
+      );
       try {
         const sessionRes = await apiFetch(`/api/sessions/${sessionId}`);
+        throwIfHttpError(sessionRes, "GET session for resume");
         const sessionData = (await sessionRes.json()) as { session?: { url?: string } };
         if (sessionData?.session?.url) {
           chrome.runtime.sendMessage({
             type: "ECHLY_OPEN_TAB",
             url: sessionData.session.url,
-          }).catch(() => {});
+          }).catch((err) => logSendMessageRejection("ECHLY_OPEN_TAB (resume session)", err));
         }
-      } catch {
-        // Session URL optional; pointers loaded by background on ECHLY_SET_ACTIVE_SESSION
+      } catch (e) {
+        console.error("[ECHLY] session URL fetch failed (optional tab open)", e);
       }
     },
     []
@@ -923,6 +964,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       chrome.runtime.sendMessage(
         { type: "ECHLY_VERIFY_DASHBOARD_SESSION" },
         (response: { valid?: boolean } | undefined) => {
+          logRuntimeLastError("ECHLY_VERIFY_DASHBOARD_SESSION");
           resolve(response?.valid === true);
         }
       );
@@ -930,8 +972,29 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   }, []);
 
   const onTriggerLogin = React.useCallback(() => {
-    chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch(() => {});
+    chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" }).catch((err) =>
+      logSendMessageRejection("ECHLY_TRIGGER_LOGIN", err)
+    );
   }, []);
+
+  if (globalState === null) {
+    return (
+      <div
+        style={{
+          minWidth: 280,
+          padding: "16px",
+          borderRadius: 12,
+          border: "1px solid #E6F0FF",
+          background: "#F8FBFF",
+          color: "#374151",
+          fontSize: 14,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+        }}
+      >
+        Syncing extension state…
+      </div>
+    );
+  }
 
   if (authState === "loading") {
     return (
@@ -993,8 +1056,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const captureWidgetPropsForDebug = {
     onPreviousSessions: () => setOpenResumeModalFromMessage(true),
     onSetCaptureMode: (mode: "voice" | "text") =>
-      chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(() => {}),
-    onOpenBilling: () => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {}),
+      chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch((err) =>
+        logSendMessageRejection("ECHLY_SET_CAPTURE_MODE (debug props)", err)
+      ),
+    onOpenBilling: () =>
+      chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch((err) =>
+        logSendMessageRejection("ECHLY_OPEN_BILLING (debug props)", err)
+      ),
     onOpenDashboard: () => environment.openDashboard(`${APP_ORIGIN}/dashboard`),
     getAssetUrl,
     environment,
@@ -1024,7 +1092,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           sessionId={effectiveSessionId ?? ""}
           userId={user.uid}
           extensionMode={true}
-          captureMode={globalState.captureMode ?? "voice"}
+          captureMode={globalState.captureMode}
           onComplete={handleComplete}
           onDelete={handleDelete}
           onUpdate={handleUpdate}
@@ -1039,12 +1107,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           fetchSessions={fetchSessions}
           hasPreviousSessions={hasPreviousSessions}
           onPreviousSessionSelect={onPreviousSessionSelect}
-          pointers={globalState.pointers ?? []}
-          totalCount={globalState.totalCount ?? 0}
-          openCount={globalState.openCount ?? 0}
-          skippedCount={globalState.skippedCount ?? 0}
-          resolvedCount={globalState.resolvedCount ?? 0}
-          sessionLoading={globalState.sessionLoading ?? false}
+          pointers={globalState.feedback.items}
+          feedbackRecovering={globalState.feedback.recovering === true}
+          feedbackRecoveryAttempts={globalState.feedback.recoveryAttempts}
+          feedbackFetchFailed={globalState.feedback.recovering !== true && globalState.feedback.recoveryAttempts > 0}
+          totalCount={globalState.counts.total}
+          openCount={globalState.openCount}
+          skippedCount={globalState.skippedCount}
+          resolvedCount={globalState.resolvedCount}
+          sessionLoading={globalState.sessionLoading}
           sessionTitleProp={globalState.sessionTitle ?? undefined}
           onSessionTitleChange={onSessionTitleChange}
           isProcessingFeedback={isProcessingFeedback}
@@ -1055,14 +1126,30 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           ensureAuthenticated={ensureAuthenticated}
           verifySessionBeforeSessions={verifySessionBeforeSessions}
           onTriggerLogin={onTriggerLogin}
-          globalSessionModeActive={globalState.sessionModeActive ?? false}
-          globalSessionPaused={globalState.sessionPaused ?? false}
-          onSessionModeStart={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(() => {})}
-          onSessionModePause={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(() => {})}
-          onSessionModeResume={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(() => {})}
-          onSessionActivity={() => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch(() => {})}
+          globalSessionModeActive={globalState.session.status !== "idle"}
+          globalSessionPaused={globalState.session.status === "paused"}
+          onSessionModeStart={() =>
+            chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch((err) =>
+              logSendMessageRejection("ECHLY_SESSION_MODE_START", err)
+            )
+          }
+          onSessionModePause={() =>
+            chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch((err) =>
+              logSendMessageRejection("ECHLY_SESSION_MODE_PAUSE", err)
+            )
+          }
+          onSessionModeResume={() =>
+            chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch((err) =>
+              logSendMessageRejection("ECHLY_SESSION_MODE_RESUME", err)
+            )
+          }
+          onSessionActivity={() =>
+            chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch((err) =>
+              logSendMessageRejection("ECHLY_SESSION_ACTIVITY", err)
+            )
+          }
           onSessionModeEnd={() => {
-            const sessionId = globalState.sessionId;
+            const sessionId = globalState.session.id;
             (async () => {
               await new Promise<void>((resolve, reject) => {
                 chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, () => {
@@ -1073,23 +1160,35 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               await new Promise((r) => setTimeout(r, 50));
               if (sessionId) {
                 const url = `${APP_ORIGIN}/dashboard/${sessionId}`;
-                chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch(() => {});
+                chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch((err) =>
+                  logSendMessageRejection("ECHLY_OPEN_TAB (session mode end)", err)
+                );
               }
-            })().catch(() => {});
+            })().catch((err) => logSendMessageRejection("ECHLY_SESSION_MODE_END chain", err));
           }}
           captureRootParent={widgetRoot}
           launcherLogoUrl={launcherLogoUrl}
           openResumeModal={openResumeModalFromMessage}
           onResumeModalClose={() => setOpenResumeModalFromMessage(false)}
           sessionLimitReached={sessionLimitReached}
+          sessionStartErrorBanner={sessionStartErrorBanner}
+          onSessionStartErrorDismiss={() => setSessionStartErrorBanner(null)}
           environment={environment}
           onPreviousSessions={() => {
             logger.debug("extension", "previous_sessions_handler_fired");
             setOpenResumeModalFromMessage(true);
             logger.debug("extension", "resume_modal_opened");
           }}
-          onSetCaptureMode={(mode) => chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(() => {})}
-          onOpenBilling={() => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(() => {})}
+          onSetCaptureMode={(mode) =>
+            chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch((err) =>
+              logSendMessageRejection("ECHLY_SET_CAPTURE_MODE", err)
+            )
+          }
+          onOpenBilling={() =>
+            chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch((err) =>
+              logSendMessageRejection("ECHLY_OPEN_BILLING", err)
+            )
+          }
           onOpenDashboard={() => environment.openDashboard(`${APP_ORIGIN}/dashboard`)}
           getAssetUrl={getAssetUrl}
         />
@@ -1172,19 +1271,29 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     visible: state.visible ?? false,
     expanded: state.expanded ?? false,
     isRecording: state.isRecording ?? false,
-    sessionId: state.sessionId ?? null,
+    session: {
+      id: state.session?.id ?? null,
+      status:
+        state.session?.status === "active" || state.session?.status === "paused"
+          ? state.session.status
+          : "idle",
+    },
     sessionTitle: state.sessionTitle ?? null,
-    sessionModeActive: state.sessionModeActive ?? false,
-    sessionPaused: state.sessionPaused ?? false,
     sessionLoading: state.sessionLoading ?? false,
-    totalCount: typeof state.totalCount === "number" ? state.totalCount : 0,
+    feedback: {
+      items: Array.isArray(state.feedback?.items) ? state.feedback.items : [],
+      nextCursor: typeof state.feedback?.nextCursor === "string" ? state.feedback.nextCursor : null,
+      hasMore: state.feedback?.hasMore === true,
+      isFetching: state.feedback?.isFetching === true,
+      recovering: state.feedback?.recovering === true,
+      recoveryAttempts: typeof state.feedback?.recoveryAttempts === "number" ? state.feedback.recoveryAttempts : 0,
+    },
+    counts: {
+      total: typeof state.counts?.total === "number" ? state.counts.total : 0,
+    },
     openCount: typeof state.openCount === "number" ? state.openCount : 0,
     skippedCount: typeof state.skippedCount === "number" ? state.skippedCount : 0,
     resolvedCount: typeof state.resolvedCount === "number" ? state.resolvedCount : 0,
-    pointers: Array.isArray(state.pointers) ? state.pointers : [],
-    nextCursor: typeof state.nextCursor === "string" ? state.nextCursor : null,
-    hasMore: state.hasMore === true,
-    isFetching: state.isFetching === true,
     captureMode: state.captureMode === "text" ? "text" : "voice",
   };
 }
@@ -1201,8 +1310,12 @@ function syncInitialGlobalState(): void {
   chrome.runtime.sendMessage(
     { type: "ECHLY_GET_GLOBAL_STATE" },
     (response: GlobalStateResponse) => {
+      logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (syncInitialGlobalState)");
       const normalized = normalizeGlobalState(response?.state);
-      if (!normalized) return;
+      if (!normalized) {
+        console.error("[ECHLY] syncInitialGlobalState: no valid state");
+        return;
+      }
       dispatchGlobalState(normalized);
     }
   );
@@ -1215,8 +1328,12 @@ function ensureVisibilityStateRefresh(): void {
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_GLOBAL_STATE" },
       (response: GlobalStateResponse) => {
+        logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (ensureVisibilityStateRefresh)");
         const normalized = normalizeGlobalState(response?.state);
-        if (!normalized) return;
+        if (!normalized) {
+          console.error("[ECHLY] ensureVisibilityStateRefresh: no valid state");
+          return;
+        }
         setHostVisibilityFromState(normalized);
         dispatchGlobalState(normalized);
       }
@@ -1249,11 +1366,15 @@ function ensureMessageListener(): void {
     const h = document.getElementById(SHADOW_HOST_ID);
     if (!h) return;
     if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
-      const state = msg.state;
-      setHostVisibilityFromState(state);
-      (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(state);
+      const normalized = normalizeGlobalState(msg.state);
+      if (!normalized) {
+        console.error("[ECHLY] ECHLY_GLOBAL_STATE runtime message had invalid state");
+        return;
+      }
+      setHostVisibilityFromState(normalized);
+      (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
-      window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } }));
+      window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
     }
     if (msg.type === "ECHLY_TOGGLE") {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_TOGGLE_WIDGET" });
@@ -1271,6 +1392,7 @@ function ensureMessageListener(): void {
       chrome.runtime.sendMessage(
         { type: "GET_AUTH_STATE" },
         (r: { authenticated?: boolean; user?: { uid: string } } | undefined) => {
+          logRuntimeLastError("GET_AUTH_STATE (ECHLY_OPEN_PREVIOUS_SESSIONS)");
           if (!r?.authenticated || !r?.user?.uid) {
             return;
           }
@@ -1283,14 +1405,19 @@ function ensureMessageListener(): void {
     /* Tab activation resync: always fetch and apply state; never debounce or skip. */
     if (msg.type === "ECHLY_SESSION_STATE_SYNC") {
       chrome.runtime.sendMessage({ type: "ECHLY_GET_GLOBAL_STATE" }, (response: GlobalStateResponse) => {
-        if (response?.state) {
-          const normalized = normalizeGlobalState(response.state);
-          if (normalized) {
-            setHostVisibilityFromState(normalized);
-            (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
-            window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
-          }
+        logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (ECHLY_SESSION_STATE_SYNC)");
+        if (!response?.state) {
+          console.error("[ECHLY] ECHLY_SESSION_STATE_SYNC: GET_GLOBAL_STATE returned no state");
+          return;
         }
+        const normalized = normalizeGlobalState(response.state);
+        if (!normalized) {
+          console.error("[ECHLY] ECHLY_SESSION_STATE_SYNC: invalid global state");
+          return;
+        }
+        setHostVisibilityFromState(normalized);
+        (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
+        window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
       });
     }
   });
@@ -1362,10 +1489,17 @@ function injectWidgetUI(): void {
       chrome.runtime.sendMessage(
         { type: "ECHLY_GET_GLOBAL_STATE" },
         (response: GlobalStateResponse) => {
+          logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (injectWidgetUI)");
           const state = response?.state;
-          if (!state) return;
+          if (!state) {
+            console.error("[ECHLY] injectWidgetUI: GET_GLOBAL_STATE returned no state");
+            return;
+          }
           const normalized = normalizeGlobalState(state);
-          if (!normalized) return;
+          if (!normalized) {
+            console.error("[ECHLY] injectWidgetUI: invalid global state");
+            return;
+          }
           setHostVisibilityFromState(normalized);
           window.dispatchEvent(
             new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } })

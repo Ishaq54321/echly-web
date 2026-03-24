@@ -24,7 +24,8 @@ export async function getVisibleTextFromScreenshot(
     if (!text || typeof text !== "string") return "";
     const trimmed = text.replace(/\s+/g, " ").trim();
     return trimmed.slice(0, MAX_VISIBLE_TEXT_LENGTH);
-  } catch {
+  } catch (err) {
+    console.error("[ECHLY] OCR getVisibleTextFromScreenshot failed", err);
     return "";
   }
 }

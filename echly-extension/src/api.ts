@@ -9,6 +9,14 @@ if (ECHLY_DEBUG) console.log("[EXTENSION] Using API_BASE:", API_BASE);
 
 export { API_BASE };
 
+/** Enforce HTTP safety before reading bodies; use at call sites (not all routes use res.ok === true semantics). */
+export function throwIfHttpError(res: Response, context?: string): void {
+  if (!res.ok) {
+    const suffix = context ? ` ${context}` : "";
+    throw new Error("API_ERROR_" + res.status + suffix);
+  }
+}
+
 export type ApiFetchOptions = RequestInit & {
   /** If true, do not attach Authorization header (e.g. public endpoints). Default false. */
   skipAuth?: boolean;
@@ -64,6 +72,7 @@ export async function apiFetch(
       formHeaders.Authorization = `Bearer ${token}`;
     }
 
+    /** FormData: return raw Response so callers can read error bodies on !ok (e.g. transcribe NO_SPEECH_DETECTED). */
     return fetch(url, {
       ...rest,
       method,
