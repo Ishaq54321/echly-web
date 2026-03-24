@@ -142,6 +142,9 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
     status: (item as unknown as { status?: string }).status,
     isResolved: (item as unknown as { isResolved?: boolean }).isResolved,
     isSkipped: (item as unknown as { isSkipped?: boolean }).isSkipped,
+
+    screenshotUrl: item.screenshotUrl ?? null,
+    screenshotStatus: item.screenshotStatus ?? null,
   };
 }
 

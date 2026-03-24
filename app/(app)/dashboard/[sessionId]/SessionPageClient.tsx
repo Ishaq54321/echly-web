@@ -8,7 +8,6 @@ import { db } from "@/lib/firebase";
 import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
-import { SessionPremiumLoader } from "@/components/session/SessionPremiumLoader";
 import { FeedbackPremiumLoader } from "@/components/session/FeedbackPremiumLoader";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
 import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
@@ -45,8 +44,8 @@ function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps
         type: ticket.type ?? "Feedback",
       },
     });
-  } catch {
-    // Extension not available
+  } catch (err) {
+    console.error("[ECHLY] broadcastTicketUpdated extension message failed", err);
   }
 }
 
@@ -248,8 +247,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         type: "ECHLY_SET_ACTIVE_SESSION",
         sessionId,
       });
-    } catch {
-      // Extension not available — silent fail
+    } catch (err) {
+      console.error("[ECHLY] ECHLY_SET_ACTIVE_SESSION extension message failed", err);
     }
   }, [sessionId]);
 
@@ -279,7 +278,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }>;
       const { ticket, sessionId: evSessionId } = ev.detail ?? {};
       if (evSessionId !== sessionId || !ticket) return;
-      const newItem = {
+      const newItem: Feedback = {
         id: ticket.id,
         sessionId: evSessionId,
         userId: session.userId,
@@ -290,8 +289,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         isResolved: false,
         createdAt: null,
         clientTimestamp: Date.now(),
+        screenshotUrl: null,
+        screenshotStatus: null,
       };
-      setFeedback((prev) => [newItem, ...prev]);
+      setFeedback((prev) => [newItem, ...prev.filter((x) => x.id !== newItem.id)]);
       ensureCountsSeeded();
       updateCachedCounts(evSessionId, (c) => ({
         total: c.total + 1,
@@ -337,7 +338,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setSessionLoading(false);
       const viewerId = getViewerId(authUser.uid);
       if (viewerId) {
-        recordSessionViewIfNew(sessionSnap.id, viewerId).catch(() => {});
+        recordSessionViewIfNew(sessionSnap.id, viewerId).catch((err) => {
+          console.error("[ECHLY] recordSessionViewIfNew failed", err);
+        });
       }
     });
     return () => {
@@ -470,7 +473,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         );
         broadcastTicketUpdated(data.ticket);
       }
-    } catch {
+    } catch (err) {
+      console.error("[ECHLY] saveTitle failed", err);
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId
@@ -509,7 +513,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         );
         broadcastTicketUpdated(data.ticket);
       }
-    } catch {
+    } catch (err) {
+      console.error("[ECHLY] saveActionSteps failed", err);
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId ? { ...item, actionSteps: previous } : item
@@ -545,7 +550,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         );
         broadcastTicketUpdated(data.ticket);
       }
-    } catch {
+    } catch (err) {
+      console.error("[ECHLY] saveTags failed", err);
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId ? { ...item, suggestedTags: previous } : item
@@ -588,7 +594,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         );
         broadcastTicketUpdated(data.ticket);
       }
-    } catch {
+    } catch (err) {
+      console.error("[ECHLY] saveResolved failed", err);
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId
@@ -639,7 +646,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isSkipped: true }),
       });
-    } catch {
+    } catch (err) {
+      console.error("[ECHLY] handleExecutionSkip PATCH failed", err);
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId
@@ -696,12 +704,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               sessionId,
               title: (data.session.title as string) ?? safeTitle,
             });
-          } catch {
-            // Extension not available
+          } catch (err) {
+            console.error("[ECHLY] ECHLY_SESSION_UPDATED extension message failed", err);
           }
         }
       }
-    } catch {
+    } catch (err) {
+      console.error("[ECHLY] handleSessionTitleBlur PATCH failed", err);
       setSession((prev: Session | null) =>
         prev ? ({ ...prev, title: previousTitle } as Session) : prev
       );
@@ -820,7 +829,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       const data = (await res.json()) as { success?: boolean; error?: string };
       if (!res.ok || !data?.success) throw new Error(data?.error ?? "Delete failed");
       router.push(`/dashboard/${sessionId}`);
-    } catch {
+    } catch (err) {
+      console.error("[ECHLY] handleDeleteFeedback failed", err);
       setFeedback(prevFeedback);
       if (sessionId && prevCounts) {
         setCachedCounts(sessionId, prevCounts);
@@ -1127,9 +1137,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           </div>
         </div>
       )}
-
-      {/* Keep legacy full-screen loader available (unused by default) */}
-      {false && <SessionPremiumLoader />}
     </>
   );
 }

@@ -37,6 +37,9 @@ export async function fetchCountsDedup(
       );
       const json = await res.json();
       return parseSessionFeedbackCountsBody(json);
+    } catch (err) {
+      console.error("[ECHLY] fetchCountsDedup request failed", err);
+      throw err;
     } finally {
       clearPendingRequest(sessionId);
     }

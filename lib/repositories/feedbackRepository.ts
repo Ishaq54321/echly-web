@@ -354,6 +354,8 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     userAgent: data.userAgent ?? null,
     clientTimestamp: data.clientTimestamp ?? null,
     screenshotUrl: data.screenshotUrl ?? null,
+    screenshotStatus:
+      (data.screenshotStatus as Feedback["screenshotStatus"] | undefined) ?? null,
     commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
     lastCommentPreview: typeof data.lastCommentPreview === "string" ? data.lastCommentPreview : undefined,
     lastCommentAt: (data.lastCommentAt ?? null) as Timestamp | null,

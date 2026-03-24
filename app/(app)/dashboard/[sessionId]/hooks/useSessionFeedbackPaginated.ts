@@ -31,6 +31,11 @@ const ZERO_COUNTS: Counts = {
 export interface UseSessionFeedbackPaginatedResult {
   feedback: Feedback[];
   setFeedback: React.Dispatch<React.SetStateAction<Feedback[]>>;
+  /**
+   * Replaces the list with the first API page only (full replace, not append).
+   * Does not run from realtime; call explicitly when you need a hard reset of page 1.
+   */
+  refetchFirstPage: () => Promise<void>;
   /** Total count from server (first page); stable, not derived from loaded items. */
   total: number;
   /** Active (open) count from server (first page only); do not derive from items. */
@@ -45,8 +50,6 @@ export interface UseSessionFeedbackPaginatedResult {
   hasMore: boolean;
   hasReachedLimit: boolean;
   loadingMore: boolean;
-  fetchNextPage: () => Promise<void>;
-  refetchFirstPage: () => Promise<void>;
   /** Ref to attach to sentinel div for intersection observer. */
   loadMoreRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -89,6 +92,8 @@ export function useSessionFeedbackPaginated(
   const countsLoadedRef = useRef(false);
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const itemsRef = useRef<Feedback[]>([]);
+  const countsDirtyRef = useRef(false);
+  const countsDebounceRef = useRef<number | null>(null);
   const guardMultipleSources = useCallback(
     (apiItems: Feedback[]) => {
       if (ECHLY_STRICT_MODE) {
@@ -103,46 +108,16 @@ export function useSessionFeedbackPaginated(
       }
 
       if (ECHLY_STRICT_MODE) {
-        if (!Array.isArray(items)) {
+        // Use itemsRef so this callback stays stable when local `items` updates; otherwise
+        // the realtime effect (which depends on guardMultipleSources) re-runs while
+        // docChanges is still set and retriggers setCanonicalFeedback → infinite loop.
+        if (!Array.isArray(itemsRef.current)) {
           console.error("[GUARDRAIL] Canonical items list missing — CRITICAL");
         }
       }
     },
-    [realtimeItems, items]
+    [realtimeItems]
   );
-
-  // Keep a ref to the latest sessionId so in-flight async pagination
-  // can't update state after the user switches sessions.
-  useEffect(() => {
-    sessionIdRef.current = sessionId;
-  }, [sessionId]);
-
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
-
-  // Reset infinite scroll state when sessionId changes to avoid ghost items.
-  useLayoutEffect(() => {
-    setItems([]);
-    itemsRef.current = [];
-    setCountsState(ZERO_COUNTS);
-    setCursor(null);
-    setHasMore(true);
-    setLoadingMore(false);
-    setInitialLoadDone(false);
-    isFetchingRef.current = false;
-    hasUserScrolledRef.current = false;
-    // Refs (used by the realtime + pagination effects) must also be reset immediately,
-    // otherwise in-flight seeding/pagination may update state for the new session.
-    hasFetchedRef.current = false;
-    countsLoadedRef.current = false;
-    previousFeedbackCountRef.current = 0;
-  }, [sessionId]);
-
-  /** Track previous snapshot size so we can detect new tickets and auto-select the newest. */
-  const previousFeedbackCountRef = useRef(0);
-  const onNewTicketFromRealtimeRef = useRef(onNewTicketFromRealtime);
-  onNewTicketFromRealtimeRef.current = onNewTicketFromRealtime;
 
   const getTimestamp = useCallback((item: Feedback): number => {
     if (!item) return 0;
@@ -194,25 +169,54 @@ export function useSessionFeedbackPaginated(
     [sortByCreatedAtDesc]
   );
 
-  const mergeRealtimeIntoCanonical = useCallback(
-    (incoming: Feedback[]) => {
-      if (incoming.length === 0) return;
-      const byId = new Map<string, Feedback>(itemsRef.current.map((item) => [item.id, item]));
-      let changed = false;
-      for (const item of incoming) {
-        const existing = byId.get(item.id);
-        if (existing !== item) {
-          byId.set(item.id, item);
-          changed = true;
-        }
+  // Keep a ref to the latest sessionId so in-flight async pagination
+  // can't update state after the user switches sessions.
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    return () => {
+      if (countsDebounceRef.current !== null) {
+        clearTimeout(countsDebounceRef.current);
+        countsDebounceRef.current = null;
       }
-      if (!changed) return;
-      const normalized = sortByCreatedAtDesc(Array.from(byId.values()));
-      itemsRef.current = normalized;
-      setItems(normalized);
-    },
-    [sortByCreatedAtDesc]
-  );
+    };
+  }, []);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  // Reset infinite scroll state when sessionId changes to avoid ghost items.
+  useLayoutEffect(() => {
+    setCanonicalFeedback([]);
+    setCountsState(ZERO_COUNTS);
+    setCursor(null);
+    setHasMore(true);
+    setLoadingMore(false);
+    setInitialLoadDone(false);
+    isFetchingRef.current = false;
+    hasUserScrolledRef.current = false;
+    // Refs (used by the realtime + pagination effects) must also be reset immediately,
+    // otherwise in-flight seeding/pagination may update state for the new session.
+    hasFetchedRef.current = false;
+    countsLoadedRef.current = false;
+    previousFeedbackCountRef.current = 0;
+    realtimeBootstrapDoneRef.current = false;
+    if (countsDebounceRef.current !== null) {
+      clearTimeout(countsDebounceRef.current);
+      countsDebounceRef.current = null;
+    }
+    countsDirtyRef.current = false;
+  }, [sessionId, setCanonicalFeedback]);
+
+  /** Track previous snapshot size so we can detect new tickets and auto-select the newest. */
+  const previousFeedbackCountRef = useRef(0);
+  /** One-time bootstrap per session: seed from realtime window + API, then only incremental docChanges apply. */
+  const realtimeBootstrapDoneRef = useRef(false);
+  const onNewTicketFromRealtimeRef = useRef(onNewTicketFromRealtime);
+  onNewTicketFromRealtimeRef.current = onNewTicketFromRealtime;
 
   const appendPaginationIntoCanonical = useCallback(
     (incoming: Feedback[]): number => {
@@ -231,6 +235,40 @@ export function useSessionFeedbackPaginated(
       return appended;
     },
     [sortByCreatedAtDesc]
+  );
+
+  const refetchFirstPage = useCallback(
+    async (internal?: { bypassConcurrentGuard?: boolean }) => {
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+      if (!internal?.bypassConcurrentGuard && isFetchingRef.current) return;
+      isFetchingRef.current = true;
+      try {
+        const url = `/api/feedback?sessionId=${encodeURIComponent(sid)}&cursor=&limit=${PAGE_SIZE}`;
+        const res = await cachedFetch(url, () => authFetch(url));
+        const data = (await res.json()) as {
+          feedback?: Feedback[];
+          nextCursor?: string | null;
+          hasMore?: boolean;
+        };
+        if (sessionIdRef.current !== sid) return;
+        const incoming = data.feedback ?? [];
+        const pageCursor =
+          data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
+        setCursor(pageCursor);
+        const totalFromCounts = getCounts(sid)?.total ?? 0;
+        const newLen = incoming.length;
+        setHasMore(totalFromCounts > 0 ? newLen < totalFromCounts : data.hasMore ?? false);
+        setCanonicalFeedback(incoming);
+      } catch (err) {
+        console.error("[ECHLY] refetchFirstPage failed", err);
+        setHasMore(false);
+        setCursor(null);
+      } finally {
+        isFetchingRef.current = false;
+      }
+    },
+    [setCanonicalFeedback]
   );
 
   const hasReachedLimit = items.length >= FEEDBACK_LOAD_CAP;
@@ -275,9 +313,6 @@ export function useSessionFeedbackPaginated(
         feedback?: Feedback[];
         nextCursor?: string | null;
         hasMore?: boolean;
-        total?: number;
-        activeCount?: number;
-        resolvedCount?: number;
       };
 
       // If the user switched sessions while this request was in flight, ignore this response.
@@ -293,14 +328,15 @@ export function useSessionFeedbackPaginated(
 
         setCursor(pageCursor);
 
-        // If total isn't provided by the API, we rely on `data.hasMore`.
-        const serverTotal = typeof data.total === "number" ? data.total : s.total;
+        // Totals come from `/api/feedback/counts` (counts state); list response has `hasMore` only when total is unknown.
         const newLen = loadedCount + appended;
-        setHasMore(serverTotal > 0 ? newLen < serverTotal : data.hasMore ?? false);
+        setHasMore(s.total > 0 ? newLen < s.total : data.hasMore ?? false);
       } else {
         setHasMore(false);
         setCursor(pageCursor);
       }
+    } catch (err) {
+      console.error("[ECHLY] loadMore failed", err);
     } finally {
       isFetchingRef.current = false;
       stateRef.current.loadingMore = false;
@@ -367,16 +403,21 @@ export function useSessionFeedbackPaginated(
   // When no sessionId, clear loading so we don't block the list area.
   useEffect(() => {
     if (!sessionId) {
+      if (countsDebounceRef.current !== null) {
+        clearTimeout(countsDebounceRef.current);
+        countsDebounceRef.current = null;
+      }
+      countsDirtyRef.current = false;
       setInitialLoading(false);
       setInitialLoadDone(false);
       hasFetchedRef.current = false;
       countsLoadedRef.current = false;
       hasUserScrolledRef.current = false;
       previousFeedbackCountRef.current = 0;
+      realtimeBootstrapDoneRef.current = false;
       setCountsLoading(false);
       setCountsState(ZERO_COUNTS);
-      setItems([]);
-      itemsRef.current = [];
+      setCanonicalFeedback([]);
       setCursor(null);
       setHasMore(true);
       isFetchingRef.current = false;
@@ -397,8 +438,7 @@ export function useSessionFeedbackPaginated(
 
     setCountsState(ZERO_COUNTS);
     setCountsLoading(true);
-    setItems([]);
-    itemsRef.current = [];
+    setCanonicalFeedback([]);
     setCursor(null);
     setHasMore(true);
     isFetchingRef.current = false;
@@ -410,7 +450,8 @@ export function useSessionFeedbackPaginated(
         const next = await fetchCountsDedup(sessionId);
         if (cancelled || sessionIdRef.current !== sessionId) return;
         setStoreCounts(sessionId, next);
-      } catch {
+      } catch (err) {
+        console.error("[ECHLY] initial counts fetch failed", err);
         if (!cancelled) setCountsLoading(false);
       }
     })();
@@ -420,7 +461,7 @@ export function useSessionFeedbackPaginated(
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, setCanonicalFeedback]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -439,98 +480,119 @@ export function useSessionFeedbackPaginated(
     const snapshotList = realtimeItems;
     const realtimeWindowCount = snapshotList.length;
 
-    if (realtimeWindowCount > previousFeedbackCountRef.current && snapshotList.length > 0) {
-      const newestTicketId = snapshotList[0].id;
-      onNewTicketFromRealtimeRef.current?.(newestTicketId);
-    }
-    previousFeedbackCountRef.current = realtimeWindowCount;
-
-    mergeRealtimeIntoCanonical(snapshotList);
-
-    const isFirstSnapshot = !stateRef.current.initialLoadDone;
-    if (!isFirstSnapshot) return;
-
-    setInitialLoadDone(true);
-    setInitialLoading(false);
-    if (hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
-
-    // Seed pagination + true totals from the API. API items are treated as older pages.
-    void (async () => {
-      try {
-        const url = `/api/feedback?sessionId=${encodeURIComponent(effectSessionId)}&cursor=&limit=${PAGE_SIZE}`;
-        const res = await cachedFetch(url, () => authFetch(url));
-        const data = (await res.json()) as {
-          feedback?: Feedback[];
-          nextCursor?: string | null;
-          hasMore?: boolean;
-          total?: number;
-          activeCount?: number;
-          resolvedCount?: number;
-          skippedCount?: number;
-        };
-        // Ignore stale API seeding if the user switched sessions.
-        if (sessionIdRef.current !== effectSessionId) return;
-        const apiItems = data.feedback ?? [];
-        guardMultipleSources(apiItems);
-        const incoming = apiItems;
-        const pageCursor = data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
-        setCursor(pageCursor);
-        setHasMore(data.hasMore ?? false);
-        if (incoming.length > 0) {
-          appendPaginationIntoCanonical(incoming);
-        }
-      } catch {
-        // If API seeding fails, realtime list still works; pagination will remain unavailable.
-        setHasMore(false);
-        setCursor(null);
+    if (!realtimeBootstrapDoneRef.current) {
+      if (realtimeWindowCount > previousFeedbackCountRef.current && snapshotList.length > 0) {
+        const newestTicketId = snapshotList[0].id;
+        onNewTicketFromRealtimeRef.current?.(newestTicketId);
       }
-    })();
+      previousFeedbackCountRef.current = realtimeWindowCount;
+
+      if (realtimeItems.length > 0) {
+        setCanonicalFeedback(realtimeItems);
+      }
+      realtimeBootstrapDoneRef.current = true;
+
+      const isFirstSnapshot = !stateRef.current.initialLoadDone;
+      if (!isFirstSnapshot) return;
+
+      setInitialLoadDone(true);
+      setInitialLoading(false);
+      if (hasFetchedRef.current) return;
+      hasFetchedRef.current = true;
+
+      void (async () => {
+        try {
+          const url = `/api/feedback?sessionId=${encodeURIComponent(effectSessionId)}&cursor=&limit=${PAGE_SIZE}`;
+          const res = await cachedFetch(url, () => authFetch(url));
+          const data = (await res.json()) as {
+            feedback?: Feedback[];
+            nextCursor?: string | null;
+            hasMore?: boolean;
+          };
+          if (sessionIdRef.current !== effectSessionId) return;
+          const apiItems = data.feedback ?? [];
+          guardMultipleSources(apiItems);
+          const incoming = apiItems;
+          const pageCursor = data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
+          setCursor(pageCursor);
+          setHasMore(data.hasMore ?? false);
+          if (incoming.length > 0) {
+            appendPaginationIntoCanonical(incoming);
+          }
+        } catch (err) {
+          console.error("[ECHLY] bootstrap first-page fetch failed", err);
+          setHasMore(false);
+          setCursor(null);
+        }
+      })();
+      return;
+    }
+
+    const changes = feedbackRealtime.docChanges;
+    if (changes.length === 0) return;
+
+    countsDirtyRef.current = true;
+    if (countsDebounceRef.current !== null) {
+      clearTimeout(countsDebounceRef.current);
+    }
+    countsDebounceRef.current = window.setTimeout(() => {
+      if (!countsDirtyRef.current) return;
+      countsDirtyRef.current = false;
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+      void fetchCountsDedup(sid)
+        .then((next) => {
+          if (sessionIdRef.current !== sid) return;
+          setStoreCounts(sid, next);
+        })
+        .catch((err) => {
+          console.error("[ECHLY] counts refresh failed", err);
+        });
+    }, 500);
+
+    if (changes.some((c) => c.type === "removed")) {
+      // Ignore window eviction from Firestore limit — do not refetch page 1 or the
+      // list wipes; apply loop below skips "removed" for the canonical list.
+      console.log("[ECHLY] realtime removal detected");
+    }
+
+    for (const change of changes) {
+      if (change.type === "added") {
+        if (!itemsRef.current.some((x) => x.id === change.feedback.id)) {
+          onNewTicketFromRealtimeRef.current?.(change.feedback.id);
+        }
+      }
+    }
+
+    try {
+      setCanonicalFeedback((current) => {
+        let next = [...current];
+        for (const change of changes) {
+          if (change.type === "removed") continue;
+          if (change.type === "modified") {
+            const idx = next.findIndex((x) => x.id === change.feedback.id);
+            if (idx !== -1) next[idx] = change.feedback;
+          } else if (change.type === "added") {
+            const idx = next.findIndex((x) => x.id === change.feedback.id);
+            if (idx === -1) next.unshift(change.feedback);
+            else next[idx] = change.feedback;
+          }
+        }
+        return next;
+      });
+    } catch (err) {
+      console.error("[ECHLY] realtime docChanges apply failed", err);
+    }
   }, [
     appendPaginationIntoCanonical,
     feedbackRealtime.loading,
     feedbackRealtime.sessionId,
     feedbackRealtime.version,
     guardMultipleSources,
-    mergeRealtimeIntoCanonical,
     realtimeItems,
     sessionId,
+    setCanonicalFeedback,
   ]);
-
-  const refetchFirstPage = useCallback(async () => {
-    if (!sessionId) return;
-    const startedSessionId = sessionId;
-    try {
-      const url = `/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=&limit=${PAGE_SIZE}`;
-      const res = await cachedFetch(url, () => authFetch(url));
-      const data = (await res.json()) as {
-        feedback?: Feedback[];
-        nextCursor?: string | null;
-        hasMore?: boolean;
-        total?: number;
-        activeCount?: number;
-        resolvedCount?: number;
-        skippedCount?: number;
-      };
-      if (sessionIdRef.current !== startedSessionId) return;
-      const apiItems = data.feedback ?? [];
-      guardMultipleSources(apiItems);
-      const incoming = apiItems;
-      const pageCursor = data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
-      if (incoming.length) {
-        appendPaginationIntoCanonical(incoming);
-        setCursor(pageCursor);
-        setHasMore(data.hasMore ?? false);
-      } else {
-        setItems([]);
-        itemsRef.current = [];
-        setCursor(null);
-        setHasMore(false);
-      }
-    } finally {
-      // Do not set initialLoading: keep loading only for first mount and loadMore
-    }
-  }, [appendPaginationIntoCanonical, guardMultipleSources, sessionId]);
 
   return {
     feedback: items,
@@ -540,12 +602,11 @@ export function useSessionFeedbackPaginated(
     skippedCount,
     countsLoading,
     setFeedback: setCanonicalFeedback,
+    refetchFirstPage,
     loading: initialLoading,
     hasMore,
     hasReachedLimit,
     loadingMore,
-    fetchNextPage: loadMore,
-    refetchFirstPage,
     loadMoreRef,
   };
 }

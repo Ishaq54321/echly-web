@@ -3,7 +3,7 @@
 import type { SignalHeatmapBucket } from "@/lib/domain/signal";
 
 export interface TrendingProblemsSectionProps {
-  /** From useCommandCenterData: heatmapBuckets (sessions with most feedback). */
+  /** Sessions with the most feedback (heatmap-style ranking). */
   buckets: SignalHeatmapBucket[];
   onView: (sessionId: string) => void;
 }

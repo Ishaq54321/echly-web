@@ -7,9 +7,17 @@ import type { Feedback } from "@/lib/domain/feedback";
 
 const REALTIME_LIMIT = 30;
 
+/** Firestore snapshot deltas; consumers apply single-item updates only (no full-list merge). */
+export type RealtimeDocChange =
+  | { type: "added"; feedback: Feedback }
+  | { type: "modified"; feedback: Feedback }
+  | { type: "removed"; id: string };
+
 type FeedbackStoreSnapshot = {
   sessionId: string | null;
   items: Feedback[];
+  /** Last onSnapshot docChanges(); cleared when subscribing or on error. */
+  docChanges: RealtimeDocChange[];
   loading: boolean;
   error: string | null;
   version: number;
@@ -18,6 +26,7 @@ type FeedbackStoreSnapshot = {
 let snapshot: FeedbackStoreSnapshot = {
   sessionId: null,
   items: [],
+  docChanges: [],
   loading: false,
   error: null,
   version: 0,
@@ -105,6 +114,7 @@ export function subscribeFeedbackSession(sessionId: string): void {
     loading: true,
     error: null,
     items: [],
+    docChanges: [],
   });
 
   const feedbackRef = collection(db, "feedback");
@@ -118,32 +128,30 @@ export function subscribeFeedbackSession(sessionId: string): void {
   unsubscribe = onSnapshot(
     feedbackQuery,
     (snap) => {
+      const docChanges: RealtimeDocChange[] = snap.docChanges().map((change) => {
+        if (change.type === "added" || change.type === "modified") {
+          return {
+            type: change.type,
+            feedback: mapDocToFeedback(change.doc),
+          } as RealtimeDocChange;
+        }
+        return { type: "removed", id: change.doc.id };
+      });
       setSnapshot({
         items: snap.docs.map((docSnap) => mapDocToFeedback(docSnap)),
+        docChanges,
         loading: false,
         error: null,
       });
     },
     (err) => {
+      console.error("[ECHLY] feedback realtime snapshot failed", err);
       setSnapshot({
         items: [],
+        docChanges: [],
         loading: false,
         error: err instanceof Error ? err.message : "Failed to load feedback realtime",
       });
     }
   );
-}
-
-export function clearFeedbackSubscription(): void {
-  if (unsubscribe) {
-    unsubscribe();
-    unsubscribe = null;
-  }
-  currentSessionId = null;
-  setSnapshot({
-    sessionId: null,
-    items: [],
-    loading: false,
-    error: null,
-  });
 }

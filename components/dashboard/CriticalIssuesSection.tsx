@@ -4,7 +4,7 @@ import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspace
 import type { AIExecutiveSummary } from "@/lib/domain/signal";
 
 export interface CriticalIssuesSectionProps {
-  /** From useCommandCenterData: summary.highImpactItems (session-level). */
+  /** High-impact sessions (e.g. by open count). */
   highImpactItems: AIExecutiveSummary["highImpactItems"];
   /** Session lookup for open count. */
   sessionsById: Map<string, SessionWithCounts>;
