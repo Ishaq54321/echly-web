@@ -59,6 +59,7 @@ export async function resolveSessionFeedbackCounts(
   );
 
   snapshot.forEach((docSnap) => {
+    if (docSnap.data().isDeleted === true) return;
     realTotal++;
     const status = docSnap.data().status;
 

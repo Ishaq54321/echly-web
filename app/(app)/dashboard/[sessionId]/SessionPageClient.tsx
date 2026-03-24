@@ -70,7 +70,6 @@ function preloadImage(src: string, preloaded: Set<string>) {
   preloaded.add(src);
   const img = new window.Image();
   img.src = src;
-  console.log("PRELOADING", src);
 }
 
 function SessionPageSkeleton() {
@@ -120,12 +119,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const ticketIdFromUrl = searchParams.get("ticket");
 
   const [session, setSession] = useState<Session | null>(null);
-  const [userName, setUserName] = useState<string>("");
-  const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(true);
 
   const { user: authUser, loading: authLoading } = useAuthGuard({ router });
 
@@ -167,7 +163,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [executionMode, setExecutionMode] = useState(false);
-  const [executionStreak, setExecutionStreak] = useState(0);
   const [isCommentMode, setIsCommentMode] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -224,13 +219,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  useEffect(() => {
-    console.log("[SESSION_INSIGHT_REMOVED]", {
-      status: "complete",
-      tracesRemaining: false,
-    });
   }, []);
 
   /* Sync active session to extension when user opens this session page. */
@@ -312,30 +300,23 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (authLoading) return;
     if (!authUser || !sessionId) {
       setSession(null);
-      setSessionLoading(false);
       return;
     }
 
-    setSessionLoading(true);
     let cancelled = false;
     const sessionRef = doc(db, "sessions", sessionId);
     getDoc(sessionRef).then((sessionSnap) => {
       if (cancelled) return;
       if (!sessionSnap.exists()) {
         router.push("/dashboard");
-        setSessionLoading(false);
         return;
       }
       const data = sessionSnap.data();
       if ((data as { userId?: string }).userId !== authUser.uid) {
         router.push("/dashboard");
-        setSessionLoading(false);
         return;
       }
       setSession({ id: sessionSnap.id, ...(data as object) } as Session);
-      setUserName(authUser.displayName || authUser.email || "You");
-      setUserPhotoURL(authUser.photoURL ?? null);
-      setSessionLoading(false);
       const viewerId = getViewerId(authUser.uid);
       if (viewerId) {
         recordSessionViewIfNew(sessionSnap.id, viewerId).catch((err) => {
@@ -426,11 +407,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const {
     comments,
     loadingComments,
-    sendComment,
     sendReply,
     sendPinComment,
     sendTextComment,
-    resolve,
     updatePinPosition,
     updateComment,
     deleteComment,
@@ -617,7 +596,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const nextOpen = openFeedback[openIdx + 1] ?? openFeedback[0];
     if (nextOpen && nextOpen.id !== selectedId) {
       setSelectedId(nextOpen.id);
-      setExecutionStreak((s) => s + 1);
     }
   };
 
@@ -627,7 +605,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const previousResolved = Boolean(selectedItem?.isResolved);
     const previousSkipped = Boolean(selectedItem?.isSkipped);
     const previousCounts = sessionId ? getCachedCounts(sessionId) : null;
-    setExecutionStreak(0);
     const openIdx = openFeedback.findIndex((f) => f.id === selectedId);
     const nextOpen = openIdx >= 0 ? openFeedback[openIdx + 1] ?? openFeedback[0] : undefined;
     const nextOpenId = nextOpen?.id === selectedId ? undefined : nextOpen?.id ?? null;
@@ -811,9 +788,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const deletedStatus = deletedItem ? getTicketStatus(deletedItem) : "open";
     const prevFeedback = feedback;
     const prevCounts = sessionId ? getCachedCounts(sessionId) : null;
-    const nextList = feedback.filter((item) => item.id !== id);
-    const nextSelected = selectedId === id ? nextList[0]?.id ?? null : selectedId;
-    setFeedback(nextList);
+    const nextSelected =
+      selectedId === id
+        ? feedback.filter((item) => item.id !== id)[0]?.id ?? null
+        : selectedId;
+    setFeedback((prev) => prev.filter((item) => item.id !== id));
     ensureCountsSeeded();
     updateCachedCounts(sessionId, (c) => {
       const next = { ...c, total: Math.max(0, c.total - 1) };
@@ -853,7 +832,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             onSkip={handleExecutionSkip}
             onNeedsClarification={() => {
               setExecutionMode(false);
-              setExecutionStreak(0);
             }}
             onAssign={() => {}}
             onResolveAndNext={handleResolveAndNext}

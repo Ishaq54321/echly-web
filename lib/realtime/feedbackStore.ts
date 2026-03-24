@@ -49,8 +49,9 @@ function setSnapshot(next: Partial<FeedbackStoreSnapshot>) {
   emitChange();
 }
 
-function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback {
+function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback | null {
   const data = docSnap.data() ?? {};
+  if (data.isDeleted === true) return null;
   const status = (data.status ?? "open") as string;
   const isResolved = data.isResolved === true || status === "resolved" || status === "done";
   const isSkipped = status === "skipped";
@@ -76,9 +77,12 @@ function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback {
     userAgent: (data.userAgent as string | null) ?? null,
     clientTimestamp: (data.clientTimestamp as number | null) ?? null,
     screenshotUrl: (data.screenshotUrl as string | null) ?? null,
+    screenshotStatus: data.screenshotStatus ?? null,
+    status: typeof data.status === "string" ? (data.status as Feedback["status"]) : undefined,
     commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
     lastCommentPreview: typeof data.lastCommentPreview === "string" ? data.lastCommentPreview : undefined,
     lastCommentAt: (data.lastCommentAt ?? null) as Timestamp | null,
+    isDeleted: data.isDeleted ?? false,
   };
 }
 
@@ -128,17 +132,20 @@ export function subscribeFeedbackSession(sessionId: string): void {
   unsubscribe = onSnapshot(
     feedbackQuery,
     (snap) => {
-      const docChanges: RealtimeDocChange[] = snap.docChanges().map((change) => {
+      const docChanges: RealtimeDocChange[] = snap.docChanges().flatMap((change) => {
         if (change.type === "added" || change.type === "modified") {
-          return {
-            type: change.type,
-            feedback: mapDocToFeedback(change.doc),
-          } as RealtimeDocChange;
+          const feedback = mapDocToFeedback(change.doc);
+          if (feedback === null) {
+            return [{ type: "removed" as const, id: change.doc.id }];
+          }
+          return [{ type: change.type, feedback }] as RealtimeDocChange[];
         }
-        return { type: "removed", id: change.doc.id };
+        return [{ type: "removed" as const, id: change.doc.id }];
       });
       setSnapshot({
-        items: snap.docs.map((docSnap) => mapDocToFeedback(docSnap)),
+        items: snap.docs
+          .map((docSnap) => mapDocToFeedback(docSnap))
+          .filter((item): item is Feedback => item !== null),
         docChanges,
         loading: false,
         error: null,

@@ -96,19 +96,6 @@ export async function OPTIONS(req: NextRequest) {
   });
 }
 
-function serializeFeedback(item: Feedback): Record<string, unknown> {
-  const out = { ...item } as Record<string, unknown>;
-  const createdAt = item.createdAt as { toDate?: () => Date; seconds?: number } | null;
-  out.createdAt = createdAt != null && typeof createdAt.toDate === "function" ? createdAt.toDate().toISOString() : null;
-  const lastCommentAt = item.lastCommentAt as { toDate?: () => Date; seconds?: number } | null | undefined;
-  if (lastCommentAt != null && typeof lastCommentAt.toDate === "function") {
-    out.lastCommentAt = { seconds: Math.floor(lastCommentAt.toDate().getTime() / 1000) };
-  } else if (lastCommentAt != null && typeof (lastCommentAt as { seconds?: number }).seconds === "number") {
-    out.lastCommentAt = { seconds: (lastCommentAt as { seconds: number }).seconds };
-  }
-  return out;
-}
-
 function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
   const createdAt = item.createdAt as { toDate?: () => Date; seconds?: number } | null;
   const createdAtOut =
@@ -142,6 +129,7 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
     status: (item as unknown as { status?: string }).status,
     isResolved: (item as unknown as { isResolved?: boolean }).isResolved,
     isSkipped: (item as unknown as { isSkipped?: boolean }).isSkipped,
+    isDeleted: item.isDeleted ?? false,
 
     screenshotUrl: item.screenshotUrl ?? null,
     screenshotStatus: item.screenshotStatus ?? null,
@@ -151,6 +139,10 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
 /**
  * GET /api/feedback?sessionId=ID&cursor=XYZ&limit=20
  * Returns { feedback: [], nextCursor: string | null, hasMore: boolean }
+ *
+ * Session-scoped pagination excludes soft-deleted feedback (`isDeleted === true`).
+ * The repository applies the same rule as `where("isDeleted","!=",true)` without
+ * dropping legacy docs that omit `isDeleted` (see getSessionFeedbackPageForUserWithStringCursorRepo).
  */
 export async function GET(req: NextRequest) {
   let user;

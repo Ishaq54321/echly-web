@@ -78,6 +78,9 @@ export interface Feedback {
   screenshotUrl?: string | null;
   screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
   status?: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
+
+  /** Soft delete: when true, row stays in Firestore but is hidden from list/query semantics. */
+  isDeleted?: boolean;
 }
 
 /** Returns explicit status for a feedback item. Use instead of !isResolved. */

@@ -146,7 +146,6 @@ export default function InsightsPage() {
     const unsubscribe = onSnapshot(
       ref,
       (snap) => {
-        console.log("Insights snapshot update");
         if (!snap.exists()) {
           setData(mapDocToApi(emptyWorkspaceInsightsDoc()));
           setLoading(false);
@@ -156,7 +155,7 @@ export default function InsightsPage() {
         setLoading(false);
       },
       (err) => {
-        console.error("[insights] onSnapshot error:", err);
+        console.error("[ECHLY] insights onSnapshot failed", err);
         setError("Failed to load insights.");
         setLoading(false);
       }
@@ -264,7 +263,7 @@ export default function InsightsPage() {
           return next;
         });
       } catch (err) {
-        console.error("[insights] sessions fetch error:", err);
+        console.error("[ECHLY] insights sessions fetch failed", err);
       }
     })();
     return () => {

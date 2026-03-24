@@ -23,6 +23,7 @@ import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
 import { invalidateCounts } from "@/lib/server/cache/feedbackCountsCache";
+import { invalidateFeedbackCache } from "@/lib/server/cache/feedbackCache";
 import {
   emptyWorkspaceInsightsDoc,
   workspaceInsightsRef,
@@ -57,6 +58,7 @@ const feedbackPayload = (
 
   screenshotUrl: data.screenshotUrl ?? null,
   screenshotStatus: data.screenshotStatus ?? null,
+  isDeleted: false,
 });
 
 /**
@@ -359,7 +361,12 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
     lastCommentPreview: typeof data.lastCommentPreview === "string" ? data.lastCommentPreview : undefined,
     lastCommentAt: (data.lastCommentAt ?? null) as Timestamp | null,
+    isDeleted: data.isDeleted ?? false,
   };
+}
+
+function omitSoftDeletedFeedback(items: Feedback[]): Feedback[] {
+  return items.filter((f) => f.isDeleted !== true);
 }
 
 /**
@@ -397,12 +404,14 @@ export async function getSessionFeedbackPageRepo(
     limit(pageSize + 1)
   );
   const snapshot = await getDocs(q);
-  const docs = snapshot.docs.map(docToFeedback);
+  const docs = omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
   const hasMore = docs.length > pageSize;
   const feedback = hasMore ? docs.slice(0, pageSize) : docs;
   const lastVisibleDoc =
-    hasMore && snapshot.docs.length > 0
-      ? (snapshot.docs[snapshot.docs.length - 1] as FeedbackPageCursor)
+    hasMore && feedback.length > 0
+      ? (snapshot.docs.find((d) => d.id === feedback[feedback.length - 1].id) as
+          | FeedbackPageCursor
+          | undefined) ?? null
       : null;
 
   return { feedback, lastVisibleDoc, hasMore };
@@ -459,28 +468,72 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
 ): Promise<{ feedback: Feedback[]; nextCursor: string | null; hasMore: boolean }> {
   const { workspaceId, sessionId, userId, limit: pageSize, cursor } = args;
   assertQueryLimit(pageSize, "getSessionFeedbackPageForUserWithStringCursorRepo");
+  void userId;
   const trimmed = cursor?.trim();
   const cursorSnap: DocumentSnapshot | null =
     trimmed && trimmed.length > 0 ? await getDoc(doc(db, "feedback", trimmed)) : null;
 
-  // Required query shape:
-  // where("workspaceId", "==", workspaceId)
-  // where("sessionId", "==", sessionId)
-  // orderBy("createdAt", "desc")
-  // limit(limit)
-  // startAfter(cursor) (if present)
-  const q = query(
-    collection(db, "feedback"),
-    where("workspaceId", "==", workspaceId),
-    where("sessionId", "==", sessionId),
-    orderBy("createdAt", "desc"),
-    limit(pageSize),
-    ...(cursorSnap && cursorSnap.exists() ? [startAfter(cursorSnap)] : [])
-  );
+  // Same ordering as before: workspaceId + sessionId + createdAt desc.
+  // Exclude soft-deleted rows by skipping `isDeleted === true`. We do not use
+  // Firestore `where("isDeleted","!=",true)` here because it drops legacy docs
+  // that omit the field; semantic is identical once all rows have `isDeleted`.
+  let startAfterDoc: QueryDocumentSnapshot | null =
+    cursorSnap && cursorSnap.exists() ? (cursorSnap as QueryDocumentSnapshot) : null;
+  const collected: QueryDocumentSnapshot[] = [];
+  let hasMore = false;
 
-  let snapshot;
+  const runQuery = () =>
+    query(
+      collection(db, "feedback"),
+      where("workspaceId", "==", workspaceId),
+      where("sessionId", "==", sessionId),
+      orderBy("createdAt", "desc"),
+      limit(pageSize),
+      ...(startAfterDoc ? [startAfter(startAfterDoc)] : [])
+    );
+
   try {
-    snapshot = await getDocs(q);
+    while (collected.length < pageSize) {
+      let snapshot;
+      try {
+        snapshot = await getDocs(runQuery());
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.toLowerCase().includes("requires an index")) {
+          console.warn(
+            "[FIRESTORE] Missing composite index: feedback(workspaceId ASC, sessionId ASC, createdAt DESC)",
+            { workspaceId, sessionId }
+          );
+        }
+        throw err;
+      }
+
+      if (snapshot.empty) {
+        hasMore = false;
+        break;
+      }
+
+      let filledPage = false;
+      for (let i = 0; i < snapshot.docs.length; i++) {
+        const d = snapshot.docs[i] as QueryDocumentSnapshot;
+        if (d.data().isDeleted === true) continue;
+        collected.push(d);
+        if (collected.length >= pageSize) {
+          const moreInBatch = i < snapshot.docs.length - 1;
+          hasMore = moreInBatch || snapshot.size === pageSize;
+          filledPage = true;
+          break;
+        }
+      }
+
+      if (filledPage) break;
+
+      startAfterDoc = snapshot.docs[snapshot.docs.length - 1] as QueryDocumentSnapshot;
+      if (snapshot.size < pageSize) {
+        hasMore = false;
+        break;
+      }
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.toLowerCase().includes("requires an index")) {
@@ -492,9 +545,9 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
     throw err;
   }
 
-  const feedback = snapshot.docs.map(docToFeedback);
-  const lastVisibleDoc = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
-  const hasMore = snapshot.size === pageSize;
+  const pageDocs = collected.slice(0, pageSize);
+  const feedback = pageDocs.map((d) => docToFeedback(d));
+  const lastVisibleDoc = pageDocs.length > 0 ? pageDocs[pageDocs.length - 1] : null;
 
   return {
     feedback,
@@ -512,18 +565,7 @@ export async function getSessionFeedbackCountRepo(sessionId: string): Promise<nu
 }
 
 export async function deleteFeedbackRepo(feedbackId: string): Promise<void> {
-  let sessionIdForInvalidation: string | null = null;
-  const feedbackSnap = await getDoc(doc(db, "feedback", feedbackId));
-  if (feedbackSnap.exists()) {
-    const sessionId = feedbackSnap.data().sessionId;
-    if (typeof sessionId === "string" && sessionId.trim() !== "") {
-      sessionIdForInvalidation = sessionId;
-    }
-  }
-  await deleteDoc(doc(db, "feedback", feedbackId));
-  if (sessionIdForInvalidation) {
-    invalidateCounts(sessionIdForInvalidation);
-  }
+  await deleteFeedbackWithSessionCountersRepo(feedbackId);
 }
 
 /**
@@ -539,6 +581,7 @@ export async function deleteFeedbackWithSessionCountersRepo(
     const feedbackSnap = await tx.get(feedbackRef);
     if (!feedbackSnap.exists()) return null;
     const data = feedbackSnap.data();
+    if (data.isDeleted === true) return null;
     const sessionId = data.sessionId as string;
     const workspaceId = data.workspaceId as string | undefined;
     const status = (data.status as string) ?? "open";
@@ -558,7 +601,10 @@ export async function deleteFeedbackWithSessionCountersRepo(
     const totalCountUpdate = currentTotalCount <= 0 ? 0 : increment(-1);
     const feedbackCount = Math.max(0, ((s.feedbackCount as number) ?? 0) - 1);
 
-    tx.delete(feedbackRef);
+    tx.update(feedbackRef, {
+      isDeleted: true,
+      deletedAt: serverTimestamp(),
+    });
     tx.update(sessionRef, {
       openCount,
       resolvedCount,
@@ -573,10 +619,13 @@ export async function deleteFeedbackWithSessionCountersRepo(
         "stats.updatedAt": serverTimestamp(),
       });
     }
-    return { sessionId };
+    return { sessionId, workspaceId };
   });
   if (result?.sessionId) {
     invalidateCounts(result.sessionId);
+    if (typeof result.workspaceId === "string" && result.workspaceId.trim() !== "") {
+      invalidateFeedbackCache(result.workspaceId, result.sessionId);
+    }
   }
 }
 
@@ -645,7 +694,7 @@ export async function getSessionFeedbackByResolvedRepo(
     limit(max)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(docToFeedback);
+  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
 }
 
 const OVERVIEW_FEEDBACK_BY_IDS_LIMIT = 10;
@@ -656,6 +705,7 @@ export async function getFeedbackByIdRepo(
 ): Promise<Feedback | null> {
   const snap = await getDoc(doc(db, "feedback", feedbackId));
   if (!snap.exists()) return null;
+  if (snap.data().isDeleted === true) return null;
   return docToFeedback(snap as QueryDocumentSnapshot);
 }
 
@@ -678,7 +728,7 @@ export async function getUserFeedbackAllRepo(
     limit(max)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(docToFeedback);
+  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
 }
 
 /**
@@ -698,7 +748,7 @@ export async function getWorkspaceFeedbackAllRepo(
     limit(max)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(docToFeedback);
+  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
 }
 
 /** Limit for insights feedback query. NEVER increase. */
@@ -725,7 +775,7 @@ export async function getWorkspaceFeedbackForInsightsRepo(
       );
 
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(docToFeedback);
+  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
 }
 
 /**
@@ -764,7 +814,7 @@ export async function getUserFeedbackWithCommentsRepo(
     limit(max)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(docToFeedback);
+  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
 }
 
 /**
@@ -796,7 +846,7 @@ export async function getWorkspaceFeedbackWithCommentsRepo(
     limit(pageSize)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(docToFeedback);
+  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
 }
 
 /** Fetches feedback docs by IDs (e.g. for activity titles). Limited for cost safety. */
@@ -810,7 +860,9 @@ export async function getFeedbackByIdsRepo(
   const snaps = await Promise.all(
     limited.map((id) => getDoc(doc(db, "feedback", id)))
   );
-  return snaps
-    .filter((s) => s.exists())
-    .map((s) => docToFeedback(s as QueryDocumentSnapshot));
+  return omitSoftDeletedFeedback(
+    snaps
+      .filter((s) => s.exists())
+      .map((s) => docToFeedback(s as QueryDocumentSnapshot))
+  );
 }

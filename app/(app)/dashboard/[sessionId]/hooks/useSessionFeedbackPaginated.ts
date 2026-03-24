@@ -31,11 +31,6 @@ const ZERO_COUNTS: Counts = {
 export interface UseSessionFeedbackPaginatedResult {
   feedback: Feedback[];
   setFeedback: React.Dispatch<React.SetStateAction<Feedback[]>>;
-  /**
-   * Replaces the list with the first API page only (full replace, not append).
-   * Does not run from realtime; call explicitly when you need a hard reset of page 1.
-   */
-  refetchFirstPage: () => Promise<void>;
   /** Total count from server (first page); stable, not derived from loaded items. */
   total: number;
   /** Active (open) count from server (first page only); do not derive from items. */
@@ -103,7 +98,7 @@ export function useSessionFeedbackPaginated(
           realtimeItems.length > 0 &&
           apiItems.length > 0
         ) {
-          console.warn("[GUARDRAIL] Multiple sources present (expected during hydration)");
+          console.warn("[ECHLY] GUARDRAIL multiple sources present (expected during hydration)");
         }
       }
 
@@ -112,7 +107,7 @@ export function useSessionFeedbackPaginated(
         // the realtime effect (which depends on guardMultipleSources) re-runs while
         // docChanges is still set and retriggers setCanonicalFeedback → infinite loop.
         if (!Array.isArray(itemsRef.current)) {
-          console.error("[GUARDRAIL] Canonical items list missing — CRITICAL");
+          console.error("[ECHLY] GUARDRAIL canonical items list missing — CRITICAL");
         }
       }
     },
@@ -224,6 +219,7 @@ export function useSessionFeedbackPaginated(
       const byId = new Map<string, Feedback>(itemsRef.current.map((item) => [item.id, item]));
       let appended = 0;
       for (const item of incoming) {
+        if (item.isDeleted === true) continue;
         if (byId.has(item.id)) continue;
         byId.set(item.id, item);
         appended += 1;
@@ -235,40 +231,6 @@ export function useSessionFeedbackPaginated(
       return appended;
     },
     [sortByCreatedAtDesc]
-  );
-
-  const refetchFirstPage = useCallback(
-    async (internal?: { bypassConcurrentGuard?: boolean }) => {
-      const sid = sessionIdRef.current;
-      if (!sid) return;
-      if (!internal?.bypassConcurrentGuard && isFetchingRef.current) return;
-      isFetchingRef.current = true;
-      try {
-        const url = `/api/feedback?sessionId=${encodeURIComponent(sid)}&cursor=&limit=${PAGE_SIZE}`;
-        const res = await cachedFetch(url, () => authFetch(url));
-        const data = (await res.json()) as {
-          feedback?: Feedback[];
-          nextCursor?: string | null;
-          hasMore?: boolean;
-        };
-        if (sessionIdRef.current !== sid) return;
-        const incoming = data.feedback ?? [];
-        const pageCursor =
-          data.nextCursor ?? (incoming.length > 0 ? incoming[incoming.length - 1]?.id ?? null : null);
-        setCursor(pageCursor);
-        const totalFromCounts = getCounts(sid)?.total ?? 0;
-        const newLen = incoming.length;
-        setHasMore(totalFromCounts > 0 ? newLen < totalFromCounts : data.hasMore ?? false);
-        setCanonicalFeedback(incoming);
-      } catch (err) {
-        console.error("[ECHLY] refetchFirstPage failed", err);
-        setHasMore(false);
-        setCursor(null);
-      } finally {
-        isFetchingRef.current = false;
-      }
-    },
-    [setCanonicalFeedback]
   );
 
   const hasReachedLimit = items.length >= FEEDBACK_LOAD_CAP;
@@ -550,12 +512,6 @@ export function useSessionFeedbackPaginated(
         });
     }, 500);
 
-    if (changes.some((c) => c.type === "removed")) {
-      // Ignore window eviction from Firestore limit — do not refetch page 1 or the
-      // list wipes; apply loop below skips "removed" for the canonical list.
-      console.log("[ECHLY] realtime removal detected");
-    }
-
     for (const change of changes) {
       if (change.type === "added") {
         if (!itemsRef.current.some((x) => x.id === change.feedback.id)) {
@@ -566,7 +522,10 @@ export function useSessionFeedbackPaginated(
 
     try {
       setCanonicalFeedback((current) => {
-        let next = [...current];
+        const removedIds = new Set(
+          changes.filter((c) => c.type === "removed").map((c) => c.id)
+        );
+        const next = current.filter((item) => !removedIds.has(item.id));
         for (const change of changes) {
           if (change.type === "removed") continue;
           if (change.type === "modified") {
@@ -602,7 +561,6 @@ export function useSessionFeedbackPaginated(
     skippedCount,
     countsLoading,
     setFeedback: setCanonicalFeedback,
-    refetchFirstPage,
     loading: initialLoading,
     hasMore,
     hasReachedLimit,

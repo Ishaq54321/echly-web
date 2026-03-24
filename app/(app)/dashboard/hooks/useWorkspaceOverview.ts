@@ -13,11 +13,6 @@ import {
 } from "@/lib/state/sessionCountsStore";
 import { fetchCountsDedup } from "@/lib/state/fetchCountsDedup";
 
-export interface PlanLimitReachedPayload {
-  message: string;
-  upgradePlan: string | null;
-}
-
 const SESSIONS_CACHE_KEY = "echly_sessions";
 const SESSION_COUNT_CACHE_KEY = "sessionCount";
 const FOLDER_COUNT_CACHE_KEY = "folderCount";
@@ -173,7 +168,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       setCountsBySessionId(freshCounts);
       writeCachedSessions(freshSessions);
     } catch (error) {
-      console.error("Failed to refresh sessions:", error);
+      console.error("[ECHLY] Failed to refresh sessions", error);
     } finally {
       setLoading(false);
     }
@@ -189,7 +184,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       const data = await res.json();
       setFolders(data.folders || []);
     } catch (error) {
-      console.error("Failed to load folders:", error);
+      console.error("[ECHLY] Failed to load folders", error);
       setFolders([]);
     } finally {
       setFoldersLoading(false);
@@ -240,7 +235,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
         setCountsBySessionId(freshCounts);
         writeCachedSessions(freshSessions);
       } catch (error) {
-        console.error("Failed to load sessions:", error);
+        console.error("[ECHLY] Failed to load sessions", error);
         if (!hasCachedSessions) {
           setAllSessions([]);
           setCountsBySessionId({});
@@ -287,7 +282,9 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
   }));
 
   const handleCreateSession = useCallback(
-    async (onPlanLimitReached?: (payload: PlanLimitReachedPayload) => void) => {
+    async (
+      onPlanLimitReached?: (payload: { message: string; upgradePlan: string | null }) => void
+    ) => {
       if (!user) return;
       // Optimistic insert: temp session shows up instantly in the UI.
       const tempSessionId = `temp-${Date.now()}`;
@@ -306,7 +303,10 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
 
       try {
         const res = await authFetch("/api/sessions", { method: "POST" });
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch((err) => {
+          console.error("[ECHLY] JSON parse failed", err);
+          return {};
+        });
 
         if (res.status === 403) {
           setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
@@ -347,7 +347,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
             delete next[tempSessionId];
             return next;
           });
-          console.error("Create session failed:", res.status, data);
+          console.error("[ECHLY] Create session failed", res.status, data);
           return;
         }
 
@@ -398,7 +398,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
           delete next[tempSessionId];
           return next;
         });
-        console.error("Create session failed:", err);
+        console.error("[ECHLY] Create session failed", err);
       }
     },
     [user, router]
@@ -431,7 +431,10 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       try {
         const res = await authFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
+          const data = await res.json().catch((err) => {
+            console.error("[ECHLY] JSON parse failed", err);
+            return {};
+          });
           throw new Error((data && data.error) || "Failed to delete session");
         }
       } catch (err) {
@@ -441,7 +444,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
           ...prev,
           [sessionId]: prev[sessionId] ?? { total: 0, open: 0, resolved: 0, skipped: 0 },
         }));
-        console.error("Delete session failed:", err);
+        console.error("[ECHLY] Delete session failed", err);
         throw err;
       }
     },

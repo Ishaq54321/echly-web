@@ -70,7 +70,9 @@ export function useFeedbackDetailController(args: {
       userAvatar: user.photoURL || "",
       message: trimmed,
     };
-    addComment(workspaceId, sessionId, feedbackId, payload).catch(console.error);
+    addComment(workspaceId, sessionId, feedbackId, payload).catch((err) =>
+      console.error("[ECHLY] addComment failed", err)
+    );
   };
 
   const sendReply = async (threadId: string, message: string): Promise<void> => {
@@ -84,7 +86,7 @@ export function useFeedbackDetailController(args: {
       userAvatar: user.photoURL || "",
       message: trimmed,
       threadId,
-    }).catch(console.error);
+    }).catch((err) => console.error("[ECHLY] addComment reply failed", err));
   };
 
   const sendPinComment = async (
@@ -105,8 +107,8 @@ export function useFeedbackDetailController(args: {
         position,
       });
       return id;
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error("[ECHLY] sendPinComment failed", err);
       return null;
     }
   };
@@ -129,8 +131,8 @@ export function useFeedbackDetailController(args: {
         textRange,
       });
       return id;
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error("[ECHLY] sendTextComment failed", err);
       return null;
     }
   };
