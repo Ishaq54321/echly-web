@@ -177,10 +177,10 @@ export function FeedbackHeader({
               type="button"
               onClick={onRequestDelete}
               className="flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] rounded-xl cursor-pointer"
-              aria-label="Delete permanently"
+              aria-label="Delete"
             >
               <Trash2 size={14} />
-              Delete permanently
+              Delete
             </button>
           )}
           <button

@@ -174,8 +174,8 @@ Persistence:
 
 ## D) Browser persisted app state
 
-- `sessionStorage`: session/folder list cache, execution scroll memory
-- `localStorage`: pinned session IDs, session/folder count caches, viewer ID
+- `sessionStorage`: session list cache, execution scroll memory
+- `localStorage`: pinned session IDs, session count caches, viewer ID
 
 Mutation:
 - Hook mount/read-before-fetch, post-fetch writes, UI pin/scroll actions
@@ -285,7 +285,7 @@ Persistence:
 - Extension lifecycle/session flags in `chrome.storage.local`
 - Extension per-feedback completion flags in `chrome.storage.session`
 - Widget theme, viewer id, pinned IDs, count hints in `localStorage`
-- Session/folder lists and scroll positions in `sessionStorage`
+- Session lists and scroll positions in `sessionStorage`
 - Multiple in-memory caches (client and server) for counts, requests, billing, feedback pages, workspace docs
 
 ## Write timing

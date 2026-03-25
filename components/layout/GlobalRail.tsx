@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRef, useEffect, useState } from "react";
 import {
   Home,
-  Folder,
+  Layers,
   MessageSquare,
   BarChart3,
   Settings,
@@ -24,7 +24,7 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
 const NAV_ITEMS = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
   { href: "/discussion", icon: MessageSquare, label: "Discussion" },
-  { href: "/dashboard/sessions", icon: Folder, label: "Sessions" },
+  { href: "/dashboard/sessions", icon: Layers, label: "Sessions" },
   { href: "/dashboard/insights", icon: BarChart3, label: "Insights" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ] as const;

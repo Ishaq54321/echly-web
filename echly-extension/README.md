@@ -27,7 +27,7 @@ Capture screenshots and submit feedback to the Echly backend with Firebase Auth.
    ```
 
 4. **Load in Chrome**  
-   `chrome://extensions` → Load unpacked → select the `echly-extension` folder.
+   `chrome://extensions` → Load unpacked → select the `echly-extension` directory.
 
 ## Production
 

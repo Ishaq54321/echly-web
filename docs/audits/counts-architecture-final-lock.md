@@ -65,7 +65,6 @@ Observed flow: **`getCounts` → `fetchCountsDedup` → `setCounts`** (and `subs
 
 - `app/(app)/dashboard/hooks/useWorkspaceOverview.ts` (`loadSessionsAndCounts`)
 - `app/(app)/dashboard/sessions/page.tsx`
-- `app/(app)/folders/[folderId]/page.tsx`
 - `app/(app)/dashboard/[sessionId]/hooks/useSessionFeedbackPaginated.ts`
 - `app/(app)/dashboard/[sessionId]/overview/hooks/useSessionOverview.ts`
 

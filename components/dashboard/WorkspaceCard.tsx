@@ -9,15 +9,13 @@ import {
   MoreHorizontal,
   Pencil,
   Archive,
+  RotateCcw,
   Trash2,
   Eye,
   MessageCircle,
   FileText,
-  FolderPlus,
-  ArrowLeft,
   Loader2,
 } from "lucide-react";
-import { useDragSession } from "./context/DragSessionContext";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import type { Session } from "@/lib/domain/session";
 import { formatDistanceToNowStrict } from "date-fns/formatDistanceToNowStrict";
@@ -33,15 +31,8 @@ export interface WorkspaceCardProps {
   onView: (sessionId: string) => void;
   index: number;
   onRenameSuccess?: (session: { id: string; title: string; updatedAt?: unknown }) => void;
-  onArchiveSuccess?: (sessionId: string) => void;
+  onSetArchived?: (sessionId: string, archived: boolean) => Promise<void> | void;
   onRequestDelete?: (session: Session) => void;
-  /** If true, this session is in a folder (root sessions only can be dragged) */
-  isRootSession?: boolean;
-  /** Open move-to-folder modal for this session (dashboard only) */
-  onOpenMoveToFolder?: (sessionId: string) => void;
-  /** When set, show "Remove from folder" and call onRemoveFromFolder (folder page only) */
-  folderId?: string;
-  onRemoveFromFolder?: (sessionId: string) => void;
 }
 
 const COPIED_TOOLTIP_MS = 2000;
@@ -51,16 +42,12 @@ export function WorkspaceCard({
   onView,
   index,
   onRenameSuccess,
-  onArchiveSuccess,
+  onSetArchived,
   onRequestDelete,
-  isRootSession = true,
-  onOpenMoveToFolder,
-  folderId,
-  onRemoveFromFolder,
 }: WorkspaceCardProps) {
-  const { setDraggedSessionId } = useDragSession();
   const { session, counts } = item;
   const isOptimistic = Boolean(session.isOptimistic);
+  const isArchived = (session.isArchived ?? session.archived) === true;
   const updatedAt = typeof session.updatedAt === "string" ? session.updatedAt : null;
   const updatedAtDate = updatedAt ? new Date(updatedAt) : null;
   const updatedAtLabel =
@@ -189,19 +176,6 @@ export function WorkspaceCard({
     }
   };
 
-  const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", session.id);
-    setDraggedSessionId(session.id);
-    const img = new Image();
-    img.src = "data:image/gif;base64,R0lGOODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-    e.dataTransfer.setDragImage(img, 0, 0);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedSessionId(null);
-  };
-
   const handleCopyLink = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -233,20 +207,15 @@ export function WorkspaceCard({
     closeMenu();
   };
 
-  const handleArchiveClick = async (e: React.MouseEvent) => {
+  const handleArchiveToggleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (isOptimistic || isOpening) return;
     closeMenu();
-    if (archiving || !onArchiveSuccess) return;
+    if (archiving || !onSetArchived) return;
     setArchiving(true);
     try {
-      const res = await authFetch(`/api/sessions/${session.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archived: true }),
-      });
-      if (res.ok) onArchiveSuccess(session.id);
+      await onSetArchived(session.id, !isArchived);
     } finally {
       setArchiving(false);
     }
@@ -281,9 +250,6 @@ export function WorkspaceCard({
       <div
         role="button"
         tabIndex={0}
-        draggable={isRootSession}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
         onClick={handleCardClick}
         onKeyDown={handleCardKeyDown}
         className="
@@ -406,38 +372,6 @@ export function WorkspaceCard({
                 <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 Copy link
               </button>
-              {onOpenMoveToFolder && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onOpenMoveToFolder(session.id);
-                    closeMenu();
-                  }}
-                  className={menuItemClass}
-                  role="menuitem"
-                >
-                  <FolderPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Move to folder
-                </button>
-              )}
-              {folderId && onRemoveFromFolder && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onRemoveFromFolder(session.id);
-                    closeMenu();
-                  }}
-                  className={menuItemClass}
-                  role="menuitem"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Remove from folder
-                </button>
-              )}
               <button
                 type="button"
                 onClick={handleShare}
@@ -458,13 +392,21 @@ export function WorkspaceCard({
               </button>
               <button
                 type="button"
-                onClick={handleArchiveClick}
+                onClick={handleArchiveToggleClick}
                 disabled={archiving}
-                className={`${menuItemClass} disabled:opacity-60`}
+                className={[
+                  menuItemClass,
+                  "disabled:opacity-60",
+                  isArchived ? "group text-gray-900 hover:bg-gray-100 hover:text-gray-900" : "",
+                ].join(" ")}
                 role="menuitem"
               >
-                <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                {archiving ? "Archiving…" : "Archive"}
+                {isArchived ? (
+                  <RotateCcw className="h-3.5 w-3.5 shrink-0 text-gray-700 group-hover:text-gray-900" aria-hidden />
+                ) : (
+                  <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                )}
+                {archiving ? (isArchived ? "Unarchiving…" : "Archiving…") : isArchived ? "Unarchive" : "Archive"}
               </button>
               <div className="my-1 border-t border-[var(--glass-1-border)]" role="separator" aria-hidden />
               <button
@@ -474,7 +416,7 @@ export function WorkspaceCard({
                 role="menuitem"
               >
                 <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                Delete permanently
+                Delete
               </button>
             </div>,
             document.body

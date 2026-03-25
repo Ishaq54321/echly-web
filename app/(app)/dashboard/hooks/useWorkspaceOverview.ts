@@ -6,6 +6,8 @@ import { auth } from "@/lib/firebase";
 import { clearAuthTokenCache, authFetch } from "@/lib/authFetch";
 import { onAuthStateChanged } from "firebase/auth";
 import { sessionsArrayFromApiPayload, type Session } from "@/lib/domain/session";
+import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import {
   getCounts,
@@ -15,10 +17,10 @@ import { fetchCountsDedup } from "@/lib/state/fetchCountsDedup";
 
 const SESSIONS_CACHE_KEY = "echly_sessions";
 const SESSION_COUNT_CACHE_KEY = "sessionCount";
-const FOLDER_COUNT_CACHE_KEY = "folderCount";
 
 function filterSessionsByView(sessions: Session[], archivedOnly: boolean): Session[] {
-  return archivedOnly ? sessions.filter((s) => s.archived) : sessions;
+  if (!archivedOnly) return sessions;
+  return sessions.filter((s) => (s.isArchived ?? s.archived) === true);
 }
 
 function readCachedSessions(): Session[] | null {
@@ -58,18 +60,6 @@ function writeCachedSessionCount(count: number) {
     localStorage.setItem(SESSION_COUNT_CACHE_KEY, String(count));
   } catch {
     // Ignore storage write errors.
-  }
-}
-
-function readCachedFolderCount(): number | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(FOLDER_COUNT_CACHE_KEY);
-    if (!raw) return null;
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  } catch {
-    return null;
   }
 }
 
@@ -128,27 +118,17 @@ export interface SessionWithCounts {
   counts: SessionFeedbackCounts;
 }
 
-export interface DashboardFolder {
-  id: string;
-  name: string;
-  sessions?: string[];
-  sessionCount?: number;
-}
-
 export type ViewMode = "all" | "archived";
 
 export function useWorkspaceOverview(viewMode: ViewMode = "all") {
   const router = useRouter();
   const [user, setUser] = useState<{ uid: string } | null>(null);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
-  const [folders, setFolders] = useState<DashboardFolder[]>([]);
   const [countsBySessionId, setCountsBySessionId] = useState<
     Record<string, SessionFeedbackCounts>
   >({});
   const [loading, setLoading] = useState(true);
-  const [foldersLoading, setFoldersLoading] = useState(true);
   const expectedCountRef = useRef<number | null>(readCachedSessionCount());
-  const expectedFolderCountRef = useRef<number | null>(readCachedFolderCount());
   const userId = user?.uid;
 
   const archivedOnly = viewMode === "archived";
@@ -171,23 +151,6 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       console.error("[ECHLY] Failed to refresh sessions", error);
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const loadFolders = useCallback(async () => {
-    try {
-      setFoldersLoading(true);
-      const res = await authFetch("/api/folders");
-      if (!res.ok) {
-        throw new Error(`Failed to fetch folders: ${res.status}`);
-      }
-      const data = await res.json();
-      setFolders(data.folders || []);
-    } catch (error) {
-      console.error("[ECHLY] Failed to load folders", error);
-      setFolders([]);
-    } finally {
-      setFoldersLoading(false);
     }
   }, []);
 
@@ -224,7 +187,6 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
 
     (async () => {
       try {
-        await loadFolders();
         const { sessions: freshSessions, countsBySessionId: freshCounts } =
           await loadSessionsAndCounts();
         if (freshSessions.length > 0) {
@@ -244,30 +206,50 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
         setLoading(false);
       }
     })();
-  }, [userId, loadFolders]);
+  }, [userId]);
 
+  // Realtime sessions sync (Firestore). Keeps UI state correct without refresh.
   useEffect(() => {
-    if (foldersLoading) return;
-    if (folders.length > 0) {
-      expectedFolderCountRef.current = folders.length;
-      try {
-        if (typeof window !== "undefined") {
-          localStorage.setItem(FOLDER_COUNT_CACHE_KEY, String(folders.length));
-        }
-      } catch {
-        // Ignore storage write errors.
+    if (!userId) return;
+
+    const q = query(
+      collection(db, "sessions"),
+      where("userId", "==", userId),
+      orderBy("updatedAt", "desc"),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        const dbSessions: Session[] = snap.docs.map((docSnap) => {
+          const data = docSnap.data() as Partial<Session> & { archived?: boolean; isArchived?: boolean };
+          const archived = (data.isArchived ?? data.archived) === true;
+          const title = typeof data.title === "string" ? data.title : "Untitled Session";
+          return {
+            id: docSnap.id,
+            ...data,
+            title,
+            archived,
+            isArchived: archived,
+          };
+        });
+
+        const dbIds = new Set(dbSessions.map((s) => s.id));
+        setAllSessions((prev) => {
+          const optimistic = prev.filter((s) => Boolean(s.isOptimistic) && !dbIds.has(s.id));
+          const next = [...optimistic, ...dbSessions];
+          writeCachedSessions(next);
+          return next;
+        });
+      },
+      (err) => {
+        console.error("[ECHLY] Firestore sessions subscription failed", err);
       }
-    } else {
-      expectedFolderCountRef.current = null;
-      try {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem(FOLDER_COUNT_CACHE_KEY);
-        }
-      } catch {
-        // Ignore storage write errors.
-      }
-    }
-  }, [folders, foldersLoading]);
+    );
+
+    return () => unsubscribe();
+  }, [userId]);
 
   const sessions = filterSessionsByView(allSessions, archivedOnly);
 
@@ -303,7 +285,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
 
       try {
         const res = await authFetch("/api/sessions", { method: "POST" });
-        const data = await res.json().catch((err) => {
+        const data = await res.json().catch((err: unknown) => {
           console.error("[ECHLY] JSON parse failed", err);
           return {};
         });
@@ -410,6 +392,50 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
     );
   }, []);
 
+  const setSessionArchived = useCallback(async (sessionId: string, archived: boolean) => {
+    if (!sessionId) return;
+
+    let hasRollback = false;
+    let rollbackArchived = false;
+    setAllSessions((prev) => {
+      const current = prev.find((s) => s.id === sessionId) ?? null;
+      if (current) {
+        hasRollback = true;
+        rollbackArchived = (current.isArchived ?? current.archived) === true;
+      }
+      const next = prev.map((s) =>
+        s.id === sessionId ? { ...s, archived, isArchived: archived } : s
+      );
+      writeCachedSessions(next);
+      return next;
+    });
+
+    try {
+      const res = await authFetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived, isArchived: archived }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data && typeof data.error === "string" && data.error) || `Archive update failed: ${res.status}`);
+      }
+    } catch (err) {
+      // Rollback optimistic patch on failure.
+      if (hasRollback) {
+        setAllSessions((prev) => {
+          const next = prev.map((s) =>
+            s.id === sessionId ? { ...s, archived: rollbackArchived, isArchived: rollbackArchived } : s
+          );
+          writeCachedSessions(next);
+          return next;
+        });
+      }
+      console.error("[ECHLY] setSessionArchived failed", err);
+      throw err;
+    }
+  }, []);
+
   const removeSession = useCallback((sessionId: string) => {
     setAllSessions((prev) => prev.filter((s) => s.id !== sessionId));
     setCountsBySessionId((prev) => {
@@ -431,7 +457,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       try {
         const res = await authFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
         if (!res.ok) {
-          const data = await res.json().catch((err) => {
+          const data = await res.json().catch((err: unknown) => {
             console.error("[ECHLY] JSON parse failed", err);
             return {};
           });
@@ -454,15 +480,12 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
   return {
     user,
     sessions: sessionsWithCounts,
-    folders,
     loading,
-    foldersLoading,
     expectedSessionCount: expectedCountRef.current,
-    expectedFolderCount: expectedFolderCountRef.current,
     handleCreateSession,
     refreshSessions,
-    refreshFolders: loadFolders,
     updateSession,
+    setSessionArchived,
     removeSession,
     deleteSession,
   };

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 export type ModalProps = {
   open: boolean;
@@ -34,20 +35,19 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div
-      className="echly-modal-overlay"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      role={role}
-      aria-modal="true"
-      aria-labelledby={ariaLabelledBy}
-      data-echly-ui="true"
-    >
+    <ModalPortal>
       <div
-        className="echly-modal-panel"
-        onClick={(e) => e.stopPropagation()}
+        className="echly-modal-overlay"
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+        role={role}
+        aria-modal="true"
+        aria-labelledby={ariaLabelledBy}
+        data-echly-ui="true"
       >
-        {children}
+        <div className="echly-modal-panel" onClick={(e) => e.stopPropagation()}>
+          {children}
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Modal } from "@/components/ui/Modal";
 
 export interface DeleteSessionModalProps {
   open: boolean;
@@ -34,16 +35,9 @@ export function DeleteSessionModal({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="delete-session-title"
-    >
+    <Modal open={open} onClose={onClose} ariaLabelledBy="delete-session-title" role="alertdialog">
       <div
         className="card-depth bg-[var(--layer-1-bg)] rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] max-w-md w-full p-6 cursor-default"
-        onClick={(e) => e.stopPropagation()}
       >
         <h2
           id="delete-session-title"
@@ -79,10 +73,10 @@ export function DeleteSessionModal({
             disabled={deleting}
             className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(185,28,28,0.25)] hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {deleting ? "Deleting…" : "Delete permanently"}
+            {deleting ? "Deleting…" : "Delete"}
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

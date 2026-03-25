@@ -4,20 +4,19 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { createPortal } from "react-dom";
 import {
   Archive,
-  ArrowLeft,
   Calendar,
   CircleDashed,
-  FolderPlus,
   Link,
   Link2,
   Loader2,
   MoreHorizontal,
   Pencil,
+  RotateCcw,
   Trash2,
   UserPlus,
-  CheckCircle,
   Check,
   XCircle,
+  X,
 } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
@@ -29,6 +28,7 @@ import { ShareSessionModal } from "@/components/dashboard/ShareSessionModal";
 import { RenameSessionModal } from "@/components/dashboard/RenameSessionModal";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { SessionsViewModeToggle } from "@/components/dashboard/SessionsViewModeToggle";
+import { Modal } from "@/components/ui/Modal";
 
 const DROPDOWN_Z_INDEX = 1000;
 
@@ -41,13 +41,14 @@ export interface SessionWorkspaceSection {
 
 export interface SessionsWorkspaceProps {
   sections?: SessionWorkspaceSection[];
+  /** Controls whether bulk bar shows Archive vs Unarchive. */
+  activeTab?: "sessions" | "archived";
   onView: (sessionId: string) => void;
   onRenameSuccess?: (session: { id: string; title: string; updatedAt?: unknown }) => void;
-  onArchiveSuccess?: (sessionId: string) => void;
+  onSetArchived?: (sessionId: string, archived: boolean) => Promise<void> | void;
   onRequestDelete?: (session: Session) => void;
-  onOpenMoveToFolder?: (sessionId: string) => void;
-  folderId?: string;
-  onRemoveFromFolder?: (sessionId: string) => void;
+  /** Direct delete API (used for bulk delete). */
+  onDeleteSession?: (session: Session) => Promise<void>;
   /** When set with onViewModeChange, view toggle is controlled by the parent (e.g. dashboard header). */
   viewMode?: "list" | "grid";
   onViewModeChange?: (mode: "list" | "grid") => void;
@@ -104,51 +105,24 @@ function SessionWorkspaceRow({
   rowIndex,
   onView,
   onRenameSuccess,
-  onArchiveSuccess,
+  onSetArchived,
   onRequestDelete,
-  onOpenMoveToFolder,
-  folderId,
-  onRemoveFromFolder,
+  isSelectionMode,
+  isSelected,
+  onToggleSelected,
   isLoading,
 }: {
   item?: SessionWithCounts;
   rowIndex: number;
   onView?: (sessionId: string) => void;
   onRenameSuccess?: SessionsWorkspaceProps["onRenameSuccess"];
-  onArchiveSuccess?: SessionsWorkspaceProps["onArchiveSuccess"];
+  onSetArchived?: SessionsWorkspaceProps["onSetArchived"];
   onRequestDelete?: SessionsWorkspaceProps["onRequestDelete"];
-  onOpenMoveToFolder?: SessionsWorkspaceProps["onOpenMoveToFolder"];
-  folderId?: string;
-  onRemoveFromFolder?: SessionsWorkspaceProps["onRemoveFromFolder"];
+  isSelectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelected?: (sessionId: string) => void;
   isLoading?: boolean;
 }) {
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-between px-8 py-4 rounded-lg">
-        <div className="flex items-center gap-4">
-          <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
-          <div className="h-4 w-36 bg-gray-200 rounded-md animate-pulse" />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-[90px] rounded-full bg-gray-200 animate-pulse" />
-          <div className="h-8 w-[110px] rounded-full bg-gray-200 animate-pulse" />
-          <div className="h-8 w-[95px] rounded-full bg-gray-200 animate-pulse" />
-          <div className="h-8 w-[85px] rounded-full bg-gray-200 animate-pulse" />
-          <div className="flex -space-x-2">
-            <div className="w-7 h-7 rounded-full bg-gray-300 animate-pulse" />
-            <div className="w-7 h-7 rounded-full bg-gray-300 animate-pulse" />
-            <div className="w-7 h-7 rounded-full bg-gray-300 animate-pulse" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!item) return null;
-
-  const { session, counts } = item;
-  const isOptimistic = Boolean(session.isOptimistic);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
@@ -156,6 +130,7 @@ function SessionWorkspaceRow({
   const [renameOpen, setRenameOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement>(null);
@@ -212,16 +187,55 @@ function SessionWorkspaceRow({
     if (moreOpen) firstMenuItemRef.current?.focus();
   }, [moreOpen]);
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-between px-4 py-4 rounded-lg">
+        <div className="flex items-center gap-4">
+          <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+          <div className="h-4 w-36 bg-gray-200 rounded-md animate-pulse" />
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="h-8 w-[90px] rounded-full bg-gray-200 animate-pulse" />
+          <div className="h-8 w-[110px] rounded-full bg-gray-200 animate-pulse" />
+          <div className="h-8 w-[95px] rounded-full bg-gray-200 animate-pulse" />
+          <div className="h-8 w-[85px] rounded-full bg-gray-200 animate-pulse" />
+          <div className="flex -space-x-2">
+            <div className="w-7 h-7 rounded-full bg-gray-300 animate-pulse" />
+            <div className="w-7 h-7 rounded-full bg-gray-300 animate-pulse" />
+            <div className="w-7 h-7 rounded-full bg-gray-300 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!item) return null;
+
+  const { session, counts } = item;
+  const sessionId = session.id;
+  const isOptimistic = Boolean(session.isOptimistic);
+  const isArchived = (session.isArchived ?? session.archived) === true;
+
   const handleRowActivate = () => {
-    if (isOptimistic) {
-      setOpeningId(session.id);
+    if (isSelectionMode) {
+      onToggleSelected?.(sessionId);
       return;
     }
-    setOpeningId(session.id);
-    onView?.(session.id);
+    if (isOptimistic) {
+      setOpeningId(sessionId);
+      return;
+    }
+    setOpeningId(sessionId);
+    onView?.(sessionId);
   };
 
   const handleRowKeyDown = (e: React.KeyboardEvent) => {
+    if (isSelectionMode && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      onToggleSelected?.(sessionId);
+      return;
+    }
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       handleRowActivate();
@@ -251,7 +265,8 @@ function SessionWorkspaceRow({
   })();
 
   const handleRenameSave = async (title: string) => {
-    const res = await authFetch(`/api/sessions/${session.id}`, {
+    if (!sessionId) throw new Error("Missing session id");
+    const res = await authFetch(`/api/sessions/${sessionId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
@@ -273,8 +288,12 @@ function SessionWorkspaceRow({
         tabIndex={0}
         onClick={handleRowActivate}
         onKeyDown={handleRowKeyDown}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         className={[
-          "group flex w-full items-center justify-between rounded-lg px-8 py-4 transition-all duration-150 hover:bg-gray-50",
+          "group flex w-full items-center justify-between rounded-lg px-4 py-4 transition-all duration-150 hover:bg-gray-50",
+          isSelectionMode ? "hover:bg-gray-100 cursor-pointer" : "",
+          isSelected ? "bg-blue-50 hover:bg-blue-50" : "",
           openingId === session.id ? "bg-gray-50" : "",
         ]
           .filter(Boolean)
@@ -282,7 +301,51 @@ function SessionWorkspaceRow({
         data-session-id={session.id}
       >
         <div className="flex items-center gap-4 min-w-0">
-          <ProgressPie value={progress} size={32} />
+          <button
+            type="button"
+            aria-label={isSelected ? "Deselect session" : "Select session"}
+            className={[
+              "relative flex h-8 w-8 items-center justify-center",
+              (hovered || isSelectionMode) ? "cursor-pointer" : "cursor-default",
+              (hovered || isSelectionMode) ? "transition-all duration-150" : "",
+            ].join(" ")}
+            onClick={(e) => {
+              if (!(hovered || isSelectionMode)) return;
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleSelected?.(sessionId);
+            }}
+            onMouseDown={(e) => {
+              if (!(hovered || isSelectionMode)) return;
+              e.stopPropagation();
+            }}
+          >
+            {(hovered || isSelectionMode) ? (
+              <div
+                className={[
+                  "w-[22px] h-[22px] rounded-[6px] border flex items-center justify-center transition-all duration-150",
+                  "cursor-pointer",
+                  "hover:scale-[1.06] active:scale-[0.97]",
+                  isSelected
+                    ? "bg-blue-600 border-blue-600"
+                    : "bg-white border-gray-400 hover:border-gray-600 hover:bg-gray-50",
+                ].join(" ")}
+              >
+                <Check
+                  className={[
+                    "w-4 h-4",
+                    isSelected
+                      ? "text-white opacity-100"
+                      : "text-gray-500 opacity-60",
+                  ].join(" ")}
+                  strokeWidth={3}
+                  aria-hidden
+                />
+              </div>
+            ) : (
+              <ProgressPie value={progress} size={32} />
+            )}
+          </button>
 
           <div className="min-w-0">
             <span className="truncate block text-[15px] font-medium text-gray-900">
@@ -297,32 +360,28 @@ function SessionWorkspaceRow({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          {hasAnyPills && (
-            <div className="flex items-center gap-3 min-w-[260px] justify-end">
-              {open > 0 && (
-                <div className="h-8 w-[90px] rounded-full border border-gray-200 bg-white px-3 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
-                  <CircleDashed className="h-4 w-4 shrink-0 text-blue-500" aria-hidden />
-                  <span className="whitespace-nowrap font-medium tracking-tight">{open} open</span>
-                </div>
-              )}
-              {resolved > 0 && (
-                <div className="h-8 w-[110px] rounded-full border border-gray-200 bg-white px-3 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
-                  <CheckCircle className="h-4 w-4 shrink-0 text-green-500" aria-hidden />
-                  <span className="whitespace-nowrap font-medium tracking-tight">{resolved} resolved</span>
-                </div>
-              )}
-              {skipped > 0 && (
-                <div className="h-8 w-[95px] rounded-full border border-gray-200 bg-white px-3 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
-                  <XCircle className="h-4 w-4 shrink-0 text-red-500" aria-hidden />
-                  <span className="whitespace-nowrap font-medium tracking-tight">{skipped} skipped</span>
-                </div>
-              )}
+        <div className="flex items-center shrink-0 gap-3.5">
+          {open > 0 && (
+            <div className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+              <CircleDashed className="h-4 w-4 shrink-0 text-blue-500" aria-hidden />
+              <span className="whitespace-nowrap font-medium tracking-tight">{open} open</span>
             </div>
           )}
-          <div className="h-8 w-[85px] rounded-full border border-gray-200 bg-white px-3 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
-            <Calendar className="h-4 w-4 shrink-0 text-orange-500" aria-hidden />
-            <span className="whitespace-nowrap font-medium tracking-tight">
+          {resolved > 0 && (
+            <div className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+              <Check className="h-4 w-4 shrink-0 text-green-500" strokeWidth={2.5} aria-hidden />
+              <span className="whitespace-nowrap font-medium tracking-tight">{resolved} resolved</span>
+            </div>
+          )}
+          {skipped > 0 && (
+            <div className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+              <XCircle className="h-4 w-4 shrink-0 text-red-500" aria-hidden />
+              <span className="whitespace-nowrap font-medium tracking-tight">{skipped} skipped</span>
+            </div>
+          )}
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm">
+            <Calendar className="h-4 w-4 shrink-0 text-orange-500" strokeWidth={2.5} aria-hidden />
+            <span className="whitespace-nowrap font-medium tracking-tight text-gray-700">
               {formatSessionUpdatedShort(session)}
             </span>
           </div>
@@ -364,14 +423,14 @@ function SessionWorkspaceRow({
                     setCopied(true);
                   }
                 }}
-                className="w-8 h-8 rounded-md flex items-center justify-center hover:bg-gray-100 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
+                className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
                 aria-label={copied ? "Copied" : "Copy link"}
                 title={copied ? "Copied" : "Copy link"}
               >
                 {copied ? (
-                  <Check className="h-5 w-5 stroke-[2] text-green-600" aria-hidden />
+                  <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 ) : (
-                  <Link className="h-5 w-5 stroke-[2] text-gray-500" aria-hidden />
+                  <Link className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 )}
               </button>
               <button
@@ -382,12 +441,12 @@ function SessionWorkspaceRow({
                   if (isOptimistic) return;
                   setMoreOpen((o) => !o);
                 }}
-                className="w-8 h-8 rounded-md flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
+                className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
                 aria-label="Session actions"
                 aria-expanded={moreOpen}
                 aria-haspopup="menu"
               >
-                <MoreHorizontal className="h-5 w-5 stroke-[2]" />
+                <MoreHorizontal className="h-5 w-5" strokeWidth={2.5} />
               </button>
             </div>
           </div>
@@ -412,112 +471,115 @@ function SessionWorkspaceRow({
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <button
-              ref={firstMenuItemRef}
-              type="button"
-              role="menuitem"
-              className={menuItemClass}
-              onClick={(e) => {
-                e.stopPropagation();
-                const url =
-                  typeof window !== "undefined"
-                    ? `${window.location.origin}/dashboard/${session.id}`
-                    : "";
-                if (url && navigator.clipboard?.writeText) {
-                  void navigator.clipboard.writeText(url);
-                }
-                closeMenu();
-              }}
-            >
-              <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Copy link
-            </button>
-            {onOpenMoveToFolder && (
-              <button
-                type="button"
-                role="menuitem"
-                className={menuItemClass}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenMoveToFolder(session.id);
-                  closeMenu();
-                }}
-              >
-                <FolderPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                Move to folder
-              </button>
+            {isArchived ? (
+              <>
+                <button
+                  ref={firstMenuItemRef}
+                  type="button"
+                  role="menuitem"
+                  className={[
+                    menuItemClass,
+                    "group text-gray-900 hover:bg-gray-100 hover:text-gray-900",
+                  ].join(" ")}
+                  disabled={archiving || !onSetArchived}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (isOptimistic || !onSetArchived) return;
+                    setArchiving(true);
+                    try {
+                      await onSetArchived(session.id, false);
+                    } finally {
+                      setArchiving(false);
+                    }
+                    closeMenu();
+                  }}
+                >
+                  <RotateCcw
+                    className="h-3.5 w-3.5 shrink-0 text-gray-700 group-hover:text-gray-900"
+                    strokeWidth={2}
+                    aria-hidden
+                  />
+                  {archiving ? "Unarchiving…" : "Unarchive"}
+                </button>
+
+                <div className="mt-1 border-t border-gray-100 pt-1" role="separator" aria-hidden />
+              </>
+            ) : (
+              <>
+                <button
+                  ref={firstMenuItemRef}
+                  type="button"
+                  role="menuitem"
+                  className={menuItemClass}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const url =
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/dashboard/${session.id}`
+                        : "";
+                    if (url && navigator.clipboard?.writeText) {
+                      void navigator.clipboard.writeText(url);
+                    }
+                    closeMenu();
+                  }}
+                >
+                  <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Copy link
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={menuItemClass}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShareOpen(true);
+                    closeMenu();
+                  }}
+                >
+                  <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Share
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={menuItemClass}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isOptimistic) setRenameOpen(true);
+                    closeMenu();
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={menuItemClass}
+                  disabled={archiving || !onSetArchived}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (isOptimistic || !onSetArchived) return;
+                    setArchiving(true);
+                    try {
+                      await onSetArchived(session.id, true);
+                    } finally {
+                      setArchiving(false);
+                    }
+                    closeMenu();
+                  }}
+                >
+                  <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  {archiving ? "Archiving…" : "Archive"}
+                </button>
+
+                <div className="my-1 border-t border-neutral-200" role="separator" aria-hidden />
+              </>
             )}
-            {folderId && onRemoveFromFolder && (
-              <button
-                type="button"
-                role="menuitem"
-                className={menuItemClass}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemoveFromFolder(session.id);
-                  closeMenu();
-                }}
-              >
-                <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                Remove from folder
-              </button>
-            )}
             <button
               type="button"
               role="menuitem"
-              className={menuItemClass}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShareOpen(true);
-                closeMenu();
-              }}
-            >
-              <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Share
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className={menuItemClass}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isOptimistic) setRenameOpen(true);
-                closeMenu();
-              }}
-            >
-              <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Rename
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className={menuItemClass}
-              disabled={archiving || !onArchiveSuccess}
-              onClick={async (e) => {
-                e.stopPropagation();
-                if (isOptimistic || !onArchiveSuccess) return;
-                setArchiving(true);
-                try {
-                  const res = await authFetch(`/api/sessions/${session.id}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ archived: true }),
-                  });
-                  if (res.ok) onArchiveSuccess(session.id);
-                } finally {
-                  setArchiving(false);
-                }
-                closeMenu();
-              }}
-            >
-              <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              {archiving ? "Archiving…" : "Archive"}
-            </button>
-            <div className="my-1 border-t border-neutral-200" role="separator" aria-hidden />
-            <button
-              type="button"
-              role="menuitem"
-              className="w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 flex cursor-pointer items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/30"
+              className="w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 flex cursor-pointer items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/30"
               onClick={(e) => {
                 e.stopPropagation();
                 if (!isOptimistic) onRequestDelete?.(session);
@@ -525,7 +587,7 @@ function SessionWorkspaceRow({
               }}
             >
               <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Delete permanently
+              Delete
             </button>
           </div>,
           document.body
@@ -550,13 +612,12 @@ function SessionWorkspaceRow({
 
 export function SessionsWorkspace({
   sections,
+  activeTab = "sessions",
   onView,
   onRenameSuccess,
-  onArchiveSuccess,
+  onSetArchived,
   onRequestDelete,
-  onOpenMoveToFolder,
-  folderId,
-  onRemoveFromFolder,
+  onDeleteSession,
   viewMode: viewModeProp,
   onViewModeChange,
   isLoading,
@@ -566,6 +627,87 @@ export function SessionsWorkspace({
   const isControlled = viewModeProp !== undefined && typeof onViewModeChange === "function";
   const viewMode = isControlled ? viewModeProp! : internalViewMode;
   const setViewMode = isControlled ? onViewModeChange! : setInternalViewMode;
+
+  const [selectedSessions, setSelectedSessions] = useState<string[]>([]);
+  const isSelectionMode = selectedSessions.length > 0;
+  const [bulkArchiving, setBulkArchiving] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const bulkBusy = bulkArchiving || bulkDeleting;
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedSessions((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  const sessionById = useCallback(() => {
+    const map = new Map<string, Session>();
+    for (const section of sections ?? []) {
+      for (const item of section.items) {
+        map.set(item.session.id, item.session);
+      }
+    }
+    return map;
+  }, [sections]);
+
+  const archiveSelected = useCallback(async () => {
+    if (!onSetArchived) return;
+    if (bulkBusy) return;
+    const ids = selectedSessions.slice();
+    if (ids.length === 0) return;
+    setBulkArchiving(true);
+    try {
+      await Promise.all(ids.map((id) => onSetArchived(id, true)));
+      setSelectedSessions([]);
+    } finally {
+      setBulkArchiving(false);
+    }
+  }, [onSetArchived, selectedSessions, bulkBusy]);
+
+  const unarchiveSelected = useCallback(async () => {
+    if (!onSetArchived) return;
+    if (bulkBusy) return;
+    const ids = selectedSessions.slice();
+    if (ids.length === 0) return;
+    setBulkArchiving(true);
+    try {
+      await Promise.all(ids.map((id) => onSetArchived(id, false)));
+      setSelectedSessions([]);
+    } finally {
+      setBulkArchiving(false);
+    }
+  }, [onSetArchived, selectedSessions, bulkBusy]);
+
+  const deleteSelected = useCallback(async () => {
+    if (!onDeleteSession) return;
+    if (bulkBusy) return;
+    const ids = selectedSessions.slice();
+    if (ids.length === 0) return;
+    const byId = sessionById();
+    const sessionsToDelete: Session[] = ids.map((id) => byId.get(id)).filter(Boolean) as Session[];
+    if (sessionsToDelete.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      await Promise.all(sessionsToDelete.map((s) => onDeleteSession(s)));
+      setSelectedSessions([]);
+    } finally {
+      setBulkDeleting(false);
+    }
+  }, [onDeleteSession, selectedSessions, bulkBusy, sessionById]);
+
+  const handleBulkDelete = useCallback(() => {
+    if (bulkBusy) return;
+    if (selectedSessions.length === 0) return;
+    setDeleteModalOpen(true);
+  }, [bulkBusy, selectedSessions.length]);
+
+  const confirmBulkDelete = useCallback(async () => {
+    if (selectedSessions.length === 0) return;
+    await deleteSelected();
+    setSelectedSessions([]);
+    setDeleteModalOpen(false);
+  }, [deleteSelected, selectedSessions.length]);
 
   if (isLoading) {
     return (
@@ -597,6 +739,14 @@ export function SessionsWorkspace({
 
   const visibleSections = (sections ?? []).filter((s) => s.items.length > 0);
   if (visibleSections.length === 0) return null;
+
+  const byId = sessionById();
+  const selectedSessionObjects = selectedSessions
+    .map((id) => byId.get(id))
+    .filter(Boolean) as Session[];
+  const allArchived =
+    selectedSessionObjects.length > 0 &&
+    selectedSessionObjects.every((s) => (s.isArchived ?? (s as Session & { archived?: boolean }).archived) === true);
 
   return (
     <div className={`flex w-full flex-col gap-4 ${isControlled ? "mt-0" : "mt-4"}`}>
@@ -637,16 +787,16 @@ export function SessionsWorkspace({
               <div className={`${listWrap} mt-0 space-y-3`}>
                 {section.items.map((item, rowIndex) => (
                   <SessionWorkspaceRow
-                    key={item.session.id}
+                    key={`${sectionIndex}-${item.session.id}-${rowIndex}`}
                     item={item}
                     rowIndex={rowIndex}
                     onView={onView}
                     onRenameSuccess={onRenameSuccess}
-                    onArchiveSuccess={onArchiveSuccess}
+                    onSetArchived={onSetArchived}
                     onRequestDelete={onRequestDelete}
-                    onOpenMoveToFolder={onOpenMoveToFolder}
-                    folderId={folderId}
-                    onRemoveFromFolder={onRemoveFromFolder}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedSessions.includes(item.session.id)}
+                    onToggleSelected={toggleSelected}
                   />
                 ))}
               </div>
@@ -655,17 +805,13 @@ export function SessionsWorkspace({
                 <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
                   {section.items.map((item, index) => (
                     <WorkspaceCard
-                      key={item.session.id}
+                      key={`${sectionIndex}-${item.session.id}-${index}`}
                       item={item}
                       onView={onView}
                       index={index}
                       onRenameSuccess={onRenameSuccess}
-                      onArchiveSuccess={onArchiveSuccess}
+                      onSetArchived={onSetArchived}
                       onRequestDelete={onRequestDelete}
-                      isRootSession={!folderId}
-                      onOpenMoveToFolder={onOpenMoveToFolder}
-                      folderId={folderId}
-                      onRemoveFromFolder={onRemoveFromFolder}
                     />
                   ))}
                 </div>
@@ -674,6 +820,113 @@ export function SessionsWorkspace({
           </section>
         );
       })}
+
+      {selectedSessions.length > 0 ? (
+        <div
+          className={[
+            "fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999]",
+            "transition-all duration-200 ease-out",
+            "opacity-100 translate-y-0",
+          ].join(" ")}
+        >
+          <div
+            className={[
+              "flex items-center justify-between bg-[#1C1C1E] text-white px-5 py-3 rounded-xl shadow-2xl backdrop-blur-sm min-w-[420px] max-w-[600px]",
+              "select-none",
+            ].join(" ")}
+          >
+            <span className="text-sm font-medium">{selectedSessions.length} selected</span>
+
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => void (allArchived ? unarchiveSelected() : archiveSelected())}
+                disabled={bulkBusy || !onSetArchived}
+                aria-disabled={bulkBusy || !onSetArchived}
+                className="flex items-center gap-2 hover:opacity-80 disabled:opacity-50"
+              >
+                {allArchived ? (
+                  <RotateCcw className="w-4 h-4" strokeWidth={2.5} />
+                ) : (
+                  <Archive className="w-4 h-4" strokeWidth={2.5} />
+                )}
+                <span className="text-sm">
+                  {bulkArchiving
+                    ? allArchived
+                      ? "Unarchiving…"
+                      : "Archiving…"
+                    : allArchived
+                      ? "Unarchive"
+                      : "Archive"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={selectedSessions.length === 0 || bulkBusy || !onDeleteSession}
+                aria-disabled={selectedSessions.length === 0 || bulkBusy || !onDeleteSession}
+                className={[
+                  "flex items-center gap-2 transition-opacity",
+                  selectedSessions.length === 0 || bulkBusy || !onDeleteSession
+                    ? "opacity-40 pointer-events-none"
+                    : "hover:opacity-80",
+                ].join(" ")}
+              >
+                <Trash2 className="w-4 h-4" strokeWidth={2.5} />
+                <span className="text-sm">{bulkDeleting ? "Deleting…" : "Delete"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedSessions([])}
+                disabled={bulkBusy}
+                className="text-sm text-gray-300 hover:text-white disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                <X className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteModalOpen ? (
+        <Modal
+          open={deleteModalOpen}
+          onClose={() => setDeleteModalOpen(false)}
+          ariaLabelledBy="bulk-delete-title"
+          role="alertdialog"
+        >
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 cursor-default">
+            <h2 id="bulk-delete-title" className="text-[18px] font-semibold text-gray-900">
+              Delete sessions?
+            </h2>
+            <p className="mt-2 text-[14px] leading-[1.5] text-gray-600">
+              This will permanently delete {selectedSessions.length} session(s). This action cannot be undone.
+            </p>
+
+            <div className="mt-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={bulkDeleting}
+                className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-gray-100 text-gray-900 hover:bg-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmBulkDelete()}
+                disabled={bulkDeleting || selectedSessions.length === 0 || !onDeleteSession}
+                className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {bulkDeleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

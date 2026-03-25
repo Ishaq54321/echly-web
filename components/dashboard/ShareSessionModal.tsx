@@ -1,5 +1,7 @@
 "use client";
 
+import { Modal } from "@/components/ui/Modal";
+
 /**
  * Placeholder modal for sharing a session.
  * Future: invite users by email.
@@ -20,16 +22,9 @@ export function ShareSessionModal({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="share-session-title"
-    >
+    <Modal open={open} onClose={onClose} ariaLabelledBy="share-session-title">
       <div
         className="card-depth bg-[var(--layer-1-bg)] rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] max-w-md w-full p-6 cursor-default"
-        onClick={(e) => e.stopPropagation()}
       >
         <h2
           id="share-session-title"
@@ -53,6 +48,6 @@ export function ShareSessionModal({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

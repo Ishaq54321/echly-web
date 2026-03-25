@@ -11,7 +11,7 @@
 
 - **`useWorkspaceOverview.ts`** (dashboard hook): Replaced both `await res.json().catch(() => ({}))` usages with a catch that logs `console.error("[ECHLY] JSON parse failed", err)` and still returns `{}`, preserving downstream handling.
 
-_Note: The same silent `res.json().catch(() => ({}))` pattern still exists outside this cleanup scope (e.g. `app/(app)/folders/[folderId]/page.tsx`, `app/admin/customers/page.tsx`) and was left unchanged._
+_Note: The same silent `res.json().catch(() => ({}))` pattern still exists outside this cleanup scope (e.g. `app/admin/customers/page.tsx`) and was left unchanged._
 
 ## Imports cleaned
 
@@ -32,7 +32,7 @@ Dashboard-facing `console.error` / guardrail output now consistently uses the **
 
 | Area | Change |
 |------|--------|
-| `useWorkspaceOverview.ts` | Session refresh / folders / load / create / delete errors → `[ECHLY] …` |
+| `useWorkspaceOverview.ts` | Session refresh / load / create / delete errors → `[ECHLY] …` |
 | `useFeedbackDetailController.ts` | Comment failures → `[ECHLY] addComment…` / `sendPinComment` / `sendTextComment` |
 | `useSessionFeedbackPaginated.ts` | GUARDRAIL warn/error → `[ECHLY] GUARDRAIL …` |
 | `insights/page.tsx` | Snapshot and sessions fetch errors → `[ECHLY] insights …` |

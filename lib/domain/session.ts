@@ -14,7 +14,16 @@ export interface Session {
   /** Legacy scope (pre-workspaces). */
   userId?: string;
   title: string;
+  /**
+   * Canonical archive flag used throughout the app today.
+   * Stored in Firestore as `archived`.
+   */
   archived?: boolean;
+  /**
+   * Compatibility alias for clients that expect `isArchived`.
+   * When both exist, treat `isArchived` as the source of truth.
+   */
+  isArchived?: boolean;
   createdAt?: Timestamp | Date | string | null;
   updatedAt?: Timestamp | Date | string | null;
   /** Set at creation. Creator profile for card display. */
@@ -65,6 +74,13 @@ export function sessionFromApiItem(item: unknown): Session | null {
   const archived = Reflect.get(item, "archived");
   if (typeof archived === "boolean") {
     session.archived = archived;
+    session.isArchived = archived;
+  }
+
+  const isArchived = Reflect.get(item, "isArchived");
+  if (typeof isArchived === "boolean") {
+    session.isArchived = isArchived;
+    session.archived = isArchived;
   }
 
   const updatedAt = Reflect.get(item, "updatedAt");

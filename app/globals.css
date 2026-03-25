@@ -367,11 +367,11 @@ button[aria-disabled="true"],
 .echly-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.5);
   font-family: "Plus Jakarta Sans", sans-serif;
 }
 

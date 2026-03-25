@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Modal } from "@/components/ui/Modal";
 
 export interface RenameSessionModalProps {
   open: boolean;
@@ -65,16 +66,9 @@ export function RenameSessionModal({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="rename-session-title"
-    >
+    <Modal open={open} onClose={onClose} ariaLabelledBy="rename-session-title">
       <div
         className="card-depth bg-[var(--layer-1-bg)] rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] max-w-md w-full p-6 cursor-default"
-        onClick={(e) => e.stopPropagation()}
       >
         <h2
           id="rename-session-title"
@@ -118,6 +112,6 @@ export function RenameSessionModal({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

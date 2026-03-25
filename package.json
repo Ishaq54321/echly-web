@@ -7,8 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "fix:folders": "ts-node scripts/fixMissingFolderWorkspaceId.ts",
-    "backfill:folder-workspace-id": "npx tsx scripts/backfillFolderWorkspaceId.ts",
     "build:extension": "npm run build:extension:css && npm run build:extension:js",
     "build:extension:css": "npx postcss app/globals.css -o echly-extension/popup.css && node -e \"const fs=require('fs'); const f=fs.readFileSync('echly-extension/extension-fonts.css','utf8'); const m=fs.readFileSync('echly-extension/popup.css','utf8'); fs.writeFileSync('echly-extension/popup.css', f+m);\"",
     "build:extension:js": "node esbuild-extension.mjs"

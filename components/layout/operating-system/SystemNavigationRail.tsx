@@ -8,7 +8,7 @@ import {
   Command,
   Inbox,
   Flag,
-  FolderKanban,
+  LayoutGrid,
   BarChart2,
   Archive,
   Settings,
@@ -22,7 +22,7 @@ const NAV_GROUPS = [
     items: [
       { href: "#", icon: Command, label: "Search", shortcut: "⌘K" },
       { href: "/dashboard", icon: Inbox, label: "Dashboard" },
-      { href: "/dashboard", icon: FolderKanban, label: "Sessions" },
+      { href: "/dashboard", icon: LayoutGrid, label: "Sessions" },
     ],
   },
   {

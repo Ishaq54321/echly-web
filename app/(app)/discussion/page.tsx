@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { MessageSquareMore, Folder } from "lucide-react";
+import { MessageSquareMore, Layers } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { DiscussionList, type ProjectItem, type DiscussionItem } from "@/components/discussion/DiscussionList";
 import { DiscussionThread } from "@/components/discussion/DiscussionThread";
@@ -135,7 +135,7 @@ export default function DiscussionPage() {
                       : "text-secondary hover:bg-neutral-50"
                   }`}
                 >
-                  <Folder className="h-4 w-4 shrink-0 text-[#155DFC]" />
+                  <Layers className="h-4 w-4 shrink-0 text-[#155DFC]" />
                   <span className="truncate">All projects</span>
                 </button>
                 {projects.map((proj) => {
@@ -151,7 +151,7 @@ export default function DiscussionPage() {
                           : "text-secondary hover:bg-neutral-50"
                       }`}
                     >
-                      <Folder className="h-4 w-4 shrink-0 text-[#155DFC]" />
+                      <Layers className="h-4 w-4 shrink-0 text-[#155DFC]" />
                       <span className="truncate">{proj.name}</span>
                     </button>
                   );

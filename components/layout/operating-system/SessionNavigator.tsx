@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { Pin, PinOff } from "lucide-react";
 import type { Session } from "@/lib/domain/session";
@@ -42,11 +42,7 @@ export function SessionNavigator({
   currentSessionId,
   onSelectSession,
 }: SessionNavigatorProps) {
-  const [pinnedIds, setPinnedIdsState] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    setPinnedIdsState(getPinnedIds());
-  }, []);
+  const [pinnedIds, setPinnedIdsState] = useState<Set<string>>(() => getPinnedIds());
 
   const togglePinned = (sessionId: string) => {
     setPinnedIdsState((prev) => {
@@ -58,8 +54,8 @@ export function SessionNavigator({
     });
   };
 
-  const active = sessions.filter((s) => !s.session.archived);
-  const archived = sessions.filter((s) => s.session.archived);
+  const active = sessions.filter((s) => (s.session.isArchived ?? s.session.archived) !== true);
+  const archived = sessions.filter((s) => (s.session.isArchived ?? s.session.archived) === true);
   const pinned = active.filter((s) => pinnedIds.has(s.session.id));
   const activeUnpinned = active.filter((s) => !pinnedIds.has(s.session.id));
 

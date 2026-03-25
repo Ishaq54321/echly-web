@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Calendar } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { SessionsTimeRange } from "@/lib/utils/sessionTimeRange";
 
 const OPTIONS: { id: SessionsTimeRange; label: string }[] = [
@@ -42,10 +42,10 @@ export function SessionsTimeRangeFilter({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 transition-all hover:bg-neutral-50"
+        className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-gray-50"
       >
-        <Calendar className="h-4 w-4 shrink-0 stroke-[2]" aria-hidden />
-        {label}
+        <span>{label}</span>
+        <ChevronDown className="h-4 w-4 text-gray-500" strokeWidth={2} aria-hidden />
       </button>
       {open ? (
         <ul
