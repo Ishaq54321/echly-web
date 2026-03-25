@@ -25,7 +25,6 @@ const ZERO_COUNTS: Counts = {
   total: 0,
   open: 0,
   resolved: 0,
-  skipped: 0,
 };
 
 export interface UseSessionFeedbackPaginatedResult {
@@ -37,8 +36,6 @@ export interface UseSessionFeedbackPaginatedResult {
   activeCount: number;
   /** Resolved count from server (first page only); do not derive from items. */
   resolvedCount: number;
-  /** Skipped count from server (first page only); do not derive from items. */
-  skippedCount: number;
   /** While true, counts are still loading from `/api/feedback/counts`. */
   countsLoading: boolean;
   loading: boolean;
@@ -73,7 +70,6 @@ export function useSessionFeedbackPaginated(
   const total = counts.total;
   const activeCount = counts.open;
   const resolvedCount = counts.resolved;
-  const skippedCount = counts.skipped;
   const [countsLoading, setCountsLoading] = useState<boolean>(true);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -558,7 +554,6 @@ export function useSessionFeedbackPaginated(
     total,
     activeCount,
     resolvedCount,
-    skippedCount,
     countsLoading,
     setFeedback: setCanonicalFeedback,
     loading: initialLoading,

@@ -54,7 +54,6 @@ function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback | null {
   if (data.isDeleted === true) return null;
   const status = (data.status ?? "open") as string;
   const isResolved = data.isResolved === true || status === "resolved" || status === "done";
-  const isSkipped = status === "skipped";
   return {
     id: docSnap.id,
     workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : undefined,
@@ -66,7 +65,6 @@ function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback | null {
     suggestion: (data.suggestion as string) ?? "",
     type: (data.type as string) ?? "Feedback",
     isResolved,
-    isSkipped: isSkipped || undefined,
     createdAt: (data.createdAt ?? null) as Timestamp | null,
     contextSummary: (data.contextSummary as string | null) ?? null,
     actionSteps: (data.actionSteps ?? data.actionItems ?? null) as string[] | null,

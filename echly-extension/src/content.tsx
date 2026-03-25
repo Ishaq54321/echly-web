@@ -163,7 +163,6 @@ type GlobalUIState = {
   };
   captureMode: "voice" | "text";
   openCount: number;
-  skippedCount: number;
   resolvedCount: number;
 };
 
@@ -1113,7 +1112,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           feedbackFetchFailed={globalState.feedback.recovering !== true && globalState.feedback.recoveryAttempts > 0}
           totalCount={globalState.counts.total}
           openCount={globalState.openCount}
-          skippedCount={globalState.skippedCount}
           resolvedCount={globalState.resolvedCount}
           sessionLoading={globalState.sessionLoading}
           sessionTitleProp={globalState.sessionTitle ?? undefined}
@@ -1292,7 +1290,6 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
       total: typeof state.counts?.total === "number" ? state.counts.total : 0,
     },
     openCount: typeof state.openCount === "number" ? state.openCount : 0,
-    skippedCount: typeof state.skippedCount === "number" ? state.skippedCount : 0,
     resolvedCount: typeof state.resolvedCount === "number" ? state.resolvedCount : 0,
     captureMode: state.captureMode === "text" ? "text" : "voice",
   };

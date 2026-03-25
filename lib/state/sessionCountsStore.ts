@@ -2,7 +2,6 @@ export type Counts = {
   total: number;
   open: number;
   resolved: number;
-  skipped: number;
 };
 
 const store = new Map<string, Counts>();

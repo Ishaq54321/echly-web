@@ -25,9 +25,9 @@ import Image from "next/image";
 import {
   TicketList,
   ExecutionView,
-  ExecutionModeLayout,
   CommentPanel,
 } from "@/components/layout/operating-system";
+import { TopControlBar } from "@/components/ui/TopControlBar";
 
 /** Broadcast ticket update to extension tray so tray stays in sync. */
 function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps?: string[] | null; type?: string }) {
@@ -57,7 +57,6 @@ type TicketFromApi = {
   description?: string;
   type: string;
   isResolved?: boolean;
-  isSkipped?: boolean;
   actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
   screenshotUrl?: string | null;
@@ -74,8 +73,8 @@ function preloadImage(src: string, preloaded: Set<string>) {
 
 function SessionPageSkeleton() {
   return (
-    <div className="flex h-screen overflow-hidden pt-6">
-      <aside className="w-[280px] h-full shrink-0 min-h-0 flex flex-col rounded-none bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-1)] border-r border-[var(--layer-1-border)]">
+    <div className="flex h-full min-h-0 overflow-hidden">
+      <aside className="w-[280px] h-screen shrink-0 self-start flex flex-col rounded-none bg-[#FAFBFC]">
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           <div className="space-y-3">
             <div className="h-4 w-40 rounded bg-neutral-200/50 animate-feedback-placeholder-pulse" />
@@ -84,6 +83,7 @@ function SessionPageSkeleton() {
           </div>
         </div>
       </aside>
+      <div className="content-divider shrink-0" aria-hidden />
       <main className="surface-main flex-1 h-full overflow-y-auto min-h-0 flex flex-col">
         <div className="h-full flex flex-col min-w-0">
           <div className="max-w-4xl mx-auto w-full px-12 py-9 border-b border-[var(--layer-1-border)] shrink-0">
@@ -138,7 +138,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     total: feedbackTotal,
     activeCount: feedbackActiveCount,
     resolvedCount: feedbackResolvedCount,
-    skippedCount: feedbackSkippedCount,
     countsLoading: feedbackCountsLoading,
     loading: feedbackLoading,
     hasMore: hasMoreFeedback,
@@ -155,14 +154,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
   );
 
-  /** Open tickets only; used for Execution Mode queue and progress. */
+  /** Open tickets only; used for Resolve & Next navigation. */
   const openFeedback = useMemo(
     () => feedback.filter((f) => getTicketStatus(f) === "open"),
     [feedback]
   );
 
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
-  const [executionMode, setExecutionMode] = useState(false);
   const [isCommentMode, setIsCommentMode] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -181,7 +179,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       total: feedbackTotal,
       open: feedbackActiveCount,
       resolved: feedbackResolvedCount,
-      skipped: feedbackSkippedCount,
     };
     setCachedCounts(sessionId, seed);
     return seed;
@@ -190,22 +187,19 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     feedbackTotal,
     feedbackActiveCount,
     feedbackResolvedCount,
-    feedbackSkippedCount,
   ]);
 
   const applyCountTransition = useCallback(
-    (previousStatus: "open" | "resolved" | "skipped", nextStatus: "open" | "resolved" | "skipped") => {
+    (previousStatus: "open" | "resolved", nextStatus: "open" | "resolved") => {
       if (!sessionId || previousStatus === nextStatus) return;
       ensureCountsSeeded();
       updateCachedCounts(sessionId, (current) => {
         const next = { ...current };
         if (previousStatus === "open") next.open = Math.max(0, next.open - 1);
         if (previousStatus === "resolved") next.resolved = Math.max(0, next.resolved - 1);
-        if (previousStatus === "skipped") next.skipped = Math.max(0, next.skipped - 1);
 
         if (nextStatus === "open") next.open += 1;
         if (nextStatus === "resolved") next.resolved += 1;
-        if (nextStatus === "skipped") next.skipped += 1;
         return next;
       });
     },
@@ -286,7 +280,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         total: c.total + 1,
         open: c.open + 1,
         resolved: c.resolved,
-        skipped: c.skipped,
       }));
       setSelectedId(ticket.id);
       setNewTicketId(ticket.id);
@@ -354,24 +347,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return () => clearTimeout(timeout);
   }, [newTicketId]);
 
-  /* In Execution Mode, ensure selection is an open ticket (open-only queue). */
-  useEffect(() => {
-    if (!executionMode) return;
-    if (openFeedback.length === 0) {
-      setSelectedId(null);
-      return;
-    }
-    const current = selectedId ? feedback.find((f) => f.id === selectedId) : null;
-    if (!current || getTicketStatus(current) !== "open") {
-      setSelectedId(openFeedback[0].id);
-    }
-  }, [executionMode, openFeedback, feedback, selectedId]);
-
   /* ================= SELECTED ITEM (derived from feedback list) ================= */
 
   const selectedIndex = feedback.findIndex((f) => f.id === selectedId);
-  const selectedIndexInOpen = openFeedback.findIndex((f) => f.id === selectedId);
-  const executionModeTotal = feedbackActiveCount;
 
   // Preload only the next 1-2 ticket screenshots from the current selection.
   useEffect(() => {
@@ -389,18 +367,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (!ticket) return null;
     return {
       ...ticket,
-      index:
-        executionMode && openFeedback.length > 0
-          ? selectedIndexInOpen !== -1
-            ? selectedIndexInOpen + 1
-            : 1
-          : selectedIndex !== -1
-            ? selectedIndex + 1
-            : 1,
-      total:
-        executionMode
-          ? executionModeTotal
-          : feedbackTotal,
+      index: selectedIndex !== -1 ? selectedIndex + 1 : 1,
+      total: feedbackTotal,
     };
   })();
 
@@ -544,13 +512,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const previousStatus = selectedItem ? getTicketStatus(selectedItem) : "open";
     const nextStatus = isResolved ? "resolved" : "open";
     const previousResolved = Boolean(selectedItem?.isResolved);
-    const previousSkipped = Boolean(selectedItem?.isSkipped);
     const previousCounts = sessionId ? getCachedCounts(sessionId) : null;
 
-    // Optimistic update: resolving/unresolving clears skipped state.
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === selectedId ? { ...item, isResolved, isSkipped: false } : item
+        item.id === selectedId ? { ...item, isResolved } : item
       )
     );
     applyCountTransition(previousStatus, nextStatus);
@@ -558,8 +524,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       const res = await authFetch(`/api/tickets/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        // Clear `isSkipped` so status transitions are consistent with counts.
-        body: JSON.stringify({ isResolved, isSkipped: false }),
+        body: JSON.stringify({ isResolved }),
       });
       const data = (await res.json()) as {
         success?: boolean;
@@ -578,7 +543,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === selectedId
-            ? { ...item, isResolved: previousResolved, isSkipped: previousSkipped }
+            ? { ...item, isResolved: previousResolved }
             : item
         )
       );
@@ -596,46 +561,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const nextOpen = openFeedback[openIdx + 1] ?? openFeedback[0];
     if (nextOpen && nextOpen.id !== selectedId) {
       setSelectedId(nextOpen.id);
-    }
-  };
-
-  const handleExecutionSkip = async () => {
-    if (!selectedId) return;
-    const previousStatus = selectedItem ? getTicketStatus(selectedItem) : "open";
-    const previousResolved = Boolean(selectedItem?.isResolved);
-    const previousSkipped = Boolean(selectedItem?.isSkipped);
-    const previousCounts = sessionId ? getCachedCounts(sessionId) : null;
-    const openIdx = openFeedback.findIndex((f) => f.id === selectedId);
-    const nextOpen = openIdx >= 0 ? openFeedback[openIdx + 1] ?? openFeedback[0] : undefined;
-    const nextOpenId = nextOpen?.id === selectedId ? undefined : nextOpen?.id ?? null;
-
-    setFeedback((prev) =>
-      prev.map((item) =>
-        item.id === selectedId ? { ...item, isSkipped: true, isResolved: false } : item
-      )
-    );
-    applyCountTransition(previousStatus, "skipped");
-    setSelectedId(nextOpenId ?? null);
-
-    try {
-      await authFetch(`/api/tickets/${selectedId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isSkipped: true }),
-      });
-    } catch (err) {
-      console.error("[ECHLY] handleExecutionSkip PATCH failed", err);
-      setFeedback((prev) =>
-        prev.map((item) =>
-          item.id === selectedId
-            ? { ...item, isSkipped: previousSkipped, isResolved: previousResolved }
-            : item
-        )
-      );
-      if (sessionId && previousCounts) {
-        setCachedCounts(sessionId, previousCounts);
-      }
-      setSelectedId(selectedId);
     }
   };
 
@@ -798,7 +723,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       const next = { ...c, total: Math.max(0, c.total - 1) };
       if (deletedStatus === "open") next.open = Math.max(0, next.open - 1);
       if (deletedStatus === "resolved") next.resolved = Math.max(0, next.resolved - 1);
-      if (deletedStatus === "skipped") next.skipped = Math.max(0, next.skipped - 1);
       return next;
     });
     setSelectedId(nextSelected);
@@ -820,44 +744,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   // If auth is still settling, keep the UI stable but show a lightweight skeleton.
   if (authLoading) return <SessionPageSkeleton />;
-
-  /* Full-screen Execution Mode: no sidebar, no comment panel, minimal UI only */
-  if (executionMode) {
-    return (
-      <>
-        <div className="flex h-screen overflow-hidden">
-          <ExecutionModeLayout
-            item={selectedItem}
-            onExitExecutionMode={() => setExecutionMode(false)}
-            onSkip={handleExecutionSkip}
-            onNeedsClarification={() => {
-              setExecutionMode(false);
-            }}
-            onAssign={() => {}}
-            onResolveAndNext={handleResolveAndNext}
-            onSaveActionSteps={saveActionSteps}
-            onExpandImage={() => setIsImageExpanded(true)}
-            sessionId={sessionId}
-          />
-        </div>
-        {isImageExpanded && selectedItem?.screenshotUrl && (
-          <div
-            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-10 cursor-pointer"
-            onClick={() => setIsImageExpanded(false)}
-          >
-            <div className="relative w-full h-full max-w-5xl max-h-[90vh]">
-              <Image
-                src={selectedItem.screenshotUrl}
-                alt="Expanded Screenshot"
-                fill
-                className="object-contain rounded-xl"
-              />
-            </div>
-          </div>
-        )}
-      </>
-    );
-  }
 
   const renderExecutionContent = () => {
     if (feedbackLoading) {
@@ -910,15 +796,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   return (
     <>
-      <div className="flex h-screen overflow-hidden pt-6">
-        <aside className="hidden lg:flex w-[300px] h-full overflow-hidden shrink-0 min-h-0 flex-col">
+      <div className="flex h-full min-h-0 overflow-hidden">
+        <aside className="sidebar hidden lg:flex w-[300px] h-screen overflow-hidden shrink-0 self-start min-h-0 flex-col sticky top-0">
           <TicketList
             sessionTitle={session?.title ?? "Session"}
             counts={{
               total: feedbackTotal,
               open: feedbackActiveCount,
               resolved: feedbackResolvedCount,
-              skipped: feedbackSkippedCount,
             }}
             countsLoading={feedbackCountsLoading}
             isEditingSessionTitle={isEditingSessionTitle}
@@ -951,56 +836,52 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           />
         </aside>
 
-        <main className="surface-main flex-1 h-full overflow-y-auto min-h-0 flex flex-col min-w-0">
-          <div className="h-full flex flex-col min-w-0">
-            <div className="z-20 shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--layer-1-border)] bg-[var(--layer-1-bg)]">
-              <div className="lg:hidden">
-                <button
-                  type="button"
-                  onClick={() => setIsTicketNavigatorOpen(true)}
-                  className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-200"
-                >
-                  Tickets
-                </button>
+        <div className="content-divider hidden lg:block shrink-0" aria-hidden />
+
+        <div className="main-area flex min-h-0 min-w-0 flex-1 flex-col">
+          <TopControlBar sessionId={sessionId} sessionTitle={session?.title} />
+          <div className="flex flex-1 min-h-0 min-w-0">
+            <main className="surface-main flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
+              <div className="h-full flex flex-col min-w-0">
+                <div className="z-20 shrink-0 flex items-center gap-2 px-4 py-3 lg:hidden bg-[var(--layer-1-bg)]">
+                  <button
+                    type="button"
+                    onClick={() => setIsTicketNavigatorOpen(true)}
+                    className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-200"
+                  >
+                    Tickets
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+                  <div className="max-w-[1000px] mx-auto w-full px-6 py-6 flex-1 min-h-0 flex flex-col">
+                    {renderExecutionContent()}
+                  </div>
+                </div>
               </div>
-              {feedbackActiveCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setExecutionMode(true)}
-                  className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-200 cursor-pointer"
-                >
-                  Execution Mode
-                </button>
+            </main>
+
+            {/* Comment panel: only when a pin/thread is opened (Google Docs style). No permanent sidebar. */}
+            <div
+              className="shrink-0 flex flex-col min-h-0 bg-[var(--canvas-base)] shadow-[-8px_0_24px_-12px_rgba(15,23,42,0.12)] transition-[width] duration-200 ease-out overflow-hidden"
+              style={{ width: activeThreadId != null ? 380 : 0 }}
+            >
+              {activeThreadId != null && (
+                <CommentPanel
+                  variant="sidebar"
+                  isOpen
+                  onClose={() => setActiveThreadId(null)}
+                  comments={comments}
+                  loading={loadingComments}
+                  sendReply={sendReply}
+                  activeThreadId={activeThreadId}
+                  onSelectThread={setActiveThreadId}
+                  currentUserId={authUser?.uid ?? null}
+                  updateComment={updateComment}
+                  deleteComment={deleteComment}
+                />
               )}
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-              <div className="max-w-3xl mx-auto w-full px-6 pt-4 pb-4 flex-1 min-h-0 flex flex-col">
-                {renderExecutionContent()}
-              </div>
-            </div>
           </div>
-        </main>
-
-        {/* Comment panel: only when a pin/thread is opened (Google Docs style). No permanent sidebar. */}
-        <div
-          className="shrink-0 flex flex-col min-h-0 border-l border-[var(--layer-2-border)] bg-[var(--canvas-base)] transition-[width] duration-200 ease-out overflow-hidden"
-          style={{ width: activeThreadId != null ? 380 : 0 }}
-        >
-          {activeThreadId != null && (
-            <CommentPanel
-              variant="sidebar"
-              isOpen
-              onClose={() => setActiveThreadId(null)}
-              comments={comments}
-              loading={loadingComments}
-              sendReply={sendReply}
-              activeThreadId={activeThreadId}
-              onSelectThread={setActiveThreadId}
-              currentUserId={authUser?.uid ?? null}
-              updateComment={updateComment}
-              deleteComment={deleteComment}
-            />
-          )}
         </div>
       </div>
 
@@ -1021,7 +902,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 total: feedbackTotal,
                 open: feedbackActiveCount,
                 resolved: feedbackResolvedCount,
-                skipped: feedbackSkippedCount,
               }}
               countsLoading={feedbackCountsLoading}
               isEditingSessionTitle={isEditingSessionTitle}

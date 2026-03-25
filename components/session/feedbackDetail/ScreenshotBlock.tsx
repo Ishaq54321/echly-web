@@ -6,9 +6,15 @@ import { Loader2, ZoomIn } from "lucide-react";
 interface ScreenshotBlockProps {
   screenshotUrl: string;
   onExpand: () => void;
+  /** Omit outer frame when nested inside a parent attachment card. */
+  embeddedInCard?: boolean;
 }
 
-export function ScreenshotBlock({ screenshotUrl, onExpand }: ScreenshotBlockProps) {
+export function ScreenshotBlock({
+  screenshotUrl,
+  onExpand,
+  embeddedInCard = false,
+}: ScreenshotBlockProps) {
   const [isImageLoading, setIsImageLoading] = useState(true);
 
   // Prevent "ghost" screenshot during ticket switch: reset loading before paint.
@@ -23,9 +29,14 @@ export function ScreenshotBlock({ screenshotUrl, onExpand }: ScreenshotBlockProp
     return () => window.clearTimeout(timeout);
   }, [screenshotUrl]);
 
+  const outerFrame = embeddedInCard
+    ? "rounded-lg overflow-hidden transition-transform duration-200 hover:scale-[1.005] group"
+    : "rounded-[var(--radius-xl)] overflow-hidden border border-[#E5E7EB] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-transform duration-200 hover:scale-[1.005] group";
+  const innerRadius = embeddedInCard ? "rounded-lg" : "rounded-[var(--radius-xl)]";
+
   return (
-    <div className="rounded-[var(--radius-xl)] overflow-hidden shadow-[var(--shadow-level-3)] border border-[var(--card-border)] transition-transform duration-200 hover:scale-[1.01] group">
-      <div className="relative overflow-hidden rounded-[var(--radius-xl)] max-h-[317px] bg-[var(--layer-2-bg)]">
+    <div className={outerFrame}>
+      <div className={`relative overflow-hidden ${innerRadius} max-h-[317px] bg-[var(--layer-2-bg)]`}>
         <img
           key={screenshotUrl} // Hard reset the image element on ticket switch
           src={screenshotUrl}

@@ -8,7 +8,6 @@ interface FeedbackItem {
   title: string;
   type: string;
   isResolved?: boolean;
-  isSkipped?: boolean;
   createdAt?: { seconds: number } | null;
   clientTimestamp?: number | null;
   timestamp?: number;
@@ -55,7 +54,7 @@ function FeedbackSidebarInner({
 
   const filteredItems = useMemo(() => {
     return feedback.filter((item) => {
-      if (filter === "active") return (item.isResolved ?? false) === false && (item.isSkipped ?? false) === false;
+      if (filter === "active") return (item.isResolved ?? false) === false;
       if (filter === "resolved") return item.isResolved === true;
       return true;
     });
@@ -89,7 +88,7 @@ function FeedbackSidebarInner({
   const activeCount =
     typeof activeCountProp === "number"
       ? activeCountProp
-      : feedback.filter((f) => (f.isResolved ?? false) === false && (f.isSkipped ?? false) === false).length;
+      : feedback.filter((f) => (f.isResolved ?? false) === false).length;
   const resolvedCount =
     typeof resolvedCountProp === "number"
       ? resolvedCountProp

@@ -22,11 +22,11 @@ export interface StructuredFeedback {
   // Screenshot
   screenshotUrl?: string | null;
   screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
-  status?: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
+  status?: "processing" | "complete" | "open" | "resolved" | "failed";
 }
 
 /** Derived status for a ticket. Prefer explicit checks over !isResolved. */
-export type TicketStatus = "open" | "resolved" | "skipped";
+export type TicketStatus = "open" | "resolved";
 
 /**
  * Anchor used to scroll to a specific feedback location in the UI.
@@ -52,8 +52,6 @@ export interface Feedback {
   suggestion?: string;
   type: string;
   isResolved: boolean;
-  /** True when ticket was skipped (e.g. in Execution Mode). Excluded from open count. */
-  isSkipped?: boolean;
   createdAt: Timestamp | null;
   /** Number of comments on this feedback. Used for Discussion feed (conversations only). */
   commentCount?: number;
@@ -77,15 +75,14 @@ export interface Feedback {
   // Screenshot
   screenshotUrl?: string | null;
   screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
-  status?: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
+  status?: "processing" | "complete" | "open" | "resolved" | "failed";
 
   /** Soft delete: when true, row stays in Firestore but is hidden from list/query semantics. */
   isDeleted?: boolean;
 }
 
 /** Returns explicit status for a feedback item. Use instead of !isResolved. */
-export function getTicketStatus(f: Pick<Feedback, "isResolved" | "isSkipped">): TicketStatus {
-  if (f.isSkipped === true) return "skipped";
+export function getTicketStatus(f: Pick<Feedback, "isResolved">): TicketStatus {
   if (f.isResolved === true) return "resolved";
   return "open";
 }

@@ -126,8 +126,6 @@ export type CaptureWidgetProps = {
   totalCount?: number;
   /** Extension: open feedback count from backend aggregation; independent of loaded pointers. */
   openCount?: number;
-  /** Extension: skipped feedback count from backend aggregation; independent of loaded pointers. */
-  skippedCount?: number;
   /** Extension: resolved feedback count from backend aggregation; independent of loaded pointers. */
   resolvedCount?: number;
   /** Extension: true while loading a previous session's feedback; show spinner instead of empty state. */

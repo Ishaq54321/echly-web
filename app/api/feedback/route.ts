@@ -128,7 +128,6 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
     lastCommentAt: lastCommentAtOut ?? undefined,
     status: (item as unknown as { status?: string }).status,
     isResolved: (item as unknown as { isResolved?: boolean }).isResolved,
-    isSkipped: (item as unknown as { isSkipped?: boolean }).isSkipped,
     isDeleted: item.isDeleted ?? false,
 
     screenshotUrl: item.screenshotUrl ?? null,

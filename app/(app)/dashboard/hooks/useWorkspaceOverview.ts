@@ -87,7 +87,7 @@ async function loadSessionsAndCounts(): Promise<SessionsLoadPayload> {
         sessions.map(async (session): Promise<[string, SessionFeedbackCounts]> => {
           const sessionId = typeof session.id === "string" ? session.id : "";
           if (!sessionId) {
-            return [sessionId, { total: 0, open: 0, resolved: 0, skipped: 0 }];
+            return [sessionId, { total: 0, open: 0, resolved: 0 }];
           }
           const cached = getCounts(sessionId);
           if (cached) {
@@ -98,7 +98,7 @@ async function loadSessionsAndCounts(): Promise<SessionsLoadPayload> {
             setCachedCounts(sessionId, normalizedCounts);
             return [sessionId, normalizedCounts];
           } catch {
-            return [sessionId, { total: 0, open: 0, resolved: 0, skipped: 0 }];
+            return [sessionId, { total: 0, open: 0, resolved: 0 }];
           }
         })
       );
@@ -176,7 +176,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       const cachedCounts = Object.fromEntries(
         cachedSessions.map((session) => [
           session.id,
-          getCounts(session.id) ?? { total: 0, open: 0, resolved: 0, skipped: 0 },
+          getCounts(session.id) ?? { total: 0, open: 0, resolved: 0 },
         ])
       );
       setCountsBySessionId(cachedCounts);
@@ -259,7 +259,6 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       total: 0,
       open: 0,
       resolved: 0,
-      skipped: 0,
     },
   }));
 
@@ -280,7 +279,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       setAllSessions((prev) => [tempSession, ...prev]);
       setCountsBySessionId((prev) => ({
         ...prev,
-        [tempSessionId]: { total: 0, open: 0, resolved: 0, skipped: 0 },
+        [tempSessionId]: { total: 0, open: 0, resolved: 0 },
       }));
 
       try {
@@ -362,7 +361,6 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
             total: 0,
             open: 0,
             resolved: 0,
-            skipped: 0,
           };
           const next: Record<string, SessionFeedbackCounts> = {
             ...prev,
@@ -468,7 +466,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
         setAllSessions((prev) => [session, ...prev]);
         setCountsBySessionId((prev) => ({
           ...prev,
-          [sessionId]: prev[sessionId] ?? { total: 0, open: 0, resolved: 0, skipped: 0 },
+          [sessionId]: prev[sessionId] ?? { total: 0, open: 0, resolved: 0 },
         }));
         console.error("[ECHLY] Delete session failed", err);
         throw err;

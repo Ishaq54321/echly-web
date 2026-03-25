@@ -14,9 +14,10 @@ export default function AppLayout({
     <WorkspaceSuspendedGuard>
       <BillingUsageCacheInitializer />
       <SessionsSearchProvider>
-        <div className="flex h-screen overflow-hidden">
+        <div className="main-layout flex h-screen overflow-hidden">
           <GlobalRail />
-          <main className="relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden bg-white transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
+          <div className="content-divider shrink-0" aria-hidden />
+          <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
             <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
               <FloatingUtilityActions />
               <ErrorBoundary>{children}</ErrorBoundary>

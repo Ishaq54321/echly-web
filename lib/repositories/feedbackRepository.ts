@@ -142,15 +142,14 @@ type FeedbackUpdate = Partial<{
   title: string;
   instruction: string;
   type: string;
-  status: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
+  status: "processing" | "complete" | "open" | "resolved" | "failed";
   screenshotUrl: string | null;
   screenshotStatus: "attached" | "pending" | "none" | "failed" | null;
   actionSteps: string[] | null;
   suggestedTags: string[] | null;
 }>;
 
-function statusFromResolveAndSkip(isResolved: boolean, isSkipped: boolean): "open" | "resolved" | "skipped" {
-  if (isSkipped) return "skipped";
+function statusFromResolved(isResolved: boolean): "open" | "resolved" {
   if (isResolved) return "resolved";
   return "open";
 }
@@ -162,9 +161,8 @@ export async function updateFeedbackRepo(
     instruction: string;
     description: string;
     type: string;
-    status: "processing" | "complete" | "open" | "resolved" | "skipped" | "failed";
+    status: "processing" | "complete" | "open" | "resolved" | "failed";
     isResolved: boolean;
-    isSkipped: boolean;
     screenshotUrl: string | null;
     screenshotStatus: "attached" | "pending" | "none" | "failed" | null;
     actionSteps: string[] | null;
@@ -182,11 +180,8 @@ export async function updateFeedbackRepo(
   if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
   const isResolved = (data as { isResolved?: boolean }).isResolved;
-  const isSkipped = (data as { isSkipped?: boolean }).isSkipped;
-  if (typeof isSkipped === "boolean") {
-    updates.status = statusFromResolveAndSkip(isResolved === true, isSkipped);
-  } else if (typeof isResolved === "boolean") {
-    updates.status = statusFromResolveAndSkip(isResolved, false);
+  if (typeof isResolved === "boolean") {
+    updates.status = statusFromResolved(isResolved === true);
   }
   if (Object.keys(updates).length === 0) return;
   let sessionIdForInvalidation: string | null = null;
@@ -205,11 +200,11 @@ export async function updateFeedbackRepo(
   }
 }
 
-type FeedbackStatus = "open" | "resolved" | "skipped";
+type FeedbackStatus = "open" | "resolved";
 
 /**
- * Updates feedback (including status: resolve/skip) and session denormalized counters in one transaction.
- * Use when isResolved or isSkipped may change. Migration-safe: floors session counters at 0.
+ * Updates feedback (resolve / reopen) and session denormalized counters in one transaction.
+ * Use when isResolved may change. Migration-safe: floors session counters at 0.
  */
 export async function updateFeedbackResolveAndSessionCountersRepo(
   feedbackId: string,
@@ -222,13 +217,11 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     actionSteps: string[] | null;
     suggestedTags: string[] | null;
     isResolved: boolean;
-    isSkipped: boolean;
   }>
 ): Promise<void> {
   const feedbackRef = doc(db, "feedback", feedbackId);
   const isResolved = (data as { isResolved?: boolean }).isResolved === true;
-  const isSkipped = (data as { isSkipped?: boolean }).isSkipped === true;
-  const toStatus: FeedbackStatus = statusFromResolveAndSkip(isResolved, isSkipped);
+  const toStatus: FeedbackStatus = statusFromResolved(isResolved);
 
   const updates: FeedbackUpdate = {};
   if (typeof data.title === "string") updates.title = data.title;
@@ -238,7 +231,7 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
   if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
   if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
-  if (typeof (data as { isResolved?: boolean }).isResolved === "boolean" || typeof (data as { isSkipped?: boolean }).isSkipped === "boolean") {
+  if (typeof (data as { isResolved?: boolean }).isResolved === "boolean") {
     updates.status = toStatus;
   }
 
@@ -248,14 +241,14 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     const fd = feedbackSnap.data();
     const sessionId = fd.sessionId as string;
     const workspaceId = (fd.workspaceId as string | undefined) ?? undefined;
-    const wasStatus = ((s: string): FeedbackStatus => (s === "resolved" || s === "skipped" ? s : "open"))(fd.status as string);
+    const raw = (fd.status as string) ?? "open";
+    const wasStatus: FeedbackStatus = raw === "resolved" ? "resolved" : "open";
 
     const sessionRef = doc(db, "sessions", sessionId);
     const sessionSnap = await tx.get(sessionRef);
     const s = sessionSnap.data() || {};
     let openCount = (s.openCount as number) ?? 0;
     let resolvedCount = (s.resolvedCount as number) ?? 0;
-    let skippedCount = (s.skippedCount as number) ?? 0;
 
     const insightsRef = workspaceId ? workspaceInsightsRef(workspaceId) : null;
     const insightsSnap = insightsRef ? await tx.get(insightsRef) : null;
@@ -272,16 +265,13 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     if (wasStatus !== toStatus) {
       if (wasStatus === "open") openCount = Math.max(0, openCount - 1);
       else if (wasStatus === "resolved") resolvedCount = Math.max(0, resolvedCount - 1);
-      else if (wasStatus === "skipped") skippedCount = Math.max(0, skippedCount - 1);
       if (toStatus === "open") openCount += 1;
       else if (toStatus === "resolved") resolvedCount += 1;
-      else if (toStatus === "skipped") skippedCount += 1;
     }
 
     tx.update(sessionRef, {
       openCount,
       resolvedCount,
-      skippedCount,
       updatedAt: serverTimestamp(),
     });
 
@@ -323,7 +313,6 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     data.isResolved === true ||
     status === "resolved" ||
     status === "done";
-  const isSkipped = status === "skipped";
   return {
     id: docSnap.id,
     workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : undefined,
@@ -345,7 +334,6 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     suggestion: data.suggestion ?? "",
     type: data.type,
     isResolved,
-    isSkipped: isSkipped || undefined,
     createdAt: (data.createdAt ?? null) as Timestamp | null,
     contextSummary: data.contextSummary ?? null,
     actionSteps: data.actionSteps ?? data.actionItems ?? null,
@@ -376,7 +364,7 @@ function omitSoftDeletedFeedback(items: Feedback[]): Feedback[] {
 export async function getSessionFeedbackPageRepo(
   sessionId: string,
   opts: {
-    status?: "open" | "resolved" | "skipped" | "all";
+    status?: "open" | "resolved" | "all";
     limit?: number;
     cursor?: FeedbackPageCursor | null;
   } = {}
@@ -634,7 +622,6 @@ export interface SessionFeedbackCounts {
   total: number;
   open: number;
   resolved: number;
-  skipped: number;
 }
 
 /**

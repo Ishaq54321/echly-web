@@ -279,7 +279,7 @@ export function buildCaptureContext(
     }
   }
   if (!visibleText?.trim()) {
-    echlyDebug("VISIBLE TEXT FALLBACK USED", "(skipped to avoid Echly UI)");
+    echlyDebug("VISIBLE TEXT FALLBACK USED", "(omitted to avoid Echly UI)");
   }
 
   const ctx: CaptureContext = {

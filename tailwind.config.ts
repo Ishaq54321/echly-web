@@ -27,7 +27,6 @@ const config: Config = {
           system: "#1a56db",
           insight: "#7C3AED",
           success: "#0d9488",
-          skipped: "#b45309",
           danger: "#b91c1c",
         },
       },

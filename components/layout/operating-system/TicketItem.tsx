@@ -6,8 +6,6 @@ interface TicketItemProps {
   id: string;
   title: string;
   isResolved?: boolean;
-  /** When true, shows skipped (deferred) styling. Takes precedence over isResolved for display. */
-  isSkipped?: boolean;
   index?: number;
   impactLabel?: string | null;
   active?: boolean;
@@ -33,9 +31,9 @@ function TicketItemInner({
       type="button"
       onClick={handleClick}
       data-ticket-id={id}
-      className={`sidebar-row-interactive group relative flex w-full items-center gap-2 px-3 py-2 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] border-b border-gray-100 last:border-b-0 hover:bg-gray-50 ${
+      className={`sidebar-item sidebar-row-interactive group relative flex w-full items-center gap-2 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] hover:bg-[#F1F5F9] ${
         active
-          ? "bg-[var(--layer-2-hover-bg)]"
+          ? "bg-[#E8F0FF]"
           : ""
       } ${isNewTicket ? "echly-new-ticket-highlight" : ""}`}
       aria-current={active ? "true" : undefined}
@@ -44,7 +42,7 @@ function TicketItemInner({
         <span
           className={`truncate block ${
             active
-              ? "text-[hsl(var(--text-primary-strong))] font-medium"
+              ? "text-[#1D4ED8] font-medium"
               : "text-[hsl(var(--text-secondary-soft))]"
           }`}
         >

@@ -19,10 +19,10 @@ import {
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import type { Session } from "@/lib/domain/session";
 import { formatDistanceToNowStrict } from "date-fns/formatDistanceToNowStrict";
-import { ShareSessionModal } from "./ShareSessionModal";
+import { ShareModal } from "@/components/share/ShareModal";
 import { RenameSessionModal } from "./RenameSessionModal";
-
-const DROPDOWN_Z_INDEX = 1000;
+import { PORTAL_DROPDOWN_Z_INDEX } from "@/lib/ui/zIndex";
+import { getPortalDropdownFixedPosition } from "@/lib/ui/portalDropdownPosition";
 const TOOLTIP_HOVER_DELAY_MS = 300;
 const DROPDOWN_ANIMATION_MS = 150;
 
@@ -89,19 +89,37 @@ export function WorkspaceCard({
     setDropdownPosition(null);
   }, []);
 
-  // Position dropdown when open (for portal)
+  const syncDropdownPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const menu = menuRef.current;
+    if (!trigger || !moreOpen) return;
+    const rect = trigger.getBoundingClientRect();
+    const menuW = menu?.offsetWidth ?? undefined;
+    setDropdownPosition(
+      getPortalDropdownFixedPosition(rect, {
+        menuWidthPx: menuW,
+        menuHeightPx: menu?.offsetHeight,
+        placement: "below",
+      })
+    );
+  }, [moreOpen]);
+
   useLayoutEffect(() => {
     if (!moreOpen || typeof document === "undefined") return;
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    const padding = 8;
-    const dropdownMinWidth = 160;
-    setDropdownPosition({
-      top: rect.bottom + padding,
-      left: Math.max(8, rect.right - dropdownMinWidth),
-    });
-  }, [moreOpen]);
+    syncDropdownPosition();
+    const id = requestAnimationFrame(() => syncDropdownPosition());
+    return () => cancelAnimationFrame(id);
+  }, [moreOpen, syncDropdownPosition]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    window.addEventListener("scroll", syncDropdownPosition, true);
+    window.addEventListener("resize", syncDropdownPosition);
+    return () => {
+      window.removeEventListener("scroll", syncDropdownPosition, true);
+      window.removeEventListener("resize", syncDropdownPosition);
+    };
+  }, [moreOpen, syncDropdownPosition]);
 
   // Click outside: both trigger (in card) and portaled menu
   useEffect(() => {
@@ -243,7 +261,7 @@ export function WorkspaceCard({
   };
 
   const menuItemClass =
-    "w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)]";
+    "dropdown-item w-full transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]";
 
   return (
     <>
@@ -318,7 +336,7 @@ export function WorkspaceCard({
                 aria-haspopup="menu"
                 className="flex items-center justify-center h-10 w-10 rounded-xl text-[hsl(var(--text-tertiary))] transition-colors duration-[var(--motion-duration)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
               >
-                <MoreHorizontal className="h-[16px] w-[16px] relative top-[1px] pointer-events-none" strokeWidth={1.5} aria-hidden />
+                <MoreHorizontal className="h-[16px] w-[16px] relative top-[1px] pointer-events-none" strokeWidth={1.6} aria-hidden />
               </button>
               {/* Tooltip: only when hover and dropdown is closed */}
               {showTooltip && !moreOpen && (
@@ -352,12 +370,12 @@ export function WorkspaceCard({
               data-card-actions
               role="menu"
               aria-label="Workspace actions"
-              className="workspace-card-dropdown min-w-[160px] rounded-xl border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)] shadow-[var(--shadow-level-5)] py-1"
+              className="workspace-card-dropdown session-actions-dropdown dropdown-menu border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)]"
               style={{
                 position: "fixed",
                 top: dropdownPosition.top,
                 left: dropdownPosition.left,
-                zIndex: DROPDOWN_Z_INDEX,
+                zIndex: PORTAL_DROPDOWN_Z_INDEX,
               }}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
@@ -369,7 +387,7 @@ export function WorkspaceCard({
                 className={menuItemClass}
                 role="menuitem"
               >
-                <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <Link2 className="shrink-0" strokeWidth={1.6} aria-hidden />
                 Copy link
               </button>
               <button
@@ -378,7 +396,7 @@ export function WorkspaceCard({
                 className={menuItemClass}
                 role="menuitem"
               >
-                <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <UserPlus className="shrink-0" strokeWidth={1.6} aria-hidden />
                 Share
               </button>
               <button
@@ -387,7 +405,7 @@ export function WorkspaceCard({
                 className={menuItemClass}
                 role="menuitem"
               >
-                <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <Pencil className="shrink-0" strokeWidth={1.6} aria-hidden />
                 Rename
               </button>
               <button
@@ -402,9 +420,9 @@ export function WorkspaceCard({
                 role="menuitem"
               >
                 {isArchived ? (
-                  <RotateCcw className="h-3.5 w-3.5 shrink-0 text-gray-700 group-hover:text-gray-900" aria-hidden />
+                  <RotateCcw className="shrink-0 text-gray-700 group-hover:text-gray-900" strokeWidth={1.6} aria-hidden />
                 ) : (
-                  <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <Archive className="shrink-0" strokeWidth={1.6} aria-hidden />
                 )}
                 {archiving ? (isArchived ? "Unarchiving…" : "Archiving…") : isArchived ? "Unarchive" : "Archive"}
               </button>
@@ -412,10 +430,10 @@ export function WorkspaceCard({
               <button
                 type="button"
                 onClick={handleDeleteClick}
-                className="w-full px-3 py-2 text-left text-[14px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)]"
+                className="dropdown-item delete w-full transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
                 role="menuitem"
               >
-                <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <Trash2 className="shrink-0" strokeWidth={1.6} aria-hidden />
                 Delete
               </button>
             </div>,
@@ -484,8 +502,8 @@ export function WorkspaceCard({
         </div>
       </div>
 
-      <ShareSessionModal
-        open={shareOpen}
+      <ShareModal
+        isOpen={shareOpen}
         onClose={() => setShareOpen(false)}
         sessionId={session.id}
         sessionTitle={session.title}

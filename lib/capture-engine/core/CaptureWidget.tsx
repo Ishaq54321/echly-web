@@ -38,7 +38,6 @@ export default function CaptureWidget({
   pointers: pointersProp,
   totalCount,
   openCount,
-  skippedCount,
   resolvedCount,
   sessionLoading = false,
   feedbackRecovering = false,
@@ -176,9 +175,6 @@ export default function CaptureWidget({
         if (status === "resolved" || isResolved === true) return false;
         return true;
       }).length;
-  const skippedTicketsCount = extensionMode
-    ? (typeof skippedCount === "number" ? skippedCount : 0)
-    : state.pointers.filter((p) => (p as { status?: string }).status === "skipped").length;
   const resolvedTicketsCount = extensionMode
     ? (typeof resolvedCount === "number" ? resolvedCount : 0)
     : state.pointers.filter((p) => {
@@ -195,7 +191,7 @@ export default function CaptureWidget({
     /critical|bug|high|urgent/i.test(p.type || "")
   ).length;
   const summary = extensionMode
-    ? `${typeof totalCount === "number" ? totalCount : 0} total · ${openTicketsCount} open · ${skippedTicketsCount} skipped · ${resolvedTicketsCount} resolved`
+    ? `${typeof totalCount === "number" ? totalCount : 0} total · ${openTicketsCount} open · ${resolvedTicketsCount} resolved`
     : openTicketsCount > 0
       ? highPriorityCount > 0
         ? `${highPriorityCount} need attention`

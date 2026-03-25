@@ -47,7 +47,6 @@ const initialCountsPlaceholder: SessionFeedbackCounts = {
   total: 0,
   open: 0,
   resolved: 0,
-  skipped: 0,
 };
 
 function extractTagCounts(feedback: Feedback[]): { tag: string; count: number }[] {

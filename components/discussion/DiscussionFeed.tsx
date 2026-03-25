@@ -24,7 +24,7 @@ export interface DiscussionFeedItem {
   sessionName?: string;
   commentCount?: number;
   lastCommentPreview?: string;
-  status: "open" | "resolved" | "skipped";
+  status: "open" | "resolved";
   updatedAt?: string;
   lastCommentAt?: { seconds?: number } | string;
   createdAt?: { seconds?: number } | string;
@@ -125,7 +125,6 @@ export function DiscussionFeed({
         const list: DiscussionFeedItem[] = sorted.map((item) => {
           const status = (item.status as string) ?? "open";
           const isResolved = status === "resolved" || item.isResolved === true;
-          const isSkipped = status === "skipped" || item.isSkipped === true;
           return {
             id: String(item.id ?? ""),
             title: String(item.title ?? "Untitled"),
@@ -133,7 +132,7 @@ export function DiscussionFeed({
             sessionName: sessionMap.get(item.sessionId as string) ?? "Unknown Session",
             commentCount: typeof item.commentCount === "number" ? item.commentCount : 0,
             lastCommentPreview: typeof item.lastCommentPreview === "string" ? item.lastCommentPreview : undefined,
-            status: getTicketStatus({ isResolved, isSkipped }),
+            status: getTicketStatus({ isResolved }),
             updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : undefined,
             lastCommentAt: item.lastCommentAt as DiscussionFeedItem["lastCommentAt"],
             createdAt: item.createdAt as DiscussionFeedItem["createdAt"],

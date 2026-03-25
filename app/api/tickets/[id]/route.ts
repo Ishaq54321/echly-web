@@ -109,8 +109,7 @@ export async function PATCH(
     actionSteps?: string[];
     suggestedTags?: string[];
     isResolved?: boolean;
-    isSkipped?: boolean;
-    status?: "open" | "resolved" | "skipped";
+    status?: "open" | "resolved";
   };
   try {
     body = await req.json();
@@ -155,17 +154,11 @@ export async function PATCH(
   if (typeof body.status === "string") {
     if (body.status === "resolved") {
       updates.isResolved = true;
-      updates.isSkipped = false;
-    } else if (body.status === "skipped") {
-      updates.isResolved = false;
-      updates.isSkipped = true;
     } else if (body.status === "open") {
       updates.isResolved = false;
-      updates.isSkipped = false;
     }
-  } else {
-    if (typeof body.isResolved === "boolean") updates.isResolved = body.isResolved;
-    if (typeof body.isSkipped === "boolean") updates.isSkipped = body.isSkipped;
+  } else if (typeof body.isResolved === "boolean") {
+    updates.isResolved = body.isResolved;
   }
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({
@@ -173,16 +166,13 @@ export async function PATCH(
       ticket: serializeTicket(existingForOwnership),
     });
   }
-  const statusChange =
-    typeof updates.isResolved === "boolean" || typeof updates.isSkipped === "boolean";
+  const statusChange = typeof updates.isResolved === "boolean";
   try {
     if (statusChange) {
       const targetResolved = updates.isResolved ?? existingForOwnership.isResolved;
-      const targetSkipped = updates.isSkipped ?? existingForOwnership.isSkipped ?? false;
       await updateFeedbackResolveAndSessionCountersRepo(id, {
         ...updates,
-        isResolved: targetSkipped ? false : targetResolved,
-        isSkipped: targetSkipped,
+        isResolved: targetResolved === true,
       });
     } else {
       await updateFeedbackRepo(id, updates);

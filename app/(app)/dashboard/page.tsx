@@ -12,10 +12,14 @@ import {
 import { SessionsHeader } from "@/components/dashboard/SessionsHeader";
 import { SessionsTimeRangeFilter } from "@/components/dashboard/SessionsTimeRangeFilter";
 import { SessionsViewModeToggle } from "@/components/dashboard/SessionsViewModeToggle";
-import { sessionPassesTimeRange } from "@/lib/utils/sessionTimeRange";
+import {
+  DEFAULT_FILTER,
+  sessionPassesTimeRange,
+} from "@/lib/utils/sessionTimeRange";
 import type { SessionsTimeRange } from "@/lib/utils/sessionTimeRange";
 import { useSessionsSearch } from "@/components/dashboard/context/SessionsSearchContext";
 import EmptySessionsCard from "@/components/dashboard/EmptySessionsCard";
+import { ArchiveEmptyState } from "@/components/empty/ArchiveEmptyState";
 import { ToastProvider } from "@/components/dashboard/context/ToastContext";
 import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
 import DashboardCaptureHost from "./components/DashboardCaptureHost";
@@ -58,22 +62,36 @@ function DashboardContent() {
   const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
   const [listArchiveTab, setListArchiveTab] = useState<SessionsListArchiveTab>("sessions");
   const [sessionViewMode, setSessionViewMode] = useState<"list" | "grid">("list");
-  const [sessionsTimeRange, setSessionsTimeRange] = useState<SessionsTimeRange>("all");
+  const [sessionsTimeRange, setSessionsTimeRange] =
+    useState<SessionsTimeRange>(DEFAULT_FILTER);
 
   const filteredSessions = useMemo(
     () => filterAndSortSessions(sessions, search),
     [sessions, search]
   );
 
+  const activeSessions = useMemo(
+    () =>
+      filteredSessions.filter(
+        ({ session }) => (session.isArchived ?? session.archived) !== true
+      ),
+    [filteredSessions]
+  );
+
+  const archivedSessions = useMemo(
+    () =>
+      filteredSessions.filter(
+        ({ session }) => (session.isArchived ?? session.archived) === true
+      ),
+    [filteredSessions]
+  );
+
   const tabFilteredSessions = useMemo(() => {
-    const byArchive =
-      listArchiveTab === "sessions"
-        ? filteredSessions.filter(({ session }) => (session.isArchived ?? session.archived) !== true)
-        : filteredSessions.filter(({ session }) => (session.isArchived ?? session.archived) === true);
-    return byArchive.filter(({ session }) =>
+    const pool = listArchiveTab === "sessions" ? activeSessions : archivedSessions;
+    return pool.filter(({ session }) =>
       sessionPassesTimeRange(session, sessionsTimeRange)
     );
-  }, [filteredSessions, listArchiveTab, sessionsTimeRange]);
+  }, [listArchiveTab, activeSessions, archivedSessions, sessionsTimeRange]);
 
   const workspaceSections = useMemo(
     () => [
@@ -172,7 +190,15 @@ function DashboardContent() {
                   }
                 />
 
-                {tabFilteredSessions.length > 0 ? (
+                {listArchiveTab === "sessions" && sessions.length === 0 ? (
+                  <div className="mt-16">
+                    <EmptySessionsCard />
+                  </div>
+                ) : listArchiveTab === "archived" && archivedSessions.length === 0 ? (
+                  <div className="mt-16">
+                    <ArchiveEmptyState />
+                  </div>
+                ) : (
                   <SessionsWorkspace
                     sections={workspaceSections}
                     onView={handleView}
@@ -185,10 +211,6 @@ function DashboardContent() {
                     viewMode={sessionViewMode}
                     onViewModeChange={setSessionViewMode}
                   />
-                ) : (
-                  <div className="mt-16">
-                    <EmptySessionsCard />
-                  </div>
                 )}
               </div>
             )}

@@ -8,9 +8,9 @@ import {
 
 function parseSessionFeedbackCountsBody(v: unknown): SessionFeedbackCounts {
   if (typeof v !== "object" || v === null) {
-    return { total: 0, open: 0, resolved: 0, skipped: 0 };
+    return { total: 0, open: 0, resolved: 0 };
   }
-  const readNum = (key: "total" | "open" | "resolved" | "skipped"): number => {
+  const readNum = (key: "total" | "open" | "resolved"): number => {
     if (!Object.prototype.hasOwnProperty.call(v, key)) return 0;
     const n = Reflect.get(v, key);
     return typeof n === "number" && !Number.isNaN(n) ? n : 0;
@@ -19,7 +19,6 @@ function parseSessionFeedbackCountsBody(v: unknown): SessionFeedbackCounts {
     total: readNum("total"),
     open: readNum("open"),
     resolved: readNum("resolved"),
-    skipped: readNum("skipped"),
   };
 }
 

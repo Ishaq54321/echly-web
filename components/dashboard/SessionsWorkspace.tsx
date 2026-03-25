@@ -15,7 +15,6 @@ import {
   Trash2,
   UserPlus,
   Check,
-  XCircle,
   X,
 } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
@@ -24,13 +23,16 @@ import type { Session, SessionCreatedBy } from "@/lib/domain/session";
 import { getInitials } from "@/lib/utils/getInitials";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import ProgressPie from "@/components/ui/ProgressPie";
-import { ShareSessionModal } from "@/components/dashboard/ShareSessionModal";
+import { ShareModal } from "@/components/share/ShareModal";
 import { RenameSessionModal } from "@/components/dashboard/RenameSessionModal";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { SessionsViewModeToggle } from "@/components/dashboard/SessionsViewModeToggle";
 import { Modal } from "@/components/ui/Modal";
-
-const DROPDOWN_Z_INDEX = 1000;
+import { PORTAL_DROPDOWN_Z_INDEX } from "@/lib/ui/zIndex";
+import {
+  getPortalDropdownFixedPosition,
+  PORTAL_DROPDOWN_HEIGHT_ESTIMATE_PX,
+} from "@/lib/ui/portalDropdownPosition";
 
 export interface SessionWorkspaceSection {
   title: string;
@@ -125,7 +127,10 @@ function SessionWorkspaceRow({
 }) {
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(
+    null
+  );
+  const [dropdownPlacement, setDropdownPlacement] = useState<"above" | "below">("below");
   const [shareOpen, setShareOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -140,18 +145,46 @@ function SessionWorkspaceRow({
     setDropdownPosition(null);
   }, []);
 
+  const syncDropdownPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const menu = menuRef.current;
+    if (!trigger || !moreOpen) return;
+    const rect = trigger.getBoundingClientRect();
+    const menuW = menu?.offsetWidth;
+    const menuH = menu?.offsetHeight ?? 0;
+    const gap = 8;
+    const effectiveH = menuH > 0 ? menuH : PORTAL_DROPDOWN_HEIGHT_ESTIMATE_PX;
+    const spaceBelow = window.innerHeight - rect.bottom - gap;
+    const spaceAbove = rect.top - gap;
+    const placement =
+      spaceBelow < effectiveH && spaceAbove > spaceBelow ? "above" : "below";
+    setDropdownPlacement(placement);
+
+    setDropdownPosition(
+      getPortalDropdownFixedPosition(rect, {
+        menuWidthPx: menuW,
+        menuHeightPx: menuH > 0 ? menuH : undefined,
+        placement,
+      })
+    );
+  }, [moreOpen]);
+
   useLayoutEffect(() => {
     if (!moreOpen || typeof document === "undefined") return;
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    const dropdownMinWidth = 160;
-    const padding = 8;
-    setDropdownPosition({
-      top: rect.bottom + padding,
-      left: Math.max(8, rect.right - dropdownMinWidth),
-    });
-  }, [moreOpen]);
+    syncDropdownPosition();
+    const id = requestAnimationFrame(() => syncDropdownPosition());
+    return () => cancelAnimationFrame(id);
+  }, [moreOpen, syncDropdownPosition]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    window.addEventListener("scroll", syncDropdownPosition, true);
+    window.addEventListener("resize", syncDropdownPosition);
+    return () => {
+      window.removeEventListener("scroll", syncDropdownPosition, true);
+      window.removeEventListener("resize", syncDropdownPosition);
+    };
+  }, [moreOpen, syncDropdownPosition]);
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -245,14 +278,13 @@ function SessionWorkspaceRow({
   const assignees = getAssignees(session);
   const open = counts.open ?? 0;
   const resolved = counts.resolved ?? 0;
-  const skipped = counts.skipped ?? 0;
-  const total = open + resolved + skipped;
-  const hasAnyPills = open > 0 || resolved > 0 || skipped > 0;
+  const total = open + resolved;
+  const hasAnyPills = open > 0 || resolved > 0;
   let progress = total === 0 ? 0 : (resolved / total) * 100;
   if (progress >= 100) progress = 99.999;
 
   const menuItemClass =
-    "w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/30";
+    "dropdown-item w-full text-neutral-900 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30";
 
   const mockAssigneeInitials = (() => {
     // Temp mock per spec (static for now).
@@ -373,12 +405,6 @@ function SessionWorkspaceRow({
               <span className="whitespace-nowrap font-medium tracking-tight">{resolved} resolved</span>
             </div>
           )}
-          {skipped > 0 && (
-            <div className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
-              <XCircle className="h-4 w-4 shrink-0 text-red-500" aria-hidden />
-              <span className="whitespace-nowrap font-medium tracking-tight">{skipped} skipped</span>
-            </div>
-          )}
           <div className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm">
             <Calendar className="h-4 w-4 shrink-0 text-orange-500" strokeWidth={2.5} aria-hidden />
             <span className="whitespace-nowrap font-medium tracking-tight text-gray-700">
@@ -433,44 +459,42 @@ function SessionWorkspaceRow({
                   <Link className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 )}
               </button>
-              <button
-                ref={triggerRef}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isOptimistic) return;
-                  setMoreOpen((o) => !o);
-                }}
-                className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
-                aria-label="Session actions"
-                aria-expanded={moreOpen}
-                aria-haspopup="menu"
-              >
-                <MoreHorizontal className="h-5 w-5" strokeWidth={2.5} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {moreOpen &&
-        dropdownPosition &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={menuRef}
-            role="menu"
-            aria-label="Session actions"
-            className="min-w-[160px] rounded-xl border border-neutral-200 bg-white py-1 shadow-sm"
-            style={{
-              position: "fixed",
-              top: dropdownPosition.top,
-              left: dropdownPosition.left,
-              zIndex: DROPDOWN_Z_INDEX,
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
+              <div className="relative">
+                <button
+                  ref={triggerRef}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isOptimistic) return;
+                    setMoreOpen((o) => !o);
+                  }}
+                  className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
+                  aria-label="Session actions"
+                  aria-expanded={moreOpen}
+                  aria-haspopup="menu"
+                >
+                  <MoreHorizontal className="h-5 w-5" strokeWidth={1.6} />
+                </button>
+                {moreOpen &&
+                  dropdownPosition &&
+                  typeof document !== "undefined" &&
+                  createPortal(
+                    <div
+                      ref={menuRef}
+                      role="menu"
+                      aria-label="Session actions"
+                      className="session-actions-dropdown session-actions-dropdown-portal dropdown-menu border border-neutral-200 bg-white"
+                      style={{
+                        position: "fixed",
+                        top: dropdownPosition.top,
+                        left: dropdownPosition.left,
+                        zIndex: PORTAL_DROPDOWN_Z_INDEX,
+                        transformOrigin:
+                          dropdownPlacement === "above" ? "bottom right" : "top right",
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
             {isArchived ? (
               <>
                 <button
@@ -495,8 +519,8 @@ function SessionWorkspaceRow({
                   }}
                 >
                   <RotateCcw
-                    className="h-3.5 w-3.5 shrink-0 text-gray-700 group-hover:text-gray-900"
-                    strokeWidth={2}
+                    className="shrink-0 text-gray-700 group-hover:text-gray-900"
+                    strokeWidth={1.6}
                     aria-hidden
                   />
                   {archiving ? "Unarchiving…" : "Unarchive"}
@@ -523,7 +547,7 @@ function SessionWorkspaceRow({
                     closeMenu();
                   }}
                 >
-                  <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <Link2 className="shrink-0" strokeWidth={1.6} aria-hidden />
                   Copy link
                 </button>
                 <button
@@ -536,7 +560,7 @@ function SessionWorkspaceRow({
                     closeMenu();
                   }}
                 >
-                  <UserPlus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <UserPlus className="shrink-0" strokeWidth={1.6} aria-hidden />
                   Share
                 </button>
                 <button
@@ -549,7 +573,7 @@ function SessionWorkspaceRow({
                     closeMenu();
                   }}
                 >
-                  <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <Pencil className="shrink-0" strokeWidth={1.6} aria-hidden />
                   Rename
                 </button>
                 <button
@@ -569,7 +593,7 @@ function SessionWorkspaceRow({
                     closeMenu();
                   }}
                 >
-                  <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <Archive className="shrink-0" strokeWidth={1.6} aria-hidden />
                   {archiving ? "Archiving…" : "Archive"}
                 </button>
 
@@ -579,22 +603,27 @@ function SessionWorkspaceRow({
             <button
               type="button"
               role="menuitem"
-              className="w-full px-3 py-2.5 text-left text-[14px] font-medium rounded-xl text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 flex cursor-pointer items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/30"
+              className="dropdown-item delete w-full flex cursor-pointer items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
               onClick={(e) => {
                 e.stopPropagation();
                 if (!isOptimistic) onRequestDelete?.(session);
                 closeMenu();
               }}
             >
-              <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <Trash2 className="shrink-0" strokeWidth={1.6} aria-hidden />
               Delete
             </button>
-          </div>,
-          document.body
-        )}
+                    </div>,
+                    document.body
+                  )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <ShareSessionModal
-        open={shareOpen}
+      <ShareModal
+        isOpen={shareOpen}
         onClose={() => setShareOpen(false)}
         sessionId={session.id}
         sessionTitle={session.title}

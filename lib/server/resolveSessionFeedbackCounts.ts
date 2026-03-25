@@ -1,6 +1,7 @@
 import { db } from "@/lib/firebase";
 import {
   collection,
+  deleteField,
   doc,
   getDocs,
   query,
@@ -16,7 +17,6 @@ export type ResolvedSessionFeedbackCounts = {
   total: number;
   open: number;
   resolved: number;
-  skipped: number;
 };
 
 /**
@@ -35,15 +35,13 @@ export async function resolveSessionFeedbackCounts(
   const total = (sessionRow.totalCount as number) ?? 0;
   const open = (sessionRow.openCount as number) ?? 0;
   const resolved = (sessionRow.resolvedCount as number) ?? 0;
-  const skipped = (sessionRow.skippedCount as number) ?? 0;
-  const isConsistent = total === open + resolved + skipped;
+  const isConsistent = total === open + resolved;
 
   if (isConsistent) {
     const data: ResolvedSessionFeedbackCounts = {
       total,
       open,
       resolved,
-      skipped,
     };
     setCachedCounts(sessionId, data);
     return data;
@@ -52,7 +50,6 @@ export async function resolveSessionFeedbackCounts(
   let realTotal = 0;
   let realOpen = 0;
   let realResolved = 0;
-  let realSkipped = 0;
 
   const snapshot = await getDocs(
     query(collection(db, "feedback"), where("sessionId", "==", sessionId))
@@ -63,9 +60,8 @@ export async function resolveSessionFeedbackCounts(
     realTotal++;
     const status = docSnap.data().status;
 
-    if (status === "open") realOpen++;
-    else if (status === "resolved") realResolved++;
-    else if (status === "skipped") realSkipped++;
+    if (status === "resolved") realResolved++;
+    else realOpen++;
   });
 
   const sessionRef = doc(db, "sessions", sessionId);
@@ -73,17 +69,16 @@ export async function resolveSessionFeedbackCounts(
     totalCount: realTotal,
     openCount: realOpen,
     resolvedCount: realResolved,
-    skippedCount: realSkipped,
+    skippedCount: deleteField(),
   }).catch(() => {});
 
   console.warn("[ECHLY COUNT FALLBACK USED]", {
     sessionId,
-    before: { total, open, resolved, skipped },
+    before: { total, open, resolved },
     after: {
       total: realTotal,
       open: realOpen,
       resolved: realResolved,
-      skipped: realSkipped,
     },
   });
 
@@ -91,7 +86,6 @@ export async function resolveSessionFeedbackCounts(
     total: realTotal,
     open: realOpen,
     resolved: realResolved,
-    skipped: realSkipped,
   };
   setCachedCounts(sessionId, data);
   return data;

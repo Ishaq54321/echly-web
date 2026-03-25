@@ -6,8 +6,6 @@ export { SignalStream } from "./SignalStream";
 export type { SignalStreamSortBy } from "./SignalStream";
 export { SessionNavigator } from "./SessionNavigator";
 export { FeedbackListPanel } from "./FeedbackListPanel";
-export { ExecutionModeView } from "./ExecutionModeView";
-export { ExecutionModeLayout } from "./ExecutionModeLayout";
 export { ExecutionCanvas } from "./ExecutionCanvas";
 export type { ExecutionCanvasHeaderItem } from "./ExecutionCanvas";
 export { TicketList } from "./TicketList";

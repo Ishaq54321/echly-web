@@ -11,6 +11,12 @@ interface ActionStepsSectionProps {
   isResolved?: boolean;
 }
 
+const cardClass =
+  "action-steps-card rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4";
+
+const titleClass =
+  "text-[13px] font-semibold text-[#475569] tracking-[0.06em] uppercase mb-3";
+
 export function ActionItemsSection({
   actionSteps,
   onSave,
@@ -77,12 +83,13 @@ export function ActionItemsSection({
 
   if (items.length === 0) {
     return (
-      <section className="my-6">
+      <div className={cardClass}>
+        <h2 className={titleClass}>Action steps</h2>
         {!isAdding ? (
           <button
             type="button"
             onClick={startAdd}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors duration-150 cursor-pointer"
+            className="flex items-center gap-2 px-1 py-1.5 text-sm font-medium text-[#64748B] hover:text-[#0F172A] transition-colors duration-150 cursor-pointer"
           >
             <Plus size={14} />
             Add action step
@@ -99,21 +106,21 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 min-w-0 text-base leading-relaxed px-3 py-2 rounded-lg border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
+              className="flex-1 min-w-0 text-[14px] leading-relaxed px-3 py-2 rounded-lg border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
               autoFocus
               aria-label="New action step"
             />
           </div>
         )}
-      </section>
+      </div>
     );
   }
 
-  const numberClass = "font-sans font-medium text-gray-700";
+  const numberClass = "font-sans font-medium text-[#64748B] text-[14px]";
   return (
-    <section className="my-4">
-      <h2 className="text-sm font-semibold text-orange-500 tracking-wide mb-2">ACTION STEPS</h2>
-      <ul className="list-none space-y-1 p-0 m-0 text-base leading-relaxed">
+    <div className={cardClass}>
+      <h2 className={titleClass}>Action steps</h2>
+      <ul className="list-none space-y-2 p-0 m-0 text-[14px] leading-relaxed text-[#0F172A]">
         {items.map((text, i) => (
           <li key={i} className="group flex items-start gap-2">
             <span className={numberClass}>{i + 1}.</span>
@@ -128,7 +135,7 @@ export function ActionItemsSection({
                     if (e.key === "Enter") void saveEdit();
                     if (e.key === "Escape") cancelEdit();
                   }}
-                  className="flex-1 min-w-0 text-base leading-relaxed px-2 py-1 rounded border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
+                  className="flex-1 min-w-0 text-[14px] leading-relaxed px-2 py-1 rounded border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
                   autoFocus
                   aria-label={`Edit action step ${i + 1}`}
                 />
@@ -145,10 +152,10 @@ export function ActionItemsSection({
                 <button
                   type="button"
                   onClick={() => startEdit(i)}
-                  className={`flex-1 text-left px-0 py-0 min-w-0 cursor-pointer font-medium leading-relaxed ${
+                  className={`flex-1 text-left px-0 py-0 min-w-0 cursor-pointer text-[14px] leading-relaxed ${
                     isResolved
-                      ? "line-through text-base text-gray-500"
-                      : "text-base text-gray-800"
+                      ? "line-through text-[#64748B]"
+                      : "text-[#0F172A] font-normal"
                   }`}
                 >
                   {formatActionStep(text)}
@@ -178,7 +185,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 min-w-0 text-base leading-relaxed px-2 py-1 rounded border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
+              className="flex-1 min-w-0 text-[14px] leading-relaxed px-2 py-1 rounded border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
               autoFocus
               aria-label="New action step"
             />
@@ -189,12 +196,12 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-2 flex items-center gap-2 px-0 py-1 text-sm font-medium text-gray-600 hover:text-gray-800 cursor-pointer"
+          className="mt-3 flex items-center gap-2 px-1 py-1 text-sm font-medium text-[#64748B] hover:text-[#0F172A] cursor-pointer"
         >
           <Plus size={14} />
           Add action step
         </button>
       )}
-    </section>
+    </div>
   );
 }

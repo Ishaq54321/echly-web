@@ -2,14 +2,13 @@ import type { Session } from "@/lib/domain/session";
 
 /**
  * Serializes a session for API responses: converts Firestore Timestamp fields (createdAt, updatedAt) to ISO strings.
- * Counter snapshots (open/resolved/skipped/total/feedback) are omitted so clients use `/api/feedback/counts` only.
+ * Counter snapshots (open/resolved/total/feedback) are omitted so clients use `/api/feedback/counts` only.
  */
 export function serializeSession(session: Session): Record<string, unknown> {
   const {
     totalCount: _totalCount,
     openCount: _openCount,
     resolvedCount: _resolvedCount,
-    skippedCount: _skippedCount,
     feedbackCount: _feedbackCount,
     ...safeSession
   } = session;

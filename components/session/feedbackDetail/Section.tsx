@@ -15,12 +15,13 @@ export function Section({ title, children, titleMuted, titleSemantic }: SectionP
       ? "text-semantic-insight"
       : titleSemantic === "attention"
         ? "text-semantic-attention"
-        : titleMuted
-          ? "text-[hsl(var(--text-tertiary))]"
-          : "text-[hsl(var(--text-tertiary))]";
+        : "text-[#9CA3AF]";
+  const mutedClass = titleMuted && !titleSemantic ? "opacity-80" : "";
   return (
-    <section className="my-4">
-      <h2 className={`text-[11px] font-medium uppercase tracking-[0.06em] mb-1 ${titleClass}`}>
+    <section className="min-w-0">
+      <h2
+        className={`text-[12px] font-medium uppercase tracking-[0.08em] mb-1.5 ${titleClass} ${mutedClass}`}
+      >
         {title}
       </h2>
       <div className="gap-2 flex flex-col text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))]">

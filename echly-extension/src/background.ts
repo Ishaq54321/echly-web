@@ -91,14 +91,12 @@ type FeedbackListResponse = {
 type FeedbackCountResponse = {
   total?: number;
   open?: number;
-  skipped?: number;
   resolved?: number;
 };
-type CountStatus = "open" | "resolved" | "skipped";
+type CountStatus = "open" | "resolved";
 type SessionCounts = {
   total: number;
   open: number;
-  skipped: number;
   resolved: number;
 };
 const COUNTS_TTL_MS = 5 * 60 * 1000;
@@ -200,7 +198,6 @@ const globalUIState: {
   sessionLoading: boolean;
   totalCount: number;
   openCount: number;
-  skippedCount: number;
   resolvedCount: number;
   pointers: StructuredFeedback[];
   nextCursor: string | null;
@@ -222,7 +219,6 @@ const globalUIState: {
   sessionLoading: false,
   totalCount: 0,
   openCount: 0,
-  skippedCount: 0,
   resolvedCount: 0,
   pointers: [],
   nextCursor: null,
@@ -299,7 +295,6 @@ function setRehydratingLoadingState(sessionId: string, mode: RehydrateMode = "co
     globalUIState.pointers = [];
     globalUIState.totalCount = 0;
     globalUIState.openCount = 0;
-    globalUIState.skippedCount = 0;
     globalUIState.resolvedCount = 0;
     globalUIState.nextCursor = null;
     globalUIState.hasMore = false;
@@ -333,7 +328,6 @@ async function rehydrateSession(sessionId: string, mode: RehydrateMode = "cold")
       globalUIState.hasMore = feedbackJson.hasMore === true;
       globalUIState.totalCount = counts.total;
       globalUIState.openCount = counts.open;
-      globalUIState.skippedCount = counts.skipped;
       globalUIState.resolvedCount = counts.resolved;
       const now = Date.now();
       globalUIState.lastSyncedAt = now;
@@ -348,7 +342,6 @@ async function rehydrateSession(sessionId: string, mode: RehydrateMode = "cold")
         globalUIState.pointers = [];
         globalUIState.totalCount = 0;
         globalUIState.openCount = 0;
-        globalUIState.skippedCount = 0;
         globalUIState.resolvedCount = 0;
         globalUIState.nextCursor = null;
         globalUIState.hasMore = false;
@@ -375,7 +368,6 @@ async function fetchFeedbackCountFresh(sessionId: string): Promise<SessionCounts
   const counts: SessionCounts = {
     total: typeof data.total === "number" ? data.total : 0,
     open: typeof data.open === "number" ? data.open : 0,
-    skipped: typeof data.skipped === "number" ? data.skipped : 0,
     resolved: typeof data.resolved === "number" ? data.resolved : 0,
   };
   setCounts(sessionId, counts);
@@ -386,30 +378,25 @@ function mutateGlobalCounts(
   updater: (counts: {
     total: number;
     open: number;
-    skipped: number;
     resolved: number;
   }) => {
     total: number;
     open: number;
-    skipped: number;
     resolved: number;
   }
 ): void {
   const next = updater({
     total: globalUIState.totalCount,
     open: globalUIState.openCount,
-    skipped: globalUIState.skippedCount,
     resolved: globalUIState.resolvedCount,
   });
   globalUIState.totalCount = Math.max(0, next.total);
   globalUIState.openCount = Math.max(0, next.open);
-  globalUIState.skippedCount = Math.max(0, next.skipped);
   globalUIState.resolvedCount = Math.max(0, next.resolved);
   if (globalUIState.sessionId) {
     setCounts(globalUIState.sessionId, {
       total: globalUIState.totalCount,
       open: globalUIState.openCount,
-      skipped: globalUIState.skippedCount,
       resolved: globalUIState.resolvedCount,
     });
   }
@@ -421,10 +408,8 @@ function applyStatusTransition(previousStatus: CountStatus, nextStatus: CountSta
     const next = { ...counts };
     if (previousStatus === "open") next.open -= 1;
     if (previousStatus === "resolved") next.resolved -= 1;
-    if (previousStatus === "skipped") next.skipped -= 1;
     if (nextStatus === "open") next.open += 1;
     if (nextStatus === "resolved") next.resolved += 1;
-    if (nextStatus === "skipped") next.skipped += 1;
     return next;
   });
 }
@@ -545,7 +530,6 @@ function endSessionFromIdle(): void {
   globalUIState.sessionLoading = false;
   globalUIState.totalCount = 0;
   globalUIState.openCount = 0;
-  globalUIState.skippedCount = 0;
   globalUIState.resolvedCount = 0;
   globalUIState.pointers = [];
   resetPaginationState();
@@ -609,7 +593,6 @@ async function initializeSessionState(): Promise<void> {
           globalUIState.sessionModeActive = false;
           globalUIState.totalCount = 0;
           globalUIState.openCount = 0;
-          globalUIState.skippedCount = 0;
           globalUIState.resolvedCount = 0;
           resetPaginationState();
           globalUIState.lastSyncedAt = null;
@@ -1159,7 +1142,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       mutateGlobalCounts((counts) => ({
         total: counts.total + 1,
         open: counts.open + 1,
-        skipped: counts.skipped,
         resolved: counts.resolved,
       }));
       resetSessionIdleTimer();
@@ -1184,7 +1166,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       mutateGlobalCounts((counts) => ({
         total: counts.total + 1,
         open: counts.open + 1,
-        skipped: counts.skipped,
         resolved: counts.resolved,
       }));
       broadcastUIState();
@@ -1193,7 +1174,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const next = { ...counts, total: counts.total - 1 };
         if (mutation.deletedStatus === "open") next.open -= 1;
         if (mutation.deletedStatus === "resolved") next.resolved -= 1;
-        if (mutation.deletedStatus === "skipped") next.skipped -= 1;
         return next;
       });
       broadcastUIState();
@@ -1254,7 +1234,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionLoading = Boolean(sessionId);
     globalUIState.totalCount = 0;
     globalUIState.openCount = 0;
-    globalUIState.skippedCount = 0;
     globalUIState.resolvedCount = 0;
     resetPaginationState();
     globalUIState.lastSyncedAt = null;
@@ -1274,7 +1253,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         globalUIState.pointers = [];
         globalUIState.totalCount = 0;
         globalUIState.openCount = 0;
-        globalUIState.skippedCount = 0;
         globalUIState.resolvedCount = 0;
         resetPaginationState();
         globalUIState.lastSyncedAt = null;
@@ -1298,7 +1276,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         globalUIState.pointers = [];
         globalUIState.totalCount = 0;
         globalUIState.openCount = 0;
-        globalUIState.skippedCount = 0;
         globalUIState.resolvedCount = 0;
         resetPaginationState();
         globalUIState.lastSyncedAt = null;
@@ -1392,7 +1369,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionLoading = false;
     globalUIState.totalCount = 0;
     globalUIState.openCount = 0;
-    globalUIState.skippedCount = 0;
     globalUIState.resolvedCount = 0;
     globalUIState.pointers = [];
     resetPaginationState();
@@ -1641,13 +1617,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           ownerTabId,
         });
 
-        sendResponse({ success: true, skipped: true, reason: "not_job_owner" });
+        sendResponse({ success: true, suppressed: true, reason: "not_job_owner" });
         return;
       }
 
       if (processingFeedbackIds.has(feedbackId)) {
         console.warn("[ECHLY] Duplicate blocked (atomic lock)", feedbackId);
-        sendResponse({ success: true, skipped: true, reason: "locked" });
+        sendResponse({ success: true, suppressed: true, reason: "locked" });
         return;
       }
 
@@ -1655,7 +1631,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         if (await isFeedbackCompleted(feedbackId)) {
           console.warn("[ECHLY] Duplicate blocked (already completed)", feedbackId);
-          sendResponse({ success: true, skipped: true });
+          sendResponse({ success: true, suppressed: true });
           return;
         }
 

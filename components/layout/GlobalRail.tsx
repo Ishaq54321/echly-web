@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRef, useEffect, useState } from "react";
 import {
   Home,
-  Layers,
   MessageSquare,
   BarChart3,
   Settings,
@@ -24,7 +23,6 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
 const NAV_ITEMS = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
   { href: "/discussion", icon: MessageSquare, label: "Discussion" },
-  { href: "/dashboard/sessions", icon: Layers, label: "Sessions" },
   { href: "/dashboard/insights", icon: BarChart3, label: "Insights" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ] as const;
@@ -78,7 +76,7 @@ export default function GlobalRail() {
     >
       <aside
         className={cn(
-          "relative border-r border-gray-200 flex flex-col bg-white h-screen shrink-0 min-h-0 overflow-visible py-4",
+          "relative flex flex-col bg-white h-screen shrink-0 min-h-0 overflow-visible py-4",
           mounted && "transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
           isCollapsed ? "w-[64px] items-center" : "w-[220px] items-stretch"
         )}

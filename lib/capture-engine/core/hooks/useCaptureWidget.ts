@@ -358,7 +358,7 @@ export function useCaptureWidget({
 
   const createCaptureRoot = useCallback(() => {
     if (captureRootRef.current) {
-      if (ECHLY_DEBUG) console.debug("ECHLY createCaptureRoot", "skipped (ref already set)");
+      if (ECHLY_DEBUG) console.debug("ECHLY createCaptureRoot", "noop (ref already set)");
       return;
     }
     const existingRoot = document.getElementById(OVERLAY_ROOT_ID);
@@ -375,7 +375,7 @@ export function useCaptureWidget({
       logger.debug("extension", "pending_cleared", { reason: "create_capture_root" });
       setPending(null);
     } else {
-      logger.debug("extension", "pending_clear_skipped");
+      logger.debug("extension", "pending_clear_noop");
     }
     const captureEl = document.createElement("div");
     captureEl.id = OVERLAY_ROOT_ID;

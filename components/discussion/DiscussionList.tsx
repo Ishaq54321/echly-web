@@ -15,7 +15,7 @@ export interface DiscussionItem {
   sessionName?: string;
   commentCount?: number;
   lastCommentPreview?: string;
-  status: "open" | "resolved" | "skipped";
+  status: "open" | "resolved";
   updatedAt?: string;
   createdAt?: { seconds?: number } | string;
   lastCommentAt?: { seconds?: number } | string;
@@ -98,7 +98,6 @@ export function DiscussionList({
           const item = f as Record<string, unknown>;
           const status = (item.status as string) ?? "open";
           const isResolved = status === "resolved" || item.isResolved === true;
-          const isSkipped = status === "skipped" || item.isSkipped === true;
           return {
             id: String(item.id ?? ""),
             title: String(item.title ?? "Untitled"),
@@ -106,7 +105,7 @@ export function DiscussionList({
             sessionName: typeof item.sessionName === "string" ? item.sessionName : undefined,
             commentCount: typeof item.commentCount === "number" ? item.commentCount : 0,
             lastCommentPreview: typeof item.lastCommentPreview === "string" ? item.lastCommentPreview : undefined,
-            status: getTicketStatus({ isResolved, isSkipped }),
+            status: getTicketStatus({ isResolved }),
             updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : undefined,
             createdAt: item.createdAt as DiscussionItem["createdAt"],
             lastCommentAt: item.lastCommentAt as DiscussionItem["lastCommentAt"],

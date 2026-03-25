@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { Paperclip } from "lucide-react";
 import { Section } from "./Section";
 import { ScreenshotBlock } from "./ScreenshotBlock";
 import { ScreenshotWithPins } from "./ScreenshotWithPins";
@@ -92,38 +93,46 @@ export function FeedbackContent({
   const tagsToOffer = AVAILABLE_TAGS.filter((t) => !tags.includes(t));
 
   return (
-    <>
-      <Section title="Attachments">
-        {item.screenshotUrl ? (
-          sendPinComment != null ? (
-            <ScreenshotWithPins
-              screenshotUrl={item.screenshotUrl}
-              onExpand={onExpandImage}
-              isCommentMode={isCommentMode}
-              pins={pinComments ?? []}
-              comments={comments}
-              activePinId={activePinId}
-              activeThreadId={activeThreadId}
-              onPinClick={onPinClick}
-              onOpenThreadPanel={onOpenThreadPanel}
-              onCloseInlinePopover={onCloseInlinePopover}
-              onAddPinComment={sendPinComment}
-              updateComment={updateComment}
-              onCommentPlaced={onCommentPlaced}
-              onPinPositionChange={updatePinPosition}
-            />
+    <div className="content-wrapper flex flex-col gap-6 min-w-0">
+      <section className="min-w-0">
+        <div className="section-header text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6B7280] flex items-center gap-1.5 mb-2">
+          <Paperclip size={16} strokeWidth={1.8} className="shrink-0 text-[#6B7280]" aria-hidden />
+          Attachments
+        </div>
+        <div className="attachments rounded-xl border border-[#E5E7EB] bg-white p-[14px]">
+          {item.screenshotUrl ? (
+            sendPinComment != null ? (
+              <ScreenshotWithPins
+                screenshotUrl={item.screenshotUrl}
+                onExpand={onExpandImage}
+                isCommentMode={isCommentMode}
+                pins={pinComments ?? []}
+                comments={comments}
+                activePinId={activePinId}
+                activeThreadId={activeThreadId}
+                onPinClick={onPinClick}
+                onOpenThreadPanel={onOpenThreadPanel}
+                onCloseInlinePopover={onCloseInlinePopover}
+                onAddPinComment={sendPinComment}
+                updateComment={updateComment}
+                onCommentPlaced={onCommentPlaced}
+                onPinPositionChange={updatePinPosition}
+                embeddedInCard
+              />
+            ) : (
+              <ScreenshotBlock
+                screenshotUrl={item.screenshotUrl}
+                onExpand={onExpandImage}
+                embeddedInCard
+              />
+            )
           ) : (
-            <ScreenshotBlock
-              screenshotUrl={item.screenshotUrl}
-              onExpand={onExpandImage}
-            />
-          )
-        ) : (
-          <div className="echly-screenshot-placeholder">
-            <div className="echly-screenshot-loading-bar" />
-          </div>
-        )}
-      </Section>
+            <div className="echly-screenshot-placeholder rounded-lg overflow-hidden">
+              <div className="echly-screenshot-loading-bar" />
+            </div>
+          )}
+        </div>
+      </section>
       {item.suggestion != null && item.suggestion !== "" && (
         <SuggestionSection suggestion={item.suggestion} />
       )}
@@ -135,19 +144,18 @@ export function FeedbackContent({
         />
       ) : (
         actionSteps.length > 0 && (
-          <section className="my-4">
-            <h2 className="text-sm font-semibold text-orange-700 tracking-wide mb-1">ACTION STEPS</h2>
-            <ul className="list-none space-y-1 p-0 m-0 text-base leading-relaxed">
+          <div className="action-steps-card rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
+            <h2 className="text-[13px] font-semibold text-[#475569] tracking-[0.06em] uppercase mb-3">
+              Action steps
+            </h2>
+            <ul className="list-none space-y-2 p-0 m-0 text-[14px] leading-relaxed text-[#0F172A]">
               {actionSteps.map((action, i) => (
-                <li
-                  key={i}
-                  className="font-medium text-base text-gray-800 leading-relaxed border border-[var(--layer-2-border)] bg-white px-2 py-1 rounded-lg inline-block"
-                >
+                <li key={i} className="leading-relaxed">
                   {formatActionStep(action)}
                 </li>
               ))}
             </ul>
-          </section>
+          </div>
         )
       )}
       {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (
@@ -218,6 +226,6 @@ export function FeedbackContent({
           </div>
         </Section>
       )}
-    </>
+    </div>
   );
 }

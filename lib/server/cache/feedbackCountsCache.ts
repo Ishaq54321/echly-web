@@ -2,7 +2,6 @@ type FeedbackCounts = {
   total: number;
   open: number;
   resolved: number;
-  skipped: number;
 };
 
 const cache = new Map<

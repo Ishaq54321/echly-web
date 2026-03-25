@@ -203,7 +203,6 @@ export function FeedbackHeader({
             : `Created ${formatRelative(item.createdAt ?? null)}`}
         </div>
       )}
-      <div className="my-3 border-b border-[var(--layer-1-border)]" />
     </div>
   );
 }

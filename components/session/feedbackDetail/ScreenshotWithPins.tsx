@@ -36,6 +36,8 @@ interface ScreenshotWithPinsProps {
   updateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
   onCommentPlaced?: () => void;
   onPinPositionChange?: (commentId: string, position: CommentPosition) => Promise<void>;
+  /** Omit outer card chrome when nested inside a parent attachment card. */
+  embeddedInCard?: boolean;
 }
 
 const PinMarker = memo(function PinMarker({
@@ -162,6 +164,7 @@ const ScreenshotWithPinsInner = ({
   updateComment,
   onCommentPlaced,
   onPinPositionChange,
+  embeddedInCard = false,
 }: ScreenshotWithPinsProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const threadPopoverRef = useRef<HTMLDivElement>(null);
@@ -284,11 +287,16 @@ const ScreenshotWithPinsInner = ({
   const userAvatar = currentUser?.photoURL ?? "";
   const userName = currentUser?.displayName || currentUser?.email || "You";
 
+  const outerCard = embeddedInCard
+    ? "block"
+    : "rounded-xl border border-[#E5E7EB] bg-white backdrop-blur-[6px] p-2.5 shadow-none";
+  const innerBorder = embeddedInCard ? "border-0" : "border border-[#E5E7EB]";
+
   return (
-    <div className="rounded-xl border border-[var(--layer-2-border)] bg-white/95 backdrop-blur-[6px] p-3 shadow-[var(--layer-2-shadow)]">
+    <div className={outerCard}>
       <div
         ref={containerRef}
-        className={`relative overflow-visible rounded-lg max-h-[317px] bg-white/90 border border-[var(--layer-2-border)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${isCommentMode ? "cursor-crosshair" : ""}`}
+        className={`relative overflow-visible rounded-lg max-h-[317px] bg-white ${innerBorder} shadow-none ${isCommentMode ? "cursor-crosshair" : ""}`}
         onClick={handleImageClick}
         role={isCommentMode ? "button" : undefined}
         aria-label={isCommentMode ? "Click to add comment pin" : undefined}
