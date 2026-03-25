@@ -35,18 +35,18 @@ export default function ExtensionPopup({
     >
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2 text-gray-700">
-          <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center">
-            <Home className="h-[18px] w-[18px]" />
+          <div className="h-10 w-10 rounded-xl hover:bg-gray-50 flex items-center justify-center">
+            <Home className="h-5 w-5 [shape-rendering:geometricPrecision]" strokeWidth={2} />
           </div>
-          <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center">
-            <Moon className="h-[18px] w-[18px]" />
+          <div className="h-10 w-10 rounded-xl hover:bg-gray-50 flex items-center justify-center">
+            <Moon className="h-5 w-5 [shape-rendering:geometricPrecision]" strokeWidth={2} />
           </div>
-          <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center">
-            <Mic className="h-[18px] w-[18px]" />
+          <div className="h-10 w-10 rounded-xl hover:bg-gray-50 flex items-center justify-center">
+            <Mic className="h-5 w-5 [shape-rendering:geometricPrecision]" strokeWidth={2} />
           </div>
         </div>
-        <div className="h-9 w-9 rounded-xl hover:bg-gray-50 flex items-center justify-center text-gray-500">
-          <X className="h-[18px] w-[18px]" />
+        <div className="h-10 w-10 rounded-xl hover:bg-gray-50 flex items-center justify-center text-gray-500">
+          <X className="h-5 w-5 [shape-rendering:geometricPrecision]" strokeWidth={2} />
         </div>
       </div>
 

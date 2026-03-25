@@ -143,7 +143,7 @@ export default function CaptureHeader({
             aria-label="Open Echly dashboard"
           >
             <div className="header-home-btn">
-              <Home size={18} />
+              <Home size={20} />
             </div>
           </button>
         ) : (

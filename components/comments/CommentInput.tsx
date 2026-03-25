@@ -36,7 +36,7 @@ export default function CommentInput({ onSend }: Props) {
           className="flex-shrink-0 p-2 rounded-md text-brand-accent hover:bg-neutral-100 transition-colors duration-120 cursor-pointer"
           aria-label="Send comment"
         >
-          <Send size={18} strokeWidth={1.5} />
+          <Send size={20} strokeWidth={1.5} />
         </button>
       </div>
     </div>

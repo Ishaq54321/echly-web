@@ -320,7 +320,7 @@ export function WorkspaceCard({
         )}
         {/* 3-DOTS — visible on hover; tooltip only when hover and dropdown closed */}
         <div className="absolute top-4 right-4">
-          <div data-card-actions className="relative z-10 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+          <div data-card-actions className="relative z-10 shrink-0 opacity-100">
             <div
               className="relative h-10 w-10"
               onMouseEnter={() => {
@@ -496,7 +496,7 @@ export function WorkspaceCard({
                   shrink-0
                 "
               >
-                <FileText size={18} aria-hidden />
+                <FileText size={20} aria-hidden />
               </div>
               <div className="flex flex-col min-w-0 flex-1">
                 <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2 overflow-hidden text-ellipsis min-w-0">

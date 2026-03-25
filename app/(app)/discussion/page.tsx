@@ -50,7 +50,7 @@ export default function DiscussionPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20">
+      <div className="flex min-h-0 w-full flex-1 flex-col bg-white pt-6">
         <div className="w-full px-6 flex flex-1 flex-col min-h-0">
           <div className="mb-0 shrink-0">
             <h1 className="text-3xl font-semibold text-neutral-900">Discussion</h1>
@@ -81,7 +81,7 @@ export default function DiscussionPage() {
 
   if (!user) {
     return (
-      <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20">
+      <div className="flex min-h-0 w-full flex-1 flex-col bg-white pt-6">
         <div className="w-full px-6 flex flex-1 flex-col min-h-0">
           <div className="mb-0 shrink-0">
             <h1 className="text-3xl font-semibold text-neutral-900">Discussion</h1>
@@ -105,7 +105,7 @@ export default function DiscussionPage() {
   }
 
   return (
-    <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20">
+    <div className="flex min-h-0 w-full flex-1 flex-col bg-white pt-6">
       <div className="w-full px-6 flex flex-1 flex-col min-h-0">
         <div className="mb-0 shrink-0">
           <h1 className="text-3xl font-semibold text-neutral-900">Discussion</h1>

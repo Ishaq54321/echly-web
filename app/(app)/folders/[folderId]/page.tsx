@@ -13,7 +13,6 @@ import { useWorkspaceOverview } from "@/app/(app)/dashboard/hooks/useWorkspaceOv
 import { Folder, Loader2 } from "lucide-react";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { MoveSessionsModal } from "@/components/dashboard/MoveSessionsModal";
-import SessionsGridSkeleton from "@/components/skeleton/SessionsGridSkeleton";
 import { DragSessionProvider } from "@/components/dashboard/context/DragSessionContext";
 import { UpgradeModal } from "@/components/billing/UpgradeModal";
 import { Button } from "@/components/ui/Button";
@@ -280,7 +279,7 @@ function FolderPageContent() {
   }
 
   return (
-    <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20 relative">
+    <div className="relative flex min-h-0 w-full flex-1 flex-col bg-white pt-6">
       <div className="mx-auto w-full max-w-[1800px] px-10 pt-10 pb-8">
         <div className="flex items-start justify-between">
           <div>
@@ -326,7 +325,9 @@ function FolderPageContent() {
           <div className="pt-8">
             <div className="transition-opacity duration-200">
               {loading ? (
-                <SessionsGridSkeleton />
+                <div className="flex w-full items-center justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-neutral-400" aria-hidden />
+                </div>
               ) : folder && folder.sessionIds.length > 0 ? (
                 <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
                   {sessions.map((item, index) => (

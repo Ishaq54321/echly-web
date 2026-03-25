@@ -3,6 +3,7 @@ import { FloatingUtilityActions } from "@/components/layout/FloatingUtilityActio
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WorkspaceSuspendedGuard } from "@/components/workspace/WorkspaceSuspendedGuard";
 import { BillingUsageCacheInitializer } from "@/components/billing/BillingUsageCacheInitializer";
+import { SessionsSearchProvider } from "@/components/dashboard/context/SessionsSearchContext";
 
 export default function AppLayout({
   children,
@@ -12,17 +13,17 @@ export default function AppLayout({
   return (
     <WorkspaceSuspendedGuard>
       <BillingUsageCacheInitializer />
-      <div className="flex h-screen overflow-hidden">
-        <GlobalRail />
-        <main className="flex-1 h-full overflow-y-auto min-h-0 relative bg-white">
-          <div className="h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto min-h-0">
+      <SessionsSearchProvider>
+        <div className="flex h-screen overflow-hidden">
+          <GlobalRail />
+          <main className="relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden bg-white transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
+            <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
               <FloatingUtilityActions />
               <ErrorBoundary>{children}</ErrorBoundary>
             </div>
-          </div>
-        </main>
-      </div>
+          </main>
+        </div>
+      </SessionsSearchProvider>
       <div className="fixed bottom-4 right-6 text-[11px] text-meta pointer-events-none">
         All changes saved • Secure session
       </div>

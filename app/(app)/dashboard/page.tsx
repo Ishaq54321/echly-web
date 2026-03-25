@@ -2,19 +2,26 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
-import { setDoc, updateDoc, deleteDoc, doc, serverTimestamp, arrayUnion } from "firebase/firestore";
+import { updateDoc, deleteDoc, doc, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { useWorkspaceOverview } from "./hooks/useWorkspaceOverview";
 import type { SessionWithCounts } from "./hooks/useWorkspaceOverview";
 import type { DashboardFolder } from "./hooks/useWorkspaceOverview";
-import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
+import { SessionsWorkspace } from "@/components/dashboard/SessionsWorkspace";
+import {
+  SessionsListArchiveTabs,
+  type SessionsListArchiveTab,
+} from "@/components/dashboard/SessionsListArchiveTabs";
 import { SessionsHeader } from "@/components/dashboard/SessionsHeader";
+import { SessionsTimeRangeFilter } from "@/components/dashboard/SessionsTimeRangeFilter";
+import { SessionsViewModeToggle } from "@/components/dashboard/SessionsViewModeToggle";
+import { sessionPassesTimeRange } from "@/lib/utils/sessionTimeRange";
+import type { SessionsTimeRange } from "@/lib/utils/sessionTimeRange";
+import { Loader2 } from "lucide-react";
+import { useSessionsSearch } from "@/components/dashboard/context/SessionsSearchContext";
 import { FolderCard } from "@/components/dashboard/FolderCard";
 import EmptySessionsCard from "@/components/dashboard/EmptySessionsCard";
 import FoldersSkeleton from "@/components/skeleton/FoldersSkeleton";
-import SessionSkeletonList from "@/components/skeleton/SessionSkeletonList";
 import { MoveSessionsModal } from "@/components/dashboard/MoveSessionsModal";
 import { DragSessionProvider, useDragSession } from "@/components/dashboard/context/DragSessionContext";
 import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
@@ -46,7 +53,6 @@ function DashboardContent() {
   const { showToast } = useToast();
   const { draggedSessionId, setDraggedSessionId } = useDragSession();
   const [hoveredFolder, setHoveredFolder] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"all" | "archived">("all");
   const {
     user,
     sessions,
@@ -60,10 +66,13 @@ function DashboardContent() {
     updateSession,
     removeSession,
     deleteSession,
-  } = useWorkspaceOverview(viewMode);
-  const [search, setSearch] = useState("");
+  } = useWorkspaceOverview("all");
+  const { search } = useSessionsSearch();
   const hasFolders = folders.length > 0;
-  const sessionSkeletonCount = expectedSessionCount ?? 0;
+  const skeletonCount =
+    sessions?.length > 0
+      ? sessions.length
+      : 3;
   const [moveModalFolder, setMoveModalFolder] = useState<DashboardFolder | null>(null);
   const [moveToFolderSessionId, setMoveToFolderSessionId] = useState<string | null>(null);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
@@ -72,25 +81,13 @@ function DashboardContent() {
   const [creatingSession, setCreatingSession] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [listArchiveTab, setListArchiveTab] = useState<SessionsListArchiveTab>("sessions");
+  const [sessionViewMode, setSessionViewMode] = useState<"list" | "grid">("list");
+  const [sessionsTimeRange, setSessionsTimeRange] = useState<SessionsTimeRange>("all");
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
-
-  const createFolder = async () => {
-    if (!user?.uid) return;
-    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const folderId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    await setDoc(doc(db, "folders", folderId), {
-      name: "Untitled Folder",
-      sessionIds: [],
-      workspaceId,
-      createdAt: serverTimestamp(),
-    });
-    await refreshFolders();
-  };
 
   const updateFolder = async (id: string, updates: Partial<Pick<DashboardFolder, "name" | "sessions">>) => {
     const ref = doc(db, "folders", id);
@@ -116,9 +113,30 @@ function DashboardContent() {
     [sessions, sessionIdsInFolders]
   );
 
-  const filteredSessions = useMemo(
+  const filteredRootSessions = useMemo(
     () => filterAndSortSessions(rootSessions, search),
     [rootSessions, search]
+  );
+
+  const tabFilteredRootSessions = useMemo(() => {
+    const byArchive =
+      listArchiveTab === "sessions"
+        ? filteredRootSessions.filter(({ session }) => !session.archived)
+        : filteredRootSessions.filter(({ session }) => Boolean(session.archived));
+    return byArchive.filter(({ session }) =>
+      sessionPassesTimeRange(session, sessionsTimeRange)
+    );
+  }, [filteredRootSessions, listArchiveTab, sessionsTimeRange]);
+
+  const workspaceSections = useMemo(
+    () => [
+      {
+        title: listArchiveTab === "sessions" ? "" : "Archived",
+        markerClassName: listArchiveTab === "sessions" ? "bg-blue-500" : "bg-neutral-400",
+        items: tabFilteredRootSessions,
+      },
+    ],
+    [listArchiveTab, tabFilteredRootSessions]
   );
 
   const handleMoveSessions = async (sessionIds: string[], folderId: string) => {
@@ -157,35 +175,15 @@ function DashboardContent() {
   };
 
   return (
-    <div className="flex-1 bg-white flex flex-col w-full min-h-0 pt-20 relative">
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 w-[560px]">
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-meta pointer-events-none" />
-          <input
-            type="search"
-            placeholder="Search sessions"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-4 rounded-full border border-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
-            aria-label="Search sessions"
-          />
-        </div>
-      </div>
-      <div className="mx-auto w-full max-w-[1800px] px-10 pt-10 pb-8">
-        <SessionsHeader
-          activeTab={viewMode}
-          onTabChange={setViewMode}
-          sessionCount={sessions.length}
-          onNewFolder={createFolder}
-          isCreating={creatingSession}
-          onNewSession={startRecording}
-        />
+    <div className="relative flex min-h-0 w-full flex-1 flex-col bg-white">
+      <div className="mx-auto w-full max-w-[1400px] px-6 pb-10 pt-3">
+        <SessionsHeader />
 
         <main className="flex-1">
-          <div className="pt-8">
+          <div className="pt-3">
             {hasFolders && (
-              <div className="mb-6">
-                <h3 className="text-sm font-medium mb-3">Folders</h3>
+              <div className="mb-4">
+                <h3 className="mb-3 text-[16px] font-semibold text-neutral-900">Folders</h3>
                 {foldersLoading ? (
                   <FoldersSkeleton count={expectedFolderCount || 2} />
                 ) : (
@@ -208,42 +206,125 @@ function DashboardContent() {
               </div>
             )}
 
-            {hasFolders && (
-              <h2 className="text-sm font-semibold text-neutral-700 mb-3">
-                Sessions
-              </h2>
-            )}
+            {isMounted && sessionsLoading ? (
+              <div className="transition-opacity duration-150">
+                <SessionsListArchiveTabs
+                  value={listArchiveTab}
+                  onChange={setListArchiveTab}
+                  actions={
+                    <div className="flex items-center gap-3">
+                      <SessionsTimeRangeFilter
+                        value={sessionsTimeRange}
+                        onChange={setSessionsTimeRange}
+                      />
 
-            {isMounted && sessionsLoading && sessionSkeletonCount > 0 ? (
-              <SessionSkeletonList count={sessionSkeletonCount} />
+                      <button
+                        type="button"
+                        onClick={startRecording}
+                        disabled={creatingSession}
+                        aria-busy={creatingSession}
+                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {creatingSession ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Creating…
+                          </span>
+                        ) : (
+                          "New Session"
+                        )}
+                      </button>
+
+                      <SessionsViewModeToggle
+                        value={sessionViewMode}
+                        onChange={setSessionViewMode}
+                      />
+                    </div>
+                  }
+                />
+
+                <SessionsWorkspace
+                  sections={workspaceSections}
+                  onView={handleView}
+                  onRenameSuccess={(session) =>
+                    updateSession(session.id, { title: session.title })
+                  }
+                  onArchiveSuccess={removeSession}
+                  onRequestDelete={(session) => setDeleteTarget(session)}
+                  onOpenMoveToFolder={setMoveToFolderSessionId}
+                  viewMode={sessionViewMode}
+                  onViewModeChange={setSessionViewMode}
+                  isLoading
+                  loadingRowCount={skeletonCount}
+                />
+              </div>
             ) : !isMounted ? null : sessions.length === 0 ? (
               <EmptySessionsCard />
             ) : (
               <div className="transition-opacity duration-150">
-                <div className="grid w-full gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
-                  {filteredSessions.map((item, index) => (
-                    <WorkspaceCard
-                      key={item.session.id}
-                      item={item}
-                      onView={handleView}
-                      index={index}
-                      onRenameSuccess={(session) =>
-                        updateSession(session.id, { title: session.title })
-                      }
-                      onArchiveSuccess={removeSession}
-                      onRequestDelete={(session) => setDeleteTarget(session)}
-                      onOpenMoveToFolder={setMoveToFolderSessionId}
-                    />
-                  ))}
-                </div>
+                <SessionsListArchiveTabs
+                  value={listArchiveTab}
+                  onChange={setListArchiveTab}
+                  actions={
+                    <div className="flex items-center gap-3">
+                      <SessionsTimeRangeFilter
+                        value={sessionsTimeRange}
+                        onChange={setSessionsTimeRange}
+                      />
 
-                {filteredSessions.length === 0 && (
-                  <p className="text-[14px] text-[hsl(var(--text-tertiary))] py-8">
+                      <button
+                        type="button"
+                        onClick={startRecording}
+                        disabled={creatingSession}
+                        aria-busy={creatingSession}
+                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {creatingSession ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Creating…
+                          </span>
+                        ) : (
+                          "New Session"
+                        )}
+                      </button>
+
+                      <SessionsViewModeToggle
+                        value={sessionViewMode}
+                        onChange={setSessionViewMode}
+                      />
+                    </div>
+                  }
+                />
+
+                {tabFilteredRootSessions.length > 0 ? (
+                  <SessionsWorkspace
+                    sections={workspaceSections}
+                    onView={handleView}
+                    onRenameSuccess={(session) =>
+                      updateSession(session.id, { title: session.title })
+                    }
+                    onArchiveSuccess={removeSession}
+                    onRequestDelete={(session) => setDeleteTarget(session)}
+                    onOpenMoveToFolder={setMoveToFolderSessionId}
+                    viewMode={sessionViewMode}
+                    onViewModeChange={setSessionViewMode}
+                  />
+                ) : null}
+
+                {filteredRootSessions.length === 0 && (
+                  <p className="py-8 text-[13px] text-neutral-500">
                     {search.trim()
                       ? "No sessions match your search."
-                      : viewMode === "archived"
-                        ? "No archived sessions."
-                        : "No sessions yet. Create one to get started."}
+                      : "No sessions at the workspace root yet. Create one or move sessions out of folders."}
+                  </p>
+                )}
+
+                {filteredRootSessions.length > 0 && tabFilteredRootSessions.length === 0 && (
+                  <p className="py-8 text-[13px] text-neutral-500">
+                    {listArchiveTab === "sessions"
+                      ? "No active sessions at the workspace root."
+                      : "No archived sessions at the workspace root."}
                   </p>
                 )}
               </div>

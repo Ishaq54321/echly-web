@@ -2,6 +2,7 @@
 
 import { Bell } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 export function DashboardHeaderActions() {
   const { user } = useAuthGuard();
@@ -24,10 +25,15 @@ export function DashboardHeaderActions() {
       </button>
 
       <button type="button" aria-label="Profile" className="cursor-pointer">
-        <img
-          src={user?.photoURL || "/avatar-placeholder.png"}
-          alt=""
-          className="w-9 h-9 rounded-full object-cover cursor-pointer"
+        <UserAvatar
+          image={(user as { image?: string | null } | null)?.image}
+          photoURL={user?.photoURL}
+          name={
+            user?.displayName?.trim() ||
+            user?.email?.split("@")[0] ||
+            undefined
+          }
+          className="h-9 w-9 cursor-pointer"
         />
       </button>
     </div>

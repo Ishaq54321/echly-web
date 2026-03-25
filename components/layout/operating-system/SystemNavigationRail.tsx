@@ -63,7 +63,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
       <div className="pt-4 pb-6 shrink-0">
         <Link
           href="/dashboard"
-          className="flex items-center justify-center w-9 h-9 rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[120ms] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="flex items-center justify-center w-10 h-10 rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[120ms] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
           aria-label="Echly home"
         >
           <Image
@@ -87,7 +87,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
 
               const content = (
                 <span
-                  className={`relative flex items-center justify-center w-9 h-9 rounded-lg transition-colors duration-[120ms] ${
+                  className={`relative flex items-center justify-center w-10 h-10 rounded-lg transition-colors duration-[120ms] ${
                     active
                       ? "text-[var(--accent-operational)] bg-[var(--accent-operational-muted)]"
                       : "text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))]"
@@ -99,7 +99,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
                       aria-hidden
                     />
                   )}
-                  <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                  <Icon className="h-5 w-5" strokeWidth={1.5} />
                 </span>
               );
 

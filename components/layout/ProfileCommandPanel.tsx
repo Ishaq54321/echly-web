@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Clock, Info, MessageCircle, Sparkles } from "lucide-react";
@@ -14,6 +13,7 @@ import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime
 import { useBillingStore } from "@/lib/store/billingStore";
 import CountUp from "react-countup";
 import { filterDaily, type DailyInsights } from "@/lib/analytics/filterDaily";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 const PANEL_WIDTH = 520;
 
@@ -164,7 +164,6 @@ export function ProfileCommandPanel({
     user?.displayName?.trim() || user?.email?.split("@")[0] || "User";
   const workspaceName = "Workspace";
   const metaText = `Admin • ${workspaceName}`;
-  const photoURL = user?.photoURL || "/avatar-placeholder.png";
   const sessionUsed = workspaceUsage?.sessionUsed ?? 0;
   const displayPlan = cachedPlan ?? workspaceUsage?.plan ?? "free";
   const sessionsText = !isBillingLoaded
@@ -343,7 +342,7 @@ export function ProfileCommandPanel({
                       {/* Row 1: icon + label */}
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                         <span style={{ opacity: 0.8, flexShrink: 0 }} aria-hidden>
-                          <Icon size={18} style={{ color: stat.textColor }} />
+                          <Icon size={20} style={{ color: stat.textColor }} />
                         </span>
                         <p
                           style={{
@@ -391,7 +390,7 @@ export function ProfileCommandPanel({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Sparkles size={18} style={{ color: "#2563EB", flexShrink: 0 }} aria-hidden />
+                  <Sparkles size={20} style={{ color: "#2563EB", flexShrink: 0 }} aria-hidden />
                   <p style={{ fontSize: 13, fontWeight: 500, color: "#1E3A8A", margin: 0 }}>
                     Unlock advanced feedback tools
                   </p>
@@ -428,13 +427,11 @@ export function ProfileCommandPanel({
               {/* Profile header */}
               <div className="flex items-start gap-3 mb-4">
                 <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[#E7E7E7] bg-[#F5F5F5]">
-                  <Image
-                    src={photoURL}
-                    alt=""
-                    width={40}
-                    height={40}
-                    className="h-full w-full object-cover"
-                    unoptimized
+                  <UserAvatar
+                    image={(user as { image?: string | null } | null)?.image}
+                    photoURL={user?.photoURL}
+                    name={displayName}
+                    className="h-full w-full"
                   />
                 </div>
                 <div className="min-w-0 flex-1">

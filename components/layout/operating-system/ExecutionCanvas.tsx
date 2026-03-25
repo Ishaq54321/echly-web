@@ -214,7 +214,7 @@ export function ExecutionCanvas({
               <button
                 type="button"
                 onClick={() => setActionsOpen((o) => !o)}
-                className="h-9 w-9 flex items-center justify-center rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+                className="h-10 w-10 flex items-center justify-center rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
                 aria-label="More actions"
                 aria-expanded={actionsOpen}
               >

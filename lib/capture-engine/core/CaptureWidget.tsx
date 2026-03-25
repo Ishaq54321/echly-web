@@ -586,7 +586,7 @@ export default function CaptureWidget({
                       aria-label={captureMode === "voice" ? "Voice (Recommended). Click to select microphone." : "Voice (Recommended)"}
                     >
                       <span className="echly-mode-card-icon echly-mic-trigger" aria-hidden>
-                        <Mic size={18} strokeWidth={2} />
+                        <Mic size={20} strokeWidth={2} />
                       </span>
                       <span className="echly-mode-card-title">Voice (Recommended)</span>
                     </div>
@@ -605,7 +605,7 @@ export default function CaptureWidget({
                       aria-pressed={captureMode === "text"}
                     >
                       <span className="echly-mode-card-icon">
-                        <PenLine className="mode-icon" size={18} strokeWidth={2} />
+                        <PenLine className="mode-icon" size={20} strokeWidth={2} />
                       </span>
                       <span className="echly-mode-card-title">Write</span>
                     </div>
