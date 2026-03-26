@@ -1,18 +1,36 @@
 "use client";
 
-import { Check, Link as LinkIcon, MoreHorizontal, UserPlus } from "lucide-react";
+import { Check, Link as LinkIcon, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ShareModal } from "@/components/share/ShareModal";
 import { GlobalSearchButton } from "@/components/layout/GlobalSearchButton";
 import { GlobalNotificationButton } from "@/components/layout/GlobalNotificationButton";
 import { ProfileDropdown } from "@/components/layout/ProfileDropdown";
+import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
+import { copySessionLink } from "@/utils/copySessionLink";
+import type { Session } from "@/lib/domain/session";
 
 export function TopControlBar({
   sessionId,
   sessionTitle,
+  session,
+  onSessionRenameSuccess,
+  onSetSessionArchived,
+  onRequestDeleteSession,
 }: {
   sessionId: string;
   sessionTitle?: string;
+  session: Session | null;
+  onSessionRenameSuccess?: (updated: {
+    id: string;
+    title: string;
+    updatedAt?: unknown;
+  }) => void;
+  onSetSessionArchived?: (
+    sessionId: string,
+    archived: boolean
+  ) => Promise<void> | void;
+  onRequestDeleteSession?: (session: Session) => void;
 }) {
   const copyTimerRef = useRef<number | null>(null);
 
@@ -21,16 +39,12 @@ export function TopControlBar({
   const [linkCopied, setLinkCopied] = useState(false);
 
   const copyCurrentLink = useCallback(async () => {
-    const url = window.location.href;
-    try {
-      await navigator.clipboard?.writeText?.(url);
-    } catch {
-      // Clipboard may be blocked; still show inline feedback.
-    }
+    const ok = await copySessionLink(sessionId);
+    if (!ok) return;
     setLinkCopied(true);
     if (copyTimerRef.current != null) window.clearTimeout(copyTimerRef.current);
     copyTimerRef.current = window.setTimeout(() => setLinkCopied(false), 2000);
-  }, []);
+  }, [sessionId]);
 
   useEffect(() => {
     return () => {
@@ -71,9 +85,26 @@ export function TopControlBar({
             )}
           </button>
 
-          <button type="button" className="icon-btn" aria-label="More">
-            <MoreHorizontal size={20} strokeWidth={2} />
-          </button>
+          {session ? (
+            <div
+              className="relative shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <SessionActionsDropdown
+                session={session}
+                variant="list"
+                flipPlacement
+                hideActions={["copyLink", "share"]}
+                onRenameSuccess={onSessionRenameSuccess}
+                onSetArchived={onSetSessionArchived}
+                onRequestDelete={onRequestDeleteSession}
+                triggerClassName="icon-btn"
+                triggerIconClassName="h-5 w-5"
+                triggerAriaLabel="Session actions"
+              />
+            </div>
+          ) : null}
 
           <span
             className="divider mx-1.5 h-5 w-px shrink-0 bg-[#E5E7EB]"

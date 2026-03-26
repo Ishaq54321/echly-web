@@ -5,14 +5,17 @@ import {
   getSessionByIdRepo,
   updateSessionArchivedRepo,
   updateSessionTitleRepo,
+  updateSessionAccessLevelRepo,
 } from "@/lib/repositories/sessionsRepository";
+import type { AccessLevel } from "@/lib/domain/accessLevel";
+import { parseAccessLevelStrict } from "@/lib/domain/accessLevel";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { serializeSession } from "@/lib/server/serializeSession";
 import { log } from "@/lib/utils/logger";
 
-type PatchBody = { title?: string; archived?: boolean };
+type PatchBody = { title?: string; archived?: boolean; accessLevel?: string };
 
 /** GET /api/sessions/:id — return session metadata (e.g. title for Discussion context). */
 export async function GET(
@@ -112,8 +115,17 @@ export async function PATCH(
 
   const hasTitle = typeof body.title === "string" && body.title.trim() !== "";
   const hasArchived = typeof body.archived === "boolean";
+  const rawAccess = body.accessLevel;
+  const hasAccessLevel = rawAccess !== undefined;
+  const validAccessLevel: AccessLevel | null = hasAccessLevel
+    ? parseAccessLevelStrict(typeof rawAccess === "string" ? rawAccess.trim() : rawAccess)
+    : null;
 
-  if (!hasTitle && !hasArchived) {
+  if (hasAccessLevel && validAccessLevel === null) {
+    return NextResponse.json({ success: false, error: "Invalid accessLevel" }, { status: 400 });
+  }
+
+  if (!hasTitle && !hasArchived && validAccessLevel === null) {
     return NextResponse.json({
       success: true,
       session: serializeSession(existing),
@@ -126,6 +138,9 @@ export async function PATCH(
     }
     if (hasArchived) {
       await updateSessionArchivedRepo(id, body.archived!, workspaceId);
+    }
+    if (validAccessLevel != null) {
+      await updateSessionAccessLevelRepo(id, validAccessLevel);
     }
     const updated = await getSessionByIdRepo(id);
     if (!updated) {

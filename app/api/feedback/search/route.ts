@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
-import {
-  getSessionFeedbackPageForUserWithStringCursorRepo,
-  getWorkspaceFeedbackAllRepo,
-  getWorkspaceFeedbackWithCommentsRepo,
-} from "@/lib/repositories/feedbackRepository";
+import { getSessionFeedbackSearchCorpusForUserRepo } from "@/lib/repositories/feedbackRepository";
 import { resolveWorkspaceForUserLight } from "@/lib/server/resolveWorkspaceForUserLight";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { corsHeaders } from "@/lib/server/cors";
 import { verifyExtensionToken } from "@/lib/server/extensionAuth";
 import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
 import { getSessionUser } from "@/lib/server/session";
-import {
-  getCachedFeedback,
-  setCachedFeedback,
-  type FeedbackListKind,
-} from "@/lib/server/cache/feedbackCache";
 
 function unauthorized(): Response {
   return Response.json(
@@ -25,25 +16,17 @@ function unauthorized(): Response {
       error: "NOT_AUTHENTICATED",
       message: "User is not authenticated",
     },
-    {
-      status: 401,
-    }
+    { status: 401 }
   );
 }
 
 function missingExtensionToken(): Response {
-  return Response.json(
-    { error: "MISSING_EXTENSION_TOKEN" },
-    {
-      status: 401,
-    }
-  );
+  return Response.json({ error: "MISSING_EXTENSION_TOKEN" }, { status: 401 });
 }
 
 function base64UrlDecodeToString(input: string): string {
   const b64 = input.replace(/-/g, "+").replace(/_/g, "/");
   const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-  // Node runtime (Next.js): Buffer exists.
   return Buffer.from(padded, "base64").toString("utf8");
 }
 
@@ -55,7 +38,7 @@ function peekJwtPayload(token: string): Record<string, unknown> | null {
     const parsed = JSON.parse(json) as Record<string, unknown>;
     return parsed && typeof parsed === "object" ? parsed : null;
   } catch (err) {
-    console.error("[feedback] peekJwtPayload parse failed:", err);
+    console.error("[feedback/search] peekJwtPayload parse failed:", err);
     return null;
   }
 }
@@ -93,13 +76,6 @@ async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
   throw unauthorized();
 }
 
-export async function OPTIONS(req: NextRequest) {
-  return new Response(null, {
-    status: 200,
-    headers: corsHeaders(req),
-  });
-}
-
 function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
   const createdAt = item.createdAt as { toDate?: () => Date; seconds?: number } | null;
   const createdAtOut =
@@ -119,39 +95,72 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
     id: item.id,
     sessionId: item.sessionId,
     createdAt: createdAtOut,
-
-    // Fields used by capture widget + discussion UI
     title: item.title,
     instruction: item.instruction ?? item.description,
     description: item.description,
     type: item.type,
     actionSteps: item.actionSteps ?? undefined,
-
+    suggestedTags: item.suggestedTags ?? undefined,
     commentCount: typeof item.commentCount === "number" ? item.commentCount : 0,
     lastCommentPreview: item.lastCommentPreview,
     lastCommentAt: lastCommentAtOut ?? undefined,
     status: (item as unknown as { status?: string }).status,
     isResolved: (item as unknown as { isResolved?: boolean }).isResolved,
     isDeleted: item.isDeleted ?? false,
-
     screenshotUrl: item.screenshotUrl ?? null,
     screenshotStatus: item.screenshotStatus ?? null,
   };
 }
 
+function createdAtSeconds(item: Feedback): number {
+  const c = item.createdAt as { seconds?: number; toDate?: () => Date } | null;
+  if (!c) return 0;
+  if (typeof c.seconds === "number") return c.seconds;
+  if (typeof c.toDate === "function") return Math.floor(c.toDate().getTime() / 1000);
+  return 0;
+}
+
+function feedbackMatchesQuery(item: Feedback, needle: string): boolean {
+  const q = needle.trim().toLowerCase();
+  if (!q) return false;
+
+  const title = (item.title ?? "").toLowerCase();
+  if (title.includes(q)) return true;
+
+  const textParts = [
+    item.instruction,
+    item.description,
+    item.suggestion,
+    ...(Array.isArray(item.actionSteps) ? item.actionSteps : []),
+  ]
+    .filter((x): x is string => typeof x === "string" && x.length > 0)
+    .join("\n")
+    .toLowerCase();
+  if (textParts.includes(q)) return true;
+
+  const tags = item.suggestedTags;
+  if (Array.isArray(tags)) {
+    for (const t of tags) {
+      if (typeof t === "string" && t.toLowerCase().includes(q)) return true;
+    }
+  }
+
+  return false;
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders(req),
+  });
+}
+
 /**
- * GET /api/feedback?sessionId=ID&cursor=XYZ&limit=20&status=open|resolved
- * Returns { feedback: [], nextCursor: string | null, hasMore: boolean }
- *
- * When `status` is omitted, returns the mixed-status session list (extension / legacy).
- * When `status=open` or `status=resolved`, filters by Firestore `status` (paginated separately).
- *
- * Session-scoped pagination excludes soft-deleted feedback (`isDeleted === true`).
- * The repository applies the same rule as `where("isDeleted","!=",true)` without
- * dropping legacy docs that omit `isDeleted` (see getSessionFeedbackPageForUserWithStringCursorRepo).
+ * GET /api/feedback/search?sessionId=&query=
+ * Loads a capped session corpus from Firestore and returns matches (title, text, tags). No pagination.
  */
 export async function GET(req: NextRequest) {
-  let user;
+  let user: AuthUser;
   try {
     user = await requireAuthFast(req);
   } catch (res) {
@@ -178,106 +187,47 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const sessionId = searchParams.get("sessionId");
-  const cursor = searchParams.get("cursor") ?? "";
-  const limitParam = searchParams.get("limit");
-  const statusParam = searchParams.get("status")?.trim().toLowerCase();
-  const statusFilter =
-    statusParam === "open" || statusParam === "resolved" ? statusParam : undefined;
-  const listKind: FeedbackListKind = statusFilter ?? "all";
-  const DEFAULT_LIMIT = 20;
-  const requestedLimit = limitParam ? parseInt(limitParam, 10) : NaN;
-  const normalizedRequestedLimit = Number.isFinite(requestedLimit) ? Math.max(1, requestedLimit) : DEFAULT_LIMIT;
-  const safeLimit = Math.min(normalizedRequestedLimit, 50);
+  const sessionId = searchParams.get("sessionId")?.trim() ?? "";
+  const queryRaw = searchParams.get("query") ?? "";
 
-  // When sessionId is omitted, return feedback across sessions (Discussion inbox)
-  // Use conversationsOnly=true to fetch only feedback with comments (conversation feed)
-  if (!sessionId || sessionId.trim() === "") {
-    const conversationsOnly = searchParams.get("conversationsOnly") === "true";
-    try {
-      const workspaceId = resolvedWorkspaceId ?? user.uid;
-      const feedback = conversationsOnly
-        ? await getWorkspaceFeedbackWithCommentsRepo({
-            workspaceId,
-            limit: safeLimit,
-            cursor,
-          })
-        : await getWorkspaceFeedbackAllRepo(workspaceId, safeLimit);
-
-      return NextResponse.json(
-        {
-          feedback: feedback.map(serializeFeedbackMinimal),
-          nextCursor: null,
-          hasMore: false,
-        },
-        { headers: corsHeaders(req) }
-      );
-    } catch (err) {
-      if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-        return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
-          status: 403,
-          headers: corsHeaders(req),
-        });
-      }
-      console.error("GET /api/feedback (all):", err);
-      return NextResponse.json(
-        { error: "Server error" },
-        { status: 500, headers: corsHeaders(req) }
-      );
-    }
+  if (!sessionId) {
+    return NextResponse.json(
+      { error: "sessionId required" },
+      { status: 400, headers: corsHeaders(req) }
+    );
   }
 
+  const workspaceId = resolvedWorkspaceId ?? user.uid;
+
   try {
-    const workspaceId = resolvedWorkspaceId ?? user.uid;
-    const isFirstPage = !cursor || cursor.trim() === "";
-
-    if (isFirstPage) {
-      const cached = getCachedFeedback(workspaceId, sessionId, listKind);
-      if (cached) {
-        return NextResponse.json(cached, { headers: corsHeaders(req) });
-      }
-    }
-
-    const pageResult = await getSessionFeedbackPageForUserWithStringCursorRepo({
+    const corpus = await getSessionFeedbackSearchCorpusForUserRepo({
       workspaceId,
       sessionId,
       userId: user.uid,
-      limit: safeLimit,
-      cursor: isFirstPage ? undefined : cursor,
-      ...(statusFilter ? { statusFilter } : {}),
     });
-    const { feedback, nextCursor, hasMore } = pageResult;
 
-    const responseBody = {
-      feedback: feedback.map(serializeFeedbackMinimal),
-      nextCursor,
-      hasMore,
-    };
-
-    if (isFirstPage) {
-      setCachedFeedback(workspaceId, sessionId, responseBody, listKind);
+    const needle = queryRaw.trim();
+    if (!needle) {
+      return NextResponse.json({ feedback: [] }, { headers: corsHeaders(req) });
     }
 
+    const matched = corpus.filter((item) => feedbackMatchesQuery(item, needle));
+    matched.sort((a, b) => {
+      const ta = createdAtSeconds(a);
+      const tb = createdAtSeconds(b);
+      if (tb !== ta) return tb - ta;
+      return b.id.localeCompare(a.id);
+    });
+
     return NextResponse.json(
-      responseBody,
+      { feedback: matched.map(serializeFeedbackMinimal) },
       { headers: corsHeaders(req) }
     );
   } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
-        status: 403,
-        headers: corsHeaders(req),
-      });
-    }
-    console.error("GET /api/feedback:", err);
+    console.error("GET /api/feedback/search:", err);
     return NextResponse.json(
       { error: "Server error" },
       { status: 500, headers: corsHeaders(req) }
     );
   }
-}
-
-export async function POST(req: NextRequest) {
-  const mod = await import("./post");
-  return mod.POST(req);
 }

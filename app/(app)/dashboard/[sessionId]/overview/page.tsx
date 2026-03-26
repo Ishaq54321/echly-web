@@ -9,6 +9,7 @@ import { useSessionOverview } from "./hooks/useSessionOverview";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { OverviewActivityItem } from "./hooks/useSessionOverview";
 import { formatOverviewDate, formatActivityTime } from "@/lib/utils/date";
+import { copySessionLink } from "@/utils/copySessionLink";
 import type { Timestamp } from "firebase/firestore";
 
 function resolutionLabel(isResolved: boolean): string {
@@ -250,10 +251,10 @@ export default function SessionOverviewPage() {
     }
   }, [authLoading, authUser, loading, data.session, router]);
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback(async () => {
     if (!sessionId) return;
-    const url = typeof window !== "undefined" ? window.location.origin : "";
-    void navigator.clipboard.writeText(`${url}/dashboard/${sessionId}`);
+    const ok = await copySessionLink(sessionId);
+    if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [sessionId]);

@@ -11,12 +11,18 @@ const cache = new Map<string, CacheEntry>();
 
 const TTL = 30 * 1000; // 30 seconds
 
-function getKey(workspaceId: string, sessionId: string) {
-  return `${workspaceId}:${sessionId}`;
+export type FeedbackListKind = "all" | "open" | "resolved";
+
+function getKey(workspaceId: string, sessionId: string, listKind: FeedbackListKind = "all") {
+  return `${workspaceId}:${sessionId}:${listKind}`;
 }
 
-export function getCachedFeedback(workspaceId: string, sessionId: string) {
-  const key = getKey(workspaceId, sessionId);
+export function getCachedFeedback(
+  workspaceId: string,
+  sessionId: string,
+  listKind: FeedbackListKind = "all"
+) {
+  const key = getKey(workspaceId, sessionId, listKind);
   const entry = cache.get(key);
 
   if (!entry) {
@@ -37,9 +43,10 @@ export function getCachedFeedback(workspaceId: string, sessionId: string) {
 export function setCachedFeedback(
   workspaceId: string,
   sessionId: string,
-  data: CacheEntry["data"]
+  data: CacheEntry["data"],
+  listKind: FeedbackListKind = "all"
 ) {
-  const key = getKey(workspaceId, sessionId);
+  const key = getKey(workspaceId, sessionId, listKind);
 
   cache.set(key, {
     data,
@@ -49,9 +56,17 @@ export function setCachedFeedback(
   console.log("[FEEDBACK CACHE] SET", { key });
 }
 
+/**
+ * Drops every cached first-page variant for this session (`all`, `open`, `resolved`).
+ * Call after creates/updates so list snapshots cannot cross-contaminate.
+ */
 export function invalidateFeedbackCache(workspaceId: string, sessionId: string) {
-  const key = getKey(workspaceId, sessionId);
-  cache.delete(key);
-  console.log("[FEEDBACK CACHE] INVALIDATED", { key });
+  for (const kind of ["all", "open", "resolved"] as const) {
+    const key = getKey(workspaceId, sessionId, kind);
+    cache.delete(key);
+    console.log("[FEEDBACK CACHE] INVALIDATED", { key });
+  }
 }
 
+/** @alias {@link invalidateFeedbackCache} — same behavior; clears all/open/resolved keys. */
+export const invalidateSessionFeedbackCache = invalidateFeedbackCache;

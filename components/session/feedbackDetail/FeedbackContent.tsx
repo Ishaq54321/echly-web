@@ -93,7 +93,7 @@ export function FeedbackContent({
   const tagsToOffer = AVAILABLE_TAGS.filter((t) => !tags.includes(t));
 
   return (
-    <div className="content-wrapper flex flex-col gap-6 min-w-0">
+    <div className="content-wrapper flex flex-col gap-4 min-w-0">
       <section className="min-w-0">
         <div className="section-header text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6B7280] flex items-center gap-1.5 mb-2">
           <Paperclip size={16} strokeWidth={1.8} className="shrink-0 text-[#6B7280]" aria-hidden />

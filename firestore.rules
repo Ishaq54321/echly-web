@@ -114,6 +114,32 @@ service cloud.firestore {
       allow read, write: if signedIn() && request.auth.uid == viewerId;
     }
 
+    // Email invites per session; only the session owner (sessions.userId) can manage rows.
+    match /session_shares/{shareId} {
+      function ownsSharedSession(sessionId) {
+        return signedIn()
+          && exists(/databases/$(database)/documents/sessions/$(sessionId))
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == request.auth.uid;
+      }
+
+      allow read: if resource.data.sessionId is string
+        && ownsSharedSession(resource.data.sessionId);
+
+      allow create: if request.resource.data.sessionId is string
+        && request.resource.data.email is string
+        && request.resource.data.permission in ['view', 'comment', 'resolve']
+        && ownsSharedSession(request.resource.data.sessionId);
+
+      allow update: if resource.data.sessionId is string
+        && request.resource.data.sessionId == resource.data.sessionId
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.permission in ['view', 'comment', 'resolve']
+        && ownsSharedSession(resource.data.sessionId);
+
+      allow delete: if resource.data.sessionId is string
+        && ownsSharedSession(resource.data.sessionId);
+    }
+
     // Default deny.
     match /{document=**} {
       allow read, write: if false;

@@ -4,7 +4,6 @@ import type { FeedbackItemShape } from "@/components/session/feedbackDetail/type
 import { FeedbackContent } from "@/components/session/feedbackDetail/FeedbackContent";
 import { SessionFeedbackHeader } from "@/components/session/FeedbackHeader";
 import type { Comment } from "@/lib/domain/comment";
-
 export interface ExecutionViewProps {
   item: (FeedbackItemShape & { index: number; total: number }) | null;
   onSaveTitle?: (newTitle: string) => Promise<void>;
@@ -16,6 +15,8 @@ export interface ExecutionViewProps {
   onCloseCommentMode?: () => void;
   isCommentMode?: boolean;
   onResolveAndNext?: () => void;
+  canComment?: boolean;
+  canResolve?: boolean;
   impactScore?: number | null;
   comments?: Comment[];
   sendPinComment?: (position: { xPercent: number; yPercent: number }, message: string) => Promise<string | null>;
@@ -43,6 +44,8 @@ export function ExecutionView({
   onCloseCommentMode,
   isCommentMode = false,
   onResolveAndNext,
+  canComment = true,
+  canResolve = true,
   impactScore,
   comments = [],
   sendPinComment,
@@ -76,15 +79,15 @@ export function ExecutionView({
       <SessionFeedbackHeader
         item={item}
         impactScore={impactScore}
-        onResolvedChange={onResolvedChange}
-        onResolveAndNext={onResolveAndNext}
-        onOpenComment={onOpenComment}
+        onResolvedChange={canResolve ? onResolvedChange : undefined}
+        onResolveAndNext={canResolve ? onResolveAndNext : undefined}
+        onOpenComment={canComment ? onOpenComment : undefined}
         onCloseCommentMode={onCloseCommentMode}
         isCommentMode={isCommentMode}
         onDelete={onDelete}
       />
 
-      {isCommentMode && (
+      {canComment && isCommentMode && (
         <div className="shrink-0 px-3 py-2.5 flex items-center justify-center bg-[#FAFBFC] -mx-6 mt-1">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 text-[11px] text-[#6B7280]">
             Comment mode · Click anywhere to add comment · Esc to exit
@@ -93,16 +96,16 @@ export function ExecutionView({
       )}
 
       <div
-        className={`main-content flex-1 min-h-0 overflow-y-auto ${isCommentMode ? "cursor-crosshair" : ""}`}
-        data-comment-mode={isCommentMode || undefined}
+        className={`main-content flex-1 min-h-0 overflow-y-auto ${canComment && isCommentMode ? "cursor-crosshair" : ""}`}
+        data-comment-mode={canComment && isCommentMode ? true : undefined}
       >
-        <div className="pt-1 pb-6">
+        <div className="pt-0 pb-4">
           <FeedbackContent
             item={item}
-            onSaveActionSteps={onSaveActionSteps}
-            onSaveTags={onSaveTags}
+            onSaveActionSteps={canResolve ? onSaveActionSteps : undefined}
+            onSaveTags={canResolve ? onSaveTags : undefined}
             onExpandImage={() => setIsImageExpanded(true)}
-            isCommentMode={isCommentMode}
+            isCommentMode={canComment && isCommentMode}
             comments={comments}
             pinComments={comments.filter((c): c is Comment & { position: NonNullable<Comment["position"]> } => c.type === "pin" && c.position != null)}
             activePinId={activePinIdForPopover ?? undefined}

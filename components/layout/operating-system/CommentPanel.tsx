@@ -21,6 +21,9 @@ export interface CommentPanelProps {
   currentUserId?: string | null;
   updateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
   deleteComment?: (commentId: string) => Promise<void>;
+  /** When false, hides replies and comment resolve actions (link access view-only). */
+  canComment?: boolean;
+  canResolve?: boolean;
 }
 
 const CommentRow = memo(function CommentRow({
@@ -84,6 +87,8 @@ const ThreadBlock = memo(function ThreadBlock({
   deleteComment,
   sendReply,
   onSelectThread,
+  canComment = true,
+  canResolve = true,
 }: {
   root: Comment;
   replies: Comment[];
@@ -95,6 +100,8 @@ const ThreadBlock = memo(function ThreadBlock({
   deleteComment?: (id: string) => Promise<void>;
   sendReply?: (threadId: string, message: string) => Promise<void>;
   onSelectThread?: (threadId: string) => void;
+  canComment?: boolean;
+  canResolve?: boolean;
 }) {
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState("");
@@ -124,7 +131,7 @@ const ThreadBlock = memo(function ThreadBlock({
         currentUserId={currentUserId}
         updateComment={updateComment}
         deleteComment={deleteComment}
-        showResolve
+        showResolve={canResolve}
       />
       {replies.length > 0 && (
         <div className="ml-10 mt-1 space-y-0.5">
@@ -140,7 +147,7 @@ const ThreadBlock = memo(function ThreadBlock({
           ))}
         </div>
       )}
-      {sendReply && (
+      {canComment && sendReply && (
         <>
           {!replyOpen ? (
             <div className="ml-10 mt-1">
@@ -197,6 +204,8 @@ const CommentThreadList = memo(function CommentThreadList({
   deleteComment,
   sendReply,
   onSelectThread,
+  canComment = true,
+  canResolve = true,
 }: {
   comments: Comment[];
   loading: boolean;
@@ -210,6 +219,8 @@ const CommentThreadList = memo(function CommentThreadList({
   deleteComment?: (id: string) => Promise<void>;
   sendReply?: (threadId: string, message: string) => Promise<void>;
   onSelectThread?: (threadId: string) => void;
+  canComment?: boolean;
+  canResolve?: boolean;
 }) {
   const roots = comments.filter((c) => !c.threadId);
   const byThreadId = new Map<string, Comment[]>();
@@ -288,6 +299,8 @@ const CommentThreadList = memo(function CommentThreadList({
             deleteComment={deleteComment}
             sendReply={sendReply}
             onSelectThread={onSelectThread}
+            canComment={canComment}
+            canResolve={canResolve}
           />
         ))}
         {filterTab === "all" && resolvedRoots.length > 0 && (
@@ -315,6 +328,8 @@ const CommentThreadList = memo(function CommentThreadList({
                     deleteComment={deleteComment}
                     sendReply={sendReply}
                     onSelectThread={onSelectThread}
+                    canComment={canComment}
+                    canResolve={canResolve}
                   />
                 ))}
               </div>
@@ -334,6 +349,8 @@ const CommentThreadList = memo(function CommentThreadList({
             deleteComment={deleteComment}
             sendReply={sendReply}
             onSelectThread={onSelectThread}
+            canComment={canComment}
+            canResolve={canResolve}
           />
         ))}
       </div>
@@ -353,6 +370,8 @@ export function CommentPanel({
   currentUserId = null,
   updateComment,
   deleteComment,
+  canComment = true,
+  canResolve = true,
 }: CommentPanelProps) {
   const [filterTab, setFilterTab] = useState<CommentFilterTab>("unresolved");
   const [highlightThreadId, setHighlightThreadId] = useState<string | null>(null);
@@ -409,6 +428,8 @@ export function CommentPanel({
             deleteComment={deleteComment}
             sendReply={sendReply}
             onSelectThread={onSelectThread}
+            canComment={canComment}
+            canResolve={canResolve}
           />
         </div>
       </div>

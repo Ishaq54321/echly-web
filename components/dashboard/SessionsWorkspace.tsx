@@ -1,38 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useState } from "react";
 import {
   Archive,
   Calendar,
   CircleDashed,
   Link,
-  Link2,
   Loader2,
-  MoreHorizontal,
-  Pencil,
   RotateCcw,
   Trash2,
-  UserPlus,
   Check,
   X,
 } from "lucide-react";
-import { authFetch } from "@/lib/authFetch";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
-import type { Session, SessionCreatedBy } from "@/lib/domain/session";
-import { getInitials } from "@/lib/utils/getInitials";
-import { UserAvatar } from "@/components/ui/UserAvatar";
+import type { Session } from "@/lib/domain/session";
 import ProgressPie from "@/components/ui/ProgressPie";
-import { ShareModal } from "@/components/share/ShareModal";
-import { RenameSessionModal } from "@/components/dashboard/RenameSessionModal";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { SessionsViewModeToggle } from "@/components/dashboard/SessionsViewModeToggle";
+import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
 import { Modal } from "@/components/ui/Modal";
-import { PORTAL_DROPDOWN_Z_INDEX } from "@/lib/ui/zIndex";
-import {
-  getPortalDropdownFixedPosition,
-  PORTAL_DROPDOWN_HEIGHT_ESTIMATE_PX,
-} from "@/lib/ui/portalDropdownPosition";
+import { copySessionLink } from "@/utils/copySessionLink";
 
 export interface SessionWorkspaceSection {
   title: string;
@@ -58,21 +45,6 @@ export interface SessionsWorkspaceProps {
   isLoading?: boolean;
   /** Number of inline-loading rows when `isLoading` is true (default: 3). */
   loadingRowCount?: number;
-}
-
-function displayName(u: SessionCreatedBy): string {
-  return [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || "User";
-}
-
-function getAssignees(session: Session): SessionCreatedBy[] {
-  const withUsers = session as Session & { users?: SessionCreatedBy[] };
-  if (withUsers.users?.length) {
-    return withUsers.users.slice(0, 4);
-  }
-  if (session.createdBy) {
-    return [session.createdBy];
-  }
-  return [];
 }
 
 function formatSessionUpdatedShort(session: Session): string {
@@ -126,99 +98,14 @@ function SessionWorkspaceRow({
   isLoading?: boolean;
 }) {
   const [openingId, setOpeningId] = useState<string | null>(null);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(
-    null
-  );
-  const [dropdownPlacement, setDropdownPlacement] = useState<"above" | "below">("below");
-  const [shareOpen, setShareOpen] = useState(false);
-  const [renameOpen, setRenameOpen] = useState(false);
-  const [archiving, setArchiving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const firstMenuItemRef = useRef<HTMLButtonElement>(null);
-
-  const closeMenu = useCallback(() => {
-    setMoreOpen(false);
-    setDropdownPosition(null);
-  }, []);
-
-  const syncDropdownPosition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const menu = menuRef.current;
-    if (!trigger || !moreOpen) return;
-    const rect = trigger.getBoundingClientRect();
-    const menuW = menu?.offsetWidth;
-    const menuH = menu?.offsetHeight ?? 0;
-    const gap = 8;
-    const effectiveH = menuH > 0 ? menuH : PORTAL_DROPDOWN_HEIGHT_ESTIMATE_PX;
-    const spaceBelow = window.innerHeight - rect.bottom - gap;
-    const spaceAbove = rect.top - gap;
-    const placement =
-      spaceBelow < effectiveH && spaceAbove > spaceBelow ? "above" : "below";
-    setDropdownPlacement(placement);
-
-    setDropdownPosition(
-      getPortalDropdownFixedPosition(rect, {
-        menuWidthPx: menuW,
-        menuHeightPx: menuH > 0 ? menuH : undefined,
-        placement,
-      })
-    );
-  }, [moreOpen]);
-
-  useLayoutEffect(() => {
-    if (!moreOpen || typeof document === "undefined") return;
-    syncDropdownPosition();
-    const id = requestAnimationFrame(() => syncDropdownPosition());
-    return () => cancelAnimationFrame(id);
-  }, [moreOpen, syncDropdownPosition]);
-
-  useEffect(() => {
-    if (!moreOpen) return;
-    window.addEventListener("scroll", syncDropdownPosition, true);
-    window.addEventListener("resize", syncDropdownPosition);
-    return () => {
-      window.removeEventListener("scroll", syncDropdownPosition, true);
-      window.removeEventListener("resize", syncDropdownPosition);
-    };
-  }, [moreOpen, syncDropdownPosition]);
-
-  useEffect(() => {
-    if (!moreOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      const inTrigger = triggerRef.current?.contains(target);
-      const inMenu = menuRef.current?.contains(target);
-      if (!inTrigger && !inMenu) closeMenu();
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [moreOpen, closeMenu]);
-
-  useEffect(() => {
-    if (!moreOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        closeMenu();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [moreOpen, closeMenu]);
 
   useEffect(() => {
     if (!copied) return;
     const t = window.setTimeout(() => setCopied(false), 900);
     return () => window.clearTimeout(t);
   }, [copied]);
-
-  useEffect(() => {
-    if (moreOpen) firstMenuItemRef.current?.focus();
-  }, [moreOpen]);
 
   if (isLoading) {
     return (
@@ -248,7 +135,6 @@ function SessionWorkspaceRow({
   const { session, counts } = item;
   const sessionId = session.id;
   const isOptimistic = Boolean(session.isOptimistic);
-  const isArchived = (session.isArchived ?? session.archived) === true;
 
   const handleRowActivate = () => {
     if (isSelectionMode) {
@@ -275,16 +161,11 @@ function SessionWorkspaceRow({
     }
   };
 
-  const assignees = getAssignees(session);
   const open = counts.open ?? 0;
   const resolved = counts.resolved ?? 0;
   const total = open + resolved;
-  const hasAnyPills = open > 0 || resolved > 0;
   let progress = total === 0 ? 0 : (resolved / total) * 100;
   if (progress >= 100) progress = 99.999;
-
-  const menuItemClass =
-    "dropdown-item w-full text-neutral-900 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30";
 
   const mockAssigneeInitials = (() => {
     // Temp mock per spec (static for now).
@@ -295,23 +176,6 @@ function SessionWorkspaceRow({
     ];
     return rows[rowIndex % rows.length] ?? ["?"];
   })();
-
-  const handleRenameSave = async (title: string) => {
-    if (!sessionId) throw new Error("Missing session id");
-    const res = await authFetch(`/api/sessions/${sessionId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
-    });
-    if (!res.ok) throw new Error("Failed to rename");
-    const data = (await res.json()) as {
-      success?: boolean;
-      session?: { id: string; title: string; updatedAt?: unknown };
-    };
-    if (data.success && data.session && onRenameSuccess) {
-      onRenameSuccess(data.session);
-    }
-  };
 
   return (
     <>
@@ -444,10 +308,9 @@ function SessionWorkspaceRow({
                 onClick={(e) => {
                   e.stopPropagation();
                   if (isOptimistic) return;
-                  if (navigator.clipboard?.writeText) {
-                    void navigator.clipboard.writeText(session.id);
-                    setCopied(true);
-                  }
+                  void copySessionLink(session.id).then((ok) => {
+                    if (ok) setCopied(true);
+                  });
                 }}
                 className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
                 aria-label={copied ? "Copied" : "Copy link"}
@@ -459,182 +322,28 @@ function SessionWorkspaceRow({
                   <Link className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 )}
               </button>
-              <div className="relative">
-                <button
-                  ref={triggerRef}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isOptimistic) return;
-                    setMoreOpen((o) => !o);
-                  }}
-                  className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
-                  aria-label="Session actions"
-                  aria-expanded={moreOpen}
-                  aria-haspopup="menu"
-                >
-                  <MoreHorizontal className="h-5 w-5" strokeWidth={1.6} />
-                </button>
-                {moreOpen &&
-                  dropdownPosition &&
-                  typeof document !== "undefined" &&
-                  createPortal(
-                    <div
-                      ref={menuRef}
-                      role="menu"
-                      aria-label="Session actions"
-                      className="session-actions-dropdown session-actions-dropdown-portal dropdown-menu border border-neutral-200 bg-white"
-                      style={{
-                        position: "fixed",
-                        top: dropdownPosition.top,
-                        left: dropdownPosition.left,
-                        zIndex: PORTAL_DROPDOWN_Z_INDEX,
-                        transformOrigin:
-                          dropdownPlacement === "above" ? "bottom right" : "top right",
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    >
-            {isArchived ? (
-              <>
-                <button
-                  ref={firstMenuItemRef}
-                  type="button"
-                  role="menuitem"
-                  className={[
-                    menuItemClass,
-                    "group text-gray-900 hover:bg-gray-100 hover:text-gray-900",
-                  ].join(" ")}
-                  disabled={archiving || !onSetArchived}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (isOptimistic || !onSetArchived) return;
-                    setArchiving(true);
-                    try {
-                      await onSetArchived(session.id, false);
-                    } finally {
-                      setArchiving(false);
-                    }
-                    closeMenu();
-                  }}
-                >
-                  <RotateCcw
-                    className="shrink-0 text-gray-700 group-hover:text-gray-900"
-                    strokeWidth={1.6}
-                    aria-hidden
-                  />
-                  {archiving ? "Unarchiving…" : "Unarchive"}
-                </button>
-
-                <div className="mt-1 border-t border-gray-100 pt-1" role="separator" aria-hidden />
-              </>
-            ) : (
-              <>
-                <button
-                  ref={firstMenuItemRef}
-                  type="button"
-                  role="menuitem"
-                  className={menuItemClass}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const url =
-                      typeof window !== "undefined"
-                        ? `${window.location.origin}/dashboard/${session.id}`
-                        : "";
-                    if (url && navigator.clipboard?.writeText) {
-                      void navigator.clipboard.writeText(url);
-                    }
-                    closeMenu();
-                  }}
-                >
-                  <Link2 className="shrink-0" strokeWidth={1.6} aria-hidden />
-                  Copy link
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={menuItemClass}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShareOpen(true);
-                    closeMenu();
-                  }}
-                >
-                  <UserPlus className="shrink-0" strokeWidth={1.6} aria-hidden />
-                  Share
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={menuItemClass}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isOptimistic) setRenameOpen(true);
-                    closeMenu();
-                  }}
-                >
-                  <Pencil className="shrink-0" strokeWidth={1.6} aria-hidden />
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={menuItemClass}
-                  disabled={archiving || !onSetArchived}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (isOptimistic || !onSetArchived) return;
-                    setArchiving(true);
-                    try {
-                      await onSetArchived(session.id, true);
-                    } finally {
-                      setArchiving(false);
-                    }
-                    closeMenu();
-                  }}
-                >
-                  <Archive className="shrink-0" strokeWidth={1.6} aria-hidden />
-                  {archiving ? "Archiving…" : "Archive"}
-                </button>
-
-                <div className="my-1 border-t border-neutral-200" role="separator" aria-hidden />
-              </>
-            )}
-            <button
-              type="button"
-              role="menuitem"
-              className="dropdown-item delete w-full flex cursor-pointer items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isOptimistic) onRequestDelete?.(session);
-                closeMenu();
-              }}
-            >
-              <Trash2 className="shrink-0" strokeWidth={1.6} aria-hidden />
-              Delete
-            </button>
-                    </div>,
-                    document.body
-                  )}
+              <div
+                className="relative"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <SessionActionsDropdown
+                  session={session}
+                  onRenameSuccess={onRenameSuccess}
+                  onSetArchived={onSetArchived}
+                  onRequestDelete={onRequestDelete}
+                  variant="list"
+                  flipPlacement
+                  disabled={isOptimistic}
+                  triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
+                  triggerIconClassName="h-5 w-5"
+                  triggerAriaLabel="Session actions"
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      <ShareModal
-        isOpen={shareOpen}
-        onClose={() => setShareOpen(false)}
-        sessionId={session.id}
-        sessionTitle={session.title}
-      />
-      <RenameSessionModal
-        open={renameOpen}
-        onClose={() => setRenameOpen(false)}
-        sessionId={session.id}
-        currentTitle={session.title}
-        onSave={handleRenameSave}
-      />
     </>
   );
 }

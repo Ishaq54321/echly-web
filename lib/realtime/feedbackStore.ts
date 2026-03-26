@@ -120,9 +120,11 @@ export function subscribeFeedbackSession(sessionId: string): void {
   });
 
   const feedbackRef = collection(db, "feedback");
+  /** Open tickets only (incl. explicit null status); keeps resolved out until the user expands. */
   const feedbackQuery = query(
     feedbackRef,
     where("sessionId", "==", normalizedSessionId),
+    where("status", "in", ["open", null]),
     orderBy("createdAt", "desc"),
     limit(REALTIME_LIMIT)
   );

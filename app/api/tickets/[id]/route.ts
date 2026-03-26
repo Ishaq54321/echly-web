@@ -13,6 +13,7 @@ import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { log } from "@/lib/utils/logger";
 import { getCachedWorkspace } from "@/lib/server/cache/workspaceCache";
+import { requireTicketActorPermission } from "@/lib/server/sessionActorPermissions";
 
 /** GET /api/tickets/:id — return single ticket (feedback) from DB. */
 export async function GET(
@@ -42,13 +43,14 @@ export async function GET(
         { status: 404 }
       );
     }
-    if (ticket.userId !== user.uid) {
+    const session = await getSessionByIdRepo(ticket.sessionId);
+    const viewGate = await requireTicketActorPermission(user, ticket, session, "view");
+    if (!viewGate.ok) {
       return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 }
+        { success: false, error: viewGate.message },
+        { status: viewGate.status }
       );
     }
-    const session = await getSessionByIdRepo(ticket.sessionId);
     const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
     try {
       await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
@@ -126,13 +128,19 @@ export async function PATCH(
       { status: 404 }
     );
   }
-  if (existingForOwnership.userId !== user.uid) {
+  const session = await getSessionByIdRepo(existingForOwnership.sessionId);
+  const resolveGate = await requireTicketActorPermission(
+    user,
+    existingForOwnership,
+    session,
+    "resolve"
+  );
+  if (!resolveGate.ok) {
     return NextResponse.json(
-      { success: false, error: "Forbidden" },
-      { status: 403 }
+      { success: false, error: resolveGate.message },
+      { status: resolveGate.status }
     );
   }
-  const session = await getSessionByIdRepo(existingForOwnership.sessionId);
   const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
   try {
     await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
@@ -235,13 +243,19 @@ export async function DELETE(
         { status: 404 }
       );
     }
-    if (existingForOwnership.userId !== user.uid) {
+    const session = await getSessionByIdRepo(existingForOwnership.sessionId);
+    const delGate = await requireTicketActorPermission(
+      user,
+      existingForOwnership,
+      session,
+      "resolve"
+    );
+    if (!delGate.ok) {
       return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 }
+        { success: false, error: delGate.message },
+        { status: delGate.status }
       );
     }
-    const session = await getSessionByIdRepo(existingForOwnership.sessionId);
     const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
     try {
       await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));

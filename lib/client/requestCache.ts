@@ -38,11 +38,19 @@ function responseLikeFromCached(entry: NonNullable<CacheEntry["data"]>): Respons
   return resLike as Response;
 }
 
+/** Default client TTL (seconds-scale); pagination should bypass via `bypassCache`. */
+const DEFAULT_CLIENT_CACHE_TTL_MS = 4000;
+
 export async function cachedFetch(
   key: string,
   fetcher: () => Promise<Response>,
-  ttl = 10000
+  ttl = DEFAULT_CLIENT_CACHE_TTL_MS,
+  bypassCache = false
 ): Promise<Response> {
+  if (bypassCache) {
+    return fetcher();
+  }
+
   const now = Date.now();
   const existing = cache.get(key);
 

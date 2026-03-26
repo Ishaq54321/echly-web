@@ -452,9 +452,11 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
     userId: string;
     limit: number;
     cursor?: string;
+    /** When set, only returns tickets with this Firestore `status` (open or resolved). */
+    statusFilter?: "open" | "resolved";
   }
 ): Promise<{ feedback: Feedback[]; nextCursor: string | null; hasMore: boolean }> {
-  const { workspaceId, sessionId, userId, limit: pageSize, cursor } = args;
+  const { workspaceId, sessionId, userId, limit: pageSize, cursor, statusFilter } = args;
   assertQueryLimit(pageSize, "getSessionFeedbackPageForUserWithStringCursorRepo");
   void userId;
   const trimmed = cursor?.trim();
@@ -470,11 +472,27 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
   const collected: QueryDocumentSnapshot[] = [];
   let hasMore = false;
 
+  const indexHint =
+    statusFilter != null
+      ? statusFilter === "open"
+        ? "feedback(workspaceId ASC, sessionId ASC, status ASC, createdAt DESC) — open uses status in [open, null]"
+        : "feedback(workspaceId ASC, sessionId ASC, status ASC, createdAt DESC)"
+      : "feedback(workspaceId ASC, sessionId ASC, createdAt DESC)";
+
+  /** Open list: include legacy rows with `status == null` (missing field still needs one-time backfill script). */
+  const statusConstraints =
+    statusFilter === "open"
+      ? [where("status", "in", ["open", null])]
+      : statusFilter === "resolved"
+        ? [where("status", "==", "resolved")]
+        : [];
+
   const runQuery = () =>
     query(
       collection(db, "feedback"),
       where("workspaceId", "==", workspaceId),
       where("sessionId", "==", sessionId),
+      ...statusConstraints,
       orderBy("createdAt", "desc"),
       limit(pageSize),
       ...(startAfterDoc ? [startAfter(startAfterDoc)] : [])
@@ -488,10 +506,11 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.toLowerCase().includes("requires an index")) {
-          console.warn(
-            "[FIRESTORE] Missing composite index: feedback(workspaceId ASC, sessionId ASC, createdAt DESC)",
-            { workspaceId, sessionId }
-          );
+          console.warn(`[FIRESTORE] Missing composite index: ${indexHint}`, {
+            workspaceId,
+            sessionId,
+            statusFilter,
+          });
         }
         throw err;
       }
@@ -525,10 +544,11 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.toLowerCase().includes("requires an index")) {
-      console.warn(
-        "[FIRESTORE] Missing composite index: feedback(workspaceId ASC, sessionId ASC, createdAt DESC)",
-        { workspaceId, sessionId }
-      );
+      console.warn(`[FIRESTORE] Missing composite index: ${indexHint}`, {
+        workspaceId,
+        sessionId,
+        statusFilter,
+      });
     }
     throw err;
   }
@@ -542,6 +562,44 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
     nextCursor: lastVisibleDoc ? lastVisibleDoc.id : null,
     hasMore,
   };
+}
+
+/** Max docs loaded into memory for sidebar search (no pagination of results). */
+const SESSION_SEARCH_CORPUS_MAX = 200;
+
+/**
+ * Loads up to {@link SESSION_SEARCH_CORPUS_MAX} non-deleted feedback docs for a session
+ * (mixed status, newest first) for server-side search. Uses the same access path as list pagination.
+ */
+export async function getSessionFeedbackSearchCorpusForUserRepo(args: {
+  workspaceId: string;
+  sessionId: string;
+  userId: string;
+}): Promise<Feedback[]> {
+  const { workspaceId, sessionId, userId } = args;
+  void userId;
+  const maxDocs = SESSION_SEARCH_CORPUS_MAX;
+  const batchLimit = 50;
+  const out: Feedback[] = [];
+  let cursor: string | undefined;
+
+  while (out.length < maxDocs) {
+    const { feedback, nextCursor, hasMore } = await getSessionFeedbackPageForUserWithStringCursorRepo({
+      workspaceId,
+      sessionId,
+      userId,
+      limit: batchLimit,
+      cursor,
+    });
+    for (const item of feedback) {
+      if (out.length >= maxDocs) break;
+      out.push(item);
+    }
+    if (!hasMore || !nextCursor) break;
+    cursor = nextCursor;
+  }
+
+  return out;
 }
 
 /** Total count of feedback for a session (for sidebar display). */

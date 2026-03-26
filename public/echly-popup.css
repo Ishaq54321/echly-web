@@ -9508,14 +9508,38 @@ html.dark .echly-mic-item.is-active {
 .share-modal {
   gap: 0;
 }
-.share-modal-invite {
-  margin-top: 16px;
+.share-modal-share-stack {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+  margin-top: 14px;
+}
+.share-modal-share-stack .share-modal-list-error {
+  margin: 0;
+}
+.share-modal-invite {
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.share-modal-invite-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.share-modal-invite-actions .share-dropdown {
+  flex: 1 1 140px;
+  min-width: 140px;
+}
+.share-modal-invite-share-btn {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 .share-modal-team {
-  margin-top: 18px;
+  margin-top: 0;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -9524,23 +9548,46 @@ html.dark .echly-mic-item.is-active {
 .share-team-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
 }
 .share-member {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
+  min-height: 44px;
+  padding: 0;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  transition: background-color 0.12s ease;
 }
+.share-member:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+.share-member:last-child {
+  border-bottom: none;
+}
+.share-member-info {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+.share-user-email,
 .share-member-info strong {
   display: block;
+  min-width: 0;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 500;
+  line-height: 1.25;
   color: #111827;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .share-member-info p {
   margin: 4px 0 0;
@@ -9557,20 +9604,23 @@ html.dark .echly-mic-item.is-active {
 .share-member .share-dropdown {
   width: auto;
   min-width: 132px;
+  flex-shrink: 0;
 }
 .share-dropdown-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  box-sizing: border-box;
   width: 100%;
-  height: 42px;
+  height: 44px;
   padding: 0 12px;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   background: #ffffff;
   font-size: 14px;
   font-weight: 500;
+  line-height: 1.25;
   color: #111827;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -9591,12 +9641,6 @@ html.dark .echly-mic-item.is-active {
 .share-dropdown-trigger:focus-visible {
   border-color: #2563eb;
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
-}
-.share-member .share-dropdown-trigger {
-  height: 38px;
-  font-size: 13px;
-  width: 100%;
-  min-width: 132px;
 }
 .share-dropdown-menu,
 .dropdown-menu {
@@ -9626,9 +9670,6 @@ html.dark .echly-mic-item.is-active {
   color: #111827;
   transition: background 0.15s ease;
 }
-.share-member .share-dropdown-option {
-  font-size: 13px;
-}
 .share-dropdown-option:hover {
   background: #f3f4f6;
 }
@@ -9648,10 +9689,13 @@ html.dark .echly-mic-item.is-active {
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
 }
 .share-btn {
+  box-sizing: border-box;
   height: 44px;
   border-radius: 8px;
   padding: 0 16px;
+  font-size: 14px;
   font-weight: 500;
+  line-height: 1.25;
   border: 1px solid #E5E7EB;
   background: #ffffff;
   cursor: pointer;
@@ -9677,12 +9721,12 @@ html.dark .echly-mic-item.is-active {
   background: #1D4ED8;
 }
 .share-modal-permissions {
-  margin-top: 18px;
-  padding-top: 16px;
+  margin-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 .share-modal-actions {
   display: flex;

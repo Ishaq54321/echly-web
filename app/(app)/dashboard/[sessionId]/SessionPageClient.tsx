@@ -20,6 +20,8 @@ import {
   type Counts,
 } from "@/lib/state/sessionCountsStore";
 import type { Session } from "@/lib/domain/session";
+import { hasPermission, normalizeAccessLevel } from "@/lib/domain/accessLevel";
+import { getEffectiveAccessLevel } from "@/lib/permissions/sessionEffectiveAccess";
 import { warn } from "@/lib/utils/logger";
 import Image from "next/image";
 import {
@@ -28,6 +30,7 @@ import {
   CommentPanel,
 } from "@/components/layout/operating-system";
 import { TopControlBar } from "@/components/ui/TopControlBar";
+import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
 
 /** Broadcast ticket update to extension tray so tray stays in sync. */
 function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps?: string[] | null; type?: string }) {
@@ -119,11 +122,28 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const ticketIdFromUrl = searchParams.get("ticket");
 
   const [session, setSession] = useState<Session | null>(null);
+  const [viewerWorkspaceId, setViewerWorkspaceId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
 
   const { user: authUser, loading: authLoading } = useAuthGuard({ router });
+
+  useEffect(() => {
+    if (!authUser?.uid) {
+      setViewerWorkspaceId(null);
+      return;
+    }
+    let cancelled = false;
+    void getDoc(doc(db, "users", authUser.uid)).then((snap) => {
+      if (cancelled || !snap.exists()) return;
+      const w = (snap.data() as { workspaceId?: string }).workspaceId;
+      setViewerWorkspaceId(typeof w === "string" ? w : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.uid]);
 
   // Start feedback loading as soon as auth is ready (do not block on session doc).
   const feedbackSessionId =
@@ -131,6 +151,92 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const listScrollRef = useRef<HTMLDivElement | null>(null);
   const [listScrollReady, setListScrollReady] = useState(0);
+  const [openExpanded, setOpenExpanded] = useState(true);
+  const [resolvedExpanded, setResolvedExpanded] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const isSearchMode = searchQuery.trim().length > 0;
+  const [searchResults, setSearchResults] = useState<Feedback[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  const onOpenExpandedChange = useCallback(() => {
+    setOpenExpanded((prev) => {
+      const next = !prev;
+      if (next) {
+        setResolvedExpanded(false);
+      }
+      return next;
+    });
+  }, []);
+
+  const onResolvedExpandedChange = useCallback(() => {
+    setResolvedExpanded((prev) => {
+      const next = !prev;
+      if (next) {
+        setOpenExpanded(false);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    setOpenExpanded(true);
+    setResolvedExpanded(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearchLoading(false);
+  }, [sessionId]);
+
+  useEffect(() => {
+    const el = listScrollRef.current;
+    if (!el) return;
+    el.scrollTop = 0;
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!isSearchMode) return;
+    setOpenExpanded(true);
+    setResolvedExpanded(true);
+  }, [isSearchMode]);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    if (!feedbackSessionId) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSearchLoading(true);
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const url = `/api/feedback/search?sessionId=${encodeURIComponent(feedbackSessionId)}&query=${encodeURIComponent(q)}`;
+          const res = await authFetch(url);
+          if (!res.ok) {
+            throw new Error(`search ${res.status}`);
+          }
+          const data = (await res.json()) as { feedback?: Feedback[] };
+          if (cancelled) return;
+          setSearchResults(data.feedback ?? []);
+        } catch (err) {
+          console.error("[ECHLY] Session search failed", err);
+          if (!cancelled) setSearchResults([]);
+        } finally {
+          if (!cancelled) setSearchLoading(false);
+        }
+      })();
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [searchQuery, feedbackSessionId]);
 
   const {
     feedback,
@@ -143,6 +249,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     hasMore: hasMoreFeedback,
     hasReachedLimit: feedbackReachedLimit,
     loadingMore: feedbackLoadingMore,
+    isLoadingResolved: feedbackLoadingResolved,
     loadMoreRef: feedbackLoadMoreRef,
   } = useSessionFeedbackPaginated(
     feedbackSessionId,
@@ -151,7 +258,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     (newestTicketId) => {
       setSelectedId(newestTicketId);
       setNewTicketId(newestTicketId);
-    }
+    },
+    resolvedExpanded,
+    openExpanded,
+    isSearchMode
   );
 
   /** Open tickets only; used for Resolve & Next navigation. */
@@ -164,9 +274,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [isCommentMode, setIsCommentMode] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteSessionModalOpen, setDeleteSessionModalOpen] = useState(false);
   const [isEditingSessionTitle, setIsEditingSessionTitle] = useState(false);
   const [sessionTitleDraft, setSessionTitleDraft] = useState("");
-  const [isSavingSessionTitle, setIsSavingSessionTitle] = useState(false);
   const [saveSessionTitleSuccess, setSaveSessionTitleSuccess] = useState(false);
 
   const preloadedScreenshotUrlsRef = useRef<Set<string>>(new Set());
@@ -309,7 +419,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         router.push("/dashboard");
         return;
       }
-      setSession({ id: sessionSnap.id, ...(data as object) } as Session);
+      const raw = data as { accessLevel?: unknown };
+      setSession({
+        id: sessionSnap.id,
+        ...(data as object),
+        accessLevel: normalizeAccessLevel(raw.accessLevel),
+      } as Session);
       const viewerId = getViewerId(authUser.uid);
       if (viewerId) {
         recordSessionViewIfNew(sessionSnap.id, viewerId).catch((err) => {
@@ -324,12 +439,81 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
+  const deepLinkHydrateAttempted = useRef<string | null>(null);
+  const deepLinkSidebarExpansionDone = useRef<string | null>(null);
+
+  useEffect(() => {
+    deepLinkHydrateAttempted.current = null;
+    hasAppliedTicketParam.current = false;
+    deepLinkSidebarExpansionDone.current = null;
+  }, [sessionId, ticketIdFromUrl]);
+
+  useEffect(() => {
+    if (!ticketIdFromUrl || !feedbackSessionId) return;
+    if (feedbackLoading) return;
+    if (feedback.some((f) => f.id === ticketIdFromUrl)) return;
+    if (deepLinkHydrateAttempted.current === ticketIdFromUrl) return;
+    deepLinkHydrateAttempted.current = ticketIdFromUrl;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await authFetch(`/api/tickets/${ticketIdFromUrl}`);
+        const data = (await res.json()) as {
+          success?: boolean;
+          ticket?: TicketFromApi & { sessionId?: string; status?: string; createdAt?: string | null };
+        };
+        if (cancelled || !data.success || !data.ticket) return;
+        const t = data.ticket;
+        if (t.sessionId && t.sessionId !== sessionId) return;
+        const isResolved =
+          t.isResolved === true || t.status === "resolved";
+        if (isResolved) {
+          setResolvedExpanded(true);
+          setOpenExpanded(false);
+        }
+        setFeedback((prev) => {
+          if (prev.some((f) => f.id === ticketIdFromUrl)) return prev;
+          return [...prev, t as unknown as Feedback];
+        });
+      } catch (err) {
+        console.error("[ECHLY] deep link ticket hydrate failed", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    ticketIdFromUrl,
+    feedbackSessionId,
+    sessionId,
+    feedbackLoading,
+    feedback,
+    setFeedback,
+  ]);
+
   useEffect(() => {
     if (!ticketIdFromUrl || feedback.length === 0 || hasAppliedTicketParam.current) return;
     const exists = feedback.some((f) => f.id === ticketIdFromUrl);
     if (exists) {
       hasAppliedTicketParam.current = true;
       setSelectedId(ticketIdFromUrl);
+    }
+  }, [ticketIdFromUrl, feedback]);
+
+  // Deep link: expand the sidebar section that contains ?ticket= (once per ticket id; controlled sections).
+  useEffect(() => {
+    if (!ticketIdFromUrl) return;
+    if (deepLinkSidebarExpansionDone.current === ticketIdFromUrl) return;
+    const ticket = feedback.find((f) => f.id === ticketIdFromUrl);
+    if (!ticket) return;
+    deepLinkSidebarExpansionDone.current = ticketIdFromUrl;
+    if (getTicketStatus(ticket) === "resolved") {
+      setResolvedExpanded(true);
+      setOpenExpanded(false);
+    } else {
+      setOpenExpanded(true);
+      setResolvedExpanded(false);
     }
   }, [ticketIdFromUrl, feedback]);
 
@@ -372,6 +556,87 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     };
   })();
 
+  const sessionActionCaps = useMemo(() => {
+    if (!authUser?.uid || !session) {
+      return { canComment: false, canResolve: false };
+    }
+    const effective = getEffectiveAccessLevel({
+      session,
+      viewerUserId: authUser.uid,
+      viewerWorkspaceId,
+      invitedPermission: null,
+    });
+    return {
+      canComment: hasPermission(effective, "comment"),
+      canResolve: hasPermission(effective, "resolve"),
+    };
+  }, [authUser?.uid, session, viewerWorkspaceId]);
+
+  useEffect(() => {
+    if (!sessionActionCaps.canComment && isCommentMode) {
+      setIsCommentMode(false);
+    }
+  }, [sessionActionCaps.canComment, isCommentMode]);
+
+  const handleSessionRenameFromMenu = useCallback(
+    (updated: { id: string; title: string; updatedAt?: unknown }) => {
+      if (updated.id !== sessionId) return;
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              title: updated.title,
+              updatedAt: updated.updatedAt as Session["updatedAt"],
+            }
+          : prev
+      );
+      setSessionTitleDraft(updated.title);
+    },
+    [sessionId]
+  );
+
+  const handleSetSessionArchivedFromMenu = useCallback(
+    async (id: string, archived: boolean) => {
+      if (id !== sessionId) return;
+      const snapshot = session;
+      if (snapshot) {
+        setSession({ ...snapshot, archived, isArchived: archived });
+      }
+      try {
+        const res = await authFetch(`/api/sessions/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived, isArchived: archived }),
+        });
+        if (!res.ok) {
+          const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(errBody?.error ?? "Archive failed");
+        }
+        if (archived) {
+          router.push("/dashboard");
+        }
+      } catch (err) {
+        console.error("[ECHLY] Session archive from menu failed", err);
+        if (snapshot) setSession(snapshot);
+      }
+    },
+    [sessionId, session, router]
+  );
+
+  const handleRequestDeleteSessionFromMenu = useCallback((_s: Session) => {
+    setDeleteSessionModalOpen(true);
+  }, []);
+
+  const confirmDeleteSessionFromMenu = useCallback(async () => {
+    if (!sessionId) return;
+    const res = await authFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+    const data = (await res.json()) as { success?: boolean; error?: string };
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.error ?? "Delete failed");
+    }
+    router.push("/dashboard");
+  }, [sessionId, router]);
+
   const {
     comments,
     loadingComments,
@@ -385,6 +650,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     sessionId,
     workspaceId: session?.workspaceId ?? session?.userId ?? null,
     feedbackId: selectedId,
+    canComment: sessionActionCaps.canComment,
+    canResolve: sessionActionCaps.canResolve,
   });
 
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -394,7 +661,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /* ================= SAVE TITLE (optimistic update, then PATCH) ================= */
 
   const saveTitle = async (newTitle: string): Promise<void> => {
-    if (!selectedId || newTitle.trim() === "") return;
+    if (!sessionActionCaps.canResolve || !selectedId || newTitle.trim() === "") return;
     const trimmed = newTitle.trim();
     const previousTitle = selectedItem?.title;
     setFeedback((prev) =>
@@ -435,7 +702,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /* ================= SAVE ACTION STEPS (optimistic update, then PATCH) ================= */
 
   const saveActionSteps = async (actionSteps: string[]) => {
-    if (!selectedId) return;
+    if (!sessionActionCaps.canResolve || !selectedId) return;
     const previous = selectedItem?.actionSteps ?? null;
     setFeedback((prev) =>
       prev.map((item) =>
@@ -471,7 +738,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   };
 
   const saveTags = async (suggestedTags: string[]) => {
-    if (!selectedId) return;
+    if (!sessionActionCaps.canResolve || !selectedId) return;
     const nextTags = Array.isArray(suggestedTags) ? suggestedTags : null;
     const previous = selectedItem?.suggestedTags ?? null;
     setFeedback((prev) =>
@@ -508,7 +775,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   };
 
   const saveResolved = async (isResolved: boolean) => {
-    if (!selectedId) return;
+    if (!sessionActionCaps.canResolve || !selectedId) return;
     const previousStatus = selectedItem ? getTicketStatus(selectedItem) : "open";
     const nextStatus = isResolved ? "resolved" : "open";
     const previousResolved = Boolean(selectedItem?.isResolved);
@@ -565,22 +832,20 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   };
 
   const handleSessionTitleBlur = useCallback(async () => {
-    const trimmed = sessionTitleDraft.trim();
     if (!sessionId || !session) return;
-    if (trimmed === (session.title ?? "")) {
+    const trimmed = sessionTitleDraft.trim();
+    const prevDisplay = (session.title ?? "").trim() || "Untitled Session";
+    const safeTitle = trimmed.length > 0 ? trimmed : "Untitled Session";
+    if (safeTitle === prevDisplay) {
       setIsEditingSessionTitle(false);
+      setSessionTitleDraft(prevDisplay);
       return;
     }
-    const safeTitle =
-      trimmed && trimmed.length > 0
-        ? trimmed
-        : session.title || "Untitled Session";
     const previousTitle = session.title ?? "";
     setSession((prev: Session | null) =>
       prev ? ({ ...prev, title: safeTitle } as Session) : prev
     );
     setSessionTitleDraft(safeTitle);
-    setIsSavingSessionTitle(true);
     setIsEditingSessionTitle(false);
     setSaveSessionTitleSuccess(true);
     setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
@@ -598,13 +863,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         setSession((prev: Session | null) =>
           prev ? ({ ...prev, ...data.session } as Session) : prev
         );
-        setSessionTitleDraft((data.session.title as string) ?? safeTitle);
+        const apiTitle = ((data.session.title as string) ?? safeTitle).trim() || "Untitled Session";
+        setSessionTitleDraft(apiTitle);
         if (typeof window !== "undefined" && "chrome" in window) {
           try {
             (window as Window & { chrome?: { runtime?: { sendMessage?: (msg: unknown) => void } } }).chrome?.runtime?.sendMessage?.({
               type: "ECHLY_SESSION_UPDATED",
               sessionId,
-              title: (data.session.title as string) ?? safeTitle,
+              title: apiTitle,
             });
           } catch (err) {
             console.error("[ECHLY] ECHLY_SESSION_UPDATED extension message failed", err);
@@ -616,13 +882,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setSession((prev: Session | null) =>
         prev ? ({ ...prev, title: previousTitle } as Session) : prev
       );
-      setSessionTitleDraft(previousTitle);
-    } finally {
-      setIsSavingSessionTitle(false);
+      setSessionTitleDraft((previousTitle || "").trim() || "Untitled Session");
     }
   }, [sessionId, session, sessionTitleDraft]);
 
   const handleMarkAllResolved = useCallback(async () => {
+    if (!sessionActionCaps.canResolve) return;
     const active = feedback.filter((item) => getTicketStatus(item) === "open");
     if (active.length === 0) return;
     const previousFeedback = feedback;
@@ -662,9 +927,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
       return;
     }
-  }, [feedback, sessionId, setFeedback, ensureCountsSeeded]);
+  }, [feedback, sessionId, setFeedback, ensureCountsSeeded, sessionActionCaps.canResolve]);
 
   const handleMarkAllUnresolved = useCallback(async () => {
+    if (!sessionActionCaps.canResolve) return;
     const resolved = feedback.filter((item) => getTicketStatus(item) === "resolved");
     if (resolved.length === 0) return;
     const previousFeedback = feedback;
@@ -706,9 +972,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
       return;
     }
-  }, [feedback, sessionId, setFeedback, ensureCountsSeeded]);
+  }, [feedback, sessionId, setFeedback, ensureCountsSeeded, sessionActionCaps.canResolve]);
 
   const handleDeleteFeedback = async (id: string) => {
+    if (!sessionActionCaps.canResolve) return;
     const deletedItem = feedback.find((f) => f.id === id);
     const deletedStatus = deletedItem ? getTicketStatus(deletedItem) : "open";
     const prevFeedback = feedback;
@@ -773,9 +1040,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         onOpenComment={() => setIsCommentMode(true)}
         onCloseCommentMode={() => setIsCommentMode(false)}
         onResolveAndNext={handleResolveAndNext}
+        canComment={sessionActionCaps.canComment}
+        canResolve={sessionActionCaps.canResolve}
         impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
         comments={comments}
-        sendPinComment={sendPinComment ?? undefined}
+        sendPinComment={sessionActionCaps.canComment ? sendPinComment ?? undefined : undefined}
         sendReply={sendReply}
         activePinIdForPopover={activePinIdForPopover}
         activeThreadId={activeThreadId}
@@ -786,10 +1055,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         }}
         onCloseInlinePopover={() => setActivePinIdForPopover(null)}
         updateComment={updateComment}
-        sendTextComment={sendTextComment ?? undefined}
+        sendTextComment={
+          sessionActionCaps.canComment ? sendTextComment ?? undefined : undefined
+        }
         onCommentPlaced={() => setIsCommentMode(false)}
-        updatePinPosition={updatePinPosition ?? undefined}
-        onDelete={() => setShowDeleteModal(true)}
+        updatePinPosition={sessionActionCaps.canComment ? updatePinPosition ?? undefined : undefined}
+        onDelete={
+          sessionActionCaps.canResolve ? () => setShowDeleteModal(true) : undefined
+        }
       />
     );
   };
@@ -799,7 +1072,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       <div className="flex h-full min-h-0 overflow-hidden">
         <aside className="sidebar hidden lg:flex w-[300px] h-screen overflow-hidden shrink-0 self-start min-h-0 flex-col sticky top-0">
           <TicketList
-            sessionTitle={session?.title ?? "Session"}
+            sessionTitle={(session?.title ?? "").trim() || "Untitled Session"}
             counts={{
               total: feedbackTotal,
               open: feedbackActiveCount,
@@ -812,34 +1085,60 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             onSessionTitleSave={handleSessionTitleBlur}
             onSessionTitleCancel={() => {
               setIsEditingSessionTitle(false);
-              setSessionTitleDraft(session?.title ?? "Session");
+              setSessionTitleDraft((session?.title ?? "").trim() || "Untitled Session");
             }}
             onSessionTitleEdit={() => {
-              setSessionTitleDraft(session?.title ?? "Session");
+              setSessionTitleDraft((session?.title ?? "").trim() || "Untitled Session");
               setIsEditingSessionTitle(true);
             }}
-            isSavingSessionTitle={isSavingSessionTitle}
             saveSessionTitleSuccess={saveSessionTitleSuccess}
             items={feedback}
             selectedId={selectedId}
             onSelect={setSelectedId}
             newTicketId={newTicketId}
-            loadingMore={feedbackLoadingMore}
-            hasMore={hasMoreFeedback}
+            loadingMore={isSearchMode ? false : feedbackLoadingMore}
+            hasMore={isSearchMode ? false : hasMoreFeedback}
             hasReachedLimit={feedbackReachedLimit}
             loadMoreRef={feedbackLoadMoreRef}
             scrollContainerRef={listScrollRef}
             onScrollContainerReady={() => setListScrollReady((n) => n + 1)}
-            onMarkAllTicketsResolved={handleMarkAllResolved}
-            onMarkAllTicketsUnresolved={handleMarkAllUnresolved}
+            onMarkAllTicketsResolved={
+              sessionActionCaps.canResolve ? handleMarkAllResolved : undefined
+            }
+            onMarkAllTicketsUnresolved={
+              sessionActionCaps.canResolve ? handleMarkAllUnresolved : undefined
+            }
             scrollToId={ticketIdFromUrl}
+            openExpanded={openExpanded}
+            onOpenExpandedChange={onOpenExpandedChange}
+            resolvedExpanded={resolvedExpanded}
+            onResolvedExpandedChange={onResolvedExpandedChange}
+            isLoadingResolved={isSearchMode ? false : feedbackLoadingResolved}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            isSearchMode={isSearchMode}
+            searchResults={searchResults}
+            searchLoading={searchLoading}
           />
         </aside>
 
         <div className="content-divider hidden lg:block shrink-0" aria-hidden />
 
         <div className="main-area flex min-h-0 min-w-0 flex-1 flex-col">
-          <TopControlBar sessionId={sessionId} sessionTitle={session?.title} />
+          <TopControlBar
+            sessionId={sessionId}
+            sessionTitle={session?.title}
+            session={session}
+            onSessionRenameSuccess={
+              sessionActionCaps.canResolve ? handleSessionRenameFromMenu : undefined
+            }
+            onSetSessionArchived={
+              sessionActionCaps.canResolve ? handleSetSessionArchivedFromMenu : undefined
+            }
+            onRequestDeleteSession={
+              sessionActionCaps.canResolve ? handleRequestDeleteSessionFromMenu : undefined
+            }
+          />
           <div className="flex flex-1 min-h-0 min-w-0">
             <main className="surface-main flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
               <div className="h-full flex flex-col min-w-0">
@@ -878,6 +1177,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                   currentUserId={authUser?.uid ?? null}
                   updateComment={updateComment}
                   deleteComment={deleteComment}
+                  canComment={sessionActionCaps.canComment}
+                  canResolve={sessionActionCaps.canResolve}
                 />
               )}
             </div>
@@ -897,7 +1198,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             onClick={(e) => e.stopPropagation()}
           >
             <TicketList
-              sessionTitle={session?.title ?? "Session"}
+              sessionTitle={(session?.title ?? "").trim() || "Untitled Session"}
               counts={{
                 total: feedbackTotal,
                 open: feedbackActiveCount,
@@ -910,13 +1211,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               onSessionTitleSave={handleSessionTitleBlur}
               onSessionTitleCancel={() => {
                 setIsEditingSessionTitle(false);
-                setSessionTitleDraft(session?.title ?? "Session");
+                setSessionTitleDraft((session?.title ?? "").trim() || "Untitled Session");
               }}
               onSessionTitleEdit={() => {
-                setSessionTitleDraft(session?.title ?? "Session");
+                setSessionTitleDraft((session?.title ?? "").trim() || "Untitled Session");
                 setIsEditingSessionTitle(true);
               }}
-              isSavingSessionTitle={isSavingSessionTitle}
               saveSessionTitleSuccess={saveSessionTitleSuccess}
               items={feedback}
               selectedId={selectedId}
@@ -925,15 +1225,29 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 setIsTicketNavigatorOpen(false);
               }}
               newTicketId={newTicketId}
-              loadingMore={feedbackLoadingMore}
-              hasMore={hasMoreFeedback}
+              loadingMore={isSearchMode ? false : feedbackLoadingMore}
+              hasMore={isSearchMode ? false : hasMoreFeedback}
               hasReachedLimit={feedbackReachedLimit}
               loadMoreRef={feedbackLoadMoreRef}
               scrollContainerRef={listScrollRef}
               onScrollContainerReady={() => setListScrollReady((n) => n + 1)}
-              onMarkAllTicketsResolved={handleMarkAllResolved}
-              onMarkAllTicketsUnresolved={handleMarkAllUnresolved}
+              onMarkAllTicketsResolved={
+                sessionActionCaps.canResolve ? handleMarkAllResolved : undefined
+              }
+              onMarkAllTicketsUnresolved={
+                sessionActionCaps.canResolve ? handleMarkAllUnresolved : undefined
+              }
               scrollToId={ticketIdFromUrl}
+              openExpanded={openExpanded}
+              onOpenExpandedChange={onOpenExpandedChange}
+              resolvedExpanded={resolvedExpanded}
+              onResolvedExpandedChange={onResolvedExpandedChange}
+              isLoadingResolved={isSearchMode ? false : feedbackLoadingResolved}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              isSearchMode={isSearchMode}
+              searchResults={searchResults}
+              searchLoading={searchLoading}
             />
           </div>
         </div>
@@ -954,6 +1268,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           </div>
         </div>
       )}
+
+      <DeleteSessionModal
+        open={deleteSessionModalOpen}
+        onClose={() => setDeleteSessionModalOpen(false)}
+        sessionTitle={(session?.title ?? "").trim() || "Untitled Session"}
+        onConfirm={confirmDeleteSessionFromMenu}
+      />
 
       {showDeleteModal && selectedId && (
         <div

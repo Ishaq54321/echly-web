@@ -62,7 +62,7 @@ export interface SessionFeedbackHeaderProps {
 
 /**
  * Premium session ticket header: title + ticket meta, status badge, action bar (Resolve / Assign / … + Delete).
- * Used by ExecutionView for the main dashboard session detail surface.
+ * Session-level ⋮ (rename / archive / delete) lives in TopControlBar.
  */
 export function SessionFeedbackHeader({
   item,
@@ -77,16 +77,16 @@ export function SessionFeedbackHeader({
   const status = statusFromResolved(item.isResolved);
 
   return (
-    <header className="sticky top-0 z-10 shrink-0 bg-white py-5 px-6 -mx-6">
-      <div className="header flex justify-between items-start gap-4 min-w-0">
-        <div className="header-left min-w-0 flex-1">
+    <header className="sticky top-0 z-20 shrink-0 bg-white pt-3 px-6 -mx-6 pb-0">
+      <div className="flex items-start justify-between gap-3 min-w-0 mb-3">
+        <div className="min-w-0 flex-1">
           <h1
             className="text-2xl font-semibold tracking-[-0.3px] text-[#0A0A0A] truncate leading-tight"
             title={item.title}
           >
             {item.title}
           </h1>
-          <div className="header-meta mt-1.5 flex flex-wrap items-center gap-2">
+          <div className="mt-1 flex flex-wrap items-center gap-2">
             <span className="ticket-pill inline-flex items-center bg-[#F3F4F6] px-2.5 py-1 rounded-full text-[12px] font-medium text-[#374151]">
               {item.index} of {item.total}
             </span>
@@ -100,7 +100,7 @@ export function SessionFeedbackHeader({
         </div>
       </div>
 
-      <div className="action-bar mt-4 flex justify-between items-center gap-3 flex-wrap sm:flex-nowrap">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:flex-nowrap mb-4">
         <div className="left flex flex-wrap items-center gap-2 min-w-0">
           {onResolvedChange && (
             <button

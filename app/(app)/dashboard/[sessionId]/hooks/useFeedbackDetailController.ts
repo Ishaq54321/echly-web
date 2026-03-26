@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useRef } from "react";
 import { auth } from "@/lib/firebase";
-import { addComment, resolveFeedback, updatePinPosition, updateComment, deleteComment, type Comment } from "@/lib/comments";
+import { addComment, updatePinPosition, updateComment, deleteComment, type Comment } from "@/lib/comments";
 import type { CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
+import { authFetch } from "@/lib/authFetch";
 
 /**
  * Controlled realtime comment list: exactly ONE onSnapshot listener at a time.
@@ -15,8 +16,10 @@ export function useFeedbackDetailController(args: {
   sessionId: string;
   workspaceId: string | null | undefined;
   feedbackId: string | null | undefined;
+  canComment?: boolean;
+  canResolve?: boolean;
 }) {
-  const { sessionId, workspaceId, feedbackId } = args;
+  const { sessionId, workspaceId, feedbackId, canComment = true, canResolve = true } = args;
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -61,7 +64,7 @@ export function useFeedbackDetailController(args: {
 
   const sendComment = async (message: string): Promise<void> => {
     const user = auth.currentUser;
-    if (!user || !feedbackId || !workspaceId) return;
+    if (!canComment || !user || !feedbackId || !workspaceId) return;
     const trimmed = message.trim();
     if (!trimmed) return;
     const payload = {
@@ -77,7 +80,7 @@ export function useFeedbackDetailController(args: {
 
   const sendReply = async (threadId: string, message: string): Promise<void> => {
     const user = auth.currentUser;
-    if (!user || !feedbackId || !workspaceId) return;
+    if (!canComment || !user || !feedbackId || !workspaceId) return;
     const trimmed = message.trim();
     if (!trimmed) return;
     addComment(workspaceId, sessionId, feedbackId, {
@@ -94,7 +97,7 @@ export function useFeedbackDetailController(args: {
     message: string
   ): Promise<string | null> => {
     const user = auth.currentUser;
-    if (!user || !feedbackId || !workspaceId) return null;
+    if (!canComment || !user || !feedbackId || !workspaceId) return null;
     const trimmed = message.trim();
     if (!trimmed) return null;
     try {
@@ -118,7 +121,7 @@ export function useFeedbackDetailController(args: {
     message: string
   ): Promise<string | null> => {
     const user = auth.currentUser;
-    if (!user || !feedbackId || !workspaceId) return null;
+    if (!canComment || !user || !feedbackId || !workspaceId) return null;
     const trimmed = message.trim();
     if (!trimmed) return null;
     try {
@@ -138,14 +141,22 @@ export function useFeedbackDetailController(args: {
   };
 
   const resolve = async () => {
-    if (!feedbackId) return;
-    await resolveFeedback(feedbackId, sessionId);
+    if (!canResolve || !feedbackId) return;
+    const res = await authFetch(`/api/tickets/${feedbackId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isResolved: true }),
+    });
+    if (!res.ok) {
+      console.error("[ECHLY] resolve via API failed", await res.text().catch(() => ""));
+    }
   };
 
   const updatePinPositionHandler = async (
     commentId: string,
     position: { xPercent: number; yPercent: number }
   ) => {
+    if (!canComment) return;
     await updatePinPosition(commentId, position);
   };
 
@@ -153,10 +164,13 @@ export function useFeedbackDetailController(args: {
     commentId: string,
     data: { message?: string; resolved?: boolean }
   ) => {
+    if (data.resolved !== undefined && !canResolve) return;
+    if (data.message !== undefined && !canComment) return;
     await updateComment(commentId, data);
   };
 
   const deleteCommentHandler = async (commentId: string) => {
+    if (!canComment) return;
     await deleteComment(commentId);
   };
 

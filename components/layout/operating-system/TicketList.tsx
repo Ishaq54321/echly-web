@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, Check, Search, MoreVertical, Loader2, X } from "lucide-react";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
@@ -23,7 +24,6 @@ export interface TicketListProps {
   onSessionTitleSave?: () => void;
   onSessionTitleCancel?: () => void;
   onSessionTitleEdit?: () => void;
-  isSavingSessionTitle?: boolean;
   saveSessionTitleSuccess?: boolean;
   /** List */
   items: Feedback[];
@@ -45,6 +45,36 @@ export interface TicketListProps {
   onMarkAllTicketsUnresolved?: () => void;
   /** When set (e.g. from ?ticket= deep link), expand the section containing this id and scroll to it. */
   scrollToId?: string | null;
+  /** When set with `onOpenExpandedChange`, controls the Open section (mutual exclusion is parent’s responsibility). */
+  openExpanded?: boolean;
+  /** Header click: parent toggles `openExpanded` (e.g. closes Resolved when opening Open). */
+  onOpenExpandedChange?: () => void;
+  /** When set with `onResolvedExpandedChange`, controls the Resolved section expand state (for lazy-loaded resolved data). */
+  resolvedExpanded?: boolean;
+  /** Header click: parent toggles `resolvedExpanded` (e.g. closes Open when opening Resolved). */
+  onResolvedExpandedChange?: () => void;
+  /** True while the first page of resolved tickets is being fetched. */
+  isLoadingResolved?: boolean;
+  /** Controlled sidebar search (SessionPageClient owns query + API). */
+  searchQuery: string;
+  onSearchQueryChange: (value: string) => void;
+  /** When true, list rows come from `searchResults` (not lazy-loaded `items`). */
+  isSearchMode?: boolean;
+  searchResults?: Feedback[];
+  /** True while `/api/feedback/search` is in flight. */
+  searchLoading?: boolean;
+}
+
+/** Unified spinner-only loading row for Open / Resolved section bodies (identical everywhere). */
+function TicketListSectionLoading() {
+  return (
+    <div
+      className="flex min-h-[40px] items-center justify-center py-4"
+      aria-busy="true"
+    >
+      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />
+    </div>
+  );
 }
 
 function TicketListInner({
@@ -57,7 +87,6 @@ function TicketListInner({
   onSessionTitleSave,
   onSessionTitleCancel,
   onSessionTitleEdit,
-  isSavingSessionTitle = false,
   saveSessionTitleSuccess = false,
   items,
   selectedId,
@@ -72,34 +101,82 @@ function TicketListInner({
   onMarkAllTicketsResolved,
   onMarkAllTicketsUnresolved,
   scrollToId,
+  openExpanded: openExpandedProp,
+  onOpenExpandedChange,
+  resolvedExpanded: resolvedExpandedProp,
+  onResolvedExpandedChange,
+  isLoadingResolved: isLoadingResolvedFromParent,
+  searchQuery,
+  onSearchQueryChange,
+  isSearchMode = false,
+  searchResults = [],
+  searchLoading = false,
 }: TicketListProps) {
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [sidebarMenuOpen, setSidebarMenuOpen] = useState(false);
+  const [sidebarMenuRect, setSidebarMenuRect] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
   const sidebarMenuRef = useRef<HTMLDivElement>(null);
+  const sidebarMenuPortalRef = useRef<HTMLDivElement>(null);
+  const sidebarMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const skipTitleBlurSaveRef = useRef(false);
   const scrollToIdApplied = useRef(false);
+
+  const updateSidebarMenuPosition = () => {
+    const el = sidebarMenuButtonRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setSidebarMenuRect({ top: r.bottom, right: r.right });
+  };
+
+  useLayoutEffect(() => {
+    if (!sidebarMenuOpen) {
+      setSidebarMenuRect(null);
+      return;
+    }
+    updateSidebarMenuPosition();
+    const onReposition = () => updateSidebarMenuPosition();
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    return () => {
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+  }, [sidebarMenuOpen]);
 
   useEffect(() => {
     if (!sidebarMenuOpen) return;
     const close = (e: MouseEvent) => {
-      if (sidebarMenuRef.current && !sidebarMenuRef.current.contains(e.target as Node)) setSidebarMenuOpen(false);
+      const t = e.target as Node;
+      if (sidebarMenuRef.current?.contains(t)) return;
+      if (sidebarMenuPortalRef.current?.contains(t)) return;
+      setSidebarMenuOpen(false);
     };
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
   }, [sidebarMenuOpen]);
-  const [openExpanded, setOpenExpanded] = useState(true);
-  const [resolvedExpanded, setResolvedExpanded] = useState(false);
+  const [openExpandedInternal, setOpenExpandedInternal] = useState(true);
+  const openExpandedControlled =
+    typeof openExpandedProp === "boolean" && typeof onOpenExpandedChange === "function";
+  const openExpanded = openExpandedControlled ? openExpandedProp : openExpandedInternal;
+  const [resolvedExpandedInternal, setResolvedExpandedInternal] = useState(false);
+  const resolvedExpandedControlled =
+    typeof resolvedExpandedProp === "boolean" && typeof onResolvedExpandedChange === "function";
+  const resolvedExpanded = resolvedExpandedControlled
+    ? resolvedExpandedProp
+    : resolvedExpandedInternal;
+  const setResolvedExpandedInternalOnly = useCallback(
+    (next: boolean) => {
+      if (!resolvedExpandedControlled) setResolvedExpandedInternal(next);
+    },
+    [resolvedExpandedControlled]
+  );
   const scrollContainerReadySent = useRef(false);
   const internalContainerRef = useRef<HTMLDivElement | null>(null);
   const prevScrollHeightRef = useRef(0);
   const prevItemsLengthRef = useRef(items.length);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setDebouncedQuery(query.trim().toLowerCase());
-    }, 100);
-    return () => clearTimeout(t);
-  }, [query]);
 
   const { total, open, resolved } = counts;
 
@@ -117,16 +194,6 @@ function TicketListInner({
   })();
 
   const loadingValueClass = countsLoading ? "animate-pulse opacity-70" : "";
-
-  const getTime = (f: Feedback): number => {
-    const createdSeconds =
-      typeof f.createdAt?.seconds === "number" ? f.createdAt.seconds : null;
-    if (createdSeconds != null) return createdSeconds * 1000;
-    if (typeof f.clientTimestamp === "number") return f.clientTimestamp;
-    return 0;
-  };
-
-  const q = debouncedQuery;
 
   const { loadedOpenCount, loadedResolvedCount } = useMemo(() => {
     const seen = new Set<string>();
@@ -146,35 +213,20 @@ function TicketListInner({
   }, [items]);
 
   const { openItems, resolvedItems } = useMemo(() => {
-    const sorted = [...items].sort((a, b) => getTime(b) - getTime(a));
-    const seen = new Set<string>();
-    const deduped = sorted.filter((f) => {
-      if (seen.has(f.id)) return false;
-      seen.add(f.id);
-      return true;
-    });
-    const filtered = q
-      ? (() => {
-          const startsWith: Feedback[] = [];
-          const contains: Feedback[] = [];
-
-          for (const f of deduped) {
-            const title = f.title.toLowerCase();
-            if (title.startsWith(q)) startsWith.push(f);
-            else if (title.includes(q)) contains.push(f);
-          }
-
-          return [...startsWith, ...contains];
-        })()
-      : deduped;
+    const source = isSearchMode ? searchResults : items;
     return {
-      openItems: filtered.filter((i) => getTicketStatus(i) === "open"),
-      resolvedItems: filtered.filter((i) => getTicketStatus(i) === "resolved"),
+      openItems: source.filter((i) => getTicketStatus(i) === "open"),
+      resolvedItems: source.filter((i) => getTicketStatus(i) === "resolved"),
     };
-  }, [items, q]);
+  }, [isSearchMode, items, searchResults]);
 
   const filteredTotalCount = openItems.length + resolvedItems.length;
-  const showSearchEmpty = q.length > 0 && filteredTotalCount === 0 && !countsLoading && !loadingMore;
+  const showSearchEmpty =
+    isSearchMode &&
+    !searchLoading &&
+    filteredTotalCount === 0 &&
+    !countsLoading &&
+    !loadingMore;
 
   const missingOpenCount = Math.max(open - loadedOpenCount, 0);
   const missingResolvedCount = Math.max(resolved - loadedResolvedCount, 0);
@@ -186,16 +238,38 @@ function TicketListInner({
     return null;
   })();
 
-  const isLoadingOpen = activeLoadingSection === "open" && openExpanded && openItems.length > 0;
-  const isLoadingResolved = activeLoadingSection === "resolved" && resolvedExpanded && resolvedItems.length > 0;
+  const isLoadingOpenPagination =
+    activeLoadingSection === "open" && openExpanded && openItems.length > 0;
+  const isLoadingOpen =
+    isLoadingOpenPagination || (isSearchMode && searchLoading && openExpanded);
 
-  // Deep link: expand section containing scrollToId and scroll to it (once per mount).
+  const isLoadingResolvedMore =
+    activeLoadingSection === "resolved" && resolvedExpanded && resolvedItems.length > 0;
+  const isLoadingResolvedFirst =
+    Boolean(isLoadingResolvedFromParent) && resolvedExpanded && resolvedItems.length === 0 && resolved > 0;
+  const isLoadingResolvedSearch = isSearchMode && searchLoading && resolvedExpanded;
+  const showResolvedPendingLoader =
+    (isLoadingResolvedFirst && !countsLoading) || isLoadingResolvedSearch;
+  const showResolvedListLoading = showResolvedPendingLoader || isLoadingResolvedMore;
+
+  // Deep link: expand section containing scrollToId (uncontrolled only; parent handles controlled `scrollToId`).
   useEffect(() => {
     if (!scrollToId || scrollToIdApplied.current) return;
-    if (openItems.some((i) => i.id === scrollToId)) setOpenExpanded(true);
-    if (resolvedItems.some((i) => i.id === scrollToId)) setResolvedExpanded(true);
+    if (openItems.some((i) => i.id === scrollToId) && !openExpandedControlled) {
+      setOpenExpandedInternal(true);
+    }
+    if (resolvedItems.some((i) => i.id === scrollToId) && !resolvedExpandedControlled) {
+      setResolvedExpandedInternalOnly(true);
+    }
     scrollToIdApplied.current = true;
-  }, [scrollToId, openItems, resolvedItems]);
+  }, [
+    scrollToId,
+    openItems,
+    resolvedItems,
+    openExpandedControlled,
+    resolvedExpandedControlled,
+    setResolvedExpandedInternalOnly,
+  ]);
 
   useEffect(() => {
     if (!scrollToId) return;
@@ -204,12 +278,28 @@ function TicketListInner({
       el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }, 100);
     return () => clearTimeout(t);
-  }, [scrollToId]);
+  }, [scrollToId, openExpanded, resolvedExpanded]);
 
   const canEditTitle =
     typeof onSessionTitleChange === "function" &&
     typeof onSessionTitleSave === "function" &&
     typeof onSessionTitleEdit === "function";
+
+  useEffect(() => {
+    if (!isEditingSessionTitle || !canEditTitle) return;
+    const el = titleInputRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      el.focus();
+      const len = el.value.length;
+      try {
+        el.setSelectionRange(len, len);
+      } catch {
+        /* ignore */
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [isEditingSessionTitle, canEditTitle]);
 
   useEffect(() => {
     const container = internalContainerRef.current;
@@ -236,79 +326,130 @@ function TicketListInner({
       {/* Session header */}
       <div className="sidebar-inner">
         <div className="sidebar-header z-20 shrink-0">
-          <div className="flex items-start justify-between gap-2 min-w-0">
+          <div className="flex items-center justify-between gap-2 min-w-0">
             {isEditingSessionTitle && canEditTitle ? (
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 flex items-center gap-1.5 text-[hsl(var(--text-primary-strong))]">
                 <input
+                  ref={titleInputRef}
                   type="text"
                   value={sessionTitleDraft ?? sessionTitle}
                   onChange={(e) => onSessionTitleChange?.(e.target.value)}
-                  onBlur={() => onSessionTitleSave?.()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                    if (e.key === "Escape") onSessionTitleCancel?.();
+                  onBlur={() => {
+                    if (skipTitleBlurSaveRef.current) {
+                      skipTitleBlurSaveRef.current = false;
+                      return;
+                    }
+                    onSessionTitleSave?.();
                   }}
-                  className="w-full text-[15px] font-semibold leading-tight text-[hsl(var(--text-primary-strong))] bg-[var(--layer-2-bg)] border border-[var(--layer-2-border)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-shadow duration-[var(--motion-duration-fast)]"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      (e.target as HTMLInputElement).blur();
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      skipTitleBlurSaveRef.current = true;
+                      onSessionTitleCancel?.();
+                    }
+                  }}
+                  className="session-title-input session-title-input--light-surface min-w-0 flex-1 min-h-[1.875rem] border-0 appearance-none truncate"
                   aria-label="Edit session title"
-                  autoFocus
                 />
-                {isSavingSessionTitle && (
-                  <p className="mt-1.5 text-[11px] text-[hsl(var(--text-tertiary))]">
-                    Saving…
-                  </p>
-                )}
+                <button
+                  type="button"
+                  aria-label="Save title"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => onSessionTitleSave?.()}
+                  className="shrink-0 inline-flex size-7 items-center justify-center rounded-md text-neutral-900 opacity-70 hover:opacity-100 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFBFC]"
+                >
+                  <Check className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
+                </button>
               </div>
             ) : (
               <>
                 <div className="min-w-0 flex-1 flex items-center gap-2">
-                  <h1 className="text-[15px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] truncate">
-                    {sessionTitle}
-                  </h1>
+                  {canEditTitle ? (
+                    <button
+                      type="button"
+                      onClick={() => onSessionTitleEdit?.()}
+                      className="min-w-0 flex-1 text-left truncate bg-transparent border-0 p-0 shadow-none cursor-text text-[15px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFBFC] rounded-sm"
+                    >
+                      {sessionTitle}
+                    </button>
+                  ) : (
+                    <h1 className="text-[15px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] truncate">
+                      {sessionTitle}
+                    </h1>
+                  )}
                   {saveSessionTitleSuccess && (
                     <Check className="h-3.5 w-3.5 text-[var(--color-success)] shrink-0" aria-hidden />
                   )}
                 </div>
                 <div className="relative shrink-0" ref={sidebarMenuRef}>
                   <button
+                    ref={sidebarMenuButtonRef}
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setSidebarMenuOpen((v) => !v); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (sidebarMenuOpen) {
+                        setSidebarMenuOpen(false);
+                        return;
+                      }
+                      const el = sidebarMenuButtonRef.current;
+                      if (el) {
+                        const r = el.getBoundingClientRect();
+                        setSidebarMenuRect({ top: r.bottom, right: r.right });
+                      }
+                      setSidebarMenuOpen(true);
+                    }}
                     className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
                     aria-label="Session options"
                     aria-expanded={sidebarMenuOpen}
                   >
                     <MoreVertical className="h-4 w-4" aria-hidden />
                   </button>
-                  {sidebarMenuOpen && (
-                    <div className="absolute right-0 top-full mt-1.5 py-1.5 min-w-[200px] rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-1-border)] shadow-[var(--shadow-level-4)] z-[100]">
-                      {canEditTitle && (
-                        <button
-                          type="button"
-                          onClick={() => { onSessionTitleEdit?.(); setSidebarMenuOpen(false); }}
-                          className="w-full text-left px-3 py-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer rounded-xl mx-1"
-                        >
-                          Rename review
-                        </button>
-                      )}
-                      {onMarkAllTicketsResolved && (
-                        <button
-                          type="button"
-                          onClick={() => { onMarkAllTicketsResolved(); setSidebarMenuOpen(false); }}
-                          className="w-full text-left px-3 py-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer rounded-xl mx-1"
-                        >
-                          Resolve all open tickets
-                        </button>
-                      )}
-                      {onMarkAllTicketsUnresolved && (
-                        <button
-                          type="button"
-                          onClick={() => { onMarkAllTicketsUnresolved(); setSidebarMenuOpen(false); }}
-                          className="w-full text-left px-3 py-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer rounded-xl mx-1"
-                        >
-                          Reopen all resolved tickets
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  {typeof document !== "undefined" &&
+                    sidebarMenuOpen &&
+                    sidebarMenuRect != null &&
+                    createPortal(
+                      <div
+                        ref={sidebarMenuPortalRef}
+                        className="p-[6px] w-max min-w-[180px] max-w-[240px] rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-1-border)] shadow-[var(--shadow-level-4)] overflow-hidden"
+                        style={{
+                          position: "fixed",
+                          zIndex: 9999,
+                          top: sidebarMenuRect.top + 6,
+                          right: Math.max(8, window.innerWidth - sidebarMenuRect.right),
+                        }}
+                        role="menu"
+                      >
+                        {onMarkAllTicketsResolved && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onMarkAllTicketsResolved();
+                              setSidebarMenuOpen(false);
+                            }}
+                            className="block w-full my-0.5 rounded-lg text-left whitespace-nowrap py-2 px-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] cursor-pointer border-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-inset"
+                          >
+                            Resolve all open tickets
+                          </button>
+                        )}
+                        {onMarkAllTicketsUnresolved && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onMarkAllTicketsUnresolved();
+                              setSidebarMenuOpen(false);
+                            }}
+                            className="block w-full my-0.5 rounded-lg text-left whitespace-nowrap py-2 px-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] cursor-pointer border-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-inset"
+                          >
+                            Reopen all resolved tickets
+                          </button>
+                        )}
+                      </div>,
+                      document.body
+                    )}
                 </div>
               </>
             )}
@@ -320,19 +461,21 @@ function TicketListInner({
             <div className="search-container">
               <Search className="search-icon" aria-hidden />
               <input
-                type="search"
+                type="text"
                 placeholder="Search tickets..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                value={searchQuery}
+                onChange={(e) => onSearchQueryChange(e.target.value)}
                 className="search-input placeholder:text-[hsl(var(--text-tertiary))] text-[hsl(var(--text-primary-strong))]"
                 aria-label="Search tickets"
+                autoComplete="off"
+                enterKeyHint="search"
               />
-              {query ? (
+              {searchQuery ? (
                 <button
                   type="button"
                   className="clear-icon"
                   aria-label="Clear search"
-                  onClick={() => setQuery("")}
+                  onClick={() => onSearchQueryChange("")}
                 >
                   <X className="w-4 h-4" strokeWidth={2} aria-hidden />
                 </button>
@@ -369,7 +512,10 @@ function TicketListInner({
         <section className="pt-1">
           <button
             type="button"
-            onClick={() => setOpenExpanded((x) => !x)}
+            onClick={() => {
+              if (openExpandedControlled) onOpenExpandedChange?.();
+              else setOpenExpandedInternal((x) => !x);
+            }}
             className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left border-none shadow-none hover:bg-white transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
             aria-expanded={openExpanded}
           >
@@ -388,7 +534,7 @@ function TicketListInner({
             </span>
           </button>
           {openExpanded && (
-            <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0">
+            <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0 transition-opacity duration-150 ease-out">
               {openItems.map((item, idx) => (
                 <TicketItem
                   key={item.id}
@@ -403,27 +549,18 @@ function TicketListInner({
               ))}
               {openItems.length === 0 && !showSearchEmpty && (
                 <>
-                  {countsLoading ? (
-                    <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
-                      Loading open tickets…
-                    </p>
+                  {countsLoading && !(isSearchMode && searchLoading) ? (
+                    <TicketListSectionLoading />
                   ) : open === 0 ? (
                     <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
                       No open tickets
                     </p>
-                  ) : (
-                    <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
-                      Loading open tickets…
-                    </p>
+                  ) : isSearchMode && searchLoading ? null : (
+                    <TicketListSectionLoading />
                   )}
                 </>
               )}
-              {isLoadingOpen && (
-                <div className="mt-2 flex items-center justify-center gap-2 py-3 text-[11px] text-[hsl(var(--text-tertiary))]">
-                  <Loader2 className="h-3 w-3 animate-spin opacity-70" aria-hidden />
-                  <span className="opacity-80">Loading more</span>
-                </div>
-              )}
+              {isLoadingOpen && <TicketListSectionLoading />}
             </div>
           )}
         </section>
@@ -432,7 +569,10 @@ function TicketListInner({
         <section className="pt-2">
           <button
             type="button"
-            onClick={() => setResolvedExpanded((x) => !x)}
+            onClick={() => {
+              if (resolvedExpandedControlled) onResolvedExpandedChange?.();
+              else setResolvedExpandedInternalOnly(!resolvedExpanded);
+            }}
             className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left border-none shadow-none hover:bg-white transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
             aria-expanded={resolvedExpanded}
           >
@@ -451,7 +591,7 @@ function TicketListInner({
             </span>
           </button>
           {resolvedExpanded && (
-            <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0">
+            <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0 transition-opacity duration-150 ease-out">
               {resolvedItems.map((item, idx) => (
                 <TicketItem
                   key={item.id}
@@ -464,29 +604,18 @@ function TicketListInner({
                   isNewTicket={item.id === newTicketId}
                 />
               ))}
-              {resolvedItems.length === 0 && !loadingMore && !showSearchEmpty && (
+              {resolvedItems.length === 0 && !showSearchEmpty && !(isSearchMode && searchLoading) && (
                 <>
-                  {countsLoading ? (
-                    <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
-                      Loading resolved tickets…
-                    </p>
+                  {countsLoading && !(isSearchMode && searchLoading) ? (
+                    <TicketListSectionLoading />
                   ) : resolved === 0 ? (
                     <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
                       No resolved tickets
                     </p>
-                  ) : (
-                    <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
-                      Loading resolved tickets…
-                    </p>
-                  )}
+                  ) : null}
                 </>
               )}
-              {isLoadingResolved && (
-                <div className="mt-2 flex items-center justify-center gap-2 py-3 text-[11px] text-[hsl(var(--text-tertiary))]">
-                  <Loader2 className="h-3 w-3 animate-spin opacity-70" aria-hidden />
-                  <span className="opacity-80">Loading more</span>
-                </div>
-              )}
+              {showResolvedListLoading && <TicketListSectionLoading />}
             </div>
           )}
         </section>

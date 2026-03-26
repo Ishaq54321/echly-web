@@ -1,4 +1,6 @@
 import type { Timestamp } from "firebase/firestore";
+import type { AccessLevel } from "@/lib/domain/accessLevel";
+import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
 
 export interface SessionCreatedBy {
   id: string;
@@ -40,6 +42,11 @@ export interface Session {
   totalCount?: number;
   /** Denormalized: total feedback count (WAVE 1 structural). */
   feedbackCount?: number;
+
+  /**
+   * Default link access for visitors who are not workspace peers and have no email share row.
+   */
+  accessLevel?: AccessLevel;
 
   /**
    * Client-only flag for optimistic UI rows (temp sessions).
@@ -89,6 +96,9 @@ export function sessionFromApiItem(item: unknown): Session | null {
   ) {
     session.updatedAt = updatedAt;
   }
+
+  const accessLevel = Reflect.get(item, "accessLevel");
+  session.accessLevel = normalizeAccessLevel(accessLevel);
 
   return session;
 }

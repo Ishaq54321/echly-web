@@ -19,6 +19,7 @@ import {
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Session, SessionCreatedBy } from "@/lib/domain/session";
+import type { AccessLevel } from "@/lib/domain/accessLevel";
 import type { Workspace } from "@/lib/domain/workspace";
 import { deleteAllCommentsForSessionRepo } from "@/lib/repositories/commentsRepository";
 import { deleteAllFeedbackForSessionRepo } from "@/lib/repositories/feedbackRepository";
@@ -52,6 +53,7 @@ export async function createSessionRepo(
     resolvedCount: 0,
     totalCount: 0,
     feedbackCount: 0,
+    accessLevel: "view",
   };
 
   await runTransaction(db, async (tx) => {
@@ -241,6 +243,16 @@ export async function updateSessionTitleRepo(
 ): Promise<void> {
   await updateDoc(doc(db, "sessions", sessionId), {
     title,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateSessionAccessLevelRepo(
+  sessionId: string,
+  accessLevel: AccessLevel
+): Promise<void> {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    accessLevel,
     updatedAt: serverTimestamp(),
   });
 }
