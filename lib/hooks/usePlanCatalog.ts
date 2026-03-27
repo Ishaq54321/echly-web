@@ -35,7 +35,7 @@ export function usePlanCatalog(): UsePlanCatalogResult {
     setLoading(true);
     setError(null);
 
-    fetch(CATALOG_API)
+    fetch(CATALOG_API, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to load plans"))))
       .then((data: PlanCatalogItem[]) => {
         if (!cancelled) {

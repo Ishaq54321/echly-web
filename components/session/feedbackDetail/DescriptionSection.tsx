@@ -66,7 +66,7 @@ export function DescriptionSection({
   };
 
   return (
-    <Section title="Description" titleSemantic="insight">
+    <Section title="" titleSemantic="insight">
       <div className="flex flex-col gap-2 border-l border-semantic-insight/30 pl-4">
         {isEditing && hasEdit ? (
           <>

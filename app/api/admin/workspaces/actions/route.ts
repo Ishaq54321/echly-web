@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { doc, updateDoc, serverTimestamp, deleteField } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { logAdminAction } from "@/lib/admin/adminLogs";
 import { invalidateWorkspaceCache } from "@/lib/server/resolveWorkspaceForUser";
@@ -8,7 +8,7 @@ import {
   getWorkspace,
   invalidateWorkspaceDocCache,
   updateWorkspacePlanRepo,
-} from "@/lib/repositories/workspacesRepository";
+} from "@/lib/repositories/workspacesRepository.server";
 import type { PlanId } from "@/lib/billing/plans";
 
 const VALID_PLANS: PlanId[] = ["free", "starter", "business", "enterprise"];
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
-  const ref = doc(db, "workspaces", workspaceId);
+  const ref = adminDb.doc(`workspaces/${workspaceId}`);
 
   try {
     if (action === "set_plan") {
@@ -74,9 +74,9 @@ export async function POST(req: Request) {
     }
 
     if (action === "grant_unlimited_sessions") {
-      await updateDoc(ref, {
+      await ref.update({
         "entitlements.maxSessions": null,
-        updatedAt: serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.grant_unlimited_sessions", workspaceId });
       invalidateWorkspaceDocCache(workspaceId);
@@ -88,9 +88,9 @@ export async function POST(req: Request) {
     // Session limit is enforced only when creating NEW sessions (POST /api/sessions).
     if (action === "override_session_limit") {
       const sessionLimit = body.sessionLimit === undefined ? null : (typeof body.sessionLimit === "number" ? body.sessionLimit : null);
-      await updateDoc(ref, {
+      await ref.update({
         "entitlements.maxSessions": sessionLimit,
-        updatedAt: serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.override_session_limit", workspaceId, metadata: { sessionLimit } });
       invalidateWorkspaceDocCache(workspaceId);
@@ -99,9 +99,9 @@ export async function POST(req: Request) {
     }
 
     if (action === "remove_session_override") {
-      await updateDoc(ref, {
-        "entitlements.maxSessions": deleteField(),
-        updatedAt: serverTimestamp(),
+      await ref.update({
+        "entitlements.maxSessions": FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.remove_session_override", workspaceId });
       invalidateWorkspaceDocCache(workspaceId);
@@ -110,9 +110,9 @@ export async function POST(req: Request) {
     }
 
     if (action === "suspend") {
-      await updateDoc(ref, {
+      await ref.update({
         "billing.suspended": true,
-        updatedAt: serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.suspend", workspaceId });
       invalidateWorkspaceDocCache(workspaceId);
@@ -121,9 +121,9 @@ export async function POST(req: Request) {
     }
 
     if (action === "resume") {
-      await updateDoc(ref, {
+      await ref.update({
         "billing.suspended": false,
-        updatedAt: serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       await logAdminAction({ adminId: admin.uid, action: "workspace.resume", workspaceId });
       invalidateWorkspaceDocCache(workspaceId);

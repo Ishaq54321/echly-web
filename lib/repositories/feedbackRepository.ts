@@ -22,12 +22,15 @@ import {
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
-import { invalidateCounts } from "@/lib/server/cache/feedbackCountsCache";
-import { invalidateFeedbackCache } from "@/lib/server/cache/feedbackCache";
 import {
   emptyWorkspaceInsightsDoc,
   workspaceInsightsRef,
 } from "@/lib/repositories/insightsRepository";
+
+// These caches are server-only concerns. The client repository intentionally
+// no-ops them so this module can be used in Client Components.
+function invalidateCounts(..._args: unknown[]): void {}
+function invalidateFeedbackCache(..._args: unknown[]): void {}
 
 const feedbackPayload = (
   workspaceId: string,

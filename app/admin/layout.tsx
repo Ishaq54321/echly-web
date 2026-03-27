@@ -20,7 +20,10 @@ export default function AdminRootLayout({
     if (!user) return;
     let cancelled = false;
     authFetch("/api/admin/me")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res) return { isAdmin: false };
+        return res.json();
+      })
       .then((data: { isAdmin?: boolean }) => {
         if (!cancelled) {
           setAdminChecked(true);

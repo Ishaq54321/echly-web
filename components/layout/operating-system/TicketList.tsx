@@ -63,6 +63,10 @@ export interface TicketListProps {
   searchResults?: Feedback[];
   /** True while `/api/feedback/search` is in flight. */
   searchLoading?: boolean;
+  /** When false, hides ticket search (e.g. public share). Default true. */
+  showTicketSearch?: boolean;
+  /** When false, hides session ⋮ overflow menu. Default true. */
+  showSessionOverflowMenu?: boolean;
 }
 
 /** Unified spinner-only loading row for Open / Resolved section bodies (identical everywhere). */
@@ -111,6 +115,8 @@ function TicketListInner({
   isSearchMode = false,
   searchResults = [],
   searchLoading = false,
+  showTicketSearch = true,
+  showSessionOverflowMenu = true,
 }: TicketListProps) {
   const [sidebarMenuOpen, setSidebarMenuOpen] = useState(false);
   const [sidebarMenuRect, setSidebarMenuRect] = useState<{
@@ -175,8 +181,7 @@ function TicketListInner({
   );
   const scrollContainerReadySent = useRef(false);
   const internalContainerRef = useRef<HTMLDivElement | null>(null);
-  const prevScrollHeightRef = useRef(0);
-  const prevItemsLengthRef = useRef(items.length);
+  const isUserScrollingRef = useRef(false);
 
   const { total, open, resolved } = counts;
 
@@ -194,6 +199,31 @@ function TicketListInner({
   })();
 
   const loadingValueClass = countsLoading ? "animate-pulse opacity-70" : "";
+
+  // Detect user-driven scroll so we don't fight the browser during manual navigation.
+  useEffect(() => {
+    const el = internalContainerRef.current;
+    if (!el) return;
+
+    const onScroll = () => {
+      // Ignore scroll events caused by our own "pin to TOP" behavior.
+      if (el.scrollTop > 0) isUserScrollingRef.current = true;
+    };
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  // Optional: reset the "user scrolling" latch when we enter an empty loading state
+  // (typically session change / initial load), so the list can be pinned to TOP.
+  useEffect(() => {
+    if (countsLoading && items.length === 0) {
+      isUserScrollingRef.current = false;
+    }
+  }, [countsLoading, items.length]);
 
   const { loadedOpenCount, loadedResolvedCount } = useMemo(() => {
     const seen = new Set<string>();
@@ -305,21 +335,17 @@ function TicketListInner({
     const container = internalContainerRef.current;
     if (!container) return;
     const rafId = requestAnimationFrame(() => {
-      const prevHeight = prevScrollHeightRef.current;
-      const newHeight = container.scrollHeight;
-      const heightDiff = newHeight - prevHeight;
+      // Don't override deep-link scrolling behavior.
+      if (scrollToId) return;
 
-      // Preserve relative position only when the user was near the previous bottom.
-      const isNearBottom = container.scrollTop + container.clientHeight >= prevHeight - 5;
-      if (prevItemsLengthRef.current !== items.length && prevHeight > 0 && isNearBottom && heightDiff > 0) {
-        container.scrollTop += heightDiff;
+      if (!isUserScrollingRef.current) {
+        // Force scroll to top if user hasn't interacted
+        internalContainerRef.current!.scrollTop = 0;
+        return;
       }
-
-      prevScrollHeightRef.current = newHeight;
-      prevItemsLengthRef.current = items.length;
     });
     return () => cancelAnimationFrame(rafId);
-  }, [items.length]);
+  }, [items.length, scrollToId]);
 
   return (
     <div className="sidebar flex flex-col h-full min-h-0 rounded-none bg-[#FAFBFC] overflow-hidden">
@@ -385,103 +411,107 @@ function TicketListInner({
                     <Check className="h-3.5 w-3.5 text-[var(--color-success)] shrink-0" aria-hidden />
                   )}
                 </div>
-                <div className="relative shrink-0" ref={sidebarMenuRef}>
-                  <button
-                    ref={sidebarMenuButtonRef}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (sidebarMenuOpen) {
-                        setSidebarMenuOpen(false);
-                        return;
-                      }
-                      const el = sidebarMenuButtonRef.current;
-                      if (el) {
-                        const r = el.getBoundingClientRect();
-                        setSidebarMenuRect({ top: r.bottom, right: r.right });
-                      }
-                      setSidebarMenuOpen(true);
-                    }}
-                    className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
-                    aria-label="Session options"
-                    aria-expanded={sidebarMenuOpen}
-                  >
-                    <MoreVertical className="h-4 w-4" aria-hidden />
-                  </button>
-                  {typeof document !== "undefined" &&
-                    sidebarMenuOpen &&
-                    sidebarMenuRect != null &&
-                    createPortal(
-                      <div
-                        ref={sidebarMenuPortalRef}
-                        className="p-[6px] w-max min-w-[180px] max-w-[240px] rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-1-border)] shadow-[var(--shadow-level-4)] overflow-hidden"
-                        style={{
-                          position: "fixed",
-                          zIndex: 9999,
-                          top: sidebarMenuRect.top + 6,
-                          right: Math.max(8, window.innerWidth - sidebarMenuRect.right),
-                        }}
-                        role="menu"
-                      >
-                        {onMarkAllTicketsResolved && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onMarkAllTicketsResolved();
-                              setSidebarMenuOpen(false);
-                            }}
-                            className="block w-full my-0.5 rounded-lg text-left whitespace-nowrap py-2 px-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] cursor-pointer border-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-inset"
-                          >
-                            Resolve all open tickets
-                          </button>
-                        )}
-                        {onMarkAllTicketsUnresolved && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onMarkAllTicketsUnresolved();
-                              setSidebarMenuOpen(false);
-                            }}
-                            className="block w-full my-0.5 rounded-lg text-left whitespace-nowrap py-2 px-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] cursor-pointer border-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-inset"
-                          >
-                            Reopen all resolved tickets
-                          </button>
-                        )}
-                      </div>,
-                      document.body
-                    )}
-                </div>
+                {showSessionOverflowMenu ? (
+                  <div className="relative shrink-0" ref={sidebarMenuRef}>
+                    <button
+                      ref={sidebarMenuButtonRef}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (sidebarMenuOpen) {
+                          setSidebarMenuOpen(false);
+                          return;
+                        }
+                        const el = sidebarMenuButtonRef.current;
+                        if (el) {
+                          const r = el.getBoundingClientRect();
+                          setSidebarMenuRect({ top: r.bottom, right: r.right });
+                        }
+                        setSidebarMenuOpen(true);
+                      }}
+                      className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
+                      aria-label="Session options"
+                      aria-expanded={sidebarMenuOpen}
+                    >
+                      <MoreVertical className="h-4 w-4" aria-hidden />
+                    </button>
+                    {typeof document !== "undefined" &&
+                      sidebarMenuOpen &&
+                      sidebarMenuRect != null &&
+                      createPortal(
+                        <div
+                          ref={sidebarMenuPortalRef}
+                          className="p-[6px] w-max min-w-[180px] max-w-[240px] rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-1-border)] shadow-[var(--shadow-level-4)] overflow-hidden"
+                          style={{
+                            position: "fixed",
+                            zIndex: 9999,
+                            top: sidebarMenuRect.top + 6,
+                            right: Math.max(8, window.innerWidth - sidebarMenuRect.right),
+                          }}
+                          role="menu"
+                        >
+                          {onMarkAllTicketsResolved && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onMarkAllTicketsResolved();
+                                setSidebarMenuOpen(false);
+                              }}
+                              className="block w-full my-0.5 rounded-lg text-left whitespace-nowrap py-2 px-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] cursor-pointer border-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-inset"
+                            >
+                              Resolve all open tickets
+                            </button>
+                          )}
+                          {onMarkAllTicketsUnresolved && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onMarkAllTicketsUnresolved();
+                                setSidebarMenuOpen(false);
+                              }}
+                              className="block w-full my-0.5 rounded-lg text-left whitespace-nowrap py-2 px-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] cursor-pointer border-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-inset"
+                            >
+                              Reopen all resolved tickets
+                            </button>
+                          )}
+                        </div>,
+                        document.body
+                      )}
+                  </div>
+                ) : null}
               </>
             )}
           </div>
           <p className="mt-1.5 text-[12px] text-[hsl(var(--text-tertiary))] leading-relaxed">
             {meta}
           </p>
-          <div className="mt-3">
-            <div className="search-container">
-              <Search className="search-icon" aria-hidden />
-              <input
-                type="text"
-                placeholder="Search tickets..."
-                value={searchQuery}
-                onChange={(e) => onSearchQueryChange(e.target.value)}
-                className="search-input placeholder:text-[hsl(var(--text-tertiary))] text-[hsl(var(--text-primary-strong))]"
-                aria-label="Search tickets"
-                autoComplete="off"
-                enterKeyHint="search"
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  className="clear-icon"
-                  aria-label="Clear search"
-                  onClick={() => onSearchQueryChange("")}
-                >
-                  <X className="w-4 h-4" strokeWidth={2} aria-hidden />
-                </button>
-              ) : null}
+          {showTicketSearch ? (
+            <div className="mt-3">
+              <div className="search-container">
+                <Search className="search-icon" aria-hidden />
+                <input
+                  type="text"
+                  placeholder="Search tickets..."
+                  value={searchQuery}
+                  onChange={(e) => onSearchQueryChange(e.target.value)}
+                  className="search-input placeholder:text-[hsl(var(--text-tertiary))] text-[hsl(var(--text-primary-strong))]"
+                  aria-label="Search tickets"
+                  autoComplete="off"
+                  enterKeyHint="search"
+                />
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    className="clear-icon"
+                    aria-label="Clear search"
+                    onClick={() => onSearchQueryChange("")}
+                  >
+                    <X className="w-4 h-4" strokeWidth={2} aria-hidden />
+                  </button>
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
 
@@ -492,9 +522,6 @@ function TicketListInner({
           // We intentionally mutate `.current` on the passed-in ref.
           // eslint-disable-next-line react-hooks/immutability
           if (scrollContainerRefRef) (scrollContainerRefRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
-          if (el && prevScrollHeightRef.current === 0) {
-            prevScrollHeightRef.current = el.scrollHeight;
-          }
           if (el && !scrollContainerReadySent.current) {
             scrollContainerReadySent.current = true;
             onScrollContainerReady?.();

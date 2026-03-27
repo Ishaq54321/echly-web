@@ -16,7 +16,7 @@ export default function AdminPage() {
     setError(null);
     authFetch("/api/admin/usage")
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to load usage");
+        if (!res || !res.ok) throw new Error("Failed to load usage");
         return res.json();
       })
       .then((data: UsageStats) => {

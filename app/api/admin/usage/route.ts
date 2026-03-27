@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { getDocs, collection } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 import { requireAdmin } from "@/lib/server/adminAuth";
-import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository";
+import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository.server";
 import type { Workspace } from "@/lib/domain/workspace";
 
 export interface UsageStats {
@@ -24,7 +23,7 @@ export async function GET(req: Request) {
     return e as Response;
   }
   try {
-    const workspacesSnap = await getDocs(collection(db, "workspaces"));
+    const workspacesSnap = await adminDb.collection("workspaces").get();
     const docs = workspacesSnap.docs;
     let freeWorkspaces = 0;
     let paidWorkspaces = 0;

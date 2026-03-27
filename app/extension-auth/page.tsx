@@ -18,6 +18,7 @@ export default function ExtensionAuthPage() {
     async function run() {
       const res = await fetch("/api/extension/session", {
         method: "POST",
+        cache: "no-store",
         credentials: "include",
       });
 

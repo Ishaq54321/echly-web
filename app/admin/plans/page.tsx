@@ -25,7 +25,7 @@ export default function AdminPlansPage() {
     setError(null);
     try {
       const res = await authFetch("/api/admin/plans");
-      if (!res.ok) throw new Error("Failed to load plans");
+      if (!res || !res.ok) throw new Error("Failed to load plans");
       const data = await res.json();
       setPlans(data);
     } catch (e) {
@@ -63,7 +63,7 @@ export default function AdminPlansPage() {
           insightsEnabled: plan.insightsEnabled,
         }),
       });
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res || !res.ok) throw new Error("Failed to save");
       showToast("Plan updated successfully");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save");

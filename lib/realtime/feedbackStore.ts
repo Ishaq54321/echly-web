@@ -52,8 +52,8 @@ function setSnapshot(next: Partial<FeedbackStoreSnapshot>) {
 function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback | null {
   const data = docSnap.data() ?? {};
   if (data.isDeleted === true) return null;
-  const status = (data.status ?? "open") as string;
-  const isResolved = data.isResolved === true || status === "resolved" || status === "done";
+  const status = data.status === "resolved" ? "resolved" : "open";
+  const isResolved = data.isResolved === true || status === "resolved";
   return {
     id: docSnap.id,
     workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : undefined,
@@ -76,7 +76,7 @@ function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback | null {
     clientTimestamp: (data.clientTimestamp as number | null) ?? null,
     screenshotUrl: (data.screenshotUrl as string | null) ?? null,
     screenshotStatus: data.screenshotStatus ?? null,
-    status: typeof data.status === "string" ? (data.status as Feedback["status"]) : undefined,
+    status,
     commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
     lastCommentPreview: typeof data.lastCommentPreview === "string" ? data.lastCommentPreview : undefined,
     lastCommentAt: (data.lastCommentAt ?? null) as Timestamp | null,
@@ -120,36 +120,41 @@ export function subscribeFeedbackSession(sessionId: string): void {
   });
 
   const feedbackRef = collection(db, "feedback");
-  /** Open tickets only (incl. explicit null status); keeps resolved out until the user expands. */
-  const feedbackQuery = query(
+  const openQuery = query(
     feedbackRef,
     where("sessionId", "==", normalizedSessionId),
-    where("status", "in", ["open", null]),
+    where("status", "==", "open"),
     orderBy("createdAt", "desc"),
     limit(REALTIME_LIMIT)
   );
+  const resolvedQuery = query(
+    feedbackRef,
+    where("sessionId", "==", normalizedSessionId),
+    where("status", "==", "resolved"),
+    orderBy("createdAt", "desc"),
+    limit(REALTIME_LIMIT)
+  );
+  let openDocs: Feedback[] = [];
+  let resolvedDocs: Feedback[] = [];
+  const emitCombined = () => {
+    const merged = [...openDocs, ...resolvedDocs]
+      .sort((a, b) => {
+        const aMs = (a.createdAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
+        const bMs = (b.createdAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
+        if (bMs !== aMs) return bMs - aMs;
+        return b.id.localeCompare(a.id);
+      })
+      .slice(0, REALTIME_LIMIT);
+    setSnapshot({ items: merged, docChanges: [], loading: false, error: null });
+  };
 
-  unsubscribe = onSnapshot(
-    feedbackQuery,
+  const unsubOpen = onSnapshot(
+    openQuery,
     (snap) => {
-      const docChanges: RealtimeDocChange[] = snap.docChanges().flatMap((change) => {
-        if (change.type === "added" || change.type === "modified") {
-          const feedback = mapDocToFeedback(change.doc);
-          if (feedback === null) {
-            return [{ type: "removed" as const, id: change.doc.id }];
-          }
-          return [{ type: change.type, feedback }] as RealtimeDocChange[];
-        }
-        return [{ type: "removed" as const, id: change.doc.id }];
-      });
-      setSnapshot({
-        items: snap.docs
-          .map((docSnap) => mapDocToFeedback(docSnap))
-          .filter((item): item is Feedback => item !== null),
-        docChanges,
-        loading: false,
-        error: null,
-      });
+      openDocs = snap.docs
+        .map((docSnap) => mapDocToFeedback(docSnap))
+        .filter((item): item is Feedback => item !== null);
+      emitCombined();
     },
     (err) => {
       console.error("[ECHLY] feedback realtime snapshot failed", err);
@@ -161,4 +166,42 @@ export function subscribeFeedbackSession(sessionId: string): void {
       });
     }
   );
+  const unsubResolved = onSnapshot(
+    resolvedQuery,
+    (snap) => {
+      resolvedDocs = snap.docs
+        .map((docSnap) => mapDocToFeedback(docSnap))
+        .filter((item): item is Feedback => item !== null);
+      emitCombined();
+    },
+    (err) => {
+      console.error("[ECHLY] feedback realtime snapshot failed", err);
+      setSnapshot({
+        items: [],
+        docChanges: [],
+        loading: false,
+        error: err instanceof Error ? err.message : "Failed to load feedback realtime",
+      });
+    }
+  );
+  unsubscribe = () => {
+    unsubOpen();
+    unsubResolved();
+  };
+}
+
+/** Tear down realtime feedback listeners (e.g. on logout). */
+export function clearFeedbackSubscription(): void {
+  if (unsubscribe) {
+    unsubscribe();
+    unsubscribe = null;
+  }
+  currentSessionId = null;
+  setSnapshot({
+    sessionId: null,
+    items: [],
+    docChanges: [],
+    loading: false,
+    error: null,
+  });
 }

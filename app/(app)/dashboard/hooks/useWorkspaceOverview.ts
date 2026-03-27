@@ -13,7 +13,10 @@ import {
   getCounts,
   setCounts as setCachedCounts,
 } from "@/lib/state/sessionCountsStore";
-import { fetchCountsDedup } from "@/lib/state/fetchCountsDedup";
+import { clearFeedbackSubscription } from "@/lib/realtime/feedbackStore";
+import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
+import { fetchSessionsListJson } from "@/lib/api/fetchSessionsList";
+import { fetchCounts } from "@/lib/state/fetchCountsDedup";
 
 const SESSIONS_CACHE_KEY = "echly_sessions";
 const SESSION_COUNT_CACHE_KEY = "sessionCount";
@@ -68,49 +71,33 @@ type SessionsLoadPayload = {
   countsBySessionId: Record<string, SessionFeedbackCounts>;
 };
 
-/** One in-flight load (e.g. React Strict Mode double effect) → single GET /api/sessions + counts batch. */
-let sessionsLoadInFlight: Promise<SessionsLoadPayload> | null = null;
-
+/** One concurrent GET /api/sessions per tab (deduped via `fetchSessionsListJson`) + counts batch. */
 async function loadSessionsAndCounts(): Promise<SessionsLoadPayload> {
-  if (sessionsLoadInFlight) {
-    return sessionsLoadInFlight;
-  }
-  sessionsLoadInFlight = (async () => {
-    try {
-      const res = await authFetch("/api/sessions");
-      if (!res.ok) {
-        throw new Error(`Failed to fetch sessions: ${res.status}`);
+  const data: unknown = await fetchSessionsListJson();
+  const sessions = sessionsArrayFromApiPayload(data);
+  const countsEntries = await Promise.all(
+    sessions.map(async (session): Promise<[string, SessionFeedbackCounts]> => {
+      const sessionId = typeof session.id === "string" ? session.id : "";
+      if (!sessionId) {
+        return [sessionId, { total: 0, open: 0, resolved: 0 }];
       }
-      const data: unknown = await res.json();
-      const sessions = sessionsArrayFromApiPayload(data);
-      const countsEntries = await Promise.all(
-        sessions.map(async (session): Promise<[string, SessionFeedbackCounts]> => {
-          const sessionId = typeof session.id === "string" ? session.id : "";
-          if (!sessionId) {
-            return [sessionId, { total: 0, open: 0, resolved: 0 }];
-          }
-          const cached = getCounts(sessionId);
-          if (cached) {
-            return [sessionId, cached];
-          }
-          try {
-            const normalizedCounts = await fetchCountsDedup(sessionId);
-            setCachedCounts(sessionId, normalizedCounts);
-            return [sessionId, normalizedCounts];
-          } catch {
-            return [sessionId, { total: 0, open: 0, resolved: 0 }];
-          }
-        })
-      );
-      return {
-        sessions,
-        countsBySessionId: Object.fromEntries(countsEntries),
-      };
-    } finally {
-      sessionsLoadInFlight = null;
-    }
-  })();
-  return sessionsLoadInFlight;
+      const cached = getCounts(sessionId);
+      if (cached) {
+        return [sessionId, cached];
+      }
+      try {
+        const normalizedCounts = await fetchCounts(sessionId);
+        setCachedCounts(sessionId, normalizedCounts);
+        return [sessionId, normalizedCounts];
+      } catch {
+        return [sessionId, { total: 0, open: 0, resolved: 0 }];
+      }
+    })
+  );
+  return {
+    sessions,
+    countsBySessionId: Object.fromEntries(countsEntries),
+  };
 }
 
 export interface SessionWithCounts {
@@ -158,6 +145,12 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         clearAuthTokenCache();
+        clearFeedbackSubscription();
+        clearWorkspaceSubscription();
+        setUser(null);
+        setAllSessions([]);
+        setCountsBySessionId({});
+        setLoading(false);
         router.push("/login");
         return;
       }
@@ -284,6 +277,15 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
 
       try {
         const res = await authFetch("/api/sessions", { method: "POST" });
+        if (!res) {
+          setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
+          setCountsBySessionId((prev) => {
+            const next = { ...prev };
+            delete next[tempSessionId];
+            return next;
+          });
+          return;
+        }
         const data = await res.json().catch((err: unknown) => {
           console.error("[ECHLY] JSON parse failed", err);
           return {};
@@ -414,6 +416,18 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ archived, isArchived: archived }),
       });
+      if (!res) {
+        if (hasRollback) {
+          setAllSessions((prev) => {
+            const next = prev.map((s) =>
+              s.id === sessionId ? { ...s, archived: rollbackArchived, isArchived: rollbackArchived } : s
+            );
+            writeCachedSessions(next);
+            return next;
+          });
+        }
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error((data && typeof data.error === "string" && data.error) || `Archive update failed: ${res.status}`);
@@ -454,6 +468,14 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
       });
       try {
         const res = await authFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+        if (!res) {
+          setAllSessions((prev) => [session, ...prev]);
+          setCountsBySessionId((prev) => ({
+            ...prev,
+            [sessionId]: prev[sessionId] ?? { total: 0, open: 0, resolved: 0 },
+          }));
+          return;
+        }
         if (!res.ok) {
           const data = await res.json().catch((err: unknown) => {
             console.error("[ECHLY] JSON parse failed", err);

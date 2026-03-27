@@ -99,6 +99,7 @@ function SessionWorkspaceRow({
 }) {
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyLinkBusy, setCopyLinkBusy] = useState(false);
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
@@ -305,18 +306,23 @@ function SessionWorkspaceRow({
             >
               <button
                 type="button"
+                disabled={isOptimistic || copyLinkBusy}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (isOptimistic) return;
-                  void copySessionLink(session.id).then((ok) => {
+                  if (isOptimistic || copyLinkBusy) return;
+                  void copySessionLink(session.id, { onBusy: setCopyLinkBusy }).then((ok) => {
                     if (ok) setCopied(true);
                   });
                 }}
-                className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
-                aria-label={copied ? "Copied" : "Copy link"}
-                title={copied ? "Copied" : "Copy link"}
+                className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30 disabled:opacity-50 disabled:pointer-events-none"
+                aria-label={
+                  copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"
+                }
+                title={copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"}
               >
-                {copied ? (
+                {copyLinkBusy ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-500" aria-hidden />
+                ) : copied ? (
                   <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 ) : (
                   <Link className="h-5 w-5" strokeWidth={2.5} aria-hidden />

@@ -16,16 +16,35 @@ export function useFeedbackDetailController(args: {
   sessionId: string;
   workspaceId: string | null | undefined;
   feedbackId: string | null | undefined;
+  /** When absent, realtime comments and API resolve are skipped (e.g. after logout). */
+  authUserId?: string | null;
   canComment?: boolean;
   canResolve?: boolean;
 }) {
-  const { sessionId, workspaceId, feedbackId, canComment = true, canResolve = true } = args;
+  const {
+    sessionId,
+    workspaceId,
+    feedbackId,
+    authUserId,
+    canComment = true,
+    canResolve = true,
+  } = args;
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    if (!authUserId) {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+      setComments([]);
+      setLoadingComments(false);
+      return;
+    }
+
     if (!feedbackId) {
       const t = requestAnimationFrame(() => {
         setComments([]);
@@ -60,7 +79,7 @@ export function useFeedbackDetailController(args: {
       unsubscribe();
       unsubscribeRef.current = null;
     };
-  }, [sessionId, feedbackId]);
+  }, [sessionId, feedbackId, authUserId]);
 
   const sendComment = async (message: string): Promise<void> => {
     const user = auth.currentUser;
@@ -147,6 +166,7 @@ export function useFeedbackDetailController(args: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isResolved: true }),
     });
+    if (!res) return;
     if (!res.ok) {
       console.error("[ECHLY] resolve via API failed", await res.text().catch(() => ""));
     }

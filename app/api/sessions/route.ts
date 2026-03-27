@@ -4,14 +4,13 @@ import { requireAuth } from "@/lib/server/auth";
 import {
   createSessionRepo,
   getWorkspaceSessionCountRepo,
-} from "@/lib/repositories/sessionsRepository";
+} from "@/lib/repositories/sessionsRepository.server";
 import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
 import { corsHeaders } from "@/lib/server/cors";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -38,13 +37,12 @@ export async function GET(req: NextRequest) {
 
   try {
     const { workspaceId } = await resolveWorkspaceForUser(user.uid);
-    const q = query(
-      collection(db, "sessions"),
-      where("workspaceId", "==", workspaceId),
-      orderBy("updatedAt", "desc"),
-      limit(30)
-    );
-    const snap = await getDocs(q);
+    const snap = await adminDb
+      .collection("sessions")
+      .where("workspaceId", "==", workspaceId)
+      .orderBy("updatedAt", "desc")
+      .limit(30)
+      .get();
     const sessions = snap.docs.map((docSnap) => {
       const data = docSnap.data() as {
         title?: string;

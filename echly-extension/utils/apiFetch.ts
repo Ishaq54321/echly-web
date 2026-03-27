@@ -19,6 +19,7 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
 
   const response = await fetch(url, {
     ...options,
+    cache: "no-store",
     headers: {
       "x-extension-token": extensionToken,
       ...mergedHeaders,

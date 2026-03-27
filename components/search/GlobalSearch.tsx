@@ -3,7 +3,7 @@
 import { FileText, Search as SearchIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { authFetch } from "@/lib/authFetch";
+import { fetchSessionsListJson } from "@/lib/api/fetchSessionsList";
 
 export const OPEN_SEARCH_EVENT = "echly:open-search-overlay";
 
@@ -66,10 +66,10 @@ export function GlobalSearch() {
     });
 
     if (sessions === null) {
-      authFetch("/api/sessions")
-        .then(async (res) => {
-          const data = (await res.json()) as { sessions?: SessionSearchResult[] };
-          return data.sessions ?? [];
+      fetchSessionsListJson()
+        .then((data) => {
+          const payload = data as { sessions?: SessionSearchResult[] };
+          return payload.sessions ?? [];
         })
         .then((nextSessions) => setSessions(nextSessions))
         .catch(() => setSessions([]));

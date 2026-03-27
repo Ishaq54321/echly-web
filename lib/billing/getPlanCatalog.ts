@@ -1,5 +1,4 @@
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 import { PLANS, type PlanId, DEFAULT_PRICES } from "./plans";
 
 export interface PlanCatalogEntry {
@@ -15,11 +14,6 @@ export interface PlanCatalogEntry {
 export type PlanCatalog = Record<PlanId, PlanCatalogEntry>;
 
 const PLANS_COLLECTION = "plans";
-
-let cachedCatalog: PlanCatalog | null = null;
-let lastFetchTime = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-let inFlightCatalogFetch: Promise<PlanCatalog> | null = null;
 
 const PLAN_NAMES: Record<PlanId, string> = {
   free: "Free",
@@ -53,11 +47,21 @@ async function fetchPlans(): Promise<PlanCatalog> {
   const catalog = buildDefaultCatalog();
 
   try {
-    const snapshot = await getDocs(collection(db, PLANS_COLLECTION));
-    snapshot.docs.forEach((docSnap) => {
-      const id = docSnap.id as PlanId;
-      if (!(id in catalog)) return;
-      const data = docSnap.data() as {
+    const snapshot = await adminDb.collection(PLANS_COLLECTION).get();
+    const plans = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    if (!plans || plans.length === 0) {
+      console.warn("Plan catalog fallback triggered");
+    }
+
+    for (const row of plans) {
+      const id = row.id as PlanId;
+      if (!(id in catalog)) continue;
+      const data = row as {
+        id: string;
         name?: string;
         priceMonthly?: number;
         priceYearly?: number;
@@ -81,42 +85,21 @@ async function fetchPlans(): Promise<PlanCatalog> {
             ? data.insightsEnabled
             : current.insightsEnabled,
       };
-    });
+    }
     return catalog;
-  } catch {
-    // Safety fallback: never crash because plans can't be fetched.
+  } catch (err) {
+    console.warn("Plan catalog fallback triggered", err);
     return catalog;
   }
 }
 
 /**
- * Returns plan catalog (Firestore plans + code defaults). Cached in-memory for 5 minutes
- * so repeated calls in the same process (e.g. multiple API handlers) share one Firestore read.
+ * Returns plan catalog (Firestore plans + code defaults) with fresh data per call.
  */
 export async function getPlanCatalog(): Promise<PlanCatalog> {
-  const now = Date.now();
-  if (cachedCatalog && now - lastFetchTime < CACHE_TTL) {
-    return cachedCatalog;
-  }
-
-  if (inFlightCatalogFetch) {
-    return inFlightCatalogFetch;
-  }
-
-  inFlightCatalogFetch = fetchPlans();
-  try {
-    const catalog = await inFlightCatalogFetch;
-    cachedCatalog = catalog;
-    lastFetchTime = Date.now();
-    return catalog;
-  } finally {
-    inFlightCatalogFetch = null;
-  }
+  return fetchPlans();
 }
 
 export function invalidatePlanCatalogCache(): void {
-  cachedCatalog = null;
-  lastFetchTime = 0;
-  inFlightCatalogFetch = null;
+  // No-op: plan catalog caching was removed.
 }
-

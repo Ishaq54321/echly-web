@@ -8,8 +8,6 @@ const JWKS = createRemoteJWKSet(
   new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
 );
 
-const tokenCache = new Map<string, { uid: string; expiresAt: number }>();
-
 export interface DecodedIdToken {
   uid: string;
   email?: string;
@@ -59,24 +57,7 @@ export async function requireAuth(request: Request): Promise<AuthUser> {
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7).trim();
     try {
-      const cached = tokenCache.get(token);
-      if (cached && cached.expiresAt > Date.now()) {
-        return { uid: cached.uid };
-      }
-
       const decoded = await verifyIdToken(token);
-
-      // Prevent unbounded growth in long-lived processes.
-      if (tokenCache.size > 1000) {
-        tokenCache.clear();
-      }
-
-      // Cache result for 5 minutes.
-      tokenCache.set(token, {
-        uid: decoded.uid,
-        expiresAt: Date.now() + 5 * 60 * 1000,
-      });
-
       return { uid: decoded.uid, email: decoded.email };
     } catch {
       const decoded = await verifyExtensionToken(token);

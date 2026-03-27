@@ -17,16 +17,8 @@ import {
   subscribeWorkspaceStore,
 } from "@/lib/realtime/workspaceStore";
 
-const WORKSPACE_CACHE_TTL_MS = 60 * 1000; // 1 minute
-const WORKSPACE_CACHE_MAX_ENTRIES = 1000;
-const workspaceCache = new Map<string, { data: Workspace; expiresAt: number }>();
-
 export function invalidateWorkspaceDocCache(workspaceId?: string): void {
-  if (workspaceId) {
-    workspaceCache.delete(workspaceId);
-    return;
-  }
-  workspaceCache.clear();
+  void workspaceId;
 }
 
 /** Used by onboarding: create a new workspace and return its id (caller must update user.workspaceId). */
@@ -58,24 +50,9 @@ function docToWorkspace(workspaceId: string, data: DocumentData): Workspace {
 }
 
 export async function getWorkspace(workspaceId: string): Promise<Workspace | null> {
-  const cached = workspaceCache.get(workspaceId);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data;
-  }
-
   const snap = await getDoc(doc(db, "workspaces", workspaceId));
   if (!snap.exists()) return null;
-  const workspace = docToWorkspace(snap.id, snap.data());
-
-  // Safety valve against unbounded in-memory growth.
-  if (workspaceCache.size > WORKSPACE_CACHE_MAX_ENTRIES) {
-    workspaceCache.clear();
-  }
-  workspaceCache.set(workspaceId, {
-    data: workspace,
-    expiresAt: Date.now() + WORKSPACE_CACHE_TTL_MS,
-  });
-  return workspace;
+  return docToWorkspace(snap.id, snap.data());
 }
 
 export function listenToWorkspace(

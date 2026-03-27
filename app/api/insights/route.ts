@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { getDoc } from "firebase/firestore";
 import {
   emptyWorkspaceInsightsDoc,
   workspaceInsightsRef,
   type WorkspaceInsightsDoc,
-} from "@/lib/repositories/insightsRepository";
+} from "@/lib/repositories/insightsRepository.server";
 
 export interface InsightsApiResponse {
   lifetime: {
@@ -58,9 +57,9 @@ export async function GET(req: Request) {
       return NextResponse.json(cached.data);
     }
 
-    const snap = await getDoc(workspaceInsightsRef(workspaceId));
-    const docData = snap.exists()
-      ? (snap.data() as WorkspaceInsightsDoc)
+    const snap = await workspaceInsightsRef(workspaceId).get();
+    const docData = snap.exists
+      ? ((snap.data() as WorkspaceInsightsDoc) ?? emptyWorkspaceInsightsDoc())
       : emptyWorkspaceInsightsDoc();
 
     const totalFeedback = Math.max(0, Number(docData.totalFeedback) || 0);

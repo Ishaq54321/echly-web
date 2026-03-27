@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { addComment } from "@/lib/comments";
 import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
@@ -51,7 +52,7 @@ export function DiscussionPanel({
     authFetch(`/api/tickets/${feedbackId}`)
       .then((res) => {
         if (cancelled) return;
-        if (!res.ok) throw new Error("Failed to load");
+        if (!res || !res.ok) throw new Error("Failed to load");
         return res.json();
       })
       .then((data: { success?: boolean; ticket?: TicketData }) => {
@@ -61,8 +62,12 @@ export function DiscussionPanel({
           setTicket(t);
           if (t.sessionId) {
             authFetch(`/api/sessions/${t.sessionId}`)
-              .then((r) => r.json())
-              .then((d: { session?: { title?: string } }) => {
+              .then((r) => {
+                if (!r || !r.ok) return null;
+                return r.json();
+              })
+              .then((d: { session?: { title?: string } } | null) => {
+                if (!d) return;
                 if (!cancelled && d.session?.title) {
                   setSessionName(d.session.title);
                 }
@@ -89,20 +94,35 @@ export function DiscussionPanel({
       return;
     }
 
-    if (unsubscribeRef.current) {
-      unsubscribeRef.current();
-      unsubscribeRef.current = null;
-    }
+    const sessionId = ticket.sessionId;
+    const fid = feedbackId;
 
-    const unsubscribe = listenToCommentsRepo(
-      ticket.sessionId,
-      feedbackId,
-      (incoming) => setComments([...incoming])
-    );
-    unsubscribeRef.current = unsubscribe;
+    let unsubComments: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (unsubComments) {
+        unsubComments();
+        unsubComments = null;
+      }
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+      if (!user) {
+        setComments([]);
+        return;
+      }
+      unsubComments = listenToCommentsRepo(
+        sessionId,
+        fid,
+        (incoming) => setComments([...incoming])
+      );
+      unsubscribeRef.current = unsubComments;
+    });
 
     return () => {
-      unsubscribe();
+      unsubAuth();
+      if (unsubComments) unsubComments();
       unsubscribeRef.current = null;
     };
   }, [feedbackId, ticket?.sessionId]);

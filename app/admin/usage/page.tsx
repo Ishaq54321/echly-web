@@ -11,9 +11,12 @@ export default function AdminUsagePage() {
   useEffect(() => {
     let cancelled = false;
     authFetch("/api/admin/usage")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res) return null;
+        return res.json();
+      })
       .then((data) => {
-        if (!cancelled) setStats(data);
+        if (!cancelled) setStats(data ?? null);
       })
       .catch(() => {
         if (!cancelled) setStats(null);

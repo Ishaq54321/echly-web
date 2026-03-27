@@ -1,23 +1,12 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  serverTimestamp,
-  setDoc,
-  where,
-  type Timestamp,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export type ScreenshotStatus = "TEMP" | "ATTACHED";
 
 export interface ScreenshotRecord {
   id: string;
   status: ScreenshotStatus;
-  createdAt: Timestamp | null;
+  createdAt: FirebaseFirestore.Timestamp | Date | null;
   feedbackId?: string | null;
   /** Storage path for cleanup (delete from Firebase Storage when deleting TEMP). */
   storagePath?: string | null;
@@ -31,10 +20,10 @@ export async function createScreenshotRepoSync(
   screenshotId: string,
   storagePath: string
 ): Promise<void> {
-  const ref = doc(db, "screenshots", screenshotId);
-  await setDoc(ref, {
+  const ref = adminDb.doc(`screenshots/${screenshotId}`);
+  await ref.set({
     status: "TEMP",
-    createdAt: serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
     storagePath,
   });
 }
@@ -45,15 +34,15 @@ export async function createScreenshotRepoSync(
 export async function getScreenshotByIdRepo(
   screenshotId: string
 ): Promise<ScreenshotRecord | null> {
-  const snap = await getDoc(doc(db, "screenshots", screenshotId));
-  if (!snap.exists()) return null;
-  const d = snap.data();
+  const snap = await adminDb.doc(`screenshots/${screenshotId}`).get();
+  if (!snap.exists) return null;
+  const d = (snap.data() ?? {}) as Record<string, unknown>;
   return {
     id: snap.id,
     status: (d.status === "ATTACHED" ? "ATTACHED" : "TEMP") as ScreenshotStatus,
-    createdAt: (d.createdAt ?? null) as Timestamp | null,
-    feedbackId: d.feedbackId ?? null,
-    storagePath: d.storagePath ?? null,
+    createdAt: (d.createdAt ?? null) as FirebaseFirestore.Timestamp | Date | null,
+    feedbackId: (d.feedbackId as string | null | undefined) ?? null,
+    storagePath: (d.storagePath as string | null | undefined) ?? null,
   };
 }
 
@@ -64,28 +53,25 @@ export async function getScreenshotByIdRepo(
 export async function getTempScreenshotsOlderThanRepo(
   createdBeforeMs: number
 ): Promise<ScreenshotRecord[]> {
-  const coll = collection(db, "screenshots");
-  const q = query(
-    coll,
-    where("status", "==", "TEMP")
-    // Firestore doesn't support compound inequality on different fields;
-  );
-  const snapshot = await getDocs(q);
+  const snapshot = await adminDb.collection("screenshots").where("status", "==", "TEMP").get();
   const results: ScreenshotRecord[] = [];
   for (const s of snapshot.docs) {
     const d = s.data();
-    const createdAt = d.createdAt as Timestamp | null | undefined;
+    const createdAt = d.createdAt as FirebaseFirestore.Timestamp | Date | null | undefined;
     if (!createdAt) continue;
-    const ms = typeof createdAt.toDate === "function"
-      ? createdAt.toDate().getTime()
-      : (createdAt as { seconds?: number }).seconds != null
-        ? (createdAt as { seconds: number }).seconds * 1000
-        : 0;
+    const ms =
+      createdAt instanceof Date
+        ? createdAt.getTime()
+        : typeof (createdAt as { toDate?: () => Date }).toDate === "function"
+          ? (createdAt as { toDate: () => Date }).toDate().getTime()
+          : (createdAt as { seconds?: number }).seconds != null
+            ? (createdAt as { seconds: number }).seconds * 1000
+            : 0;
     if (ms < createdBeforeMs) {
       results.push({
         id: s.id,
         status: "TEMP",
-        createdAt: (d.createdAt ?? null) as Timestamp | null,
+        createdAt: (d.createdAt ?? null) as FirebaseFirestore.Timestamp | Date | null,
         feedbackId: d.feedbackId ?? null,
         storagePath: d.storagePath ?? null,
       });
@@ -98,5 +84,5 @@ export async function getTempScreenshotsOlderThanRepo(
  * Delete a screenshot record (e.g. during cleanup of TEMP orphans).
  */
 export async function deleteScreenshotRepo(screenshotId: string): Promise<void> {
-  await deleteDoc(doc(db, "screenshots", screenshotId));
+  await adminDb.doc(`screenshots/${screenshotId}`).delete();
 }

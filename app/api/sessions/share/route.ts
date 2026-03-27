@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import type { SessionSharePermission } from "@/lib/repositories/sessionSharesRepository";

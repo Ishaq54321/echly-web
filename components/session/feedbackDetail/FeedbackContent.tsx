@@ -6,15 +6,17 @@ import { Section } from "./Section";
 import { ScreenshotBlock } from "./ScreenshotBlock";
 import { ScreenshotWithPins } from "./ScreenshotWithPins";
 import { SuggestionSection } from "./SuggestionSection";
+import { DescriptionSection } from "./DescriptionSection";
 import { ActionItemsSection } from "./ActionItemsSection";
 import { Tag } from "@/components/ui/Tag";
-import { formatActionStep } from "@/lib/formatters/formatActionStep";
 import { AVAILABLE_TAGS, getTagDotClass } from "@/lib/tagConfig";
 import type { FeedbackItemShape } from "./types";
 import type { Comment } from "@/lib/domain/comment";
 
 interface FeedbackContentProps {
   item: FeedbackItemShape & { index?: number; total?: number };
+  /** Read-only body text from public share / sanitized description (not editable). */
+  readOnlyDescription?: string | null;
   onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
   onSaveTags?: (suggestedTags: string[]) => Promise<void>;
   onExpandImage: () => void;
@@ -35,6 +37,7 @@ interface FeedbackContentProps {
 
 export function FeedbackContent({
   item,
+  readOnlyDescription = null,
   onSaveActionSteps,
   onSaveTags,
   onExpandImage,
@@ -54,6 +57,9 @@ export function FeedbackContent({
 }: FeedbackContentProps) {
   const actionSteps = Array.isArray(item.actionSteps) ? item.actionSteps : [];
   const tags = Array.isArray(item.suggestedTags) ? item.suggestedTags : [];
+  const fileAttachments =
+    item.publicAttachments?.filter((a): a is { kind: "file"; url: string; name?: string; size?: number } => a.kind === "file") ??
+    [];
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [dropdownAnimate, setDropdownAnimate] = useState(false);
   const tagPopoverRef = useRef<HTMLDivElement>(null);
@@ -92,14 +98,19 @@ export function FeedbackContent({
 
   const tagsToOffer = AVAILABLE_TAGS.filter((t) => !tags.includes(t));
 
+  const roDesc = typeof readOnlyDescription === "string" ? readOnlyDescription.trim() : "";
+
   return (
     <div className="content-wrapper flex flex-col gap-4 min-w-0">
+      {roDesc ? (
+        <DescriptionSection description={roDesc} />
+      ) : null}
       <section className="min-w-0">
         <div className="section-header text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6B7280] flex items-center gap-1.5 mb-2">
           <Paperclip size={16} strokeWidth={1.8} className="shrink-0 text-[#6B7280]" aria-hidden />
           Attachments
         </div>
-        <div className="attachments rounded-xl border border-[#E5E7EB] bg-white p-[14px]">
+        <div className="attachments rounded-xl border border-[#E5E7EB] bg-white p-[14px] space-y-3">
           {item.screenshotUrl ? (
             sendPinComment != null ? (
               <ScreenshotWithPins
@@ -126,38 +137,37 @@ export function FeedbackContent({
                 embeddedInCard
               />
             )
-          ) : (
+          ) : fileAttachments.length === 0 ? (
             <div className="echly-screenshot-placeholder rounded-lg overflow-hidden">
               <div className="echly-screenshot-loading-bar" />
             </div>
-          )}
+          ) : null}
+          {fileAttachments.length > 0 ? (
+            <ul className="list-none m-0 p-0 space-y-2">
+              {fileAttachments.map((f, i) => (
+                <li key={`${f.url}-${i}`}>
+                  <a
+                    href={f.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[14px] font-medium text-[#2563EB] hover:underline break-all"
+                  >
+                    {f.name?.trim() ? f.name : "Attachment"}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       </section>
       {item.suggestion != null && item.suggestion !== "" && (
         <SuggestionSection suggestion={item.suggestion} />
       )}
-      {onSaveActionSteps ? (
-        <ActionItemsSection
-          actionSteps={actionSteps}
-          onSave={onSaveActionSteps}
-          isResolved={item.isResolved ?? false}
-        />
-      ) : (
-        actionSteps.length > 0 && (
-          <div className="action-steps-card rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
-            <h2 className="text-[13px] font-semibold text-[#475569] tracking-[0.06em] uppercase mb-3">
-              Action steps
-            </h2>
-            <ul className="list-none space-y-2 p-0 m-0 text-[14px] leading-relaxed text-[#0F172A]">
-              {actionSteps.map((action, i) => (
-                <li key={i} className="leading-relaxed">
-                  {formatActionStep(action)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )
-      )}
+      <ActionItemsSection
+        actionSteps={actionSteps}
+        onSave={onSaveActionSteps}
+        isResolved={item.isResolved ?? false}
+      />
       {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (
         <Section title="Tags" titleMuted>
           <div className="flex flex-wrap gap-2 mt-3 max-w-full">

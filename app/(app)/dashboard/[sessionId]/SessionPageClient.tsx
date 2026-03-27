@@ -218,6 +218,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         try {
           const url = `/api/feedback/search?sessionId=${encodeURIComponent(feedbackSessionId)}&query=${encodeURIComponent(q)}`;
           const res = await authFetch(url);
+          if (!res) return;
           if (!res.ok) {
             throw new Error(`search ${res.status}`);
           }
@@ -239,6 +240,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [searchQuery, feedbackSessionId]);
 
   const {
+    canonicalFeedback,
+    openFeedback,
+    resolvedFeedback,
     feedback,
     setFeedback,
     total: feedbackTotal,
@@ -262,12 +266,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     resolvedExpanded,
     openExpanded,
     isSearchMode
-  );
-
-  /** Open tickets only; used for Resolve & Next navigation. */
-  const openFeedback = useMemo(
-    () => feedback.filter((f) => getTicketStatus(f) === "open"),
-    [feedback]
   );
 
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
@@ -459,6 +457,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     void (async () => {
       try {
         const res = await authFetch(`/api/tickets/${ticketIdFromUrl}`);
+        if (!res) return;
         const data = (await res.json()) as {
           success?: boolean;
           ticket?: TicketFromApi & { sessionId?: string; status?: string; createdAt?: string | null };
@@ -533,7 +532,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   /* ================= SELECTED ITEM (derived from feedback list) ================= */
 
-  const selectedIndex = feedback.findIndex((f) => f.id === selectedId);
+  const selectedIndex = canonicalFeedback.findIndex((f) => f.id === selectedId);
 
   // Preload only the next 1-2 ticket screenshots from the current selection.
   useEffect(() => {
@@ -546,15 +545,55 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     });
   }, [selectedIndex, feedback]);
 
-  const selectedItem = (() => {
-    const ticket = feedback.find((t) => t.id === selectedId) ?? null;
+  const contextualPosition = useMemo(() => {
+    if (!selectedId) return { index: 0, total: -1 };
+
+    const openIndex = openFeedback.findIndex((ticket) => ticket.id === selectedId);
+    if (openIndex >= 0) {
+      return {
+        index: openIndex + 1,
+        total: feedbackCountsLoading ? -1 : Math.max(0, feedbackActiveCount),
+      };
+    }
+
+    const resolvedIndex = resolvedFeedback.findIndex((ticket) => ticket.id === selectedId);
+    if (resolvedIndex >= 0) {
+      return {
+        index: resolvedIndex + 1,
+        total: feedbackCountsLoading ? -1 : Math.max(0, feedbackResolvedCount),
+      };
+    }
+
+    // Fallback: selected ticket not present in filtered subsets; use canonical/global position.
+    const globalIndex = canonicalFeedback.findIndex((ticket) => ticket.id === selectedId);
+    if (globalIndex >= 0) {
+      return {
+        index: globalIndex + 1,
+        total: feedbackCountsLoading ? -1 : Math.max(0, feedbackTotal),
+      };
+    }
+
+    return { index: 0, total: -1 };
+  }, [
+    selectedId,
+    openFeedback,
+    resolvedFeedback,
+    canonicalFeedback,
+    feedbackCountsLoading,
+    feedbackTotal,
+    feedbackActiveCount,
+    feedbackResolvedCount,
+  ]);
+
+  const selectedItem = useMemo(() => {
+    const ticket = canonicalFeedback.find((t) => t.id === selectedId) ?? null;
     if (!ticket) return null;
     return {
       ...ticket,
-      index: selectedIndex !== -1 ? selectedIndex + 1 : 1,
-      total: feedbackTotal,
+      index: Math.max(0, contextualPosition.index),
+      total: contextualPosition.total >= 0 ? Math.max(0, contextualPosition.total) : -1,
     };
-  })();
+  }, [canonicalFeedback, selectedId, contextualPosition.index, contextualPosition.total]);
 
   const sessionActionCaps = useMemo(() => {
     if (!authUser?.uid || !session) {
@@ -608,6 +647,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ archived, isArchived: archived }),
         });
+        if (!res) return;
         if (!res.ok) {
           const errBody = (await res.json().catch(() => ({}))) as { error?: string };
           throw new Error(errBody?.error ?? "Archive failed");
@@ -630,6 +670,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const confirmDeleteSessionFromMenu = useCallback(async () => {
     if (!sessionId) return;
     const res = await authFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+    if (!res) return;
     const data = (await res.json()) as { success?: boolean; error?: string };
     if (!res.ok || !data?.success) {
       throw new Error(data?.error ?? "Delete failed");
@@ -650,6 +691,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     sessionId,
     workspaceId: session?.workspaceId ?? session?.userId ?? null,
     feedbackId: selectedId,
+    authUserId: authUser?.uid ?? null,
     canComment: sessionActionCaps.canComment,
     canResolve: sessionActionCaps.canResolve,
   });
@@ -675,6 +717,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: trimmed }),
       });
+      if (!res) return;
       const data = (await res.json()) as {
         success?: boolean;
         ticket?: TicketFromApi;
@@ -715,6 +758,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ actionSteps }),
       });
+      if (!res) return;
       const data = (await res.json()) as {
         success?: boolean;
         ticket?: TicketFromApi;
@@ -752,6 +796,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ suggestedTags }),
       });
+      if (!res) return;
       const data = (await res.json()) as {
         success?: boolean;
         ticket?: TicketFromApi;
@@ -793,6 +838,19 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isResolved }),
       });
+      if (!res) {
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === selectedId
+              ? { ...item, isResolved: previousResolved }
+              : item
+          )
+        );
+        if (sessionId && previousCounts) {
+          setCachedCounts(sessionId, previousCounts);
+        }
+        return;
+      }
       const data = (await res.json()) as {
         success?: boolean;
         ticket?: TicketFromApi;
@@ -855,6 +913,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: safeTitle }),
       });
+      if (!res) return;
       const data = (await res.json()) as {
         success?: boolean;
         session?: Record<string, unknown>;
@@ -909,7 +968,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       });
     }
     try {
-      await Promise.all(
+      const results = await Promise.all(
         active.map((item) =>
           authFetch(`/api/tickets/${item.id}`, {
             method: "PATCH",
@@ -919,6 +978,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           })
         )
       );
+      if (results.some((r) => r == null)) {
+        setFeedback(previousFeedback);
+        if (sessionId && previousCounts) {
+          setCachedCounts(sessionId, previousCounts);
+        }
+        return;
+      }
     } catch (err) {
       warn("Mark all resolved failed:", err);
       setFeedback(previousFeedback);
@@ -954,7 +1020,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       });
     }
     try {
-      await Promise.all(
+      const results = await Promise.all(
         resolved.map((item) =>
           authFetch(`/api/tickets/${item.id}`, {
             method: "PATCH",
@@ -964,6 +1030,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           })
         )
       );
+      if (results.some((r) => r == null)) {
+        setFeedback(previousFeedback);
+        if (sessionId && previousCounts) {
+          setCachedCounts(sessionId, previousCounts);
+        }
+        return;
+      }
     } catch (err) {
       warn("Mark all unresolved failed:", err);
       setFeedback(previousFeedback);
@@ -996,6 +1069,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     setShowDeleteModal(false);
     try {
       const res = await authFetch(`/api/tickets/${id}`, { method: "DELETE" });
+      if (!res) return;
       const data = (await res.json()) as { success?: boolean; error?: string };
       if (!res.ok || !data?.success) throw new Error(data?.error ?? "Delete failed");
       router.push(`/dashboard/${sessionId}`);

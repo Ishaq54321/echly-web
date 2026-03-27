@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { MessageSquareMore } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
-import { cachedFetch } from "@/lib/client/requestCache";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { getTicketStatus } from "@/lib/domain/feedback";
 
@@ -88,8 +87,8 @@ export function DiscussionList({
     const url = "/api/feedback?conversationsOnly=true&limit=20";
     void (async () => {
       try {
-        const res = await cachedFetch(url, () => authFetch(url));
-        if (!res.ok) throw new Error("Failed to load feedback");
+        const res = await authFetch(url, { cache: "no-store" });
+        if (!res || !res.ok) throw new Error("Failed to load feedback");
         const data = (await res.json()) as { feedback?: unknown[] };
         if (cancelled) return;
         const raw = Array.isArray(data.feedback) ? data.feedback : [];

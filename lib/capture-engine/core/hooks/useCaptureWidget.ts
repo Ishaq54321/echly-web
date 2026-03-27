@@ -28,6 +28,7 @@ import {
 } from "../internal/domHelpers";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 import { logger } from "@/lib/logger";
+import { getOrCreateShareLink } from "@/lib/share/getOrCreateShareLink";
 
 const SAFE_MARGIN = 24;
 const ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
@@ -74,6 +75,7 @@ const CAPTURE_FLOW_STATES: CaptureState[] = [
 
 export function useCaptureWidget({
   sessionId,
+  userId,
   extensionMode = false,
   initialPointers,
   onComplete,
@@ -844,11 +846,17 @@ export function useCaptureWidget({
 
   const handleShare = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      const origin = window.location.origin;
+      const url = await getOrCreateShareLink({
+        sessionId,
+        userId,
+        origin,
+      });
+      await navigator.clipboard.writeText(url);
     } catch (err) {
       logger.error("error", "share_clipboard_failed", err);
     }
-  }, []);
+  }, [sessionId, userId]);
 
   const resetSession = useCallback(() => {
     setRecordings([]);

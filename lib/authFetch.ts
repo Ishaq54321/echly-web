@@ -1,29 +1,15 @@
 import { auth } from "@/lib/firebase";
 
-let cachedToken: string | null = null;
-let tokenExpiry: number | null = null;
-
-async function getCachedIdToken(user: { getIdToken(): Promise<string>; getIdTokenResult(): Promise<{ expirationTime?: string }> }): Promise<string> {
-  const now = Date.now();
-
-  if (cachedToken && tokenExpiry && now < tokenExpiry) {
-    return cachedToken;
-  }
-
+async function getIdTokenFresh(
+  user: { getIdToken(): Promise<string>; getIdTokenResult(): Promise<{ expirationTime?: string }> }
+): Promise<string> {
   const token = await user.getIdToken();
-  const result = await user.getIdTokenResult();
-
-  cachedToken = token;
-  tokenExpiry = result.expirationTime
-    ? new Date(result.expirationTime).getTime() - 60000
-    : now + 60000; // fallback 1 min
-
+  await user.getIdTokenResult();
   return token;
 }
 
 export function clearAuthTokenCache(): void {
-  cachedToken = null;
-  tokenExpiry = null;
+  // No-op: token cache removed.
 }
 
 /** In extension context, set window.__ECHLY_API_BASE__ so requests use the API origin. */
@@ -53,14 +39,14 @@ export type AuthFetchInit = RequestInit & {
 export async function authFetch(
   input: RequestInfo | URL,
   init: AuthFetchInit = {}
-): Promise<Response> {
+): Promise<Response | null> {
   const user = auth.currentUser;
 
   if (!user) {
-    throw new Error("User not authenticated");
+    return null;
   }
 
-  const token = await getCachedIdToken(user);
+  const token = await getIdTokenFresh(user);
 
   const headers = new Headers(init.headers || {});
   headers.set("Authorization", `Bearer ${token}`);
@@ -94,6 +80,7 @@ export async function authFetch(
     const res = await fetch(resolveInput(input), {
       ...restInit,
       headers,
+      cache: "no-store",
       signal: signal ?? restInit.signal,
     });
     if (timeoutId) clearTimeout(timeoutId);

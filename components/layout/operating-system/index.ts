@@ -12,6 +12,8 @@ export { TicketList } from "./TicketList";
 export { TicketItem } from "./TicketItem";
 export { ContextPanel } from "./ContextPanel";
 export { ExecutionView } from "./ExecutionView";
+/** Dashboard + share: same ticket body chrome as `ExecutionView` (session feedback detail). */
+export { ExecutionView as FeedbackDetailView } from "./ExecutionView";
 export { ActivitySlideOver } from "./ActivitySlideOver";
 export type { ActivitySlideOverProps } from "./ActivitySlideOver";
 export { CommentPanel } from "./CommentPanel";

@@ -1,22 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
+import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import {
   getSessionFeedbackPageForUserWithStringCursorRepo,
   getWorkspaceFeedbackAllRepo,
   getWorkspaceFeedbackWithCommentsRepo,
-} from "@/lib/repositories/feedbackRepository";
+} from "@/lib/repositories/feedbackRepository.server";
 import { resolveWorkspaceForUserLight } from "@/lib/server/resolveWorkspaceForUserLight";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { corsHeaders } from "@/lib/server/cors";
 import { verifyExtensionToken } from "@/lib/server/extensionAuth";
 import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
 import { getSessionUser } from "@/lib/server/session";
-import {
-  getCachedFeedback,
-  setCachedFeedback,
-  type FeedbackListKind,
-} from "@/lib/server/cache/feedbackCache";
 
 function unauthorized(): Response {
   return Response.json(
@@ -115,6 +111,14 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
         ? { seconds: (lastCommentAt as { seconds: number }).seconds }
         : null;
 
+  const rawStatus =
+    typeof (item as { status?: string }).status === "string"
+      ? ((item as { status?: string }).status as string)
+      : (item as { isResolved?: boolean }).isResolved
+        ? "resolved"
+        : "open";
+  const normalizedStatus = normalizeTicketStatus(rawStatus);
+
   return {
     id: item.id,
     sessionId: item.sessionId,
@@ -130,8 +134,8 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
     commentCount: typeof item.commentCount === "number" ? item.commentCount : 0,
     lastCommentPreview: item.lastCommentPreview,
     lastCommentAt: lastCommentAtOut ?? undefined,
-    status: (item as unknown as { status?: string }).status,
-    isResolved: (item as unknown as { isResolved?: boolean }).isResolved,
+    status: normalizedStatus,
+    isResolved: normalizedStatus === "resolved",
     isDeleted: item.isDeleted ?? false,
 
     screenshotUrl: item.screenshotUrl ?? null,
@@ -143,7 +147,7 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
  * GET /api/feedback?sessionId=ID&cursor=XYZ&limit=20&status=open|resolved
  * Returns { feedback: [], nextCursor: string | null, hasMore: boolean }
  *
- * When `status` is omitted, returns the mixed-status session list (extension / legacy).
+ * When `status` is omitted, returns the mixed-status session list.
  * When `status=open` or `status=resolved`, filters by Firestore `status` (paginated separately).
  *
  * Session-scoped pagination excludes soft-deleted feedback (`isDeleted === true`).
@@ -183,8 +187,9 @@ export async function GET(req: NextRequest) {
   const limitParam = searchParams.get("limit");
   const statusParam = searchParams.get("status")?.trim().toLowerCase();
   const statusFilter =
-    statusParam === "open" || statusParam === "resolved" ? statusParam : undefined;
-  const listKind: FeedbackListKind = statusFilter ?? "all";
+    statusParam === "open" || statusParam === "resolved"
+      ? statusParam
+      : undefined;
   const DEFAULT_LIMIT = 20;
   const requestedLimit = limitParam ? parseInt(limitParam, 10) : NaN;
   const normalizedRequestedLimit = Number.isFinite(requestedLimit) ? Math.max(1, requestedLimit) : DEFAULT_LIMIT;
@@ -231,13 +236,6 @@ export async function GET(req: NextRequest) {
     const workspaceId = resolvedWorkspaceId ?? user.uid;
     const isFirstPage = !cursor || cursor.trim() === "";
 
-    if (isFirstPage) {
-      const cached = getCachedFeedback(workspaceId, sessionId, listKind);
-      if (cached) {
-        return NextResponse.json(cached, { headers: corsHeaders(req) });
-      }
-    }
-
     const pageResult = await getSessionFeedbackPageForUserWithStringCursorRepo({
       workspaceId,
       sessionId,
@@ -253,10 +251,6 @@ export async function GET(req: NextRequest) {
       nextCursor,
       hasMore,
     };
-
-    if (isFirstPage) {
-      setCachedFeedback(workspaceId, sessionId, responseBody, listKind);
-    }
 
     return NextResponse.json(
       responseBody,

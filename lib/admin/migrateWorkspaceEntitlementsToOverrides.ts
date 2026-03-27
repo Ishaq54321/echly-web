@@ -5,8 +5,8 @@
  * (so true overrides are preserved).
  */
 
-import { collection, doc, getDocs, updateDoc, serverTimestamp, deleteField } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { FieldValue } from "firebase-admin/firestore";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getPlanCatalog, type PlanCatalog } from "@/lib/billing/getPlanCatalog";
 import type { PlanId } from "@/lib/billing/plans";
 
@@ -29,7 +29,7 @@ export async function migrateWorkspaceEntitlementsToOverrides(dryRun: boolean): 
 }> {
   const catalog: PlanCatalog = await getPlanCatalog();
 
-  const workspacesSnap = await getDocs(collection(db, "workspaces"));
+  const workspacesSnap = await adminDb.collection("workspaces").get();
   const results: MigrationResult[] = [];
   let updated = 0;
 
@@ -64,14 +64,13 @@ export async function migrateWorkspaceEntitlementsToOverrides(dryRun: boolean): 
     results.push({ workspaceId, plan, removed: toRemove });
 
     if (!dryRun) {
-      const ref = doc(db, "workspaces", workspaceId);
       const updates: Record<string, unknown> = {
-        updatedAt: serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       };
-      if (toRemove.includes("maxSessions")) updates["entitlements.maxSessions"] = deleteField();
-      if (toRemove.includes("maxMembers")) updates["entitlements.maxMembers"] = deleteField();
-      if (toRemove.includes("insightsAccess")) updates["entitlements.insightsAccess"] = deleteField();
-      await updateDoc(ref, updates);
+      if (toRemove.includes("maxSessions")) updates["entitlements.maxSessions"] = FieldValue.delete();
+      if (toRemove.includes("maxMembers")) updates["entitlements.maxMembers"] = FieldValue.delete();
+      if (toRemove.includes("insightsAccess")) updates["entitlements.insightsAccess"] = FieldValue.delete();
+      await adminDb.collection("workspaces").doc(workspaceId).update(updates);
       updated += 1;
     }
   }

@@ -6,7 +6,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 interface ActionStepsSectionProps {
   actionSteps: string[];
-  onSave: (steps: string[]) => Promise<void>;
+  onSave?: (steps: string[]) => Promise<void>;
   /** When true, show items as resolved (line-through, muted). */
   isResolved?: boolean;
 }
@@ -22,6 +22,7 @@ export function ActionItemsSection({
   onSave,
   isResolved = false,
 }: ActionStepsSectionProps) {
+  const isReadOnly = typeof onSave !== "function";
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [newItemDraft, setNewItemDraft] = useState("");
@@ -35,7 +36,7 @@ export function ActionItemsSection({
   };
 
   const saveEdit = async () => {
-    if (editingIndex === null) return;
+    if (editingIndex === null || !onSave) return;
     const next = [...items];
     const value = draft.trim();
     if (value) {
@@ -52,6 +53,7 @@ export function ActionItemsSection({
   };
 
   const removeItem = async (index: number) => {
+    if (!onSave) return;
     const next = items.filter((_, i) => i !== index);
     await onSave(next);
     if (editingIndex === index) {
@@ -68,6 +70,7 @@ export function ActionItemsSection({
   };
 
   const saveNew = async () => {
+    if (!onSave) return;
     const value = newItemDraft.trim();
     setNewItemDraft("");
     setIsAdding(false);
@@ -82,6 +85,7 @@ export function ActionItemsSection({
   };
 
   if (items.length === 0) {
+    if (isReadOnly) return null;
     return (
       <div className={cardClass}>
         <h2 className={titleClass}>Action steps</h2>
@@ -124,7 +128,17 @@ export function ActionItemsSection({
         {items.map((text, i) => (
           <li key={i} className="group flex items-start gap-2">
             <span className={numberClass}>{i + 1}.</span>
-            {editingIndex === i ? (
+            {isReadOnly ? (
+              <span
+                className={`flex-1 min-w-0 text-[14px] leading-relaxed ${
+                  isResolved
+                    ? "line-through text-[#64748B]"
+                    : "text-[#0F172A] font-normal"
+                }`}
+              >
+                {formatActionStep(text)}
+              </span>
+            ) : editingIndex === i ? (
               <div className="flex-1 flex gap-2 items-center min-w-0">
                 <input
                   type="text"

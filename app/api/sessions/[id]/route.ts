@@ -6,10 +6,10 @@ import {
   updateSessionArchivedRepo,
   updateSessionTitleRepo,
   updateSessionAccessLevelRepo,
-} from "@/lib/repositories/sessionsRepository";
+} from "@/lib/repositories/sessionsRepository.server";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { parseAccessLevelStrict } from "@/lib/domain/accessLevel";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { serializeSession } from "@/lib/server/serializeSession";

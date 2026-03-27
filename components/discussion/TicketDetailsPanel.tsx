@@ -29,7 +29,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
     authFetch(`/api/tickets/${feedbackId}`)
       .then((res) => {
         if (cancelled) return;
-        if (!res.ok) throw new Error("Failed to load");
+        if (!res || !res.ok) throw new Error("Failed to load");
         return res.json();
       })
       .then((data: { success?: boolean; ticket?: TicketData }) => {

@@ -1,15 +1,6 @@
-import {
-  collection,
-  doc,
-  getDocs,
-  limit,
-  query,
-  serverTimestamp,
-  where,
-  writeBatch,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 
 /** Firestore batch write limit. We leave one slot for the session update. */
 const BATCH_SIZE = 499;
@@ -30,8 +21,8 @@ export async function resolveAllOpenFeedbackInSession(
     throw new Error("Session not found or forbidden");
   }
 
-  const feedbackRef = collection(db, "feedback");
-  const sessionRef = doc(db, "sessions", sessionId);
+  const feedbackRef = adminDb.collection("feedback");
+  const sessionRef = adminDb.doc(`sessions/${sessionId}`);
   let totalResolved = 0;
 
   for (;;) {
@@ -40,17 +31,15 @@ export async function resolveAllOpenFeedbackInSession(
     const openCount = sessionSnap.openCount ?? 0;
     const resolvedCount = sessionSnap.resolvedCount ?? 0;
 
-    const q = query(
-      feedbackRef,
-      where("sessionId", "==", sessionId),
-      where("status", "==", "open"),
-      limit(BATCH_SIZE)
-    );
-    const snapshot = await getDocs(q);
+    const snapshot = await feedbackRef
+      .where("sessionId", "==", sessionId)
+      .where("status", "==", "open")
+      .limit(BATCH_SIZE)
+      .get();
     const docs = snapshot.docs;
     if (docs.length === 0) break;
 
-    const batch = writeBatch(db);
+    const batch = adminDb.batch();
     for (const d of docs) {
       batch.update(d.ref, { status: "resolved" });
     }
@@ -58,7 +47,7 @@ export async function resolveAllOpenFeedbackInSession(
     batch.update(sessionRef, {
       openCount: Math.max(0, openCount - n),
       resolvedCount: resolvedCount + n,
-      updatedAt: serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     await batch.commit();
     totalResolved += n;

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { getDocs, getDoc, doc, collection } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 import { requireAdmin } from "@/lib/server/adminAuth";
-import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository";
+import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository.server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 import type { Workspace } from "@/lib/domain/workspace";
 import type { PlanId } from "@/lib/billing/plans";
@@ -38,7 +37,7 @@ export async function GET(req: Request) {
   }
   try {
     const catalog = await getPlanCatalog();
-    const workspacesSnap = await getDocs(collection(db, "workspaces"));
+    const workspacesSnap = await adminDb.collection("workspaces").get();
     const rows: WorkspaceRow[] = [];
     for (const d of workspacesSnap.docs) {
       const data = d.data() as Omit<Workspace, "id">;
@@ -50,9 +49,9 @@ export async function GET(req: Request) {
       let ownerEmail: string | null = null;
       let ownerName: string | null = null;
       if (data.ownerId) {
-        const userSnap = await getDoc(doc(db, "users", data.ownerId));
-        if (userSnap.exists()) {
-          const u = userSnap.data() as { email?: string; name?: string };
+        const userSnap = await adminDb.doc(`users/${data.ownerId}`).get();
+        if (userSnap.exists) {
+          const u = (userSnap.data() as { email?: string; name?: string } | undefined) ?? {};
           ownerEmail = u.email ?? null;
           ownerName = u.name ?? null;
         }

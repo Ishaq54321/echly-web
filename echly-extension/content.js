@@ -13891,6 +13891,7 @@
         ...rest,
         method,
         body,
+        cache: "no-store",
         credentials: "include",
         headers: formHeaders
       });
@@ -13957,6 +13958,28 @@
     });
   })();
 
+  // lib/domain/accessLevel.ts
+  var ACCESS_LEVELS = ["view", "comment", "resolve"];
+  var ORDER = {
+    view: 0,
+    comment: 1,
+    resolve: 2
+  };
+  function normalizeAccessLevel(raw) {
+    if (raw === "resolve" || raw === "comment" || raw === "view") return raw;
+    if (raw === "edit") return "resolve";
+    return "view";
+  }
+  function parseAccessLevelStrict(raw) {
+    if (raw === "view" || raw === "comment" || raw === "resolve") return raw;
+    if (raw === "edit") return "resolve";
+    return null;
+  }
+  function hasPermission(effectiveLevel, requiredLevel) {
+    if (requiredLevel === "view") return true;
+    return ORDER[effectiveLevel] >= ORDER[requiredLevel];
+  }
+
   // lib/domain/session.ts
   function sessionsArrayFromApiPayload(data) {
     if (typeof data !== "object" || data === null) return [];
@@ -13979,122 +14002,62 @@
     const archived = Reflect.get(item, "archived");
     if (typeof archived === "boolean") {
       session.archived = archived;
+      session.isArchived = archived;
+    }
+    const isArchived = Reflect.get(item, "isArchived");
+    if (typeof isArchived === "boolean") {
+      session.isArchived = isArchived;
+      session.archived = isArchived;
     }
     const updatedAt = Reflect.get(item, "updatedAt");
     if (typeof updatedAt === "string" || updatedAt instanceof Date || updatedAt === null) {
       session.updatedAt = updatedAt;
     }
+    const accessLevel = Reflect.get(item, "accessLevel");
+    session.accessLevel = normalizeAccessLevel(accessLevel);
     return session;
   }
 
   // echly-extension/src/countsRequestStore.ts
-  var pendingRequests = {};
-  function getPendingRequest(sessionId) {
-    return pendingRequests[sessionId] || null;
-  }
-  function setPendingRequest(sessionId, promise) {
-    pendingRequests[sessionId] = promise;
-  }
-  function clearPendingRequest(sessionId) {
-    delete pendingRequests[sessionId];
-  }
-  async function fetchCountsDedup(sessionId, fetchResponse) {
-    const existing = getPendingRequest(sessionId);
-    if (existing) {
-      return existing;
+  async function fetchCountsDedup(_sessionId, fetchResponse) {
+    const res = await fetchResponse();
+    if (!res.ok) {
+      throw new Error("API_ERROR_" + res.status);
     }
-    const promise = (async () => {
-      try {
-        const res = await fetchResponse();
-        if (!res.ok) {
-          throw new Error("API_ERROR_" + res.status);
-        }
-        return await res.json();
-      } finally {
-        clearPendingRequest(sessionId);
-      }
-    })();
-    setPendingRequest(sessionId, promise);
-    return promise;
+    return await res.json();
   }
 
   // echly-extension/src/cachedSessions.ts
-  var TTL_MS = 3e4;
-  var COUNTS_TTL_MS = 5 * 6e4;
-  var cached = null;
-  var inFlight = null;
-  var countsCache = /* @__PURE__ */ new Map();
-  function getCounts(sessionId) {
-    const cachedEntry = countsCache.get(sessionId);
-    if (!cachedEntry) return null;
-    if (Date.now() - cachedEntry.at > COUNTS_TTL_MS) {
-      countsCache.delete(sessionId);
-      return null;
-    }
-    return { total: cachedEntry.total };
-  }
-  function setCounts(sessionId, total) {
-    countsCache.set(sessionId, { total, at: Date.now() });
-  }
   async function getSessionsCached(fetchFn) {
-    const now = Date.now();
-    if (cached && now - cached.at < TTL_MS) {
-      return cached.sessions;
+    const res = await fetchFn("/api/sessions");
+    if (!res.ok) {
+      console.error("[ECHLY] getSessionsCached /api/sessions failed", res.status);
+      return [];
     }
-    if (inFlight) {
-      return inFlight;
-    }
-    const promise = (async () => {
-      try {
-        const res = await fetchFn("/api/sessions");
-        if (!res.ok) {
-          console.error("[ECHLY] getSessionsCached /api/sessions failed", res.status);
-          return [];
+    const data = await res.json();
+    const baseSessions = sessionsArrayFromApiPayload(data);
+    const sessions = await Promise.all(
+      baseSessions.map(async (session) => {
+        const sessionId = session.id;
+        try {
+          const countsJson = await fetchCountsDedup(
+            sessionId,
+            () => fetchFn(`/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`)
+          );
+          const total = typeof countsJson.total === "number" ? countsJson.total : 0;
+          return {
+            ...session,
+            counts: { total }
+          };
+        } catch (countsErr) {
+          console.error("[ECHLY] getSessionsCached counts for session failed", sessionId, countsErr);
+          return { ...session, counts: { total: 0 } };
         }
-        const data = await res.json();
-        const baseSessions = sessionsArrayFromApiPayload(data);
-        const sessions = await Promise.all(
-          baseSessions.map(async (session) => {
-            const sessionId = session.id;
-            const cached2 = getCounts(sessionId);
-            if (cached2) {
-              return {
-                ...session,
-                counts: { total: cached2.total }
-              };
-            }
-            try {
-              const countsJson = await fetchCountsDedup(
-                sessionId,
-                () => fetchFn(
-                  `/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`
-                )
-              );
-              const total = typeof countsJson.total === "number" ? countsJson.total : 0;
-              setCounts(sessionId, total);
-              return {
-                ...session,
-                counts: { total }
-              };
-            } catch (countsErr) {
-              console.error("[ECHLY] getSessionsCached counts for session failed", sessionId, countsErr);
-              return { ...session, counts: { total: 0 } };
-            }
-          })
-        );
-        cached = { sessions, at: Date.now() };
-        return sessions;
-      } finally {
-        inFlight = null;
-      }
-    })();
-    inFlight = promise;
-    return promise;
+      })
+    );
+    return sessions;
   }
   function invalidateSessionsCache() {
-    cached = null;
-    inFlight = null;
-    countsCache = /* @__PURE__ */ new Map();
   }
 
   // lib/guardrails.ts
@@ -36330,7 +36293,7 @@
       }
     }
     if (!visibleText?.trim()) {
-      echlyDebug2("VISIBLE TEXT FALLBACK USED", "(skipped to avoid Echly UI)");
+      echlyDebug2("VISIBLE TEXT FALLBACK USED", "(omitted to avoid Echly UI)");
     }
     const ctx = {
       url: win.location.href,
@@ -36995,6 +36958,96 @@
     }
   }
 
+  // echly-extension/src/contentAuthFetch.ts
+  function clearAuthTokenCache() {
+  }
+  function getFullUrl(input) {
+    if (typeof input === "string") {
+      return input.startsWith("http") ? input : API_BASE + input;
+    }
+    if (input instanceof URL) return input.href;
+    return input.url;
+  }
+  async function authFetch(input, init = {}) {
+    try {
+      const token = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "ECHLY_GET_EXTENSION_TOKEN" },
+          (res) => resolve(res?.token ?? null)
+        );
+      });
+      const url = getFullUrl(input);
+      const headers = init.headers instanceof Headers ? Object.fromEntries(init.headers) : Array.isArray(init.headers) ? Object.fromEntries(init.headers) : init.headers ?? {};
+      const body = init.body;
+      const isFormDataBody = typeof FormData !== "undefined" && body instanceof FormData;
+      if (!isFormDataBody && body != null) {
+        const hasContentType = Object.keys(headers).some(
+          (headerName) => headerName.toLowerCase() === "content-type"
+        );
+        if (!hasContentType) {
+          headers["Content-Type"] = "application/json";
+        }
+      }
+      if (isFormDataBody) {
+        for (const key of Object.keys(headers)) {
+          if (key.toLowerCase() === "content-type") delete headers[key];
+        }
+      }
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      return fetch(url, {
+        ...init,
+        headers,
+        credentials: "include"
+      });
+    } catch (err) {
+      console.error("[ECHLY] API request failed", err);
+      throw err;
+    }
+  }
+  async function apiFetch2(path, options = {}) {
+    const url = path.startsWith("http") ? path : API_BASE + path;
+    return authFetch(url, options);
+  }
+
+  // lib/share/getOrCreateShareLink.ts
+  async function getOrCreateShareLink({
+    sessionId,
+    userId,
+    origin
+  }) {
+    const sid = sessionId.trim();
+    const uid = userId.trim();
+    const base = (origin || "").replace(/\/$/, "");
+    if (!sid) throw new Error("getOrCreateShareLink: sessionId is required");
+    if (!uid) throw new Error("getOrCreateShareLink: userId is required");
+    if (!base) throw new Error("getOrCreateShareLink: origin is required");
+    const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/share-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: uid })
+    });
+    if (!res) {
+      throw new Error("share-link failed");
+    }
+    if (!res.ok) {
+      let message = "share-link failed";
+      try {
+        const err = await res.json();
+        if (typeof err?.error === "string" && err.error) message = err.error;
+      } catch {
+      }
+      throw new Error(message);
+    }
+    const data = await res.json();
+    const token = typeof data.token === "string" ? data.token.trim() : "";
+    if (!data.success || !token) {
+      throw new Error("Invalid share-link response");
+    }
+    return `${base}/s/${encodeURIComponent(token)}`;
+  }
+
   // lib/capture-engine/core/hooks/useCaptureWidget.ts
   var import_react4 = __toESM(require_react());
   var SAFE_MARGIN = 24;
@@ -37033,6 +37086,7 @@
   ];
   function useCaptureWidget({
     sessionId,
+    userId,
     extensionMode = false,
     initialPointers,
     onComplete,
@@ -37276,7 +37330,7 @@
     }, []);
     const createCaptureRoot = (0, import_react4.useCallback)(() => {
       if (captureRootRef.current) {
-        if (ECHLY_DEBUG) console.debug("ECHLY createCaptureRoot", "skipped (ref already set)");
+        if (ECHLY_DEBUG) console.debug("ECHLY createCaptureRoot", "noop (ref already set)");
         return;
       }
       const existingRoot = document.getElementById(OVERLAY_ROOT_ID);
@@ -37293,7 +37347,7 @@
         logger.debug("extension", "pending_cleared", { reason: "create_capture_root" });
         setPending(null);
       } else {
-        logger.debug("extension", "pending_clear_skipped");
+        logger.debug("extension", "pending_clear_noop");
       }
       const captureEl = document.createElement("div");
       captureEl.id = OVERLAY_ROOT_ID;
@@ -37730,11 +37784,17 @@
     }, [captureRootReady, discardListening]);
     const handleShare = (0, import_react4.useCallback)(async () => {
       try {
-        await navigator.clipboard.writeText(window.location.href);
+        const origin = window.location.origin;
+        const url = await getOrCreateShareLink({
+          sessionId,
+          userId,
+          origin
+        });
+        await navigator.clipboard.writeText(url);
       } catch (err) {
         logger.error("error", "share_clipboard_failed", err);
       }
-    }, []);
+    }, [sessionId, userId]);
     const resetSession = (0, import_react4.useCallback)(() => {
       setRecordings([]);
       setActiveRecordingId(null);
@@ -38519,7 +38579,7 @@
           className: `echly-header-home-wrap${theme === "dark" ? " dark" : ""}`,
           onClick: () => onOpenDashboard?.(),
           "aria-label": "Open Echly dashboard",
-          children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "header-home-btn", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(House, { size: 18 }) })
+          children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "header-home-btn", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(House, { size: 20 }) })
         }
       ) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "echly-sidebar-title", children: title ?? "Echly" }),
@@ -40406,7 +40466,6 @@
     pointers: pointersProp,
     totalCount,
     openCount,
-    skippedCount,
     resolvedCount,
     sessionLoading = false,
     feedbackRecovering = false,
@@ -40526,7 +40585,6 @@
       if (status === "resolved" || isResolved === true) return false;
       return true;
     }).length;
-    const skippedTicketsCount = extensionMode ? typeof skippedCount === "number" ? skippedCount : 0 : state.pointers.filter((p) => p.status === "skipped").length;
     const resolvedTicketsCount = extensionMode ? typeof resolvedCount === "number" ? resolvedCount : 0 : state.pointers.filter((p) => {
       const status = p.status;
       const isResolved = p.isResolved;
@@ -40536,7 +40594,7 @@
     const highPriorityCount = state.pointers.filter(
       (p) => /critical|bug|high|urgent/i.test(p.type || "")
     ).length;
-    const summary = extensionMode ? `${typeof totalCount === "number" ? totalCount : 0} total \xB7 ${openTicketsCount} open \xB7 ${skippedTicketsCount} skipped \xB7 ${resolvedTicketsCount} resolved` : openTicketsCount > 0 ? highPriorityCount > 0 ? `${highPriorityCount} need attention` : null : null;
+    const summary = extensionMode ? `${typeof totalCount === "number" ? totalCount : 0} total \xB7 ${openTicketsCount} open \xB7 ${resolvedTicketsCount} resolved` : openTicketsCount > 0 ? highPriorityCount > 0 ? `${highPriorityCount} need attention` : null : null;
     (0, import_react16.useEffect)(() => {
       if (state.highlightTicketId && listScrollRef.current) {
         listScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
@@ -40830,7 +40888,7 @@
             "aria-pressed": captureMode === "voice",
             "aria-label": captureMode === "voice" ? "Voice (Recommended). Click to select microphone." : "Voice (Recommended)"
           },
-          /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-mode-card-icon echly-mic-trigger", "aria-hidden": true }, /* @__PURE__ */ import_react16.default.createElement(Mic, { size: 18, strokeWidth: 2 })),
+          /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-mode-card-icon echly-mic-trigger", "aria-hidden": true }, /* @__PURE__ */ import_react16.default.createElement(Mic, { size: 20, strokeWidth: 2 })),
           /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-mode-card-title" }, "Voice (Recommended)")
         ), /* @__PURE__ */ import_react16.default.createElement(
           "div",
@@ -40848,7 +40906,7 @@
             tabIndex: 0,
             "aria-pressed": captureMode === "text"
           },
-          /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-mode-card-icon" }, /* @__PURE__ */ import_react16.default.createElement(PenLine, { className: "mode-icon", size: 18, strokeWidth: 2 })),
+          /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-mode-card-icon" }, /* @__PURE__ */ import_react16.default.createElement(PenLine, { className: "mode-icon", size: 20, strokeWidth: 2 })),
           /* @__PURE__ */ import_react16.default.createElement("span", { className: "echly-mode-card-title" }, "Write")
         )),
         state.errorMessage && /* @__PURE__ */ import_react16.default.createElement("div", { className: "echly-sidebar-error" }, state.errorMessage)
@@ -41811,7 +41869,6 @@
           feedbackFetchFailed: globalState.feedback.recovering !== true && globalState.feedback.recoveryAttempts > 0,
           totalCount: globalState.counts.total,
           openCount: globalState.openCount,
-          skippedCount: globalState.skippedCount,
           resolvedCount: globalState.resolvedCount,
           sessionLoading: globalState.sessionLoading,
           sessionTitleProp: globalState.sessionTitle ?? void 0,
@@ -41958,7 +42015,6 @@
         total: typeof state.counts?.total === "number" ? state.counts.total : 0
       },
       openCount: typeof state.openCount === "number" ? state.openCount : 0,
-      skippedCount: typeof state.skippedCount === "number" ? state.skippedCount : 0,
       resolvedCount: typeof state.resolvedCount === "number" ? state.resolvedCount : 0,
       captureMode: state.captureMode === "text" ? "text" : "voice"
     };

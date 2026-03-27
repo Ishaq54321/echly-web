@@ -2,23 +2,52 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import {
   Link2,
+  Loader2,
   MoreHorizontal,
   Search,
   Bell,
 } from "lucide-react";
 import { useState, useCallback } from "react";
+import { auth } from "@/lib/firebase";
+import { getOrCreateShareLink } from "@/lib/share/getOrCreateShareLink";
+
+function dashboardSessionIdFromPath(pathname: string | null): string | null {
+  if (!pathname) return null;
+  const m = /^\/dashboard\/([^/]+)/.exec(pathname);
+  const id = m?.[1]?.trim() ?? "";
+  if (!id || id === "insights") return null;
+  return id;
+}
 
 export function GlobalNavBar() {
+  const pathname = usePathname();
+  const sessionId = dashboardSessionIdFromPath(pathname);
   const [copied, setCopied] = useState(false);
+  const [copyBusy, setCopyBusy] = useState(false);
 
-  const handleCopyLink = useCallback(() => {
-    if (typeof window === "undefined") return;
-    navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, []);
+  const handleCopyLink = useCallback(async () => {
+    if (typeof window === "undefined" || copyBusy) return;
+    const user = auth.currentUser;
+    if (!sessionId || !user) return;
+    setCopyBusy(true);
+    try {
+      const url = await getOrCreateShareLink({
+        sessionId,
+        userId: user.uid,
+        origin: window.location.origin,
+      });
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    } finally {
+      setCopyBusy(false);
+    }
+  }, [sessionId, copyBusy]);
 
   const iconButtonClass =
     "h-10 w-10 flex items-center justify-center rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer shrink-0";
@@ -45,11 +74,32 @@ export function GlobalNavBar() {
         <button
           type="button"
           onClick={handleCopyLink}
+          disabled={!sessionId || copyBusy}
           className={iconButtonClass}
-          title={copied ? "Copied" : "Copy link"}
-          aria-label={copied ? "Copied" : "Copy link"}
+          title={
+            !sessionId
+              ? "Open a session to copy a public link"
+              : copyBusy
+                ? "Generating link…"
+                : copied
+                  ? "Copied"
+                  : "Copy link"
+          }
+          aria-label={
+            !sessionId
+              ? "Copy link unavailable outside a session"
+              : copyBusy
+                ? "Generating link…"
+                : copied
+                  ? "Copied"
+                  : "Copy link"
+          }
         >
-          <Link2 className="h-4 w-4" strokeWidth={1.5} />
+          {copyBusy ? (
+            <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} aria-hidden />
+          ) : (
+            <Link2 className="h-4 w-4" strokeWidth={1.5} />
+          )}
         </button>
         <button
           type="button"

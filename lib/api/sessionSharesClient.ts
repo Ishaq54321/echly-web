@@ -6,6 +6,9 @@ export type SharePermission = AccessLevel;
 
 export async function fetchSessionLinkAccess(sessionId: string): Promise<AccessLevel> {
   const res = await authFetch(`/api/sessions/${encodeURIComponent(sessionId)}`);
+  if (!res) {
+    throw new Error("Failed to load session");
+  }
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error || "Failed to load session");
@@ -26,6 +29,9 @@ export async function updateSessionLinkAccess(params: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ accessLevel: params.accessLevel }),
   });
+  if (!res) {
+    throw new Error("Failed to update link access");
+  }
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error || "Failed to update link access");
@@ -42,6 +48,9 @@ export async function shareSession(params: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
+  if (!res) {
+    throw new Error("Share failed");
+  }
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error || "Share failed");
@@ -61,6 +70,9 @@ export async function fetchSessionShares(sessionId: string): Promise<
   { email: string; permission: SharePermission }[]
 > {
   const res = await authFetch(`/api/sessions/${encodeURIComponent(sessionId)}/shares`);
+  if (!res) {
+    throw new Error("Failed to load shares");
+  }
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error || "Failed to load shares");

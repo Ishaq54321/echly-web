@@ -29,6 +29,12 @@ export async function uploadScreenshot(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (!res) {
+        return {
+          screenshotId: payload.screenshotId,
+          url: undefined,
+        };
+      }
       const data = (await res.json()) as {
         screenshotId?: string;
         url?: string;

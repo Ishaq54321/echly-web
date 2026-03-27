@@ -1,10 +1,6 @@
 import { authFetch } from "@/lib/authFetch";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
-import {
-  clearPendingRequest,
-  getPendingRequest,
-  setPendingRequest,
-} from "@/lib/state/countsRequestStore";
+import { dedupedRequest } from "@/lib/utils/inflightDedup";
 
 function parseSessionFeedbackCountsBody(v: unknown): SessionFeedbackCounts {
   if (typeof v !== "object" || v === null) {
@@ -22,27 +18,24 @@ function parseSessionFeedbackCountsBody(v: unknown): SessionFeedbackCounts {
   };
 }
 
-export async function fetchCountsDedup(
-  sessionId: string
-): Promise<SessionFeedbackCounts> {
-  const existing = getPendingRequest(sessionId);
-  if (existing) {
-    return existing;
-  }
-  const promise = (async () => {
+export async function fetchCounts(sessionId: string): Promise<SessionFeedbackCounts> {
+  return dedupedRequest(`counts-${sessionId}`, async () => {
     try {
       const res = await authFetch(
-        `/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`
+        `/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`,
+        { cache: "no-store" }
       );
+      if (!res) {
+        throw new Error("Failed to fetch feedback counts: no response");
+      }
       const json = await res.json();
       return parseSessionFeedbackCountsBody(json);
     } catch (err) {
-      console.error("[ECHLY] fetchCountsDedup request failed", err);
+      console.error("[ECHLY] fetchCounts request failed", err);
       throw err;
-    } finally {
-      clearPendingRequest(sessionId);
     }
-  })();
-  setPendingRequest(sessionId, promise);
-  return promise;
+  });
 }
+
+/** Alias for `fetchCounts` — kept for existing imports. */
+export const fetchCountsDedup = fetchCounts;

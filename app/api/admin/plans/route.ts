@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDocs, doc, setDoc, collection } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { logAdminAction } from "@/lib/admin/adminLogs";
 import type { PlanDoc } from "@/lib/admin/types";
@@ -37,7 +36,7 @@ export async function GET(req: Request) {
   } catch (e) {
     return e as Response;
   }
-  const snapshot = await getDocs(collection(db, PLANS_COLLECTION));
+  const snapshot = await adminDb.collection(PLANS_COLLECTION).get();
   const byId = new Map<string, PlanDoc>();
   snapshot.docs.forEach((d) => {
     byId.set(d.id, d.data() as PlanDoc);
@@ -82,7 +81,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
   const { id: _id, ...updates } = body;
-  const ref = doc(db, PLANS_COLLECTION, id);
+  const ref = adminDb.doc(`${PLANS_COLLECTION}/${id}`);
   const payload: Partial<PlanDoc> = {};
   if (typeof updates.name === "string") payload.name = updates.name;
   if (typeof updates.priceMonthly === "number") payload.priceMonthly = updates.priceMonthly;
@@ -94,7 +93,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
   try {
-    await setDoc(ref, payload, { merge: true });
+    await ref.set(payload, { merge: true });
     invalidatePlanCatalogCache();
     await logAdminAction({
       adminId: admin.uid,

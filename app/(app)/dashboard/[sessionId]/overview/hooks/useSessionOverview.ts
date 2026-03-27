@@ -12,7 +12,7 @@ import {
   getCounts,
   setCounts as setStoreCounts,
 } from "@/lib/state/sessionCountsStore";
-import { fetchCountsDedup } from "@/lib/state/fetchCountsDedup";
+import { fetchCounts } from "@/lib/state/fetchCountsDedup";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getSessionById } from "@/lib/sessions";
 import type { Session } from "@/lib/domain/session";
@@ -110,7 +110,7 @@ export function useSessionOverview(sessionId: string | undefined) {
         const countsPromise = (async (): Promise<SessionFeedbackCounts> => {
           const cached = getCounts(sid);
           if (cached) return cached;
-          const next = await fetchCountsDedup(sid);
+          const next = await fetchCounts(sid);
           setStoreCounts(sid, next);
           return next;
         })();

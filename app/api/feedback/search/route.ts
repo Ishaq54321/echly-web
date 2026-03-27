@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
-import { getSessionFeedbackSearchCorpusForUserRepo } from "@/lib/repositories/feedbackRepository";
+import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
+import { getSessionFeedbackSearchCorpusForUserRepo } from "@/lib/repositories/feedbackRepository.server";
 import { resolveWorkspaceForUserLight } from "@/lib/server/resolveWorkspaceForUserLight";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { corsHeaders } from "@/lib/server/cors";
@@ -91,6 +92,14 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
         ? { seconds: (lastCommentAt as { seconds: number }).seconds }
         : null;
 
+  const rawStatus =
+    typeof (item as { status?: string }).status === "string"
+      ? ((item as { status?: string }).status as string)
+      : (item as { isResolved?: boolean }).isResolved
+        ? "resolved"
+        : "open";
+  const normalizedStatus = normalizeTicketStatus(rawStatus);
+
   return {
     id: item.id,
     sessionId: item.sessionId,
@@ -104,8 +113,8 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
     commentCount: typeof item.commentCount === "number" ? item.commentCount : 0,
     lastCommentPreview: item.lastCommentPreview,
     lastCommentAt: lastCommentAtOut ?? undefined,
-    status: (item as unknown as { status?: string }).status,
-    isResolved: (item as unknown as { isResolved?: boolean }).isResolved,
+    status: normalizedStatus,
+    isResolved: normalizedStatus === "resolved",
     isDeleted: item.isDeleted ?? false,
     screenshotUrl: item.screenshotUrl ?? null,
     screenshotStatus: item.screenshotStatus ?? null,

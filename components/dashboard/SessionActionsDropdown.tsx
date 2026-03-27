@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import {
   Archive,
   Link2,
+  Loader2,
   MoreHorizontal,
   Pencil,
   RotateCcw,
@@ -97,6 +98,7 @@ export function SessionActionsDropdown({
   const [shareOpen, setShareOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [copyLinkBusy, setCopyLinkBusy] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement>(null);
@@ -213,7 +215,8 @@ export function SessionActionsDropdown({
   const handleCopyLink = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const ok = await copySessionLink(session.id);
+    if (copyLinkBusy) return;
+    const ok = await copySessionLink(session.id, { onBusy: setCopyLinkBusy });
     if (ok) onCopyLinkSuccess?.();
     closeMenu();
   };
@@ -261,6 +264,7 @@ export function SessionActionsDropdown({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
     });
+    if (!res) throw new Error("Failed to rename");
     if (!res.ok) throw new Error("Failed to rename");
     const data = (await res.json()) as {
       success?: boolean;
@@ -362,11 +366,16 @@ export function SessionActionsDropdown({
                       ref={itemRef}
                       type="button"
                       onClick={handleCopyLink}
+                      disabled={copyLinkBusy}
                       className={menuItemClass}
                       role="menuitem"
                     >
-                      <Link2 className="shrink-0" strokeWidth={1.6} aria-hidden />
-                      Copy link
+                      {copyLinkBusy ? (
+                        <Loader2 className="shrink-0 animate-spin" strokeWidth={1.6} aria-hidden />
+                      ) : (
+                        <Link2 className="shrink-0" strokeWidth={1.6} aria-hidden />
+                      )}
+                      {copyLinkBusy ? "Copying…" : "Copy link"}
                     </button>
                   );
                 case "share":

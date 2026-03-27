@@ -15,6 +15,11 @@ export interface FeedbackItemShape {
   contextSummary?: string | null;
   actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
+  /** Public share only: sanitized attachment metadata (screenshots + files). */
+  publicAttachments?: ReadonlyArray<
+    | { kind: "screenshot"; url: string }
+    | { kind: "file"; url: string; name?: string; size?: number }
+  >;
   /** ISO date string from API or Firestore Timestamp (audit trail). */
   createdAt?: string | Timestamp | null;
   /** ISO date string from API or Firestore Timestamp when available. */

@@ -19,7 +19,10 @@ export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardPro
   useEffect(() => {
     let cancelled = false;
     authFetch("/api/workspace/status")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res) return Promise.resolve({ suspended: false as boolean | undefined });
+        return res.json();
+      })
       .then((data: { suspended?: boolean }) => {
         if (!cancelled) setSuspended(data.suspended === true);
       })

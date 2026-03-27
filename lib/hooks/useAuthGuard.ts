@@ -5,6 +5,8 @@ import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { clearAuthTokenCache } from "@/lib/authFetch";
+import { clearFeedbackSubscription } from "@/lib/realtime/feedbackStore";
+import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
 import { ensureUserWorkspaceLinkRepo } from "@/lib/repositories/usersRepository";
 
 type UseAuthGuardOptions = {
@@ -37,12 +39,16 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): {
           console.error("Failed to ensure user workspace link:", err);
         });
       }
-      if (currentUser == null && router) {
+      if (currentUser == null) {
         clearAuthTokenCache();
-        if (useReplace) {
-          router.replace("/login");
-        } else {
-          router.push("/login");
+        clearFeedbackSubscription();
+        clearWorkspaceSubscription();
+        if (router) {
+          if (useReplace) {
+            router.replace("/login");
+          } else {
+            router.push("/login");
+          }
         }
       }
     });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { resolveWorkspaceForUserLight } from "@/lib/server/resolveWorkspaceForUser";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 
 export const dynamic = "force-dynamic";

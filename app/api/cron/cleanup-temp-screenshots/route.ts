@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { ref, deleteObject } from "firebase/storage";
-import { storage } from "@/lib/firebase";
+import { adminBucket } from "@/lib/server/firebaseAdmin";
 import {
   getTempScreenshotsOlderThanRepo,
   deleteScreenshotRepo,
@@ -42,8 +41,7 @@ async function runCleanup(req: Request): Promise<Response> {
     for (const record of candidates) {
       if (record.storagePath) {
         try {
-          const storageRef = ref(storage, record.storagePath);
-          await deleteObject(storageRef);
+          await adminBucket.file(record.storagePath).delete({ ignoreNotFound: true });
         } catch (err) {
           console.error("[cleanup-temp-screenshots] Storage delete failed:", record.id, err);
           storageErrors += 1;

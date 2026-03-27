@@ -77,6 +77,7 @@ export async function apiFetch(
       ...rest,
       method,
       body,
+      cache: "no-store",
       credentials: "include",
       headers: formHeaders,
     });

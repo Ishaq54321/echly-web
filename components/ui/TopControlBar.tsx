@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Link as LinkIcon, UserPlus } from "lucide-react";
+import { Check, Link as LinkIcon, Loader2, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ShareModal } from "@/components/share/ShareModal";
 import { GlobalSearchButton } from "@/components/layout/GlobalSearchButton";
@@ -37,14 +37,16 @@ export function TopControlBar({
   const [shareOpen, setShareOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [linkCopyBusy, setLinkCopyBusy] = useState(false);
 
   const copyCurrentLink = useCallback(async () => {
-    const ok = await copySessionLink(sessionId);
+    if (linkCopyBusy) return;
+    const ok = await copySessionLink(sessionId, { onBusy: setLinkCopyBusy });
     if (!ok) return;
     setLinkCopied(true);
     if (copyTimerRef.current != null) window.clearTimeout(copyTimerRef.current);
     copyTimerRef.current = window.setTimeout(() => setLinkCopied(false), 2000);
-  }, [sessionId]);
+  }, [sessionId, linkCopyBusy]);
 
   useEffect(() => {
     return () => {
@@ -72,10 +74,16 @@ export function TopControlBar({
           <button
             type="button"
             className={`icon-btn copy-link-btn ${linkCopied ? "copy-link-btn--copied" : ""}`}
-            aria-label={linkCopied ? "Copied" : "Copy link"}
+            aria-label={linkCopyBusy ? "Generating link…" : linkCopied ? "Copied" : "Copy link"}
+            disabled={linkCopyBusy}
             onClick={copyCurrentLink}
           >
-            {linkCopied ? (
+            {linkCopyBusy ? (
+              <>
+                <Loader2 size={20} strokeWidth={2} className="animate-spin" aria-hidden />
+                <span className="copy-link-label">Copying…</span>
+              </>
+            ) : linkCopied ? (
               <>
                 <Check size={18} strokeWidth={2.5} aria-hidden />
                 <span className="copy-link-label">Copied</span>

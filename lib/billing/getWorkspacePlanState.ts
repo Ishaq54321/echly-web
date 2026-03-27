@@ -1,4 +1,4 @@
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 import { getWorkspaceEntitlements } from "@/lib/billing/getWorkspaceEntitlements";
 import { getWorkspaceUsage } from "@/lib/billing/getWorkspaceUsage";
@@ -42,6 +42,9 @@ export async function getWorkspacePlanState(
   ]);
 
   const planId = (workspace.billing?.plan ?? "free") as PlanId;
+  if (!catalog[planId]) {
+    console.warn("Plan catalog fallback triggered");
+  }
   const plan = catalog[planId] ?? catalog.free;
 
   const limits = {

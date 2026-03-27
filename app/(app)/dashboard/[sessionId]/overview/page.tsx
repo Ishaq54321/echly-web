@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Share2, Settings, LayoutPanelLeft } from "lucide-react";
+import { Share2, Settings, LayoutPanelLeft, Loader2 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { useSessionOverview } from "./hooks/useSessionOverview";
 import type { Feedback } from "@/lib/domain/feedback";
@@ -22,12 +22,14 @@ function OverviewSessionHeader({
   createdAt,
   sessionId,
   copied,
+  copyBusy,
   onCopy,
 }: {
   title: string;
   createdAt: string | Date | Timestamp | null;
   sessionId: string;
   copied: boolean;
+  copyBusy: boolean;
   onCopy: () => void;
 }) {
   const normalizedCreatedAt =
@@ -47,10 +49,11 @@ function OverviewSessionHeader({
         <button
           type="button"
           onClick={onCopy}
-          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
+          disabled={copyBusy}
+          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <Share2 size={14} />
-          {copied ? "Copied" : "Share"}
+          {copyBusy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Share2 size={14} />}
+          {copyBusy ? "Copying…" : copied ? "Copied" : "Share"}
         </button>
         <Link
           href={`/dashboard/${sessionId}`}
@@ -243,6 +246,7 @@ export default function SessionOverviewPage() {
   });
   const { data, loading, error } = useSessionOverview(sessionId);
   const [copied, setCopied] = useState(false);
+  const [copyBusy, setCopyBusy] = useState(false);
 
   useEffect(() => {
     if (authLoading || loading || !data.session || !authUser) return;
@@ -252,12 +256,12 @@ export default function SessionOverviewPage() {
   }, [authLoading, authUser, loading, data.session, router]);
 
   const handleCopy = useCallback(async () => {
-    if (!sessionId) return;
-    const ok = await copySessionLink(sessionId);
+    if (!sessionId || copyBusy) return;
+    const ok = await copySessionLink(sessionId, { onBusy: setCopyBusy });
     if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [sessionId]);
+  }, [sessionId, copyBusy]);
 
   if (authLoading || (loading && !data.session)) {
     return (
@@ -292,6 +296,7 @@ export default function SessionOverviewPage() {
         createdAt={session.createdAt ?? null}
         sessionId={sessionId}
         copied={copied}
+        copyBusy={copyBusy}
         onCopy={handleCopy}
       />
 

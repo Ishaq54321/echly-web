@@ -125,7 +125,7 @@ export function ProfileCommandPanel({
 
     authFetch("/api/insights")
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to load insights");
+        if (!res || !res.ok) throw new Error("Failed to load insights");
         return res.json();
       })
       .then((json: InsightsApiResponse) => {

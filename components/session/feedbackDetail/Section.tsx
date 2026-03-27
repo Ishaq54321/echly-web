@@ -17,13 +17,16 @@ export function Section({ title, children, titleMuted, titleSemantic }: SectionP
         ? "text-semantic-attention"
         : "text-[#9CA3AF]";
   const mutedClass = titleMuted && !titleSemantic ? "opacity-80" : "";
+  const hasTitle = title.trim().length > 0;
   return (
     <section className="min-w-0">
-      <h2
-        className={`text-[12px] font-medium uppercase tracking-[0.08em] mb-1.5 ${titleClass} ${mutedClass}`}
-      >
-        {title}
-      </h2>
+      {hasTitle ? (
+        <h2
+          className={`text-[12px] font-medium uppercase tracking-[0.08em] mb-1.5 ${titleClass} ${mutedClass}`}
+        >
+          {title}
+        </h2>
+      ) : null}
       <div className="gap-2 flex flex-col text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))]">
         {children}
       </div>

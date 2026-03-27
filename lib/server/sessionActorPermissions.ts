@@ -3,7 +3,7 @@ import type { Feedback } from "@/lib/domain/feedback";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { hasPermission } from "@/lib/domain/accessLevel";
 import type { AuthUser } from "@/lib/server/auth";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getSessionSharePermissionForEmailRepo } from "@/lib/repositories/sessionSharesRepository";
 import { getEffectiveAccessLevel } from "@/lib/permissions/sessionEffectiveAccess";
 

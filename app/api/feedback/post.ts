@@ -4,26 +4,23 @@ import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
   addFeedbackWithSessionCountersRepo,
   getFeedbackByIdRepo,
-} from "@/lib/repositories/feedbackRepository";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
+} from "@/lib/repositories/feedbackRepository.server";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import {
   getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { corsHeaders } from "@/lib/server/cors";
 import { verifyExtensionToken } from "@/lib/server/extensionAuth";
 import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
 import { getSessionUser } from "@/lib/server/session";
-import { invalidateFeedbackCache } from "@/lib/server/cache/feedbackCache";
-import { getDownloadURL, ref } from "firebase/storage";
-import { storage } from "@/lib/firebase";
+import "@/lib/server/firebaseAdmin";
+import { getStorage } from "firebase-admin/storage";
 import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
 
-const WORKSPACE_BY_ID_CACHE_TTL_MS = 30_000;
-const workspaceByIdCache = new Map<string, { workspace: unknown; expiresAt: number }>();
 
 function unauthorized(): Response {
   return Response.json(
@@ -100,13 +97,7 @@ async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
 }
 
 async function resolveWorkspaceByIdCached(workspaceId: string): Promise<{ workspace: unknown }> {
-  const now = Date.now();
-  const hit = workspaceByIdCache.get(workspaceId);
-  if (hit && now < hit.expiresAt) {
-    return { workspace: hit.workspace };
-  }
   const { workspace } = await resolveWorkspaceById(workspaceId);
-  workspaceByIdCache.set(workspaceId, { workspace, expiresAt: now + WORKSPACE_BY_ID_CACHE_TTL_MS });
   return { workspace };
 }
 
@@ -115,15 +106,28 @@ async function resolveScreenshotDownloadUrl(
   sessionId: string
 ): Promise<string | null> {
   const screenshotRecord = await getScreenshotByIdRepo(screenshotId);
+
   const storagePathRaw =
     typeof screenshotRecord?.storagePath === "string"
       ? screenshotRecord.storagePath.trim()
       : "";
+
   const fallbackStoragePath = `sessions/${sessionId}/screenshots/${screenshotId}.png`;
-  const storagePath = storagePathRaw.length > 0 ? storagePathRaw : fallbackStoragePath;
+
+  const storagePath =
+    storagePathRaw.length > 0 ? storagePathRaw : fallbackStoragePath;
 
   try {
-    return await getDownloadURL(ref(storage, storagePath));
+    const bucket = getStorage().bucket();
+
+    const file = bucket.file(storagePath);
+
+    const [url] = await file.getSignedUrl({
+      action: "read",
+      expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
+    });
+
+    return url;
   } catch (err) {
     console.error("[feedback lifecycle] failed to resolve screenshot URL", {
       screenshotId,
@@ -167,7 +171,9 @@ export async function POST(req: NextRequest) {
       clientTimestamp?: number;
     };
     screenshotId?: string;
-  };
+    status?: string;
+  } = {};
+
   try {
     body = await req.json();
   } catch (err) {
@@ -177,6 +183,29 @@ export async function POST(req: NextRequest) {
       { status: 400, headers: corsHeaders(req) }
     );
   }
+
+  const incomingStatusRaw =
+    typeof body.status === "string" ? body.status.trim().toLowerCase() : "open";
+  if (incomingStatusRaw === "failed") {
+    return NextResponse.json(
+      { success: false, error: "invalid status" },
+      { status: 400, headers: corsHeaders(req) }
+    );
+  }
+  if (
+    incomingStatusRaw !== "open" &&
+    incomingStatusRaw !== "resolved" &&
+    incomingStatusRaw !== "processing"
+  ) {
+    return NextResponse.json(
+      { success: false, error: "invalid status" },
+      { status: 400, headers: corsHeaders(req) }
+    );
+  }
+  type FeedbackStatus = "open" | "resolved" | "processing";
+  const incomingStatus = incomingStatusRaw as FeedbackStatus;
+  const normalizedIncomingStatus: FeedbackStatus =
+    incomingStatus === "processing" ? "open" : incomingStatus;
 
   const feedbackId = body?.feedbackId;
   if (!feedbackId) {
@@ -322,7 +351,7 @@ export async function POST(req: NextRequest) {
       ? body.suggestedTags
       : undefined,
     screenshotUrl: resolvedScreenshotUrl,
-    status: "open" as const,
+    status: normalizedIncomingStatus,
     screenshotStatus: "attached" as const,
     url: meta?.url,
     viewportWidth: meta?.viewportWidth,
@@ -349,8 +378,6 @@ export async function POST(req: NextRequest) {
         { status: 500, headers: corsHeaders(req) }
       );
     }
-
-    invalidateFeedbackCache(workspaceId, sessionId);
 
     return NextResponse.json(
       {

@@ -6,13 +6,12 @@ import {
   updateFeedbackRepo,
   updateFeedbackResolveAndSessionCountersRepo,
   deleteFeedbackWithSessionCountersRepo,
-} from "@/lib/repositories/feedbackRepository";
-import { getSessionByIdRepo, updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+} from "@/lib/repositories/feedbackRepository.server";
+import { getSessionByIdRepo, updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository.server";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { log } from "@/lib/utils/logger";
-import { getCachedWorkspace } from "@/lib/server/cache/workspaceCache";
 import { requireTicketActorPermission } from "@/lib/server/sessionActorPermissions";
 
 /** GET /api/tickets/:id — return single ticket (feedback) from DB. */
@@ -53,7 +52,7 @@ export async function GET(
     }
     const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
     try {
-      await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
+      await resolveWorkspaceById(workspaceId);
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
         return NextResponse.json(
@@ -143,7 +142,7 @@ export async function PATCH(
   }
   const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
   try {
-    await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
+    await resolveWorkspaceById(workspaceId);
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(
@@ -258,7 +257,7 @@ export async function DELETE(
     }
     const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
     try {
-      await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
+      await resolveWorkspaceById(workspaceId);
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
         return NextResponse.json(

@@ -1,17 +1,5 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-  type Timestamp,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
@@ -23,7 +11,7 @@ export interface SessionShare {
   sessionId: string;
   email: string;
   permission: SessionSharePermission;
-  createdAt?: Timestamp | null;
+  createdAt?: FirebaseFirestore.Timestamp | Date | null;
 }
 
 const SHARES_LIST_LIMIT = 100;
@@ -47,28 +35,27 @@ export async function upsertSessionShareRepo(
   const normalizedEmail = normalizeEmail(email);
   const level = normalizeAccessLevel(permission) as SessionSharePermission;
   const id = sessionShareDocId(sessionId, normalizedEmail);
-  const ref = doc(db, "session_shares", id);
-  const snap = await getDoc(ref);
-  if (snap.exists()) {
-    await updateDoc(ref, { permission: level });
+  const ref = adminDb.doc(`session_shares/${id}`);
+  const snap = await ref.get();
+  if (snap.exists) {
+    await ref.update({ permission: level });
   } else {
-    await setDoc(ref, {
+    await ref.set({
       sessionId,
       email: normalizedEmail,
       permission: level,
-      createdAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
   }
 }
 
 export async function listSessionSharesRepo(sessionId: string): Promise<SessionShare[]> {
   assertQueryLimit(SHARES_LIST_LIMIT, "listSessionSharesRepo");
-  const q = query(
-    collection(db, "session_shares"),
-    where("sessionId", "==", sessionId),
-    limit(SHARES_LIST_LIMIT)
-  );
-  const snap = await getDocs(q);
+  const snap = await adminDb
+    .collection("session_shares")
+    .where("sessionId", "==", sessionId)
+    .limit(SHARES_LIST_LIMIT)
+    .get();
   return snap.docs.map((d) => {
     const raw = d.data() as Omit<SessionShare, "id">;
     return {
@@ -85,8 +72,8 @@ export async function getSessionSharePermissionForEmailRepo(
   email: string
 ): Promise<AccessLevel | null> {
   const id = sessionShareDocId(sessionId, email);
-  const snap = await getDoc(doc(db, "session_shares", id));
-  if (!snap.exists()) return null;
+  const snap = await adminDb.doc(`session_shares/${id}`).get();
+  if (!snap.exists) return null;
   const p = (snap.data() as { permission?: unknown }).permission;
   return typeof p === "string" ? normalizeAccessLevel(p) : null;
 }

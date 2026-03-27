@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 
 export const dynamic = "force-dynamic";
 

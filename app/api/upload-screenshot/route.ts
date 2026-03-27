@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { storage } from "@/lib/firebase";
+import "@/lib/server/firebaseAdmin";
+import { getStorage } from "firebase-admin/storage";
 import { requireAuth } from "@/lib/server/auth";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
-import { getCachedWorkspace } from "@/lib/server/cache/workspaceCache";
 import {
   createScreenshotRepoSync,
   getScreenshotByIdRepo,
@@ -42,6 +41,8 @@ export async function POST(req: NextRequest) {
         headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
       });
     }
+
+    const bucket = getStorage().bucket();
 
     const body = await req.json();
     const { screenshotId, imageDataUrl, sessionId } = body;
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
     try {
-      await getCachedWorkspace(workspaceId, () => resolveWorkspaceById(workspaceId));
+      await resolveWorkspaceById(workspaceId);
     } catch (err) {
       if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
         return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
@@ -97,16 +98,25 @@ export async function POST(req: NextRequest) {
       await createScreenshotRepoSync(ssId, storagePath);
     }
 
-    const screenshotRef = ref(storage, storagePath);
-
     const uploadStart = Date.now();
-    await uploadString(screenshotRef, imageDataUrl, "data_url", {
-      contentType: "image/png",
-      cacheControl: "public, max-age=31536000, immutable",
-    });
-    console.log("UPLOAD CACHE CONTROL APPLIED");
+    // Convert data URL → buffer
+    const base64Data = imageDataUrl.split(",")[1];
+    const buffer = Buffer.from(base64Data, "base64");
 
-    const url = await getDownloadURL(screenshotRef);
+    // Upload to Firebase Storage via Admin SDK
+    const file = bucket.file(storagePath);
+
+    await file.save(buffer, {
+      metadata: {
+        contentType: "image/png",
+        cacheControl: "public, max-age=31536000, immutable",
+      },
+    });
+
+    const [url] = await file.getSignedUrl({
+      action: "read",
+      expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
+    });
     const uploadDuration = Date.now() - uploadStart;
     console.log(`[UPLOAD] screenshot upload duration: ${uploadDuration}ms`);
 

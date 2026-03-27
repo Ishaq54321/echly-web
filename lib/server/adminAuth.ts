@@ -1,5 +1,4 @@
-import { getDoc, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 import { requireAuth } from "@/lib/server/auth";
 
 export interface AdminUser {
@@ -15,9 +14,8 @@ export interface AdminUser {
  */
 export async function requireAdmin(request: Request): Promise<AdminUser> {
   const decoded = await requireAuth(request);
-  const userRef = doc(db, "users", decoded.uid);
-  const snap = await getDoc(userRef);
-  const isAdmin = snap.exists() && (snap.data() as { isAdmin?: boolean }).isAdmin === true;
+  const snap = await adminDb.doc(`users/${decoded.uid}`).get();
+  const isAdmin = snap.exists && (snap.data() as { isAdmin?: boolean } | undefined)?.isAdmin === true;
 
   if (!isAdmin) {
     throw new Response(
@@ -34,7 +32,6 @@ export async function requireAdmin(request: Request): Promise<AdminUser> {
  * Used server-side (e.g. API routes).
  */
 export async function isAdminUser(uid: string): Promise<boolean> {
-  const userRef = doc(db, "users", uid);
-  const snap = await getDoc(userRef);
-  return snap.exists() && (snap.data() as { isAdmin?: boolean }).isAdmin === true;
+  const snap = await adminDb.doc(`users/${uid}`).get();
+  return snap.exists && (snap.data() as { isAdmin?: boolean } | undefined)?.isAdmin === true;
 }

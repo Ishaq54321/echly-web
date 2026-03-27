@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { invalidateWorkspaceCache } from "@/lib/server/resolveWorkspaceForUser";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
-import { updateWorkspacePlanRepo } from "@/lib/repositories/workspacesRepository";
+import { getWorkspace, updateWorkspacePlanRepo } from "@/lib/repositories/workspacesRepository.server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 import type { PlanId } from "@/lib/billing/plans";
 

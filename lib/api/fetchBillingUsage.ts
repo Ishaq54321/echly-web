@@ -1,5 +1,6 @@
 export async function fetchBillingUsage() {
   const res = await fetch("/api/billing/usage", {
+    cache: "no-store",
     credentials: "include",
   });
 

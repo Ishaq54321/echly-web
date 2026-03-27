@@ -32,6 +32,7 @@ async function createSessionCookie(user: { getIdToken: () => Promise<string> }) 
     const idToken = await user.getIdToken();
     const res = await fetch("/api/auth/session", {
       method: "POST",
+      cache: "no-store",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idToken }),
       credentials: "include",

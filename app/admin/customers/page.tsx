@@ -56,7 +56,7 @@ export default function AdminCustomersPage() {
     setLoading(true);
     try {
       const res = await authFetch("/api/admin/workspaces");
-      if (!res.ok) throw new Error("Failed to load workspaces");
+      if (!res || !res.ok) throw new Error("Failed to load workspaces");
       const data = await res.json();
       setRows(data);
       return data;
@@ -85,6 +85,9 @@ export default function AdminCustomersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workspaceId, action, ...body }),
       });
+      if (!res) {
+        throw new Error("Action failed");
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error ?? "Action failed");

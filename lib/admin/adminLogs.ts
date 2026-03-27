@@ -1,5 +1,5 @@
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { FieldValue } from "firebase-admin/firestore";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 
 export async function logAdminAction(params: {
   adminId: string;
@@ -7,11 +7,15 @@ export async function logAdminAction(params: {
   workspaceId?: string | null;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
-  await addDoc(collection(db, "adminLogs"), {
-    adminId: params.adminId,
-    action: params.action,
-    workspaceId: params.workspaceId ?? null,
-    metadata: params.metadata ?? null,
-    timestamp: serverTimestamp(),
-  });
+  try {
+    await adminDb.collection("adminLogs").add({
+      adminId: params.adminId,
+      action: params.action,
+      workspaceId: params.workspaceId ?? null,
+      metadata: params.metadata ?? null,
+      timestamp: FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.error("ADMIN LOG WRITE FAILED", err);
+  }
 }

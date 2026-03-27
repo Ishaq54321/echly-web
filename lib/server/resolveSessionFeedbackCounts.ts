@@ -1,17 +1,5 @@
-import { db } from "@/lib/firebase";
-import {
-  collection,
-  deleteField,
-  doc,
-  getDocs,
-  query,
-  updateDoc,
-  where,
-} from "firebase/firestore";
-import {
-  getCachedCounts,
-  setCachedCounts,
-} from "@/lib/server/cache/feedbackCountsCache";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export type ResolvedSessionFeedbackCounts = {
   total: number;
@@ -21,17 +9,11 @@ export type ResolvedSessionFeedbackCounts = {
 
 /**
  * Session document counters when consistent; otherwise scans `feedback` and repairs the session doc.
- * Same behavior as GET /api/feedback/counts (including TTL cache).
  */
 export async function resolveSessionFeedbackCounts(
   sessionId: string,
   sessionRow: Record<string, unknown>
 ): Promise<ResolvedSessionFeedbackCounts> {
-  const cached = getCachedCounts(sessionId);
-  if (cached) {
-    return cached;
-  }
-
   const total = (sessionRow.totalCount as number) ?? 0;
   const open = (sessionRow.openCount as number) ?? 0;
   const resolved = (sessionRow.resolvedCount as number) ?? 0;
@@ -43,7 +25,6 @@ export async function resolveSessionFeedbackCounts(
       open,
       resolved,
     };
-    setCachedCounts(sessionId, data);
     return data;
   }
 
@@ -51,25 +32,31 @@ export async function resolveSessionFeedbackCounts(
   let realOpen = 0;
   let realResolved = 0;
 
-  const snapshot = await getDocs(
-    query(collection(db, "feedback"), where("sessionId", "==", sessionId))
-  );
+  const snapshot = await adminDb
+    .collection("feedback")
+    .where("sessionId", "==", sessionId)
+    .get();
 
   snapshot.forEach((docSnap) => {
     if (docSnap.data().isDeleted === true) return;
-    realTotal++;
     const status = docSnap.data().status;
-
-    if (status === "resolved") realResolved++;
-    else realOpen++;
+    if (status === "open") {
+      realOpen++;
+      realTotal++;
+      return;
+    }
+    if (status === "resolved") {
+      realResolved++;
+      realTotal++;
+    }
   });
 
-  const sessionRef = doc(db, "sessions", sessionId);
-  updateDoc(sessionRef, {
+  const sessionRef = adminDb.doc(`sessions/${sessionId}`);
+  sessionRef.update({
     totalCount: realTotal,
     openCount: realOpen,
     resolvedCount: realResolved,
-    skippedCount: deleteField(),
+    skippedCount: FieldValue.delete(),
   }).catch(() => {});
 
   console.warn("[ECHLY COUNT FALLBACK USED]", {
@@ -87,6 +74,5 @@ export async function resolveSessionFeedbackCounts(
     open: realOpen,
     resolved: realResolved,
   };
-  setCachedCounts(sessionId, data);
   return data;
 }

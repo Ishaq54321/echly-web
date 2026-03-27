@@ -48,6 +48,7 @@ async function verifyDashboardSession(): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/api/extension/session`, {
       method: "POST",
+      cache: "no-store",
       credentials: "include",
     });
     if (res.status === 401) return false;
@@ -99,8 +100,6 @@ type SessionCounts = {
   open: number;
   resolved: number;
 };
-const COUNTS_TTL_MS = 5 * 60 * 1000;
-const countsBySessionId: Map<string, { counts: SessionCounts; at: number }> = new Map();
 const processingFeedbackIds = new Set<string>();
 const feedbackJobOwners = new Map<string, number>();
 
@@ -111,23 +110,6 @@ async function isFeedbackCompleted(feedbackId: string): Promise<boolean> {
 
 async function markFeedbackCompleted(feedbackId: string): Promise<void> {
   await chrome.storage.session.set({ [feedbackId]: true });
-}
-
-function getCounts(sessionId: string): SessionCounts | null {
-  const cached = countsBySessionId.get(sessionId);
-  if (!cached) return null;
-  if (Date.now() - cached.at > COUNTS_TTL_MS) {
-    countsBySessionId.delete(sessionId);
-    return null;
-  }
-  return cached.counts;
-}
-
-function setCounts(sessionId: string, counts: SessionCounts): void {
-  countsBySessionId.set(sessionId, {
-    counts,
-    at: Date.now(),
-  });
 }
 
 /** Global message-router API: single source for extension token, user, capture mode (used by message handler). */
@@ -251,6 +233,8 @@ function resetPaginationState(): void {
 let rehydrationPromise: Promise<void> | null = null;
 const LOAD_MORE_RECOVERY_DELAYS_MS = [0, 500, 1000, 2000, 4000] as const;
 let loadMoreRecoveryPromise: Promise<void> | null = null;
+const EAGER_THROTTLE_THRESHOLD = 1000;
+const EAGER_THROTTLE_DELAY_MS = 40;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -360,6 +344,10 @@ async function rehydrateSession(sessionId: string, mode: RehydrateMode = "cold")
   } finally {
     rehydrationPromise = null;
   }
+
+  if (globalUIState.sessionId === sessionId && globalUIState.hasMore && globalUIState.nextCursor) {
+    await drainAllFeedbackPages(sessionId);
+  }
 }
 
 async function fetchFeedbackCountFresh(sessionId: string): Promise<SessionCounts> {
@@ -370,7 +358,6 @@ async function fetchFeedbackCountFresh(sessionId: string): Promise<SessionCounts
     open: typeof data.open === "number" ? data.open : 0,
     resolved: typeof data.resolved === "number" ? data.resolved : 0,
   };
-  setCounts(sessionId, counts);
   return counts;
 }
 
@@ -393,13 +380,6 @@ function mutateGlobalCounts(
   globalUIState.totalCount = Math.max(0, next.total);
   globalUIState.openCount = Math.max(0, next.open);
   globalUIState.resolvedCount = Math.max(0, next.resolved);
-  if (globalUIState.sessionId) {
-    setCounts(globalUIState.sessionId, {
-      total: globalUIState.totalCount,
-      open: globalUIState.openCount,
-      resolved: globalUIState.resolvedCount,
-    });
-  }
 }
 
 function applyStatusTransition(previousStatus: CountStatus, nextStatus: CountStatus): void {
@@ -457,6 +437,27 @@ async function loadMore(): Promise<void> {
   } finally {
     globalUIState.isFetching = false;
     broadcastUIState();
+  }
+}
+
+async function drainAllFeedbackPages(sessionId: string): Promise<void> {
+  if (!sessionId) return;
+  while (
+    globalUIState.sessionId === sessionId &&
+    globalUIState.hasMore === true &&
+    globalUIState.nextCursor != null
+  ) {
+    await loadMore();
+    if (
+      globalUIState.sessionId !== sessionId ||
+      globalUIState.hasMore !== true ||
+      globalUIState.nextCursor == null
+    ) {
+      break;
+    }
+    if (globalUIState.totalCount > EAGER_THROTTLE_THRESHOLD) {
+      await sleep(EAGER_THROTTLE_DELAY_MS);
+    }
   }
 }
 
@@ -663,6 +664,7 @@ async function getOrRefreshToken(): Promise<string> {
 
   const res = await fetch(`${API_BASE}/api/extension/session`, {
     method: "POST",
+    cache: "no-store",
     credentials: "include",
   });
 
@@ -945,6 +947,7 @@ async function createFeedbackInternal({
     description?: string;
     suggestedTags?: string[];
     actionSteps?: string[];
+    status?: "open" | "resolved";
   };
   screenshotId: string;
 }): Promise<Response> {
@@ -1289,7 +1292,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_LOAD_MORE") {
-    void loadMore();
+    const sessionId = activeSessionId ?? globalUIState.sessionId;
+    if (sessionId) {
+      void drainAllFeedbackPages(sessionId);
+    }
     sendResponse({ ok: true });
     return false;
   }

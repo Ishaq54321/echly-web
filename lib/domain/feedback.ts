@@ -22,7 +22,7 @@ export interface StructuredFeedback {
   // Screenshot
   screenshotUrl?: string | null;
   screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
-  status?: "processing" | "complete" | "open" | "resolved" | "failed";
+  status?: "open" | "resolved" | "processing";
 }
 
 /** Derived status for a ticket. Prefer explicit checks over !isResolved. */
@@ -75,7 +75,7 @@ export interface Feedback {
   // Screenshot
   screenshotUrl?: string | null;
   screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
-  status?: "processing" | "complete" | "open" | "resolved" | "failed";
+  status?: "open" | "resolved" | "processing";
 
   /** Soft delete: when true, row stays in Firestore but is hidden from list/query semantics. */
   isDeleted?: boolean;

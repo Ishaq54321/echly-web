@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/lib/firebase";
+import { adminBucket } from "@/lib/server/firebaseAdmin";
 import { requireAuth } from "@/lib/server/auth";
 import { randomUUID } from "crypto";
 
@@ -41,14 +40,18 @@ export async function POST(req: Request) {
     const originalName = (file.name || "file").replace(/[/\\]/g, "").slice(0, 200);
     const storagePath = `${STORAGE_PREFIX}/${randomUUID()}-${originalName}`;
 
-    const storageRef = ref(storage, storagePath);
-
     const arrayBuffer = await file.arrayBuffer();
-    await uploadBytes(storageRef, arrayBuffer, {
-      contentType: file.type || "application/octet-stream",
+    const bucketFile = adminBucket.file(storagePath);
+    await bucketFile.save(Buffer.from(arrayBuffer), {
+      metadata: {
+        contentType: file.type || "application/octet-stream",
+      },
     });
 
-    const url = await getDownloadURL(storageRef);
+    const [url] = await bucketFile.getSignedUrl({
+      action: "read",
+      expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
+    });
 
     return NextResponse.json({
       url,

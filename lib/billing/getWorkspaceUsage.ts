@@ -1,4 +1,4 @@
-import { getWorkspace } from "@/lib/repositories/workspacesRepository";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository";
 
 export interface WorkspaceUsage {
