@@ -1,13 +1,14 @@
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
 /** Firestore batch write limit. We leave one slot for the session update. */
 const BATCH_SIZE = 499;
 
 /**
  * Resolves all open feedback in a session. Internal utility only (not exposed to UI).
- * - Verifies session ownership (userId)
+ * - Verifies session workspace matches the user's workspaceId
  * - Processes in batches to respect Firestore limits
  * - Updates session denormalized counters (openCount, resolvedCount, updatedAt)
  * - Does not depend on pre-loaded feedback
@@ -17,7 +18,8 @@ export async function resolveAllOpenFeedbackInSession(
   userId: string
 ): Promise<{ resolved: number }> {
   const session = await getSessionByIdRepo(sessionId);
-  if (!session || session.userId !== userId) {
+  const wid = await getUserWorkspaceIdRepo(userId);
+  if (!session || session.workspaceId !== wid) {
     throw new Error("Session not found or forbidden");
   }
 
@@ -33,6 +35,7 @@ export async function resolveAllOpenFeedbackInSession(
 
     const snapshot = await feedbackRef
       .where("sessionId", "==", sessionId)
+      .where("workspaceId", "==", wid)
       .where("status", "==", "open")
       .limit(BATCH_SIZE)
       .get();

@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { FeedbackPremiumLoader } from "@/components/session/FeedbackPremiumLoader";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
 import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
@@ -122,28 +123,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const ticketIdFromUrl = searchParams.get("ticket");
 
   const [session, setSession] = useState<Session | null>(null);
-  const [viewerWorkspaceId, setViewerWorkspaceId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
 
   const { user: authUser, loading: authLoading } = useAuthGuard({ router });
-
-  useEffect(() => {
-    if (!authUser?.uid) {
-      setViewerWorkspaceId(null);
-      return;
-    }
-    let cancelled = false;
-    void getDoc(doc(db, "users", authUser.uid)).then((snap) => {
-      if (cancelled || !snap.exists()) return;
-      const w = (snap.data() as { workspaceId?: string }).workspaceId;
-      setViewerWorkspaceId(typeof w === "string" ? w : null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [authUser?.uid]);
+  const { workspaceId, claimsReady } = useWorkspace();
 
   // Start feedback loading as soon as auth is ready (do not block on session doc).
   const feedbackSessionId =
@@ -371,7 +356,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       const newItem: Feedback = {
         id: ticket.id,
         sessionId: evSessionId,
-        userId: session.userId,
+        workspaceId: session.workspaceId,
         title: ticket.title,
         instruction: ticket.instruction ?? ticket.description,
         description: ticket.description ?? ticket.instruction,
@@ -399,7 +384,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /* ================= AUTH + LOAD SESSION (title/meta only) ================= */
   useEffect(() => {
     if (authLoading) return;
-    if (!authUser || !sessionId) {
+    if (!claimsReady || !authUser || !sessionId || !workspaceId) {
       setSession(null);
       return;
     }
@@ -413,7 +398,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         return;
       }
       const data = sessionSnap.data();
-      if ((data as { userId?: string }).userId !== authUser.uid) {
+      const sw =
+        typeof (data as { workspaceId?: string }).workspaceId === "string"
+          ? (data as { workspaceId?: string }).workspaceId!.trim()
+          : "";
+      if (sw !== workspaceId) {
         router.push("/dashboard");
         return;
       }
@@ -433,7 +422,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return () => {
       cancelled = true;
     };
-  }, [sessionId, authUser, authLoading, router]);
+  }, [sessionId, authUser, authLoading, router, workspaceId, claimsReady]);
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
@@ -601,15 +590,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
     const effective = getEffectiveAccessLevel({
       session,
-      viewerUserId: authUser.uid,
-      viewerWorkspaceId,
+      viewerWorkspaceId: workspaceId,
       invitedPermission: null,
     });
     return {
       canComment: hasPermission(effective, "comment"),
       canResolve: hasPermission(effective, "resolve"),
     };
-  }, [authUser?.uid, session, viewerWorkspaceId]);
+  }, [authUser?.uid, session, workspaceId]);
 
   useEffect(() => {
     if (!sessionActionCaps.canComment && isCommentMode) {
@@ -689,7 +677,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     deleteComment,
   } = useFeedbackDetailController({
     sessionId,
-    workspaceId: session?.workspaceId ?? session?.userId ?? null,
     feedbackId: selectedId,
     authUserId: authUser?.uid ?? null,
     canComment: sessionActionCaps.canComment,

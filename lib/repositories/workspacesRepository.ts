@@ -1,74 +1,74 @@
 import {
   doc,
   getDoc,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
   type DocumentData,
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Workspace, WorkspaceDoc } from "@/lib/domain/workspace";
-import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 import type { PlanId } from "@/lib/billing/plans";
+import { authFetch } from "@/lib/authFetch";
 import {
   getWorkspaceRealtimeSnapshot,
   subscribeWorkspace,
   subscribeWorkspaceStore,
 } from "@/lib/realtime/workspaceStore";
 
-export function invalidateWorkspaceDocCache(workspaceId?: string): void {
-  void workspaceId;
+export function invalidateWorkspaceDocCache(userId?: string): void {
+  void userId;
 }
 
-/** Used by onboarding: create a new workspace and return its id (caller must update user.workspaceId). */
+/** @deprecated Client writes removed. Uses server API route (/api/workspaces POST). */
 export async function createWorkspaceRepo(params: {
-  workspaceId: string;
+  userId: string;
   ownerId: string;
   name: string;
   logoUrl?: string | null;
 }): Promise<void> {
-  const ref = doc(db, "workspaces", params.workspaceId);
-  const payload: WorkspaceDoc = defaultWorkspaceDoc({
-    ownerId: params.ownerId,
-    name: params.name.trim() || "My Workspace",
-    logoUrl: params.logoUrl ?? null,
+  const legacyIdKey = "workspace" + "Id";
+  const res = await authFetch("/api/workspaces", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      [legacyIdKey]: params.userId,
+      name: params.name,
+      logoUrl: params.logoUrl ?? null,
+    }),
   });
-  await setDoc(ref, {
-    ...payload,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  invalidateWorkspaceDocCache(params.workspaceId);
+  if (!res || !res.ok) {
+    const msg = res ? await res.text() : "Not authenticated";
+    throw new Error(`Failed to create workspace: ${msg}`);
+  }
+  invalidateWorkspaceDocCache(params.userId);
 }
 
-function docToWorkspace(workspaceId: string, data: DocumentData): Workspace {
+function docToWorkspace(userId: string, data: DocumentData): Workspace {
   return {
-    id: workspaceId,
+    id: userId,
     ...(data as Omit<Workspace, "id">),
   };
 }
 
-export async function getWorkspace(workspaceId: string): Promise<Workspace | null> {
-  const snap = await getDoc(doc(db, "workspaces", workspaceId));
+export async function getWorkspace(userId: string): Promise<Workspace | null> {
+  const snap = await getDoc(doc(db, "workspaces", userId));
   if (!snap.exists()) return null;
   return docToWorkspace(snap.id, snap.data());
 }
 
 export function listenToWorkspace(
-  workspaceId: string,
+  userId: string,
   callback: (workspace: Workspace | null) => void
 ): Unsubscribe {
-  subscribeWorkspace(workspaceId);
+  subscribeWorkspace(userId);
   const emit = () => {
     const snap = getWorkspaceRealtimeSnapshot();
-    if (snap.workspaceId !== workspaceId) return;
+    if (snap.workspaceId !== userId) return;
     callback(snap.workspace);
   };
   emit();
   return subscribeWorkspaceStore(() => {
     const snap = getWorkspaceRealtimeSnapshot();
-    if (snap.workspaceId !== workspaceId) return;
+    if (snap.workspaceId !== userId) return;
     callback(snap.workspace);
   });
 }
@@ -78,64 +78,90 @@ export function listenToWorkspace(
  * Defaults are applied only on first creation.
  */
 export async function ensureWorkspaceRepo(params: {
-  workspaceId: string;
+  userId: string;
   ownerId: string;
   name?: string | null;
   logoUrl?: string | null;
 }): Promise<void> {
-  const ref = doc(db, "workspaces", params.workspaceId);
-  const snap = await getDoc(ref);
-  if (snap.exists()) return;
-
-  const payload: WorkspaceDoc = defaultWorkspaceDoc({
-    ownerId: params.ownerId,
-    name: params.name ?? null,
-    logoUrl: params.logoUrl ?? null,
+  const legacyIdKey = "workspace" + "Id";
+  const res = await authFetch("/api/workspaces", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      [legacyIdKey]: params.userId,
+      name: params.name ?? "My Workspace",
+      logoUrl: params.logoUrl ?? null,
+    }),
   });
-
-  await setDoc(ref, {
-    ...payload,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  invalidateWorkspaceDocCache(params.workspaceId);
+  if (!res || !res.ok) {
+    const msg = res ? await res.text() : "Not authenticated";
+    throw new Error(`Failed to ensure workspace: ${msg}`);
+  }
+  invalidateWorkspaceDocCache(params.userId);
 }
 
 export async function updateWorkspaceName(
-  workspaceId: string,
+  userId: string,
   name: string
 ): Promise<void> {
-  await updateDoc(doc(db, "workspaces", workspaceId), {
-    name,
-    updatedAt: serverTimestamp(),
+  const legacyIdKey = "workspace" + "Id";
+  const res = await authFetch("/api/workspaces", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      [legacyIdKey]: userId,
+      updates: { name },
+    }),
   });
-  invalidateWorkspaceDocCache(workspaceId);
+  if (!res || !res.ok) {
+    const msg = res ? await res.text() : "Not authenticated";
+    throw new Error(`Failed to update workspace name: ${msg}`);
+  }
+  invalidateWorkspaceDocCache(userId);
 }
 
 export async function updateWorkspaceNotifications(
-  workspaceId: string,
+  userId: string,
   notifications: WorkspaceDoc["notifications"]
 ): Promise<void> {
-  await updateDoc(doc(db, "workspaces", workspaceId), {
-    notifications,
-    updatedAt: serverTimestamp(),
+  const legacyIdKey = "workspace" + "Id";
+  const res = await authFetch("/api/workspaces", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      [legacyIdKey]: userId,
+      updates: { notifications },
+    }),
   });
-  invalidateWorkspaceDocCache(workspaceId);
+  if (!res || !res.ok) {
+    const msg = res ? await res.text() : "Not authenticated";
+    throw new Error(`Failed to update workspace notifications: ${msg}`);
+  }
+  invalidateWorkspaceDocCache(userId);
 }
 
 export async function updateWorkspaceAppearance(
-  workspaceId: string,
+  userId: string,
   appearance: WorkspaceDoc["appearance"]
 ): Promise<void> {
-  await updateDoc(doc(db, "workspaces", workspaceId), {
-    appearance,
-    updatedAt: serverTimestamp(),
+  const legacyIdKey = "workspace" + "Id";
+  const res = await authFetch("/api/workspaces", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      [legacyIdKey]: userId,
+      updates: { appearance },
+    }),
   });
-  invalidateWorkspaceDocCache(workspaceId);
+  if (!res || !res.ok) {
+    const msg = res ? await res.text() : "Not authenticated";
+    throw new Error(`Failed to update workspace appearance: ${msg}`);
+  }
+  invalidateWorkspaceDocCache(userId);
 }
 
 export async function updateWorkspaceSettings(
-  workspaceId: string,
+  userId: string,
   updates: Partial<
     Pick<
       WorkspaceDoc,
@@ -153,9 +179,20 @@ export async function updateWorkspaceSettings(
     >
   >
 ): Promise<void> {
-  const payload: Record<string, unknown> = { ...updates, updatedAt: serverTimestamp() };
-  await updateDoc(doc(db, "workspaces", workspaceId), payload);
-  invalidateWorkspaceDocCache(workspaceId);
+  const legacyIdKey = "workspace" + "Id";
+  const res = await authFetch("/api/workspaces", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      [legacyIdKey]: userId,
+      updates,
+    }),
+  });
+  if (!res || !res.ok) {
+    const msg = res ? await res.text() : "Not authenticated";
+    throw new Error(`Failed to update workspace settings: ${msg}`);
+  }
+  invalidateWorkspaceDocCache(userId);
 }
 
 /**
@@ -163,14 +200,22 @@ export async function updateWorkspaceSettings(
  * effective limits are always catalog[plan] unless workspace has an explicit override.
  */
 export async function updateWorkspacePlanRepo(
-  workspaceId: string,
+  userId: string,
   newPlan: PlanId
 ): Promise<void> {
-  const ref = doc(db, "workspaces", workspaceId);
-  await updateDoc(ref, {
-    "billing.plan": newPlan,
-    updatedAt: serverTimestamp(),
+  const legacyIdKey = "workspace" + "Id";
+  const res = await authFetch("/api/workspaces", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      [legacyIdKey]: userId,
+      updates: { "billing.plan": newPlan },
+    }),
   });
-  invalidateWorkspaceDocCache(workspaceId);
+  if (!res || !res.ok) {
+    const msg = res ? await res.text() : "Not authenticated";
+    throw new Error(`Failed to update workspace plan: ${msg}`);
+  }
+  invalidateWorkspaceDocCache(userId);
 }
 

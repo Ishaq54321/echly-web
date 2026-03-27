@@ -3,29 +3,28 @@ import type { Feedback } from "@/lib/domain/feedback";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { hasPermission } from "@/lib/domain/accessLevel";
 import type { AuthUser } from "@/lib/server/auth";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getSessionSharePermissionForEmailRepo } from "@/lib/repositories/sessionSharesRepository";
 import { getEffectiveAccessLevel } from "@/lib/permissions/sessionEffectiveAccess";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
 export async function getEffectiveAccessLevelForActor(
   user: AuthUser,
   session: Session
 ): Promise<AccessLevel> {
-  const viewerWorkspaceId = await getUserWorkspaceIdRepo(user.uid);
   let invitedPermission: AccessLevel | null = null;
   if (user.email) {
     invitedPermission = await getSessionSharePermissionForEmailRepo(session.id, user.email);
   }
+  const viewerWorkspaceId = await getUserWorkspaceIdRepo(user.uid);
   return getEffectiveAccessLevel({
     session,
-    viewerUserId: user.uid,
     viewerWorkspaceId,
     invitedPermission,
   });
 }
 
 /**
- * Ticket APIs: workspace members, session owner, ticket author, or explicit email share.
+ * Ticket APIs: session owner, ticket author, or explicit email share.
  */
 export async function canAccessTicketForActor(
   user: AuthUser,
@@ -33,10 +32,9 @@ export async function canAccessTicketForActor(
   session: Session | null
 ): Promise<boolean> {
   if (!session) return false;
-  if (ticket.userId === user.uid) return true;
-  if (session.userId === user.uid) return true;
-  const userWs = await getUserWorkspaceIdRepo(user.uid);
-  if (session.workspaceId != null && userWs === session.workspaceId) return true;
+  const actorWorkspaceId = await getUserWorkspaceIdRepo(user.uid);
+  if (ticket.workspaceId === actorWorkspaceId) return true;
+  if (session.workspaceId === actorWorkspaceId) return true;
   if (user.email) {
     const share = await getSessionSharePermissionForEmailRepo(session.id, user.email);
     if (share != null) return true;

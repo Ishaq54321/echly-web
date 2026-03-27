@@ -2,6 +2,8 @@ import "server-only";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 
 export interface WorkspaceInsightsDoc {
+  /** Workspace identity for this insights document (never userId). */
+  workspaceId?: string;
   totalFeedback: number;
   totalComments: number;
   totalResolved: number;
@@ -29,6 +31,14 @@ export interface WorkspaceInsightsDoc {
 
 type DocumentReference<T = FirebaseFirestore.DocumentData> = FirebaseFirestore.DocumentReference<T>;
 
+function requireWorkspaceId(workspaceId: string, context: string): string {
+  const trimmed = workspaceId.trim();
+  if (!trimmed) {
+    throw new Error(`Missing workspaceId - invalid state (${context})`);
+  }
+  return trimmed;
+}
+
 function num(value: unknown, fallback: number = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -43,6 +53,7 @@ function getPath(obj: unknown, path: string): unknown {
   return cur;
 }
 
+// IMPORTANT: workspaceId is used as document key (previously named userId)
 export function workspaceInsightsRef(
   workspaceId: string
 ): DocumentReference<WorkspaceInsightsDoc> {
@@ -74,7 +85,11 @@ export async function incrementInsightsOnFeedbackCreateRepo(opts: {
   sessionId: string;
   type: string;
 }): Promise<void> {
-  const { workspaceId, sessionId } = opts;
+  const workspaceId = requireWorkspaceId(
+    opts.workspaceId,
+    "incrementInsightsOnFeedbackCreateRepo"
+  );
+  const { sessionId } = opts;
   const type = (opts.type ?? "").trim() || "general";
   const day = todayKeyUtc();
   const ref = workspaceInsightsRef(workspaceId);
@@ -89,6 +104,7 @@ export async function incrementInsightsOnFeedbackCreateRepo(opts: {
       ref,
       {
         totalFeedback: num((existing as any).totalFeedback) + 1,
+        workspaceId,
         timeSavedMinutes: num((existing as any).timeSavedMinutes) + 5,
         [issueTypePath]: num(getPath(existing, issueTypePath)) + 1,
         [sessionCountPath]: num(getPath(existing, sessionCountPath)) + 1,
@@ -103,7 +119,10 @@ export async function incrementInsightsOnFeedbackCreateRepo(opts: {
 export async function incrementInsightsOnCommentCreateRepo(opts: {
   workspaceId: string;
 }): Promise<void> {
-  const { workspaceId } = opts;
+  const workspaceId = requireWorkspaceId(
+    opts.workspaceId,
+    "incrementInsightsOnCommentCreateRepo"
+  );
   const day = todayKeyUtc();
   const ref = workspaceInsightsRef(workspaceId);
 
@@ -115,6 +134,7 @@ export async function incrementInsightsOnCommentCreateRepo(opts: {
       ref,
       {
         totalComments: num((existing as any).totalComments) + 1,
+        workspaceId,
         [dailyCommentsPath]: num(getPath(existing, dailyCommentsPath)) + 1,
         updatedAt: new Date(),
       } as Record<string, unknown>,
@@ -127,7 +147,11 @@ export async function incrementInsightsOnFeedbackResolvedRepo(opts: {
   workspaceId: string;
   delta: 1 | -1;
 }): Promise<void> {
-  const { workspaceId, delta } = opts;
+  const workspaceId = requireWorkspaceId(
+    opts.workspaceId,
+    "incrementInsightsOnFeedbackResolvedRepo"
+  );
+  const { delta } = opts;
   const day = todayKeyUtc();
   const ref = workspaceInsightsRef(workspaceId);
 
@@ -139,6 +163,7 @@ export async function incrementInsightsOnFeedbackResolvedRepo(opts: {
       ref,
       {
         totalResolved: num((existing as any).totalResolved) + delta,
+        workspaceId,
         [dailyResolvedPath]: num(getPath(existing, dailyResolvedPath)) + delta,
         updatedAt: new Date(),
       } as Record<string, unknown>,

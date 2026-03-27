@@ -10,6 +10,7 @@ type PublicShareSuccess = {
   session: SanitizedPublicSession;
   feedback: SanitizedPublicFeedback[];
   permissions: ResolvedPublicSharePermissions;
+  token: string;
 };
 
 type FetchResult =
@@ -121,6 +122,6 @@ export default async function PublicSharePage({ params }: PageProps) {
   }
 
   return (
-    <PublicShareSessionView initial={result.data} />
+    <PublicShareSessionView initial={{ ...result.data, token: rawToken }} />
   );
 }

@@ -17,11 +17,17 @@ export interface ScreenshotRecord {
  * Call this at the start of upload; when feedback is created, update to ATTACHED.
  */
 export async function createScreenshotRepoSync(
+  userId: string,
   screenshotId: string,
   storagePath: string
 ): Promise<void> {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) {
+    throw new Error("Missing userId - invalid state");
+  }
   const ref = adminDb.doc(`screenshots/${screenshotId}`);
   await ref.set({
+    userId: normalizedUserId,
     status: "TEMP",
     createdAt: FieldValue.serverTimestamp(),
     storagePath,

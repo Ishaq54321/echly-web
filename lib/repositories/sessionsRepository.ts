@@ -1,7 +1,5 @@
 import {
-  addDoc,
   collection,
-  deleteDoc,
   doc,
   getCountFromServer,
   getDoc,
@@ -9,65 +7,15 @@ import {
   limit,
   orderBy,
   query,
-  runTransaction,
-  serverTimestamp,
-  updateDoc,
   where,
-  increment,
   type Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Session, SessionCreatedBy } from "@/lib/domain/session";
-import type { AccessLevel } from "@/lib/domain/accessLevel";
 import type { Workspace } from "@/lib/domain/workspace";
-import { deleteAllCommentsForSessionRepo } from "@/lib/repositories/commentsRepository";
-import { deleteAllFeedbackForSessionRepo } from "@/lib/repositories/feedbackRepository";
 
 type SessionDoc = Omit<Session, "id"> & { createdAt?: Timestamp | null; updatedAt?: Timestamp | null };
-
-/**
- * Creates a single new session and increments workspace usage in one transaction.
- * Only writes ONE session document; never modifies existing session documents.
- *
- * SERVER-ONLY: Import and use only from API routes (e.g. POST /api/sessions).
- * Client code must create sessions via POST /api/sessions so plan limits are enforced.
- */
-export async function createSessionRepo(
-  workspaceId: string,
-  userId: string,
-  createdBy?: SessionCreatedBy | null
-): Promise<string> {
-  const sessionRef = doc(collection(db, "sessions"));
-  const workspaceRef = doc(db, "workspaces", workspaceId);
-  const sessionData = {
-    workspaceId,
-    userId,
-    title: "Untitled Session",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    createdBy: createdBy ?? null,
-    viewCount: 0,
-    commentCount: 0,
-    openCount: 0,
-    resolvedCount: 0,
-    totalCount: 0,
-    feedbackCount: 0,
-    accessLevel: "view",
-  };
-
-  await runTransaction(db, async (tx) => {
-    tx.set(sessionRef, sessionData);
-    tx.update(workspaceRef, {
-      sessionCount: increment(1),
-      "usage.sessionsCreated": increment(1),
-      "stats.totalSessions": increment(1),
-      "stats.updatedAt": serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  });
-  return sessionRef.id;
-}
 
 /**
  * Returns the number of *active* sessions in a workspace (active = sessionCount - archivedCount).
@@ -110,8 +58,8 @@ export async function getWorkspaceSessionCountRepo(
 
 /**
  * Lists workspace sessions. Sorted by most recent activity (updatedAt desc).
- * Composite index required: (workspaceId Ascending, updatedAt Descending).
- * When archivedOnly is true: (workspaceId Ascending, archived Ascending, updatedAt Descending).
+ * Composite index required: (userId Ascending, updatedAt Descending).
+ * When archivedOnly is true: (userId Ascending, archived Ascending, updatedAt Descending).
  * When includeArchived is true, returns both active and archived sessions.
  */
 export async function getWorkspaceSessionsRepo(
@@ -151,7 +99,7 @@ export async function getWorkspaceSessionsRepo(
  * and migration fallback. Prefer getWorkspaceSessionsRepo going forward.
  */
 export async function getUserSessionsRepo(
-  userId: string,
+  workspaceId: string,
   max: number = 50,
   archivedOnly?: boolean,
   includeArchived?: boolean
@@ -160,7 +108,7 @@ export async function getUserSessionsRepo(
   console.log("USING COLLECTION TYPE:", "collection");
   const q = query(
     collection(db, "sessions"),
-    where("userId", "==", userId),
+    where("workspaceId", "==", workspaceId),
     ...(archivedOnly === true
       ? [where("archived", "==", true) as ReturnType<typeof where>]
       : []),
@@ -187,7 +135,7 @@ const INSIGHTS_TOP_SESSIONS_LIMIT = 10;
 
 /**
  * Bounded sessions fetch for /api/insights "most active sessions" chart.
- * Returns top sessions by feedbackCount. Composite index required: sessions (workspaceId ASC, feedbackCount DESC).
+ * Returns top sessions by feedbackCount. Composite index required: sessions (userId ASC, feedbackCount DESC).
  */
 export async function getWorkspaceSessionsByFeedbackCountRepo(
   workspaceId: string
@@ -205,7 +153,11 @@ export async function getWorkspaceSessionsByFeedbackCountRepo(
   });
 
   const q = isSimple
-    ? query(collection(db, "sessions"), limit(10))
+    ? query(
+        collection(db, "sessions"),
+        where("workspaceId", "==", workspaceId),
+        limit(10)
+      )
     : query(
         collection(db, "sessions"),
         where("workspaceId", "==", workspaceId),
@@ -235,140 +187,5 @@ export async function getSessionByIdRepo(
     id: snap.id,
     ...(snap.data() as SessionDoc),
   };
-}
-
-export async function updateSessionTitleRepo(
-  sessionId: string,
-  title: string
-): Promise<void> {
-  await updateDoc(doc(db, "sessions", sessionId), {
-    title,
-    updatedAt: serverTimestamp(),
-  });
-}
-
-export async function updateSessionAccessLevelRepo(
-  sessionId: string,
-  accessLevel: AccessLevel
-): Promise<void> {
-  await updateDoc(doc(db, "sessions", sessionId), {
-    accessLevel,
-    updatedAt: serverTimestamp(),
-  });
-}
-
-/**
- * Updates session.archived and, when workspaceId is provided (or resolved from session),
- * updates workspace.archivedCount (increment on archive, decrement on unarchive).
- */
-export async function updateSessionArchivedRepo(
-  sessionId: string,
-  archived: boolean,
-  workspaceId?: string | null
-): Promise<void> {
-  let wsId = workspaceId ?? null;
-  if (wsId === undefined || wsId === null) {
-    const session = await getSessionByIdRepo(sessionId);
-    wsId = session?.workspaceId ?? null;
-  }
-
-  if (wsId) {
-    const sessionRef = doc(db, "sessions", sessionId);
-    const workspaceRef = doc(db, "workspaces", wsId);
-    await runTransaction(db, async (tx) => {
-      tx.update(sessionRef, {
-        archived,
-        updatedAt: serverTimestamp(),
-      });
-      tx.update(workspaceRef, {
-        archivedCount: increment(archived ? 1 : -1),
-        updatedAt: serverTimestamp(),
-      });
-    });
-  } else {
-    await updateDoc(doc(db, "sessions", sessionId), {
-      archived,
-      updatedAt: serverTimestamp(),
-    });
-  }
-}
-
-/**
- * Updates only the given session's updatedAt (last activity). Call only when
- * activity occurred inside that session (ticket create/edit/delete, comment,
- * title change). Never call for other sessions or when creating a new session.
- * Do not batch update multiple sessions.
- */
-export async function updateSessionUpdatedAtRepo(sessionId: string): Promise<void> {
-  if (!sessionId || typeof sessionId !== "string" || sessionId.trim() === "") {
-    return;
-  }
-  await updateDoc(doc(db, "sessions", sessionId), {
-    updatedAt: serverTimestamp(),
-  });
-}
-
-/**
- * Atomically increment session.commentCount. Call when a comment is created.
- */
-export async function incrementSessionCommentCountRepo(sessionId: string): Promise<void> {
-  await updateDoc(doc(db, "sessions", sessionId), {
-    commentCount: increment(1),
-  });
-}
-
-/**
- * Loom-style view tracking: sessionViews/{sessionId}/views/{viewerId}.
- * If viewer has not viewed this session, creates the viewer doc and atomically
- * increments session.viewCount. Only counts once per viewer per session.
- */
-export async function recordSessionViewIfNewRepo(
-  sessionId: string,
-  viewerId: string
-): Promise<void> {
-  const viewerRef = doc(db, "sessionViews", sessionId, "views", viewerId);
-  const sessionRef = doc(db, "sessions", sessionId);
-
-  await runTransaction(db, async (tx) => {
-    const viewerSnap = await tx.get(viewerRef);
-    if (viewerSnap.exists()) return;
-
-    tx.set(viewerRef, { viewedAt: serverTimestamp() });
-    tx.update(sessionRef, { viewCount: increment(1) });
-  });
-}
-
-/**
- * Permanently deletes a session and all associated data: feedback (tickets),
- * comments, view records. Screenshots in Storage are left as-is (TODO: optional cleanup).
- * Decrements workspace.sessionCount, stats.totalSessions, stats.totalFeedback, stats.totalComments,
- * and if session was archived, workspace.archivedCount.
- */
-export async function deleteSessionRepo(sessionId: string): Promise<void> {
-  const session = await getSessionByIdRepo(sessionId);
-  const workspaceId = session?.workspaceId ?? null;
-
-  const [feedbackDeleted, commentsDeleted] = await Promise.all([
-    deleteAllFeedbackForSessionRepo(sessionId),
-    deleteAllCommentsForSessionRepo(sessionId),
-  ]);
-
-  console.log("USING COLLECTION TYPE:", "collection");
-  const viewsRef = collection(db, "sessionViews", sessionId, "views");
-  const viewsSnap = await getDocs(viewsRef);
-  await Promise.all(viewsSnap.docs.map((d) => deleteDoc(d.ref)));
-  await deleteDoc(doc(db, "sessions", sessionId));
-
-  if (workspaceId) {
-    const workspaceRef = doc(db, "workspaces", workspaceId);
-    await updateDoc(workspaceRef, {
-      sessionCount: increment(-1),
-      ...(session?.archived === true ? { archivedCount: increment(-1) } : {}),
-      "stats.totalSessions": increment(-1),
-      ...(commentsDeleted > 0 ? { "stats.totalComments": increment(-commentsDeleted) } : {}),
-      "stats.updatedAt": serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  }
 }
 

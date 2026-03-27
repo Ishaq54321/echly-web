@@ -13,6 +13,14 @@ type SessionDoc = Omit<Session, "id"> & {
   updatedAt?: FirebaseFirestore.Timestamp | Date | null;
 };
 
+function requireUserId(userId: string, context: string): string {
+  const trimmed = userId.trim();
+  if (!trimmed) {
+    throw new Error(`Missing userId - invalid state (${context})`);
+  }
+  return trimmed;
+}
+
 /**
  * Creates a single new session and increments workspace usage in one transaction.
  * Only writes ONE session document; never modifies existing session documents.
@@ -22,14 +30,15 @@ type SessionDoc = Omit<Session, "id"> & {
  */
 export async function createSessionRepo(
   workspaceId: string,
-  userId: string,
+  actorUserId: string,
   createdBy?: SessionCreatedBy | null
 ): Promise<string> {
+  const resolvedWorkspaceId = requireUserId(workspaceId, "createSessionRepo");
   const sessionRef = adminDb.collection("sessions").doc();
-  const workspaceRef = adminDb.doc(`workspaces/${workspaceId}`);
+  const workspaceRef = adminDb.doc(`workspaces/${resolvedWorkspaceId}`);
   const sessionData = {
-    workspaceId,
-    userId,
+    workspaceId: resolvedWorkspaceId,
+    createdByUserId: actorUserId,
     title: "Untitled Session",
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
@@ -124,18 +133,19 @@ export async function getWorkspaceSessionsRepo(
 }
 
 /**
- * Legacy listing: sessions were previously scoped by userId. Keep this for backward compatibility
- * and migration fallback. Prefer getWorkspaceSessionsRepo going forward.
+ * @deprecated Alias for getWorkspaceSessionsRepo (workspace-scoped).
  */
 export async function getUserSessionsRepo(
-  userId: string,
+  workspaceId: string,
   max: number = 50,
   archivedOnly?: boolean,
   includeArchived?: boolean
 ): Promise<Session[]> {
   assertQueryLimit(max, "getUserSessionsRepo");
   console.log("USING COLLECTION TYPE:", "collection");
-  let q: FirebaseFirestore.Query = adminDb.collection("sessions").where("userId", "==", userId);
+  let q: FirebaseFirestore.Query = adminDb
+    .collection("sessions")
+    .where("workspaceId", "==", workspaceId);
   if (archivedOnly === true) q = q.where("archived", "==", true);
   q = q.orderBy("updatedAt", "desc").limit(max);
   const snapshot = await q.get();
@@ -175,7 +185,10 @@ export async function getWorkspaceSessionsByFeedbackCountRepo(
   });
 
   const q = isSimple
-    ? adminDb.collection("sessions").limit(10)
+    ? adminDb
+        .collection("sessions")
+        .where("workspaceId", "==", workspaceId)
+        .limit(10)
     : adminDb
         .collection("sessions")
         .where("workspaceId", "==", workspaceId)
@@ -227,39 +240,26 @@ export async function updateSessionAccessLevelRepo(
 }
 
 /**
- * Updates session.archived and, when workspaceId is provided (or resolved from session),
- * updates workspace.archivedCount (increment on archive, decrement on unarchive).
+ * Updates session.archived and updates workspace.archivedCount.
  */
 export async function updateSessionArchivedRepo(
   sessionId: string,
   archived: boolean,
-  workspaceId?: string | null
+  workspaceScopeId: string
 ): Promise<void> {
-  let wsId = workspaceId ?? null;
-  if (wsId === undefined || wsId === null) {
-    const session = await getSessionByIdRepo(sessionId);
-    wsId = session?.workspaceId ?? null;
-  }
-
-  if (wsId) {
-    const sessionRef = adminDb.doc(`sessions/${sessionId}`);
-    const workspaceRef = adminDb.doc(`workspaces/${wsId}`);
-    await adminDb.runTransaction(async (tx) => {
-      tx.update(sessionRef, {
-        archived,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      tx.update(workspaceRef, {
-        archivedCount: FieldValue.increment(archived ? 1 : -1),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    });
-  } else {
-    await adminDb.doc(`sessions/${sessionId}`).update({
+  const resolvedWorkspaceId = requireUserId(workspaceScopeId, "updateSessionArchivedRepo");
+  const sessionRef = adminDb.doc(`sessions/${sessionId}`);
+  const workspaceRef = adminDb.doc(`workspaces/${resolvedWorkspaceId}`);
+  await adminDb.runTransaction(async (tx) => {
+    tx.update(sessionRef, {
       archived,
       updatedAt: FieldValue.serverTimestamp(),
     });
-  }
+    tx.update(workspaceRef, {
+      archivedCount: FieldValue.increment(archived ? 1 : -1),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
 }
 
 /**
@@ -315,11 +315,14 @@ export async function recordSessionViewIfNewRepo(
  */
 export async function deleteSessionRepo(sessionId: string): Promise<void> {
   const session = await getSessionByIdRepo(sessionId);
-  const workspaceId = session?.workspaceId ?? null;
+  const workspaceId = requireUserId(
+    (session?.workspaceId ?? "").toString(),
+    "deleteSessionRepo"
+  );
 
   const [feedbackDeleted, commentsDeleted] = await Promise.all([
-    deleteAllFeedbackForSessionRepo(sessionId),
-    deleteAllCommentsForSessionRepo(sessionId),
+    deleteAllFeedbackForSessionRepo(sessionId, workspaceId),
+    deleteAllCommentsForSessionRepo(sessionId, workspaceId),
   ]);
 
   console.log("USING COLLECTION TYPE:", "collection");
@@ -327,18 +330,16 @@ export async function deleteSessionRepo(sessionId: string): Promise<void> {
   await Promise.all(viewsSnap.docs.map((d) => d.ref.delete()));
   await adminDb.doc(`sessions/${sessionId}`).delete();
 
-  if (workspaceId) {
-    const workspaceRef = adminDb.doc(`workspaces/${workspaceId}`);
-    await workspaceRef.update({
-      sessionCount: FieldValue.increment(-1),
-      ...(session?.archived === true ? { archivedCount: FieldValue.increment(-1) } : {}),
-      "stats.totalSessions": FieldValue.increment(-1),
-      ...(commentsDeleted > 0
-        ? { "stats.totalComments": FieldValue.increment(-commentsDeleted) }
-        : {}),
-      "stats.updatedAt": FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-  }
+  const workspaceRef = adminDb.doc(`workspaces/${workspaceId}`);
+  await workspaceRef.update({
+    sessionCount: FieldValue.increment(-1),
+    ...(session?.archived === true ? { archivedCount: FieldValue.increment(-1) } : {}),
+    "stats.totalSessions": FieldValue.increment(-1),
+    ...(commentsDeleted > 0
+      ? { "stats.totalComments": FieldValue.increment(-commentsDeleted) }
+      : {}),
+    "stats.updatedAt": FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
 }
 

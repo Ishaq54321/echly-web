@@ -22,6 +22,7 @@ import {
   workspaceInsightsRef,
   type WorkspaceInsightsDoc,
 } from "@/lib/repositories/insightsRepository";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 interface InsightsApiResponse {
   lifetime: {
@@ -79,6 +80,7 @@ const RANGE_OPTIONS: Array<{ value: "7d" | "30d" | "90d" | "1y"; label: string; 
  */
 export default function InsightsPage() {
   const { user: authUser, loading: authLoading } = useAuthGuard();
+  const { workspaceId, claimsReady } = useWorkspace();
   const [data, setData] = useState<InsightsApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,11 +140,15 @@ export default function InsightsPage() {
   }, [authUser, authLoading]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!authUser) return;
+    if (!claimsReady) return;
+    if (!workspaceId?.trim()) return;
+
     setLoading(true);
     setError(null);
     // Realtime: keep Insights UI synced to the insights doc (no queries).
-    const ref = workspaceInsightsRef(authUser.uid);
+    const ref = workspaceInsightsRef(workspaceId.trim());
     const unsubscribe = onSnapshot(
       ref,
       (snap) => {
@@ -161,7 +167,7 @@ export default function InsightsPage() {
       }
     );
     return () => unsubscribe();
-  }, [authUser?.uid]);
+  }, [authLoading, authUser?.uid, workspaceId, claimsReady]);
 
   const filteredDaily = useMemo(() => {
     return filterDaily(data?.analytics?.daily ?? {}, rangeDays);
@@ -237,7 +243,13 @@ export default function InsightsPage() {
   const topSessionIdsKey = useMemo(() => topSessionIds.join(","), [topSessionIds]);
 
   useEffect(() => {
+    // CRITICAL: Do not run query until workspaceId is resolved
+    // Prevents Firestore permission errors
+    if (authLoading) return;
     if (!authUser) return;
+    if (!claimsReady) return;
+    if (!workspaceId?.trim()) return;
+    const wid = workspaceId.trim();
     if (topSessionIds.length === 0) {
       setSessionTitleMap((prev) => (Object.keys(prev).length === 0 ? prev : {}));
       return;
@@ -245,7 +257,11 @@ export default function InsightsPage() {
 
     // Firestore "in" queries are limited to 10 values; we only fetch top 5.
     const ids = topSessionIds.slice(0, 10);
-    const qSessions = query(collection(db, "sessions"), where(documentId(), "in", ids));
+    const qSessions = query(
+      collection(db, "sessions"),
+      where("workspaceId", "==", wid),
+      where(documentId(), "in", ids)
+    );
     let cancelled = false;
     void (async () => {
       try {
@@ -269,7 +285,7 @@ export default function InsightsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authUser?.uid, topSessionIdsKey]);
+  }, [authLoading, authUser?.uid, workspaceId, claimsReady, topSessionIdsKey]);
 
   const topSession = useMemo(() => {
     return sessionBars[0] ?? null;

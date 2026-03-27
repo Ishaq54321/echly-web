@@ -6,13 +6,10 @@ import {
   getFeedbackByIdRepo,
 } from "@/lib/repositories/feedbackRepository.server";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
-import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
-import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import {
   getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { corsHeaders } from "@/lib/server/cors";
 import { verifyExtensionToken } from "@/lib/server/extensionAuth";
 import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
@@ -20,6 +17,8 @@ import { getSessionUser } from "@/lib/server/session";
 import "@/lib/server/firebaseAdmin";
 import { getStorage } from "firebase-admin/storage";
 import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
+import { authorize } from "@/lib/server/auth/authorize";
+import { userWorkspaceMatchesSession } from "@/lib/server/sessionWorkspaceScope";
 
 
 function unauthorized(): Response {
@@ -94,11 +93,6 @@ async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
   const sessionUser = await getSessionUser(req);
   if (sessionUser) return { uid: sessionUser.uid, email: sessionUser.email ?? undefined };
   throw unauthorized();
-}
-
-async function resolveWorkspaceByIdCached(workspaceId: string): Promise<{ workspace: unknown }> {
-  const { workspace } = await resolveWorkspaceById(workspaceId);
-  return { workspace };
 }
 
 async function resolveScreenshotDownloadUrl(
@@ -283,29 +277,22 @@ export async function POST(req: NextRequest) {
       { status: 404, headers: corsHeaders(req) }
     );
   }
-  if (session.userId !== user.uid) {
-    const userWorkspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const sessionWorkspaceId = session.workspaceId ?? session.userId ?? null;
-    const ok = sessionWorkspaceId != null && sessionWorkspaceId === userWorkspaceId;
-    if (!ok) {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403, headers: corsHeaders(req) }
-      );
-    }
+  if (!(await userWorkspaceMatchesSession(user.uid, session))) {
+    return NextResponse.json(
+      { success: false, error: "Forbidden" },
+      { status: 403, headers: corsHeaders(req) }
+    );
   }
 
-  const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+  const userId = user.uid;
   try {
-    await resolveWorkspaceByIdCached(workspaceId);
+    await authorize({ uid: user.uid, action: "create_feedback" });
   } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(
-        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-        { status: 403, headers: corsHeaders(req) }
-      );
-    }
-    throw err;
+    const authErr = err as { status?: number; code?: string; message?: string };
+    return NextResponse.json(
+      { success: false, error: authErr.code ?? "FORBIDDEN", message: authErr.message ?? "Forbidden" },
+      { status: authErr.status ?? 403, headers: corsHeaders(req) }
+    );
   }
 
   const meta = body.metadata;
@@ -361,10 +348,8 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    const workspaceId = session.workspaceId ?? session.userId ?? ((await getUserWorkspaceIdRepo(user.uid)) ?? user.uid);
-
     const docRef = await addFeedbackWithSessionCountersRepo(
-      workspaceId,
+      userId,
       sessionId,
       user.uid,
       structuredData,
@@ -387,12 +372,6 @@ export async function POST(req: NextRequest) {
       { headers: corsHeaders(req) }
     );
   } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(
-        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-        { status: 403, headers: corsHeaders(req) }
-      );
-    }
     console.error("POST /api/feedback:", err);
     return NextResponse.json(
       { success: false, error: "Server error" },

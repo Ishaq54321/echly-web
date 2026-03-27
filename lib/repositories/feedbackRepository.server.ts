@@ -12,6 +12,14 @@ type DocumentSnapshot = FirebaseFirestore.DocumentSnapshot;
 type QueryDocumentSnapshot = FirebaseFirestore.QueryDocumentSnapshot;
 type Timestamp = FirebaseFirestore.Timestamp;
 
+function requireUserId(userId: string, context: string): string {
+  const trimmed = userId.trim();
+  if (!trimmed) {
+    throw new Error(`Missing userId - invalid state (${context})`);
+  }
+  return trimmed;
+}
+
 function num(value: unknown, fallback: number = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -27,14 +35,12 @@ function getPath(obj: unknown, path: string): unknown {
 }
 
 const feedbackPayload = (
-  workspaceId: string,
-  sessionId: string,
   userId: string,
+  sessionId: string,
   data: StructuredFeedback
 ) => ({
-  workspaceId,
-  sessionId,
   userId,
+  sessionId,
   title: data.title,
   instruction: data.instruction ?? data.description ?? null,
   suggestion: data.suggestion ?? "",
@@ -63,17 +69,37 @@ const feedbackPayload = (
  * Use for feedback create to avoid race conditions. Migration-safe: uses increment(1).
  */
 export async function addFeedbackWithSessionCountersRepo(
-  workspaceId: string,
-  sessionId: string,
   userId: string,
+  sessionId: string,
+  _ownerUserId: string,
   data: StructuredFeedback,
   feedbackId?: string,
   screenshotId?: string
 ): Promise<DocumentReference> {
-  const payload = feedbackPayload(workspaceId, sessionId, userId, data);
+  const resolvedUserId = requireUserId(
+    userId,
+    "addFeedbackWithSessionCountersRepo"
+  );
   const sessionRef = adminDb.doc(`sessions/${sessionId}`);
-  const workspaceRef = adminDb.doc(`workspaces/${workspaceId}`);
-  const insightsRef = workspaceInsightsRef(workspaceId);
+  const sessionSnap = await sessionRef.get();
+  if (!sessionSnap.exists) {
+    throw new Error("Session not found");
+  }
+  const sessionData = sessionSnap.data();
+  const resolvedWorkspaceId =
+    typeof sessionData?.workspaceId === "string"
+      ? sessionData.workspaceId.trim()
+      : "";
+  if (!resolvedWorkspaceId) {
+    throw new Error("Missing workspaceId on session");
+  }
+
+  const payload = {
+    ...feedbackPayload(resolvedUserId, sessionId, data),
+    workspaceId: resolvedWorkspaceId,
+  };
+  const workspaceRef = adminDb.doc(`workspaces/${resolvedWorkspaceId}`);
+  const insightsRef = workspaceInsightsRef(resolvedWorkspaceId);
   const feedbackRef = await adminDb.runTransaction(async (tx) => {
     const feedbackRef =
       feedbackId != null && feedbackId !== ""
@@ -250,19 +276,25 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     if (!feedbackSnap.exists) return null;
     const fd = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
     const sessionId = (fd.sessionId as string) ?? "";
-    const workspaceId = (fd.workspaceId as string | undefined) ?? undefined;
     const raw = (fd.status as string) ?? "open";
     const wasStatus: FeedbackStatus = raw === "resolved" ? "resolved" : "open";
 
     const sessionRef = adminDb.doc(`sessions/${sessionId}`);
     const sessionSnap = await tx.get(sessionRef);
     const s = sessionSnap.data() || {};
+    const workspaceId =
+      typeof (s as { workspaceId?: unknown }).workspaceId === "string"
+        ? (s as { workspaceId: string }).workspaceId.trim()
+        : "";
+    if (!workspaceId) {
+      throw new Error("Missing workspaceId on session");
+    }
     let openCount = (s.openCount as number) ?? 0;
     let resolvedCount = (s.resolvedCount as number) ?? 0;
 
-    const insightsRef = workspaceId ? workspaceInsightsRef(workspaceId) : null;
-    const insightsSnap = insightsRef ? await tx.get(insightsRef) : null;
-    if (insightsRef && insightsSnap && !insightsSnap.exists) {
+    const insightsRef = workspaceInsightsRef(workspaceId);
+    const insightsSnap = await tx.get(insightsRef);
+    if (!insightsSnap.exists) {
       tx.set(insightsRef, emptyWorkspaceInsightsDoc());
     }
 
@@ -285,7 +317,7 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
       updatedAt: new Date(),
     });
 
-    if (insightsRef && wasStatus !== toStatus) {
+    if (wasStatus !== toStatus) {
       const delta = (toStatus === "resolved" ? 1 : 0) - (wasStatus === "resolved" ? 1 : 0);
       if (delta !== 0) {
         const day = new Date().toISOString().slice(0, 10);
@@ -326,9 +358,11 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
   const isResolved = status === "resolved" || data.isResolved === true;
   return {
     id: docSnap.id,
-    workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : undefined,
+    userId: requireUserId(
+      typeof data.userId === "string" ? data.userId : "",
+      "docToFeedback"
+    ),
     sessionId: data.sessionId,
-    userId: data.userId,
     title: data.title,
     instruction:
       typeof data.instruction === "string"
@@ -372,9 +406,10 @@ function omitSoftDeletedFeedback(items: Feedback[]): Feedback[] {
 
 /**
  * Fetches one page of feedback for a session using cursor pagination.
- * Composite index required: feedback (sessionId ASC, status ASC, createdAt DESC).
+ * Composite index required: feedback (workspaceId ASC, sessionId ASC, status ASC, createdAt DESC).
  */
 export async function getSessionFeedbackPageRepo(
+  workspaceId: string,
   sessionId: string,
   opts: {
     status?: "open" | "resolved" | "all";
@@ -388,6 +423,7 @@ export async function getSessionFeedbackPageRepo(
 
   let q: FirebaseFirestore.Query = adminDb
     .collection("feedback")
+    .where("workspaceId", "==", workspaceId)
     .where("sessionId", "==", sessionId);
   if (status !== "all") q = q.where("status", "==", status);
   q = q.orderBy("status", "asc").orderBy("createdAt", "desc");
@@ -414,6 +450,7 @@ export async function getSessionFeedbackPageRepo(
  * Used by API routes so cursors can be serialized as simple strings.
  */
 export async function getSessionFeedbackPageWithStringCursorRepo(
+  workspaceId: string,
   sessionId: string,
   limit: number,
   cursor?: string
@@ -425,6 +462,7 @@ export async function getSessionFeedbackPageWithStringCursorRepo(
       : null;
 
   const { feedback, lastVisibleDoc, hasMore } = await getSessionFeedbackPageRepo(
+    workspaceId,
     sessionId,
     {
       status: "all",
@@ -449,51 +487,40 @@ const PUBLIC_SHARE_FEEDBACK_MAX = 10_000;
 /**
  * All non-deleted feedback for a session using session-scoped pagination only (no workspace / user).
  * Same underlying path as {@link getSessionFeedbackPageWithStringCursorRepo}; not the user-scoped query
- * that requires `workspaceId` from auth.
+ * that requires `userId` from auth.
  */
 export async function getAllFeedbackForPublicShareBySessionIdRepo(
-  sessionId: string
+  sessionId: string,
+  workspaceId: string
 ): Promise<Feedback[]> {
-  const out = new Map<string, Feedback>();
+  const out: Feedback[] = [];
+  let cursor: QueryDocumentSnapshot | null = null;
 
-  const fetchStream = async (
-    statusMode: "open" | "resolved"
-  ): Promise<void> => {
-    let cursor: QueryDocumentSnapshot | null = null;
-    while (out.size < PUBLIC_SHARE_FEEDBACK_MAX) {
-      let q: FirebaseFirestore.Query = adminDb
-        .collection("feedback")
-        .where("sessionId", "==", sessionId)
-        .where("status", "==", statusMode)
-        .orderBy("createdAt", "desc");
-      if (cursor) q = q.startAfter(cursor);
-      const snapshot = await q.limit(PUBLIC_SHARE_FEEDBACK_PAGE_SIZE).get();
-      if (snapshot.empty) break;
-      const rows = omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
-      for (const row of rows) {
-        if (out.size >= PUBLIC_SHARE_FEEDBACK_MAX) break;
-        out.set(row.id, row);
-      }
-      if (snapshot.size < PUBLIC_SHARE_FEEDBACK_PAGE_SIZE) break;
-      cursor = snapshot.docs[snapshot.docs.length - 1] as QueryDocumentSnapshot;
+  while (out.length < PUBLIC_SHARE_FEEDBACK_MAX) {
+    let q: FirebaseFirestore.Query = adminDb
+      .collection("feedback")
+      .where("sessionId", "==", sessionId)
+      .where("workspaceId", "==", workspaceId)
+      .orderBy("createdAt", "desc");
+    if (cursor) q = q.startAfter(cursor);
+    const snapshot = await q.limit(PUBLIC_SHARE_FEEDBACK_PAGE_SIZE).get();
+    if (snapshot.empty) break;
+
+    const rows = omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
+    for (const row of rows) {
+      if (out.length >= PUBLIC_SHARE_FEEDBACK_MAX) break;
+      out.push(row);
     }
-  };
 
-  await fetchStream("open");
-  await fetchStream("resolved");
+    if (snapshot.size < PUBLIC_SHARE_FEEDBACK_PAGE_SIZE) break;
+    cursor = snapshot.docs[snapshot.docs.length - 1] as QueryDocumentSnapshot;
+  }
 
-  return Array.from(out.values())
-    .sort((a, b) => {
-      const aMs = (a.createdAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
-      const bMs = (b.createdAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
-      if (bMs !== aMs) return bMs - aMs;
-      return b.id.localeCompare(a.id);
-    })
-    .slice(0, PUBLIC_SHARE_FEEDBACK_MAX);
+  return out.slice(0, PUBLIC_SHARE_FEEDBACK_MAX);
 }
 
 /**
- * User-scoped session feedback page.
+ * Workspace-scoped session feedback page.
  * Composite index required: feedback (workspaceId ASC, sessionId ASC, createdAt DESC).
  *
  * NOTE: This is intentionally separate from getSessionFeedbackPageRepo to avoid
@@ -503,21 +530,19 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
   args: {
     workspaceId: string;
     sessionId: string;
-    userId: string;
     limit: number;
     cursor?: string;
     /** When set, only returns tickets with this Firestore `status` bucket. */
     statusFilter?: "open" | "resolved";
   }
 ): Promise<{ feedback: Feedback[]; nextCursor: string | null; hasMore: boolean }> {
-  const { workspaceId, sessionId, userId, limit: pageSize, cursor, statusFilter } = args;
+  const { workspaceId, sessionId, limit: pageSize, cursor, statusFilter } = args;
   assertQueryLimit(pageSize, "getSessionFeedbackPageForUserWithStringCursorRepo");
-  void userId;
   const trimmed = cursor?.trim();
   const cursorSnap: DocumentSnapshot | null =
     trimmed && trimmed.length > 0 ? await adminDb.doc(`feedback/${trimmed}`).get() : null;
 
-  // Same ordering as before: workspaceId + sessionId + createdAt desc.
+  // Scope: workspaceId + sessionId.
   // Exclude soft-deleted rows by skipping `isDeleted === true`. We do not use
   // Firestore `where("isDeleted","!=",true)` here because it drops legacy docs
   // that omit the field; semantic is identical once all rows have `isDeleted`.
@@ -622,10 +647,8 @@ const SESSION_SEARCH_CORPUS_MAX = 200;
 export async function getSessionFeedbackSearchCorpusForUserRepo(args: {
   workspaceId: string;
   sessionId: string;
-  userId: string;
 }): Promise<Feedback[]> {
-  const { workspaceId, sessionId, userId } = args;
-  void userId;
+  const { workspaceId, sessionId } = args;
   const maxDocs = SESSION_SEARCH_CORPUS_MAX;
   const batchLimit = 50;
   const out: Feedback[] = [];
@@ -635,7 +658,6 @@ export async function getSessionFeedbackSearchCorpusForUserRepo(args: {
     const { feedback, nextCursor, hasMore } = await getSessionFeedbackPageForUserWithStringCursorRepo({
       workspaceId,
       sessionId,
-      userId,
       limit: batchLimit,
       cursor,
     });
@@ -651,9 +673,13 @@ export async function getSessionFeedbackSearchCorpusForUserRepo(args: {
 }
 
 /** Total count of feedback for a session (for sidebar display). */
-export async function getSessionFeedbackCountRepo(sessionId: string): Promise<number> {
+export async function getSessionFeedbackCountRepo(
+  workspaceId: string,
+  sessionId: string
+): Promise<number> {
   const snap = await adminDb
     .collection("feedback")
+    .where("workspaceId", "==", workspaceId)
     .where("sessionId", "==", sessionId)
     .count()
     .get();
@@ -679,7 +705,6 @@ export async function deleteFeedbackWithSessionCountersRepo(
     const data = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
     if (data.isDeleted === true) return null;
     const sessionId = (data.sessionId as string) ?? "";
-    const workspaceId = data.workspaceId as string | undefined;
     const status = (data.status as string) ?? "open";
     const sessionRef = adminDb.doc(`sessions/${sessionId}`);
     const sessionSnap = await tx.get(sessionRef);
@@ -709,13 +734,23 @@ export async function deleteFeedbackWithSessionCountersRepo(
       feedbackCount,
       updatedAt: new Date(),
     });
-    if (workspaceId) {
-      const workspaceRef = adminDb.doc(`workspaces/${workspaceId}`);
-      tx.update(workspaceRef, {
-        "stats.updatedAt": new Date(),
-      });
+    let resolvedWorkspaceId =
+      typeof data.workspaceId === "string" ? data.workspaceId.trim() : "";
+    if (!resolvedWorkspaceId) {
+      const srow = sessionSnap.data() ?? {};
+      resolvedWorkspaceId =
+        typeof (srow as { workspaceId?: unknown }).workspaceId === "string"
+          ? (srow as { workspaceId: string }).workspaceId.trim()
+          : "";
     }
-    return { sessionId, workspaceId };
+    if (!resolvedWorkspaceId) {
+      throw new Error("Missing workspaceId on feedback/session");
+    }
+    const workspaceRef = adminDb.doc(`workspaces/${resolvedWorkspaceId}`);
+    tx.update(workspaceRef, {
+      "stats.updatedAt": new Date(),
+    });
+    return { sessionId, workspaceId: resolvedWorkspaceId };
   });
   void result;
 }
@@ -747,10 +782,16 @@ const DELETE_SESSION_FEEDBACK_LIMIT = 500;
  * Screenshot URLs in Storage are not removed here (TODO: optional cleanup).
  */
 export async function deleteAllFeedbackForSessionRepo(
-  sessionId: string
+  sessionId: string,
+  workspaceId: string
 ): Promise<number> {
+  const wid = workspaceId.trim();
+  if (!wid) {
+    throw new Error("Missing workspaceId");
+  }
   const snapshot = await adminDb
     .collection("feedback")
+    .where("workspaceId", "==", wid)
     .where("sessionId", "==", sessionId)
     .limit(DELETE_SESSION_FEEDBACK_LIMIT)
     .get();
@@ -763,9 +804,10 @@ const OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT = 3;
 
 /**
  * Fetches up to N feedback items for a session filtered by resolution, newest first.
- * Composite index: feedback (sessionId ASC, status ASC, createdAt DESC).
+ * Composite index: feedback (workspaceId ASC, sessionId ASC, status ASC, createdAt DESC).
  */
 export async function getSessionFeedbackByResolvedRepo(
+  workspaceId: string,
   sessionId: string,
   isResolved: boolean,
   max: number = OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT
@@ -774,6 +816,7 @@ export async function getSessionFeedbackByResolvedRepo(
   const status = isResolved ? "resolved" : "open";
   const snapshot = await adminDb
     .collection("feedback")
+    .where("workspaceId", "==", workspaceId)
     .where("sessionId", "==", sessionId)
     .where("status", "==", status)
     .orderBy("createdAt", "desc")
@@ -796,24 +839,6 @@ export async function getFeedbackByIdRepo(
 }
 
 const USER_FEEDBACK_ALL_LIMIT = 100;
-
-/**
- * Fetches all feedback for a user across sessions (for Discussion inbox).
- * Composite index required: feedback (userId ASC, createdAt DESC).
- */
-export async function getUserFeedbackAllRepo(
-  userId: string,
-  max: number = USER_FEEDBACK_ALL_LIMIT
-): Promise<Feedback[]> {
-  assertQueryLimit(max, "getUserFeedbackAllRepo");
-  const snapshot = await adminDb
-    .collection("feedback")
-    .where("userId", "==", userId)
-    .orderBy("createdAt", "desc")
-    .limit(max)
-    .get();
-  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
-}
 
 /**
  * Workspace-scoped Discussion inbox.
@@ -848,7 +873,10 @@ export async function getWorkspaceFeedbackForInsightsRepo(
   const limitValue = isSimple ? 10 : INSIGHTS_FEEDBACK_LIMIT;
 
   const q = isSimple
-    ? adminDb.collection("feedback").limit(10)
+    ? adminDb
+        .collection("feedback")
+        .where("workspaceId", "==", workspaceId)
+        .limit(10)
     : adminDb
         .collection("feedback")
         .where("workspaceId", "==", workspaceId)
@@ -880,26 +908,6 @@ export async function incrementFeedbackCommentCountRepo(
       lastCommentAt: new Date(),
     });
   });
-}
-
-/**
- * Fetches feedback with at least one comment (conversations only).
- * Composite index required: feedback (userId ASC, commentCount DESC).
- * Results are sorted by lastCommentAt DESC in the API layer.
- */
-export async function getUserFeedbackWithCommentsRepo(
-  userId: string,
-  max: number = USER_FEEDBACK_ALL_LIMIT
-): Promise<Feedback[]> {
-  assertQueryLimit(max, "getUserFeedbackWithCommentsRepo");
-  const snapshot = await adminDb
-    .collection("feedback")
-    .where("userId", "==", userId)
-    .where("commentCount", ">", 0)
-    .orderBy("commentCount", "desc")
-    .limit(max)
-    .get();
-  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
 }
 
 /**

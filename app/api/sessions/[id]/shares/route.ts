@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
-import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
-import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { listSessionSharesRepo } from "@/lib/repositories/sessionSharesRepository";
+import { sessionWorkspaceId, userWorkspaceMatchesSession } from "@/lib/server/sessionWorkspaceScope";
 
 /** GET /api/sessions/:id/shares — list email shares for a session (owner only). */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -24,23 +22,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!session) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
-  if (session.userId !== user.uid) {
+  if (!(await userWorkspaceMatchesSession(user.uid, session))) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 
-  const workspaceId =
-    session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
   try {
-    await resolveWorkspaceById(workspaceId);
-  } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json({ success: false, ...WORKSPACE_SUSPENDED_RESPONSE }, { status: 403 });
+    const workspaceId = sessionWorkspaceId(session) ?? "";
+    if (!workspaceId) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
-    throw err;
-  }
-
-  try {
-    const rows = await listSessionSharesRepo(sessionId);
+    const rows = await listSessionSharesRepo(sessionId, workspaceId);
     const shares = rows.map((r) => ({
       email: r.email,
       permission: r.permission,

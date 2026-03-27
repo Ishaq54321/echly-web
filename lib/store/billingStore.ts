@@ -7,17 +7,20 @@ export type BillingState = {
   plan: string | null;
   isLoaded: boolean;
   isLoading: boolean;
+  error: string | null;
   setBilling: (data: { maxSessions: number | null; plan: string | null }) => void;
   setLoading: (loading: boolean) => void;
+  setError: (error: unknown) => void;
 };
 
-type BillingStoreSnapshot = Omit<BillingState, "setBilling" | "setLoading">;
+type BillingStoreSnapshot = Omit<BillingState, "setBilling" | "setLoading" | "setError">;
 
 let snapshot: BillingStoreSnapshot = {
   maxSessions: null,
   plan: null,
   isLoaded: false,
   isLoading: false,
+  error: null,
 };
 
 const listeners = new Set<() => void>();
@@ -45,11 +48,17 @@ function setBilling(data: { maxSessions: number | null; plan: string | null }) {
     maxSessions: data.maxSessions,
     plan: data.plan,
     isLoaded: true,
+    error: null,
   });
 }
 
 function setLoading(loading: boolean) {
   setSnapshot({ isLoading: loading });
+}
+
+function setError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  setSnapshot({ error: message, isLoaded: false });
 }
 
 export const billingStore: BillingState = {
@@ -65,8 +74,12 @@ export const billingStore: BillingState = {
   get isLoading() {
     return snapshot.isLoading;
   },
+  get error() {
+    return snapshot.error;
+  },
   setBilling,
   setLoading,
+  setError,
 };
 
 export function useBillingStore(): BillingState {
@@ -75,5 +88,6 @@ export function useBillingStore(): BillingState {
     ...state,
     setBilling,
     setLoading,
+    setError,
   };
 }

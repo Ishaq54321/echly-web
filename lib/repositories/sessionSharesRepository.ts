@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
 export type SessionSharePermission = AccessLevel;
 
@@ -28,19 +29,34 @@ export function sessionShareDocId(sessionId: string, email: string): string {
 }
 
 export async function upsertSessionShareRepo(
+  userId: string,
   sessionId: string,
   email: string,
   permission: SessionSharePermission
 ): Promise<void> {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) {
+    throw new Error("Missing userId - invalid state");
+  }
   const normalizedEmail = normalizeEmail(email);
   const level = normalizeAccessLevel(permission) as SessionSharePermission;
+  const workspaceId = await getUserWorkspaceIdRepo(normalizedUserId);
+  if (workspaceId === normalizedUserId) {
+    throw new Error("Invalid state: workspaceId must not equal user id");
+  }
   const id = sessionShareDocId(sessionId, normalizedEmail);
   const ref = adminDb.doc(`session_shares/${id}`);
   const snap = await ref.get();
   if (snap.exists) {
-    await ref.update({ permission: level });
+    await ref.update({
+      userId: normalizedUserId,
+      workspaceId,
+      permission: level,
+    });
   } else {
     await ref.set({
+      userId: normalizedUserId,
+      workspaceId,
       sessionId,
       email: normalizedEmail,
       permission: level,
@@ -49,11 +65,15 @@ export async function upsertSessionShareRepo(
   }
 }
 
-export async function listSessionSharesRepo(sessionId: string): Promise<SessionShare[]> {
+export async function listSessionSharesRepo(
+  sessionId: string,
+  workspaceId: string
+): Promise<SessionShare[]> {
   assertQueryLimit(SHARES_LIST_LIMIT, "listSessionSharesRepo");
   const snap = await adminDb
     .collection("session_shares")
     .where("sessionId", "==", sessionId)
+    .where("workspaceId", "==", workspaceId)
     .limit(SHARES_LIST_LIMIT)
     .get();
   return snap.docs.map((d) => {

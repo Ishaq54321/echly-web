@@ -10,7 +10,7 @@ import { addComment } from "@/lib/comments";
 import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
 import type { Comment } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 const PANEL_WIDTH = 420;
 
@@ -31,6 +31,7 @@ export function DiscussionPanel({
   onClose,
   onCommentAdded,
 }: DiscussionPanelProps) {
+  const { workspaceId, claimsReady } = useWorkspace();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
   const [comments, setComments] = useState<Comment[]>([]);
@@ -89,7 +90,7 @@ export function DiscussionPanel({
   }, [feedbackId]);
 
   useEffect(() => {
-    if (!feedbackId || !ticket?.sessionId) {
+    if (!workspaceId || !feedbackId || !ticket?.sessionId) {
       setComments([]);
       return;
     }
@@ -112,7 +113,12 @@ export function DiscussionPanel({
         setComments([]);
         return;
       }
+      if (!claimsReady) {
+        setComments([]);
+        return;
+      }
       unsubComments = listenToCommentsRepo(
+        workspaceId,
         sessionId,
         fid,
         (incoming) => setComments([...incoming])
@@ -125,7 +131,7 @@ export function DiscussionPanel({
       if (unsubComments) unsubComments();
       unsubscribeRef.current = null;
     };
-  }, [feedbackId, ticket?.sessionId]);
+  }, [workspaceId, claimsReady, feedbackId, ticket?.sessionId]);
 
   const handleSendComment = async () => {
     const user = auth.currentUser;
@@ -135,8 +141,7 @@ export function DiscussionPanel({
 
     setSending(true);
     try {
-      const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-      await addComment(workspaceId, ticket.sessionId, feedbackId, {
+      await addComment(ticket.sessionId, feedbackId, {
         userId: user.uid,
         userName: user.displayName || "User",
         userAvatar: user.photoURL || "",

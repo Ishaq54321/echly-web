@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
-import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
-import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import type { SessionSharePermission } from "@/lib/repositories/sessionSharesRepository";
 import { upsertSessionShareRepo } from "@/lib/repositories/sessionSharesRepository";
+import { userWorkspaceMatchesSession } from "@/lib/server/sessionWorkspaceScope";
 
 type ShareBody = {
   sessionId?: string;
@@ -55,23 +53,12 @@ export async function POST(req: Request) {
   if (!session) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
-  if (session.userId !== user.uid) {
+  if (!(await userWorkspaceMatchesSession(user.uid, session))) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 
-  const workspaceId =
-    session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
   try {
-    await resolveWorkspaceById(workspaceId);
-  } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json({ success: false, ...WORKSPACE_SUSPENDED_RESPONSE }, { status: 403 });
-    }
-    throw err;
-  }
-
-  try {
-    await upsertSessionShareRepo(sessionId, email, permission);
+    await upsertSessionShareRepo(user.uid, sessionId, email, permission);
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("POST /api/sessions/share:", e);

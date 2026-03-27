@@ -1,13 +1,10 @@
 export type { Session, SessionCreatedBy } from "@/lib/domain/session";
 import type { Session } from "@/lib/domain/session";
+import { authFetch } from "@/lib/authFetch";
 import {
-  deleteSessionRepo,
   getSessionByIdRepo,
   getUserSessionsRepo,
   getWorkspaceSessionsRepo,
-  updateSessionArchivedRepo,
-  updateSessionTitleRepo,
-  recordSessionViewIfNewRepo,
 } from "@/lib/repositories/sessionsRepository";
 
 /**
@@ -23,7 +20,16 @@ export async function recordSessionViewIfNew(
   sessionId: string,
   viewerId: string
 ): Promise<void> {
-  await recordSessionViewIfNewRepo(sessionId, viewerId);
+  const res = await authFetch(`/api/sessions/${encodeURIComponent(sessionId)}/view`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ viewerId }),
+  });
+  if (!res) throw new Error("Not authenticated");
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(msg || "Failed to record session view");
+  }
 }
 
 /* ================================
@@ -45,12 +51,12 @@ export async function getWorkspaceSessions(
 
 /** Legacy: pre-workspaces sessions list (fallback only). */
 export async function getUserSessions(
-  userId: string,
+  workspaceId: string,
   max?: number,
   options?: { archivedOnly?: boolean; includeArchived?: boolean }
 ): Promise<Session[]> {
   return await getUserSessionsRepo(
-    userId,
+    workspaceId,
     max ?? 50,
     options?.archivedOnly,
     options?.includeArchived
@@ -65,7 +71,16 @@ export async function updateSessionTitle(
   sessionId: string,
   title: string
 ) {
-  await updateSessionTitleRepo(sessionId, title);
+  const res = await authFetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!res) throw new Error("Not authenticated");
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(msg || "Failed to update session title");
+  }
 }
 
 /* ================================
@@ -84,7 +99,16 @@ export async function updateSessionArchived(
   sessionId: string,
   archived: boolean
 ): Promise<void> {
-  await updateSessionArchivedRepo(sessionId, archived);
+  const res = await authFetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ archived }),
+  });
+  if (!res) throw new Error("Not authenticated");
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(msg || "Failed to update session archived state");
+  }
 }
 
 /* ================================
@@ -92,5 +116,12 @@ export async function updateSessionArchived(
 ================================ */
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  await deleteSessionRepo(sessionId);
+  const res = await authFetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+  });
+  if (!res) throw new Error("Not authenticated");
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(msg || "Failed to delete session");
+  }
 }

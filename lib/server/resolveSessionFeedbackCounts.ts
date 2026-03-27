@@ -12,6 +12,7 @@ export type ResolvedSessionFeedbackCounts = {
  */
 export async function resolveSessionFeedbackCounts(
   sessionId: string,
+  workspaceId: string,
   sessionRow: Record<string, unknown>
 ): Promise<ResolvedSessionFeedbackCounts> {
   const total = (sessionRow.totalCount as number) ?? 0;
@@ -35,6 +36,7 @@ export async function resolveSessionFeedbackCounts(
   const snapshot = await adminDb
     .collection("feedback")
     .where("sessionId", "==", sessionId)
+    .where("workspaceId", "==", workspaceId)
     .get();
 
   snapshot.forEach((docSnap) => {

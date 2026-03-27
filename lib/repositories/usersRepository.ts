@@ -1,157 +1,87 @@
-import { doc, getDoc, runTransaction, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, getDocFromServer } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase";
-import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
+import { authFetch } from "@/lib/authFetch";
+import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 
-const WORKSPACE_ID_CACHE_TTL_MS = 60_000;
-const workspaceIdCache = new Map<string, { value: string | null; expiresAt: number }>();
-const workspaceIdInFlight = new Map<string, Promise<string | null>>();
+export { MISSING_USER_WORKSPACE_ERROR };
 
-function setWorkspaceIdCache(uid: string, value: string | null): void {
-  workspaceIdCache.set(uid, {
-    value,
-    expiresAt: Date.now() + WORKSPACE_ID_CACHE_TTL_MS,
-  });
-}
+const userIdInFlight = new Map<string, Promise<string>>();
 
 export function invalidateUserWorkspaceIdCache(uid?: string): void {
   if (uid) {
-    workspaceIdCache.delete(uid);
-    workspaceIdInFlight.delete(uid);
+    userIdInFlight.delete(uid);
     return;
   }
-  workspaceIdCache.clear();
-  workspaceIdInFlight.clear();
+  userIdInFlight.clear();
 }
 
-/** Set or update user's workspaceId (e.g. after onboarding). Creates user doc if missing. */
+/** @deprecated Client cannot set workspaceId; use POST /api/workspaces for onboarding. */
 export async function setUserWorkspaceIdRepo(
-  user: User,
-  workspaceId: string,
-  extra?: { role?: string; companySize?: string }
+  _user: User,
+  _workspaceId: string,
+  _extra?: { role?: string; companySize?: string }
 ): Promise<void> {
-  const userRef = doc(db, "users", user.uid);
-  const snap = await getDoc(userRef);
-  const payload: Record<string, unknown> = {
-    workspaceId,
-    updatedAt: serverTimestamp(),
-    ...(extra?.role && { role: extra.role }),
-    ...(extra?.companySize && { companySize: extra.companySize }),
-  };
-  if (!snap.exists()) {
-    await setDoc(userRef, {
-      uid: user.uid,
-      name: user.displayName,
-      email: user.email,
-      photoURL: user.photoURL,
-      workspaceId,
-      ...(extra?.role && { role: extra.role }),
-      ...(extra?.companySize && { companySize: extra.companySize }),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  } else {
-    await updateDoc(userRef, payload);
-  }
-  setWorkspaceIdCache(user.uid, workspaceId);
+  throw new Error("workspaceId is server-controlled only; use POST /api/workspaces to create a workspace.");
 }
 
 export async function ensureUserRepo(user: User): Promise<void> {
-  const userRef = doc(db, "users", user.uid);
-  const userSnap = await getDoc(userRef);
-
-  if (!userSnap.exists()) {
-    await setDoc(userRef, {
-      uid: user.uid,
-      name: user.displayName,
-      email: user.email,
-      photoURL: user.photoURL,
-      createdAt: serverTimestamp(),
-    });
+  const res = await authFetch("/api/users", { method: "POST" });
+  if (!res || !res.ok) {
+    const msg = res ? await res.text() : "Not authenticated";
+    throw new Error(`Failed to ensure user: ${msg}`);
   }
+  userIdInFlight.delete(user.uid);
 }
 
-export async function getUserWorkspaceIdRepo(uid: string): Promise<string | null> {
-  const cached = workspaceIdCache.get(uid);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
-
-  const inFlight = workspaceIdInFlight.get(uid);
+export async function getUserWorkspaceIdRepo(uid: string): Promise<string> {
+  const inFlight = userIdInFlight.get(uid);
   if (inFlight) return inFlight;
 
   const loadPromise = (async () => {
-    const snap = await getDoc(doc(db, "users", uid));
-    if (!snap.exists()) {
-      setWorkspaceIdCache(uid, null);
-      return null;
+    const ref = doc(db, "users", uid);
+    let snap;
+    try {
+      snap = await getDocFromServer(ref);
+    } catch {
+      snap = await getDoc(ref);
     }
-    const data = snap.data() as { workspaceId?: string | null };
-    const wid = data.workspaceId ?? null;
-    const normalized = typeof wid === "string" && wid.trim() ? wid.trim() : null;
-    setWorkspaceIdCache(uid, normalized);
-    return normalized;
+    if (!snap.exists()) {
+      throw new Error(MISSING_USER_WORKSPACE_ERROR);
+    }
+    const data = (snap.data() ?? {}) as Record<string, unknown>;
+    const raw = typeof data.workspaceId === "string" ? data.workspaceId : "";
+    const workspaceId = raw.trim();
+    if (!workspaceId) {
+      throw new Error(MISSING_USER_WORKSPACE_ERROR);
+    }
+    return workspaceId;
   })();
 
-  workspaceIdInFlight.set(uid, loadPromise);
+  userIdInFlight.set(uid, loadPromise);
   try {
     return await loadPromise;
   } finally {
-    workspaceIdInFlight.delete(uid);
+    userIdInFlight.delete(uid);
   }
 }
 
+/** @deprecated Client writes removed. Uses server API route (/api/users POST). */
 export async function ensureUserWorkspaceLinkRepo(user: User): Promise<{ workspaceId: string }> {
-  const userRef = doc(db, "users", user.uid);
-  const defaultWorkspaceId = user.uid; // migration + default: 1 workspace per user for now
-
-  const result = await runTransaction(db, async (tx) => {
-    // Reads (must all happen before any writes)
-    const userSnap = await tx.get(userRef);
-    const existingWorkspaceId = userSnap.exists()
-      ? ((userSnap.data() as { workspaceId?: string | null }).workspaceId ?? null)
-      : null;
-    const workspaceId = (existingWorkspaceId ?? defaultWorkspaceId).trim() || defaultWorkspaceId;
-    const workspaceRef = doc(db, "workspaces", workspaceId);
-    const workspaceSnap = await tx.get(workspaceRef);
-
-    // Writes
-    if (!userSnap.exists()) {
-      tx.set(userRef, {
-        uid: user.uid,
-        name: user.displayName,
-        email: user.email,
-        photoURL: user.photoURL,
-        workspaceId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    } else if (!existingWorkspaceId) {
-      tx.set(
-        userRef,
-        {
-          workspaceId,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-    }
-
-    if (!workspaceSnap.exists()) {
-      const payload = defaultWorkspaceDoc({
-        ownerId: user.uid,
-        name: user.displayName ? `${user.displayName}'s Workspace` : "My Workspace",
-        logoUrl: user.photoURL ?? null,
-      });
-      tx.set(workspaceRef, {
-        ...payload,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    return { workspaceId };
-  });
-  setWorkspaceIdCache(user.uid, result.workspaceId);
-  return result;
+  const res = await authFetch("/api/users", { method: "POST" });
+  if (!res || !res.ok) {
+    const msg = res ? await res.text() : "Not authenticated";
+    throw new Error(`Failed to ensure user workspace link: ${msg}`);
+  }
+  const payload = (await res.json()) as Record<string, unknown>;
+  const wid =
+    typeof payload.workspaceId === "string" && payload.workspaceId.trim()
+      ? payload.workspaceId.trim()
+      : "";
+  if (!wid) {
+    throw new Error("Missing workspaceId on user document");
+  }
+  return { workspaceId: wid };
 }
 
 export interface UserDoc {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { auth } from "@/lib/firebase";
 import { getSessionRecentComments } from "@/lib/comments";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import {
@@ -16,6 +17,7 @@ import { fetchCounts } from "@/lib/state/fetchCountsDedup";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getSessionById } from "@/lib/sessions";
 import type { Session } from "@/lib/domain/session";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 const RECENT_FEEDBACK_LIMIT = 5;
 const RECENT_ACTIVITY_LIMIT = 10;
@@ -82,6 +84,7 @@ function timestampToDate(
 }
 
 export function useSessionOverview(sessionId: string | undefined) {
+  const { workspaceId, claimsReady } = useWorkspace();
   const [data, setData] = useState<SessionOverviewData>({
     session: null,
     countsByStatus: initialCountsPlaceholder,
@@ -95,18 +98,24 @@ export function useSessionOverview(sessionId: string | undefined) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!sessionId || !workspaceId) {
       setLoading(false);
       return;
     }
+    if (!claimsReady) return;
     const sid: string = sessionId;
 
     let cancelled = false;
 
     async function load() {
+      const wid = workspaceId;
+      if (!wid) return;
       setLoading(true);
       setError(null);
       try {
+        if (!auth.currentUser?.uid) {
+          throw new Error("Not authenticated");
+        }
         const countsPromise = (async (): Promise<SessionFeedbackCounts> => {
           const cached = getCounts(sid);
           if (cached) return cached;
@@ -125,10 +134,10 @@ export function useSessionOverview(sessionId: string | undefined) {
         ] = await Promise.all([
           getSessionById(sid),
           countsPromise,
-          getSessionFeedback(sid, RECENT_FEEDBACK_LIMIT),
-          getSessionFeedbackByResolved(sid, false, 3),
-          getSessionFeedbackByResolved(sid, true, 3),
-          getSessionRecentComments(sid, RECENT_ACTIVITY_LIMIT),
+          getSessionFeedback(wid, sid, RECENT_FEEDBACK_LIMIT),
+          getSessionFeedbackByResolved(wid, sid, false, 3),
+          getSessionFeedbackByResolved(wid, sid, true, 3),
+          getSessionRecentComments(wid, sid, RECENT_ACTIVITY_LIMIT),
         ]);
 
         if (cancelled) return;
@@ -178,7 +187,7 @@ export function useSessionOverview(sessionId: string | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [claimsReady, workspaceId, sessionId]);
 
   return { data, loading, error };
 }

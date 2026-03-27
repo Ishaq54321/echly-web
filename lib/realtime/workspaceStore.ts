@@ -15,7 +15,7 @@ type WorkspaceStoreSnapshot = {
   workspace: Workspace | null;
   data: WorkspaceUsageRealtimeData | null;
   loading: boolean;
-  error: string | null;
+  error: Error | null;
   version: number;
 };
 
@@ -57,7 +57,7 @@ function resolvePlan(data: DocumentData): string {
   const billingPlan = data?.billing?.plan;
   if (typeof billingPlan === "string" && billingPlan.trim()) return billingPlan;
 
-  return "free";
+  throw new Error("Invalid workspace plan data");
 }
 
 function resolveSessionUsed(data: DocumentData): number {
@@ -102,8 +102,23 @@ export function useWorkspaceRealtimeStore(): WorkspaceStoreSnapshot {
 }
 
 export function subscribeWorkspace(workspaceId: string): void {
+  if (!workspaceId || !workspaceId.trim()) {
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
+    currentWorkspaceId = null;
+    setSnapshot({
+      workspaceId: null,
+      workspace: null,
+      data: null,
+      loading: false,
+      error: new Error("Invalid workspaceId"),
+    });
+    return;
+  }
+
   const normalizedWorkspaceId = workspaceId.trim();
-  if (!normalizedWorkspaceId) return;
 
   if (unsubscribe && currentWorkspaceId === normalizedWorkspaceId) {
     return;
@@ -127,25 +142,35 @@ export function subscribeWorkspace(workspaceId: string): void {
       if (!snap.exists()) {
         setSnapshot({
           workspace: null,
-          data: { plan: "free", sessionUsed: 0 },
+          data: null,
           loading: false,
-          error: null,
+          error: new Error("Workspace document missing"),
         });
         return;
       }
-      setSnapshot({
-        workspace: mapWorkspaceDoc(snap.id, snap.data()),
-        data: mapWorkspaceUsage(snap.data()),
-        loading: false,
-        error: null,
-      });
+      try {
+        const raw = snap.data();
+        setSnapshot({
+          workspace: mapWorkspaceDoc(snap.id, raw),
+          data: mapWorkspaceUsage(raw),
+          loading: false,
+          error: null,
+        });
+      } catch (e) {
+        setSnapshot({
+          workspace: null,
+          data: null,
+          loading: false,
+          error: e instanceof Error ? e : new Error(String(e)),
+        });
+      }
     },
     (err) => {
       setSnapshot({
         workspace: null,
         data: null,
         loading: false,
-        error: err instanceof Error ? err.message : "Failed to load workspace usage",
+        error: err instanceof Error ? err : new Error(String(err ?? "Failed to load workspace usage")),
       });
     }
   );

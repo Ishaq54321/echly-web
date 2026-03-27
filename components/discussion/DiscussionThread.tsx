@@ -10,9 +10,9 @@ import { auth } from "@/lib/firebase";
 import { addComment, updateComment, deleteComment } from "@/lib/comments";
 import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
 import type { Comment, CommentAttachment } from "@/lib/domain/comment";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { AttachmentUploadModal } from "@/components/discussion/AttachmentUploadModal";
 import { CommentItem } from "@/components/comments/CommentItem";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 export interface DiscussionThreadProps {
   feedbackId: string | null;
@@ -35,6 +35,7 @@ export function DiscussionThread({
   onCommentAdded,
   listLoaded = true,
 }: DiscussionThreadProps) {
+  const { workspaceId, claimsReady } = useWorkspace();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
   const [comments, setComments] = useState<Comment[]>([]);
@@ -58,8 +59,7 @@ export function DiscussionThread({
   const handleAttachmentSend = useCallback(
     async (attachment: CommentAttachment) => {
       const user = auth.currentUser;
-      if (!user || !feedbackId || !ticket?.sessionId) return;
-      const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
+      if (!user || !feedbackId || !ticket?.sessionId || !workspaceId) return;
       const optimisticComment: Comment = {
         id: `temp-attach-${Date.now()}`,
         workspaceId,
@@ -78,7 +78,7 @@ export function DiscussionThread({
       onCommentAdded?.();
       setSending(true);
       try {
-        await addComment(workspaceId, ticket.sessionId, feedbackId, {
+        await addComment(ticket.sessionId, feedbackId, {
           userId: user.uid,
           userName: user.displayName || "User",
           userAvatar: user.photoURL || "",
@@ -144,7 +144,7 @@ export function DiscussionThread({
   }, [feedbackId]);
 
   useEffect(() => {
-    if (!feedbackId || !ticket?.sessionId) {
+    if (!workspaceId || !feedbackId || !ticket?.sessionId) {
       setComments([]);
       setCommentsInitialized(false);
       return;
@@ -169,7 +169,12 @@ export function DiscussionThread({
         setComments([]);
         return;
       }
+      if (!claimsReady) {
+        setComments([]);
+        return;
+      }
       unsubComments = listenToCommentsRepo(
+        workspaceId,
         sessionId,
         fid,
         (incoming) => {
@@ -185,15 +190,13 @@ export function DiscussionThread({
       if (unsubComments) unsubComments();
       unsubscribeRef.current = null;
     };
-  }, [feedbackId, ticket?.sessionId]);
+  }, [workspaceId, claimsReady, feedbackId, ticket?.sessionId]);
 
   const handleSendComment = async () => {
     const user = auth.currentUser;
-    if (!user || !feedbackId || !ticket?.sessionId) return;
+    if (!user || !feedbackId || !ticket?.sessionId || !workspaceId) return;
     const trimmed = commentDraft.trim();
     if (!trimmed) return;
-    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-
     const optimisticComment: Comment = {
       id: `temp-${Date.now()}`,
       workspaceId,
@@ -212,7 +215,7 @@ export function DiscussionThread({
 
     setSending(true);
     try {
-      await addComment(workspaceId, ticket.sessionId, feedbackId, {
+      await addComment(ticket.sessionId, feedbackId, {
         userId: user.uid,
         userName: user.displayName || "User",
         userAvatar: user.photoURL || "",

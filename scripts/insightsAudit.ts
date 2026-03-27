@@ -263,7 +263,7 @@ async function loadInsightsApi(opts: { workspaceId: string; apiBaseUrl: string }
   const url = new URL("/api/insights?nocache=1", apiBaseUrl);
   const res = await fetch(url, {
     headers: {
-      // supported in non-production per app/api/insights/route.ts
+      // Local only: NODE_ENV=development, ENABLE_DEBUG_UID=true, workspaceId in ALLOWED_DEBUG_UIDS
       "x-debug-uid": workspaceId,
     },
   });

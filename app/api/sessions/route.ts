@@ -5,12 +5,13 @@ import {
   createSessionRepo,
   getWorkspaceSessionCountRepo,
 } from "@/lib/repositories/sessionsRepository.server";
-import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
 import { corsHeaders } from "@/lib/server/cors";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { workspaceId } = await resolveWorkspaceForUser(user.uid);
+    const workspaceId = await getUserWorkspaceIdRepo(user.uid);
     const snap = await adminDb
       .collection("sessions")
       .where("workspaceId", "==", workspaceId)
@@ -73,6 +74,12 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ sessions }, { headers: corsHeaders(req) });
   } catch (err) {
+    if (err instanceof Error && err.message === "Missing workspaceId for user") {
+      return new Response("Workspace not found", {
+        status: 403,
+        headers: corsHeaders(req),
+      });
+    }
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
         status: 403,
@@ -105,7 +112,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { workspaceId, workspace } = await resolveWorkspaceForUser(user.uid);
+    const workspaceId = await getUserWorkspaceIdRepo(user.uid);
+    const workspace = await getWorkspace(workspaceId);
 
     if (workspace) {
       const currentSessionCount = await getWorkspaceSessionCountRepo(workspaceId, workspace);
@@ -134,6 +142,12 @@ export async function POST(req: NextRequest) {
       { headers: corsHeaders(req) }
     );
   } catch (err) {
+    if (err instanceof Error && err.message === "Missing workspaceId for user") {
+      return new Response("Workspace not found", {
+        status: 403,
+        headers: corsHeaders(req),
+      });
+    }
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
       return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
         status: 403,

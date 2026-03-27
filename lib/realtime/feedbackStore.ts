@@ -97,9 +97,12 @@ export function useFeedbackRealtimeStore(): FeedbackStoreSnapshot {
   return useSyncExternalStore(subscribeFeedbackStore, getFeedbackSnapshot, getFeedbackSnapshot);
 }
 
-export function subscribeFeedbackSession(sessionId: string): void {
+export function subscribeFeedbackSession(workspaceId: string, sessionId: string): void {
+  const normalizedWorkspaceId = workspaceId.trim();
   const normalizedSessionId = sessionId.trim();
-  if (!normalizedSessionId) return;
+  // CRITICAL: Do not run query until workspaceId is resolved
+  // Prevents Firestore permission errors
+  if (!normalizedWorkspaceId || !normalizedSessionId) return;
 
   if (unsubscribe && currentSessionId === normalizedSessionId) {
     return;
@@ -122,6 +125,7 @@ export function subscribeFeedbackSession(sessionId: string): void {
   const feedbackRef = collection(db, "feedback");
   const openQuery = query(
     feedbackRef,
+    where("workspaceId", "==", normalizedWorkspaceId),
     where("sessionId", "==", normalizedSessionId),
     where("status", "==", "open"),
     orderBy("createdAt", "desc"),
@@ -129,6 +133,7 @@ export function subscribeFeedbackSession(sessionId: string): void {
   );
   const resolvedQuery = query(
     feedbackRef,
+    where("workspaceId", "==", normalizedWorkspaceId),
     where("sessionId", "==", normalizedSessionId),
     where("status", "==", "resolved"),
     orderBy("createdAt", "desc"),

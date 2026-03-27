@@ -1,8 +1,5 @@
 import {
   doc,
-  increment,
-  runTransaction,
-  serverTimestamp,
   type DocumentReference,
   type Timestamp,
 } from "firebase/firestore";
@@ -34,6 +31,7 @@ export interface WorkspaceInsightsDoc {
   updatedAt: Timestamp | null;
 }
 
+// IMPORTANT: workspaceId is used as document key (previously named userId)
 export function workspaceInsightsRef(
   workspaceId: string
 ): DocumentReference<WorkspaceInsightsDoc> {
@@ -58,76 +56,5 @@ export function emptyWorkspaceInsightsDoc(): WorkspaceInsightsDoc {
     response: { totalFirstReplyMs: 0, count: 0 },
     updatedAt: null,
   };
-}
-
-function todayKeyUtc(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-export async function incrementInsightsOnFeedbackCreateRepo(opts: {
-  workspaceId: string;
-  sessionId: string;
-  type: string;
-}): Promise<void> {
-  const { workspaceId, sessionId } = opts;
-  const type = (opts.type ?? "").trim() || "general";
-  const day = todayKeyUtc();
-  const ref = workspaceInsightsRef(workspaceId);
-
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) {
-      tx.set(ref, emptyWorkspaceInsightsDoc());
-    }
-    tx.update(ref, {
-      totalFeedback: increment(1),
-      timeSavedMinutes: increment(5),
-      [`issueTypes.${type}`]: increment(1),
-      [`sessionCounts.${sessionId}`]: increment(1),
-      [`daily.${day}.feedback`]: increment(1),
-      updatedAt: serverTimestamp(),
-    } as Record<string, unknown>);
-  });
-}
-
-export async function incrementInsightsOnCommentCreateRepo(opts: {
-  workspaceId: string;
-}): Promise<void> {
-  const { workspaceId } = opts;
-  const day = todayKeyUtc();
-  const ref = workspaceInsightsRef(workspaceId);
-
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) {
-      tx.set(ref, emptyWorkspaceInsightsDoc());
-    }
-    tx.update(ref, {
-      totalComments: increment(1),
-      [`daily.${day}.comments`]: increment(1),
-      updatedAt: serverTimestamp(),
-    } as Record<string, unknown>);
-  });
-}
-
-export async function incrementInsightsOnFeedbackResolvedRepo(opts: {
-  workspaceId: string;
-  delta: 1 | -1;
-}): Promise<void> {
-  const { workspaceId, delta } = opts;
-  const day = todayKeyUtc();
-  const ref = workspaceInsightsRef(workspaceId);
-
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) {
-      tx.set(ref, emptyWorkspaceInsightsDoc());
-    }
-    tx.update(ref, {
-      totalResolved: increment(delta),
-      [`daily.${day}.resolved`]: increment(delta),
-      updatedAt: serverTimestamp(),
-    } as Record<string, unknown>);
-  });
 }
 

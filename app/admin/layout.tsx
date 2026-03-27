@@ -15,10 +15,12 @@ export default function AdminRootLayout({
   const { user, loading: authLoading } = useAuthGuard({ router, useReplace: true });
   const [adminChecked, setAdminChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    setError(null);
     authFetch("/api/admin/me")
       .then((res) => {
         if (!res) return { isAdmin: false };
@@ -30,10 +32,10 @@ export default function AdminRootLayout({
           setIsAdmin(data.isAdmin === true);
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
           setAdminChecked(true);
-          setIsAdmin(false);
+          setError(err instanceof Error ? err : new Error(String(err)));
         }
       });
     return () => {
@@ -42,13 +44,38 @@ export default function AdminRootLayout({
   }, [user]);
 
   useEffect(() => {
-    if (authLoading || !adminChecked || !user) return;
+    if (authLoading || !adminChecked || !user || error) return;
     if (!isAdmin) {
       router.replace("/dashboard");
     }
-  }, [authLoading, adminChecked, isAdmin, user, router]);
+  }, [authLoading, adminChecked, error, isAdmin, user, router]);
 
-  if (authLoading || !adminChecked || !user || !isAdmin) {
+  if (authLoading || !user) {
+    return (
+      <div className="flex h-full items-center justify-center bg-neutral-50">
+        <div className="text-sm text-neutral-500">Loading…</div>
+      </div>
+    );
+  }
+
+  if (!adminChecked) {
+    return (
+      <div className="flex h-full items-center justify-center bg-neutral-50">
+        <div className="text-sm text-neutral-500">Loading…</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 bg-neutral-50 px-6">
+        <div className="text-sm font-medium text-red-600">Could not verify admin access</div>
+        <div className="max-w-md text-center text-sm text-neutral-600">{error.message}</div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
     return (
       <div className="flex h-full items-center justify-center bg-neutral-50">
         <div className="text-sm text-neutral-500">Loading…</div>

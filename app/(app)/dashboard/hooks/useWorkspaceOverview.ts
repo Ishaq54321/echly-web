@@ -17,6 +17,7 @@ import { clearFeedbackSubscription } from "@/lib/realtime/feedbackStore";
 import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
 import { fetchSessionsListJson } from "@/lib/api/fetchSessionsList";
 import { fetchCounts } from "@/lib/state/fetchCountsDedup";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 const SESSIONS_CACHE_KEY = "echly_sessions";
 const SESSION_COUNT_CACHE_KEY = "sessionCount";
@@ -108,6 +109,7 @@ export interface SessionWithCounts {
 export type ViewMode = "all" | "archived";
 
 export function useWorkspaceOverview(viewMode: ViewMode = "all") {
+  const { workspaceId, claimsReady } = useWorkspace();
   const router = useRouter();
   const [user, setUser] = useState<{ uid: string } | null>(null);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
@@ -160,7 +162,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
   }, [router]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !workspaceId) return;
     const cachedSessions = readCachedSessions();
     const hasCachedSessions = Array.isArray(cachedSessions);
 
@@ -199,15 +201,15 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
         setLoading(false);
       }
     })();
-  }, [userId]);
+  }, [userId, workspaceId]);
 
   // Realtime sessions sync (Firestore). Keeps UI state correct without refresh.
   useEffect(() => {
-    if (!userId) return;
+    if (!claimsReady || !userId || !workspaceId) return;
 
     const q = query(
       collection(db, "sessions"),
-      where("userId", "==", userId),
+      where("workspaceId", "==", workspaceId),
       orderBy("updatedAt", "desc"),
       limit(50)
     );
@@ -242,7 +244,7 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
     );
 
     return () => unsubscribe();
-  }, [userId]);
+  }, [claimsReady, userId, workspaceId]);
 
   const sessions = filterSessionsByView(allSessions, archivedOnly);
 

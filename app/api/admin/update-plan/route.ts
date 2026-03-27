@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { invalidateWorkspaceCache } from "@/lib/server/resolveWorkspaceForUser";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace, updateWorkspacePlanRepo } from "@/lib/repositories/workspacesRepository.server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 import type { PlanId } from "@/lib/billing/plans";
@@ -9,7 +10,8 @@ const VALID_PLANS: PlanId[] = ["free", "starter", "business", "enterprise"];
 
 /**
  * POST /api/admin/update-plan
- * Body: { workspaceId: string, newPlan: PlanId }
+ * Body: { newPlan: PlanId }
+ * Workspace is resolved server-side from the authenticated user.
  * Updates workspace.billing.plan. Limits come from plan catalog (source of truth).
  * Only allowed if the authenticated user is the workspace owner.
  */
@@ -21,7 +23,7 @@ export async function POST(req: Request) {
     return res as Response;
   }
 
-  let body: { workspaceId?: string; newPlan?: string };
+  let body: { newPlan?: string };
   try {
     body = await req.json();
   } catch {
@@ -31,13 +33,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId.trim() : "";
   const newPlan = typeof body.newPlan === "string" ? body.newPlan.trim().toLowerCase() : "";
 
-  if (!workspaceId) {
+  let workspaceId: string;
+  try {
+    workspaceId = await getUserWorkspaceIdRepo(user.uid);
+  } catch (err) {
+    console.error("POST /api/admin/update-plan: resolve workspace", err);
     return NextResponse.json(
-      { error: "workspaceId is required" },
-      { status: 400 }
+      { error: "Could not resolve workspace for user" },
+      { status: 500 }
     );
   }
 

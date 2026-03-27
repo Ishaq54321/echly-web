@@ -6,7 +6,13 @@ import {
 export type ShareTokenFailureReason = "NOT_FOUND" | "EXPIRED" | "INACTIVE";
 
 export type ResolveShareTokenResult =
-  | { valid: true; sessionId: string; generalAccess: "view" | "comment" | "resolve" }
+  | {
+      valid: true;
+      sessionId: string;
+      userId: string;
+      workspaceId: string;
+      generalAccess: "view" | "comment" | "resolve";
+    }
   | { valid: false; reason: ShareTokenFailureReason };
 
 /**
@@ -45,6 +51,8 @@ export async function resolveShareToken(token: string): Promise<ResolveShareToke
   return {
     valid: true,
     sessionId: row.sessionId,
+    userId: row.userId,
+    workspaceId: row.workspaceId,
     generalAccess: row.generalAccess,
   };
 }

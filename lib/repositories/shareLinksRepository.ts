@@ -7,6 +7,7 @@ import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
 export type ShareGeneralAccess = AccessLevel;
 
@@ -14,6 +15,8 @@ export interface ShareLinkRecord {
   id: string;
   token: string;
   sessionId: string;
+  userId: string;
+  workspaceId: string;
   generalAccess: ShareGeneralAccess;
   createdBy: string;
   createdAt: Timestamp | null;
@@ -34,11 +37,16 @@ export interface CreateShareLinkResult {
  * Create a share link row. Token is 32 random bytes, base64url-encoded (~43 chars).
  */
 export async function createShareLink(
+  userId: string,
   sessionId: string,
   generalAccess: ShareGeneralAccess,
   createdBy: string,
   options?: { expiresAt?: Date | null }
 ): Promise<CreateShareLinkResult> {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) {
+    throw new Error("Missing userId - invalid state");
+  }
   const trimmedSession = sessionId.trim();
   if (!trimmedSession) {
     throw new Error("createShareLink: sessionId is required");
@@ -48,11 +56,14 @@ export async function createShareLink(
     throw new Error("createShareLink: createdBy is required");
   }
   const level = normalizeAccessLevel(generalAccess) as ShareGeneralAccess;
+  const workspaceId = await getUserWorkspaceIdRepo(normalizedUserId);
   const token = generateUrlSafeToken();
   const ref = adminDb.collection("share_links").doc();
 
   const exp = options?.expiresAt ?? null;
   await ref.set({
+    userId: normalizedUserId,
+    workspaceId,
     token,
     sessionId: trimmedSession,
     generalAccess: level,
@@ -89,6 +100,8 @@ export async function getShareLinkByToken(token: string): Promise<ShareLinkRecor
   const raw = d.data() as {
     token?: unknown;
     sessionId?: unknown;
+    userId?: unknown;
+    workspaceId?: unknown;
     generalAccess?: unknown;
     createdBy?: unknown;
     createdAt?: Timestamp | null;
@@ -99,10 +112,19 @@ export async function getShareLinkByToken(token: string): Promise<ShareLinkRecor
   const sessionId = typeof raw.sessionId === "string" ? raw.sessionId : "";
   if (!sessionId) return null;
 
+  const userId = typeof raw.userId === "string" ? raw.userId.trim() : "";
+  const workspaceIdRaw = typeof raw.workspaceId === "string" ? raw.workspaceId.trim() : "";
+  if (!workspaceIdRaw) {
+    throw new Error("Invalid share link: missing workspaceId");
+  }
+  const workspaceId = workspaceIdRaw;
+
   return {
     id: d.id,
     token: typeof raw.token === "string" ? raw.token : trimmed,
     sessionId,
+    userId,
+    workspaceId,
     generalAccess: normalizeAccessLevel(raw.generalAccess) as ShareGeneralAccess,
     createdBy: typeof raw.createdBy === "string" ? raw.createdBy : "",
     createdAt: raw.createdAt ?? null,

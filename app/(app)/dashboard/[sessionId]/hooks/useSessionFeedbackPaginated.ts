@@ -4,13 +4,13 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } fr
 import {
   collection,
   onSnapshot,
-  orderBy,
   query,
   where,
   type DocumentSnapshot,
   type Timestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebaseClient";
+import { auth, db } from "@/lib/firebaseClient";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
@@ -138,6 +138,7 @@ export function useSessionFeedbackPaginated(
   _openExpanded: boolean = true,
   _isSearchMode: boolean = false
 ): UseSessionFeedbackPaginatedResult {
+  const { workspaceId, claimsReady } = useWorkspace();
   const [items, setItems] = useState<Feedback[]>([]);
   const [counts, setCountsState] = useState<Counts>(ZERO_COUNTS);
   const total = counts.total;
@@ -204,7 +205,7 @@ export function useSessionFeedbackPaginated(
   }, [items]);
 
   useLayoutEffect(() => {
-    setCanonicalFeedback([]);
+    setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
     setCountsState(ZERO_COUNTS);
     firstSnapshotRef.current = true;
     firstSnapshotCountsRef.current = true;
@@ -232,22 +233,43 @@ export function useSessionFeedbackPaginated(
 
   /** Firestore: full session list, ordered newest first — real-time updates across tabs. */
   useEffect(() => {
-    if (!sessionId) return;
+    // CRITICAL: Do not run query until custom claims + workspace are ready (Firestore rules).
+    if (!claimsReady || !sessionId || !workspaceId) return;
 
     setInitialLoading(true);
     setHasLoadedResolved(false);
     setIsLoadingResolved(true);
 
+    const user = auth.currentUser;
+    if (!user?.uid) {
+      if (sessionIdRef.current !== sessionId) return;
+      setInitialLoading(false);
+      setHasLoadedResolved(true);
+      setIsLoadingResolved(false);
+      setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
+
     const q = query(
       collection(db, "feedback"),
-      where("sessionId", "==", sessionId),
-      orderBy("createdAt", "desc")
+      where("workspaceId", "==", workspaceId),
+      where("sessionId", "==", sessionId)
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
         if (sessionIdRef.current !== sessionId) return;
+
+        if (snapshot.empty) {
+          prevIdsRef.current = new Set();
+          setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
+          setInitialLoading(false);
+          setHasLoadedResolved(true);
+          setIsLoadingResolved(false);
+          firstSnapshotCountsRef.current = false;
+          return;
+        }
 
         const raw = snapshot.docs
           .map((d) => mapDocToFeedback(d))
@@ -300,7 +322,6 @@ export function useSessionFeedbackPaginated(
         setInitialLoading(false);
         setHasLoadedResolved(true);
         setIsLoadingResolved(false);
-        setCanonicalFeedback([]);
       }
     );
 
@@ -311,7 +332,7 @@ export function useSessionFeedbackPaginated(
         countsDebounceRef.current = null;
       }
     };
-  }, [sessionId, finalizeList, setCanonicalFeedback]);
+  }, [claimsReady, sessionId, workspaceId, finalizeList, setCanonicalFeedback]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -323,7 +344,7 @@ export function useSessionFeedbackPaginated(
       setInitialLoading(false);
       setCountsLoading(false);
       setCountsState(ZERO_COUNTS);
-      setCanonicalFeedback([]);
+      setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
       return;
     }
     setInitialLoading(true);

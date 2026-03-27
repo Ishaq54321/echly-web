@@ -1,14 +1,11 @@
 export type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
 import type { StructuredFeedback, Feedback } from "@/lib/domain/feedback";
+import { authFetch } from "@/lib/authFetch";
 import {
-  deleteFeedbackWithSessionCountersRepo,
   getFeedbackByIdsRepo,
   getSessionFeedbackByResolvedRepo,
   getSessionFeedbackPageRepo,
-  updateFeedbackRepo,
-  updateFeedbackResolveAndSessionCountersRepo,
 } from "@/lib/repositories/feedbackRepository";
-import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository";
 import type {
   FeedbackPageCursor,
   FeedbackPageResult,
@@ -41,11 +38,16 @@ export async function updateFeedback(
   }>,
   sessionId?: string
 ) {
-  if (typeof (data as { isResolved?: boolean }).isResolved === "boolean") {
-    await updateFeedbackResolveAndSessionCountersRepo(feedbackId, data);
-  } else {
-    await updateFeedbackRepo(feedbackId, data);
-    if (sessionId) await updateSessionUpdatedAtRepo(sessionId);
+  const res = await authFetch(`/api/tickets/${encodeURIComponent(feedbackId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  void sessionId;
+  if (!res) throw new Error("Not authenticated");
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(msg || "Failed to update feedback");
   }
 }
 
@@ -55,11 +57,12 @@ export async function updateFeedback(
 
 /** Fetches one page of feedback; use for cursor-based pagination. */
 export async function getSessionFeedbackPage(
+  workspaceId: string,
   sessionId: string,
   pageSize: number = 20,
   cursor?: FeedbackPageCursor | null
 ): Promise<FeedbackPageResult> {
-  return getSessionFeedbackPageRepo(sessionId, {
+  return getSessionFeedbackPageRepo(workspaceId, sessionId, {
     limit: pageSize,
     cursor: cursor ?? null,
     status: "all",
@@ -68,10 +71,11 @@ export async function getSessionFeedbackPage(
 
 /** First page only; for callers that need a single batch (e.g. CaptureWidget). Cost protection: always limited. */
 export async function getSessionFeedback(
+  workspaceId: string,
   sessionId: string,
   max: number = 50
 ): Promise<Feedback[]> {
-  const { feedback } = await getSessionFeedbackPageRepo(sessionId, {
+  const { feedback } = await getSessionFeedbackPageRepo(workspaceId, sessionId, {
     limit: max,
     status: "all",
   });
@@ -80,11 +84,12 @@ export async function getSessionFeedback(
 
 /** Up to N feedback items by resolution for overview preview. */
 export async function getSessionFeedbackByResolved(
+  workspaceId: string,
   sessionId: string,
   isResolved: boolean,
   max: number = 3
 ): Promise<Feedback[]> {
-  return getSessionFeedbackByResolvedRepo(sessionId, isResolved, max);
+  return getSessionFeedbackByResolvedRepo(workspaceId, sessionId, isResolved, max);
 }
 
 /** Fetch feedback by IDs (e.g. for activity titles). Limited. */
@@ -100,5 +105,12 @@ export async function getFeedbackByIds(
 ================================ */
 
 export async function deleteFeedback(feedbackId: string, _sessionId?: string) {
-  await deleteFeedbackWithSessionCountersRepo(feedbackId);
+  const res = await authFetch(`/api/tickets/${encodeURIComponent(feedbackId)}`, {
+    method: "DELETE",
+  });
+  if (!res) throw new Error("Not authenticated");
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(msg || "Failed to delete feedback");
+  }
 }

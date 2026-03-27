@@ -3,13 +3,13 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FeedbackDetailView, TicketList } from "@/components/layout/operating-system";
+import { FeedbackPremiumLoader } from "@/components/session/FeedbackPremiumLoader";
 import { PublicShareGateModal } from "@/components/share/PublicShareGateModal";
 import type { PublicShareGateDetail } from "@/components/share/PublicShareGateModal";
 import { PublicShareSidebarShell } from "@/components/share/PublicShareSidebarShell";
 import { PublicShareTopBar } from "@/components/share/PublicShareTopBar";
-import { usePublicSessionRealtime } from "@/components/share/usePublicSessionRealtime";
+import { useShareCounts } from "@/components/share/useShareCounts";
 import type { Feedback } from "@/lib/domain/feedback";
-import { getTicketStatus } from "@/lib/domain/feedback";
 import type { ResolvedPublicSharePermissions } from "@/lib/permissions/publicSharePermissions";
 import {
   mapPublicFeedbackToFeedback,
@@ -24,6 +24,7 @@ export type PublicSharePayload = {
   session: SanitizedPublicSession;
   feedback: SanitizedPublicFeedback[];
   permissions: ResolvedPublicSharePermissions;
+  token: string;
 };
 
 export function PublicShareSessionView({
@@ -32,26 +33,32 @@ export function PublicShareSessionView({
   initial: PublicSharePayload;
 }) {
   const session = initial.session;
+  const initialFeedback = initial.feedback;
+  const token = initial.token;
   const [sanitizedFeedback, setSanitizedFeedback] = useState<SanitizedPublicFeedback[]>(
-    initial.feedback
+    initialFeedback
   );
   const [permissions] = useState<ResolvedPublicSharePermissions>(initial.permissions);
+  const [phase, setPhase] = useState<"initial" | "ready">("initial");
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
   const [gateDetail, setGateDetail] = useState<PublicShareGateDetail | null>(null);
 
   const sessionId = session.id;
-  const realtime = usePublicSessionRealtime(sessionId);
+  const { counts, loading: countsLoading } = useShareCounts(session.id, token);
   const sessionTitle = (session.title ?? "").trim() || "Untitled Session";
 
   const feedbackRows: Feedback[] = useMemo(
     () => sanitizedFeedback.map((f) => mapPublicFeedbackToFeedback(sessionId, f)),
     [sanitizedFeedback, sessionId]
   );
-
-  const total = feedbackRows.length;
-  const openCount = feedbackRows.filter((f) => getTicketStatus(f) === "open").length;
-  const resolvedCount = feedbackRows.filter((f) => getTicketStatus(f) === "resolved").length;
+  // Initial server payload is authoritative for completeness; realtime is incremental only.
+  const isDataReady = true;
+  const listCounts = counts ?? {
+    total: feedbackRows.length,
+    open: feedbackRows.filter((item) => item.status !== "resolved").length,
+    resolved: feedbackRows.filter((item) => item.status === "resolved").length,
+  };
 
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     sanitizedFeedback[0]?.id ?? null
@@ -60,6 +67,13 @@ export function PublicShareSessionView({
   const [resolvedExpanded, setResolvedExpanded] = useState(false);
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
+  const handleSelect = useCallback(
+    (id: string) => {
+      if (id === selectedId) return;
+      setSelectedId(id);
+    },
+    [selectedId]
+  );
 
   const onOpenExpandedChange = useCallback(() => {
     setOpenExpanded((prev) => {
@@ -94,41 +108,53 @@ export function PublicShareSessionView({
     [sanitizedFeedback, selectedId]
   );
 
-  const selectedIndex = useMemo(() => {
-    if (!selectedId) return -1;
-    return sanitizedFeedback.findIndex((f) => f.id === selectedId);
-  }, [sanitizedFeedback, selectedId]);
+  const openItems = useMemo(
+    () => feedbackRows.filter((item) => item.status !== "resolved"),
+    [feedbackRows]
+  );
+  const resolvedItems = useMemo(
+    () => feedbackRows.filter((item) => item.status === "resolved"),
+    [feedbackRows]
+  );
 
   const selectedItem = useMemo(() => {
-    if (!selectedSanitized || total === 0) return null;
-    const idx = selectedIndex >= 0 ? selectedIndex + 1 : 1;
-    return mapSanitizedToDetailItem(selectedSanitized, idx, total);
-  }, [selectedSanitized, selectedIndex, total]);
+    if (!selectedSanitized) return null;
+
+    const isResolved = selectedSanitized.status === "resolved";
+    let position = 0;
+    let total = 0;
+
+    if (isResolved) {
+      const index = resolvedItems.findIndex((item) => item.id === selectedSanitized.id);
+      position = index + 1;
+      total = resolvedItems.length;
+    } else {
+      const index = openItems.findIndex((item) => item.id === selectedSanitized.id);
+      position = index + 1;
+      total = openItems.length;
+    }
+
+    return mapSanitizedToDetailItem(selectedSanitized, position, total);
+  }, [openItems, resolvedItems, selectedSanitized]);
 
   useEffect(() => {
-    if (realtime.loading || realtime.error) return;
-    if (realtime.changes.length === 0) return;
-    setSanitizedFeedback((current) => {
-      const byId = new Map(current.map((item) => [item.id, item]));
-      for (const change of realtime.changes) {
-        if (change.type === "removed") {
-          byId.delete(change.id);
-          continue;
-        }
-        byId.set(change.item.id, change.item);
-      }
-      const ordered = realtime.items.map((item) => byId.get(item.id) ?? item);
-      return ordered;
+    if (!session || !initialFeedback) return;
+
+    // Move to ready on next frame to avoid instant full-render jump.
+    const frame = requestAnimationFrame(() => {
+      setPhase("ready");
     });
-  }, [realtime.changes, realtime.error, realtime.items, realtime.loading]);
+
+    return () => cancelAnimationFrame(frame);
+  }, [session, initialFeedback]);
 
   const ticketListProps = {
     sessionTitle,
-    counts: { total, open: openCount, resolved: resolvedCount },
-    countsLoading: false,
+    counts: listCounts,
+    countsLoading,
     items: feedbackRows,
     selectedId,
-    onSelect: setSelectedId,
+    onSelect: handleSelect,
     newTicketId: null as string | null,
     loadingMore: false,
     hasMore: false,
@@ -161,8 +187,24 @@ export function PublicShareSessionView({
     />
   );
 
+  if (phase === "initial") {
+    return (
+      <div className="h-full w-full">
+        <div className="flex h-[100dvh] min-h-0 overflow-hidden bg-[#FCFDFE]">
+          <aside className="sidebar hidden lg:flex w-[300px] h-screen overflow-hidden shrink-0 self-start min-h-0 flex-col sticky top-0 border-r border-[#EEF2F6] shadow-[1px_0_0_rgba(15,23,42,0.02)]">
+            <FeedbackPremiumLoader />
+          </aside>
+          <div className="content-divider hidden shrink-0 lg:block" aria-hidden />
+          <div className="main-area flex min-h-0 min-w-0 flex-1 flex-col opacity-100 transition-opacity duration-150">
+            <FeedbackPremiumLoader />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <>
+    <div className="transition-opacity duration-150 opacity-100">
       <div className="flex h-[100dvh] min-h-0 overflow-hidden bg-[#FCFDFE]">
         <aside className="sidebar hidden lg:flex w-[300px] h-screen overflow-hidden shrink-0 self-start min-h-0 flex-col sticky top-0 border-r border-[#EEF2F6] shadow-[1px_0_0_rgba(15,23,42,0.02)]">
           <PublicShareSidebarShell>
@@ -188,7 +230,9 @@ export function PublicShareSessionView({
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
                   <div className="max-w-[1000px] mx-auto w-full px-6 py-6 flex-1 min-h-0 flex flex-col">
-                    {feedbackRows.length === 0 ? (
+                    {!isDataReady ? (
+                      <FeedbackPremiumLoader />
+                    ) : feedbackRows.length === 0 ? (
                       <div className="mt-16">
                         <div className="text-[16px] font-medium text-[hsl(var(--text-primary-strong))]">
                           No feedback yet
@@ -198,7 +242,7 @@ export function PublicShareSessionView({
                         </div>
                       </div>
                     ) : (
-                      detail
+                      <div className="transition-opacity duration-150">{detail}</div>
                     )}
                   </div>
                 </div>
@@ -222,7 +266,7 @@ export function PublicShareSessionView({
             <TicketList
               {...ticketListProps}
               onSelect={(id) => {
-                setSelectedId(id);
+                handleSelect(id);
                 setIsTicketNavigatorOpen(false);
               }}
             />
@@ -247,6 +291,6 @@ export function PublicShareSessionView({
       ) : null}
 
       <PublicShareGateModal detail={gateDetail} onClose={() => setGateDetail(null)} />
-    </>
+    </div>
   );
 }

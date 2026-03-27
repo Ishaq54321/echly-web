@@ -5,7 +5,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
 import { getBillingUsageCached, invalidateBillingUsageCache } from "@/lib/cachedBillingUsage";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import {
   clearWorkspaceSubscription,
   getWorkspaceRealtimeSnapshot,
@@ -55,6 +55,7 @@ export function useBillingUsage(
   refetch: () => Promise<void>;
 } {
   const { enabled = true } = options;
+  const { workspaceId: ctxWorkspaceId, claimsReady } = useWorkspace();
   const [data, setData] = useState<BillingUsageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +71,6 @@ export function useBillingUsage(
       }
       setData(json);
     } catch (e) {
-      setData(null);
       setError(e instanceof Error ? e.message : "Error");
     } finally {
       setLoading(false);
@@ -100,57 +100,81 @@ export function useBillingUsage(
       });
     };
 
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (cancelled || !user) {
-        if (!cancelled) {
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      void (async () => {
+        if (cancelled || !user) {
+          if (!cancelled) {
+            if (unsubscribeWorkspaceStore) {
+              unsubscribeWorkspaceStore();
+              unsubscribeWorkspaceStore = null;
+            }
+            clearWorkspaceSubscription();
+            setData(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (!claimsReady || !ctxWorkspaceId) {
           if (unsubscribeWorkspaceStore) {
             unsubscribeWorkspaceStore();
             unsubscribeWorkspaceStore = null;
           }
           clearWorkspaceSubscription();
-          setData(null);
-          setLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-        if (cancelled) return;
-
-        if (unsubscribeWorkspaceStore) {
-          unsubscribeWorkspaceStore();
-          unsubscribeWorkspaceStore = null;
-        }
-        let seenInitialSnapshot = false;
-        subscribeWorkspace(workspaceId);
-        unsubscribeWorkspaceStore = subscribeWorkspaceStore(() => {
-          const snap = getWorkspaceRealtimeSnapshot();
-          if (snap.workspaceId !== workspaceId || snap.loading) return;
-          if (cancelled) return;
-          // Skip initial snapshot; we already queue the initial fetch below.
-          if (!seenInitialSnapshot) {
-            seenInitialSnapshot = true;
-            return;
-          }
-          queueRefetch();
-        });
-        const initialWorkspaceSnap = getWorkspaceRealtimeSnapshot();
-        if (initialWorkspaceSnap.workspaceId === workspaceId && !initialWorkspaceSnap.loading) {
-          seenInitialSnapshot = true;
-        }
-        if (cancelled) {
-          unsubscribeWorkspaceStore();
           return;
         }
 
-        queueRefetch();
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Error");
-          setLoading(false);
+        const workspaceId = ctxWorkspaceId;
+        try {
+          if (unsubscribeWorkspaceStore) {
+            unsubscribeWorkspaceStore();
+            unsubscribeWorkspaceStore = null;
+          }
+          let seenInitialSnapshot = false;
+          subscribeWorkspace(workspaceId);
+          unsubscribeWorkspaceStore = subscribeWorkspaceStore(() => {
+            const snap = getWorkspaceRealtimeSnapshot();
+            if (snap.workspaceId !== workspaceId || snap.loading) return;
+            if (cancelled) return;
+            if (snap.error) {
+              setError(snap.error.message);
+              setLoading(false);
+              return;
+            }
+            // Skip initial snapshot; we already queue the initial fetch below.
+            if (!seenInitialSnapshot) {
+              seenInitialSnapshot = true;
+              return;
+            }
+            queueRefetch();
+          });
+          const initialWorkspaceSnap = getWorkspaceRealtimeSnapshot();
+          if (
+            initialWorkspaceSnap.workspaceId === workspaceId &&
+            initialWorkspaceSnap.error
+          ) {
+            if (!cancelled) {
+              setError(initialWorkspaceSnap.error.message);
+              setLoading(false);
+            }
+            return;
+          }
+          if (initialWorkspaceSnap.workspaceId === workspaceId && !initialWorkspaceSnap.loading) {
+            seenInitialSnapshot = true;
+          }
+          if (cancelled) {
+            unsubscribeWorkspaceStore();
+            return;
+          }
+
+          queueRefetch();
+        } catch (e) {
+          if (!cancelled) {
+            setError(e instanceof Error ? e.message : "Error");
+            setLoading(false);
+          }
         }
-      }
+      })();
     });
 
     return () => {
@@ -159,7 +183,7 @@ export function useBillingUsage(
       unsubAuth();
       if (unsubscribeWorkspaceStore) unsubscribeWorkspaceStore();
     };
-  }, [enabled, refetch]);
+  }, [enabled, refetch, claimsReady, ctxWorkspaceId]);
 
   return { data, loading, error, refetch };
 }

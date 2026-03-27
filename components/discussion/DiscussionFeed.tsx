@@ -9,13 +9,13 @@ import {
   orderBy,
   limit,
   getDocs,
-  doc,
-  getDoc,
+  documentId,
 } from "firebase/firestore";
 import { MessageSquare } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { getTicketStatus } from "@/lib/domain/feedback";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 export interface DiscussionFeedItem {
   id: string;
@@ -59,12 +59,15 @@ export function DiscussionFeed({
   onSelect,
   refreshKey = 0,
 }: DiscussionFeedProps) {
+  const { workspaceId, claimsReady } = useWorkspace();
   const [items, setItems] = useState<DiscussionFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    // CRITICAL: Do not run query until workspaceId is resolved
+    // Prevents Firestore permission errors
+    if (!claimsReady || !user || !workspaceId) return;
 
     let cancelled = false;
     setLoading(true);
@@ -74,7 +77,7 @@ export function DiscussionFeed({
       try {
         const discussionsQuery = query(
           collection(db, "feedback"),
-          where("userId", "==", user.uid),
+          where("workspaceId", "==", workspaceId),
           where("commentCount", ">", 0),
           orderBy("commentCount", "desc"),
           limit(100)
@@ -114,12 +117,26 @@ export function DiscussionFeed({
 
         const sessionIds = [...new Set(sorted.map((f) => f.sessionId as string).filter(Boolean))];
         const sessionMap = new Map<string, string>();
-        await Promise.all(
-          sessionIds.map(async (sid) => {
-            const snap = await getDoc(doc(db, "sessions", sid));
-            if (snap.exists()) sessionMap.set(sid, (snap.data().title as string) ?? "Unknown Session");
-          })
-        );
+        if (sessionIds.length > 0) {
+          const sessionChunks: string[][] = [];
+          for (let i = 0; i < sessionIds.length; i += 10) {
+            sessionChunks.push(sessionIds.slice(i, i + 10));
+          }
+          await Promise.all(
+            sessionChunks.map(async (chunk) => {
+              const sessionsSnap = await getDocs(
+                query(
+                  collection(db, "sessions"),
+                  where("workspaceId", "==", workspaceId),
+                  where(documentId(), "in", chunk)
+                )
+              );
+              sessionsSnap.forEach((docSnap) => {
+                sessionMap.set(docSnap.id, (docSnap.data().title as string) ?? "Unknown Session");
+              });
+            })
+          );
+        }
         if (cancelled) return;
 
         const list: DiscussionFeedItem[] = sorted.map((item) => {
@@ -151,7 +168,7 @@ export function DiscussionFeed({
     return () => {
       cancelled = true;
     };
-  }, [user, refreshKey]);
+  }, [claimsReady, user, workspaceId, refreshKey]);
 
   if (loading) {
     return (

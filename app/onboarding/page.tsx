@@ -6,8 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { createWorkspaceRepo } from "@/lib/repositories/workspacesRepository";
-import { setUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { authFetch } from "@/lib/authFetch";
 import { WorkspaceForm, type WorkspaceFormValues } from "@/components/onboarding/WorkspaceForm";
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
 import { motion } from "framer-motion";
@@ -38,16 +37,34 @@ export default function OnboardingPage() {
     }
     setSubmitting(true);
     try {
-      const workspaceId = crypto.randomUUID();
-      await createWorkspaceRepo({
-        workspaceId,
-        ownerId: user.uid,
-        name: values.workspaceName || "My Workspace",
+      const createRes = await authFetch("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: values.workspaceName || "My Account",
+          role: values.role || undefined,
+          companySize: values.companySize || undefined,
+        }),
       });
-      await setUserWorkspaceIdRepo(user, workspaceId, {
-        role: values.role || undefined,
-        companySize: values.companySize || undefined,
+
+      if (!createRes || !createRes.ok) {
+        const msg = createRes ? await createRes.text() : "Not authenticated";
+        throw new Error(`Failed to create profile: ${msg}`);
+      }
+
+      const patchRes = await authFetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: values.role || undefined,
+          companySize: values.companySize || undefined,
+        }),
       });
+      if (!patchRes || !patchRes.ok) {
+        const msg = patchRes ? await patchRes.text() : "Not authenticated";
+        throw new Error(`Failed to update user profile: ${msg}`);
+      }
+      await user.getIdToken(true);
       router.replace("/onboarding/activate");
     } catch (e) {
       console.error("Onboarding error:", e);
@@ -95,7 +112,7 @@ export default function OnboardingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.06 }}
         >
-          Create your workspace in seconds.
+          Set up your account in seconds.
         </motion.p>
         <p className="text-sm text-gray-500 mt-1">You can change everything later.</p>
       </header>

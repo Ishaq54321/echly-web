@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Share2, Settings, LayoutPanelLeft, Loader2 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useSessionOverview } from "./hooks/useSessionOverview";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { OverviewActivityItem } from "./hooks/useSessionOverview";
@@ -245,15 +246,16 @@ export default function SessionOverviewPage() {
     useReplace: true,
   });
   const { data, loading, error } = useSessionOverview(sessionId);
+  const { workspaceId } = useWorkspace();
   const [copied, setCopied] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
 
   useEffect(() => {
-    if (authLoading || loading || !data.session || !authUser) return;
-    if (data.session.userId !== authUser.uid) {
+    if (authLoading || loading || !data.session || !authUser || !workspaceId) return;
+    if (data.session.workspaceId !== workspaceId) {
       router.replace("/dashboard");
     }
-  }, [authLoading, authUser, loading, data.session, router]);
+  }, [authLoading, authUser, loading, data.session, router, workspaceId]);
 
   const handleCopy = useCallback(async () => {
     if (!sessionId || copyBusy) return;

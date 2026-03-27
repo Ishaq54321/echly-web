@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import { resolveDebugUid } from "@/lib/server/debugUid";
+import { requireAuth, toAuthorizationResponse } from "@/lib/server/auth/authorize";
+import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
 import {
   emptyWorkspaceInsightsDoc,
   workspaceInsightsRef,
@@ -27,27 +29,28 @@ const insightsCache = new Map<string, { data: InsightsApiResponse; expiresAt: nu
 
 /**
  * GET /api/insights
- * Single source of truth: ONLY reads workspaces/{workspaceId}/insights/main.
+ * Single source of truth for per-workspace insights.
  */
 export async function GET(req: Request) {
   let user;
   try {
-    const debugUid =
-      process.env.NODE_ENV !== "production"
-        ? req.headers.get("x-debug-uid")
-        : null;
-    user = debugUid ? { uid: debugUid } : await requireAuth(req);
-  } catch (res) {
-    return res as Response;
+    const debug = resolveDebugUid(req);
+    if (debug.status === "forbidden") {
+      return debug.response;
+    }
+    user =
+      debug.status === "ok"
+        ? { uid: debug.uid }
+        : await requireAuth(req);
+  } catch (err) {
+    return toAuthorizationResponse(err);
   }
 
   try {
-    // Single source of truth and single Firestore read:
-    // We intentionally avoid resolving workspace via additional Firestore reads.
-    const workspaceId = user.uid;
+    const { workspaceId } = await resolveWorkspaceForUser(user.uid, req);
 
     const now = Date.now();
-    const isDev = process.env.NODE_ENV !== "production";
+    const isDev = process.env.NODE_ENV === "development";
     const disableCache =
       isDev || new URL(req.url).searchParams.get("nocache") === "1";
     const cacheKey = workspaceId;
@@ -58,9 +61,11 @@ export async function GET(req: Request) {
     }
 
     const snap = await workspaceInsightsRef(workspaceId).get();
-    const docData = snap.exists
-      ? ((snap.data() as WorkspaceInsightsDoc) ?? emptyWorkspaceInsightsDoc())
-      : emptyWorkspaceInsightsDoc();
+    if (!snap.exists) {
+      return new Response("Insights not found", { status: 404 });
+    }
+    const docData =
+      (snap.data() as WorkspaceInsightsDoc) ?? emptyWorkspaceInsightsDoc();
 
     const totalFeedback = Math.max(0, Number(docData.totalFeedback) || 0);
     const totalComments = Math.max(0, Number(docData.totalComments) || 0);

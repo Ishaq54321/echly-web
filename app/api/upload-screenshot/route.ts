@@ -4,14 +4,12 @@ import "@/lib/server/firebaseAdmin";
 import { getStorage } from "firebase-admin/storage";
 import { requireAuth } from "@/lib/server/auth";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
-import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
-import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import {
   createScreenshotRepoSync,
   getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
 import { corsHeaders } from "@/lib/server/cors";
+import { userWorkspaceMatchesSession } from "@/lib/server/sessionWorkspaceScope";
 import { createScreenshotId } from "@/lib/uploadScreenshot";
 
 export async function OPTIONS(req: NextRequest) {
@@ -71,31 +69,20 @@ export async function POST(req: NextRequest) {
         { status: 404, headers: corsHeaders(req) }
       );
     }
-    if (session.userId !== user.uid) {
+    if (!(await userWorkspaceMatchesSession(user.uid, session))) {
       return NextResponse.json(
         { error: "Forbidden" },
         { status: 403, headers: corsHeaders(req) }
       );
     }
 
-    const workspaceId = session.workspaceId ?? session.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    try {
-      await resolveWorkspaceById(workspaceId);
-    } catch (err) {
-      if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-        return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
-          status: 403,
-          headers: corsHeaders(req),
-        });
-      }
-      throw err;
-    }
+    const userId = user.uid;
 
     const storagePath = `sessions/${sid}/screenshots/${ssId}.png`;
 
     const existing = await getScreenshotByIdRepo(ssId);
     if (existing?.status !== "ATTACHED") {
-      await createScreenshotRepoSync(ssId, storagePath);
+      await createScreenshotRepoSync(userId, ssId, storagePath);
     }
 
     const uploadStart = Date.now();
@@ -122,12 +109,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ screenshotId: ssId, url }, { headers: corsHeaders(req) });
   } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
-        status: 403,
-        headers: corsHeaders(req),
-      });
-    }
     console.error("upload-screenshot error:", err);
     return NextResponse.json(
       { error: "Upload failed" },

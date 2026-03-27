@@ -7,14 +7,17 @@ import { adminDb } from "@/lib/server/firebaseAdmin";
 export type ActiveShareLinkIds = { id: string; token: string };
 
 export async function getActiveShareLinkForSession(
-  sessionId: string
+  sessionId: string,
+  workspaceId: string
 ): Promise<ActiveShareLinkIds | null> {
   const trimmed = sessionId.trim();
-  if (!trimmed) return null;
+  const trimmedWorkspaceId = workspaceId.trim();
+  if (!trimmed || !trimmedWorkspaceId) return null;
 
   const snap = await adminDb
     .collection("share_links")
     .where("sessionId", "==", trimmed)
+    .where("workspaceId", "==", trimmedWorkspaceId)
     .where("isActive", "==", true)
     .limit(1)
     .get();

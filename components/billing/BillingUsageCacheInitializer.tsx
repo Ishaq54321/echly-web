@@ -31,8 +31,8 @@ export function BillingUsageCacheInitializer() {
         .then((data) => {
           billingStore.setBilling(data);
         })
-        .catch(() => {
-          // Billing is non-blocking; UI can gracefully fallback.
+        .catch((error) => {
+          billingStore.setError(error);
         })
         .finally(() => {
           billingStore.setLoading(false);

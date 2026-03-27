@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
 import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
   getFeedbackByIdRepo,
@@ -8,26 +7,37 @@ import {
   deleteFeedbackWithSessionCountersRepo,
 } from "@/lib/repositories/feedbackRepository.server";
 import { getSessionByIdRepo, updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository.server";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
-import { resolveWorkspaceById } from "@/lib/server/resolveWorkspaceForUser";
-import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
 import { log } from "@/lib/utils/logger";
 import { requireTicketActorPermission } from "@/lib/server/sessionActorPermissions";
+import {
+  withAuthorization,
+  type HandlerContext,
+} from "@/lib/server/auth/withAuthorization";
+import { routeParamId } from "@/lib/server/routeParams";
+import { sessionWorkspaceId, userWorkspaceMatchesSession } from "@/lib/server/sessionWorkspaceScope";
+
+async function resolveTicketWorkspaceId(
+  _req: Request,
+  _user: { uid: string },
+  ctx: HandlerContext
+): Promise<string> {
+  const id = await routeParamId(ctx);
+  const ticket = id ? await getFeedbackByIdRepo(id) : null;
+  const session = ticket ? await getSessionByIdRepo(ticket.sessionId) : null;
+  return sessionWorkspaceId(session) ?? "";
+}
 
 /** GET /api/tickets/:id — return single ticket (feedback) from DB. */
-export async function GET(
+export const GET = withAuthorization(
+  "read_feedback",
+  async (
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  ctx: HandlerContext,
+  { user }: { user: { uid: string } }
+) => {
   const start = Date.now();
   log("[API] GET /api/tickets/[id] start");
-  let user;
-  try {
-    user = await requireAuth(req);
-  } catch (res) {
-    return res as Response;
-  }
-  const { id } = await params;
+  const id = await routeParamId(ctx);
   if (!id) {
     return NextResponse.json(
       { success: false, error: "Missing ticket id" },
@@ -50,17 +60,8 @@ export async function GET(
         { status: viewGate.status }
       );
     }
-    const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    try {
-      await resolveWorkspaceById(workspaceId);
-    } catch (err) {
-      if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-        return NextResponse.json(
-          { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-          { status: 403 }
-        );
-      }
-      throw err;
+    if (!(await userWorkspaceMatchesSession(user.uid, session))) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
     log("[API] GET /api/tickets/[id] duration:", Date.now() - start);
     return NextResponse.json({
@@ -68,12 +69,6 @@ export async function GET(
       ticket: serializeTicket(ticket),
     });
   } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(
-        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-        { status: 403 }
-      );
-    }
     console.error("GET /api/tickets/[id]:", err);
     log("[API] GET /api/tickets/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
@@ -81,22 +76,21 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+},
+  { resolveWorkspace: resolveTicketWorkspaceId }
+);
 
 /** PATCH /api/tickets/:id — update ticket; body: { title?, instruction?, actionSteps?, suggestedTags?, isResolved? }. */
-export async function PATCH(
+export const PATCH = withAuthorization(
+  "resolve_feedback",
+  async (
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  ctx: HandlerContext,
+  { user }: { user: { uid: string } }
+) => {
   const start = Date.now();
   log("[API] PATCH /api/tickets/[id] start");
-  let user;
-  try {
-    user = await requireAuth(req);
-  } catch (res) {
-    return res as Response;
-  }
-  const { id } = await params;
+  const id = await routeParamId(ctx);
   if (!id) {
     return NextResponse.json(
       { success: false, error: "Missing ticket id" },
@@ -140,17 +134,8 @@ export async function PATCH(
       { status: resolveGate.status }
     );
   }
-  const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-  try {
-    await resolveWorkspaceById(workspaceId);
-  } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(
-        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-        { status: 403 }
-      );
-    }
-    throw err;
+  if (!(await userWorkspaceMatchesSession(user.uid, session))) {
+    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
   const updates: Parameters<typeof updateFeedbackRepo>[1] = {};
   if (typeof body.title === "string") updates.title = body.title;
@@ -198,12 +183,6 @@ export async function PATCH(
       ticket: serializeTicket(updated),
     });
   } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(
-        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-        { status: 403 }
-      );
-    }
     console.error("PATCH /api/tickets/[id]:", err);
     log("[API] PATCH /api/tickets/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
@@ -211,22 +190,21 @@ export async function PATCH(
       { status: 500 }
     );
   }
-}
+},
+  { resolveWorkspace: resolveTicketWorkspaceId }
+);
 
 /** DELETE /api/tickets/:id — permanently delete ticket (feedback) from DB. */
-export async function DELETE(
+export const DELETE = withAuthorization(
+  "delete_feedback",
+  async (
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  ctx: HandlerContext,
+  { user }: { user: { uid: string } }
+) => {
   const start = Date.now();
   log("[API] DELETE /api/tickets/[id] start");
-  let user;
-  try {
-    user = await requireAuth(req);
-  } catch (res) {
-    return res as Response;
-  }
-  const { id } = await params;
+  const id = await routeParamId(ctx);
   if (!id) {
     return NextResponse.json(
       { success: false, error: "Missing ticket id" },
@@ -255,29 +233,13 @@ export async function DELETE(
         { status: delGate.status }
       );
     }
-    const workspaceId = session?.workspaceId ?? session?.userId ?? (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    try {
-      await resolveWorkspaceById(workspaceId);
-    } catch (err) {
-      if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-        return NextResponse.json(
-          { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-          { status: 403 }
-        );
-      }
-      throw err;
+    if (!(await userWorkspaceMatchesSession(user.uid, session))) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
-
     await deleteFeedbackWithSessionCountersRepo(id);
     log("[API] DELETE /api/tickets/[id] duration:", Date.now() - start);
     return NextResponse.json({ success: true });
   } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(
-        { success: false, ...WORKSPACE_SUSPENDED_RESPONSE },
-        { status: 403 }
-      );
-    }
     console.error("DELETE /api/tickets/[id]:", err);
     log("[API] DELETE /api/tickets/[id] duration (error):", Date.now() - start);
     return NextResponse.json(
@@ -285,4 +247,6 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+},
+  { resolveWorkspace: resolveTicketWorkspaceId }
+);

@@ -1,24 +1,20 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/workspace/status
- * Returns current user's workspace suspended status for UI (e.g. full-page suspended message).
- * Returns 200 with { suspended: boolean }. If not authenticated or no workspace, returns { suspended: false }.
+ * Legacy compatibility route. Workspace suspension is deprecated in user-owned mode
+ * and returns suspended: false when auth succeeds.
  */
-export async function GET(req: Request) {
+export async function GET(_req: Request) {
   try {
-    const user = await requireAuth(req);
-    const workspaceId = (await getUserWorkspaceIdRepo(user.uid)) ?? user.uid;
-    const workspace = await getWorkspace(workspaceId);
-    const suspended =
-      !!workspace?.billing && (workspace.billing as { suspended?: boolean }).suspended === true;
-    return NextResponse.json({ suspended });
-  } catch {
+    await requireAuth(_req);
     return NextResponse.json({ suspended: false });
+  } catch (e) {
+    if (e instanceof Response) return e;
+    console.error("GET /api/workspace/status:", e);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

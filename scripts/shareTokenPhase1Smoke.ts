@@ -34,7 +34,7 @@ async function main() {
   const short = await resolveShareToken("abc");
   assert(!short.valid && short.reason === "NOT_FOUND", "very short token → NOT_FOUND");
 
-  const { id, token } = await createShareLink(sessionId, "comment", userId, {
+  const { id, token } = await createShareLink(userId, sessionId, "comment", userId, {
     expiresAt: wantExpired ? new Date(Date.now() - 60_000) : undefined,
   });
   console.log("created token:", token.slice(0, 8) + "…", "expired?", wantExpired);

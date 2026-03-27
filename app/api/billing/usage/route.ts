@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { resolveWorkspaceForUserLight } from "@/lib/server/resolveWorkspaceForUser";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
+import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 
 export const dynamic = "force-dynamic";
-
-const SAFE_FALLBACK = {
-  plan: "free",
-  limits: {
-    maxSessions: null,
-  },
-};
 
 /**
  * GET /api/billing/usage
@@ -22,15 +16,23 @@ export async function GET(req: Request) {
   try {
     user = await requireAuth(req);
   } catch {
-    return NextResponse.json(SAFE_FALLBACK);
+    return new Response("Unauthorized", { status: 401 });
   }
 
   try {
-    const { workspaceId } = await resolveWorkspaceForUserLight(user.uid);
+    const workspaceId = await getUserWorkspaceIdRepo(user.uid);
     const workspace = await getWorkspace(workspaceId);
 
-    const plan = workspace?.billing?.plan ?? "free";
-    const override = workspace?.entitlements?.maxSessions;
+    if (!workspace) {
+      return new Response("Workspace not found", { status: 403 });
+    }
+
+    if (!workspace.billing?.plan) {
+      return new Response("Billing plan missing", { status: 500 });
+    }
+
+    const plan = workspace.billing.plan;
+    const override = workspace.entitlements?.maxSessions;
     const catalog = await getPlanCatalog();
     const maxSessions =
       override !== undefined
@@ -43,7 +45,10 @@ export async function GET(req: Request) {
         maxSessions,
       },
     });
-  } catch {
-    return NextResponse.json(SAFE_FALLBACK);
+  } catch (err) {
+    if (err instanceof Error && err.message === MISSING_USER_WORKSPACE_ERROR) {
+      return new Response("Workspace not found", { status: 403 });
+    }
+    return new Response("Failed to load billing data", { status: 500 });
   }
 }

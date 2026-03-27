@@ -3,8 +3,7 @@ import type { NextRequest } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import { getSessionFeedbackSearchCorpusForUserRepo } from "@/lib/repositories/feedbackRepository.server";
-import { resolveWorkspaceForUserLight } from "@/lib/server/resolveWorkspaceForUserLight";
-import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { corsHeaders } from "@/lib/server/cors";
 import { verifyExtensionToken } from "@/lib/server/extensionAuth";
 import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
@@ -181,18 +180,15 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  let resolvedWorkspaceId: string | null = null;
+  const userId = user.uid;
+  let workspaceId: string;
   try {
-    const { workspaceId } = await resolveWorkspaceForUserLight(user.uid, req);
-    resolvedWorkspaceId = workspaceId;
-  } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
-        status: 403,
-        headers: corsHeaders(req),
-      });
-    }
-    throw err;
+    workspaceId = await getUserWorkspaceIdRepo(userId);
+  } catch {
+    return NextResponse.json(
+      { error: "Missing workspaceId" },
+      { status: 403, headers: corsHeaders(req) }
+    );
   }
 
   const { searchParams } = new URL(req.url);
@@ -206,13 +202,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const workspaceId = resolvedWorkspaceId ?? user.uid;
-
   try {
     const corpus = await getSessionFeedbackSearchCorpusForUserRepo({
       workspaceId,
       sessionId,
-      userId: user.uid,
     });
 
     const needle = queryRaw.trim();

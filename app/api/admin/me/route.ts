@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/server/adminAuth";
+import { withAuthorization } from "@/lib/server/auth/withAuthorization";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
 /**
  * GET /api/admin/me
  * Returns { isAdmin: boolean }. Used by admin layout to gate access.
  * Uses same admin auth as other admin APIs; returns 200 { isAdmin: false } when not admin.
  */
-export async function GET(req: Request) {
-  try {
-    await requireAdmin(req);
-    return NextResponse.json({ isAdmin: true });
-  } catch (e) {
-    const res = e as Response;
-    if (res?.status === 403) return NextResponse.json({ isAdmin: false });
-    return res;
+export const GET = withAuthorization(
+  "read_feedback",
+  async (_req, _ctx, { isAdmin }) => NextResponse.json({ isAdmin }),
+  {
+    isAdmin: true,
+    allowNonAdmin: true,
+    resolveWorkspace: async (_req, user) => getUserWorkspaceIdRepo(user.uid),
   }
-}
+);

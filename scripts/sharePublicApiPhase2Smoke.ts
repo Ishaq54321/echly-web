@@ -51,7 +51,7 @@ async function main() {
     return;
   }
 
-  const { id, token } = await createShareLink(sessionId!, "comment", userId!, {
+  const { id, token } = await createShareLink(userId!, sessionId!, "comment", userId!, {
     expiresAt: wantExpired ? new Date(Date.now() - 60_000) : undefined,
   });
   if (wantInactive) {
