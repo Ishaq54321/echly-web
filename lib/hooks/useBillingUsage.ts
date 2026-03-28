@@ -115,7 +115,7 @@ export function useBillingUsage(
           return;
         }
 
-        if (!claimsReady || !ctxWorkspaceId) {
+        if (!claimsReady) {
           if (unsubscribeWorkspaceStore) {
             unsubscribeWorkspaceStore();
             unsubscribeWorkspaceStore = null;
@@ -124,7 +124,15 @@ export function useBillingUsage(
           return;
         }
 
-        const workspaceId = ctxWorkspaceId;
+        const workspaceId = ctxWorkspaceId?.trim() ?? "";
+        if (!workspaceId) {
+          if (unsubscribeWorkspaceStore) {
+            unsubscribeWorkspaceStore();
+            unsubscribeWorkspaceStore = null;
+          }
+          clearWorkspaceSubscription();
+          return;
+        }
         try {
           if (unsubscribeWorkspaceStore) {
             unsubscribeWorkspaceStore();

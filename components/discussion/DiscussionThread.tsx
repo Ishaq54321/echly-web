@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Expand, Paperclip, Send } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
-import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { addComment, updateComment, deleteComment } from "@/lib/comments";
-import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
 import type { Comment, CommentAttachment } from "@/lib/domain/comment";
 import { AttachmentUploadModal } from "@/components/discussion/AttachmentUploadModal";
 import { CommentItem } from "@/components/comments/CommentItem";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 
 export interface DiscussionThreadProps {
   feedbackId: string | null;
@@ -45,7 +44,6 @@ export function DiscussionThread({
   const [sending, setSending] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
   const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!screenshotModalOpen) return;
@@ -144,53 +142,22 @@ export function DiscussionThread({
   }, [feedbackId]);
 
   useEffect(() => {
-    if (!workspaceId || !feedbackId || !ticket?.sessionId) {
+    if (!workspaceId || !feedbackId || !ticket?.sessionId || !claimsReady) {
       setComments([]);
       setCommentsInitialized(false);
-      return;
     }
+  }, [workspaceId, feedbackId, ticket?.sessionId, claimsReady]);
 
-    const sessionId = ticket.sessionId;
-    const fid = feedbackId;
-
-    let unsubComments: (() => void) | null = null;
-
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (unsubComments) {
-        unsubComments();
-        unsubComments = null;
-      }
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
-      setCommentsInitialized(false);
-      if (!user) {
-        setComments([]);
-        return;
-      }
-      if (!claimsReady) {
-        setComments([]);
-        return;
-      }
-      unsubComments = listenToCommentsRepo(
-        workspaceId,
-        sessionId,
-        fid,
-        (incoming) => {
-          setComments([...incoming]);
-          setCommentsInitialized(true);
-        }
-      );
-      unsubscribeRef.current = unsubComments;
-    });
-
-    return () => {
-      unsubAuth();
-      if (unsubComments) unsubComments();
-      unsubscribeRef.current = null;
-    };
-  }, [workspaceId, claimsReady, feedbackId, ticket?.sessionId]);
+  useCommentsRepoSubscription({
+    workspaceId,
+    sessionId: ticket?.sessionId,
+    feedbackId,
+    claimsReady,
+    onComments: (incoming) => {
+      setComments([...incoming]);
+      setCommentsInitialized(true);
+    },
+  });
 
   const handleSendComment = async () => {
     const user = auth.currentUser;

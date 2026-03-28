@@ -51,14 +51,21 @@ export function useWorkspaceUsageRealtime(options?: {
         return;
       }
 
-      if (!claimsReady || !ctxWorkspaceId) {
+      if (!claimsReady) {
         clearWorkspaceSubscription();
         setTargetWorkspaceId(null);
         return;
       }
 
-      setTargetWorkspaceId(ctxWorkspaceId);
-      subscribeWorkspace(ctxWorkspaceId);
+      const wid = ctxWorkspaceId?.trim() ?? "";
+      if (!wid) {
+        clearWorkspaceSubscription();
+        setTargetWorkspaceId(null);
+        return;
+      }
+
+      setTargetWorkspaceId(wid);
+      subscribeWorkspace(wid);
     };
 
     const unsub = onAuthStateChanged(auth, sync);
@@ -79,8 +86,10 @@ export function useWorkspaceUsageRealtime(options?: {
   }
 
   const user = auth.currentUser;
+  const widReady = Boolean(ctxWorkspaceId?.trim());
   const waitingForClaimsOrWorkspace =
-    !!user && (!claimsReady || !ctxWorkspaceId || (uidOpt != null && user.uid !== uidOpt));
+    !!user &&
+    (!claimsReady || !widReady || (uidOpt != null && user.uid !== uidOpt));
 
   const isMatchingWorkspace =
     targetWorkspaceId != null && workspaceState.workspaceId === targetWorkspaceId;

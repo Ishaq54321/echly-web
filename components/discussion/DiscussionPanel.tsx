@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
-import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { addComment } from "@/lib/comments";
-import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
 import type { Comment } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 
 const PANEL_WIDTH = 420;
 
@@ -38,7 +37,6 @@ export function DiscussionPanel({
   const [loading, setLoading] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!feedbackId) {
@@ -90,48 +88,18 @@ export function DiscussionPanel({
   }, [feedbackId]);
 
   useEffect(() => {
-    if (!workspaceId || !feedbackId || !ticket?.sessionId) {
+    if (!workspaceId || !feedbackId || !ticket?.sessionId || !claimsReady) {
       setComments([]);
-      return;
     }
+  }, [workspaceId, feedbackId, ticket?.sessionId, claimsReady]);
 
-    const sessionId = ticket.sessionId;
-    const fid = feedbackId;
-
-    let unsubComments: (() => void) | null = null;
-
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (unsubComments) {
-        unsubComments();
-        unsubComments = null;
-      }
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
-      if (!user) {
-        setComments([]);
-        return;
-      }
-      if (!claimsReady) {
-        setComments([]);
-        return;
-      }
-      unsubComments = listenToCommentsRepo(
-        workspaceId,
-        sessionId,
-        fid,
-        (incoming) => setComments([...incoming])
-      );
-      unsubscribeRef.current = unsubComments;
-    });
-
-    return () => {
-      unsubAuth();
-      if (unsubComments) unsubComments();
-      unsubscribeRef.current = null;
-    };
-  }, [workspaceId, claimsReady, feedbackId, ticket?.sessionId]);
+  useCommentsRepoSubscription({
+    workspaceId,
+    sessionId: ticket?.sessionId,
+    feedbackId,
+    claimsReady,
+    onComments: (incoming) => setComments([...incoming]),
+  });
 
   const handleSendComment = async () => {
     const user = auth.currentUser;

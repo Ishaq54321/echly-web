@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
@@ -45,7 +51,13 @@ function normalizeWorkspaceId(value: string | null | undefined): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-export function useWorkspace(): WorkspaceContextValue {
+const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
+
+/**
+ * Single workspace identity + claims gate for the signed-in app shell.
+ * Must wrap any tree that calls useWorkspace() so listeners see one consistent claimsReady.
+ */
+export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
     normalizeWorkspaceId(cachedWorkspaceId ?? undefined)
   );
@@ -69,6 +81,7 @@ export function useWorkspace(): WorkspaceContextValue {
         return;
       }
       setWorkspaceError(null);
+      setClaimsReady(false);
       const hasModuleCacheForUser =
         cacheUid === user.uid &&
         typeof cachedWorkspaceId === "string" &&
@@ -77,29 +90,32 @@ export function useWorkspace(): WorkspaceContextValue {
         setWorkspaceLoading(true);
       }
       void (async () => {
+        let tokenSynced = false;
         try {
           const res = await authFetch("/api/users", { method: "POST" });
           if (res?.ok) {
             try {
               await user.getIdToken(true);
-              setClaimsReady(true);
+              tokenSynced = true;
             } catch {
-              setClaimsReady(false);
+              tokenSynced = false;
             }
-          } else {
-            setClaimsReady(false);
           }
         } catch {
-          // Claim sync is best-effort; resolution still runs for Firestore user doc reads.
-          setClaimsReady(false);
+          tokenSynced = false;
         }
         try {
           const resolved = await resolveWorkspaceId(user.uid);
-          setWorkspaceId(normalizeWorkspaceId(resolved));
+          const normalized = normalizeWorkspaceId(resolved);
+          setWorkspaceId(normalized);
           setWorkspaceError(null);
+          setClaimsReady(tokenSynced && normalized != null);
         } catch (err: unknown) {
           setWorkspaceId(null);
-          setWorkspaceError(err instanceof Error ? err : new Error(String(err)));
+          setWorkspaceError(
+            err instanceof Error ? err : new Error(String(err))
+          );
+          setClaimsReady(false);
         } finally {
           setWorkspaceLoading(false);
         }
@@ -108,5 +124,19 @@ export function useWorkspace(): WorkspaceContextValue {
     return () => unsubscribe();
   }, []);
 
-  return { workspaceId, workspaceError, workspaceLoading, claimsReady };
+  return (
+    <WorkspaceContext.Provider
+      value={{ workspaceId, workspaceError, workspaceLoading, claimsReady }}
+    >
+      {children}
+    </WorkspaceContext.Provider>
+  );
+}
+
+export function useWorkspace(): WorkspaceContextValue {
+  const ctx = useContext(WorkspaceContext);
+  if (!ctx) {
+    throw new Error("useWorkspace must be used within WorkspaceProvider");
+  }
+  return ctx;
 }

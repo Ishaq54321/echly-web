@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "lucide-react";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime";
 import { useBillingStore } from "@/lib/store/billingStore";
 
@@ -36,9 +37,12 @@ const VALUE_BULLETS = [
 
 export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeModalProps) {
   const router = useRouter();
+  const { claimsReady, workspaceId } = useWorkspace();
   const currentPlan = currentPlanFromUpgrade(upgradePlan);
   const currentPlanLabel = PLAN_LABEL[currentPlan] ?? currentPlan;
-  const { data: workspaceUsage } = useWorkspaceUsageRealtime({ enabled: open });
+  const { data: workspaceUsage } = useWorkspaceUsageRealtime({
+    enabled: open && claimsReady && Boolean(workspaceId?.trim()),
+  });
   const { maxSessions } = useBillingStore();
 
   const ctaLabel =

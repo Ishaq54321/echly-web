@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
 import {
   addComment,
@@ -13,10 +13,10 @@ import {
   type AddCommentOptions,
 } from "@/lib/comments";
 import type { CommentPosition, CommentTextRange } from "@/lib/domain/comment";
-import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
 import { authFetch } from "@/lib/authFetch";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 
 type LocalComment = Comment | OptimisticComment;
 
@@ -68,9 +68,8 @@ function mergeRealtimeComments(prev: LocalComment[], incoming: Comment[]): Local
 }
 
 /**
- * Controlled realtime comment list: exactly ONE onSnapshot listener at a time.
- * When selectedFeedbackId changes we unsubscribe the previous listener, then
- * subscribe to the new feedback's comments. Cleanup on unmount prevents leaks.
+ * Controlled realtime comment list: one `listenToCommentsRepo` subscription at a time
+ * (see `useCommentsRepoSubscription`). Cleanup on unmount / feedback change prevents leaks.
  */
 export function useFeedbackDetailController(args: {
   sessionId: string;
@@ -92,19 +91,15 @@ export function useFeedbackDetailController(args: {
 
   const [comments, setComments] = useState<LocalComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!claimsReady || !authUserId || !workspaceId) {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
       setComments([]);
       setLoadingComments(false);
-      return;
     }
+  }, [claimsReady, workspaceId, authUserId]);
 
+  useEffect(() => {
     if (!feedbackId) {
       const t = requestAnimationFrame(() => {
         setComments([]);
@@ -112,35 +107,27 @@ export function useFeedbackDetailController(args: {
       });
       return () => cancelAnimationFrame(t);
     }
+  }, [feedbackId]);
 
-    // Prevent multiple listeners: tear down previous before subscribing.
-    if (unsubscribeRef.current) {
-      unsubscribeRef.current();
-      unsubscribeRef.current = null;
+  useEffect(() => {
+    if (!claimsReady || !authUserId || !workspaceId || !feedbackId) {
+      return;
     }
-
-    let cancelled = false;
     const t = requestAnimationFrame(() => setLoadingComments(true));
+    return () => cancelAnimationFrame(t);
+  }, [claimsReady, workspaceId, authUserId, sessionId, feedbackId]);
 
-    const unsubscribe = listenToCommentsRepo(
-      workspaceId,
-      sessionId,
-      feedbackId,
-      (incomingComments) => {
-        if (cancelled) return;
-        setComments((prev) => mergeRealtimeComments(prev, incomingComments));
-        setLoadingComments(false);
-      }
-    );
-    unsubscribeRef.current = unsubscribe;
-
-    return () => {
-      cancelAnimationFrame(t);
-      cancelled = true;
-      unsubscribe();
-      unsubscribeRef.current = null;
-    };
-  }, [claimsReady, workspaceId, sessionId, feedbackId, authUserId]);
+  useCommentsRepoSubscription({
+    workspaceId,
+    sessionId,
+    feedbackId,
+    claimsReady,
+    enabled: Boolean(authUserId),
+    onComments: (incomingComments) => {
+      setComments((prev) => mergeRealtimeComments(prev, incomingComments));
+      setLoadingComments(false);
+    },
+  });
 
   const sendComment = async (message: string): Promise<void> => {
     const user = auth.currentUser;

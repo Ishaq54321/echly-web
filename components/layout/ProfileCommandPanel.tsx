@@ -9,6 +9,7 @@ import type { User } from "firebase/auth";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime";
 import { useBillingStore } from "@/lib/store/billingStore";
 import CountUp from "react-countup";
@@ -82,8 +83,9 @@ export function ProfileCommandPanel({
   const [analytics, setAnalytics] = useState<InsightsApiResponse | null>(null);
   const [, setAnalyticsLoading] = useState(false);
   const [hasAnimatedMetrics, setHasAnimatedMetrics] = useState(false);
+  const { claimsReady, workspaceId } = useWorkspace();
   const { data: workspaceUsage } = useWorkspaceUsageRealtime({
-    enabled: open,
+    enabled: open && claimsReady && Boolean(workspaceId?.trim()),
     uid: user?.uid ?? null,
   });
   const { maxSessions, plan: cachedPlan, isLoaded: isBillingLoaded } = useBillingStore();

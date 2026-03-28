@@ -5,7 +5,6 @@ import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { authFetch, clearAuthTokenCache } from "@/lib/authFetch";
-import { clearFeedbackSubscription } from "@/lib/realtime/feedbackStore";
 import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
 
 type UseAuthGuardOptions = {
@@ -61,7 +60,6 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): {
       if (currentUser == null) {
         setSyncStatus("idle");
         clearAuthTokenCache();
-        clearFeedbackSubscription();
         clearWorkspaceSubscription();
         if (router) {
           if (useReplace) {

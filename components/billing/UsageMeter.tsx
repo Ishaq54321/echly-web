@@ -1,5 +1,6 @@
 "use client";
 
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime";
 import { useBillingStore } from "@/lib/store/billingStore";
 
@@ -55,10 +56,15 @@ function MeterRow({
 }
 
 export function UsageMeter() {
-  const { data: realtimeUsage, loading: realtimeLoading, error: realtimeError } = useWorkspaceUsageRealtime();
+  const { claimsReady, workspaceId } = useWorkspace();
+  const workspaceGateReady = claimsReady && Boolean(workspaceId?.trim());
+  const { data: realtimeUsage, loading: realtimeLoading, error: realtimeError } =
+    useWorkspaceUsageRealtime({
+      enabled: workspaceGateReady,
+    });
   const { maxSessions, plan: cachedPlan, isLoaded: isBillingLoaded } = useBillingStore();
 
-  if (realtimeLoading || !isBillingLoaded) {
+  if (!workspaceGateReady || realtimeLoading || !isBillingLoaded) {
     return (
       <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="h-4 w-24 rounded bg-neutral-100 animate-pulse mb-3" />

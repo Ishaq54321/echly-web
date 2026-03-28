@@ -1,6 +1,7 @@
 import GlobalRail from "@/components/layout/GlobalRail";
 import { FloatingUtilityActions } from "@/components/layout/FloatingUtilityActions";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { WorkspaceProvider } from "@/lib/client/workspaceContext";
 import { WorkspaceSuspendedGuard } from "@/components/workspace/WorkspaceSuspendedGuard";
 import { WorkspaceIdentityGate } from "@/components/workspace/WorkspaceIdentityGate";
 import { BillingUsageCacheInitializer } from "@/components/billing/BillingUsageCacheInitializer";
@@ -13,6 +14,7 @@ export default function AppLayout({
 }) {
   return (
     <WorkspaceSuspendedGuard>
+      <WorkspaceProvider>
       <WorkspaceIdentityGate>
         <BillingUsageCacheInitializer />
         <SessionsSearchProvider>
@@ -31,6 +33,7 @@ export default function AppLayout({
           All changes saved • Secure session
         </div>
       </WorkspaceIdentityGate>
+      </WorkspaceProvider>
     </WorkspaceSuspendedGuard>
   );
 }

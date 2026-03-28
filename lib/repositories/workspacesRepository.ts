@@ -57,18 +57,24 @@ export async function getWorkspace(userId: string): Promise<Workspace | null> {
 
 export function listenToWorkspace(
   userId: string,
-  callback: (workspace: Workspace | null) => void
+  callback: (workspace: Workspace | null) => void,
+  claimsReady: boolean
 ): Unsubscribe {
-  subscribeWorkspace(userId);
+  const wid = userId.trim();
+  if (!claimsReady || !wid) {
+    callback(null);
+    return () => {};
+  }
+  subscribeWorkspace(wid);
   const emit = () => {
     const snap = getWorkspaceRealtimeSnapshot();
-    if (snap.workspaceId !== userId) return;
+    if (snap.workspaceId !== wid) return;
     callback(snap.workspace);
   };
   emit();
   return subscribeWorkspaceStore(() => {
     const snap = getWorkspaceRealtimeSnapshot();
-    if (snap.workspaceId !== userId) return;
+    if (snap.workspaceId !== wid) return;
     callback(snap.workspace);
   });
 }

@@ -124,7 +124,7 @@ function SettingsPageInner() {
       setWorkspace(null);
       return;
     }
-    const unsub = listenToWorkspace(workspaceId, setWorkspace);
+    const unsub = listenToWorkspace(workspaceId, setWorkspace, claimsReady);
     return () => unsub();
   }, [workspaceId, claimsReady]);
 

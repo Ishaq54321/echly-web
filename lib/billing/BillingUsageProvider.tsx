@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useBillingUsage } from "@/lib/hooks/useBillingUsage";
 import type { BillingUsageData } from "@/lib/hooks/useBillingUsage";
 
@@ -19,7 +20,9 @@ const BillingUsageContext = createContext<BillingUsageContextValue | null>(null)
  * of calling useBillingUsage(), so GET /api/billing/usage is only requested once.
  */
 export function BillingUsageProvider({ children }: { children: ReactNode }) {
-  const value = useBillingUsage();
+  const { claimsReady, workspaceId } = useWorkspace();
+  const enabled = claimsReady && Boolean(workspaceId?.trim());
+  const value = useBillingUsage({ enabled });
   return (
     <BillingUsageContext.Provider value={value}>
       {children}

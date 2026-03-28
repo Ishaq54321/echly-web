@@ -13,7 +13,6 @@ import {
   getCounts,
   setCounts as setCachedCounts,
 } from "@/lib/state/sessionCountsStore";
-import { clearFeedbackSubscription } from "@/lib/realtime/feedbackStore";
 import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
 import { fetchSessionsListJson } from "@/lib/api/fetchSessionsList";
 import { fetchCounts } from "@/lib/state/fetchCountsDedup";
@@ -147,7 +146,6 @@ export function useWorkspaceOverview(viewMode: ViewMode = "all") {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         clearAuthTokenCache();
-        clearFeedbackSubscription();
         clearWorkspaceSubscription();
         setUser(null);
         setAllSessions([]);
