@@ -246,26 +246,47 @@ export default function SessionOverviewPage() {
     useReplace: true,
   });
   const { data, loading, error } = useSessionOverview(sessionId);
-  const { workspaceId } = useWorkspace();
+  const { workspaceId, claimsReady, authUid } = useWorkspace();
   const [copied, setCopied] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
 
   useEffect(() => {
-    if (authLoading || loading || !data.session || !authUser || !workspaceId) return;
+    if (
+      !claimsReady ||
+      authLoading ||
+      loading ||
+      !data.session ||
+      !authUser ||
+      !workspaceId
+    ) {
+      return;
+    }
     if (data.session.workspaceId !== workspaceId) {
       router.replace("/dashboard");
     }
-  }, [authLoading, authUser, loading, data.session, router, workspaceId]);
+  }, [
+    claimsReady,
+    authLoading,
+    authUser,
+    loading,
+    data.session,
+    router,
+    workspaceId,
+  ]);
 
   const handleCopy = useCallback(async () => {
     if (!sessionId || copyBusy) return;
-    const ok = await copySessionLink(sessionId, { onBusy: setCopyBusy });
+    const ok = await copySessionLink(sessionId, authUid, { onBusy: setCopyBusy });
     if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [sessionId, copyBusy]);
 
-  if (authLoading || (loading && !data.session)) {
+  if (
+    !claimsReady ||
+    authLoading ||
+    (loading && !data.session)
+  ) {
     return (
       <div className="h-full flex items-center justify-center bg-[var(--canvas-base)]">
         <p className="text-sm text-[hsl(var(--text-muted))]">Loading…</p>

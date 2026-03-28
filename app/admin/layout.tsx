@@ -5,20 +5,19 @@ import { useRouter } from "next/navigation";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { authFetch } from "@/lib/authFetch";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { WorkspaceProvider, useWorkspace } from "@/lib/client/workspaceContext";
 
-export default function AdminRootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuthGuard({ router, useReplace: true });
+  const { claimsReady, authUid } = useWorkspace();
   const [adminChecked, setAdminChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!claimsReady) return;
+    if (!authUid) return;
     let cancelled = false;
     setError(null);
     authFetch("/api/admin/me")
@@ -41,7 +40,7 @@ export default function AdminRootLayout({
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [claimsReady, authUid]);
 
   useEffect(() => {
     if (authLoading || !adminChecked || !user || error) return;
@@ -84,4 +83,16 @@ export default function AdminRootLayout({
   }
 
   return <AdminLayout>{children}</AdminLayout>;
+}
+
+export default function AdminRootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <WorkspaceProvider>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </WorkspaceProvider>
+  );
 }

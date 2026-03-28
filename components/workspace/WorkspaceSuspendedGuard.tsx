@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import type { User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 interface WorkspaceSuspendedGuardProps {
   children: React.ReactNode;
@@ -33,23 +31,14 @@ function StatusErrorScreen({ message }: { message: string }) {
  */
 export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardProps) {
   const router = useRouter();
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const { authReady, authUid, claimsReady } = useWorkspace();
   const [suspended, setSuspended] = useState<boolean | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setFirebaseUser(u);
-      setAuthReady(true);
-    });
-    return unsub;
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
-    if (!authReady) return;
-    if (firebaseUser === null) {
+    if (!claimsReady) return;
+    if (!authUid) {
       setSuspended(false);
       setStatusError(null);
       return;
@@ -77,13 +66,24 @@ export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardPro
     return () => {
       cancelled = true;
     };
-  }, [authReady, firebaseUser]);
+  }, [claimsReady, authUid]);
 
   useEffect(() => {
     if (suspended === true) {
       router.replace("/workspace-suspended");
     }
   }, [suspended, router]);
+
+  if (!authReady || (authUid && (!claimsReady || (suspended === null && !statusError)))) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#466EFF]"
+          aria-label="Loading"
+        />
+      </div>
+    );
+  }
 
   if (statusError) {
     return <StatusErrorScreen message={statusError} />;

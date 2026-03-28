@@ -24,6 +24,7 @@ import type { Session } from "@/lib/domain/session";
 import { ShareModal } from "@/components/share/ShareModal";
 import { RenameSessionModal } from "@/components/dashboard/RenameSessionModal";
 import { copySessionLink } from "@/utils/copySessionLink";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { PORTAL_DROPDOWN_Z_INDEX } from "@/lib/ui/zIndex";
 import {
   getPortalDropdownFixedPosition,
@@ -87,6 +88,7 @@ export function SessionActionsDropdown({
   onOpenChange,
   hideActions,
 }: SessionActionsDropdownProps) {
+  const { authUid } = useWorkspace();
   const [moreOpen, setMoreOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
@@ -216,7 +218,9 @@ export function SessionActionsDropdown({
     e.preventDefault();
     e.stopPropagation();
     if (copyLinkBusy) return;
-    const ok = await copySessionLink(session.id, { onBusy: setCopyLinkBusy });
+    const ok = await copySessionLink(session.id, authUid, {
+      onBusy: setCopyLinkBusy,
+    });
     if (ok) onCopyLinkSuccess?.();
     closeMenu();
   };

@@ -2,9 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, type Dispatch, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase";
-import { clearAuthTokenCache, authFetch } from "@/lib/authFetch";
-import { onAuthStateChanged } from "firebase/auth";
+import { authFetch } from "@/lib/authFetch";
 import type { Session } from "@/lib/domain/session";
 import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -13,7 +11,6 @@ import {
   getCounts,
   setCounts as setCachedCounts,
 } from "@/lib/state/sessionCountsStore";
-import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
 import { fetchCounts } from "@/lib/state/fetchCountsDedup";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 
@@ -116,11 +113,10 @@ export type ViewMode = "all" | "archived";
 
 /** Single Firestore subscription; consume via `WorkspaceOverviewProvider` + `useWorkspaceOverview`. */
 export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
-  const { workspaceId, claimsReady } = useWorkspace();
+  const { workspaceId, claimsReady, authUid } = useWorkspace();
   const router = useRouter();
-  const workspaceIdRef = useRef<string | undefined>(undefined);
+  const workspaceIdRef = useRef<string | null>(null);
   const allSessionsRef = useRef<Session[]>([]);
-  const [user, setUser] = useState<{ uid: string } | null>(null);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [countsBySessionId, setCountsBySessionId] = useState<
     Record<string, SessionFeedbackCounts>
@@ -129,10 +125,10 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
   const expectedCountRef = useRef<number | null>(
     workspaceId ? readCachedSessionCount(workspaceId) : null
   );
-  const userId = user?.uid;
+  const userId = authUid;
 
   useEffect(() => {
-    workspaceIdRef.current = workspaceId ?? undefined;
+    workspaceIdRef.current = workspaceId;
   }, [workspaceId]);
 
   useEffect(() => {
@@ -142,8 +138,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
   const archivedOnly = viewMode === "archived";
 
   const refreshSessions = useCallback(async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser || !workspaceIdRef.current) return;
+    if (!workspaceIdRef.current || !claimsReady) return;
     setLoading(true);
     try {
       const ids = allSessionsRef.current
@@ -159,24 +154,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        clearAuthTokenCache();
-        clearWorkspaceSubscription();
-        setUser(null);
-        setAllSessions([]);
-        setCountsBySessionId({});
-        setLoading(false);
-        router.push("/login");
-        return;
-      }
-      setUser(currentUser);
-    });
-    return () => unsubscribe();
-  }, [router]);
+  }, [claimsReady]);
 
   useEffect(() => {
     if (!userId || !workspaceId) return;
@@ -265,7 +243,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
     async (
       onPlanLimitReached?: (payload: { message: string; upgradePlan: string | null }) => void
     ) => {
-      if (!user) return;
+      if (!claimsReady || !workspaceIdRef.current) return;
       const wid = workspaceIdRef.current;
       const tempSessionId = `temp-${Date.now()}`;
       const tempSession: Session = {
@@ -387,7 +365,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         console.error("[ECHLY] Create session failed", err);
       }
     },
-    [user, router]
+    [claimsReady, router]
   );
 
   const updateSession = useCallback((sessionId: string, patch: Partial<Session>) => {
@@ -514,7 +492,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
   );
 
   return {
-    user,
     sessions: sessionsWithCounts,
     loading,
     expectedSessionCount: expectedCountRef.current,

@@ -4,48 +4,33 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { authFetch } from "@/lib/authFetch";
+import { authFetch, clearAuthTokenCache } from "@/lib/authFetch";
+import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
+import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
 
-type WorkspaceContextValue = {
+export type WorkspaceContextValue = {
   workspaceId: string | null;
   /** Set when workspace resolution failed for a signed-in user (system error; do not continue as if unauthenticated). */
-  workspaceError: Error | null;
+  workspaceError: string | null;
   /** True while a signed-in user is being resolved and workspaceId is not yet known. */
   workspaceLoading: boolean;
   /** True after ID token has been force-refreshed post workspace sync (custom claims ready for Firestore rules). */
   claimsReady: boolean;
+  /** True after the first Firebase auth callback for this mount (signed-in or signed-out). */
+  authReady: boolean;
+  /** Firebase Auth uid when signed in; null when signed out. */
+  authUid: string | null;
+  authEmail: string | null;
+  authDisplayName: string | null;
+  authPhotoUrl: string | null;
 };
-
-let cachedWorkspaceId: string | null = null;
-let cacheUid: string | null = null;
-let inFlight: Promise<string> | null = null;
-
-async function resolveWorkspaceId(uid: string): Promise<string> {
-  if (inFlight) return inFlight;
-  inFlight = (async () => {
-    const workspaceId = await getUserWorkspaceIdRepo(uid);
-    cacheUid = uid;
-    cachedWorkspaceId = workspaceId;
-    return workspaceId;
-  })();
-  try {
-    return await inFlight;
-  } finally {
-    inFlight = null;
-  }
-}
-
-export function clearWorkspaceContextCache(): void {
-  cachedWorkspaceId = null;
-  cacheUid = null;
-  inFlight = null;
-}
 
 function normalizeWorkspaceId(value: string | null | undefined): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -58,75 +43,144 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
  * Must wrap any tree that calls useWorkspace() so listeners see one consistent claimsReady.
  */
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
-    normalizeWorkspaceId(cachedWorkspaceId ?? undefined)
-  );
-  const [workspaceError, setWorkspaceError] = useState<Error | null>(null);
-  const [workspaceLoading, setWorkspaceLoading] = useState(() => {
-    const u = auth.currentUser;
-    if (!u) return false;
-    const cached = normalizeWorkspaceId(cachedWorkspaceId ?? undefined);
-    return !cached;
-  });
+  const authSyncGenerationRef = useRef(0);
+  const syncLockUidRef = useRef<string | null>(null);
+
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [claimsReady, setClaimsReady] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [authUid, setAuthUid] = useState<string | null>(null);
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const [authDisplayName, setAuthDisplayName] = useState<string | null>(null);
+  const [authPhotoUrl, setAuthPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthReady(true);
+
       if (!user?.uid) {
-        clearWorkspaceContextCache();
-        setWorkspaceId(null);
-        setWorkspaceError(null);
-        setWorkspaceLoading(false);
-        setClaimsReady(false);
+        syncLockUidRef.current = null;
+        authSyncGenerationRef.current += 1;
+        clearAuthTokenCache();
+        clearWorkspaceSubscription();
+        if (!cancelled) {
+          setAuthUid(null);
+          setAuthEmail(null);
+          setAuthDisplayName(null);
+          setAuthPhotoUrl(null);
+          setWorkspaceId(null);
+          setWorkspaceError(null);
+          setWorkspaceLoading(false);
+          setClaimsReady(false);
+        }
         return;
       }
-      setWorkspaceError(null);
-      setClaimsReady(false);
-      const hasModuleCacheForUser =
-        cacheUid === user.uid &&
-        typeof cachedWorkspaceId === "string" &&
-        cachedWorkspaceId.trim() !== "";
-      if (!hasModuleCacheForUser) {
-        setWorkspaceLoading(true);
+
+      const uid = user.uid;
+      setAuthUid(uid);
+      setAuthEmail(user.email ?? null);
+      setAuthDisplayName(user.displayName ?? null);
+      setAuthPhotoUrl(user.photoURL ?? null);
+
+      if (syncLockUidRef.current === uid) {
+        return;
       }
+      syncLockUidRef.current = uid;
+      authSyncGenerationRef.current += 1;
+      const currentGen = authSyncGenerationRef.current;
+
+      if (cancelled) return;
+      setClaimsReady(false);
+      setWorkspaceError(null);
+      setWorkspaceLoading(true);
+
       void (async () => {
-        let tokenSynced = false;
         try {
+          if (cancelled) return;
+          if (currentGen !== authSyncGenerationRef.current) return;
+
           const res = await authFetch("/api/users", { method: "POST" });
-          if (res?.ok) {
-            try {
-              await user.getIdToken(true);
-              tokenSynced = true;
-            } catch {
-              tokenSynced = false;
-            }
+
+          if (cancelled) return;
+          if (currentGen !== authSyncGenerationRef.current) return;
+
+          if (res == null || !res.ok) {
+            setClaimsReady(false);
+            setWorkspaceId(null);
+            setWorkspaceError(
+              res == null
+                ? "Identity sync failed (no session)"
+                : `Identity sync failed (${res.status})`
+            );
+            return;
           }
-        } catch {
-          tokenSynced = false;
-        }
-        try {
-          const resolved = await resolveWorkspaceId(user.uid);
+
+          if (cancelled) return;
+          if (currentGen !== authSyncGenerationRef.current) return;
+          await user.getIdToken(true);
+
+          if (cancelled) return;
+          if (currentGen !== authSyncGenerationRef.current) return;
+
+          const resolved = await getUserWorkspaceIdRepo(uid);
           const normalized = normalizeWorkspaceId(resolved);
+
+          if (cancelled) return;
+          if (currentGen !== authSyncGenerationRef.current) return;
+
+          if (!normalized) {
+            setWorkspaceId(null);
+            setWorkspaceError(MISSING_USER_WORKSPACE_ERROR);
+            setClaimsReady(false);
+            return;
+          }
+
           setWorkspaceId(normalized);
           setWorkspaceError(null);
-          setClaimsReady(tokenSynced && normalized != null);
-        } catch (err: unknown) {
+          setClaimsReady(true);
+        } catch (err) {
+          console.error("IDENTITY SYNC FAILED", err);
+          if (cancelled) return;
+          if (currentGen !== authSyncGenerationRef.current) return;
+          setClaimsReady(false);
           setWorkspaceId(null);
           setWorkspaceError(
-            err instanceof Error ? err : new Error(String(err))
+            err instanceof Error ? err.message : String(err)
           );
-          setClaimsReady(false);
         } finally {
+          if (syncLockUidRef.current === uid) {
+            syncLockUidRef.current = null;
+          }
+          if (cancelled) return;
+          if (currentGen !== authSyncGenerationRef.current) return;
           setWorkspaceLoading(false);
         }
       })();
     });
-    return () => unsubscribe();
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   return (
     <WorkspaceContext.Provider
-      value={{ workspaceId, workspaceError, workspaceLoading, claimsReady }}
+      value={{
+        workspaceId,
+        workspaceError,
+        workspaceLoading,
+        claimsReady,
+        authReady,
+        authUid,
+        authEmail,
+        authDisplayName,
+        authPhotoUrl,
+      }}
     >
       {children}
     </WorkspaceContext.Provider>

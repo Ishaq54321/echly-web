@@ -85,8 +85,11 @@ export function ProfileCommandPanel({
   const [hasAnimatedMetrics, setHasAnimatedMetrics] = useState(false);
   const { claimsReady, workspaceId } = useWorkspace();
   const { data: workspaceUsage } = useWorkspaceUsageRealtime({
-    enabled: open && claimsReady && Boolean(workspaceId?.trim()),
-    uid: user?.uid ?? null,
+    enabled:
+      open &&
+      claimsReady &&
+      workspaceId != null &&
+      workspaceId.trim() !== "",
   });
   const { maxSessions, plan: cachedPlan, isLoaded: isBillingLoaded } = useBillingStore();
 
@@ -121,6 +124,7 @@ export function ProfileCommandPanel({
 
   useEffect(() => {
     if (!open) return;
+    if (!claimsReady) return;
 
     let cancelled = false;
     setAnalyticsLoading(true);
@@ -149,7 +153,7 @@ export function ProfileCommandPanel({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, onClose, claimsReady]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();

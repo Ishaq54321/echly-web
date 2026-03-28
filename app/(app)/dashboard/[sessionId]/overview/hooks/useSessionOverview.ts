@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth } from "@/lib/firebase";
 import { getSessionRecentComments } from "@/lib/comments";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import {
@@ -96,11 +95,14 @@ export function useSessionOverview(sessionId: string | undefined) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!sessionId || !workspaceId) {
+    if (!sessionId) {
       setLoading(false);
       return;
     }
-    if (!claimsReady) return;
+    if (!claimsReady || !workspaceId) {
+      setLoading(true);
+      return;
+    }
     const sid: string = sessionId;
 
     let cancelled = false;
@@ -111,9 +113,6 @@ export function useSessionOverview(sessionId: string | undefined) {
       setLoading(true);
       setError(null);
       try {
-        if (!auth.currentUser?.uid) {
-          throw new Error("Not authenticated");
-        }
         const countsPromise = (async (): Promise<SessionFeedbackCounts> => {
           const cached = getCounts(sid);
           if (cached) return cached;

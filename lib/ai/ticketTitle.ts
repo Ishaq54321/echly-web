@@ -54,13 +54,6 @@ export async function generateTicketTitlesBatch(
     const promptTokens = usage?.prompt_tokens ?? 0;
     const completionTokens = usage?.completion_tokens ?? 0;
     const cost = estimateCost("gpt-4o-mini", promptTokens, completionTokens);
-    console.log("[AI COST]", {
-      stage: "title",
-      model: "gpt-4o-mini",
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      cost,
-    });
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? "";
     const cleaned = raw

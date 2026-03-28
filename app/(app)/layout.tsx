@@ -15,8 +15,8 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <WorkspaceSuspendedGuard>
-      <WorkspaceProvider>
+    <WorkspaceProvider>
+      <WorkspaceSuspendedGuard>
       <WorkspaceIdentityGate>
         <BillingUsageCacheInitializer />
         <WorkspaceOverviewProvider>
@@ -38,7 +38,7 @@ export default function AppLayout({
           All changes saved • Secure session
         </div>
       </WorkspaceIdentityGate>
-      </WorkspaceProvider>
-    </WorkspaceSuspendedGuard>
+      </WorkspaceSuspendedGuard>
+    </WorkspaceProvider>
   );
 }

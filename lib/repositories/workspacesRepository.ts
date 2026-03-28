@@ -18,30 +18,6 @@ export function invalidateWorkspaceDocCache(userId?: string): void {
   void userId;
 }
 
-/** @deprecated Client writes removed. Uses server API route (/api/workspaces POST). */
-export async function createWorkspaceRepo(params: {
-  userId: string;
-  ownerId: string;
-  name: string;
-  logoUrl?: string | null;
-}): Promise<void> {
-  const legacyIdKey = "workspace" + "Id";
-  const res = await authFetch("/api/workspaces", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      [legacyIdKey]: params.userId,
-      name: params.name,
-      logoUrl: params.logoUrl ?? null,
-    }),
-  });
-  if (!res || !res.ok) {
-    const msg = res ? await res.text() : "Not authenticated";
-    throw new Error(`Failed to create workspace: ${msg}`);
-  }
-  invalidateWorkspaceDocCache(params.userId);
-}
-
 function docToWorkspace(workspaceDocId: string, data: DocumentData): Workspace {
   return {
     id: workspaceDocId,

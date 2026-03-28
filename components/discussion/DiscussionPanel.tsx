@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
-import { auth } from "@/lib/firebase";
 import { addComment } from "@/lib/comments";
 import type { Comment } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
@@ -30,7 +29,8 @@ export function DiscussionPanel({
   onClose,
   onCommentAdded,
 }: DiscussionPanelProps) {
-  const { workspaceId, claimsReady } = useWorkspace();
+  const { workspaceId, claimsReady, authUid, authDisplayName, authPhotoUrl } =
+    useWorkspace();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
   const [comments, setComments] = useState<Comment[]>([]);
@@ -44,6 +44,8 @@ export function DiscussionPanel({
       setSessionName("");
       return;
     }
+
+    if (!claimsReady) return;
 
     let cancelled = false;
     setLoading(true);
@@ -85,7 +87,7 @@ export function DiscussionPanel({
     return () => {
       cancelled = true;
     };
-  }, [feedbackId]);
+  }, [feedbackId, claimsReady]);
 
   useEffect(() => {
     if (!workspaceId || !feedbackId || !ticket?.sessionId || !claimsReady) {
@@ -102,17 +104,16 @@ export function DiscussionPanel({
   });
 
   const handleSendComment = async () => {
-    const user = auth.currentUser;
-    if (!user || !feedbackId || !ticket?.sessionId) return;
+    if (!authUid || !feedbackId || !ticket?.sessionId) return;
     const trimmed = commentDraft.trim();
     if (!trimmed) return;
 
     setSending(true);
     try {
       await addComment(ticket.sessionId, feedbackId, {
-        userId: user.uid,
-        userName: user.displayName || "User",
-        userAvatar: user.photoURL || "",
+        userId: authUid,
+        userName: authDisplayName || "User",
+        userAvatar: authPhotoUrl || "",
         message: trimmed,
         type: "general",
       });

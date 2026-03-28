@@ -1,4 +1,4 @@
-import { auth } from "@/lib/firebase";
+import { getFirebaseBearerToken } from "@/lib/authFetch";
 
 export interface UploadAttachmentResult {
   url: string;
@@ -23,9 +23,8 @@ export async function uploadAttachmentWithProgress(
   file: File,
   onProgress: (percent: number) => void
 ): Promise<UploadAttachmentResult> {
-  const user = auth.currentUser;
-  if (!user) throw new Error("User not authenticated");
-  const token = await user.getIdToken();
+  const token = await getFirebaseBearerToken();
+  if (!token) throw new Error("User not authenticated");
   const url = getUploadUrl();
 
   return new Promise((resolve, reject) => {

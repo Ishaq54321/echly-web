@@ -20,6 +20,7 @@ import { SessionsViewModeToggle } from "@/components/dashboard/SessionsViewModeT
 import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
 import { Modal } from "@/components/ui/Modal";
 import { copySessionLink } from "@/utils/copySessionLink";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 export interface SessionWorkspaceSection {
   title: string;
@@ -97,6 +98,7 @@ function SessionWorkspaceRow({
   onToggleSelected?: (sessionId: string) => void;
   isLoading?: boolean;
 }) {
+  const { authUid } = useWorkspace();
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [copyLinkBusy, setCopyLinkBusy] = useState(false);
@@ -310,7 +312,9 @@ function SessionWorkspaceRow({
                 onClick={(e) => {
                   e.stopPropagation();
                   if (isOptimistic || copyLinkBusy) return;
-                  void copySessionLink(session.id, { onBusy: setCopyLinkBusy }).then((ok) => {
+                  void copySessionLink(session.id, authUid, {
+                    onBusy: setCopyLinkBusy,
+                  }).then((ok) => {
                     if (ok) setCopied(true);
                   });
                 }}

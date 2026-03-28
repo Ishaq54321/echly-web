@@ -127,12 +127,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
 
-  const { user: authUser, loading: authLoading } = useAuthGuard({ router });
-  const { workspaceId, claimsReady } = useWorkspace();
+  const { loading: authLoading } = useAuthGuard({ router });
+  const { workspaceId, claimsReady, authUid } = useWorkspace();
 
-  // Start feedback loading as soon as auth is ready (do not block on session doc).
   const feedbackSessionId =
-    !authLoading && authUser && sessionId ? sessionId : undefined;
+    claimsReady && workspaceId && authUid && sessionId ? sessionId : undefined;
 
   const listScrollRef = useRef<HTMLDivElement | null>(null);
   const [listScrollReady, setListScrollReady] = useState(0);
@@ -384,7 +383,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /* ================= AUTH + LOAD SESSION (title/meta only) ================= */
   useEffect(() => {
     if (authLoading) return;
-    if (!claimsReady || !authUser || !sessionId || !workspaceId) {
+    if (!claimsReady || !authUid || !sessionId || !workspaceId) {
       setSession(null);
       return;
     }
@@ -412,7 +411,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         ...(data as object),
         accessLevel: normalizeAccessLevel(raw.accessLevel),
       } as Session);
-      const viewerId = getViewerId(authUser.uid);
+      const viewerId = getViewerId(authUid ?? "");
       if (viewerId) {
         recordSessionViewIfNew(sessionSnap.id, viewerId).catch((err) => {
           console.error("[ECHLY] recordSessionViewIfNew failed", err);
@@ -422,7 +421,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return () => {
       cancelled = true;
     };
-  }, [sessionId, authUser, authLoading, router, workspaceId, claimsReady]);
+  }, [sessionId, authUid, authLoading, router, workspaceId, claimsReady]);
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
@@ -585,7 +584,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [canonicalFeedback, selectedId, contextualPosition.index, contextualPosition.total]);
 
   const sessionActionCaps = useMemo(() => {
-    if (!authUser?.uid || !session) {
+    if (!authUid || !session) {
       return { canComment: false, canResolve: false };
     }
     const effective = getEffectiveAccessLevel({
@@ -597,7 +596,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       canComment: hasPermission(effective, "comment"),
       canResolve: hasPermission(effective, "resolve"),
     };
-  }, [authUser?.uid, session, workspaceId]);
+  }, [authUid, session, workspaceId]);
 
   useEffect(() => {
     if (!sessionActionCaps.canComment && isCommentMode) {
@@ -678,7 +677,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   } = useFeedbackDetailController({
     sessionId,
     feedbackId: selectedId,
-    authUserId: authUser?.uid ?? null,
     canComment: sessionActionCaps.canComment,
     canResolve: sessionActionCaps.canResolve,
   });
@@ -1235,7 +1233,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                   sendReply={sendReply}
                   activeThreadId={activeThreadId}
                   onSelectThread={setActiveThreadId}
-                  currentUserId={authUser?.uid ?? null}
+                  currentUserId={authUid}
                   updateComment={updateComment}
                   deleteComment={deleteComment}
                   canComment={sessionActionCaps.canComment}

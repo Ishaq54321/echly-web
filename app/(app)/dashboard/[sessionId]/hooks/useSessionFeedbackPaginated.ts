@@ -9,7 +9,7 @@ import {
   type DocumentSnapshot,
   type Timestamp,
 } from "firebase/firestore";
-import { auth, db } from "@/lib/firebaseClient";
+import { db } from "@/lib/firebaseClient";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
@@ -239,16 +239,6 @@ export function useSessionFeedbackPaginated(
     setInitialLoading(true);
     setHasLoadedResolved(false);
     setIsLoadingResolved(true);
-
-    const user = auth.currentUser;
-    if (!user?.uid) {
-      if (sessionIdRef.current !== sessionId) return;
-      setInitialLoading(false);
-      setHasLoadedResolved(true);
-      setIsLoadingResolved(false);
-      setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
-      return;
-    }
 
     const q = query(
       collection(db, "feedback"),

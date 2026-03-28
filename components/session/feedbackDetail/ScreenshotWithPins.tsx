@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef, memo, useEffect, useLayoutEffect 
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Expand, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
-import { auth } from "@/lib/firebase";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import type { Comment } from "@/lib/domain/comment";
 import type { CommentPosition } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
@@ -166,6 +166,7 @@ const ScreenshotWithPinsInner = ({
   onPinPositionChange,
   embeddedInCard = false,
 }: ScreenshotWithPinsProps) => {
+  const { authDisplayName, authEmail, authPhotoUrl } = useWorkspace();
   const containerRef = useRef<HTMLDivElement>(null);
   const threadPopoverRef = useRef<HTMLDivElement>(null);
   const [draftPosition, setDraftPosition] = useState<CommentPosition | null>(null);
@@ -283,9 +284,8 @@ const ScreenshotWithPinsInner = ({
     };
   }, [computePlacements]);
 
-  const currentUser = auth.currentUser;
-  const userAvatar = currentUser?.photoURL ?? "";
-  const userName = currentUser?.displayName || currentUser?.email || "You";
+  const userAvatar = authPhotoUrl ?? "";
+  const userName = authDisplayName || authEmail || "You";
 
   const outerCard = embeddedInCard
     ? "block"

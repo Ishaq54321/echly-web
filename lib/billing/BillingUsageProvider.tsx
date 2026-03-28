@@ -21,7 +21,10 @@ const BillingUsageContext = createContext<BillingUsageContextValue | null>(null)
  */
 export function BillingUsageProvider({ children }: { children: ReactNode }) {
   const { claimsReady, workspaceId } = useWorkspace();
-  const enabled = claimsReady && Boolean(workspaceId?.trim());
+  const enabled =
+    claimsReady &&
+    workspaceId != null &&
+    workspaceId.trim() !== "";
   const value = useBillingUsage({ enabled });
   return (
     <BillingUsageContext.Provider value={value}>

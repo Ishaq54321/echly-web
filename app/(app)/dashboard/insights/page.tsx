@@ -135,12 +135,13 @@ export default function InsightsPage() {
     if (authLoading) return;
     if (!authUser) return;
     if (!claimsReady) return;
-    if (!workspaceId?.trim()) return;
+    if (workspaceId == null || workspaceId.trim() === "") return;
 
     setLoading(true);
     setError(null);
     // Realtime: keep Insights UI synced to the insights doc (no queries).
-    const ref = workspaceInsightsRef(workspaceId.trim());
+    const wid = workspaceId.trim();
+    const ref = workspaceInsightsRef(wid);
     const unsubscribe = onSnapshot(
       ref,
       (snap) => {
@@ -240,7 +241,7 @@ export default function InsightsPage() {
     if (authLoading) return;
     if (!authUser) return;
     if (!claimsReady) return;
-    if (!workspaceId?.trim()) return;
+    if (workspaceId == null || workspaceId.trim() === "") return;
     const wid = workspaceId.trim();
     if (topSessionIds.length === 0) {
       setSessionTitleMap((prev) => (Object.keys(prev).length === 0 ? prev : {}));

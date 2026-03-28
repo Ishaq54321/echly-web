@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { User } from "firebase/auth";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import { authFetch, clearAuthTokenCache } from "@/lib/authFetch";
-import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
+import {
+  useWorkspace,
+  type WorkspaceContextValue,
+} from "@/lib/client/workspaceContext";
 
 type UseAuthGuardOptions = {
   /** If provided, redirect to /login when user is null (after first check). */
@@ -14,8 +14,18 @@ type UseAuthGuardOptions = {
   useReplace?: boolean;
 };
 
+function compatUser(ws: WorkspaceContextValue): User | null {
+  if (!ws.authUid) return null;
+  return {
+    uid: ws.authUid,
+    email: ws.authEmail,
+    displayName: ws.authDisplayName,
+    photoURL: ws.authPhotoUrl,
+  } as User;
+}
+
 /**
- * Subscribe to Firebase auth state. Optionally redirect to /login when not authenticated.
+ * Session user for UI (profile, redirects). Sourced only from WorkspaceProvider auth fields.
  * Returns { user, loading } so callers can gate content.
  */
 export function useAuthGuard(options: UseAuthGuardOptions = {}): {
@@ -23,55 +33,20 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): {
   loading: boolean;
 } {
   const { router, useReplace = false } = options;
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [, setSyncStatus] = useState<"idle" | "syncing" | "ok" | "failed">(
-    "idle"
-  );
+  const ws = useWorkspace();
+  const user = compatUser(ws);
+  const loading = !ws.authReady;
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser ?? null);
-      setLoading(false);
-      if (currentUser) {
-        // Idempotent: creates/ensures user profile.
-        // Fire-and-forget: UI uses Firebase auth; /api/users failure must not break the app.
-        setSyncStatus("syncing");
-        authFetch("/api/users", { method: "POST" })
-          .then(async (res) => {
-            if (!res || !res.ok) {
-              const msg = res ? await res.text() : "Not authenticated";
-              console.warn("[AUTH_SYNC] Non-blocking failure:", msg);
-              setSyncStatus("failed");
-              return;
-            }
-            try {
-              await auth.currentUser?.getIdToken(true);
-            } catch (err) {
-              console.warn("[AUTH_SYNC] Token refresh failed", err);
-            }
-            setSyncStatus("ok");
-          })
-          .catch((err) => {
-            console.warn("[AUTH_SYNC] Request failed (non-blocking):", err);
-            setSyncStatus("failed");
-          });
+    if (!router || loading) return;
+    if (user == null) {
+      if (useReplace) {
+        router.replace("/login");
+      } else {
+        router.push("/login");
       }
-      if (currentUser == null) {
-        setSyncStatus("idle");
-        clearAuthTokenCache();
-        clearWorkspaceSubscription();
-        if (router) {
-          if (useReplace) {
-            router.replace("/login");
-          } else {
-            router.push("/login");
-          }
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, [router, useReplace]);
+    }
+  }, [router, useReplace, loading, user]);
 
   return { user, loading };
 }

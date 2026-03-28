@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { User } from "firebase/auth";
 import {
   collection,
   doc,
@@ -32,7 +31,6 @@ export interface DiscussionFeedItem {
 }
 
 export interface DiscussionFeedProps {
-  user: User | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   refreshKey?: number;
@@ -55,12 +53,11 @@ function parseTimestamp(item: DiscussionFeedItem): number {
 }
 
 export function DiscussionFeed({
-  user,
   selectedId,
   onSelect,
   refreshKey = 0,
 }: DiscussionFeedProps) {
-  const { workspaceId, claimsReady } = useWorkspace();
+  const { workspaceId, claimsReady, authUid } = useWorkspace();
   const [items, setItems] = useState<DiscussionFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +65,7 @@ export function DiscussionFeed({
   useEffect(() => {
     // CRITICAL: Do not run query until workspaceId is resolved
     // Prevents Firestore permission errors
-    if (!claimsReady || !user || !workspaceId) return;
+    if (!claimsReady || !authUid || !workspaceId) return;
 
     let cancelled = false;
     setLoading(true);
@@ -190,7 +187,7 @@ export function DiscussionFeed({
     return () => {
       cancelled = true;
     };
-  }, [claimsReady, user, workspaceId, refreshKey]);
+  }, [claimsReady, authUid, workspaceId, refreshKey]);
 
   if (loading) {
     return (

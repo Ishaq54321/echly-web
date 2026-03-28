@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import type { User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import Link from "next/link";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 
 type Props = { children: React.ReactNode };
 
@@ -31,17 +29,14 @@ function FullScreenError({ message }: { message: string }) {
  * Missing workspace is a system error, not a silent empty state.
  */
 export function WorkspaceIdentityGate({ children }: Props) {
-  const { workspaceId, workspaceError, workspaceLoading } = useWorkspace();
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setFirebaseUser(u);
-      setAuthReady(true);
-    });
-    return unsub;
-  }, []);
+  const {
+    workspaceId,
+    workspaceError,
+    workspaceLoading,
+    claimsReady,
+    authReady,
+    authUid,
+  } = useWorkspace();
 
   if (!authReady) {
     return (
@@ -55,15 +50,25 @@ export function WorkspaceIdentityGate({ children }: Props) {
   }
 
   if (workspaceError) {
+    const needsOnboarding = workspaceError === MISSING_USER_WORKSPACE_ERROR;
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-white px-6 text-center">
         <p className="text-lg font-medium text-gray-900">Workspace unavailable</p>
         <p className="max-w-md text-sm text-gray-600">
-          {workspaceError.message || "Your account workspace could not be loaded. Try refreshing the page or sign in again."}
+          {workspaceError ||
+            "Your account workspace could not be loaded. Try refreshing the page or sign in again."}
         </p>
+        {needsOnboarding ? (
+          <Link
+            href="/onboarding"
+            className="rounded-lg bg-[#466EFF] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            Complete setup
+          </Link>
+        ) : null}
         <button
           type="button"
-          className="rounded-lg bg-[#466EFF] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
           onClick={() => window.location.reload()}
         >
           Reload
@@ -72,16 +77,16 @@ export function WorkspaceIdentityGate({ children }: Props) {
     );
   }
 
-  if (!firebaseUser) {
+  if (!authUid) {
     return <>{children}</>;
   }
 
-  if (workspaceLoading) {
+  if (!claimsReady || workspaceLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
         <div
           className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#466EFF]"
-          aria-label="Loading workspace"
+          aria-label="Loading identity"
         />
       </div>
     );

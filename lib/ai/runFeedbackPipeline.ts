@@ -136,13 +136,6 @@ export async function runFeedbackPipeline(
     ),
   };
 
-  console.log("[SMART_TAGS]", {
-    transcriptPreview: transcript.slice(0, 80),
-    elementType: (context as { elementType?: string } | null)?.elementType || null,
-    tagCount: ticketPayload.suggestedTags.length,
-    tags: ticketPayload.suggestedTags,
-  });
-
   return {
     success: result.success,
     tickets: [ticketPayload],

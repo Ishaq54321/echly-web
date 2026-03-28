@@ -41,7 +41,11 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
   const currentPlan = currentPlanFromUpgrade(upgradePlan);
   const currentPlanLabel = PLAN_LABEL[currentPlan] ?? currentPlan;
   const { data: workspaceUsage } = useWorkspaceUsageRealtime({
-    enabled: open && claimsReady && Boolean(workspaceId?.trim()),
+    enabled:
+      open &&
+      claimsReady &&
+      workspaceId != null &&
+      workspaceId.trim() !== "",
   });
   const { maxSessions } = useBillingStore();
 

@@ -82,8 +82,38 @@ export async function updateUserFieldsRepo(
   await userRef.set(payload, { merge: true });
 }
 
+/** Ensure a Firestore users/{uid} row exists (no workspace required). Used by POST /api/users before claims sync. */
 export async function ensureUserRepo(user: UserLike): Promise<void> {
-  await ensureUserWorkspaceLinkRepo(user);
+  const userRef = adminDb.doc(`users/${user.uid}`);
+  const snap = await userRef.get();
+  const email = user.email ?? null;
+  const displayName = user.displayName ?? null;
+
+  if (!snap.exists) {
+    await userRef.set({
+      uid: user.uid,
+      email,
+      ...(displayName != null && displayName !== ""
+        ? { displayName, name: displayName }
+        : {}),
+      ...(user.photoURL != null ? { photoURL: user.photoURL, avatarUrl: user.photoURL } : {}),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return;
+  }
+
+  await userRef.set(
+    {
+      email,
+      ...(displayName != null && displayName !== ""
+        ? { displayName, name: displayName }
+        : {}),
+      ...(user.photoURL != null ? { photoURL: user.photoURL, avatarUrl: user.photoURL } : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
 }
 
 export async function getUserWorkspaceIdRepo(uid: string): Promise<string> {

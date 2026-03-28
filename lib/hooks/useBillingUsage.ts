@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
 import { getBillingUsageCached, invalidateBillingUsageCache } from "@/lib/cachedBillingUsage";
 import { useWorkspace } from "@/lib/client/workspaceContext";
@@ -55,7 +53,7 @@ export function useBillingUsage(
   refetch: () => Promise<void>;
 } {
   const { enabled = true } = options;
-  const { workspaceId: ctxWorkspaceId, claimsReady } = useWorkspace();
+  const { workspaceId: ctxWorkspaceId, claimsReady, authUid } = useWorkspace();
   const [data, setData] = useState<BillingUsageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +85,9 @@ export function useBillingUsage(
 
     setLoading(true);
     let cancelled = false;
-    let unsubscribeWorkspaceStore: (() => void) | null = null;
+    const workspaceStoreUnsub: { current: (() => void) | null } = {
+      current: null,
+    };
     let idleHandle: number | null = null;
 
     const queueRefetch = () => {
@@ -100,98 +100,101 @@ export function useBillingUsage(
       });
     };
 
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      void (async () => {
-        if (cancelled || !user) {
-          if (!cancelled) {
-            if (unsubscribeWorkspaceStore) {
-              unsubscribeWorkspaceStore();
-              unsubscribeWorkspaceStore = null;
-            }
-            clearWorkspaceSubscription();
-            setData(null);
+    void (async () => {
+      if (!authUid) {
+        if (workspaceStoreUnsub.current) {
+          workspaceStoreUnsub.current();
+          workspaceStoreUnsub.current = null;
+        }
+        clearWorkspaceSubscription();
+        setData(null);
+        setLoading(false);
+        return;
+      }
+
+      if (cancelled) return;
+
+      if (!claimsReady) {
+        if (workspaceStoreUnsub.current) {
+          workspaceStoreUnsub.current();
+          workspaceStoreUnsub.current = null;
+        }
+        clearWorkspaceSubscription();
+        return;
+      }
+
+      const trimmedWorkspace =
+        ctxWorkspaceId != null && ctxWorkspaceId.trim() !== ""
+          ? ctxWorkspaceId.trim()
+          : null;
+      if (trimmedWorkspace == null) {
+        if (workspaceStoreUnsub.current) {
+          workspaceStoreUnsub.current();
+          workspaceStoreUnsub.current = null;
+        }
+        clearWorkspaceSubscription();
+        return;
+      }
+      try {
+        if (workspaceStoreUnsub.current) {
+          workspaceStoreUnsub.current();
+          workspaceStoreUnsub.current = null;
+        }
+        let seenInitialSnapshot = false;
+        subscribeWorkspace(trimmedWorkspace);
+        workspaceStoreUnsub.current = subscribeWorkspaceStore(() => {
+          const snap = getWorkspaceRealtimeSnapshot();
+          if (snap.workspaceId !== trimmedWorkspace || snap.loading) return;
+          if (cancelled) return;
+          if (snap.error) {
+            setError(snap.error.message);
             setLoading(false);
-          }
-          return;
-        }
-
-        if (!claimsReady) {
-          if (unsubscribeWorkspaceStore) {
-            unsubscribeWorkspaceStore();
-            unsubscribeWorkspaceStore = null;
-          }
-          clearWorkspaceSubscription();
-          return;
-        }
-
-        const workspaceId = ctxWorkspaceId?.trim() ?? "";
-        if (!workspaceId) {
-          if (unsubscribeWorkspaceStore) {
-            unsubscribeWorkspaceStore();
-            unsubscribeWorkspaceStore = null;
-          }
-          clearWorkspaceSubscription();
-          return;
-        }
-        try {
-          if (unsubscribeWorkspaceStore) {
-            unsubscribeWorkspaceStore();
-            unsubscribeWorkspaceStore = null;
-          }
-          let seenInitialSnapshot = false;
-          subscribeWorkspace(workspaceId);
-          unsubscribeWorkspaceStore = subscribeWorkspaceStore(() => {
-            const snap = getWorkspaceRealtimeSnapshot();
-            if (snap.workspaceId !== workspaceId || snap.loading) return;
-            if (cancelled) return;
-            if (snap.error) {
-              setError(snap.error.message);
-              setLoading(false);
-              return;
-            }
-            // Skip initial snapshot; we already queue the initial fetch below.
-            if (!seenInitialSnapshot) {
-              seenInitialSnapshot = true;
-              return;
-            }
-            queueRefetch();
-          });
-          const initialWorkspaceSnap = getWorkspaceRealtimeSnapshot();
-          if (
-            initialWorkspaceSnap.workspaceId === workspaceId &&
-            initialWorkspaceSnap.error
-          ) {
-            if (!cancelled) {
-              setError(initialWorkspaceSnap.error.message);
-              setLoading(false);
-            }
             return;
           }
-          if (initialWorkspaceSnap.workspaceId === workspaceId && !initialWorkspaceSnap.loading) {
+          if (!seenInitialSnapshot) {
             seenInitialSnapshot = true;
-          }
-          if (cancelled) {
-            unsubscribeWorkspaceStore();
             return;
           }
-
           queueRefetch();
-        } catch (e) {
+        });
+        const initialWorkspaceSnap = getWorkspaceRealtimeSnapshot();
+        if (
+          initialWorkspaceSnap.workspaceId === trimmedWorkspace &&
+          initialWorkspaceSnap.error
+        ) {
           if (!cancelled) {
-            setError(e instanceof Error ? e.message : "Error");
+            setError(initialWorkspaceSnap.error.message);
             setLoading(false);
           }
+          return;
         }
-      })();
-    });
+        if (
+          initialWorkspaceSnap.workspaceId === trimmedWorkspace &&
+          !initialWorkspaceSnap.loading
+        ) {
+          seenInitialSnapshot = true;
+        }
+        if (cancelled) {
+          workspaceStoreUnsub.current?.();
+          return;
+        }
+
+        queueRefetch();
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Error");
+          setLoading(false);
+        }
+      }
+    })();
 
     return () => {
       cancelled = true;
       if (idleHandle != null) cancelIdleTask(idleHandle);
-      unsubAuth();
-      if (unsubscribeWorkspaceStore) unsubscribeWorkspaceStore();
+      workspaceStoreUnsub.current?.();
+      workspaceStoreUnsub.current = null;
     };
-  }, [enabled, refetch, claimsReady, ctxWorkspaceId]);
+  }, [enabled, refetch, claimsReady, ctxWorkspaceId, authUid]);
 
   return { data, loading, error, refetch };
 }

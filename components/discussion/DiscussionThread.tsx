@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Expand, Paperclip, Send } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
-import { auth } from "@/lib/firebase";
 import { addComment, updateComment, deleteComment } from "@/lib/comments";
 import type { Comment, CommentAttachment } from "@/lib/domain/comment";
 import { AttachmentUploadModal } from "@/components/discussion/AttachmentUploadModal";
@@ -34,7 +33,13 @@ export function DiscussionThread({
   onCommentAdded,
   listLoaded = true,
 }: DiscussionThreadProps) {
-  const { workspaceId, claimsReady } = useWorkspace();
+  const {
+    workspaceId,
+    claimsReady,
+    authUid,
+    authDisplayName,
+    authPhotoUrl,
+  } = useWorkspace();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
   const [comments, setComments] = useState<Comment[]>([]);
@@ -56,16 +61,15 @@ export function DiscussionThread({
 
   const handleAttachmentSend = useCallback(
     async (attachment: CommentAttachment) => {
-      const user = auth.currentUser;
-      if (!user || !feedbackId || !ticket?.sessionId || !workspaceId) return;
+      if (!authUid || !feedbackId || !ticket?.sessionId || !workspaceId) return;
       const optimisticComment: Comment = {
         id: `temp-attach-${Date.now()}`,
         workspaceId,
         sessionId: ticket.sessionId,
         feedbackId,
-        userId: user.uid,
-        userName: user.displayName || "User",
-        userAvatar: user.photoURL || "",
+        userId: authUid,
+        userName: authDisplayName || "User",
+        userAvatar: authPhotoUrl || "",
         message: "",
         createdAt: null,
         type: "general",
@@ -77,9 +81,9 @@ export function DiscussionThread({
       setSending(true);
       try {
         await addComment(ticket.sessionId, feedbackId, {
-          userId: user.uid,
-          userName: user.displayName || "User",
-          userAvatar: user.photoURL || "",
+          userId: authUid,
+          userName: authDisplayName || "User",
+          userAvatar: authPhotoUrl || "",
           message: "",
           type: "general",
           attachment,
@@ -91,7 +95,15 @@ export function DiscussionThread({
         setSending(false);
       }
     },
-    [feedbackId, ticket?.sessionId, onCommentAdded]
+    [
+      feedbackId,
+      ticket?.sessionId,
+      onCommentAdded,
+      workspaceId,
+      authUid,
+      authDisplayName,
+      authPhotoUrl,
+    ]
   );
 
   useEffect(() => {
@@ -100,6 +112,8 @@ export function DiscussionThread({
       setSessionName("");
       return;
     }
+
+    if (!claimsReady) return;
 
     let cancelled = false;
     setLoading(true);
@@ -139,7 +153,7 @@ export function DiscussionThread({
     return () => {
       cancelled = true;
     };
-  }, [feedbackId]);
+  }, [feedbackId, claimsReady]);
 
   useEffect(() => {
     if (!workspaceId || !feedbackId || !ticket?.sessionId || !claimsReady) {
@@ -160,8 +174,7 @@ export function DiscussionThread({
   });
 
   const handleSendComment = async () => {
-    const user = auth.currentUser;
-    if (!user || !feedbackId || !ticket?.sessionId || !workspaceId) return;
+    if (!authUid || !feedbackId || !ticket?.sessionId || !workspaceId) return;
     const trimmed = commentDraft.trim();
     if (!trimmed) return;
     const optimisticComment: Comment = {
@@ -169,9 +182,9 @@ export function DiscussionThread({
       workspaceId,
       sessionId: ticket.sessionId,
       feedbackId,
-      userId: user.uid,
-      userName: user.displayName || "User",
-      userAvatar: user.photoURL || "",
+      userId: authUid,
+      userName: authDisplayName || "User",
+      userAvatar: authPhotoUrl || "",
       message: trimmed,
       createdAt: null,
       type: "general",
@@ -183,9 +196,9 @@ export function DiscussionThread({
     setSending(true);
     try {
       await addComment(ticket.sessionId, feedbackId, {
-        userId: user.uid,
-        userName: user.displayName || "User",
-        userAvatar: user.photoURL || "",
+        userId: authUid,
+        userName: authDisplayName || "User",
+        userAvatar: authPhotoUrl || "",
         message: trimmed,
         type: "general",
       });
@@ -256,8 +269,7 @@ export function DiscussionThread({
   const hasScreenshot = Boolean(ticket.screenshotUrl?.trim());
   const steps = ticket.actionSteps;
   const hasSteps = steps && Array.isArray(steps) && steps.length > 0;
-  const user = auth.currentUser;
-  const userInitial = user?.displayName?.charAt(0) ?? "?";
+  const userInitial = authDisplayName?.charAt(0) ?? "?";
 
   const contentClass = "max-w-[720px] w-full mx-auto";
   return (
@@ -356,7 +368,7 @@ export function DiscussionThread({
                     <div key={root.id} className="mt-[14px] first:mt-0">
                       <CommentItem
                         comment={root}
-                        currentUserId={user?.uid ?? null}
+                        currentUserId={authUid}
                         onUpdate={updateComment}
                         onDelete={deleteComment}
                       />
@@ -367,7 +379,7 @@ export function DiscussionThread({
                         >
                           <CommentItem
                             comment={r}
-                            currentUserId={user?.uid ?? null}
+                            currentUserId={authUid}
                             onUpdate={updateComment}
                             onDelete={deleteComment}
                             size="compact"

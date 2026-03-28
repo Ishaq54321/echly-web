@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 import { listenToCommentsRepo } from "@/lib/repositories/commentsRepository";
 import type { Comment } from "@/lib/domain/comment";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 type Args = {
   workspaceId: string | null | undefined;
@@ -21,7 +20,6 @@ type Args = {
 
 /**
  * One Firestore `onSnapshot` per (workspace, session, feedback) via `listenToCommentsRepo`.
- * Uses a single `onAuthStateChanged` gate so the listener matches signed-in state.
  */
 export function useCommentsRepoSubscription({
   workspaceId,
@@ -31,6 +29,7 @@ export function useCommentsRepoSubscription({
   enabled = true,
   onComments,
 }: Args): void {
+  const { authUid } = useWorkspace();
   const onCommentsRef = useRef(onComments);
   onCommentsRef.current = onComments;
 
@@ -39,29 +38,16 @@ export function useCommentsRepoSubscription({
     const sid = typeof sessionId === "string" ? sessionId.trim() : "";
     const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
 
-    if (!enabled || !claimsReady || !ws || !sid || !fid) {
+    if (!enabled || !claimsReady || !authUid || !ws || !sid || !fid) {
       return;
     }
 
-    let unsubComments: (() => void) | null = null;
-
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (unsubComments) {
-        unsubComments();
-        unsubComments = null;
-      }
-      if (!user) {
-        onCommentsRef.current([]);
-        return;
-      }
-      unsubComments = listenToCommentsRepo(ws, sid, fid, (incoming) => {
-        onCommentsRef.current(incoming);
-      });
+    const unsubComments = listenToCommentsRepo(ws, sid, fid, (incoming) => {
+      onCommentsRef.current(incoming);
     });
 
     return () => {
-      unsubAuth();
-      if (unsubComments) unsubComments();
+      unsubComments();
     };
-  }, [workspaceId, sessionId, feedbackId, claimsReady, enabled]);
+  }, [workspaceId, sessionId, feedbackId, claimsReady, enabled, authUid]);
 }

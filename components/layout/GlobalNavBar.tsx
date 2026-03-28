@@ -11,7 +11,7 @@ import {
   Bell,
 } from "lucide-react";
 import { useState, useCallback } from "react";
-import { auth } from "@/lib/firebase";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { getOrCreateShareLink } from "@/lib/share/getOrCreateShareLink";
 
 function dashboardSessionIdFromPath(pathname: string | null): string | null {
@@ -24,19 +24,19 @@ function dashboardSessionIdFromPath(pathname: string | null): string | null {
 
 export function GlobalNavBar() {
   const pathname = usePathname();
+  const { authUid } = useWorkspace();
   const sessionId = dashboardSessionIdFromPath(pathname);
   const [copied, setCopied] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
 
   const handleCopyLink = useCallback(async () => {
     if (typeof window === "undefined" || copyBusy) return;
-    const user = auth.currentUser;
-    if (!sessionId || !user) return;
+    if (!sessionId || !authUid) return;
     setCopyBusy(true);
     try {
       const url = await getOrCreateShareLink({
         sessionId,
-        userId: user.uid,
+        userId: authUid,
         origin: window.location.origin,
       });
       await navigator.clipboard.writeText(url);
@@ -47,7 +47,7 @@ export function GlobalNavBar() {
     } finally {
       setCopyBusy(false);
     }
-  }, [sessionId, copyBusy]);
+  }, [sessionId, copyBusy, authUid]);
 
   const iconButtonClass =
     "h-10 w-10 flex items-center justify-center rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer shrink-0";

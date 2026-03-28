@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 import {
   clearWorkspaceSubscription,
   subscribeWorkspace,
@@ -13,83 +11,54 @@ import { useWorkspace } from "@/lib/client/workspaceContext";
 
 export function useWorkspaceUsageRealtime(options?: {
   enabled?: boolean;
-  uid?: string | null;
 }): {
   data: WorkspaceUsageRealtimeData | null;
   loading: boolean;
   error: string | null;
 } {
   const enabled = options?.enabled ?? true;
-  const uidOpt = options?.uid ?? null;
   const { workspaceId: ctxWorkspaceId, claimsReady } = useWorkspace();
   const workspaceState = useWorkspaceRealtimeStore();
   const [targetWorkspaceId, setTargetWorkspaceId] = useState<string | null>(null);
-  const [authCheckedNoUser, setAuthCheckedNoUser] = useState(false);
 
   useEffect(() => {
     if (!enabled) {
       setTargetWorkspaceId(null);
-      setAuthCheckedNoUser(false);
       return;
     }
 
-    let cancelled = false;
+    if (!claimsReady) {
+      clearWorkspaceSubscription();
+      setTargetWorkspaceId(null);
+      return;
+    }
 
-    const sync = (user: User | null) => {
-      if (cancelled) return;
-      if (!user) {
-        clearWorkspaceSubscription();
-        setTargetWorkspaceId(null);
-        setAuthCheckedNoUser(true);
-        return;
-      }
-      setAuthCheckedNoUser(false);
+    const trimmed =
+      ctxWorkspaceId != null && ctxWorkspaceId.trim() !== ""
+        ? ctxWorkspaceId.trim()
+        : null;
+    if (trimmed == null) {
+      clearWorkspaceSubscription();
+      setTargetWorkspaceId(null);
+      return;
+    }
 
-      if (uidOpt != null && user.uid !== uidOpt) {
-        clearWorkspaceSubscription();
-        setTargetWorkspaceId(null);
-        return;
-      }
-
-      if (!claimsReady) {
-        clearWorkspaceSubscription();
-        setTargetWorkspaceId(null);
-        return;
-      }
-
-      const wid = ctxWorkspaceId?.trim() ?? "";
-      if (!wid) {
-        clearWorkspaceSubscription();
-        setTargetWorkspaceId(null);
-        return;
-      }
-
-      setTargetWorkspaceId(wid);
-      subscribeWorkspace(wid);
-    };
-
-    const unsub = onAuthStateChanged(auth, sync);
-    sync(auth.currentUser);
+    setTargetWorkspaceId(trimmed);
+    subscribeWorkspace(trimmed);
 
     return () => {
-      cancelled = true;
-      unsub();
+      clearWorkspaceSubscription();
+      setTargetWorkspaceId(null);
     };
-  }, [enabled, uidOpt, claimsReady, ctxWorkspaceId]);
+  }, [enabled, claimsReady, ctxWorkspaceId]);
 
   if (!enabled) {
     return { data: null, loading: false, error: null };
   }
 
-  if (!uidOpt && authCheckedNoUser) {
-    return { data: null, loading: false, error: null };
-  }
-
-  const user = auth.currentUser;
-  const widReady = Boolean(ctxWorkspaceId?.trim());
-  const waitingForClaimsOrWorkspace =
-    !!user &&
-    (!claimsReady || !widReady || (uidOpt != null && user.uid !== uidOpt));
+  const widReady =
+    ctxWorkspaceId != null && ctxWorkspaceId.trim() !== "";
+  const waitingForClaimsOrWorkspace = !claimsReady || !widReady;
 
   const isMatchingWorkspace =
     targetWorkspaceId != null && workspaceState.workspaceId === targetWorkspaceId;

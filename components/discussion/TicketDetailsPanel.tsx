@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { authFetch } from "@/lib/authFetch";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 export interface TicketDetailsPanelProps {
   feedbackId: string | null;
@@ -14,6 +15,7 @@ interface TicketData {
 }
 
 export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
+  const { claimsReady } = useWorkspace();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -22,6 +24,8 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
       setTicket(null);
       return;
     }
+
+    if (!claimsReady) return;
 
     let cancelled = false;
     setLoading(true);
@@ -47,7 +51,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [feedbackId]);
+  }, [feedbackId, claimsReady]);
 
   if (!feedbackId) {
     return (

@@ -8,6 +8,7 @@ import { GlobalNotificationButton } from "@/components/layout/GlobalNotification
 import { ProfileDropdown } from "@/components/layout/ProfileDropdown";
 import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
 import { copySessionLink } from "@/utils/copySessionLink";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import type { Session } from "@/lib/domain/session";
 
 export function TopControlBar({
@@ -32,6 +33,7 @@ export function TopControlBar({
   ) => Promise<void> | void;
   onRequestDeleteSession?: (session: Session) => void;
 }) {
+  const { authUid } = useWorkspace();
   const copyTimerRef = useRef<number | null>(null);
 
   const [shareOpen, setShareOpen] = useState(false);
@@ -41,12 +43,14 @@ export function TopControlBar({
 
   const copyCurrentLink = useCallback(async () => {
     if (linkCopyBusy) return;
-    const ok = await copySessionLink(sessionId, { onBusy: setLinkCopyBusy });
+    const ok = await copySessionLink(sessionId, authUid, {
+      onBusy: setLinkCopyBusy,
+    });
     if (!ok) return;
     setLinkCopied(true);
     if (copyTimerRef.current != null) window.clearTimeout(copyTimerRef.current);
     copyTimerRef.current = window.setTimeout(() => setLinkCopied(false), 2000);
-  }, [sessionId, linkCopyBusy]);
+  }, [sessionId, linkCopyBusy, authUid]);
 
   useEffect(() => {
     return () => {

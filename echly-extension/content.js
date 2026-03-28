@@ -39358,7 +39358,7 @@
         const cap = barCountRef.current;
         if (cap < 1) return;
         setBars((prev) => {
-          let next = [finalAmplitude, ...prev];
+          const next = [finalAmplitude, ...prev];
           while (next.length > cap) next.pop();
           while (next.length < cap) next.push(0);
           return next;

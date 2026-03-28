@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { MessageSquareMore } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { getTicketStatus } from "@/lib/domain/feedback";
 
@@ -69,6 +70,7 @@ export function DiscussionList({
   items: controlledItems,
   setItems: controlledSetItems,
 }: DiscussionListProps) {
+  const { claimsReady } = useWorkspace();
   const [internalItems, setInternalItems] = useState<DiscussionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +83,8 @@ export function DiscussionList({
   const setItems = controlledSetItems ?? setInternalItems;
 
   useEffect(() => {
+    if (!claimsReady) return;
+
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -129,7 +133,7 @@ export function DiscussionList({
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, claimsReady]);
 
   const filteredItems = useMemo(() => {
     let list = items;

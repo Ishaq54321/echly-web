@@ -12,6 +12,13 @@ export function clearAuthTokenCache(): void {
   // No-op: token cache removed.
 }
 
+/** Bearer token for non-fetch callers (e.g. XHR upload). Uses the same refresh behavior as authFetch. */
+export async function getFirebaseBearerToken(): Promise<string | null> {
+  const user = auth.currentUser;
+  if (!user) return null;
+  return getIdTokenFresh(user);
+}
+
 /** In extension context, set window.__ECHLY_API_BASE__ so requests use the API origin. */
 function resolveInput(input: RequestInfo | URL): RequestInfo | URL {
   const base =

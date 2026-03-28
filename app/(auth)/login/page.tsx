@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { signInWithGoogle, signInWithEmailPassword } from "../../../lib/auth/authActions";
-import { checkUserWorkspace } from "@/lib/auth/checkUserWorkspace";
 import { AuthCard } from "@/components/auth/AuthCard";
 
 /** Safe return path after login: only relative paths starting with /. Used by extension-auth broker. */
@@ -65,8 +64,7 @@ function LoginPageContent() {
         router.replace(returnPath);
         return;
       }
-      const dest = await checkUserWorkspace(user.uid);
-      router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
+      router.replace("/app");
     }
     catch (e: unknown) {
       const err = e as { code?: string; message?: string };
@@ -96,8 +94,7 @@ function LoginPageContent() {
         router.replace(returnPath);
         return;
       }
-      const dest = await checkUserWorkspace(user.uid);
-      router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
+      router.replace("/app");
     }
     catch(e){
       setError(e instanceof Error ? e.message : "Sign in failed");

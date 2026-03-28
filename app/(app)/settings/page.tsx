@@ -117,7 +117,7 @@ function SettingsPageInner() {
         <div className="flex flex-1 flex-col items-center justify-center px-12 py-16 max-w-lg mx-auto text-center">
           <p className="text-lg font-medium text-neutral-900">Workspace unavailable</p>
           <p className="mt-2 text-sm text-neutral-600">
-            {workspaceError?.message ??
+            {workspaceError ||
               "Workspace not found. Try refreshing the page or sign in again."}
           </p>
         </div>

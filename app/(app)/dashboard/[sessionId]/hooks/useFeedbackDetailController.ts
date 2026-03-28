@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth } from "@/lib/firebase";
 import {
   addComment,
   updatePinPosition,
@@ -74,30 +73,28 @@ function mergeRealtimeComments(prev: LocalComment[], incoming: Comment[]): Local
 export function useFeedbackDetailController(args: {
   sessionId: string;
   feedbackId: string | null | undefined;
-  /** When absent, realtime comments and API resolve are skipped (e.g. after logout). */
-  authUserId?: string | null;
   canComment?: boolean;
   canResolve?: boolean;
 }) {
   const {
     sessionId,
     feedbackId,
-    authUserId,
     canComment = true,
     canResolve = true,
   } = args;
   const { showToast } = useToast();
-  const { workspaceId, claimsReady } = useWorkspace();
+  const { workspaceId, claimsReady, authUid, authDisplayName, authPhotoUrl } =
+    useWorkspace();
 
   const [comments, setComments] = useState<LocalComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
 
   useEffect(() => {
-    if (!claimsReady || !authUserId || !workspaceId) {
+    if (!claimsReady || !authUid || !workspaceId) {
       setComments([]);
       setLoadingComments(false);
     }
-  }, [claimsReady, workspaceId, authUserId]);
+  }, [claimsReady, workspaceId, authUid]);
 
   useEffect(() => {
     if (!feedbackId) {
@@ -110,19 +107,19 @@ export function useFeedbackDetailController(args: {
   }, [feedbackId]);
 
   useEffect(() => {
-    if (!claimsReady || !authUserId || !workspaceId || !feedbackId) {
+    if (!claimsReady || !authUid || !workspaceId || !feedbackId) {
       return;
     }
     const t = requestAnimationFrame(() => setLoadingComments(true));
     return () => cancelAnimationFrame(t);
-  }, [claimsReady, workspaceId, authUserId, sessionId, feedbackId]);
+  }, [claimsReady, workspaceId, authUid, sessionId, feedbackId]);
 
   useCommentsRepoSubscription({
     workspaceId,
     sessionId,
     feedbackId,
     claimsReady,
-    enabled: Boolean(authUserId),
+    enabled: Boolean(authUid),
     onComments: (incomingComments) => {
       setComments((prev) => mergeRealtimeComments(prev, incomingComments));
       setLoadingComments(false);
@@ -130,14 +127,13 @@ export function useFeedbackDetailController(args: {
   });
 
   const sendComment = async (message: string): Promise<void> => {
-    const user = auth.currentUser;
-    if (!canComment || !user || !feedbackId) return;
+    if (!canComment || !authUid || !feedbackId) return;
     const trimmed = message.trim();
     if (!trimmed) return;
     const payload: AddCommentOptions = {
-      userId: user.uid,
-      userName: user.displayName || "User",
-      userAvatar: user.photoURL || "",
+      userId: authUid,
+      userName: authDisplayName || "User",
+      userAvatar: authPhotoUrl || "",
       message: trimmed,
     };
     const optimistic = createOptimisticComment({
@@ -157,14 +153,13 @@ export function useFeedbackDetailController(args: {
   };
 
   const sendReply = async (threadId: string, message: string): Promise<void> => {
-    const user = auth.currentUser;
-    if (!canComment || !user || !feedbackId) return;
+    if (!canComment || !authUid || !feedbackId) return;
     const trimmed = message.trim();
     if (!trimmed) return;
     const payload: AddCommentOptions = {
-      userId: user.uid,
-      userName: user.displayName || "User",
-      userAvatar: user.photoURL || "",
+      userId: authUid,
+      userName: authDisplayName || "User",
+      userAvatar: authPhotoUrl || "",
       message: trimmed,
       threadId,
     };
@@ -188,15 +183,14 @@ export function useFeedbackDetailController(args: {
     position: CommentPosition,
     message: string
   ): Promise<string | null> => {
-    const user = auth.currentUser;
-    if (!canComment || !user || !feedbackId) return null;
+    if (!canComment || !authUid || !feedbackId) return null;
     const trimmed = message.trim();
     if (!trimmed) return null;
     try {
       const id = await addComment(sessionId, feedbackId, {
-        userId: user.uid,
-        userName: user.displayName || "User",
-        userAvatar: user.photoURL || "",
+        userId: authUid,
+        userName: authDisplayName || "User",
+        userAvatar: authPhotoUrl || "",
         message: trimmed,
         type: "pin",
         position,
@@ -212,15 +206,14 @@ export function useFeedbackDetailController(args: {
     textRange: CommentTextRange,
     message: string
   ): Promise<string | null> => {
-    const user = auth.currentUser;
-    if (!canComment || !user || !feedbackId) return null;
+    if (!canComment || !authUid || !feedbackId) return null;
     const trimmed = message.trim();
     if (!trimmed) return null;
     try {
       const id = await addComment(sessionId, feedbackId, {
-        userId: user.uid,
-        userName: user.displayName || "User",
-        userAvatar: user.photoURL || "",
+        userId: authUid,
+        userName: authDisplayName || "User",
+        userAvatar: authPhotoUrl || "",
         message: trimmed,
         type: "text",
         textRange,

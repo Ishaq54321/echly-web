@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
 import { WorkspaceForm, type WorkspaceFormValues } from "@/components/onboarding/WorkspaceForm";
@@ -18,15 +17,20 @@ export default function OnboardingPage() {
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (!user) {
+    let cancelled = false;
+    void (async () => {
+      await auth.authStateReady();
+      if (cancelled) return;
+      if (!auth.currentUser) {
         router.replace("/login");
         return;
       }
-      setAuthReady(!!user);
+      setAuthReady(true);
       setLoading(false);
-    });
-    return () => unsub();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   const handleSubmit = async (values: WorkspaceFormValues) => {
@@ -52,19 +56,6 @@ export default function OnboardingPage() {
         throw new Error(`Failed to create profile: ${msg}`);
       }
 
-      const patchRes = await authFetch("/api/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role: values.role || undefined,
-          companySize: values.companySize || undefined,
-        }),
-      });
-      if (!patchRes || !patchRes.ok) {
-        const msg = patchRes ? await patchRes.text() : "Not authenticated";
-        throw new Error(`Failed to update user profile: ${msg}`);
-      }
-      await user.getIdToken(true);
       router.replace("/onboarding/activate");
     } catch (e) {
       console.error("Onboarding error:", e);

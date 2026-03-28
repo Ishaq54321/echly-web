@@ -8,7 +8,6 @@ import {
   signInWithGoogle,
   signUpWithEmailPassword,
 } from "@/lib/auth/authActions";
-import { checkUserWorkspace } from "@/lib/auth/checkUserWorkspace";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthCard } from "@/components/auth/AuthCard";
 
@@ -20,6 +19,22 @@ const primaryButtonClass =
 const primaryButtonStyle = {
   background: "linear-gradient(135deg, #466EFF, #5F7DFF)",
 };
+
+async function createSessionCookie(user: { getIdToken: () => Promise<string> }) {
+  try {
+    const idToken = await user.getIdToken();
+    const res = await fetch("/api/auth/session", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Session API failed");
+  } catch (e) {
+    console.error("Session creation failed", e);
+  }
+}
 
 export default function SignupPage() {
   const router = useRouter();
@@ -33,8 +48,8 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const user = await signInWithGoogle();
-      const dest = await checkUserWorkspace(user.uid);
-      router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
+      await createSessionCookie(user);
+      router.replace("/app");
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
       if (
@@ -55,8 +70,8 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const user = await signUpWithEmailPassword(email, password);
-      const dest = await checkUserWorkspace(user.uid);
-      router.replace(dest === "dashboard" ? "/dashboard" : "/onboarding");
+      await createSessionCookie(user);
+      router.replace("/app");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sign up failed");
     } finally {
