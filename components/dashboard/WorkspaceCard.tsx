@@ -45,7 +45,7 @@ export function WorkspaceCard({
     updatedAtDate && !Number.isNaN(updatedAtDate.getTime())
       ? formatDistanceToNowStrict(updatedAtDate, { addSuffix: true })
       : "";
-  const countsPending = !isOptimistic && counts == null;
+  const countsPending = false;
   const viewCount = session.viewCount ?? 0;
   const commentCount = session.commentCount ?? 0;
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
 import {
   collection,
+  doc,
   onSnapshot,
   query,
   where,
@@ -14,15 +15,8 @@ import { useWorkspace } from "@/lib/client/workspaceContext";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
-import {
-  getCounts,
-  setCounts as setStoreCounts,
-  subscribeCounts,
-  type Counts,
-} from "@/lib/state/sessionCountsStore";
-import { fetchCountsDedup } from "@/lib/state/fetchCountsDedup";
 
-const ZERO_COUNTS: Counts = {
+const ZERO_COUNTS = {
   total: 0,
   open: 0,
   resolved: 0,
@@ -72,13 +66,13 @@ export interface UseSessionFeedbackPaginatedResult {
   resolvedFeedback: Feedback[];
   feedback: Feedback[];
   setFeedback: React.Dispatch<React.SetStateAction<Feedback[]>>;
-  /** Total count from server (first page); stable, not derived from loaded items. */
+  /** From `sessions/{id}` snapshot. */
   total: number;
-  /** Active (open) count from server (first page only); do not derive from items. */
+  /** From `sessions/{id}` snapshot. */
   activeCount: number;
-  /** Resolved count from server (first page only); do not derive from items. */
+  /** From `sessions/{id}` snapshot. */
   resolvedCount: number;
-  /** While true, counts are still loading from `/api/feedback/counts`. */
+  /** False once session doc counters have been read. */
   countsLoading: boolean;
   loading: boolean;
   /** True while more open or (when expanded) more resolved pages exist to load. */
@@ -91,7 +85,7 @@ export interface UseSessionFeedbackPaginatedResult {
   isLoadingResolved: boolean;
   /** Kept for compatibility with TicketList prop surface. */
   loadMoreRef: React.RefObject<HTMLDivElement | null>;
-  /** True once list and server counts have been aligned for the current session. */
+  /** True after first feedback and session snapshots for this session. */
   isCountsSynced: boolean;
 }
 
@@ -128,26 +122,25 @@ function normalizeFeedbackItemStatus(item: Feedback): Feedback {
 }
 
 /**
- * Full session feedback via Firestore `onSnapshot` (single source of truth).
- * Counts still come from `/api/feedback/counts` via sessionCountsStore.
+ * Session ticket list from Firestore `feedback` query; counts from `sessions/{id}` only.
  */
 export function useSessionFeedbackPaginated(
   sessionId: string | undefined,
   onNewTicketFromRealtime?: (newestTicketId: string) => void
 ): UseSessionFeedbackPaginatedResult {
-  const { workspaceId, isIdentityResolved } = useWorkspace();
+  const { workspaceId, authUid } = useWorkspace();
   const [items, setItems] = useState<Feedback[]>([]);
-  const [counts, setCountsState] = useState<Counts>(ZERO_COUNTS);
+  const [counts, setCountsState] = useState(ZERO_COUNTS);
   const total = counts.total;
   const activeCount = counts.open;
   const resolvedCount = counts.resolved;
   const [countsLoading, setCountsLoading] = useState<boolean>(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [isCountsSynced, setIsCountsSynced] = useState(false);
+  const [feedbackSnapshotReady, setFeedbackSnapshotReady] = useState(false);
+  const [sessionSnapshotReady, setSessionSnapshotReady] = useState(false);
   const [hasLoadedResolved, setHasLoadedResolved] = useState(false);
   const [isLoadingResolved, setIsLoadingResolved] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const countsSyncGenRef = useRef(0);
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const itemsRef = useRef<Feedback[]>([]);
 
@@ -199,8 +192,11 @@ export function useSessionFeedbackPaginated(
     prevIdsRef.current = new Set();
     setHasLoadedResolved(false);
     setIsLoadingResolved(true);
-    setIsCountsSynced(false);
+    setFeedbackSnapshotReady(false);
+    setSessionSnapshotReady(false);
   }, [sessionId]);
+
+  const isCountsSynced = feedbackSnapshotReady && sessionSnapshotReady;
 
   const canonicalFeedback = items;
   const openFeedback = useMemo(
@@ -214,16 +210,70 @@ export function useSessionFeedbackPaginated(
 
   const hasReachedLimit = false;
 
-  /** Firestore: full session list, ordered newest first — real-time updates across tabs. */
+  /** Session document counters (authoritative). */
   useEffect(() => {
-    // CRITICAL: Do not run query until full identity boundary (Firestore rules + no cross-workspace leak).
-    if (!isIdentityResolved || !sessionId || !workspaceId) {
+    if (!authUid || !sessionId || !workspaceId) {
+      setCountsState(ZERO_COUNTS);
+      setCountsLoading(false);
+      setSessionSnapshotReady(false);
+      return;
+    }
+
+    setSessionSnapshotReady(false);
+    setCountsLoading(true);
+
+    const sessionRef = doc(db, "sessions", sessionId);
+    const unsubscribe = onSnapshot(
+      sessionRef,
+      (snap) => {
+        if (sessionIdRef.current !== sessionId) return;
+        if (!snap.exists()) {
+          setCountsState(ZERO_COUNTS);
+          setCountsLoading(false);
+          setSessionSnapshotReady(true);
+          return;
+        }
+        const d = snap.data();
+        const wid = typeof d.workspaceId === "string" ? d.workspaceId.trim() : "";
+        if (wid !== workspaceId) {
+          setCountsState(ZERO_COUNTS);
+          setCountsLoading(false);
+          setSessionSnapshotReady(true);
+          return;
+        }
+        const open = typeof d.openCount === "number" ? d.openCount : 0;
+        const resolved = typeof d.resolvedCount === "number" ? d.resolvedCount : 0;
+        const totalN =
+          typeof d.totalCount === "number"
+            ? d.totalCount
+            : typeof d.feedbackCount === "number"
+              ? d.feedbackCount
+              : 0;
+        setCountsState({ total: totalN, open, resolved });
+        setCountsLoading(false);
+        setSessionSnapshotReady(true);
+      },
+      (err) => {
+        console.error("[ECHLY] session onSnapshot (counts) failed", err);
+        if (sessionIdRef.current !== sessionId) return;
+        setCountsLoading(false);
+        setSessionSnapshotReady(true);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [authUid, sessionId, workspaceId]);
+
+  /** Firestore: full session list — real-time updates across tabs. */
+  useEffect(() => {
+    if (!authUid || !sessionId || !workspaceId) {
       return;
     }
 
     setInitialLoading(true);
     setHasLoadedResolved(false);
     setIsLoadingResolved(true);
+    setFeedbackSnapshotReady(false);
 
     const q = query(
       collection(db, "feedback"),
@@ -236,32 +286,13 @@ export function useSessionFeedbackPaginated(
       (snapshot) => {
         if (sessionIdRef.current !== sessionId) return;
 
-        const syncGen = ++countsSyncGenRef.current;
-        setIsCountsSynced(false);
-
-        const syncCountsAfterList = () => {
-          void (async () => {
-            const sid = sessionId;
-            if (sessionIdRef.current !== sid) return;
-            try {
-              const next = await fetchCountsDedup(sid);
-              if (sessionIdRef.current !== sid) return;
-              setStoreCounts(sid, next);
-            } catch (err) {
-              console.error("[ECHLY] counts refresh failed", err);
-            }
-            if (sessionIdRef.current !== sid || countsSyncGenRef.current !== syncGen) return;
-            setIsCountsSynced(true);
-          })();
-        };
-
         if (snapshot.empty) {
           prevIdsRef.current = new Set();
           setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
           setInitialLoading(false);
           setHasLoadedResolved(true);
           setIsLoadingResolved(false);
-          syncCountsAfterList();
+          setFeedbackSnapshotReady(true);
           return;
         }
 
@@ -287,7 +318,7 @@ export function useSessionFeedbackPaginated(
         setInitialLoading(false);
         setHasLoadedResolved(true);
         setIsLoadingResolved(false);
-        syncCountsAfterList();
+        setFeedbackSnapshotReady(true);
       },
       (err) => {
         console.error("[ECHLY] feedback onSnapshot failed", err);
@@ -295,63 +326,29 @@ export function useSessionFeedbackPaginated(
         setInitialLoading(false);
         setHasLoadedResolved(true);
         setIsLoadingResolved(false);
-        setIsCountsSynced(true);
+        setFeedbackSnapshotReady(true);
       }
     );
 
     return () => {
       unsubscribe();
     };
-  }, [isIdentityResolved, sessionId, workspaceId, finalizeList, setCanonicalFeedback]);
+  }, [authUid, sessionId, workspaceId, finalizeList, setCanonicalFeedback]);
 
   useEffect(() => {
     if (!sessionId) {
       setInitialLoading(false);
       setCountsLoading(false);
       setCountsState(ZERO_COUNTS);
-      setIsCountsSynced(false);
+      setFeedbackSnapshotReady(false);
+      setSessionSnapshotReady(false);
       setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
       return;
     }
-    if (!isIdentityResolved) {
+    if (!authUid) {
       setCountsLoading(true);
-      return;
     }
-    setInitialLoading(true);
-    const cached = getCounts(sessionId);
-    if (cached) {
-      setCountsState(cached);
-      setCountsLoading(false);
-      return;
-    }
-
-    setCountsState(ZERO_COUNTS);
-    setCountsLoading(true);
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const next = await fetchCountsDedup(sessionId);
-        if (cancelled || sessionIdRef.current !== sessionId) return;
-        setStoreCounts(sessionId, next);
-      } catch (err) {
-        console.error("[ECHLY] initial counts fetch failed", err);
-        if (!cancelled) setCountsLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId, isIdentityResolved, setCanonicalFeedback]);
-
-  useEffect(() => {
-    if (!sessionId || !isIdentityResolved) return;
-    return subscribeCounts(sessionId, (nextCounts) => {
-      setCountsState(nextCounts);
-      setCountsLoading(false);
-    });
-  }, [sessionId, isIdentityResolved]);
+  }, [sessionId, authUid, setCanonicalFeedback]);
 
   return {
     canonicalFeedback,

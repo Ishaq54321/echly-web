@@ -7,7 +7,6 @@ import { PublicShareGateModal } from "@/components/share/PublicShareGateModal";
 import type { PublicShareGateDetail } from "@/components/share/PublicShareGateModal";
 import { PublicShareSidebarShell } from "@/components/share/PublicShareSidebarShell";
 import { PublicShareTopBar } from "@/components/share/PublicShareTopBar";
-import { useShareCounts } from "@/components/share/useShareCounts";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { ResolvedPublicSharePermissions } from "@/lib/permissions/publicSharePermissions";
 import {
@@ -33,7 +32,6 @@ export function PublicShareSessionView({
 }) {
   const session = initial.session;
   const initialFeedback = initial.feedback;
-  const token = initial.token;
   const [sanitizedFeedback, setSanitizedFeedback] = useState<SanitizedPublicFeedback[]>(
     initialFeedback
   );
@@ -44,7 +42,6 @@ export function PublicShareSessionView({
   const [gateDetail, setGateDetail] = useState<PublicShareGateDetail | null>(null);
 
   const sessionId = session.id;
-  const { counts, loading: countsLoading } = useShareCounts(session.id, token);
   const sessionTitle = (session.title ?? "").trim();
 
   const feedbackRows: Feedback[] = useMemo(
@@ -53,11 +50,15 @@ export function PublicShareSessionView({
   );
   // Initial server payload is authoritative for completeness; realtime is incremental only.
   const isDataReady = true;
-  const listCounts = counts ?? {
-    total: feedbackRows.length,
-    open: feedbackRows.filter((item) => item.status !== "resolved").length,
-    resolved: feedbackRows.filter((item) => item.status === "resolved").length,
-  };
+  const countsLoading = false;
+  const listCounts = useMemo(
+    () => ({
+      total: typeof session.totalCount === "number" ? session.totalCount : 0,
+      open: typeof session.openCount === "number" ? session.openCount : 0,
+      resolved: typeof session.resolvedCount === "number" ? session.resolvedCount : 0,
+    }),
+    [session.totalCount, session.openCount, session.resolvedCount]
+  );
 
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     sanitizedFeedback[0]?.id ?? null

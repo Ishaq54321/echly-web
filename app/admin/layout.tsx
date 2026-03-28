@@ -10,13 +10,12 @@ import { WorkspaceProvider, useWorkspace } from "@/lib/client/workspaceContext";
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuthGuard({ router, useReplace: true });
-  const { isIdentityResolved, authUid } = useWorkspace();
+  const { authUid } = useWorkspace();
   const [adminChecked, setAdminChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!isIdentityResolved) return;
     if (!authUid) return;
     let cancelled = false;
     setError(null);
@@ -40,7 +39,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isIdentityResolved, authUid]);
+  }, [authUid]);
 
   useEffect(() => {
     if (authLoading || !adminChecked || !user || error) return;

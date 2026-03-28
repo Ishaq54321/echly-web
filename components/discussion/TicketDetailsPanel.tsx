@@ -16,7 +16,7 @@ interface TicketData {
 }
 
 export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
-  const { isIdentityResolved } = useWorkspace();
+  const { authUid } = useWorkspace();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +28,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
     }
 
     setTicket(null);
-    if (!isIdentityResolved) {
+    if (!authUid) {
       setLoading(false);
       return;
     }
@@ -57,7 +57,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [feedbackId, isIdentityResolved]);
+  }, [feedbackId, authUid]);
 
   if (!feedbackId) {
     return (

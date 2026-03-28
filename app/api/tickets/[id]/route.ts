@@ -137,37 +137,44 @@ export const PATCH = withAuthorization(
   if (!(await userWorkspaceMatchesSession(user.uid, session))) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
-  const updates: Parameters<typeof updateFeedbackRepo>[1] = {};
-  if (typeof body.title === "string") updates.title = body.title;
-  if (typeof body.instruction === "string") updates.instruction = body.instruction;
-  else if (typeof body.description === "string") updates.instruction = body.description;
-  if (Array.isArray(body.actionSteps)) updates.actionSteps = body.actionSteps;
-  if (Array.isArray(body.suggestedTags)) updates.suggestedTags = body.suggestedTags;
+  type TicketWriteStatus = "open" | "resolved";
+  let patchStatus: TicketWriteStatus | undefined;
   if (typeof body.status === "string") {
-    if (body.status === "resolved") {
-      updates.isResolved = true;
-    } else if (body.status === "open") {
-      updates.isResolved = false;
+    if (body.status !== "open" && body.status !== "resolved") {
+      return NextResponse.json(
+        { success: false, error: "Invalid status; allowed: open, resolved" },
+        { status: 400 }
+      );
     }
+    patchStatus = body.status;
   } else if (typeof body.isResolved === "boolean") {
-    updates.isResolved = body.isResolved;
+    patchStatus = body.isResolved ? "resolved" : "open";
   }
-  if (Object.keys(updates).length === 0) {
+
+  const contentUpdates: Parameters<typeof updateFeedbackRepo>[1] = {};
+  if (typeof body.title === "string") contentUpdates.title = body.title;
+  if (typeof body.instruction === "string") contentUpdates.instruction = body.instruction;
+  else if (typeof body.description === "string") contentUpdates.instruction = body.description;
+  if (Array.isArray(body.actionSteps)) contentUpdates.actionSteps = body.actionSteps;
+  if (Array.isArray(body.suggestedTags)) contentUpdates.suggestedTags = body.suggestedTags;
+
+  const hasContent = Object.keys(contentUpdates).length > 0;
+
+  if (!hasContent && patchStatus === undefined) {
     return NextResponse.json({
       success: true,
       ticket: serializeTicket(existingForOwnership),
     });
   }
-  const statusChange = typeof updates.isResolved === "boolean";
+
   try {
-    if (statusChange) {
-      const targetResolved = updates.isResolved ?? existingForOwnership.isResolved;
+    if (patchStatus !== undefined) {
       await updateFeedbackResolveAndSessionCountersRepo(id, {
-        ...updates,
-        isResolved: targetResolved === true,
+        ...contentUpdates,
+        status: patchStatus,
       });
     } else {
-      await updateFeedbackRepo(id, updates);
+      await updateFeedbackRepo(id, contentUpdates);
       await updateSessionUpdatedAtRepo(existingForOwnership.sessionId);
     }
     const updated = await getFeedbackByIdRepo(id);

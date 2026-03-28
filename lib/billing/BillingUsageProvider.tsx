@@ -20,9 +20,9 @@ const BillingUsageContext = createContext<BillingUsageContextValue | null>(null)
  * of calling useBillingUsage(), so GET /api/billing/usage is only requested once.
  */
 export function BillingUsageProvider({ children }: { children: ReactNode }) {
-  const { isIdentityResolved, workspaceId } = useWorkspace();
+  const { authUid, workspaceId } = useWorkspace();
   const enabled =
-    isIdentityResolved &&
+    Boolean(authUid) &&
     workspaceId != null &&
     workspaceId.trim() !== "";
   const value = useBillingUsage({ enabled });

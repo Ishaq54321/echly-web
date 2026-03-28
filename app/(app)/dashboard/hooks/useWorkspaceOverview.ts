@@ -1,17 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/authFetch";
 import type { Session } from "@/lib/domain/session";
 import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
-import {
-  getCounts,
-  setCounts as setCachedCounts,
-} from "@/lib/state/sessionCountsStore";
-import { fetchCounts } from "@/lib/state/fetchCountsDedup";
 import {
   assertIdentityResolved,
   useWorkspace,
@@ -78,40 +73,53 @@ function writeCachedSessionCount(workspaceId: string, count: number) {
   }
 }
 
-async function hydrateCountsForSessionIds(
-  sessionIds: string[],
-  setCountsBySessionId: Dispatch<SetStateAction<Record<string, SessionFeedbackCounts>>>,
-  shouldApply?: () => boolean
-): Promise<void> {
-  await Promise.all(
-    sessionIds.map(async (sessionId) => {
-      if (!sessionId) return;
-      if (shouldApply && !shouldApply()) return;
-      const cached = getCounts(sessionId);
-      if (cached) {
-        if (shouldApply && !shouldApply()) return;
-        setCountsBySessionId((prev) =>
-          prev[sessionId] ? prev : { ...prev, [sessionId]: cached }
-        );
-        return;
-      }
-      try {
-        const normalizedCounts = await fetchCounts(sessionId);
-        if (shouldApply && !shouldApply()) return;
-        setCachedCounts(sessionId, normalizedCounts);
-        setCountsBySessionId((prev) => ({ ...prev, [sessionId]: normalizedCounts }));
-      } catch {
-        if (shouldApply && !shouldApply()) return;
-        // Leave counts undefined — no placeholder zeros (UI uses field-level skeletons).
-      }
-    })
-  );
+/** Ticket counts from `sessions/{id}` denormalized fields (Firestore / snapshot). */
+export function countsFromSessionFields(session: Session): SessionFeedbackCounts {
+  const open = session.openCount ?? 0;
+  const resolved = session.resolvedCount ?? 0;
+  const total =
+    typeof session.totalCount === "number"
+      ? session.totalCount
+      : typeof session.feedbackCount === "number"
+        ? session.feedbackCount
+        : 0;
+  return { total, open, resolved };
+}
+
+function mapSessionDoc(docSnap: { id: string; data: () => Record<string, unknown> }): Session {
+  const data = docSnap.data() as Partial<Session> & { archived?: boolean; isArchived?: boolean };
+  const archived = (data.isArchived ?? data.archived) === true;
+  const title = typeof data.title === "string" ? data.title : "Untitled Session";
+  const openCount = typeof data.openCount === "number" ? data.openCount : 0;
+  const resolvedCount = typeof data.resolvedCount === "number" ? data.resolvedCount : 0;
+  const totalCount =
+    typeof data.totalCount === "number"
+      ? data.totalCount
+      : typeof data.feedbackCount === "number"
+        ? data.feedbackCount
+        : undefined;
+  const feedbackCount =
+    typeof data.feedbackCount === "number"
+      ? data.feedbackCount
+      : typeof data.totalCount === "number"
+        ? data.totalCount
+        : undefined;
+  return {
+    id: docSnap.id,
+    ...data,
+    title,
+    archived,
+    isArchived: archived,
+    openCount,
+    resolvedCount,
+    totalCount,
+    feedbackCount,
+  };
 }
 
 export interface SessionWithCounts {
   session: Session;
-  /** Undefined until counts are loaded for this session (avoids a fake 0 → N jump). */
-  counts?: SessionFeedbackCounts;
+  counts: SessionFeedbackCounts;
 }
 
 export type ViewMode = "all" | "archived";
@@ -123,18 +131,12 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
   const workspaceIdRef = useRef<string | null>(null);
   const allSessionsRef = useRef<Session[]>([]);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
-  const [countsBySessionId, setCountsBySessionId] = useState<
-    Record<string, SessionFeedbackCounts>
-  >({});
-  const [isCountsReady, setIsCountsReady] = useState(false);
-  /** True until the first Firestore sessions snapshot for the current workspace (counts never gate this). */
+  /** True until the first Firestore sessions snapshot for the current workspace. */
   const [awaitingSessionSnapshot, setAwaitingSessionSnapshot] = useState(false);
-  const refreshCountsGenRef = useRef(0);
   const expectedCountRef = useRef<number | null>(
     workspaceId ? readCachedSessionCount(workspaceId) : null
   );
-  const sessionsSnapshotGenRef = useRef(0);
-  /** Workspace id that `allSessions` / counts state was last committed for (avoids one frame of wrong-workspace UI). */
+  /** Workspace id that `allSessions` was last committed for (avoids one frame of wrong-workspace UI). */
   const sessionsSourceWorkspaceRef = useRef<string | null>(null);
   const userId = authUid;
 
@@ -149,20 +151,8 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
   const archivedOnly = viewMode === "archived";
 
   const refreshSessions = useCallback(async () => {
-    if (!isIdentityResolved || !workspaceIdRef.current || !claimsReady) return;
-    const gen = ++refreshCountsGenRef.current;
-    const shouldApply = () => refreshCountsGenRef.current === gen;
-    const ids = allSessionsRef.current
-      .map((s) => s.id)
-      .filter((id) => Boolean(id) && !id.startsWith("temp-"));
-    if (ids.length === 0) {
-      setCountsBySessionId({});
-      return;
-    }
-    void hydrateCountsForSessionIds(ids, setCountsBySessionId, shouldApply).catch((error) => {
-      console.error("[ECHLY] Failed to refresh session counts", error);
-    });
-  }, [claimsReady, isIdentityResolved]);
+    // Counts are on session documents; list refreshes via Firestore snapshot only.
+  }, []);
 
   useEffect(() => {
     if (!userId || !workspaceId) {
@@ -171,32 +161,23 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
       return;
     }
     const wid = workspaceId;
-    refreshCountsGenRef.current += 1;
     sessionsSourceWorkspaceRef.current = wid;
-    setIsCountsReady(false);
     expectedCountRef.current = readCachedSessionCount(wid);
     const cachedSessions = readCachedSessions(wid);
     if (Array.isArray(cachedSessions) && cachedSessions.length > 0) {
       setAllSessions(cachedSessions);
-      const cachedCounts = Object.fromEntries(
-        cachedSessions
-          .map((session) => [session.id, getCounts(session.id)] as const)
-          .filter((entry): entry is [string, SessionFeedbackCounts] => entry[1] != null)
-      );
-      setCountsBySessionId(cachedCounts);
     } else {
       setAllSessions([]);
-      setCountsBySessionId({});
     }
-    if (isIdentityResolved) {
+    if (authUid && workspaceId) {
       setAwaitingSessionSnapshot(true);
     } else {
       setAwaitingSessionSnapshot(false);
     }
-  }, [userId, workspaceId, isIdentityResolved]);
+  }, [userId, workspaceId, authUid]);
 
   useEffect(() => {
-    if (!isIdentityResolved || !userId || !workspaceId) {
+    if (!authUid || !workspaceId) {
       return;
     }
 
@@ -213,21 +194,9 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
       q,
       (snap) => {
         sessionsSourceWorkspaceRef.current = wid;
-        const dbSessions: Session[] = snap.docs.map((docSnap) => {
-          const data = docSnap.data() as Partial<Session> & { archived?: boolean; isArchived?: boolean };
-          const archived = (data.isArchived ?? data.archived) === true;
-          const title = typeof data.title === "string" ? data.title : "Untitled Session";
-          return {
-            id: docSnap.id,
-            ...data,
-            title,
-            archived,
-            isArchived: archived,
-          };
-        });
+        const dbSessions: Session[] = snap.docs.map((docSnap) => mapSessionDoc(docSnap));
 
         const dbIds = new Set(dbSessions.map((s) => s.id));
-        const snapshotGen = ++sessionsSnapshotGenRef.current;
         setAllSessions((prev) => {
           const optimistic = prev.filter((s) => Boolean(s.isOptimistic) && !dbIds.has(s.id));
           const next = [...optimistic, ...dbSessions];
@@ -237,22 +206,10 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
           return next;
         });
 
-        const ids = dbSessions.map((s) => s.id).filter((id): id is string => Boolean(id));
-
         setAwaitingSessionSnapshot(false);
-        setIsCountsReady(true);
-
-        void hydrateCountsForSessionIds(
-          ids,
-          setCountsBySessionId,
-          () => sessionsSnapshotGenRef.current === snapshotGen && workspaceIdRef.current === wid
-        ).catch((error) => {
-          console.error("[ECHLY] Failed to hydrate counts after sessions snapshot — non-fatal", error);
-        });
       },
       (err) => {
         console.error("[ECHLY] Firestore sessions subscription failed", err);
-        setIsCountsReady(true);
         setAwaitingSessionSnapshot(false);
       }
     );
@@ -260,20 +217,19 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
     return () => {
       unsubscribe();
     };
-  }, [isIdentityResolved, userId, workspaceId]);
+  }, [authUid, workspaceId]);
 
   const overviewDataAligned =
     Boolean(workspaceId && userId) &&
     sessionsSourceWorkspaceRef.current === workspaceId;
 
   const allSessionsForView = overviewDataAligned ? allSessions : [];
-  const countsForView = overviewDataAligned ? countsBySessionId : {};
 
   const sessions = filterSessionsByView(allSessionsForView, archivedOnly);
 
   const sessionsWithCounts: SessionWithCounts[] = sessions.map((session) => ({
     session,
-    counts: countsForView[session.id],
+    counts: countsFromSessionFields(session),
   }));
 
   const handleCreateSession = useCallback(
@@ -289,6 +245,10 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         createdAt: new Date(),
         updatedAt: new Date(),
         isOptimistic: true,
+        openCount: 0,
+        resolvedCount: 0,
+        totalCount: 0,
+        feedbackCount: 0,
       };
       setAllSessions((prev) => [tempSession, ...prev]);
 
@@ -296,11 +256,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         const res = await authFetch("/api/sessions", { method: "POST" });
         if (!res) {
           setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
-          setCountsBySessionId((prev) => {
-            const next = { ...prev };
-            delete next[tempSessionId];
-            return next;
-          });
           return;
         }
         const data = await res.json().catch((err: unknown) => {
@@ -310,11 +265,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
 
         if (res.status === 403) {
           setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
-          setCountsBySessionId((prev) => {
-            const next = { ...prev };
-            delete next[tempSessionId];
-            return next;
-          });
           if (data.error === "PLAN_LIMIT_REACHED") {
             onPlanLimitReached?.({
               message: data.message ?? "You've reached your plan limit.",
@@ -341,11 +291,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
 
         if (!res.ok) {
           setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
-          setCountsBySessionId((prev) => {
-            const next = { ...prev };
-            delete next[tempSessionId];
-            return next;
-          });
           console.error("[ECHLY] Create session failed", res.status, data);
           return;
         }
@@ -353,11 +298,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         const sessionId = data.session?.id;
         if (!sessionId) {
           setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
-          setCountsBySessionId((prev) => {
-            const next = { ...prev };
-            delete next[tempSessionId];
-            return next;
-          });
           return;
         }
 
@@ -373,20 +313,10 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
               : s
           )
         );
-        setCountsBySessionId((prev) => {
-          const next = { ...prev };
-          delete next[tempSessionId];
-          return next;
-        });
 
         router.push(`/dashboard/${sessionId}`);
       } catch (err) {
         setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
-        setCountsBySessionId((prev) => {
-          const next = { ...prev };
-          delete next[tempSessionId];
-          return next;
-        });
         console.error("[ECHLY] Create session failed", err);
       }
     },
@@ -458,11 +388,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
 
   const removeSession = useCallback((sessionId: string) => {
     setAllSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    setCountsBySessionId((prev) => {
-      const next = { ...prev };
-      delete next[sessionId];
-      return next;
-    });
   }, []);
 
   const deleteSession = useCallback(
@@ -475,11 +400,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         if (wid) writeCachedSessions(wid, next);
         return next;
       });
-      setCountsBySessionId((prev) => {
-        const next = { ...prev };
-        delete next[sessionId];
-        return next;
-      });
       try {
         const res = await authFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
         if (!res) {
@@ -487,10 +407,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
             const next = [session, ...prev];
             if (wid) writeCachedSessions(wid, next);
             return next;
-          });
-          setCountsBySessionId((prev) => {
-            const cached = getCounts(sessionId);
-            return cached ? { ...prev, [sessionId]: cached } : prev;
           });
           return;
         }
@@ -507,10 +423,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
           if (wid) writeCachedSessions(wid, next);
           return next;
         });
-        setCountsBySessionId((prev) => {
-          const cached = getCounts(sessionId);
-          return cached ? { ...prev, [sessionId]: cached } : prev;
-        });
         console.error("[ECHLY] Delete session failed", err);
         throw err;
       }
@@ -521,7 +433,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
   return {
     sessions: sessionsWithCounts,
     loading: overviewDataAligned ? awaitingSessionSnapshot : true,
-    isCountsReady: overviewDataAligned ? isCountsReady : false,
+    isCountsReady: overviewDataAligned ? true : false,
     expectedSessionCount: overviewDataAligned ? expectedCountRef.current : null,
     handleCreateSession,
     refreshSessions,

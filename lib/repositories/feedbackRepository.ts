@@ -1,7 +1,6 @@
 import {
   collection,
   doc,
-  getCountFromServer,
   getDoc,
   getDocs,
   limit,
@@ -324,40 +323,12 @@ export async function getSessionFeedbackSearchCorpusForUserRepo(args: {
   return out;
 }
 
-/** Total count of feedback within a session (for sidebar display). */
-export async function getSessionFeedbackCountRepo(
-  workspaceId: string,
-  sessionId: string
-): Promise<number> {
-  const coll = collection(db, "feedback");
-  const q = query(
-    coll,
-    where("workspaceId", "==", workspaceId),
-    where("sessionId", "==", sessionId)
-  );
-  const snapshot = await getCountFromServer(q);
-  return snapshot.data().count;
-}
-
-/** Counts by status for one session (aligned with session doc + /api/feedback/counts). */
+/** Counts by status for one session (aligned with `sessions/{id}` denormalized fields). */
 export interface SessionFeedbackCounts {
   total: number;
   open: number;
   resolved: number;
 }
-
-/**
- * Returns the total number of feedback items in a workspace. Used for usage/billing.
- */
-export async function getWorkspaceFeedbackCountRepo(workspaceId: string): Promise<number> {
-  const q = query(
-    collection(db, "feedback"),
-    where("workspaceId", "==", workspaceId)
-  );
-  const snap = await getCountFromServer(q);
-  return snap.data().count;
-}
-
 
 const OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT = 3;
 

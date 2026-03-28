@@ -47,9 +47,15 @@ export async function resolveAllOpenFeedbackInSession(
       batch.update(d.ref, { status: "resolved" });
     }
     const n = docs.length;
+    const newOpenCount = Math.max(0, openCount - n);
+    const newResolvedCount = Math.max(0, resolvedCount + n);
+    const newTotal = newOpenCount + newResolvedCount;
     batch.update(sessionRef, {
-      openCount: Math.max(0, openCount - n),
-      resolvedCount: resolvedCount + n,
+      openCount: newOpenCount,
+      resolvedCount: newResolvedCount,
+      totalCount: newTotal,
+      feedbackCount: newTotal,
+      skippedCount: FieldValue.delete(),
       updatedAt: FieldValue.serverTimestamp(),
     });
     await batch.commit();

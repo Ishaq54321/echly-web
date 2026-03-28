@@ -14015,19 +14015,27 @@
     }
     const accessLevel = Reflect.get(item, "accessLevel");
     session.accessLevel = normalizeAccessLevel(accessLevel);
+    const readCount = (key) => {
+      const v = Reflect.get(item, key);
+      return typeof v === "number" && Number.isFinite(v) ? v : void 0;
+    };
+    const oc = readCount("openCount");
+    if (oc !== void 0) session.openCount = oc;
+    const rc = readCount("resolvedCount");
+    if (rc !== void 0) session.resolvedCount = rc;
+    const tc = readCount("totalCount");
+    if (tc !== void 0) session.totalCount = tc;
+    const fc = readCount("feedbackCount");
+    if (fc !== void 0) session.feedbackCount = fc;
     return session;
   }
 
-  // echly-extension/src/countsRequestStore.ts
-  async function fetchCountsDedup(_sessionId, fetchResponse) {
-    const res = await fetchResponse();
-    if (!res.ok) {
-      throw new Error("API_ERROR_" + res.status);
-    }
-    return await res.json();
-  }
-
   // echly-extension/src/cachedSessions.ts
+  function totalTicketsFromSession(session) {
+    if (typeof session.totalCount === "number") return session.totalCount;
+    if (typeof session.feedbackCount === "number") return session.feedbackCount;
+    return 0;
+  }
   async function getSessionsCached(fetchFn) {
     const res = await fetchFn("/api/sessions");
     if (!res.ok) {
@@ -14036,26 +14044,10 @@
     }
     const data = await res.json();
     const baseSessions = sessionsArrayFromApiPayload(data);
-    const sessions = await Promise.all(
-      baseSessions.map(async (session) => {
-        const sessionId = session.id;
-        try {
-          const countsJson = await fetchCountsDedup(
-            sessionId,
-            () => fetchFn(`/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`)
-          );
-          const total = typeof countsJson.total === "number" ? countsJson.total : 0;
-          return {
-            ...session,
-            counts: { total }
-          };
-        } catch (countsErr) {
-          console.error("[ECHLY] getSessionsCached counts for session failed", sessionId, countsErr);
-          return { ...session, counts: { total: 0 } };
-        }
-      })
-    );
-    return sessions;
+    return baseSessions.map((session) => ({
+      ...session,
+      counts: { total: totalTicketsFromSession(session) }
+    }));
   }
   function invalidateSessionsCache() {
   }

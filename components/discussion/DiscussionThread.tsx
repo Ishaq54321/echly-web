@@ -122,7 +122,7 @@ export function DiscussionThread({
 
     setTicket(null);
     setSessionName("");
-    if (!isIdentityResolved) {
+    if (!authUid) {
       setLoading(false);
       return;
     }
@@ -165,14 +165,14 @@ export function DiscussionThread({
     return () => {
       cancelled = true;
     };
-  }, [feedbackId, isIdentityResolved]);
+  }, [feedbackId, authUid]);
 
   useEffect(() => {
-    if (!workspaceId || !feedbackId || !ticket?.sessionId || !isIdentityResolved) {
+    if (!workspaceId || !feedbackId || !ticket?.sessionId || !authUid) {
       setComments([]);
       setCommentsInitialized(false);
     }
-  }, [workspaceId, feedbackId, ticket?.sessionId, isIdentityResolved]);
+  }, [workspaceId, feedbackId, ticket?.sessionId, authUid]);
 
   useCommentsRepoSubscription({
     workspaceId,

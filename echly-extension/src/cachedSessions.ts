@@ -5,10 +5,18 @@
 
 import { sessionsArrayFromApiPayload } from "@/lib/domain/session";
 import type { SessionOption } from "@/lib/capture-engine/core/ResumeSessionModal";
-import { fetchCountsDedup } from "./countsRequestStore";
 
-/** Session row for picker UI; `counts.total` is sourced only from /api/feedback/counts. */
+/** Session row for picker UI; `counts.total` comes from session document fields on `/api/sessions`. */
 export type SessionListItem = SessionOption & { counts: { total: number } };
+
+function totalTicketsFromSession(session: {
+  totalCount?: number;
+  feedbackCount?: number;
+}): number {
+  if (typeof session.totalCount === "number") return session.totalCount;
+  if (typeof session.feedbackCount === "number") return session.feedbackCount;
+  return 0;
+}
 
 export async function getSessionsCached(
   fetchFn: (url: string, init?: RequestInit) => Promise<Response>
@@ -20,25 +28,10 @@ export async function getSessionsCached(
   }
   const data: unknown = await res.json();
   const baseSessions = sessionsArrayFromApiPayload(data);
-  const sessions = await Promise.all(
-    baseSessions.map(async (session) => {
-      const sessionId = session.id;
-      try {
-        const countsJson = (await fetchCountsDedup(sessionId, () =>
-          fetchFn(`/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`)
-        )) as { total?: number };
-        const total = typeof countsJson.total === "number" ? countsJson.total : 0;
-        return {
-          ...session,
-          counts: { total },
-        };
-      } catch (countsErr) {
-        console.error("[ECHLY] getSessionsCached counts for session failed", sessionId, countsErr);
-        return { ...session, counts: { total: 0 } };
-      }
-    })
-  );
-  return sessions;
+  return baseSessions.map((session) => ({
+    ...session,
+    counts: { total: totalTicketsFromSession(session) },
+  }));
 }
 
 export function invalidateSessionsCache(): void {

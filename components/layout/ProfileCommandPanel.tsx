@@ -83,11 +83,11 @@ export function ProfileCommandPanel({
   const [analytics, setAnalytics] = useState<InsightsApiResponse | null>(null);
   const [, setAnalyticsLoading] = useState(false);
   const [hasAnimatedMetrics, setHasAnimatedMetrics] = useState(false);
-  const { isIdentityResolved, workspaceId } = useWorkspace();
+  const { authUid, workspaceId } = useWorkspace();
   const { data: workspaceUsage } = useWorkspaceUsageRealtime({
     enabled:
       open &&
-      isIdentityResolved &&
+      Boolean(authUid) &&
       workspaceId != null &&
       workspaceId.trim() !== "",
   });
@@ -124,7 +124,7 @@ export function ProfileCommandPanel({
 
   useEffect(() => {
     if (!open) return;
-    if (!isIdentityResolved) return;
+    if (!authUid) return;
 
     let cancelled = false;
     setAnalyticsLoading(true);
@@ -153,7 +153,7 @@ export function ProfileCommandPanel({
     return () => {
       cancelled = true;
     };
-  }, [open, onClose, isIdentityResolved]);
+  }, [open, onClose, authUid]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();

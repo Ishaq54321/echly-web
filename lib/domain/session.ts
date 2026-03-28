@@ -38,7 +38,7 @@ export interface Session {
   openCount?: number;
   /** Denormalized: total resolved feedback (WAVE 1 structural). */
   resolvedCount?: number;
-  /** Denormalized: total feedback count (open + resolved). */
+  /** Denormalized: total feedback count (stored on session doc). */
   totalCount?: number;
   /** Denormalized: total feedback count (WAVE 1 structural). */
   feedbackCount?: number;
@@ -99,6 +99,19 @@ export function sessionFromApiItem(item: unknown): Session | null {
 
   const accessLevel = Reflect.get(item, "accessLevel");
   session.accessLevel = normalizeAccessLevel(accessLevel);
+
+  const readCount = (key: string): number | undefined => {
+    const v = Reflect.get(item, key);
+    return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  };
+  const oc = readCount("openCount");
+  if (oc !== undefined) session.openCount = oc;
+  const rc = readCount("resolvedCount");
+  if (rc !== undefined) session.resolvedCount = rc;
+  const tc = readCount("totalCount");
+  if (tc !== undefined) session.totalCount = tc;
+  const fc = readCount("feedbackCount");
+  if (fc !== undefined) session.feedbackCount = fc;
 
   return session;
 }

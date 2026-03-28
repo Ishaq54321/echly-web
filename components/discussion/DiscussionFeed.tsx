@@ -58,7 +58,7 @@ export function DiscussionFeed({
   onSelect,
   refreshKey = 0,
 }: DiscussionFeedProps) {
-  const { workspaceId, isIdentityResolved } = useWorkspace();
+  const { workspaceId, authUid } = useWorkspace();
   const [items, setItems] = useState<DiscussionFeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +66,7 @@ export function DiscussionFeed({
   useEffect(() => {
     // CRITICAL: Do not run query until workspaceId is resolved
     // Prevents Firestore permission errors
-    if (!isIdentityResolved || !workspaceId) return;
+    if (!authUid || !workspaceId) return;
 
     let cancelled = false;
     setLoading(true);
@@ -189,9 +189,9 @@ export function DiscussionFeed({
     return () => {
       cancelled = true;
     };
-  }, [isIdentityResolved, workspaceId, refreshKey]);
+  }, [authUid, workspaceId, refreshKey]);
 
-  const showSkeleton = !error && (!isIdentityResolved || !workspaceId || loading);
+  const showSkeleton = !error && (!authUid || !workspaceId || loading);
 
   if (showSkeleton) {
     return <DiscussionFeedSkeleton />;

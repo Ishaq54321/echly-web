@@ -5,6 +5,10 @@ export type SanitizedPublicSession = {
   id: string;
   title: string;
   createdAt?: string;
+  /** Denormalized from `sessions/{id}` (non-secret). */
+  openCount?: number;
+  resolvedCount?: number;
+  totalCount?: number;
 };
 
 export type SanitizedPublicFeedback = {
@@ -63,7 +67,7 @@ function feedbackCreatedAtToIso(f: Feedback): string | null {
 }
 
 /**
- * Public share API: only id, title, optional createdAt. No workspace, user, or counters.
+ * Public share API: id, title, optional createdAt, optional ticket counters.
  */
 export function sanitizePublicSession(session: Session): SanitizedPublicSession {
   const out: SanitizedPublicSession = {
@@ -72,6 +76,10 @@ export function sanitizePublicSession(session: Session): SanitizedPublicSession 
   };
   const createdAt = sessionCreatedAtToIso(session.createdAt);
   if (createdAt !== undefined) out.createdAt = createdAt;
+  if (typeof session.openCount === "number") out.openCount = session.openCount;
+  if (typeof session.resolvedCount === "number") out.resolvedCount = session.resolvedCount;
+  if (typeof session.totalCount === "number") out.totalCount = session.totalCount;
+  else if (typeof session.feedbackCount === "number") out.totalCount = session.feedbackCount;
   return out;
 }
 

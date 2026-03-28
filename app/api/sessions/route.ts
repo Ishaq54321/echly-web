@@ -57,6 +57,10 @@ export async function GET(req: NextRequest) {
         updatedAt?: { toDate?: () => Date } | string | null;
         createdAt?: { toDate?: () => Date } | string | null;
         archived?: boolean;
+        openCount?: number;
+        resolvedCount?: number;
+        totalCount?: number;
+        feedbackCount?: number;
       };
       const toIsoString = (
         value: { toDate?: () => Date } | string | null | undefined
@@ -70,6 +74,22 @@ export async function GET(req: NextRequest) {
 
       const updatedAt = toIsoString(data.updatedAt) ?? toIsoString(data.createdAt) ?? null;
 
+      const openCount = typeof data.openCount === "number" ? data.openCount : 0;
+      const resolvedCount =
+        typeof data.resolvedCount === "number" ? data.resolvedCount : 0;
+      const totalCount =
+        typeof data.totalCount === "number"
+          ? data.totalCount
+          : typeof data.feedbackCount === "number"
+            ? data.feedbackCount
+            : 0;
+      const feedbackCount =
+        typeof data.feedbackCount === "number"
+          ? data.feedbackCount
+          : typeof data.totalCount === "number"
+            ? data.totalCount
+            : 0;
+
       return {
         id: docSnap.id,
         // Keep `title` for compatibility and include `name` as a normalized alias.
@@ -77,6 +97,10 @@ export async function GET(req: NextRequest) {
         name: data.title ?? "Untitled Session",
         updatedAt,
         archived: data.archived === true,
+        openCount,
+        resolvedCount,
+        totalCount,
+        feedbackCount,
       };
     });
     return NextResponse.json({ sessions }, { headers: corsHeaders(req) });

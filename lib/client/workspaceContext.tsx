@@ -10,11 +10,17 @@ import {
   type ReactNode,
 } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { authFetch, clearAuthTokenCache } from "@/lib/authFetch";
 import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
+import {
+  clearWorkspaceHint,
+  getWorkspaceHint,
+  setWorkspaceHint,
+} from "@/lib/client/workspaceBootstrap";
 
 export type WorkspaceContextValue = {
   workspaceId: string | null;
@@ -22,7 +28,10 @@ export type WorkspaceContextValue = {
   workspaceError: string | null;
   /** True while a signed-in user is being resolved and workspaceId is not yet known. */
   workspaceLoading: boolean;
-  /** True after ID token has been force-refreshed post workspace sync (custom claims ready for Firestore rules). */
+  /**
+   * True when the app treats custom claims / identity as usable for gating.
+   * May flip true early from the persisted workspace hint or Firestore fast path; sync still runs and re-confirms (including after `getIdToken(true)`).
+   */
   claimsReady: boolean;
   /** True after the first Firebase auth callback for this mount (signed-in or signed-out). */
   authReady: boolean;
@@ -58,6 +67,7 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const authSyncGenerationRef = useRef(0);
   const syncLockUidRef = useRef<string | null>(null);
+  const workspaceIdRef = useRef<string | null>(null);
 
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
@@ -72,6 +82,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
+    const commitWorkspaceId = (next: string | null) => {
+      if (workspaceIdRef.current === next) return;
+      workspaceIdRef.current = next;
+      setWorkspaceId(next);
+      setWorkspaceHint(next);
+    };
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthReady(true);
 
@@ -80,7 +97,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         authSyncGenerationRef.current += 1;
         clearAuthTokenCache();
         clearWorkspaceSubscription();
+        clearWorkspaceHint();
         if (!cancelled) {
+          workspaceIdRef.current = null;
           setAuthUid(null);
           setAuthEmail(null);
           setAuthDisplayName(null);
@@ -107,14 +126,43 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const currentGen = authSyncGenerationRef.current;
 
       if (cancelled) return;
-      setClaimsReady(false);
       setWorkspaceError(null);
       setWorkspaceLoading(true);
+
+      const cachedWorkspaceId = getWorkspaceHint();
+      if (cachedWorkspaceId) {
+        commitWorkspaceId(cachedWorkspaceId);
+        setClaimsReady(true);
+      } else {
+        setClaimsReady(false);
+      }
 
       void (async () => {
         try {
           if (cancelled) return;
           if (currentGen !== authSyncGenerationRef.current) return;
+
+          // FAST PATH — immediate workspace resolution (cache-first getDoc; sync still validates below)
+          let fastWorkspaceId: string | null = null;
+          try {
+            const userDoc = await getDoc(doc(db, "users", uid));
+            if (userDoc.exists()) {
+              const data = userDoc.data();
+              if (typeof data.workspaceId === "string" && data.workspaceId.trim()) {
+                fastWorkspaceId = data.workspaceId.trim();
+              }
+            }
+          } catch (e) {
+            console.warn("[ECHLY][bootstrap] fast workspace fetch failed", e);
+          }
+
+          if (cancelled) return;
+          if (currentGen !== authSyncGenerationRef.current) return;
+
+          if (fastWorkspaceId) {
+            commitWorkspaceId(fastWorkspaceId);
+            setClaimsReady(true);
+          }
 
           const res = await authFetch("/api/users", { method: "POST" });
 
@@ -123,7 +171,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
           if (res == null || !res.ok) {
             setClaimsReady(false);
-            setWorkspaceId(null);
+            commitWorkspaceId(null);
             setWorkspaceError(
               res == null
                 ? "Identity sync failed (no session)"
@@ -146,13 +194,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           if (currentGen !== authSyncGenerationRef.current) return;
 
           if (!normalized) {
-            setWorkspaceId(null);
+            commitWorkspaceId(null);
             setWorkspaceError(MISSING_USER_WORKSPACE_ERROR);
             setClaimsReady(false);
             return;
           }
 
-          setWorkspaceId(normalized);
+          commitWorkspaceId(normalized);
           setWorkspaceError(null);
           setClaimsReady(true);
         } catch (err) {
@@ -160,7 +208,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           if (cancelled) return;
           if (currentGen !== authSyncGenerationRef.current) return;
           setClaimsReady(false);
-          setWorkspaceId(null);
+          commitWorkspaceId(null);
           setWorkspaceError(
             err instanceof Error ? err.message : String(err)
           );

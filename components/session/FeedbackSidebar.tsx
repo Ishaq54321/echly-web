@@ -84,15 +84,9 @@ function FeedbackSidebarInner({
     return () => document.removeEventListener("click", handleClick);
   }, [menuOpen]);
 
-  const total = typeof totalProp === "number" ? totalProp : feedback.length;
-  const activeCount =
-    typeof activeCountProp === "number"
-      ? activeCountProp
-      : feedback.filter((f) => (f.isResolved ?? false) === false).length;
-  const resolvedCount =
-    typeof resolvedCountProp === "number"
-      ? resolvedCountProp
-      : feedback.filter((f) => f.isResolved === true).length;
+  const total = typeof totalProp === "number" ? totalProp : 0;
+  const activeCount = typeof activeCountProp === "number" ? activeCountProp : 0;
+  const resolvedCount = typeof resolvedCountProp === "number" ? resolvedCountProp : 0;
 
   const subline =
     total > 0

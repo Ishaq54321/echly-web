@@ -166,7 +166,7 @@ function SessionWorkspaceRow({
   const { session, counts } = item;
   const sessionId = session.id;
   const isOptimistic = Boolean(session.isOptimistic);
-  const countsUnknown = !isOptimistic && counts == null;
+  const countsUnknown = false;
 
   const handleRowActivate = () => {
     if (isSelectionMode) {
@@ -193,10 +193,9 @@ function SessionWorkspaceRow({
     }
   };
 
-  const open = counts != null ? counts.open : undefined;
-  const resolved = counts != null ? counts.resolved : undefined;
-  const total =
-    counts == null ? null : (counts.open ?? 0) + (counts.resolved ?? 0);
+  const open = counts.open;
+  const resolved = counts.resolved;
+  const total = (counts.open ?? 0) + (counts.resolved ?? 0);
   const updatedShort = formatSessionUpdatedShort(session);
   const resolvedForPie = resolved ?? 0;
   let progress =

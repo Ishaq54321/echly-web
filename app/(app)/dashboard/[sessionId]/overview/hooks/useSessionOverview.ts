@@ -8,11 +8,6 @@ import {
   getFeedbackByIds,
   getSessionFeedbackByResolved,
 } from "@/lib/feedback";
-import {
-  getCounts,
-  setCounts as setStoreCounts,
-} from "@/lib/state/sessionCountsStore";
-import { fetchCounts } from "@/lib/state/fetchCountsDedup";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getSessionById } from "@/lib/sessions";
 import type { Session } from "@/lib/domain/session";
@@ -59,6 +54,19 @@ const EMPTY_SESSION_OVERVIEW: SessionOverviewData = {
   tagCounts: [],
 };
 
+function countsFromSession(session: Session | null): SessionFeedbackCounts {
+  if (!session) return { total: 0, open: 0, resolved: 0 };
+  const open = session.openCount ?? 0;
+  const resolved = session.resolvedCount ?? 0;
+  const total =
+    typeof session.totalCount === "number"
+      ? session.totalCount
+      : typeof session.feedbackCount === "number"
+        ? session.feedbackCount
+        : 0;
+  return { total, open, resolved };
+}
+
 function extractTagCounts(feedback: Feedback[]): { tag: string; count: number }[] {
   const map = new Map<string, number>();
   for (const f of feedback) {
@@ -92,7 +100,7 @@ function timestampToDate(
 }
 
 export function useSessionOverview(sessionId: string | undefined) {
-  const { workspaceId, isIdentityResolved } = useWorkspace();
+  const { workspaceId, authUid } = useWorkspace();
   const { nextToken, isCurrent } = useAsyncGeneration();
   const [data, setData] = useState<SessionOverviewData>({
     session: null,
@@ -114,7 +122,7 @@ export function useSessionOverview(sessionId: string | undefined) {
       setError(null);
       return;
     }
-    if (!isIdentityResolved || !workspaceId) {
+    if (!authUid || !workspaceId) {
       nextToken();
       setData(EMPTY_SESSION_OVERVIEW);
       setLoading(false);
@@ -132,22 +140,14 @@ export function useSessionOverview(sessionId: string | undefined) {
       setLoading(true);
       setError(null);
       try {
-        const countsPromise = (async (): Promise<SessionFeedbackCounts> => {
-          const cached = getCounts(sid);
-          if (cached) return cached;
-          const next = await fetchCounts(sid);
-          setStoreCounts(sid, next);
-          return next;
-        })();
+        const [session, openPreview, resolvedPreview, recentComments] = await Promise.all([
+          getSessionById(sid),
+          getSessionFeedbackByResolved(wid, sid, false, 3),
+          getSessionFeedbackByResolved(wid, sid, true, 3),
+          getSessionRecentComments(wid, sid, RECENT_ACTIVITY_LIMIT),
+        ]);
 
-        const [session, countsByStatus, openPreview, resolvedPreview, recentComments] =
-          await Promise.all([
-            getSessionById(sid),
-            countsPromise,
-            getSessionFeedbackByResolved(wid, sid, false, 3),
-            getSessionFeedbackByResolved(wid, sid, true, 3),
-            getSessionRecentComments(wid, sid, RECENT_ACTIVITY_LIMIT),
-          ]);
+        const countsByStatus = countsFromSession(session);
 
         if (cancelled || !isCurrent(token)) return;
 
@@ -200,7 +200,7 @@ export function useSessionOverview(sessionId: string | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [isIdentityResolved, workspaceId, sessionId, nextToken, isCurrent]);
+  }, [authUid, workspaceId, sessionId, nextToken, isCurrent]);
 
   return { data, loading, error };
 }

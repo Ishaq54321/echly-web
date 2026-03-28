@@ -81,6 +81,7 @@ function SettingsPageInner() {
     workspaceError,
     workspaceLoading,
     isIdentityResolved,
+    authUid,
   } = useWorkspace();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>("general");
@@ -94,13 +95,13 @@ function SettingsPageInner() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!isIdentityResolved || !workspaceId) {
+    if (!authUid || !workspaceId) {
       setWorkspace(null);
       return;
     }
     const unsub = listenToWorkspace(workspaceId, setWorkspace, claimsReady);
     return () => unsub();
-  }, [workspaceId, claimsReady, isIdentityResolved]);
+  }, [workspaceId, claimsReady, authUid]);
 
   const loadingWorkspace = Boolean(
     user &&

@@ -88,7 +88,7 @@ const RANGE_OPTIONS: Array<{ value: "7d" | "30d" | "90d" | "1y"; label: string; 
  */
 export default function InsightsPage() {
   const { user: authUser, loading: authLoading } = useAuthGuard();
-  const { workspaceId, isIdentityResolved } = useWorkspace();
+  const { workspaceId, authUid, isIdentityResolved } = useWorkspace();
   const [data, setData] = useState<InsightsApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +156,7 @@ export default function InsightsPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!authUser) return;
-    if (!isIdentityResolved) {
+    if (!authUid) {
       return;
     }
     if (workspaceId == null || workspaceId.trim() === "") return;
@@ -192,7 +192,7 @@ export default function InsightsPage() {
       }
       unsubscribe();
     };
-  }, [authLoading, authUser?.uid, workspaceId, isIdentityResolved]);
+  }, [authLoading, authUser?.uid, workspaceId, authUid]);
 
   const filteredDaily = useMemo(() => {
     return filterDaily(data?.analytics?.daily ?? {}, rangeDays);
@@ -272,7 +272,7 @@ export default function InsightsPage() {
     // Prevents Firestore permission errors
     if (authLoading) return;
     if (!authUser) return;
-    if (!isIdentityResolved) return;
+    if (!authUid) return;
     if (workspaceId == null || workspaceId.trim() === "") return;
     const wid = workspaceId.trim();
     if (topSessionIds.length === 0) {
@@ -317,7 +317,7 @@ export default function InsightsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, authUser?.uid, workspaceId, isIdentityResolved, topSessionIdsKey]);
+  }, [authLoading, authUser?.uid, workspaceId, authUid, topSessionIdsKey]);
 
   const topSession = useMemo(() => {
     return sessionBars[0] ?? null;

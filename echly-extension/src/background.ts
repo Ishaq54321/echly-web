@@ -89,12 +89,6 @@ type FeedbackListResponse = {
   nextCursor?: string | null;
   hasMore?: boolean;
 };
-type FeedbackCountResponse = {
-  total?: number;
-  open?: number;
-  resolved?: number;
-};
-type CountStatus = "open" | "resolved";
 type SessionCounts = {
   total: number;
   open: number;
@@ -351,47 +345,27 @@ async function rehydrateSession(sessionId: string, mode: RehydrateMode = "cold")
 }
 
 async function fetchFeedbackCountFresh(sessionId: string): Promise<SessionCounts> {
-  const res = await apiFetch(`${API_BASE}/api/feedback/counts?sessionId=${encodeURIComponent(sessionId)}`);
-  const data = (await res.json()) as FeedbackCountResponse;
-  const counts: SessionCounts = {
-    total: typeof data.total === "number" ? data.total : 0,
-    open: typeof data.open === "number" ? data.open : 0,
-    resolved: typeof data.resolved === "number" ? data.resolved : 0,
-  };
-  return counts;
-}
-
-function mutateGlobalCounts(
-  updater: (counts: {
-    total: number;
-    open: number;
-    resolved: number;
-  }) => {
-    total: number;
-    open: number;
-    resolved: number;
+  const res = await apiFetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}`);
+  if (!res.ok) {
+    throw new Error("session_meta_failed_" + res.status);
   }
-): void {
-  const next = updater({
-    total: globalUIState.totalCount,
-    open: globalUIState.openCount,
-    resolved: globalUIState.resolvedCount,
-  });
-  globalUIState.totalCount = Math.max(0, next.total);
-  globalUIState.openCount = Math.max(0, next.open);
-  globalUIState.resolvedCount = Math.max(0, next.resolved);
-}
-
-function applyStatusTransition(previousStatus: CountStatus, nextStatus: CountStatus): void {
-  if (previousStatus === nextStatus) return;
-  mutateGlobalCounts((counts) => {
-    const next = { ...counts };
-    if (previousStatus === "open") next.open -= 1;
-    if (previousStatus === "resolved") next.resolved -= 1;
-    if (nextStatus === "open") next.open += 1;
-    if (nextStatus === "resolved") next.resolved += 1;
-    return next;
-  });
+  const json = (await res.json()) as {
+    success?: boolean;
+    session?: Record<string, unknown>;
+  };
+  const s = json.session;
+  if (!s || json.success === false) {
+    throw new Error("session_meta_missing");
+  }
+  const open = typeof s.openCount === "number" ? s.openCount : 0;
+  const resolved = typeof s.resolvedCount === "number" ? s.resolvedCount : 0;
+  const total =
+    typeof s.totalCount === "number"
+      ? s.totalCount
+      : typeof s.feedbackCount === "number"
+        ? s.feedbackCount
+        : 0;
+  return { total, open, resolved };
 }
 
 async function loadMore(): Promise<void> {
@@ -1142,47 +1116,47 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         type: ticket.type ?? "Feedback",
       };
       globalUIState.pointers = [pointer, ...globalUIState.pointers];
-      mutateGlobalCounts((counts) => ({
-        total: counts.total + 1,
-        open: counts.open + 1,
-        resolved: counts.resolved,
-      }));
       resetSessionIdleTimer();
       broadcastUIState();
+      const sid = globalUIState.sessionId;
+      if (sid) {
+        void (async () => {
+          try {
+            const c = await fetchFeedbackCountFresh(sid);
+            if (globalUIState.sessionId !== sid) return;
+            globalUIState.totalCount = c.total;
+            globalUIState.openCount = c.open;
+            globalUIState.resolvedCount = c.resolved;
+            broadcastUIState();
+          } catch (err) {
+            console.error("[ECHLY] refresh counts after feedback created failed", err);
+          }
+        })();
+      }
     }
     sendResponse({ ok: true });
     return false;
   }
 
   if (request.type === "ECHLY_REFETCH_FEEDBACK_COUNT") {
-    const payload = request as {
-      sessionId?: string;
-      mutation?: {
-        kind?: "create" | "delete" | "transition";
-        deletedStatus?: CountStatus;
-        from?: CountStatus;
-        to?: CountStatus;
-      };
-    };
-    const mutation = payload.mutation;
-    if (mutation?.kind === "create") {
-      mutateGlobalCounts((counts) => ({
-        total: counts.total + 1,
-        open: counts.open + 1,
-        resolved: counts.resolved,
-      }));
-      broadcastUIState();
-    } else if (mutation?.kind === "delete" && mutation.deletedStatus) {
-      mutateGlobalCounts((counts) => {
-        const next = { ...counts, total: counts.total - 1 };
-        if (mutation.deletedStatus === "open") next.open -= 1;
-        if (mutation.deletedStatus === "resolved") next.resolved -= 1;
-        return next;
-      });
-      broadcastUIState();
-    } else if (mutation?.kind === "transition" && mutation.from && mutation.to) {
-      applyStatusTransition(mutation.from, mutation.to);
-      broadcastUIState();
+    const payload = request as { sessionId?: string };
+    const sid =
+      typeof payload.sessionId === "string" && payload.sessionId.trim() !== ""
+        ? payload.sessionId.trim()
+        : globalUIState.sessionId;
+    if (sid) {
+      void (async () => {
+        try {
+          const c = await fetchFeedbackCountFresh(sid);
+          if (globalUIState.sessionId !== sid) return;
+          globalUIState.totalCount = c.total;
+          globalUIState.openCount = c.open;
+          globalUIState.resolvedCount = c.resolved;
+          broadcastUIState();
+        } catch (err) {
+          console.error("[ECHLY] refresh counts (ECHLY_REFETCH_FEEDBACK_COUNT) failed", err);
+        }
+      })();
     }
     sendResponse({ ok: true });
     return false;

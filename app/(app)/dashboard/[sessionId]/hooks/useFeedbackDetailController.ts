@@ -93,11 +93,11 @@ export function useFeedbackDetailController(args: {
   const [loadingComments, setLoadingComments] = useState(false);
 
   useEffect(() => {
-    if (!isIdentityResolved || !authUid || !workspaceId) {
+    if (!authUid || !workspaceId) {
       setComments([]);
       setLoadingComments(false);
     }
-  }, [isIdentityResolved, workspaceId, authUid]);
+  }, [workspaceId, authUid]);
 
   useEffect(() => {
     if (!feedbackId) {
@@ -110,18 +110,18 @@ export function useFeedbackDetailController(args: {
   }, [feedbackId]);
 
   useEffect(() => {
-    if (!isIdentityResolved || !authUid || !workspaceId || !feedbackId) {
+    if (!authUid || !workspaceId || !feedbackId) {
       return;
     }
     const t = requestAnimationFrame(() => setLoadingComments(true));
     return () => cancelAnimationFrame(t);
-  }, [isIdentityResolved, workspaceId, authUid, sessionId, feedbackId]);
+  }, [workspaceId, authUid, sessionId, feedbackId]);
 
   useCommentsRepoSubscription({
     workspaceId,
     sessionId,
     feedbackId,
-    enabled: Boolean(isIdentityResolved && authUid),
+    enabled: Boolean(authUid),
     onComments: (incomingComments) => {
       setComments((prev) => mergeRealtimeComments(prev, incomingComments));
       setLoadingComments(false);

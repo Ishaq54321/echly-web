@@ -15,7 +15,7 @@ export interface TicketListProps {
     open: number;
     resolved: number;
   };
-  /** True while `/api/feedback/counts` is still loading aggregation counts. */
+  /** True while session counter fields are not yet available (e.g. session doc loading). */
   countsLoading?: boolean;
   /** Optional: editable session title */
   isEditingSessionTitle?: boolean;

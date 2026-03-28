@@ -18,12 +18,6 @@ import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController
 import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
-import {
-  getCounts as getCachedCounts,
-  setCounts as setCachedCounts,
-  updateCounts as updateCachedCounts,
-  type Counts,
-} from "@/lib/state/sessionCountsStore";
 import type { Session } from "@/lib/domain/session";
 import { hasPermission, normalizeAccessLevel } from "@/lib/domain/accessLevel";
 import { getEffectiveAccessLevel } from "@/lib/permissions/sessionEffectiveAccess";
@@ -92,8 +86,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const { loading: authLoading } = useAuthGuard({ router });
   const { workspaceId, authUid, isIdentityResolved } = useWorkspace();
 
-  const feedbackSessionId =
-    isIdentityResolved && sessionId ? sessionId : undefined;
+  const feedbackSessionId = authUid && sessionId ? sessionId : undefined;
 
   const listScrollRef = useRef<HTMLDivElement | null>(null);
   const [openExpanded, setOpenExpanded] = useState(true);
@@ -145,7 +138,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [isSearchMode]);
 
   useEffect(() => {
-    if (!isIdentityResolved) {
+    if (!authUid) {
       setSearchResults([]);
       setSearchLoading(false);
       return;
@@ -187,7 +180,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [searchQuery, feedbackSessionId, isIdentityResolved]);
+  }, [searchQuery, feedbackSessionId, authUid]);
 
   const {
     feedback,
@@ -214,7 +207,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   );
   const stableScopedFeedback = useStableState(
     feedbackScoped,
-    !feedbackLoading && isIdentityResolved,
+    !feedbackLoading && Boolean(authUid),
     sessionId
   );
   const stableOpenFeedback = useMemo(
@@ -274,41 +267,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [saveSessionTitleSuccess, setSaveSessionTitleSuccess] = useState(false);
 
   const preloadedScreenshotUrlsRef = useRef<Set<string>>(new Set());
-
-  const ensureCountsSeeded = useCallback((): Counts | null => {
-    if (!sessionId) return null;
-    const existing = getCachedCounts(sessionId);
-    if (existing) return existing;
-    const seed: Counts = {
-      total: feedbackTotal,
-      open: feedbackActiveCount,
-      resolved: feedbackResolvedCount,
-    };
-    setCachedCounts(sessionId, seed);
-    return seed;
-  }, [
-    sessionId,
-    feedbackTotal,
-    feedbackActiveCount,
-    feedbackResolvedCount,
-  ]);
-
-  const applyCountTransition = useCallback(
-    (previousStatus: "open" | "resolved", nextStatus: "open" | "resolved") => {
-      if (!sessionId || previousStatus === nextStatus) return;
-      ensureCountsSeeded();
-      updateCachedCounts(sessionId, (current) => {
-        const next = { ...current };
-        if (previousStatus === "open") next.open = Math.max(0, next.open - 1);
-        if (previousStatus === "resolved") next.resolved = Math.max(0, next.resolved - 1);
-
-        if (nextStatus === "open") next.open += 1;
-        if (nextStatus === "resolved") next.resolved += 1;
-        return next;
-      });
-    },
-    [sessionId, ensureCountsSeeded]
-  );
 
   /* Escape exits comment mode (canvas-native: no panel open by default). */
   useEffect(() => {
@@ -379,23 +337,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         screenshotStatus: null,
       };
       setFeedback((prev) => [newItem, ...prev.filter((x) => x.id !== newItem.id)]);
-      ensureCountsSeeded();
-      updateCachedCounts(evSessionId, (c) => ({
-        total: c.total + 1,
-        open: c.open + 1,
-        resolved: c.resolved,
-      }));
       setSelectedId(ticket.id);
       setNewTicketId(ticket.id);
     };
     window.addEventListener("ECHLY_FEEDBACK_CREATED", handler);
     return () => window.removeEventListener("ECHLY_FEEDBACK_CREATED", handler);
-  }, [sessionId, session, setFeedback, ensureCountsSeeded]);
+  }, [sessionId, session, setFeedback]);
 
   /* ================= AUTH + LOAD SESSION (title/meta only) ================= */
   useEffect(() => {
     if (authLoading) return;
-    if (!isIdentityResolved || !authUid || !sessionId || !workspaceId) {
+    if (!authUid || !sessionId || !workspaceId) {
       setSession(null);
       return;
     }
@@ -433,7 +385,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return () => {
       cancelled = true;
     };
-  }, [sessionId, authUid, authLoading, router, workspaceId, isIdentityResolved]);
+  }, [sessionId, authUid, authLoading, router, workspaceId]);
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
@@ -447,7 +399,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [sessionId, ticketIdFromUrl]);
 
   useEffect(() => {
-    if (!isIdentityResolved) return;
+    if (!authUid) return;
     if (!ticketIdFromUrl || !feedbackSessionId) return;
     if (feedbackLoading) return;
     if (feedback.some((f) => f.id === ticketIdFromUrl)) return;
@@ -484,7 +436,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       cancelled = true;
     };
   }, [
-    isIdentityResolved,
+    authUid,
     ticketIdFromUrl,
     feedbackSessionId,
     sessionId,
@@ -827,17 +779,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const saveResolved = async (isResolved: boolean) => {
     if (!sessionActionCaps.canResolve || !effectiveSelectedId) return;
     assertIdentityResolved(isIdentityResolved);
-    const previousStatus = selectedItem ? getTicketStatus(selectedItem) : "open";
-    const nextStatus = isResolved ? "resolved" : "open";
     const previousResolved = Boolean(selectedItem?.isResolved);
-    const previousCounts = sessionId ? getCachedCounts(sessionId) : null;
-
     setFeedback((prev) =>
       prev.map((item) =>
         item.id === effectiveSelectedId ? { ...item, isResolved } : item
       )
     );
-    applyCountTransition(previousStatus, nextStatus);
     try {
       const res = await authFetch(`/api/tickets/${effectiveSelectedId}`, {
         method: "PATCH",
@@ -852,9 +799,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               : item
           )
         );
-        if (sessionId && previousCounts) {
-          setCachedCounts(sessionId, previousCounts);
-        }
         return;
       }
       const data = (await res.json()) as {
@@ -878,9 +822,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             : item
         )
       );
-      if (sessionId && previousCounts) {
-        setCachedCounts(sessionId, previousCounts);
-      }
     }
   };
 
@@ -959,23 +900,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const active = feedback.filter((item) => getTicketStatus(item) === "open");
     if (active.length === 0) return;
     const previousFeedback = feedback;
-    const previousCounts = sessionId ? getCachedCounts(sessionId) : null;
     setFeedback((prev) =>
       prev.map((item) =>
         getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
       )
     );
-    ensureCountsSeeded();
-    if (sessionId) {
-      updateCachedCounts(sessionId, (current) => {
-        const moved = active.length;
-        return {
-          ...current,
-          open: Math.max(0, current.open - moved),
-          resolved: current.resolved + moved,
-        };
-      });
-    }
     try {
       const results = await Promise.all(
         active.map((item) =>
@@ -989,24 +918,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       );
       if (results.some((r) => r == null)) {
         setFeedback(previousFeedback);
-        if (sessionId && previousCounts) {
-          setCachedCounts(sessionId, previousCounts);
-        }
         return;
       }
     } catch (err) {
       warn("Mark all resolved failed:", err);
       setFeedback(previousFeedback);
-      if (sessionId && previousCounts) {
-        setCachedCounts(sessionId, previousCounts);
-      }
       return;
     }
   }, [
     feedback,
     sessionId,
     setFeedback,
-    ensureCountsSeeded,
     sessionActionCaps.canResolve,
     isIdentityResolved,
   ]);
@@ -1017,7 +939,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const resolved = feedback.filter((item) => getTicketStatus(item) === "resolved");
     if (resolved.length === 0) return;
     const previousFeedback = feedback;
-    const previousCounts = sessionId ? getCachedCounts(sessionId) : null;
     setFeedback((prev) =>
       prev.map((item) =>
         getTicketStatus(item) === "resolved"
@@ -1025,17 +946,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           : item
       )
     );
-    ensureCountsSeeded();
-    if (sessionId) {
-      updateCachedCounts(sessionId, (current) => {
-        const moved = resolved.length;
-        return {
-          ...current,
-          open: current.open + moved,
-          resolved: Math.max(0, current.resolved - moved),
-        };
-      });
-    }
     try {
       const results = await Promise.all(
         resolved.map((item) =>
@@ -1049,24 +959,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       );
       if (results.some((r) => r == null)) {
         setFeedback(previousFeedback);
-        if (sessionId && previousCounts) {
-          setCachedCounts(sessionId, previousCounts);
-        }
         return;
       }
     } catch (err) {
       warn("Mark all unresolved failed:", err);
       setFeedback(previousFeedback);
-      if (sessionId && previousCounts) {
-        setCachedCounts(sessionId, previousCounts);
-      }
       return;
     }
   }, [
     feedback,
     sessionId,
     setFeedback,
-    ensureCountsSeeded,
     sessionActionCaps.canResolve,
     isIdentityResolved,
   ]);
@@ -1075,22 +978,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (!sessionActionCaps.canResolve) return;
     assertIdentityResolved(isIdentityResolved);
     const selectionBeforeDelete = effectiveSelectedId;
-    const deletedItem = feedback.find((f) => f.id === id);
-    const deletedStatus = deletedItem ? getTicketStatus(deletedItem) : "open";
     const prevFeedback = feedback;
-    const prevCounts = sessionId ? getCachedCounts(sessionId) : null;
     const nextSelected =
       selectionBeforeDelete === id
         ? feedback.filter((item) => item.id !== id)[0]?.id ?? null
         : selectionBeforeDelete;
     setFeedback((prev) => prev.filter((item) => item.id !== id));
-    ensureCountsSeeded();
-    updateCachedCounts(sessionId, (c) => {
-      const next = { ...c, total: Math.max(0, c.total - 1) };
-      if (deletedStatus === "open") next.open = Math.max(0, next.open - 1);
-      if (deletedStatus === "resolved") next.resolved = Math.max(0, next.resolved - 1);
-      return next;
-    });
     setSelectedId(nextSelected);
     setShowDeleteModal(false);
     try {
@@ -1102,9 +995,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     } catch (err) {
       console.error("[ECHLY] handleDeleteFeedback failed", err);
       setFeedback(prevFeedback);
-      if (sessionId && prevCounts) {
-        setCachedCounts(sessionId, prevCounts);
-      }
       setSelectedId(selectionBeforeDelete);
     }
   };

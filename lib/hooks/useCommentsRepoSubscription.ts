@@ -27,7 +27,7 @@ export function useCommentsRepoSubscription({
   enabled = true,
   onComments,
 }: Args): void {
-  const { isIdentityResolved } = useWorkspace();
+  const { authUid } = useWorkspace();
   const onCommentsRef = useRef(onComments);
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function useCommentsRepoSubscription({
     const sid = typeof sessionId === "string" ? sessionId.trim() : "";
     const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
 
-    if (!enabled || !isIdentityResolved || !ws || !sid || !fid) {
+    if (!enabled || !authUid || !ws || !sid || !fid) {
       return;
     }
 
@@ -50,5 +50,5 @@ export function useCommentsRepoSubscription({
     return () => {
       unsubComments();
     };
-  }, [workspaceId, sessionId, feedbackId, isIdentityResolved, enabled]);
+  }, [workspaceId, sessionId, feedbackId, authUid, enabled]);
 }

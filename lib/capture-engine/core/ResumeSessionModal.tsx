@@ -7,7 +7,7 @@ import { FileText } from "lucide-react";
 
 export type SessionOption = Pick<Session, "id" | "title"> &
   Partial<Pick<Session, "archived" | "updatedAt">> & {
-    /** From /api/feedback/counts only — not from session documents. */
+    /** Ticket total from session document fields (`totalCount` / `feedbackCount`) when present. */
     counts?: { total: number };
     [key: string]: unknown;
   };

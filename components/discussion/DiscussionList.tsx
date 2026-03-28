@@ -71,7 +71,7 @@ export function DiscussionList({
   items: controlledItems,
   setItems: controlledSetItems,
 }: DiscussionListProps) {
-  const { isIdentityResolved } = useWorkspace();
+  const { authUid } = useWorkspace();
   const [internalItems, setInternalItems] = useState<DiscussionItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +84,7 @@ export function DiscussionList({
   const setItems = controlledSetItems ?? setInternalItems;
 
   useEffect(() => {
-    if (!isIdentityResolved) return;
+    if (!authUid) return;
 
     let cancelled = false;
     setLoading(true);
@@ -136,7 +136,7 @@ export function DiscussionList({
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, isIdentityResolved]);
+  }, [refreshKey, authUid]);
 
   const filteredItems = useMemo(() => {
     let list = items;
@@ -152,7 +152,7 @@ export function DiscussionList({
     );
   }, [items, search, filterBySessionId]);
 
-  const showSkeleton = !error && (!isIdentityResolved || loading);
+  const showSkeleton = !error && (!authUid || loading);
 
   if (showSkeleton) {
     return (
