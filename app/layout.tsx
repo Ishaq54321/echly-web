@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { GlobalSearch } from "@/components/search/GlobalSearch";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -24,10 +23,7 @@ export default function RootLayout({
         className={`${plusJakartaSans.className} font-sans antialiased h-full overflow-y-auto`}
         suppressHydrationWarning
       >
-        <div className="env-canvas h-full flex flex-col">
-          <GlobalSearch />
-          {children}
-        </div>
+        <div className="env-canvas h-full flex flex-col">{children}</div>
       </body>
     </html>
   );

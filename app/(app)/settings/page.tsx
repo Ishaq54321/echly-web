@@ -20,7 +20,6 @@ import { Switch } from "@/components/ui/Switch";
 import { Modal } from "@/components/ui/Modal";
 import type { Workspace } from "@/lib/domain/workspace";
 import { useWorkspace } from "@/lib/client/workspaceContext";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { BillingUsageProvider } from "@/lib/billing/BillingUsageProvider";
 import {
   listenToWorkspace,
@@ -68,13 +67,10 @@ type TabId = (typeof TABS)[number]["id"];
 
 function SettingsPageInner() {
   const { user, loading: authLoading } = useAuthGuard();
-  const { claimsReady } = useWorkspace();
+  const { workspaceId, claimsReady, workspaceError, workspaceLoading } = useWorkspace();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>("general");
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [loadingWorkspace, setLoadingWorkspace] = useState(true);
-  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -84,49 +80,21 @@ function SettingsPageInner() {
   }, [searchParams]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      if (!user) {
-        if (!cancelled) {
-          setWorkspaceId(null);
-          setWorkspace(null);
-          setWorkspaceError(null);
-          setLoadingWorkspace(false);
-        }
-        return;
-      }
-      if (!claimsReady) {
-        if (!cancelled) setLoadingWorkspace(true);
-        return;
-      }
-      setLoadingWorkspace(true);
-      setWorkspaceError(null);
-      try {
-        const wid = await getUserWorkspaceIdRepo(user.uid);
-        if (cancelled) return;
-        setWorkspaceId(wid);
-        setWorkspaceError(null);
-      } catch (e) {
-        if (cancelled) return;
-        setWorkspaceError(e instanceof Error ? e.message : "Failed to load workspace");
-      } finally {
-        if (!cancelled) setLoadingWorkspace(false);
-      }
-    }
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.uid, claimsReady]);
-
-  useEffect(() => {
-    if (!workspaceId || !claimsReady) {
+    if (!claimsReady || !workspaceId) {
       setWorkspace(null);
       return;
     }
     const unsub = listenToWorkspace(workspaceId, setWorkspace, claimsReady);
     return () => unsub();
   }, [workspaceId, claimsReady]);
+
+  const loadingWorkspace = Boolean(
+    user &&
+      (workspaceLoading ||
+        !workspaceId ||
+        !claimsReady ||
+        (workspace === null && Boolean(workspaceId) && claimsReady))
+  );
 
   if (authLoading) {
     return (
@@ -139,14 +107,18 @@ function SettingsPageInner() {
   if (
     user &&
     (workspaceError ||
-      (!loadingWorkspace && (!workspaceId || workspaceId.trim() === "")))
+      (!workspaceLoading &&
+        !loadingWorkspace &&
+        claimsReady &&
+        (!workspaceId || workspaceId.trim() === "")))
   ) {
     return (
       <div className="flex flex-1 min-h-0 bg-white overflow-auto">
         <div className="flex flex-1 flex-col items-center justify-center px-12 py-16 max-w-lg mx-auto text-center">
           <p className="text-lg font-medium text-neutral-900">Workspace unavailable</p>
           <p className="mt-2 text-sm text-neutral-600">
-            {workspaceError ?? "Workspace not found. Try refreshing the page or sign in again."}
+            {workspaceError?.message ??
+              "Workspace not found. Try refreshing the page or sign in again."}
           </p>
         </div>
       </div>

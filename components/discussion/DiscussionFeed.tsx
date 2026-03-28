@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import type { User } from "firebase/auth";
 import {
   collection,
+  doc,
+  getDoc,
   query,
   where,
   orderBy,
   limit,
   getDocs,
-  documentId,
 } from "firebase/firestore";
 import { MessageSquare } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -124,16 +125,37 @@ export function DiscussionFeed({
           }
           await Promise.all(
             sessionChunks.map(async (chunk) => {
-              const sessionsSnap = await getDocs(
-                query(
-                  collection(db, "sessions"),
-                  where("workspaceId", "==", workspaceId),
-                  where(documentId(), "in", chunk)
-                )
+              const sessionDocs = await Promise.all(
+                chunk.map(async (sessionId) => {
+                  try {
+                    const ref = doc(db, "sessions", sessionId);
+                    const snap = await getDoc(ref);
+
+                    if (!snap.exists()) return null;
+
+                    const data = snap.data();
+
+                    if (data.workspaceId !== workspaceId) return null;
+
+                    return {
+                      id: snap.id,
+                      title: data.title as string | undefined,
+                    };
+                  } catch (error) {
+                    console.error("[DISCUSSION] session read failed", {
+                      sessionId,
+                      error,
+                    });
+                    return null;
+                  }
+                })
               );
-              sessionsSnap.forEach((docSnap) => {
-                sessionMap.set(docSnap.id, (docSnap.data().title as string) ?? "Unknown Session");
-              });
+
+              for (const s of sessionDocs) {
+                if (s) {
+                  sessionMap.set(s.id, s.title ?? "Unknown Session");
+                }
+              }
             })
           );
         }

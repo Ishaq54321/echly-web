@@ -3,22 +3,31 @@
 import { FileText, Search as SearchIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fetchSessionsListJson } from "@/lib/api/fetchSessionsList";
+import { useWorkspaceOverview } from "@/lib/client/workspaceOverviewContext";
+import type { Session } from "@/lib/domain/session";
 
 export const OPEN_SEARCH_EVENT = "echly:open-search-overlay";
 
-type SessionSearchResult = {
-  id: string;
-  title: string;
-  archived?: boolean;
-  updatedAt?: string | null;
-};
+function sessionUpdatedMs(updatedAt: Session["updatedAt"]): number {
+  if (updatedAt == null) return 0;
+  if (
+    typeof updatedAt === "object" &&
+    updatedAt !== null &&
+    "toMillis" in updatedAt &&
+    typeof (updatedAt as { toMillis?: () => number }).toMillis === "function"
+  ) {
+    return (updatedAt as { toMillis: () => number }).toMillis();
+  }
+  const t = new Date(updatedAt as string | Date).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
 
-function formatSessionMeta(s: SessionSearchResult): string {
+function formatSessionMeta(s: Session): string {
   const base = "Session";
-  if (!s.updatedAt) return base;
+  const ms = sessionUpdatedMs(s.updatedAt);
+  if (ms === 0) return base;
   try {
-    const d = new Date(s.updatedAt);
+    const d = new Date(ms);
     const now = Date.now();
     const diff = now - d.getTime();
     const day = 86400000;
@@ -33,10 +42,24 @@ function formatSessionMeta(s: SessionSearchResult): string {
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [sessions, setSessions] = useState<SessionSearchResult[] | null>(null);
+  const { sessions: sessionsWithCounts, loading } = useWorkspaceOverview();
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
+
+  const sessionList = useMemo(
+    () => sessionsWithCounts.map(({ session }) => session),
+    [sessionsWithCounts]
+  );
+
+  const filteredSessions = useMemo(() => {
+    const q = query.trim();
+    if (!q) return sessionList;
+
+    return sessionList.filter((session) =>
+      (session.title ?? "").toLowerCase().includes(q.toLowerCase())
+    );
+  }, [sessionList, query]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -65,45 +88,30 @@ export function GlobalSearch() {
       inputRef.current?.focus();
     });
 
-    if (sessions === null) {
-      fetchSessionsListJson()
-        .then((data) => {
-          const payload = data as { sessions?: SessionSearchResult[] };
-          return payload.sessions ?? [];
-        })
-        .then((nextSessions) => setSessions(nextSessions))
-        .catch(() => setSessions([]));
-    }
-
     return () => cancelAnimationFrame(t);
-  }, [open, sessions]);
+  }, [open]);
 
   const recentSessions = useMemo(() => {
-    if (!sessions) return [];
-    return [...sessions]
-      .filter((s) => !s.archived)
-      .sort((a, b) => {
-        const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-        const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-        return tb - ta;
-      })
+    return [...sessionList]
+      .filter((s) => (s.isArchived ?? s.archived) !== true)
+      .sort((a, b) => sessionUpdatedMs(b.updatedAt) - sessionUpdatedMs(a.updatedAt))
       .slice(0, 8);
-  }, [sessions]);
+  }, [sessionList]);
 
-  const filteredSessions = useMemo(() => {
-    if (!sessions) return [];
-    const q = query.trim().toLowerCase();
-    const nonArchived = sessions.filter((s) => !s.archived);
+  const q = query.trim();
+  const searchMatches = useMemo(() => {
     if (!q) return [];
-    return nonArchived.filter((s) => (s.title ?? "").toLowerCase().includes(q)).slice(0, 12);
-  }, [sessions, query]);
+    return filteredSessions
+      .filter((s) => (s.isArchived ?? s.archived) !== true)
+      .slice(0, 12);
+  }, [filteredSessions, q]);
 
   if (!open) return null;
 
-  const q = query.trim();
-  const showIdleEmpty = sessions !== null && !q;
-  const showNoMatches = sessions !== null && q.length > 0 && filteredSessions.length === 0;
-  const showSearchResults = filteredSessions.length > 0;
+  const showIdleEmpty = !loading && !q;
+  const showNoMatches =
+    !loading && q.length > 0 && searchMatches.length === 0;
+  const showSearchResults = searchMatches.length > 0;
 
   const navigateToSession = (id: string) => {
     router.push(`/dashboard/${id}`);
@@ -132,7 +140,7 @@ export function GlobalSearch() {
           autoComplete="off"
         />
 
-        {sessions === null ? (
+        {loading ? (
           <div className="search-results-wrap">
             <div className="search-loading">Loading sessions…</div>
           </div>
@@ -181,7 +189,7 @@ export function GlobalSearch() {
                 <>
                   <div className="search-results-section-label">Sessions</div>
                   <div className="search-results-list">
-                    {filteredSessions.map((s) => (
+                    {searchMatches.map((s) => (
                       <button
                         key={s.id}
                         type="button"

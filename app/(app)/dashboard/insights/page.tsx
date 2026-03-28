@@ -7,15 +7,7 @@ import { ActivityTrendChart, type ActivityTrendPoint } from "@/components/insigh
 import { IssueTypeDonutChart, type IssueSlice } from "@/components/insights/IssueTypeDonutChart";
 import { MostActiveSessionsBarChart, type ActiveSessionBar } from "@/components/insights/MostActiveSessionsBarChart";
 import { filterDaily, type DailyInsights } from "@/lib/analytics/filterDaily";
-import {
-  collection,
-  getDocs,
-  onSnapshot,
-  query,
-  where,
-  documentId,
-  type DocumentData,
-} from "firebase/firestore";
+import { doc, getDoc, onSnapshot, type DocumentData } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   emptyWorkspaceInsightsDoc,
@@ -255,26 +247,31 @@ export default function InsightsPage() {
       return;
     }
 
-    // Firestore "in" queries are limited to 10 values; we only fetch top 5.
     const ids = topSessionIds.slice(0, 10);
-    const qSessions = query(
-      collection(db, "sessions"),
-      where("workspaceId", "==", wid),
-      where(documentId(), "in", ids)
-    );
     let cancelled = false;
     void (async () => {
       try {
-        const snap = await getDocs(qSessions);
+        const pairs = await Promise.all(
+          ids.map(async (sessionId) => {
+            try {
+              const snap = await getDoc(doc(db, "sessions", sessionId));
+              if (!snap.exists()) return null;
+              const sd = snap.data() as DocumentData;
+              if (sd.workspaceId !== wid) return null;
+              const title = (typeof sd.title === "string" ? sd.title : "").trim();
+              return [sessionId, title || "Untitled session"] as const;
+            } catch (err) {
+              console.error("[ECHLY] insights session title read failed", sessionId, err);
+              return null;
+            }
+          })
+        );
         if (cancelled) return;
         setSessionTitleMap((prev) => {
           const next: Record<string, string> = { ...prev };
-          // Clear titles for ids we care about, then repopulate from fetched docs.
           for (const id of ids) delete next[id];
-          for (const d of snap.docs) {
-            const sd = d.data() as DocumentData;
-            const title = (typeof sd.title === "string" ? sd.title : "").trim();
-            next[d.id] = title || "Untitled session";
+          for (const p of pairs) {
+            if (p) next[p[0]] = p[1];
           }
           return next;
         });

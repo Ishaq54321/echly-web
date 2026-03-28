@@ -42,25 +42,28 @@ export async function createWorkspaceRepo(params: {
   invalidateWorkspaceDocCache(params.userId);
 }
 
-function docToWorkspace(userId: string, data: DocumentData): Workspace {
+function docToWorkspace(workspaceDocId: string, data: DocumentData): Workspace {
   return {
-    id: userId,
+    id: workspaceDocId,
     ...(data as Omit<Workspace, "id">),
   };
 }
 
-export async function getWorkspace(userId: string): Promise<Workspace | null> {
-  const snap = await getDoc(doc(db, "workspaces", userId));
+/** Reads `workspaces/{workspaceId}` (client SDK). */
+export async function getWorkspace(workspaceId: string): Promise<Workspace | null> {
+  const wid = workspaceId.trim();
+  if (!wid) return null;
+  const snap = await getDoc(doc(db, "workspaces", wid));
   if (!snap.exists()) return null;
   return docToWorkspace(snap.id, snap.data());
 }
 
 export function listenToWorkspace(
-  userId: string,
+  workspaceId: string,
   callback: (workspace: Workspace | null) => void,
   claimsReady: boolean
 ): Unsubscribe {
-  const wid = userId.trim();
+  const wid = workspaceId.trim();
   if (!claimsReady || !wid) {
     callback(null);
     return () => {};

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useWorkspaceOverview } from "./hooks/useWorkspaceOverview";
+import { useWorkspaceOverview } from "@/lib/client/workspaceOverviewContext";
 import type { SessionWithCounts } from "./hooks/useWorkspaceOverview";
 import { SessionsWorkspace } from "@/components/dashboard/SessionsWorkspace";
 import {
@@ -51,7 +51,7 @@ function DashboardContent() {
     updateSession,
     setSessionArchived,
     deleteSession,
-  } = useWorkspaceOverview("all");
+  } = useWorkspaceOverview();
   const { search } = useSessionsSearch();
   const skeletonCount =
     sessions?.length > 0

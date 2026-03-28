@@ -57,13 +57,19 @@ export function listenToCommentsRepo(
     limit(COMMENTS_QUERY_LIMIT)
   );
 
-  return onSnapshot(q, (snapshot) => {
-    const comments: Comment[] = snapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as Omit<Comment, "id">),
-    }));
-    callback(comments);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const comments: Comment[] = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<Comment, "id">),
+      }));
+      callback(comments);
+    },
+    (error) => {
+      console.error("COMMENTS LISTENER ERROR", error);
+    }
+  );
 }
 
 const RECENT_ACTIVITY_LIMIT = 10;
@@ -108,7 +114,7 @@ const INSIGHTS_COMMENTS_LIMIT = 100;
 
 /**
  * Bounded comments fetch for /api/insights charts.
- * Composite index required: comments (userId ASC, createdAt DESC).
+ * Composite index required: comments (workspaceId ASC, createdAt DESC).
  */
 export async function getWorkspaceCommentsForInsightsRepo(
   workspaceId: string

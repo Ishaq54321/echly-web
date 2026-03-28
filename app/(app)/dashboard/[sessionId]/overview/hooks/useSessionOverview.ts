@@ -6,7 +6,6 @@ import { getSessionRecentComments } from "@/lib/comments";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import {
   getFeedbackByIds,
-  getSessionFeedback,
   getSessionFeedbackByResolved,
 } from "@/lib/feedback";
 import {
@@ -19,7 +18,6 @@ import { getSessionById } from "@/lib/sessions";
 import type { Session } from "@/lib/domain/session";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 
-const RECENT_FEEDBACK_LIMIT = 5;
 const RECENT_ACTIVITY_LIMIT = 10;
 
 export interface OverviewActivityItem {
@@ -124,21 +122,14 @@ export function useSessionOverview(sessionId: string | undefined) {
           return next;
         })();
 
-        const [
-          session,
-          countsByStatus,
-          recentFeedback,
-          openPreview,
-          resolvedPreview,
-          recentComments,
-        ] = await Promise.all([
-          getSessionById(sid),
-          countsPromise,
-          getSessionFeedback(wid, sid, RECENT_FEEDBACK_LIMIT),
-          getSessionFeedbackByResolved(wid, sid, false, 3),
-          getSessionFeedbackByResolved(wid, sid, true, 3),
-          getSessionRecentComments(wid, sid, RECENT_ACTIVITY_LIMIT),
-        ]);
+        const [session, countsByStatus, openPreview, resolvedPreview, recentComments] =
+          await Promise.all([
+            getSessionById(sid),
+            countsPromise,
+            getSessionFeedbackByResolved(wid, sid, false, 3),
+            getSessionFeedbackByResolved(wid, sid, true, 3),
+            getSessionRecentComments(wid, sid, RECENT_ACTIVITY_LIMIT),
+          ]);
 
         if (cancelled) return;
 
@@ -157,12 +148,12 @@ export function useSessionOverview(sessionId: string | undefined) {
           })
         );
 
-        const allForTags = [
-          ...recentFeedback,
-          ...openPreview,
-          ...resolvedPreview,
-        ];
-        const tagCounts = extractTagCounts(allForTags);
+        const byId = new Map<string, Feedback>();
+        for (const f of [...openPreview, ...resolvedPreview]) {
+          byId.set(f.id, f);
+        }
+        const recentFeedback = [...byId.values()];
+        const tagCounts = extractTagCounts(recentFeedback);
 
         setData({
           session: session ?? null,

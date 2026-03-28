@@ -108,9 +108,6 @@ export async function addFeedbackWithSessionCountersRepo(
     if (feedbackId) {
       const existing = await tx.get(feedbackRef);
       if (existing.exists) {
-        console.log("[idempotency] duplicate prevented", {
-          feedbackId,
-        });
         return feedbackRef;
       }
     }
@@ -136,7 +133,6 @@ export async function addFeedbackWithSessionCountersRepo(
         { merge: true }
       );
     }
-    console.log("[idempotency] created", { feedbackId: feedbackRef.id });
     const sessionRow = sessionSnap.data() ?? {};
     tx.set(
       sessionRef,

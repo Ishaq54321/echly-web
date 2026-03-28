@@ -112,7 +112,6 @@ export async function getWorkspaceSessionsRepo(
   includeArchived?: boolean
 ): Promise<Session[]> {
   assertQueryLimit(max, "getWorkspaceSessionsRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   let q: FirebaseFirestore.Query = adminDb
     .collection("sessions")
     .where("workspaceId", "==", workspaceId);
@@ -142,7 +141,6 @@ export async function getUserSessionsRepo(
   includeArchived?: boolean
 ): Promise<Session[]> {
   assertQueryLimit(max, "getUserSessionsRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   let q: FirebaseFirestore.Query = adminDb
     .collection("sessions")
     .where("workspaceId", "==", workspaceId);
@@ -173,16 +171,7 @@ export async function getWorkspaceSessionsByFeedbackCountRepo(
   workspaceId: string
 ): Promise<Session[]> {
   assertQueryLimit(INSIGHTS_TOP_SESSIONS_LIMIT, "getWorkspaceSessionsByFeedbackCountRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   const isSimple = process.env.INSIGHTS_SIMPLE_QUERY === "1";
-  const limitValue = isSimple ? 10 : INSIGHTS_TOP_SESSIONS_LIMIT;
-  console.log("INSIGHTS QUERY:", {
-    workspaceId,
-    hasWhere: !isSimple,
-    hasOrderBy: isSimple ? false : "feedbackCount desc",
-    limit: limitValue,
-    simpleMode: isSimple,
-  });
 
   const q = isSimple
     ? adminDb
@@ -196,11 +185,6 @@ export async function getWorkspaceSessionsByFeedbackCountRepo(
         .limit(INSIGHTS_TOP_SESSIONS_LIMIT);
 
   const snapshot = await q.get();
-  console.log("QUERY METRICS:", {
-    collection: "sessions",
-    count: snapshot.docs.length,
-    limit: limitValue,
-  });
   return snapshot.docs.map((docSnap) => ({
     id: docSnap.id,
     ...(docSnap.data() as SessionDoc),
@@ -325,7 +309,6 @@ export async function deleteSessionRepo(sessionId: string): Promise<void> {
     deleteAllCommentsForSessionRepo(sessionId, workspaceId),
   ]);
 
-  console.log("USING COLLECTION TYPE:", "collection");
   const viewsSnap = await adminDb.collection(`sessionViews/${sessionId}/views`).get();
   await Promise.all(viewsSnap.docs.map((d) => d.ref.delete()));
   await adminDb.doc(`sessions/${sessionId}`).delete();

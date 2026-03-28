@@ -58,8 +58,8 @@ export async function getWorkspaceSessionCountRepo(
 
 /**
  * Lists workspace sessions. Sorted by most recent activity (updatedAt desc).
- * Composite index required: (userId Ascending, updatedAt Descending).
- * When archivedOnly is true: (userId Ascending, archived Ascending, updatedAt Descending).
+ * Composite index required: (workspaceId Ascending, updatedAt Descending).
+ * When archivedOnly is true: (workspaceId Ascending, archived Ascending, updatedAt Descending).
  * When includeArchived is true, returns both active and archived sessions.
  */
 export async function getWorkspaceSessionsRepo(
@@ -69,7 +69,6 @@ export async function getWorkspaceSessionsRepo(
   includeArchived?: boolean
 ): Promise<Session[]> {
   assertQueryLimit(max, "getWorkspaceSessionsRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   const q = query(
     collection(db, "sessions"),
     where("workspaceId", "==", workspaceId),
@@ -95,8 +94,7 @@ export async function getWorkspaceSessionsRepo(
 }
 
 /**
- * Legacy listing: sessions were previously scoped by userId. Keep this for backward compatibility
- * and migration fallback. Prefer getWorkspaceSessionsRepo going forward.
+ * Alias of {@link getWorkspaceSessionsRepo} (workspace-scoped).
  */
 export async function getUserSessionsRepo(
   workspaceId: string,
@@ -105,7 +103,6 @@ export async function getUserSessionsRepo(
   includeArchived?: boolean
 ): Promise<Session[]> {
   assertQueryLimit(max, "getUserSessionsRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   const q = query(
     collection(db, "sessions"),
     where("workspaceId", "==", workspaceId),
@@ -135,22 +132,13 @@ const INSIGHTS_TOP_SESSIONS_LIMIT = 10;
 
 /**
  * Bounded sessions fetch for /api/insights "most active sessions" chart.
- * Returns top sessions by feedbackCount. Composite index required: sessions (userId ASC, feedbackCount DESC).
+ * Returns top sessions by feedbackCount. Composite index required: sessions (workspaceId ASC, feedbackCount DESC).
  */
 export async function getWorkspaceSessionsByFeedbackCountRepo(
   workspaceId: string
 ): Promise<Session[]> {
   assertQueryLimit(INSIGHTS_TOP_SESSIONS_LIMIT, "getWorkspaceSessionsByFeedbackCountRepo");
-  console.log("USING COLLECTION TYPE:", "collection");
   const isSimple = process.env.INSIGHTS_SIMPLE_QUERY === "1";
-  const limitValue = isSimple ? 10 : INSIGHTS_TOP_SESSIONS_LIMIT;
-  console.log("INSIGHTS QUERY:", {
-    workspaceId,
-    hasWhere: !isSimple,
-    hasOrderBy: isSimple ? false : "feedbackCount desc",
-    limit: limitValue,
-    simpleMode: isSimple,
-  });
 
   const q = isSimple
     ? query(
@@ -166,11 +154,6 @@ export async function getWorkspaceSessionsByFeedbackCountRepo(
       );
 
   const snapshot = await getDocs(q);
-  console.log("QUERY METRICS:", {
-    collection: "sessions",
-    count: snapshot.docs.length,
-    limit: limitValue,
-  });
   return snapshot.docs.map((docSnap) => ({
     id: docSnap.id,
     ...(docSnap.data() as SessionDoc),
