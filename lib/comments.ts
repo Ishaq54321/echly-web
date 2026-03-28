@@ -53,6 +53,80 @@ export function createOptimisticComment(args: {
   };
 }
 
+export type LocalComment = Comment | OptimisticComment;
+
+export function isOptimisticLocalComment(c: LocalComment): c is OptimisticComment {
+  return "isOptimistic" in c && c.isOptimistic === true;
+}
+
+function readCommentTimeMs(comment: Comment): number | null {
+  const createdAt = comment.createdAt as unknown;
+  if (!createdAt) return null;
+  if (
+    typeof createdAt === "object" &&
+    createdAt != null &&
+    "toDate" in (createdAt as { toDate?: unknown }) &&
+    typeof (createdAt as { toDate: () => Date }).toDate === "function"
+  ) {
+    return (createdAt as { toDate: () => Date }).toDate().getTime();
+  }
+  if (
+    typeof createdAt === "object" &&
+    createdAt != null &&
+    "seconds" in (createdAt as { seconds?: unknown }) &&
+    typeof (createdAt as { seconds: number }).seconds === "number"
+  ) {
+    return (createdAt as { seconds: number }).seconds * 1000;
+  }
+  return null;
+}
+
+/** True while this row is a client-only pending write (optimistic or legacy temp id). */
+function isPendingLocalComment(c: LocalComment): boolean {
+  if (isOptimisticLocalComment(c)) return true;
+  const id = c.id || "";
+  return id.startsWith("temp-") || id.startsWith("temp_");
+}
+
+export function sameCommentPayload(
+  optimistic: Comment | OptimisticComment,
+  incoming: Comment
+): boolean {
+  if (optimistic.id === incoming.id) return true;
+  if ((incoming.id || "").startsWith("temp_") || (incoming.id || "").startsWith("temp-")) {
+    return false;
+  }
+  if ((optimistic.message || "").trim() !== (incoming.message || "").trim()) return false;
+  if (optimistic.userId !== incoming.userId) return false;
+  if ((optimistic.threadId ?? null) !== (incoming.threadId ?? null)) return false;
+  if ((optimistic.type ?? "general") !== (incoming.type ?? "general")) return false;
+
+  const incomingMs = readCommentTimeMs(incoming);
+  if (incomingMs == null) return true;
+  if (isOptimisticLocalComment(optimistic)) {
+    return Math.abs(incomingMs - optimistic.optimisticCreatedAtMs) <= 30_000;
+  }
+  return true;
+}
+
+/**
+ * Merge Firestore snapshot with in-flight optimistic rows. Listener stays source of truth;
+ * pending locals drop once a matching real doc appears.
+ */
+export function mergeRealtimeCommentsWithOptimistic(
+  prev: LocalComment[],
+  incoming: Comment[]
+): LocalComment[] {
+  const incomingNonTemp = incoming.filter((c) => {
+    const id = c.id || "";
+    return !id.startsWith("temp_") && !id.startsWith("temp-");
+  });
+  const optimisticPending = prev
+    .filter(isPendingLocalComment)
+    .filter((opt) => !incomingNonTemp.some((real) => sameCommentPayload(opt, real)));
+  return [...incomingNonTemp, ...optimisticPending];
+}
+
 export async function addComment(
   sessionId: string,
   feedbackId: string,

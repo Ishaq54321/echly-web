@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { withAuthorization } from "@/lib/server/auth/withAuthorization";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
 /**
  * GET /api/admin/me
@@ -13,6 +12,6 @@ export const GET = withAuthorization(
   {
     isAdmin: true,
     allowNonAdmin: true,
-    resolveWorkspace: async (_req, user) => getUserWorkspaceIdRepo(user.uid),
+    resolveWorkspace: async (_req, _user, _ctx, viewerWorkspaceId) => viewerWorkspaceId,
   }
 );

@@ -9,16 +9,37 @@ import {
 import { isAdminUser } from "@/lib/server/adminAuth";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
+/** Data already loaded while resolving workspace (e.g. ticket + session); handlers must not re-fetch the same docs. */
+export type PreloadedTicketContext = {
+  feedback?: unknown;
+  session?: unknown;
+  comment?: unknown;
+};
+
 export type HandlerContext = {
   params?: Promise<Record<string, string>> | Record<string, string>;
+  preloaded?: PreloadedTicketContext;
 };
+
+/** `resolveWorkspace` may return a plain workspace id or an object that includes preloaded entities. */
+export type ResolvedWorkspace =
+  | string
+  | {
+      workspaceId: string;
+      feedback?: unknown;
+      session?: unknown;
+      comment?: unknown;
+    };
 
 type HandlerUser = { uid: string };
 
-type HandlerArgs = {
+export type AuthorizedHandlerArgs = {
   user: HandlerUser;
   userId: string;
+  /** Resource workspace id (must match the viewer workspace when access is granted). */
   workspaceId: string;
+  /** Viewer workspace from `users/{uid}.workspaceId` — single read per request. */
+  userWorkspaceId: string;
   isAdmin: boolean;
 };
 
@@ -31,17 +52,21 @@ type WithAuthorizationOptions = {
     user: HandlerUser,
     ctx: HandlerContext
   ) => Promise<string>;
-  /** Required. Must return the workspace id for the resource being accessed (never user.uid). */
+  /**
+   * Required. Must return the workspace id for the resource being accessed (never user.uid).
+   * `viewerWorkspaceId` is the caller's workspace (already loaded once); do not call getUserWorkspaceIdRepo again.
+   */
   resolveWorkspace: (
     req: Request,
     user: HandlerUser,
-    ctx: HandlerContext
-  ) => Promise<string>;
+    ctx: HandlerContext,
+    viewerWorkspaceId: string
+  ) => Promise<ResolvedWorkspace>;
 };
 
 export function withAuthorization(
   action: Action | null,
-  handler: (req: Request, ctx: HandlerContext, auth: HandlerArgs) => Promise<Response>,
+  handler: (req: Request, ctx: HandlerContext, auth: AuthorizedHandlerArgs) => Promise<Response>,
   options: WithAuthorizationOptions
 ) {
   return async (req: Request, ctx: HandlerContext = {}) => {
@@ -66,14 +91,40 @@ export function withAuthorization(
         );
       }
 
-      const resolvedWorkspace = await options.resolveWorkspace(req, user, ctx);
-      const normalizedWorkspaceId = (typeof resolvedWorkspace === "string" ? resolvedWorkspace : "").trim();
+      const viewerWorkspaceIdRaw = await getUserWorkspaceIdRepo(user.uid);
+      const viewerWorkspaceId =
+        typeof viewerWorkspaceIdRaw === "string" ? viewerWorkspaceIdRaw.trim() : "";
+      if (!viewerWorkspaceId) {
+        throw new AuthorizationError("Missing workspaceId", 403, "FORBIDDEN");
+      }
+
+      const resolvedWorkspace = await options.resolveWorkspace(
+        req,
+        user,
+        ctx,
+        viewerWorkspaceId
+      );
+      const handlerCtx: HandlerContext = { ...ctx };
+      let normalizedWorkspaceId: string;
+      if (typeof resolvedWorkspace === "string") {
+        normalizedWorkspaceId = resolvedWorkspace.trim();
+      } else {
+        const w =
+          typeof resolvedWorkspace.workspaceId === "string"
+            ? resolvedWorkspace.workspaceId
+            : "";
+        normalizedWorkspaceId = w.trim();
+        handlerCtx.preloaded = {
+          feedback: resolvedWorkspace.feedback,
+          session: resolvedWorkspace.session,
+          comment: resolvedWorkspace.comment,
+        };
+      }
       if (!normalizedWorkspaceId) {
         throw new AuthorizationError("Missing workspaceId", 403, "FORBIDDEN");
       }
 
-      const userWorkspaceId = await getUserWorkspaceIdRepo(user.uid);
-      if (userWorkspaceId !== normalizedWorkspaceId) {
+      if (viewerWorkspaceId !== normalizedWorkspaceId) {
         return Response.json(
           { success: false, error: "FORBIDDEN", message: "Forbidden" },
           { status: 403 }
@@ -96,10 +147,11 @@ export function withAuthorization(
         });
       }
 
-      return await handler(req, ctx, {
+      return await handler(req, handlerCtx, {
         user,
         userId: normalizedUserId,
         workspaceId: normalizedWorkspaceId,
+        userWorkspaceId: viewerWorkspaceId,
         isAdmin,
       });
     } catch (err) {

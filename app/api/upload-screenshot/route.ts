@@ -3,13 +3,12 @@ import type { NextRequest } from "next/server";
 import "@/lib/server/firebaseAdmin";
 import { getStorage } from "firebase-admin/storage";
 import { requireAuth } from "@/lib/server/auth";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import { buildRequestContext } from "@/lib/server/requestContext";
 import {
   createScreenshotRepoSync,
   getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
 import { corsHeaders } from "@/lib/server/cors";
-import { userWorkspaceMatchesSession } from "@/lib/server/sessionWorkspaceScope";
 import { createScreenshotId } from "@/lib/uploadScreenshot";
 
 export async function OPTIONS(req: NextRequest) {
@@ -62,14 +61,17 @@ export async function POST(req: NextRequest) {
       typeof screenshotId === "string" ? screenshotId.trim() : "";
     const ssId = screenshotIdRaw || createScreenshotId();
 
-    const session = await getSessionByIdRepo(sid);
-    if (!session) {
+    const accessCtx = await buildRequestContext({
+      userId: user.uid,
+      sessionId: sid,
+    });
+    if (!accessCtx.session) {
       return NextResponse.json(
         { error: "Session not found" },
         { status: 404, headers: corsHeaders(req) }
       );
     }
-    if (!(await userWorkspaceMatchesSession(user.uid, session))) {
+    if (!accessCtx.canAccess) {
       return NextResponse.json(
         { error: "Forbidden" },
         { status: 403, headers: corsHeaders(req) }

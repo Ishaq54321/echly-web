@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 import type { SessionSharePermission } from "@/lib/repositories/sessionSharesRepository";
 import { upsertSessionShareRepo } from "@/lib/repositories/sessionSharesRepository";
-import { userWorkspaceMatchesSession } from "@/lib/server/sessionWorkspaceScope";
+import { buildRequestContext } from "@/lib/server/requestContext";
 
 type ShareBody = {
   sessionId?: string;
@@ -49,11 +48,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: "Invalid permission" }, { status: 400 });
   }
 
-  const session = await getSessionByIdRepo(sessionId);
-  if (!session) {
+  const context = await buildRequestContext({
+    userId: user.uid,
+    sessionId,
+  });
+  if (!context.session) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
-  if (!(await userWorkspaceMatchesSession(user.uid, session))) {
+  if (!context.canAccess) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 

@@ -6,8 +6,16 @@ import Link from "next/link";
 import { ArrowUpRight, Expand, Paperclip, Send } from "lucide-react";
 import { DiscussionThreadBodySkeleton } from "@/components/discussion/discussionSkeletons";
 import { authFetch } from "@/lib/authFetch";
-import { addComment, updateComment, deleteComment } from "@/lib/comments";
+import {
+  addComment,
+  createOptimisticComment,
+  mergeRealtimeCommentsWithOptimistic,
+  updateComment,
+  deleteComment,
+  type LocalComment,
+} from "@/lib/comments";
 import type { Comment, CommentAttachment } from "@/lib/domain/comment";
+import { useToast } from "@/components/dashboard/context/ToastContext";
 import { AttachmentUploadModal } from "@/components/discussion/AttachmentUploadModal";
 import { CommentItem } from "@/components/comments/CommentItem";
 import {
@@ -44,9 +52,10 @@ export function DiscussionThread({
     authDisplayName,
     authPhotoUrl,
   } = useWorkspace();
+  const { showToast } = useToast();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<LocalComment[]>([]);
   const [commentsInitialized, setCommentsInitialized] = useState(false);
   const [loading, setLoading] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
@@ -67,19 +76,18 @@ export function DiscussionThread({
     async (attachment: CommentAttachment) => {
       if (!authUid || !feedbackId || !ticket?.sessionId || !workspaceId) return;
       assertIdentityResolved(isIdentityResolved);
-      const optimisticComment: Comment = {
-        id: `temp-attach-${Date.now()}`,
-        workspaceId,
+      const optimisticComment = createOptimisticComment({
         sessionId: ticket.sessionId,
         feedbackId,
-        userId: authUid,
-        userName: authDisplayName || "User",
-        userAvatar: authPhotoUrl || "",
-        message: "",
-        createdAt: null,
-        type: "general",
-        attachment,
-      };
+        data: {
+          userId: authUid,
+          userName: authDisplayName || "User",
+          userAvatar: authPhotoUrl || "",
+          message: "",
+          type: "general",
+          attachment,
+        },
+      });
       setComments((prev) => [...prev, optimisticComment]);
       setAttachmentModalOpen(false);
       onCommentAdded?.();
@@ -96,6 +104,7 @@ export function DiscussionThread({
       } catch (err) {
         console.error("[DiscussionThread] send attachment comment:", err);
         setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
+        showToast("Could not send attachment");
       } finally {
         setSending(false);
       }
@@ -109,6 +118,7 @@ export function DiscussionThread({
       authDisplayName,
       authPhotoUrl,
       isIdentityResolved,
+      showToast,
     ]
   );
 
@@ -179,47 +189,50 @@ export function DiscussionThread({
     sessionId: ticket?.sessionId,
     feedbackId,
     onComments: (incoming) => {
-      setComments([...incoming]);
+      setComments((prev) => mergeRealtimeCommentsWithOptimistic(prev, incoming));
       setCommentsInitialized(true);
     },
   });
 
-  const handleSendComment = async () => {
-    if (!authUid || !feedbackId || !ticket?.sessionId || !workspaceId) return;
+  const handleSendComment = () => {
+    const sid = ticket?.sessionId;
+    if (!authUid || !feedbackId || !sid || !workspaceId) return;
     assertIdentityResolved(isIdentityResolved);
     const trimmed = commentDraft.trim();
     if (!trimmed) return;
-    const optimisticComment: Comment = {
-      id: `temp-${Date.now()}`,
-      workspaceId,
-      sessionId: ticket.sessionId,
+    const optimisticComment = createOptimisticComment({
+      sessionId: sid,
       feedbackId,
-      userId: authUid,
-      userName: authDisplayName || "User",
-      userAvatar: authPhotoUrl || "",
-      message: trimmed,
-      createdAt: null,
-      type: "general",
-    };
-    setComments((prev) => [...prev, optimisticComment]);
-    setCommentDraft("");
-    onCommentAdded?.();
-
-    setSending(true);
-    try {
-      await addComment(ticket.sessionId, feedbackId, {
+      data: {
         userId: authUid,
         userName: authDisplayName || "User",
         userAvatar: authPhotoUrl || "",
         message: trimmed,
         type: "general",
-      });
-    } catch (err) {
-      console.error("[DiscussionThread] send comment:", err);
-      setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
-    } finally {
-      setSending(false);
-    }
+      },
+    });
+    setComments((prev) => [...prev, optimisticComment]);
+    setCommentDraft("");
+    onCommentAdded?.();
+
+    void (async () => {
+      setSending(true);
+      try {
+        await addComment(sid, feedbackId, {
+          userId: authUid,
+          userName: authDisplayName || "User",
+          userAvatar: authPhotoUrl || "",
+          message: trimmed,
+          type: "general",
+        });
+      } catch (err) {
+        console.error("[DiscussionThread] send comment:", err);
+        setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
+        showToast("Could not send comment");
+      } finally {
+        setSending(false);
+      }
+    })();
   };
 
   if (!feedbackId) {

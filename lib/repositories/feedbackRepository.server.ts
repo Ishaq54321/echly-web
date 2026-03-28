@@ -1,17 +1,17 @@
 import "server-only";
 import { adminDb } from "@/lib/server/firebaseAdmin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
 import {
-  emptyWorkspaceInsightsDoc,
+  incrementInsightsOnFeedbackCreateRepo,
   workspaceInsightsRef,
 } from "@/lib/repositories/insightsRepository.server";
+import { fireAndForget } from "@/lib/server/fireAndForget";
 
 type DocumentReference = FirebaseFirestore.DocumentReference;
 type DocumentSnapshot = FirebaseFirestore.DocumentSnapshot;
 type QueryDocumentSnapshot = FirebaseFirestore.QueryDocumentSnapshot;
-type Timestamp = FirebaseFirestore.Timestamp;
 
 function requireUserId(userId: string, context: string): string {
   const trimmed = userId.trim();
@@ -25,20 +25,11 @@ function num(value: unknown, fallback: number = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function getPath(obj: unknown, path: string): unknown {
-  if (obj == null || typeof obj !== "object") return undefined;
-  let cur: any = obj;
-  for (const part of path.split(".")) {
-    if (cur == null || typeof cur !== "object") return undefined;
-    cur = cur[part];
-  }
-  return cur;
-}
-
 const feedbackPayload = (
   userId: string,
   sessionId: string,
-  data: StructuredFeedback
+  data: StructuredFeedback,
+  createdAt: Date
 ) => ({
   userId,
   sessionId,
@@ -47,7 +38,7 @@ const feedbackPayload = (
   suggestion: data.suggestion ?? "",
   type: data.type,
   status: "open" as const,
-  createdAt: new Date(),
+  createdAt,
   commentCount: 0,
 
   contextSummary: data.contextSummary ?? null,
@@ -65,6 +56,60 @@ const feedbackPayload = (
   isDeleted: false,
 });
 
+/** Same shape as {@link docToFeedback} for a row just written by {@link addFeedbackWithSessionCountersRepo} (avoids post-write read). */
+export function feedbackFromCreateInsert(args: {
+  id: string;
+  userId: string;
+  sessionId: string;
+  data: StructuredFeedback;
+  createdAt: Date;
+}): Feedback {
+  const row = args.data;
+  const instructionRaw = row.instruction ?? row.description ?? null;
+  const instruction =
+    typeof instructionRaw === "string" ? instructionRaw : undefined;
+  const description =
+    typeof row.description === "string"
+      ? row.description
+      : typeof instructionRaw === "string"
+        ? instructionRaw
+        : undefined;
+  return {
+    id: args.id,
+    userId: requireUserId(args.userId, "feedbackFromCreateInsert"),
+    sessionId: args.sessionId,
+    title: row.title,
+    instruction,
+    description,
+    suggestion: row.suggestion ?? "",
+    type: row.type,
+    isResolved: false,
+    createdAt: Timestamp.fromDate(args.createdAt) as Feedback["createdAt"],
+    contextSummary: row.contextSummary ?? null,
+    actionSteps: row.actionSteps ?? null,
+    suggestedTags: row.suggestedTags ?? null,
+    url: row.url ?? null,
+    viewportWidth: row.viewportWidth ?? null,
+    viewportHeight: row.viewportHeight ?? null,
+    userAgent: row.userAgent ?? null,
+    clientTimestamp: row.timestamp ?? null,
+    screenshotUrl: row.screenshotUrl ?? null,
+    screenshotStatus: row.screenshotStatus ?? null,
+    commentCount: 0,
+    lastCommentAt: null,
+    isDeleted: false,
+    status: "open",
+  };
+}
+
+export type AddFeedbackWithSessionCountersResult = {
+  ref: DocumentReference;
+  inserted: boolean;
+  createdAt?: Date;
+  /** Present when `inserted` is false and the idempotent doc already existed (from the same transaction read; no extra round trip). */
+  existingFeedback?: Feedback;
+};
+
 /**
  * Creates feedback and updates session denormalized counters in one transaction.
  * Use for feedback create to avoid race conditions. Migration-safe: uses increment(1).
@@ -76,7 +121,7 @@ export async function addFeedbackWithSessionCountersRepo(
   data: StructuredFeedback,
   feedbackId?: string,
   screenshotId?: string
-): Promise<DocumentReference> {
+): Promise<AddFeedbackWithSessionCountersResult> {
   const resolvedUserId = requireUserId(
     userId,
     "addFeedbackWithSessionCountersRepo"
@@ -95,13 +140,10 @@ export async function addFeedbackWithSessionCountersRepo(
     throw new Error("Missing workspaceId on session");
   }
 
-  const payload = {
-    ...feedbackPayload(resolvedUserId, sessionId, data),
-    workspaceId: resolvedWorkspaceId,
-  };
+  const issueTypeForInsights = (data.type ?? "").trim() || "general";
+
   const workspaceRef = adminDb.doc(`workspaces/${resolvedWorkspaceId}`);
-  const insightsRef = workspaceInsightsRef(resolvedWorkspaceId);
-  const feedbackRef = await adminDb.runTransaction(async (tx) => {
+  const txResult = await adminDb.runTransaction(async (tx) => {
     const feedbackRef =
       feedbackId != null && feedbackId !== ""
         ? adminDb.doc(`feedback/${feedbackId}`)
@@ -109,23 +151,28 @@ export async function addFeedbackWithSessionCountersRepo(
     if (feedbackId) {
       const existing = await tx.get(feedbackRef);
       if (existing.exists) {
-        return feedbackRef;
+        const existingFeedback = docToFeedback(existing as QueryDocumentSnapshot);
+        return {
+          ref: feedbackRef,
+          inserted: false as const,
+          existingFeedback,
+        };
       }
     }
 
+    const createdAt = new Date();
+    const payload = {
+      ...feedbackPayload(resolvedUserId, sessionId, data, createdAt),
+      workspaceId: resolvedWorkspaceId,
+    };
+
     const sessionSnap = await tx.get(sessionRef);
     const workspaceSnap = await tx.get(workspaceRef);
-    const insightsSnap = await tx.get(insightsRef);
 
     const stats = (workspaceSnap.data()?.stats ?? {}) as Record<string, unknown>;
     const totalFeedback = (stats.totalFeedback as number | undefined) ?? 0;
     const last30DaysFeedback = (stats.last30DaysFeedback as number | undefined) ?? 0;
 
-    const issueType = (data.type ?? "").trim() || "general";
-    const day = new Date().toISOString().slice(0, 10);
-    if (!insightsSnap.exists) {
-      tx.set(insightsRef, emptyWorkspaceInsightsDoc());
-    }
     tx.set(feedbackRef, payload);
     if (typeof screenshotId === "string" && screenshotId.trim() !== "") {
       tx.set(
@@ -157,25 +204,20 @@ export async function addFeedbackWithSessionCountersRepo(
       "stats.updatedAt": new Date(),
     });
 
-    const insightsRow = insightsSnap.data() ?? emptyWorkspaceInsightsDoc();
-    const issueTypePath = `issueTypes.${issueType}`;
-    const sessionCountPath = `sessionCounts.${sessionId}`;
-    const dailyFeedbackPath = `daily.${day}.feedback`;
-    tx.set(
-      insightsRef,
-      {
-        totalFeedback: num((insightsRow as any).totalFeedback) + 1,
-        timeSavedMinutes: num((insightsRow as any).timeSavedMinutes) + 5,
-        [issueTypePath]: num(getPath(insightsRow, issueTypePath)) + 1,
-        [sessionCountPath]: num(getPath(insightsRow, sessionCountPath)) + 1,
-        [dailyFeedbackPath]: num(getPath(insightsRow, dailyFeedbackPath)) + 1,
-        updatedAt: new Date(),
-      } as Record<string, unknown>,
-      { merge: true }
-    );
-    return feedbackRef;
+    return { ref: feedbackRef, inserted: true as const, createdAt };
   });
-  return feedbackRef;
+
+  if (txResult.inserted) {
+    fireAndForget("addFeedbackWithSessionCountersRepo-insights", () =>
+      incrementInsightsOnFeedbackCreateRepo({
+        workspaceId: resolvedWorkspaceId,
+        sessionId,
+        type: issueTypeForInsights,
+      })
+    );
+  }
+
+  return txResult;
 }
 
 type FeedbackUpdate = Partial<{
@@ -274,7 +316,7 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
   updates.status = toStatus;
 
-  const result = await adminDb.runTransaction(async (tx) => {
+  const insightsFollowUp = await adminDb.runTransaction(async (tx) => {
     const feedbackSnap = await tx.get(feedbackRef);
     if (!feedbackSnap.exists) return null;
     const fd = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
@@ -282,69 +324,65 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     const raw = typeof fd.status === "string" ? fd.status : "";
     const wasStatus: FeedbackStatus = raw === "resolved" ? "resolved" : "open";
 
+    let workspaceId =
+      typeof fd.workspaceId === "string" ? fd.workspaceId.trim() : "";
     const sessionRef = adminDb.doc(`sessions/${sessionId}`);
-    const sessionSnap = await tx.get(sessionRef);
-    const s = sessionSnap.data() || {};
-    const workspaceId =
-      typeof (s as { workspaceId?: unknown }).workspaceId === "string"
-        ? (s as { workspaceId: string }).workspaceId.trim()
-        : "";
+
     if (!workspaceId) {
-      throw new Error("Missing workspaceId on session");
+      const sessionSnap = await tx.get(sessionRef);
+      const s = sessionSnap.data() || {};
+      workspaceId =
+        typeof (s as { workspaceId?: unknown }).workspaceId === "string"
+          ? (s as { workspaceId: string }).workspaceId.trim()
+          : "";
+      if (!workspaceId) {
+        throw new Error("Missing workspaceId on session");
+      }
     }
-    let openCount = Math.max(0, num(s.openCount));
-    let resolvedCount = Math.max(0, num(s.resolvedCount));
 
-    const insightsRef = workspaceInsightsRef(workspaceId);
-    const insightsSnap = await tx.get(insightsRef);
-    if (!insightsSnap.exists) {
-      tx.set(insightsRef, emptyWorkspaceInsightsDoc());
-    }
-
-    // Important: Firestore transactions require *all reads* to happen before *any writes*.
-    // We read both feedback + session above, then perform writes below.
     tx.update(feedbackRef, updates);
 
     if (wasStatus !== toStatus) {
-      if (wasStatus === "open") openCount = Math.max(0, openCount - 1);
-      else if (wasStatus === "resolved") resolvedCount = Math.max(0, resolvedCount - 1);
-      if (toStatus === "open") openCount += 1;
-      else if (toStatus === "resolved") resolvedCount += 1;
+      const dOpen =
+        (toStatus === "open" ? 1 : 0) - (wasStatus === "open" ? 1 : 0);
+      const dResolved =
+        (toStatus === "resolved" ? 1 : 0) - (wasStatus === "resolved" ? 1 : 0);
+      const dTotal = dOpen + dResolved;
+
+      tx.update(sessionRef, {
+        openCount: FieldValue.increment(dOpen),
+        resolvedCount: FieldValue.increment(dResolved),
+        totalCount: FieldValue.increment(dTotal),
+        feedbackCount: FieldValue.increment(dTotal),
+        skippedCount: FieldValue.delete(),
+        updatedAt: new Date(),
+      });
+
+      const deltaResolved =
+        (toStatus === "resolved" ? 1 : 0) - (wasStatus === "resolved" ? 1 : 0);
+      return { workspaceId, delta: deltaResolved };
     }
 
-    openCount = Math.max(0, openCount);
-    resolvedCount = Math.max(0, resolvedCount);
-    const totalCount = openCount + resolvedCount;
-
     tx.update(sessionRef, {
-      openCount,
-      resolvedCount,
-      totalCount,
-      feedbackCount: totalCount,
       skippedCount: FieldValue.delete(),
       updatedAt: new Date(),
     });
-
-    if (wasStatus !== toStatus) {
-      const delta = (toStatus === "resolved" ? 1 : 0) - (wasStatus === "resolved" ? 1 : 0);
-      if (delta !== 0) {
-        const day = new Date().toISOString().slice(0, 10);
-        const insightsRow = insightsSnap?.data() ?? emptyWorkspaceInsightsDoc();
-        const dailyResolvedPath = `daily.${day}.resolved`;
-        tx.set(
-          insightsRef,
-          {
-            totalResolved: num((insightsRow as any).totalResolved) + delta,
-            [dailyResolvedPath]: num(getPath(insightsRow, dailyResolvedPath)) + delta,
-            updatedAt: new Date(),
-          } as Record<string, unknown>,
-          { merge: true }
-        );
-      }
-    }
-    return { sessionId };
+    return null;
   });
-  void result;
+
+  if (insightsFollowUp) {
+    const { workspaceId, delta } = insightsFollowUp;
+    const insightsRef = workspaceInsightsRef(workspaceId);
+    const day = new Date().toISOString().slice(0, 10);
+    const patch: Record<string, unknown> = {
+      totalResolved: FieldValue.increment(delta),
+      updatedAt: new Date(),
+    };
+    patch[`daily.${day}.resolved`] = FieldValue.increment(delta);
+    fireAndForget("updateFeedbackResolveAndSessionCountersRepo-insights", () =>
+      insightsRef.set(patch, { merge: true })
+    );
+  }
 }
 
 /** Cursor for server-side pagination. Opaque to callers; only repo uses it. */

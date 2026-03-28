@@ -9,6 +9,7 @@ import {
 } from "@/lib/repositories/sessionsRepository.server";
 import { incrementFeedbackCommentCountRepo } from "@/lib/repositories/feedbackRepository.server";
 import { incrementInsightsOnCommentCreateRepo } from "@/lib/repositories/insightsRepository.server";
+import { fireAndForget } from "@/lib/server/fireAndForget";
 
 function requireUserId(userId: string, context: string): string {
   const trimmed = userId.trim();
@@ -62,12 +63,20 @@ export async function addCommentRepo(
   const ref = await adminDb.collection("comments").add(payload);
   await incrementSessionCommentCountRepo(sessionId);
   await incrementFeedbackCommentCountRepo(feedbackId, data.message);
-  await updateSessionUpdatedAtRepo(sessionId);
-  await adminDb.doc(`workspaces/${workspaceId}`).update({
-    "stats.totalComments": FieldValue.increment(1),
-    "stats.updatedAt": FieldValue.serverTimestamp(),
-  });
-  await incrementInsightsOnCommentCreateRepo({ workspaceId });
+
+  fireAndForget("addCommentRepo-sessionUpdatedAt", () =>
+    updateSessionUpdatedAtRepo(sessionId)
+  );
+  fireAndForget("addCommentRepo-workspaceStats", () =>
+    adminDb.doc(`workspaces/${workspaceId}`).update({
+      "stats.totalComments": FieldValue.increment(1),
+      "stats.updatedAt": FieldValue.serverTimestamp(),
+    })
+  );
+  fireAndForget("addCommentRepo-insights", () =>
+    incrementInsightsOnCommentCreateRepo({ workspaceId })
+  );
+
   return ref.id;
 }
 
@@ -91,20 +100,45 @@ export async function updateCommentRepo(
 
 export async function deleteCommentRepo(commentId: string): Promise<void> {
   const commentRef = adminDb.doc(`comments/${commentId}`);
-  const snap = await commentRef.get();
-  if (!snap.exists) return;
-  const data = snap.data() ?? {};
-  const workspaceId =
-    typeof (data as { workspaceId?: unknown }).workspaceId === "string"
-      ? String((data as { workspaceId: string }).workspaceId).trim()
-      : "";
-  if (!workspaceId) {
-    throw new Error("Missing workspaceId on comment");
-  }
 
   await adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(commentRef);
+    if (!snap.exists) return;
+    const data = snap.data() ?? {};
+    const workspaceId =
+      typeof (data as { workspaceId?: unknown }).workspaceId === "string"
+        ? String((data as { workspaceId: string }).workspaceId).trim()
+        : "";
+    const sessionId =
+      typeof (data as { sessionId?: unknown }).sessionId === "string"
+        ? String((data as { sessionId: string }).sessionId).trim()
+        : "";
+    const feedbackId =
+      typeof (data as { feedbackId?: unknown }).feedbackId === "string"
+        ? String((data as { feedbackId: string }).feedbackId).trim()
+        : "";
+    if (!workspaceId) {
+      throw new Error("Missing workspaceId on comment");
+    }
+    if (!sessionId) {
+      throw new Error("Missing sessionId on comment");
+    }
+    if (!feedbackId) {
+      throw new Error("Missing feedbackId on comment");
+    }
+
+    const sessionRef = adminDb.doc(`sessions/${sessionId}`);
+    const feedbackRef = adminDb.doc(`feedback/${feedbackId}`);
+    const workspaceRef = adminDb.doc(`workspaces/${workspaceId}`);
+
     tx.delete(commentRef);
-    tx.update(adminDb.doc(`workspaces/${workspaceId}`), {
+    tx.update(sessionRef, {
+      commentCount: FieldValue.increment(-1),
+    });
+    tx.update(feedbackRef, {
+      commentCount: FieldValue.increment(-1),
+    });
+    tx.update(workspaceRef, {
       "stats.totalComments": FieldValue.increment(-1),
       "stats.updatedAt": FieldValue.serverTimestamp(),
     });

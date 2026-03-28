@@ -40480,6 +40480,7 @@
     totalCount,
     openCount,
     resolvedCount,
+    highPriorityOpenCount,
     sessionLoading = false,
     feedbackRecovering = false,
     feedbackRecoveryAttempts = 0,
@@ -40590,26 +40591,14 @@
     const showSessionSidebar = extensionMode && shouldShowTray;
     const showFloatingButton = !effectiveIsOpen && (showSidebar || showSessionSidebar);
     const showPanel = effectiveIsOpen && (showSidebar || showSessionSidebar);
-    const hasTickets = Boolean(state.pointers?.length);
+    const hasTickets = typeof totalCount === "number" && totalCount > 0;
     const sessionModeActive = globalSessionModeActive === true || globalSessionPaused === true || optimisticSessionActive;
     const showHomeScreen = !sessionModeActive;
     const isStartingSession = state.sessionStatus === "starting";
-    const openTicketsCount = extensionMode ? typeof openCount === "number" ? openCount : 0 : state.pointers.filter((p) => {
-      const status = p.status;
-      const isResolved = p.isResolved;
-      if (status === "resolved" || isResolved === true) return false;
-      return true;
-    }).length;
-    const resolvedTicketsCount = extensionMode ? typeof resolvedCount === "number" ? resolvedCount : 0 : state.pointers.filter((p) => {
-      const status = p.status;
-      const isResolved = p.isResolved;
-      return status === "resolved" || isResolved === true;
-    }).length;
+    const openTicketsCount = typeof openCount === "number" ? openCount : 0;
+    const resolvedTicketsCount = typeof resolvedCount === "number" ? resolvedCount : 0;
     const sessionHeaderCount = extensionMode && typeof totalCount === "number" ? totalCount : openTicketsCount;
-    const highPriorityCount = state.pointers.filter(
-      (p) => /critical|bug|high|urgent/i.test(p.type || "")
-    ).length;
-    const summary = extensionMode ? `${typeof totalCount === "number" ? totalCount : 0} total \xB7 ${openTicketsCount} open \xB7 ${resolvedTicketsCount} resolved` : openTicketsCount > 0 ? highPriorityCount > 0 ? `${highPriorityCount} need attention` : null : null;
+    const summary = extensionMode ? `${typeof totalCount === "number" ? totalCount : 0} total \xB7 ${openTicketsCount} open \xB7 ${resolvedTicketsCount} resolved` : openTicketsCount > 0 && typeof highPriorityOpenCount === "number" && highPriorityOpenCount > 0 ? `${highPriorityOpenCount} need attention` : null;
     (0, import_react16.useEffect)(() => {
       if (state.highlightTicketId && listScrollRef.current) {
         listScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });

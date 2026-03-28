@@ -1,5 +1,13 @@
 import { auth } from "@/lib/firebase";
 
+function echlyPerfEnabled(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof localStorage !== "undefined" &&
+    localStorage.getItem("ECHLY_PERF") === "1"
+  );
+}
+
 async function getIdTokenFresh(
   user: { getIdToken(): Promise<string>; getIdTokenResult(): Promise<{ expirationTime?: string }> }
 ): Promise<string> {
@@ -53,7 +61,18 @@ export async function authFetch(
     return null;
   }
 
+  const perf = echlyPerfEnabled();
+  const clientStart = perf ? performance.now() : 0;
+  if (perf) {
+    console.log("[ECHLY_PERF] CLIENT authFetch start", clientStart);
+    console.log("[ECHLY_PERF] TOKEN START");
+  }
+  const tokenStart = perf ? performance.now() : 0;
   const token = await getIdTokenFresh(user);
+  const tokenMs = perf ? performance.now() - tokenStart : 0;
+  if (perf) {
+    console.log("[ECHLY_PERF] TOKEN END", tokenMs.toFixed(1), "ms");
+  }
 
   const headers = new Headers(init.headers || {});
   headers.set("Authorization", `Bearer ${token}`);
@@ -84,12 +103,28 @@ export async function authFetch(
   }
 
   try {
+    const netStart = perf ? performance.now() : 0;
+    if (perf) console.log("[ECHLY_PERF] NETWORK START (fetch → response)");
     const res = await fetch(resolveInput(input), {
       ...restInit,
       headers,
       cache: "no-store",
       signal: signal ?? restInit.signal,
     });
+    if (perf) {
+      const networkMs = performance.now() - netStart;
+      const totalMs = performance.now() - clientStart;
+      console.log("[ECHLY_PERF] NETWORK END", networkMs.toFixed(1), "ms");
+      console.log(
+        "[ECHLY_PERF] authFetch summary — CLIENT TOTAL:",
+        totalMs.toFixed(1),
+        "ms | TOKEN:",
+        tokenMs.toFixed(1),
+        "ms | NETWORK:",
+        networkMs.toFixed(1),
+        "ms (API time = server logs: [Resolve] Total API)"
+      );
+    }
     if (timeoutId) clearTimeout(timeoutId);
     if (res.status === 403 && typeof window !== "undefined") {
       res

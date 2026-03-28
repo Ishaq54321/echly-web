@@ -30,6 +30,7 @@ import {
 } from "@/components/layout/operating-system";
 import { TopControlBar } from "@/components/ui/TopControlBar";
 import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
+import { useToast } from "@/components/dashboard/context/ToastContext";
 
 /** Broadcast ticket update to extension tray so tray stays in sync. */
 function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps?: string[] | null; type?: string }) {
@@ -85,6 +86,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const { loading: authLoading } = useAuthGuard({ router });
   const { workspaceId, authUid, isIdentityResolved } = useWorkspace();
+  const { showToast } = useToast();
 
   const feedbackSessionId = authUid && sessionId ? sessionId : undefined;
 
@@ -611,10 +613,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         }
       } catch (err) {
         console.error("[ECHLY] Session archive from menu failed", err);
+        showToast("Could not update session");
         if (snapshot) setSession(snapshot);
       }
     },
-    [sessionId, session, router, isIdentityResolved]
+    [sessionId, session, router, isIdentityResolved, showToast]
   );
 
   const handleRequestDeleteSessionFromMenu = useCallback((session: Session) => {
@@ -687,6 +690,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
     } catch (err) {
       console.error("[ECHLY] saveTitle failed", err);
+      showToast("Could not save title");
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === effectiveSelectedId
@@ -729,6 +733,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
     } catch (err) {
       console.error("[ECHLY] saveActionSteps failed", err);
+      showToast("Could not save action items");
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === effectiveSelectedId ? { ...item, actionSteps: previous } : item
@@ -768,6 +773,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
     } catch (err) {
       console.error("[ECHLY] saveTags failed", err);
+      showToast("Could not save tags");
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
@@ -776,63 +782,92 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
   };
 
-  const saveResolved = async (isResolved: boolean) => {
+  const saveResolved = (isResolved: boolean) => {
     if (!sessionActionCaps.canResolve || !effectiveSelectedId) return;
     assertIdentityResolved(isIdentityResolved);
+    const ticketId = effectiveSelectedId;
     const previousResolved = Boolean(selectedItem?.isResolved);
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === effectiveSelectedId ? { ...item, isResolved } : item
+        item.id === ticketId ? { ...item, isResolved } : item
       )
     );
-    try {
-      const res = await authFetch(`/api/tickets/${effectiveSelectedId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isResolved }),
-      });
-      if (!res) {
+    void (async () => {
+      const perf =
+        typeof window !== "undefined" &&
+        typeof localStorage !== "undefined" &&
+        localStorage.getItem("ECHLY_PERF") === "1";
+      const t0 = performance.now();
+      if (perf) console.log("[ECHLY_PERF] CLIENT START (resolve ticket)", t0);
+      try {
+        const res = await authFetch(`/api/tickets/${ticketId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isResolved }),
+        });
+        if (!res) {
+          setFeedback((prev) =>
+            prev.map((item) =>
+              item.id === ticketId
+                ? { ...item, isResolved: previousResolved }
+                : item
+            )
+          );
+          showToast("Could not update ticket status");
+          return;
+        }
+        const data = (await res.json()) as {
+          success?: boolean;
+          ticket?: TicketFromApi;
+        };
+        if (perf) {
+          const clientTotal = performance.now() - t0;
+          console.log("[ECHLY_PERF] CLIENT END (resolve ticket)", clientTotal.toFixed(1), "ms");
+          console.log(
+            "[ECHLY_PERF] Full breakdown: compare CLIENT total above with authFetch TOKEN/NETWORK lines and server [Resolve] logs for API vs Firestore."
+          );
+        }
+        if (!res.ok || !data.success || !data.ticket) {
+          showToast("Could not update ticket status");
+          setFeedback((prev) =>
+            prev.map((item) =>
+              item.id === ticketId
+                ? { ...item, isResolved: previousResolved }
+                : item
+            )
+          );
+          return;
+        }
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === effectiveSelectedId
+            item.id === ticketId ? { ...item, ...data.ticket } : item
+          )
+        );
+        broadcastTicketUpdated(data.ticket);
+      } catch (err) {
+        console.error("[ECHLY] saveResolved failed", err);
+        showToast("Could not update ticket status");
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === ticketId
               ? { ...item, isResolved: previousResolved }
               : item
           )
         );
-        return;
       }
-      const data = (await res.json()) as {
-        success?: boolean;
-        ticket?: TicketFromApi;
-      };
-      if (data.success && data.ticket) {
-        setFeedback((prev) =>
-          prev.map((item) =>
-            item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
-          )
-        );
-        broadcastTicketUpdated(data.ticket);
-      }
-    } catch (err) {
-      console.error("[ECHLY] saveResolved failed", err);
-      setFeedback((prev) =>
-        prev.map((item) =>
-          item.id === effectiveSelectedId
-            ? { ...item, isResolved: previousResolved }
-            : item
-        )
-      );
-    }
+    })();
   };
 
-  const handleResolveAndNext = async () => {
+  const handleResolveAndNext = () => {
     if (!effectiveSelectedId || !selectedItem) return;
-    await saveResolved(true);
-    const openIdx = stableOpenFeedback.findIndex((f) => f.id === effectiveSelectedId);
-    if (openIdx === -1) return;
+    const currentId = effectiveSelectedId;
+    const openIdx = stableOpenFeedback.findIndex((f) => f.id === currentId);
     const nextOpen =
-      stableOpenFeedback[openIdx + 1] ?? stableOpenFeedback[0];
-    if (nextOpen && nextOpen.id !== effectiveSelectedId) {
+      openIdx >= 0
+        ? stableOpenFeedback[openIdx + 1] ?? stableOpenFeedback[0]
+        : stableOpenFeedback[0];
+    saveResolved(true);
+    if (nextOpen && nextOpen.id !== currentId) {
       setSelectedId(nextOpen.id);
     }
   };
@@ -887,12 +922,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
     } catch (err) {
       console.error("[ECHLY] handleSessionTitleBlur PATCH failed", err);
+      showToast("Could not save session name");
       setSession((prev: Session | null) =>
         prev ? ({ ...prev, title: previousTitle } as Session) : prev
       );
       setSessionTitleDraft((previousTitle || "").trim());
     }
-  }, [sessionId, session, sessionTitleDraft, isIdentityResolved]);
+  }, [sessionId, session, sessionTitleDraft, isIdentityResolved, showToast]);
 
   const handleMarkAllResolved = useCallback(async () => {
     if (!sessionActionCaps.canResolve) return;
@@ -916,13 +952,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           })
         )
       );
-      if (results.some((r) => r == null)) {
+      if (results.some((r) => r == null || !r.ok)) {
         setFeedback(previousFeedback);
+        showToast("Could not resolve all tickets");
         return;
       }
     } catch (err) {
       warn("Mark all resolved failed:", err);
       setFeedback(previousFeedback);
+      showToast("Could not resolve all tickets");
       return;
     }
   }, [
@@ -931,6 +969,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     setFeedback,
     sessionActionCaps.canResolve,
     isIdentityResolved,
+    showToast,
   ]);
 
   const handleMarkAllUnresolved = useCallback(async () => {
@@ -957,13 +996,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           })
         )
       );
-      if (results.some((r) => r == null)) {
+      if (results.some((r) => r == null || !r.ok)) {
         setFeedback(previousFeedback);
+        showToast("Could not reopen all tickets");
         return;
       }
     } catch (err) {
       warn("Mark all unresolved failed:", err);
       setFeedback(previousFeedback);
+      showToast("Could not reopen all tickets");
       return;
     }
   }, [
@@ -972,6 +1013,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     setFeedback,
     sessionActionCaps.canResolve,
     isIdentityResolved,
+    showToast,
   ]);
 
   const handleDeleteFeedback = async (id: string) => {
@@ -994,6 +1036,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       router.push(`/dashboard/${sessionId}`);
     } catch (err) {
       console.error("[ECHLY] handleDeleteFeedback failed", err);
+      showToast("Could not delete ticket");
       setFeedback(prevFeedback);
       setSelectedId(selectionBeforeDelete);
     }

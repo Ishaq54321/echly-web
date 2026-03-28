@@ -236,8 +236,13 @@ const CommentThreadList = memo(function CommentThreadList({
   const resolvedRoots = roots.filter((r) => r.resolved);
   const [resolvedCollapsed, setResolvedCollapsed] = useState(true);
 
-  if (loading) {
-    return <div className="py-6 min-h-[4.5rem]" aria-hidden />;
+  if (loading && roots.length === 0) {
+    return (
+      <div className="py-3 space-y-2" aria-busy="true" aria-label="Loading comments">
+        <div className="h-2.5 w-24 rounded-md bg-[var(--layer-2-border)]/80 animate-pulse" />
+        <div className="h-16 w-full rounded-lg bg-[var(--layer-2-hover-bg)]/90 animate-pulse" />
+      </div>
+    );
   }
 
   if (roots.length === 0) {

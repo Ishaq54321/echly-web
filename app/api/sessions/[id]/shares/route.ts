@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 import { listSessionSharesRepo } from "@/lib/repositories/sessionSharesRepository";
-import { sessionWorkspaceId, userWorkspaceMatchesSession } from "@/lib/server/sessionWorkspaceScope";
+import { sessionWorkspaceId } from "@/lib/server/sessionWorkspaceScope";
+import { buildRequestContext } from "@/lib/server/requestContext";
 
 /** GET /api/sessions/:id/shares — list email shares for a session (owner only). */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,13 +18,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ success: false, error: "Missing session id" }, { status: 400 });
   }
 
-  const session = await getSessionByIdRepo(sessionId);
-  if (!session) {
+  const context = await buildRequestContext({
+    userId: user.uid,
+    sessionId: sessionId.trim(),
+  });
+  if (!context.session) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
-  if (!(await userWorkspaceMatchesSession(user.uid, session))) {
+  if (!context.canAccess) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
+  const session = context.session;
 
   try {
     const workspaceId = sessionWorkspaceId(session) ?? "";

@@ -7,67 +7,19 @@ import {
   updateComment,
   deleteComment,
   createOptimisticComment,
+  isOptimisticLocalComment,
+  mergeRealtimeCommentsWithOptimistic,
   type Comment,
-  type OptimisticComment,
+  type LocalComment,
   type AddCommentOptions,
 } from "@/lib/comments";
 import type { CommentPosition, CommentTextRange } from "@/lib/domain/comment";
-import { authFetch } from "@/lib/authFetch";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import {
   assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
-
-type LocalComment = Comment | OptimisticComment;
-
-function isTempComment(comment: LocalComment): comment is OptimisticComment {
-  return "isOptimistic" in comment && comment.isOptimistic === true;
-}
-
-function readCommentTimeMs(comment: Comment): number | null {
-  const createdAt = comment.createdAt as unknown;
-  if (!createdAt) return null;
-  if (
-    typeof createdAt === "object" &&
-    createdAt != null &&
-    "toDate" in (createdAt as { toDate?: unknown }) &&
-    typeof (createdAt as { toDate: () => Date }).toDate === "function"
-  ) {
-    return (createdAt as { toDate: () => Date }).toDate().getTime();
-  }
-  if (
-    typeof createdAt === "object" &&
-    createdAt != null &&
-    "seconds" in (createdAt as { seconds?: unknown }) &&
-    typeof (createdAt as { seconds: number }).seconds === "number"
-  ) {
-    return (createdAt as { seconds: number }).seconds * 1000;
-  }
-  return null;
-}
-
-function sameCommentPayload(optimistic: OptimisticComment, incoming: Comment): boolean {
-  if (optimistic.id === incoming.id) return true;
-  if ((incoming.id || "").startsWith("temp_")) return false;
-  if ((optimistic.message || "").trim() !== (incoming.message || "").trim()) return false;
-  if (optimistic.userId !== incoming.userId) return false;
-  if ((optimistic.threadId ?? null) !== (incoming.threadId ?? null)) return false;
-  if ((optimistic.type ?? "general") !== (incoming.type ?? "general")) return false;
-
-  const incomingMs = readCommentTimeMs(incoming);
-  if (incomingMs == null) return true;
-  return Math.abs(incomingMs - optimistic.optimisticCreatedAtMs) <= 30_000;
-}
-
-function mergeRealtimeComments(prev: LocalComment[], incoming: Comment[]): LocalComment[] {
-  const incomingNonTemp = incoming.filter((c) => !(c.id || "").startsWith("temp_"));
-  const optimisticPending = prev
-    .filter(isTempComment)
-    .filter((opt) => !incomingNonTemp.some((real) => sameCommentPayload(opt, real)));
-  return [...incomingNonTemp, ...optimisticPending];
-}
 
 /**
  * Controlled realtime comment list: one `listenToCommentsRepo` subscription at a time
@@ -110,12 +62,10 @@ export function useFeedbackDetailController(args: {
   }, [feedbackId]);
 
   useEffect(() => {
-    if (!authUid || !workspaceId || !feedbackId) {
-      return;
-    }
-    const t = requestAnimationFrame(() => setLoadingComments(true));
-    return () => cancelAnimationFrame(t);
-  }, [workspaceId, authUid, sessionId, feedbackId]);
+    if (!sessionId || !feedbackId) return;
+    setComments([]);
+    setLoadingComments(true);
+  }, [sessionId, feedbackId]);
 
   useCommentsRepoSubscription({
     workspaceId,
@@ -123,7 +73,9 @@ export function useFeedbackDetailController(args: {
     feedbackId,
     enabled: Boolean(authUid),
     onComments: (incomingComments) => {
-      setComments((prev) => mergeRealtimeComments(prev, incomingComments));
+      setComments((prev) =>
+        mergeRealtimeCommentsWithOptimistic(prev, incomingComments)
+      );
       setLoadingComments(false);
     },
   });
@@ -147,7 +99,6 @@ export function useFeedbackDetailController(args: {
     setComments((prev) => [...prev, optimistic]);
     try {
       await addComment(sessionId, feedbackId, payload);
-      setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
     } catch (err) {
       console.error("[ECHLY] addComment failed", err);
       setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -175,7 +126,6 @@ export function useFeedbackDetailController(args: {
     setComments((prev) => [...prev, optimistic]);
     try {
       await addComment(sessionId, feedbackId, payload);
-      setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
     } catch (err) {
       console.error("[ECHLY] addComment reply failed", err);
       setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -191,18 +141,39 @@ export function useFeedbackDetailController(args: {
     assertIdentityResolved(isIdentityResolved);
     const trimmed = message.trim();
     if (!trimmed) return null;
+    const payload: AddCommentOptions = {
+      userId: authUid,
+      userName: authDisplayName || "User",
+      userAvatar: authPhotoUrl || "",
+      message: trimmed,
+      type: "pin",
+      position,
+    };
+    const optimistic = createOptimisticComment({
+      sessionId,
+      feedbackId,
+      data: payload,
+    });
+    setComments((prev) => [...prev, optimistic]);
     try {
-      const id = await addComment(sessionId, feedbackId, {
-        userId: authUid,
-        userName: authDisplayName || "User",
-        userAvatar: authPhotoUrl || "",
-        message: trimmed,
-        type: "pin",
-        position,
-      });
+      const id = await addComment(sessionId, feedbackId, payload);
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === optimistic.id && isOptimisticLocalComment(c)
+            ? {
+                ...c,
+                id,
+                isOptimistic: true,
+                optimisticCreatedAtMs: c.optimisticCreatedAtMs,
+              }
+            : c
+        )
+      );
       return id;
     } catch (err) {
       console.error("[ECHLY] sendPinComment failed", err);
+      setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
+      showToast("Failed to add pin comment");
       return null;
     }
   };
@@ -215,33 +186,40 @@ export function useFeedbackDetailController(args: {
     assertIdentityResolved(isIdentityResolved);
     const trimmed = message.trim();
     if (!trimmed) return null;
+    const payload: AddCommentOptions = {
+      userId: authUid,
+      userName: authDisplayName || "User",
+      userAvatar: authPhotoUrl || "",
+      message: trimmed,
+      type: "text",
+      textRange,
+    };
+    const optimistic = createOptimisticComment({
+      sessionId,
+      feedbackId,
+      data: payload,
+    });
+    setComments((prev) => [...prev, optimistic]);
     try {
-      const id = await addComment(sessionId, feedbackId, {
-        userId: authUid,
-        userName: authDisplayName || "User",
-        userAvatar: authPhotoUrl || "",
-        message: trimmed,
-        type: "text",
-        textRange,
-      });
+      const id = await addComment(sessionId, feedbackId, payload);
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === optimistic.id && isOptimisticLocalComment(c)
+            ? {
+                ...c,
+                id,
+                isOptimistic: true,
+                optimisticCreatedAtMs: c.optimisticCreatedAtMs,
+              }
+            : c
+        )
+      );
       return id;
     } catch (err) {
       console.error("[ECHLY] sendTextComment failed", err);
+      setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
+      showToast("Failed to add comment");
       return null;
-    }
-  };
-
-  const resolve = async () => {
-    if (!canResolve || !feedbackId) return;
-    assertIdentityResolved(isIdentityResolved);
-    const res = await authFetch(`/api/tickets/${feedbackId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isResolved: true }),
-    });
-    if (!res) return;
-    if (!res.ok) {
-      console.error("[ECHLY] resolve via API failed", await res.text().catch(() => ""));
     }
   };
 
@@ -261,7 +239,29 @@ export function useFeedbackDetailController(args: {
     if (data.resolved !== undefined && !canResolve) return;
     if (data.message !== undefined && !canComment) return;
     assertIdentityResolved(isIdentityResolved);
-    await updateComment(commentId, data);
+    let previousResolved: boolean | undefined;
+    if (data.resolved !== undefined) {
+      setComments((prev) => {
+        const target = prev.find((c) => c.id === commentId);
+        previousResolved = target ? Boolean(target.resolved) : undefined;
+        return prev.map((c) =>
+          c.id === commentId ? { ...c, resolved: data.resolved } : c
+        );
+      });
+    }
+    try {
+      await updateComment(commentId, data);
+    } catch (err) {
+      console.error("[ECHLY] updateComment failed", err);
+      if (data.resolved !== undefined && previousResolved !== undefined) {
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === commentId ? { ...c, resolved: previousResolved } : c
+          )
+        );
+      }
+      showToast("Failed to update comment");
+    }
   };
 
   const deleteCommentHandler = async (commentId: string) => {
@@ -277,7 +277,6 @@ export function useFeedbackDetailController(args: {
     sendReply,
     sendPinComment,
     sendTextComment,
-    resolve,
     updatePinPosition: updatePinPositionHandler,
     updateComment: updateCommentHandler,
     deleteComment: deleteCommentHandler,

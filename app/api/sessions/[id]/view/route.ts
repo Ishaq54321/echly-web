@@ -7,7 +7,7 @@ import {
 } from "@/lib/server/auth/authorize";
 import { resolveShareToken } from "@/lib/server/shareTokenResolver";
 import { checkRateLimit, clientKeyFromRequest } from "@/lib/server/rateLimit";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { buildRequestContext } from "@/lib/server/requestContext";
 
 export async function POST(
   req: Request,
@@ -47,11 +47,6 @@ export async function POST(
     }
   }
 
-  const session = await getSessionByIdRepo(id);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
-  }
-
   if (!uid && shareToken) {
     const shareResolution = await resolveShareToken(shareToken);
     if (!shareResolution.valid || shareResolution.sessionId !== id) {
@@ -60,17 +55,21 @@ export async function POST(
     isShareAuthorized = true;
   }
 
-  if (!isShareAuthorized && uid) {
-    let wid: string;
-    try {
-      wid = await getUserWorkspaceIdRepo(uid);
-    } catch {
+  if (uid && !isShareAuthorized) {
+    const accessCtx = await buildRequestContext({
+      userId: uid,
+      sessionId: id,
+    });
+    if (!accessCtx.session) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+    }
+    if (!accessCtx.canAccess) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
-    const sw =
-      typeof session.workspaceId === "string" ? session.workspaceId.trim() : "";
-    if (!sw || wid !== sw) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  } else {
+    const session = await getSessionByIdRepo(id);
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
     }
   }
 

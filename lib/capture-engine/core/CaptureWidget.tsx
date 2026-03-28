@@ -39,6 +39,7 @@ export default function CaptureWidget({
   totalCount,
   openCount,
   resolvedCount,
+  highPriorityOpenCount,
   sessionLoading = false,
   feedbackRecovering = false,
   feedbackRecoveryAttempts = 0,
@@ -162,42 +163,26 @@ export default function CaptureWidget({
   const showFloatingButton = !effectiveIsOpen && (showSidebar || showSessionSidebar);
   const showPanel = effectiveIsOpen && (showSidebar || showSessionSidebar);
 
-  const hasTickets = Boolean(state.pointers?.length);
+  const hasTickets = typeof totalCount === "number" && totalCount > 0;
   /** When true, we are in an active or paused session; always render session layout (ticket list or empty state), never home. */
   const sessionModeActive = globalSessionModeActive === true || globalSessionPaused === true || optimisticSessionActive;
   /** Home screen (mode tiles + Start Session / Previous Sessions footer) only when not in a session. */
   const showHomeScreen = !sessionModeActive;
   const isStartingSession = state.sessionStatus === "starting";
 
-  const openTicketsCount = extensionMode
-    ? (typeof openCount === "number" ? openCount : 0)
-    : state.pointers.filter((p) => {
-        const status = (p as { status?: string }).status;
-        const isResolved = (p as { isResolved?: boolean }).isResolved;
-        if (status === "resolved" || isResolved === true) return false;
-        return true;
-      }).length;
-  const resolvedTicketsCount = extensionMode
-    ? (typeof resolvedCount === "number" ? resolvedCount : 0)
-    : state.pointers.filter((p) => {
-        const status = (p as { status?: string }).status;
-        const isResolved = (p as { isResolved?: boolean }).isResolved;
-        return status === "resolved" || isResolved === true;
-      }).length;
+  const openTicketsCount = typeof openCount === "number" ? openCount : 0;
+  const resolvedTicketsCount = typeof resolvedCount === "number" ? resolvedCount : 0;
   const sessionHeaderCount =
     extensionMode && typeof totalCount === "number"
       ? totalCount
       : openTicketsCount;
 
-  const highPriorityCount = state.pointers.filter((p) =>
-    /critical|bug|high|urgent/i.test(p.type || "")
-  ).length;
   const summary = extensionMode
     ? `${typeof totalCount === "number" ? totalCount : 0} total · ${openTicketsCount} open · ${resolvedTicketsCount} resolved`
-    : openTicketsCount > 0
-      ? highPriorityCount > 0
-        ? `${highPriorityCount} need attention`
-        : null
+    : openTicketsCount > 0 &&
+        typeof highPriorityOpenCount === "number" &&
+        highPriorityOpenCount > 0
+      ? `${highPriorityOpenCount} need attention`
       : null;
 
   useEffect(() => {

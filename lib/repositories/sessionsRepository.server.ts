@@ -324,6 +324,9 @@ export async function deleteSessionRepo(sessionId: string): Promise<void> {
     sessionCount: FieldValue.increment(-1),
     ...(session?.archived === true ? { archivedCount: FieldValue.increment(-1) } : {}),
     "stats.totalSessions": FieldValue.increment(-1),
+    ...(feedbackDeleted > 0
+      ? { "stats.totalFeedback": FieldValue.increment(-feedbackDeleted) }
+      : {}),
     ...(commentsDeleted > 0
       ? { "stats.totalComments": FieldValue.increment(-commentsDeleted) }
       : {}),

@@ -3,9 +3,9 @@ import type { NextRequest } from "next/server";
 import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
   addFeedbackWithSessionCountersRepo,
-  getFeedbackByIdRepo,
+  feedbackFromCreateInsert,
 } from "@/lib/repositories/feedbackRepository.server";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import type { Feedback } from "@/lib/domain/feedback";
 import {
   getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
@@ -18,7 +18,7 @@ import "@/lib/server/firebaseAdmin";
 import { getStorage } from "firebase-admin/storage";
 import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
 import { authorize } from "@/lib/server/auth/authorize";
-import { userWorkspaceMatchesSession } from "@/lib/server/sessionWorkspaceScope";
+import { buildRequestContext } from "@/lib/server/requestContext";
 
 
 function unauthorized(): Response {
@@ -270,14 +270,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const session = await getSessionByIdRepo(sessionId);
-  if (!session) {
+  const accessCtx = await buildRequestContext({
+    userId: user.uid,
+    userEmail: user.email,
+    sessionId,
+  });
+  if (!accessCtx.session) {
     return NextResponse.json(
       { success: false, error: "Session not found" },
       { status: 404, headers: corsHeaders(req) }
     );
   }
-  if (!(await userWorkspaceMatchesSession(user.uid, session))) {
+  if (!accessCtx.canAccess) {
     return NextResponse.json(
       { success: false, error: "Forbidden" },
       { status: 403, headers: corsHeaders(req) }
@@ -348,7 +352,7 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    const docRef = await addFeedbackWithSessionCountersRepo(
+    const result = await addFeedbackWithSessionCountersRepo(
       userId,
       sessionId,
       user.uid,
@@ -356,18 +360,32 @@ export async function POST(req: NextRequest) {
       normalizedFeedbackId,
       normalizedScreenshotId
     );
-    const created = await getFeedbackByIdRepo(docRef.id);
-    if (!created) {
-      return NextResponse.json(
-        { success: false, error: "Feedback created but could not be read" },
-        { status: 500, headers: corsHeaders(req) }
-      );
+    const { ref, inserted } = result;
+    let created: Feedback;
+    if (inserted) {
+      created = feedbackFromCreateInsert({
+        id: ref.id,
+        userId,
+        sessionId,
+        data: structuredData,
+        createdAt: result.createdAt!,
+      });
+    } else {
+      const existing = result.existingFeedback;
+      if (!existing) {
+        return NextResponse.json(
+          { success: false, error: "Idempotent create returned no document" },
+          { status: 500, headers: corsHeaders(req) }
+        );
+      }
+      created = existing;
     }
 
     return NextResponse.json(
       {
         success: true,
         ticket: serializeTicket(created),
+        ...(inserted ? {} : { alreadyExists: true }),
       },
       { headers: corsHeaders(req) }
     );

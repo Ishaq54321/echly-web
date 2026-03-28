@@ -5,8 +5,14 @@ import Link from "next/link";
 import { X } from "lucide-react";
 import { DiscussionPanelBodySkeleton } from "@/components/discussion/discussionSkeletons";
 import { authFetch } from "@/lib/authFetch";
-import { addComment } from "@/lib/comments";
+import {
+  addComment,
+  createOptimisticComment,
+  mergeRealtimeCommentsWithOptimistic,
+  type LocalComment,
+} from "@/lib/comments";
 import type { Comment } from "@/lib/domain/comment";
+import { useToast } from "@/components/dashboard/context/ToastContext";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
 import {
   assertIdentityResolved,
@@ -40,9 +46,10 @@ export function DiscussionPanel({
     authDisplayName,
     authPhotoUrl,
   } = useWorkspace();
+  const { showToast } = useToast();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<LocalComment[]>([]);
   const [loading, setLoading] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -114,31 +121,50 @@ export function DiscussionPanel({
     workspaceId,
     sessionId: ticket?.sessionId,
     feedbackId,
-    onComments: (incoming) => setComments([...incoming]),
+    onComments: (incoming) =>
+      setComments((prev) => mergeRealtimeCommentsWithOptimistic(prev, incoming)),
   });
 
-  const handleSendComment = async () => {
-    if (!authUid || !feedbackId || !ticket?.sessionId) return;
+  const handleSendComment = () => {
+    const sid = ticket?.sessionId;
+    if (!authUid || !feedbackId || !sid || !workspaceId) return;
     assertIdentityResolved(isIdentityResolved);
     const trimmed = commentDraft.trim();
     if (!trimmed) return;
 
-    setSending(true);
-    try {
-      await addComment(ticket.sessionId, feedbackId, {
+    const optimistic = createOptimisticComment({
+      sessionId: sid,
+      feedbackId,
+      data: {
         userId: authUid,
         userName: authDisplayName || "User",
         userAvatar: authPhotoUrl || "",
         message: trimmed,
         type: "general",
-      });
-      setCommentDraft("");
-      onCommentAdded?.();
-    } catch (err) {
-      console.error("[DiscussionPanel] send comment:", err);
-    } finally {
-      setSending(false);
-    }
+      },
+    });
+    setComments((prev) => [...prev, optimistic]);
+    setCommentDraft("");
+    onCommentAdded?.();
+
+    void (async () => {
+      setSending(true);
+      try {
+        await addComment(sid, feedbackId, {
+          userId: authUid,
+          userName: authDisplayName || "User",
+          userAvatar: authPhotoUrl || "",
+          message: trimmed,
+          type: "general",
+        });
+      } catch (err) {
+        console.error("[DiscussionPanel] send comment:", err);
+        setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
+        showToast("Could not send comment");
+      } finally {
+        setSending(false);
+      }
+    })();
   };
 
   useEffect(() => {

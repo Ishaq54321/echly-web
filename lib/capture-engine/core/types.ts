@@ -128,6 +128,8 @@ export type CaptureWidgetProps = {
   openCount?: number;
   /** Extension: resolved feedback count from backend aggregation; independent of loaded pointers. */
   resolvedCount?: number;
+  /** Precomputed open high-priority feedback count (session/write-time); optional summary line when greater than zero. */
+  highPriorityOpenCount?: number;
   /** Extension: true while loading a previous session's feedback; show spinner instead of empty state. */
   sessionLoading?: boolean;
   /** Extension: true while pagination recovery loop is actively retrying rehydrate. */
