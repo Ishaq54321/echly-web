@@ -99,67 +99,67 @@ export function FeedbackContent({
   const tagsToOffer = AVAILABLE_TAGS.filter((t) => !tags.includes(t));
 
   const roDesc = typeof readOnlyDescription === "string" ? readOnlyDescription.trim() : "";
+  const hasAttachmentContent =
+    Boolean(item.screenshotUrl?.trim()) || fileAttachments.length > 0;
 
   return (
     <div className="content-wrapper flex flex-col gap-4 min-w-0">
       {roDesc ? (
         <DescriptionSection description={roDesc} />
       ) : null}
-      <section className="min-w-0">
-        <div className="section-header text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6B7280] flex items-center gap-1.5 mb-2">
-          <Paperclip size={16} strokeWidth={1.8} className="shrink-0 text-[#6B7280]" aria-hidden />
-          Attachments
-        </div>
-        <div className="attachments rounded-xl border border-[#E5E7EB] bg-white p-[14px] space-y-3">
-          {item.screenshotUrl ? (
-            sendPinComment != null ? (
-              <ScreenshotWithPins
-                screenshotUrl={item.screenshotUrl}
-                onExpand={onExpandImage}
-                isCommentMode={isCommentMode}
-                pins={pinComments ?? []}
-                comments={comments}
-                activePinId={activePinId}
-                activeThreadId={activeThreadId}
-                onPinClick={onPinClick}
-                onOpenThreadPanel={onOpenThreadPanel}
-                onCloseInlinePopover={onCloseInlinePopover}
-                onAddPinComment={sendPinComment}
-                updateComment={updateComment}
-                onCommentPlaced={onCommentPlaced}
-                onPinPositionChange={updatePinPosition}
-                embeddedInCard
-              />
-            ) : (
-              <ScreenshotBlock
-                screenshotUrl={item.screenshotUrl}
-                onExpand={onExpandImage}
-                embeddedInCard
-              />
-            )
-          ) : fileAttachments.length === 0 ? (
-            <div className="echly-screenshot-placeholder rounded-lg overflow-hidden">
-              <div className="echly-screenshot-loading-bar" />
-            </div>
-          ) : null}
-          {fileAttachments.length > 0 ? (
-            <ul className="list-none m-0 p-0 space-y-2">
-              {fileAttachments.map((f, i) => (
-                <li key={`${f.url}-${i}`}>
-                  <a
-                    href={f.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[14px] font-medium text-[#2563EB] hover:underline break-all"
-                  >
-                    {f.name?.trim() ? f.name : "Attachment"}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      </section>
+      {hasAttachmentContent ? (
+        <section className="min-w-0">
+          <div className="section-header text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6B7280] flex items-center gap-1.5 mb-2">
+            <Paperclip size={16} strokeWidth={1.8} className="shrink-0 text-[#6B7280]" aria-hidden />
+            Attachments
+          </div>
+          <div className="attachments rounded-xl border border-[#E5E7EB] bg-white p-[14px] space-y-3">
+            {item.screenshotUrl ? (
+              sendPinComment != null ? (
+                <ScreenshotWithPins
+                  screenshotUrl={item.screenshotUrl}
+                  onExpand={onExpandImage}
+                  isCommentMode={isCommentMode}
+                  pins={pinComments ?? []}
+                  comments={comments}
+                  activePinId={activePinId}
+                  activeThreadId={activeThreadId}
+                  onPinClick={onPinClick}
+                  onOpenThreadPanel={onOpenThreadPanel}
+                  onCloseInlinePopover={onCloseInlinePopover}
+                  onAddPinComment={sendPinComment}
+                  updateComment={updateComment}
+                  onCommentPlaced={onCommentPlaced}
+                  onPinPositionChange={updatePinPosition}
+                  embeddedInCard
+                />
+              ) : (
+                <ScreenshotBlock
+                  screenshotUrl={item.screenshotUrl}
+                  onExpand={onExpandImage}
+                  embeddedInCard
+                />
+              )
+            ) : null}
+            {fileAttachments.length > 0 ? (
+              <ul className="list-none m-0 p-0 space-y-2">
+                {fileAttachments.map((f, i) => (
+                  <li key={`${f.url}-${i}`}>
+                    <a
+                      href={f.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[14px] font-medium text-[#2563EB] hover:underline break-all"
+                    >
+                      {f.name?.trim() ? f.name : f.url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
       {item.suggestion != null && item.suggestion !== "" && (
         <SuggestionSection suggestion={item.suggestion} />
       )}

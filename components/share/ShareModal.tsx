@@ -19,6 +19,11 @@ import { useToast } from "@/components/dashboard/context/ToastContext";
 
 import { PORTAL_DROPDOWN_Z_INDEX } from "@/lib/ui/zIndex";
 
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
+
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
 import {
@@ -450,6 +455,7 @@ export function ShareModal({
   sessionTitle,
 }: ShareModalProps) {
   const { showToast } = useToast();
+  const { isIdentityResolved } = useWorkspace();
 
   const [email, setEmail] = useState("");
 
@@ -625,6 +631,8 @@ export function ShareModal({
 
     beginShareOp();
 
+    assertIdentityResolved(isIdentityResolved);
+
     shareSession({
       sessionId,
 
@@ -697,9 +705,11 @@ export function ShareModal({
     emailValid &&
     users.some((u) => normalizeEmail(u.email) === normalizedInput);
 
-  const shareHeaderSessionName = sessionTitle?.trim() || "Untitled Session";
+  const shareHeaderSessionName = sessionTitle?.trim() ?? "";
 
-  const dialogLabel = `Share “${shareHeaderSessionName}”`;
+  const dialogLabel = shareHeaderSessionName
+    ? `Share “${shareHeaderSessionName}”`
+    : "Share";
 
   return (
     <ModalPortal>
@@ -802,6 +812,8 @@ export function ShareModal({
 
                           beginShareOp();
 
+                          assertIdentityResolved(isIdentityResolved);
+
                           updateSharePermission({
                             sessionId,
                             email: rowEmail,
@@ -854,6 +866,7 @@ export function ShareModal({
                 const prev = linkAccessLevel;
                 setLinkAccessLevel(next);
                 beginShareOp();
+                assertIdentityResolved(isIdentityResolved);
                 updateSessionLinkAccess({ sessionId, accessLevel: next })
                   .catch(() => {
                     setLinkAccessLevel(prev);

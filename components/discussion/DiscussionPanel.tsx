@@ -3,11 +3,15 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
+import { DiscussionPanelBodySkeleton } from "@/components/discussion/discussionSkeletons";
 import { authFetch } from "@/lib/authFetch";
 import { addComment } from "@/lib/comments";
 import type { Comment } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 
 const PANEL_WIDTH = 420;
@@ -29,8 +33,13 @@ export function DiscussionPanel({
   onClose,
   onCommentAdded,
 }: DiscussionPanelProps) {
-  const { workspaceId, claimsReady, authUid, authDisplayName, authPhotoUrl } =
-    useWorkspace();
+  const {
+    workspaceId,
+    isIdentityResolved,
+    authUid,
+    authDisplayName,
+    authPhotoUrl,
+  } = useWorkspace();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
   const [comments, setComments] = useState<Comment[]>([]);
@@ -42,10 +51,16 @@ export function DiscussionPanel({
     if (!feedbackId) {
       setTicket(null);
       setSessionName("");
+      setLoading(false);
       return;
     }
 
-    if (!claimsReady) return;
+    setTicket(null);
+    setSessionName("");
+    if (!isIdentityResolved) {
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);
@@ -87,24 +102,24 @@ export function DiscussionPanel({
     return () => {
       cancelled = true;
     };
-  }, [feedbackId, claimsReady]);
+  }, [feedbackId, isIdentityResolved]);
 
   useEffect(() => {
-    if (!workspaceId || !feedbackId || !ticket?.sessionId || !claimsReady) {
+    if (!workspaceId || !feedbackId || !ticket?.sessionId || !isIdentityResolved) {
       setComments([]);
     }
-  }, [workspaceId, feedbackId, ticket?.sessionId, claimsReady]);
+  }, [workspaceId, feedbackId, ticket?.sessionId, isIdentityResolved]);
 
   useCommentsRepoSubscription({
     workspaceId,
     sessionId: ticket?.sessionId,
     feedbackId,
-    claimsReady,
     onComments: (incoming) => setComments([...incoming]),
   });
 
   const handleSendComment = async () => {
     if (!authUid || !feedbackId || !ticket?.sessionId) return;
+    assertIdentityResolved(isIdentityResolved);
     const trimmed = commentDraft.trim();
     if (!trimmed) return;
 
@@ -173,11 +188,7 @@ export function DiscussionPanel({
 
         <div className="flex-1 overflow-y-auto min-h-0">
           {loading || !ticket ? (
-            <div className="p-6 space-y-4">
-              <div className="h-6 w-3/4 bg-neutral-200 rounded animate-pulse" />
-              <div className="h-4 w-1/2 bg-neutral-100 rounded animate-pulse" />
-              <div className="h-24 bg-neutral-100 rounded animate-pulse" />
-            </div>
+            <DiscussionPanelBodySkeleton />
           ) : (
             <div className="p-6 space-y-6">
               <div>
@@ -194,7 +205,9 @@ export function DiscussionPanel({
                       {sessionName}
                     </Link>
                   ) : (
-                    "Loading…"
+                    <span className="inline-block align-middle" aria-busy="true">
+                      <span className="inline-block h-3.5 w-[7.5rem] rounded-md bg-neutral-200/80 animate-pulse" />
+                    </span>
                   )}
                 </div>
               </div>

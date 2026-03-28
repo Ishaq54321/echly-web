@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FeedbackDetailView, TicketList } from "@/components/layout/operating-system";
-import { FeedbackPremiumLoader } from "@/components/session/FeedbackPremiumLoader";
 import { PublicShareGateModal } from "@/components/share/PublicShareGateModal";
 import type { PublicShareGateDetail } from "@/components/share/PublicShareGateModal";
 import { PublicShareSidebarShell } from "@/components/share/PublicShareSidebarShell";
@@ -46,7 +45,7 @@ export function PublicShareSessionView({
 
   const sessionId = session.id;
   const { counts, loading: countsLoading } = useShareCounts(session.id, token);
-  const sessionTitle = (session.title ?? "").trim() || "Untitled Session";
+  const sessionTitle = (session.title ?? "").trim();
 
   const feedbackRows: Feedback[] = useMemo(
     () => sanitizedFeedback.map((f) => mapPublicFeedbackToFeedback(sessionId, f)),
@@ -187,16 +186,39 @@ export function PublicShareSessionView({
     />
   );
 
+  const detailPlaceholder = (
+    <FeedbackDetailView
+      item={null}
+      shareGating={{
+        permissions,
+        onBlocked: (d) => setGateDetail(d),
+      }}
+      readOnlyDescription={null}
+      setIsImageExpanded={setIsImageExpanded}
+      isCommentMode={false}
+      comments={[]}
+    />
+  );
+
   if (phase === "initial") {
     return (
       <div className="h-full w-full">
         <div className="flex h-[100dvh] min-h-0 overflow-hidden bg-[#FCFDFE]">
           <aside className="sidebar hidden lg:flex w-[300px] h-screen overflow-hidden shrink-0 self-start min-h-0 flex-col sticky top-0 border-r border-[#EEF2F6] shadow-[1px_0_0_rgba(15,23,42,0.02)]">
-            <FeedbackPremiumLoader />
+            <PublicShareSidebarShell>
+              <TicketList {...ticketListProps} />
+            </PublicShareSidebarShell>
           </aside>
           <div className="content-divider hidden shrink-0 lg:block" aria-hidden />
           <div className="main-area flex min-h-0 min-w-0 flex-1 flex-col opacity-100 transition-opacity duration-150">
-            <FeedbackPremiumLoader />
+            <PublicShareTopBar shareUrl={shareUrl} />
+            <div className="flex flex-1 min-h-0 min-w-0 flex-col">
+              <main className="surface-main flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
+                <div className="max-w-[1000px] mx-auto w-full px-6 py-6 flex-1 min-h-0 flex flex-col">
+                  {detailPlaceholder}
+                </div>
+              </main>
+            </div>
           </div>
         </div>
       </div>
@@ -231,7 +253,7 @@ export function PublicShareSessionView({
                 <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
                   <div className="max-w-[1000px] mx-auto w-full px-6 py-6 flex-1 min-h-0 flex flex-col">
                     {!isDataReady ? (
-                      <FeedbackPremiumLoader />
+                      detailPlaceholder
                     ) : feedbackRows.length === 0 ? (
                       <div className="mt-16">
                         <div className="text-[16px] font-medium text-[hsl(var(--text-primary-strong))]">

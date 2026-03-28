@@ -51,7 +51,7 @@ function StatusBadge({ status }: { status: FeedbackStatus }) {
 }
 
 export interface SessionFeedbackHeaderProps {
-  item: FeedbackItemShape & { index: number; total: number };
+  item: (FeedbackItemShape & { index: number; total: number }) | null;
   impactScore?: number | null;
   onResolvedChange?: (isResolved: boolean) => void;
   onResolveAndNext?: () => void;
@@ -95,19 +95,32 @@ export function SessionFeedbackHeader({
   readOnlyPermissions,
   shareGating,
 }: SessionFeedbackHeaderProps) {
-  const status = statusFromResolved(item.isResolved);
+  const isResolved = item?.isResolved === true;
+  const status = statusFromResolved(item?.isResolved);
   const ro = readOnly === true && readOnlyPermissions != null && shareGating == null;
-  const hasContextualPosition = item.index > 0 && item.total >= 0;
+  const titleTrim = item?.title?.trim() ?? "";
+  const showPosition =
+    item != null &&
+    typeof item.index === "number" &&
+    typeof item.total === "number" &&
+    item.total >= 0 &&
+    item.index >= 1;
+  const positionLabel = showPosition ? `${item.index} of ${item.total}` : null;
+
+  const isActionable =
+    item != null &&
+    Boolean(item.id?.trim()) &&
+    Boolean(item.type?.trim());
 
   const gateResolve = () => {
-    if (!shareGating || item.isResolved) return;
+    if (!shareGating || isResolved) return;
     const { permissions, onBlocked } = shareGating;
     if (!permissions.canResolve) onBlocked({ reason: "tier", action: "resolve" });
     else onBlocked({ reason: "app", action: "resolve" });
   };
 
   const gateResolveNext = () => {
-    if (!shareGating || item.isResolved) return;
+    if (!shareGating || isResolved) return;
     const { permissions, onBlocked } = shareGating;
     if (!permissions.canResolve) onBlocked({ reason: "tier", action: "resolve_next" });
     else onBlocked({ reason: "app", action: "resolve_next" });
@@ -138,22 +151,26 @@ export function SessionFeedbackHeader({
     <header className="sticky top-0 z-20 shrink-0 bg-white/95 backdrop-blur-[2px] pt-4 px-6 -mx-6 pb-0">
       <div className="flex items-start justify-between gap-3 min-w-0 mb-3">
         <div className="min-w-0 flex-1">
-          <h1
-            className="text-[29px] font-semibold tracking-[-0.35px] text-[#0A0A0A] truncate leading-tight"
-            title={item.title}
-          >
-            {item.title}
-          </h1>
+          {titleTrim ? (
+            <h1
+              className="text-[29px] font-semibold tracking-[-0.35px] text-[#0A0A0A] truncate leading-tight"
+              title={titleTrim}
+            >
+              {titleTrim}
+            </h1>
+          ) : null}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <span className="ticket-pill inline-flex items-center bg-[#F4F6F8] px-2.5 py-1 rounded-full text-[11px] font-medium text-[#4B5563]">
-              {hasContextualPosition ? `${item.index} of ${item.total}` : "— of —"}
-            </span>
-            <StatusBadge status={status} />
-            {impactScore != null && (
+            {positionLabel != null ? (
+              <span className="ticket-pill inline-flex items-center bg-[#F4F6F8] px-2.5 py-1 rounded-full text-[11px] font-medium text-[#4B5563]">
+                {positionLabel}
+              </span>
+            ) : null}
+            {item != null ? <StatusBadge status={status} /> : null}
+            {item != null && impactScore != null ? (
               <span className="text-[11px] tabular-nums text-[#94A3B8] font-medium">
                 Impact {impactScore}
               </span>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -165,85 +182,89 @@ export function SessionFeedbackHeader({
       >
         <div className="left flex flex-wrap items-center gap-2.5 min-w-0">
           {shareGating ? (
-            <>
-              <button
-                type="button"
-                onClick={gateResolve}
-                disabled={item.isResolved === true}
-                className={
-                  item.isResolved
-                    ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
-                    : resolveBtn
-                }
-              >
-                <CheckCircle {...iconBtn} aria-hidden />
-                <span>{item.isResolved ? "Resolved" : "Resolve"}</span>
-              </button>
-              <button type="button" className={secondaryBtn} onClick={gateAssign}>
-                <UserPlus {...iconBtn} aria-hidden />
-                Assign
-              </button>
-              <button type="button" className={secondaryBtn} onClick={gateDefer}>
-                <Clock {...iconBtn} aria-hidden />
-                Defer
-              </button>
-              {!item.isResolved && (
-                <button type="button" onClick={gateResolveNext} className={secondaryBtn}>
-                  <CheckCircle {...iconBtn} aria-hidden />
-                  Resolve &amp; Next
-                </button>
-              )}
-              <button type="button" className={secondaryBtn} onClick={gateComment}>
-                <MessageSquare {...iconBtn} aria-hidden />
-                Comment
-              </button>
-            </>
-          ) : ro ? (
-            <>
-              {readOnlyPermissions?.canResolve ? (
+            isActionable ? (
+              <>
                 <button
                   type="button"
-                  disabled
-                  title="Not available on shared links yet"
+                  onClick={gateResolve}
+                  disabled={isResolved}
                   className={
-                    item.isResolved
-                      ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
-                      : `${resolveBtn} opacity-60 cursor-not-allowed`
-                  }
-                >
-                  <CheckCircle {...iconBtn} aria-hidden />
-                  <span>{item.isResolved ? "Resolved" : "Resolve"}</span>
-                </button>
-              ) : null}
-              {readOnlyPermissions?.canComment ? (
-                <button
-                  type="button"
-                  disabled
-                  title="Not available on shared links yet"
-                  className={`${secondaryBtn} opacity-60 cursor-not-allowed`}
-                >
-                  <MessageSquare {...iconBtn} aria-hidden />
-                  Comment
-                </button>
-              ) : null}
-            </>
-          ) : (
-            <>
-              {onResolvedChange && (
-                <button
-                  type="button"
-                  onClick={() => onResolvedChange(true)}
-                  disabled={item.isResolved === true}
-                  className={
-                    item.isResolved
+                    isResolved
                       ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
                       : resolveBtn
                   }
                 >
                   <CheckCircle {...iconBtn} aria-hidden />
-                  <span>{item.isResolved ? "Resolved" : "Resolve"}</span>
+                  <span>{isResolved ? "Resolved" : "Resolve"}</span>
                 </button>
-              )}
+                <button type="button" className={secondaryBtn} onClick={gateAssign}>
+                  <UserPlus {...iconBtn} aria-hidden />
+                  Assign
+                </button>
+                <button type="button" className={secondaryBtn} onClick={gateDefer}>
+                  <Clock {...iconBtn} aria-hidden />
+                  Defer
+                </button>
+                {!isResolved && (
+                  <button type="button" onClick={gateResolveNext} className={secondaryBtn}>
+                    <CheckCircle {...iconBtn} aria-hidden />
+                    Resolve &amp; Next
+                  </button>
+                )}
+                <button type="button" className={secondaryBtn} onClick={gateComment}>
+                  <MessageSquare {...iconBtn} aria-hidden />
+                  Comment
+                </button>
+              </>
+            ) : null
+          ) : ro ? (
+            isActionable ? (
+              <>
+                {readOnlyPermissions?.canResolve ? (
+                  <button
+                    type="button"
+                    disabled
+                    title="Not available on shared links yet"
+                    className={
+                      isResolved
+                        ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
+                        : `${resolveBtn} opacity-60 cursor-not-allowed`
+                    }
+                  >
+                    <CheckCircle {...iconBtn} aria-hidden />
+                    <span>{isResolved ? "Resolved" : "Resolve"}</span>
+                  </button>
+                ) : null}
+                {readOnlyPermissions?.canComment ? (
+                  <button
+                    type="button"
+                    disabled
+                    title="Not available on shared links yet"
+                    className={`${secondaryBtn} opacity-60 cursor-not-allowed`}
+                  >
+                    <MessageSquare {...iconBtn} aria-hidden />
+                    Comment
+                  </button>
+                ) : null}
+              </>
+            ) : null
+          ) : isActionable ? (
+            <>
+              {onResolvedChange ? (
+                <button
+                  type="button"
+                  onClick={() => onResolvedChange(true)}
+                  disabled={isResolved}
+                  className={
+                    isResolved
+                      ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
+                      : resolveBtn
+                  }
+                >
+                  <CheckCircle {...iconBtn} aria-hidden />
+                  <span>{isResolved ? "Resolved" : "Resolve"}</span>
+                </button>
+              ) : null}
               <button type="button" className={secondaryBtn}>
                 <UserPlus {...iconBtn} aria-hidden />
                 Assign
@@ -252,13 +273,13 @@ export function SessionFeedbackHeader({
                 <Clock {...iconBtn} aria-hidden />
                 Defer
               </button>
-              {onResolveAndNext && !item.isResolved && (
+              {onResolveAndNext && !isResolved ? (
                 <button type="button" onClick={onResolveAndNext} className={secondaryBtn}>
                   <CheckCircle {...iconBtn} aria-hidden />
                   Resolve &amp; Next
                 </button>
-              )}
-              {onOpenComment && (
+              ) : null}
+              {onOpenComment ? (
                 <button
                   type="button"
                   onClick={() =>
@@ -271,12 +292,12 @@ export function SessionFeedbackHeader({
                   <MessageSquare {...iconBtn} aria-hidden />
                   Comment
                 </button>
-              )}
+              ) : null}
             </>
-          )}
+          ) : null}
         </div>
 
-        {onDelete && !shareGating ? (
+        {onDelete && !shareGating && isActionable ? (
           <div className="right shrink-0">
             <button
               type="button"

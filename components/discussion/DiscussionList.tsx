@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { MessageSquareMore } from "lucide-react";
+import { DiscussionListSkeleton } from "@/components/discussion/discussionSkeletons";
 import { authFetch } from "@/lib/authFetch";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { formatRelativeTime } from "@/lib/utils/time";
@@ -70,9 +71,9 @@ export function DiscussionList({
   items: controlledItems,
   setItems: controlledSetItems,
 }: DiscussionListProps) {
-  const { claimsReady } = useWorkspace();
+  const { isIdentityResolved } = useWorkspace();
   const [internalItems, setInternalItems] = useState<DiscussionItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const onEmptyChangeRef = useRef(onEmptyChange);
   onEmptyChangeRef.current = onEmptyChange;
@@ -83,7 +84,7 @@ export function DiscussionList({
   const setItems = controlledSetItems ?? setInternalItems;
 
   useEffect(() => {
-    if (!claimsReady) return;
+    if (!isIdentityResolved) return;
 
     let cancelled = false;
     setLoading(true);
@@ -101,9 +102,11 @@ export function DiscussionList({
           const item = f as Record<string, unknown>;
           const status = (item.status as string) ?? "open";
           const isResolved = status === "resolved" || item.isResolved === true;
+          const titleStr =
+            typeof item.title === "string" ? item.title.trim() : "";
           return {
             id: String(item.id ?? ""),
-            title: String(item.title ?? "Untitled"),
+            title: titleStr,
             sessionId: String(item.sessionId ?? ""),
             sessionName: typeof item.sessionName === "string" ? item.sessionName : undefined,
             commentCount: typeof item.commentCount === "number" ? item.commentCount : 0,
@@ -119,7 +122,7 @@ export function DiscussionList({
         const projectMap = new Map<string, string>();
         list.forEach((i) => {
           if (i.sessionId && !projectMap.has(i.sessionId)) {
-            projectMap.set(i.sessionId, i.sessionName ?? "Session");
+            projectMap.set(i.sessionId, i.sessionName ?? "");
           }
         });
         const projects: ProjectItem[] = Array.from(projectMap.entries()).map(([id, name]) => ({ id, name }));
@@ -133,7 +136,7 @@ export function DiscussionList({
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, claimsReady]);
+  }, [refreshKey, isIdentityResolved]);
 
   const filteredItems = useMemo(() => {
     let list = items;
@@ -149,23 +152,12 @@ export function DiscussionList({
     );
   }, [items, search, filterBySessionId]);
 
-  if (loading) {
+  const showSkeleton = !error && (!isIdentityResolved || loading);
+
+  if (showSkeleton) {
     return (
-      <div className="flex flex-col overflow-hidden bg-transparent" style={{ minHeight: 200 }}>
-        <div className="discussion-list-scroll flex-1 overflow-y-auto min-h-0 pl-0 pr-3 py-2">
-          <div className="flex flex-col gap-0">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-2.5 pl-3 pr-3 py-3">
-                <div className="w-8 h-8 rounded-full skeleton shrink-0" />
-                <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-                  <div className="h-4 w-3/4 skeleton max-w-[200px]" />
-                  <div className="h-3 w-1/2 skeleton max-w-[120px]" />
-                  <div className="h-3 w-1/3 skeleton max-w-[80px]" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="flex flex-col overflow-hidden bg-transparent h-full" style={{ minHeight: 200 }}>
+        <DiscussionListSkeleton />
       </div>
     );
   }

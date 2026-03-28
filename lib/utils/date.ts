@@ -22,7 +22,7 @@ export function toDate(value: Date | Timestamp | null | undefined): Date | null 
  */
 export function formatFullDateTime(date: Date | Timestamp | null | undefined): string {
   const d = toDate(date);
-  if (!d) return "—";
+  if (!d) return "";
 
   const datePart = new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -52,7 +52,7 @@ export type TimestampLike =
  */
 export function formatOverviewDate(ts: TimestampLike): string {
   const date = toDate(ts as Date | Timestamp | null | undefined);
-  if (!date) return "—";
+  if (!date) return "";
   return date.toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
@@ -72,12 +72,12 @@ const sessionTimeFormatter = new Intl.DateTimeFormat("en-US", {
 export function formatSessionCreatedMeta(
   createdAt: TimestampLike | string
 ): { dateStr: string; timeStr: string } {
-  if (createdAt == null) return { dateStr: "—", timeStr: "" };
+  if (createdAt == null) return { dateStr: "", timeStr: "" };
   const date =
     typeof createdAt === "string"
       ? new Date(createdAt)
       : toDate(createdAt as Date | Timestamp | null | undefined);
-  if (!date) return { dateStr: "—", timeStr: "" };
+  if (!date) return { dateStr: "", timeStr: "" };
   return {
     dateStr: sessionDateFormatter.format(date),
     timeStr: sessionTimeFormatter.format(date),
@@ -88,7 +88,7 @@ export function formatSessionCreatedMeta(
  * Relative time for activity (e.g. "5m ago", "Just now").
  */
 export function formatActivityTime(date: Date | null): string {
-  if (!date) return "—";
+  if (!date) return "";
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffM = Math.floor(diffMs / 60000);

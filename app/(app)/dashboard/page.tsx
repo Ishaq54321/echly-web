@@ -1,5 +1,6 @@
 "use client";
 
+// deep_data_latency_trace_phase3b_v2
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkspaceOverview } from "@/lib/client/workspaceOverviewContext";
@@ -25,6 +26,8 @@ import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
 import DashboardCaptureHost from "./components/DashboardCaptureHost";
 import type { Session } from "@/lib/domain/session";
 import { useSessionEntryCta } from "@/components/dashboard/hooks/useSessionEntryCta";
+import { useStableState } from "@/lib/client/perception/useStableState";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 function filterAndSortSessions(sessions: SessionWithCounts[], search: string): SessionWithCounts[] {
   const q = search.trim().toLowerCase();
@@ -52,11 +55,12 @@ function DashboardContent() {
     setSessionArchived,
     deleteSession,
   } = useWorkspaceOverview();
+  const { workspaceId, isIdentityResolved } = useWorkspace();
+  const stableSessions = useStableState(sessions, true, workspaceId);
   const { search } = useSessionsSearch();
-  const skeletonCount =
-    sessions?.length > 0
-      ? sessions.length
-      : 3;
+  const showListPlaceholders =
+    !isIdentityResolved || (sessionsLoading && sessions.length === 0);
+
   const [captureOpen, setCaptureOpen] = useState(false);
   const { startingRecorder, triggerCta } = useSessionEntryCta();
   const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
@@ -66,8 +70,8 @@ function DashboardContent() {
     useState<SessionsTimeRange>(DEFAULT_FILTER);
 
   const filteredSessions = useMemo(
-    () => filterAndSortSessions(sessions, search),
-    [sessions, search]
+    () => filterAndSortSessions(stableSessions, search),
+    [stableSessions, search]
   );
 
   const activeSessions = useMemo(
@@ -115,92 +119,56 @@ function DashboardContent() {
 
         <main className="flex-1">
           <div className="pt-3">
-            {sessionsLoading ? (
-              <div className="transition-opacity duration-150">
-                <SessionsListArchiveTabs
-                  value={listArchiveTab}
-                  onChange={setListArchiveTab}
-                  actions={
-                    <div className="flex items-center gap-3">
-                      <SessionsTimeRangeFilter
-                        value={sessionsTimeRange}
-                        onChange={setSessionsTimeRange}
-                      />
+            <div className="transition-opacity duration-150">
+              <SessionsListArchiveTabs
+                value={listArchiveTab}
+                onChange={setListArchiveTab}
+                actions={
+                  <div className="flex items-center gap-3">
+                    <SessionsTimeRangeFilter
+                      value={sessionsTimeRange}
+                      onChange={setSessionsTimeRange}
+                    />
 
-                      <button
-                        type="button"
-                        onClick={triggerCta}
-                        disabled={startingRecorder}
-                        aria-busy={startingRecorder}
-                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
-                      >
-                        New Session
-                      </button>
+                    <button
+                      type="button"
+                      onClick={triggerCta}
+                      disabled={startingRecorder || !isIdentityResolved}
+                      aria-busy={startingRecorder}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-blue-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
+                    >
+                      New Session
+                    </button>
 
-                      <SessionsViewModeToggle
-                        value={sessionViewMode}
-                        onChange={setSessionViewMode}
-                      />
-                    </div>
-                  }
-                />
+                    <SessionsViewModeToggle
+                      value={sessionViewMode}
+                      onChange={setSessionViewMode}
+                    />
+                  </div>
+                }
+              />
 
-                <SessionsWorkspace
-                  sections={workspaceSections}
-                  onView={handleView}
-                  onRenameSuccess={(session) =>
-                    updateSession(session.id, { title: session.title })
-                  }
-                  onSetArchived={setSessionArchived}
-                  onRequestDelete={(session) => setDeleteTarget(session)}
-                  onDeleteSession={deleteSession}
-                  viewMode={sessionViewMode}
-                  onViewModeChange={setSessionViewMode}
-                  isLoading
-                  loadingRowCount={skeletonCount}
-                />
-              </div>
-            ) : (
-              <div className="transition-opacity duration-150">
-                <SessionsListArchiveTabs
-                  value={listArchiveTab}
-                  onChange={setListArchiveTab}
-                  actions={
-                    <div className="flex items-center gap-3">
-                      <SessionsTimeRangeFilter
-                        value={sessionsTimeRange}
-                        onChange={setSessionsTimeRange}
-                      />
-
-                      <button
-                        type="button"
-                        onClick={triggerCta}
-                        disabled={startingRecorder}
-                        aria-busy={startingRecorder}
-                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
-                      >
-                        New Session
-                      </button>
-
-                      <SessionsViewModeToggle
-                        value={sessionViewMode}
-                        onChange={setSessionViewMode}
-                      />
-                    </div>
-                  }
-                />
-
-                {listArchiveTab === "sessions" && sessions.length === 0 ? (
+              <div className="ech-content-enter">
+                {listArchiveTab === "sessions" &&
+                activeSessions.length === 0 &&
+                !showListPlaceholders ? (
                   <div className="mt-16">
                     <EmptySessionsCard />
                   </div>
-                ) : listArchiveTab === "archived" && archivedSessions.length === 0 ? (
+                ) : listArchiveTab === "archived" &&
+                  archivedSessions.length === 0 &&
+                  !showListPlaceholders ? (
                   <div className="mt-16">
                     <ArchiveEmptyState />
                   </div>
                 ) : (
                   <SessionsWorkspace
                     sections={workspaceSections}
+                    listPlaceholderCount={
+                      showListPlaceholders && tabFilteredSessions.length === 0
+                        ? 3
+                        : 0
+                    }
                     onView={handleView}
                     onRenameSuccess={(session) =>
                       updateSession(session.id, { title: session.title })
@@ -213,7 +181,7 @@ function DashboardContent() {
                   />
                 )}
               </div>
-            )}
+            </div>
           </div>
         </main>
       </div>

@@ -1172,6 +1172,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           sessionStartErrorBanner={sessionStartErrorBanner}
           onSessionStartErrorDismiss={() => setSessionStartErrorBanner(null)}
           environment={environment}
+          assertIdentityBeforeWorkspaceMutations={() => {
+            /* Extension host: mutations are authorized via extension session / background; no web WorkspaceProvider assert. */
+          }}
           onPreviousSessions={() => {
             logger.debug("extension", "previous_sessions_handler_fired");
             setOpenResumeModalFromMessage(true);

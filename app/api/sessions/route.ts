@@ -36,14 +36,21 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  console.time("API /sessions");
   try {
     const workspaceId = await getUserWorkspaceIdRepo(user.uid);
-    const snap = await adminDb
-      .collection("sessions")
-      .where("workspaceId", "==", workspaceId)
-      .orderBy("updatedAt", "desc")
-      .limit(30)
-      .get();
+    console.time("Firestore query");
+    let snap;
+    try {
+      snap = await adminDb
+        .collection("sessions")
+        .where("workspaceId", "==", workspaceId)
+        .orderBy("updatedAt", "desc")
+        .limit(30)
+        .get();
+    } finally {
+      console.timeEnd("Firestore query");
+    }
     const sessions = snap.docs.map((docSnap) => {
       const data = docSnap.data() as {
         title?: string;
@@ -91,6 +98,8 @@ export async function GET(req: NextRequest) {
       { success: false, error: "Failed to load sessions" },
       { status: 500, headers: corsHeaders(req) }
     );
+  } finally {
+    console.timeEnd("API /sessions");
   }
 }
 

@@ -14,30 +14,48 @@ export function TicketMetadata({
   updatedAt,
   assignee,
 }: TicketMetadataProps) {
+  const createdStr = formatCommentDate(createdAt, {
+    fallback: "",
+    includeTime: false,
+    includeYear: true,
+  });
+  const updatedStr = formatCommentDate(updatedAt, {
+    fallback: "",
+    includeTime: false,
+    includeYear: true,
+  });
+  const assigneeTrim = assignee?.trim() ?? "";
+
   return (
     <section className="mb-6">
       <h3 className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] mb-2">
         Details
       </h3>
       <dl className="space-y-1.5 text-[12px]">
-        <div>
-          <dt className="text-[hsl(var(--text-tertiary))]">Created</dt>
-          <dd className="text-[hsl(var(--text-primary-strong))] font-medium">
-            {formatCommentDate(createdAt, { fallback: "—", includeTime: false, includeYear: true })}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-[hsl(var(--text-tertiary))]">Updated</dt>
-          <dd className="text-[hsl(var(--text-primary-strong))] font-medium">
-            {formatCommentDate(updatedAt, { fallback: "—", includeTime: false, includeYear: true })}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-[hsl(var(--text-tertiary))]">Assignee</dt>
-          <dd className="text-[hsl(var(--text-primary-strong))] font-medium">
-            {assignee ?? "Unassigned"}
-          </dd>
-        </div>
+        {createdStr ? (
+          <div>
+            <dt className="text-[hsl(var(--text-tertiary))]">Created</dt>
+            <dd className="text-[hsl(var(--text-primary-strong))] font-medium">
+              {createdStr}
+            </dd>
+          </div>
+        ) : null}
+        {updatedStr ? (
+          <div>
+            <dt className="text-[hsl(var(--text-tertiary))]">Updated</dt>
+            <dd className="text-[hsl(var(--text-primary-strong))] font-medium">
+              {updatedStr}
+            </dd>
+          </div>
+        ) : null}
+        {assigneeTrim ? (
+          <div>
+            <dt className="text-[hsl(var(--text-tertiary))]">Assignee</dt>
+            <dd className="text-[hsl(var(--text-primary-strong))] font-medium">
+              {assigneeTrim}
+            </dd>
+          </div>
+        ) : null}
       </dl>
     </section>
   );

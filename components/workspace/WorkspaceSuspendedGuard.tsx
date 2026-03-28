@@ -4,25 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/authFetch";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { StatusOverlay } from "@/components/ui/StatusOverlay";
 
 interface WorkspaceSuspendedGuardProps {
   children: React.ReactNode;
-}
-
-function StatusErrorScreen({ message }: { message: string }) {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-white px-6 text-center">
-      <p className="text-lg font-medium text-gray-900">Could not load workspace status</p>
-      <p className="max-w-md text-sm text-gray-600">{message}</p>
-      <button
-        type="button"
-        className="rounded-lg bg-[#466EFF] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-        onClick={() => window.location.reload()}
-      >
-        Reload
-      </button>
-    </div>
-  );
 }
 
 /**
@@ -31,15 +16,19 @@ function StatusErrorScreen({ message }: { message: string }) {
  */
 export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardProps) {
   const router = useRouter();
-  const { authReady, authUid, claimsReady } = useWorkspace();
+  const { authUid, isIdentityResolved } = useWorkspace();
   const [suspended, setSuspended] = useState<boolean | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    if (!claimsReady) return;
     if (!authUid) {
       setSuspended(false);
+      setStatusError(null);
+      return;
+    }
+    if (!isIdentityResolved) {
+      setSuspended(null);
       setStatusError(null);
       return;
     }
@@ -66,7 +55,7 @@ export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardPro
     return () => {
       cancelled = true;
     };
-  }, [claimsReady, authUid]);
+  }, [isIdentityResolved, authUid]);
 
   useEffect(() => {
     if (suspended === true) {
@@ -74,20 +63,12 @@ export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardPro
     }
   }, [suspended, router]);
 
-  if (!authReady || (authUid && (!claimsReady || (suspended === null && !statusError)))) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-white">
-        <div
-          className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#466EFF]"
-          aria-label="Loading"
-        />
-      </div>
-    );
-  }
-
-  if (statusError) {
-    return <StatusErrorScreen message={statusError} />;
-  }
-
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {authUid && statusError ? (
+        <StatusOverlay title="Could not load workspace status" message={statusError} />
+      ) : null}
+    </>
+  );
 }

@@ -14,7 +14,10 @@ import {
 import type { CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import { authFetch } from "@/lib/authFetch";
 import { useToast } from "@/components/dashboard/context/ToastContext";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 
 type LocalComment = Comment | OptimisticComment;
@@ -83,18 +86,18 @@ export function useFeedbackDetailController(args: {
     canResolve = true,
   } = args;
   const { showToast } = useToast();
-  const { workspaceId, claimsReady, authUid, authDisplayName, authPhotoUrl } =
+  const { workspaceId, authUid, authDisplayName, authPhotoUrl, isIdentityResolved } =
     useWorkspace();
 
   const [comments, setComments] = useState<LocalComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
 
   useEffect(() => {
-    if (!claimsReady || !authUid || !workspaceId) {
+    if (!isIdentityResolved || !authUid || !workspaceId) {
       setComments([]);
       setLoadingComments(false);
     }
-  }, [claimsReady, workspaceId, authUid]);
+  }, [isIdentityResolved, workspaceId, authUid]);
 
   useEffect(() => {
     if (!feedbackId) {
@@ -107,19 +110,18 @@ export function useFeedbackDetailController(args: {
   }, [feedbackId]);
 
   useEffect(() => {
-    if (!claimsReady || !authUid || !workspaceId || !feedbackId) {
+    if (!isIdentityResolved || !authUid || !workspaceId || !feedbackId) {
       return;
     }
     const t = requestAnimationFrame(() => setLoadingComments(true));
     return () => cancelAnimationFrame(t);
-  }, [claimsReady, workspaceId, authUid, sessionId, feedbackId]);
+  }, [isIdentityResolved, workspaceId, authUid, sessionId, feedbackId]);
 
   useCommentsRepoSubscription({
     workspaceId,
     sessionId,
     feedbackId,
-    claimsReady,
-    enabled: Boolean(authUid),
+    enabled: Boolean(isIdentityResolved && authUid),
     onComments: (incomingComments) => {
       setComments((prev) => mergeRealtimeComments(prev, incomingComments));
       setLoadingComments(false);
@@ -128,6 +130,7 @@ export function useFeedbackDetailController(args: {
 
   const sendComment = async (message: string): Promise<void> => {
     if (!canComment || !authUid || !feedbackId) return;
+    assertIdentityResolved(isIdentityResolved);
     const trimmed = message.trim();
     if (!trimmed) return;
     const payload: AddCommentOptions = {
@@ -154,6 +157,7 @@ export function useFeedbackDetailController(args: {
 
   const sendReply = async (threadId: string, message: string): Promise<void> => {
     if (!canComment || !authUid || !feedbackId) return;
+    assertIdentityResolved(isIdentityResolved);
     const trimmed = message.trim();
     if (!trimmed) return;
     const payload: AddCommentOptions = {
@@ -184,6 +188,7 @@ export function useFeedbackDetailController(args: {
     message: string
   ): Promise<string | null> => {
     if (!canComment || !authUid || !feedbackId) return null;
+    assertIdentityResolved(isIdentityResolved);
     const trimmed = message.trim();
     if (!trimmed) return null;
     try {
@@ -207,6 +212,7 @@ export function useFeedbackDetailController(args: {
     message: string
   ): Promise<string | null> => {
     if (!canComment || !authUid || !feedbackId) return null;
+    assertIdentityResolved(isIdentityResolved);
     const trimmed = message.trim();
     if (!trimmed) return null;
     try {
@@ -227,6 +233,7 @@ export function useFeedbackDetailController(args: {
 
   const resolve = async () => {
     if (!canResolve || !feedbackId) return;
+    assertIdentityResolved(isIdentityResolved);
     const res = await authFetch(`/api/tickets/${feedbackId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -243,6 +250,7 @@ export function useFeedbackDetailController(args: {
     position: { xPercent: number; yPercent: number }
   ) => {
     if (!canComment) return;
+    assertIdentityResolved(isIdentityResolved);
     await updatePinPosition(commentId, position);
   };
 
@@ -252,11 +260,13 @@ export function useFeedbackDetailController(args: {
   ) => {
     if (data.resolved !== undefined && !canResolve) return;
     if (data.message !== undefined && !canComment) return;
+    assertIdentityResolved(isIdentityResolved);
     await updateComment(commentId, data);
   };
 
   const deleteCommentHandler = async (commentId: string) => {
     if (!canComment) return;
+    assertIdentityResolved(isIdentityResolved);
     await deleteComment(commentId);
   };
 

@@ -91,6 +91,8 @@ export interface UseSessionFeedbackPaginatedResult {
   isLoadingResolved: boolean;
   /** Kept for compatibility with TicketList prop surface. */
   loadMoreRef: React.RefObject<HTMLDivElement | null>;
+  /** True once list and server counts have been aligned for the current session. */
+  isCountsSynced: boolean;
 }
 
 /** ISO string or Firestore `{ seconds }` — single source for sidebar ordering. */
@@ -131,14 +133,9 @@ function normalizeFeedbackItemStatus(item: Feedback): Feedback {
  */
 export function useSessionFeedbackPaginated(
   sessionId: string | undefined,
-  _scrollContainerRef?: React.RefObject<HTMLDivElement | null>,
-  _scrollReady?: number,
-  onNewTicketFromRealtime?: (newestTicketId: string) => void,
-  _resolvedExpanded: boolean = false,
-  _openExpanded: boolean = true,
-  _isSearchMode: boolean = false
+  onNewTicketFromRealtime?: (newestTicketId: string) => void
 ): UseSessionFeedbackPaginatedResult {
-  const { workspaceId, claimsReady } = useWorkspace();
+  const { workspaceId, isIdentityResolved } = useWorkspace();
   const [items, setItems] = useState<Feedback[]>([]);
   const [counts, setCountsState] = useState<Counts>(ZERO_COUNTS);
   const total = counts.total;
@@ -146,20 +143,18 @@ export function useSessionFeedbackPaginated(
   const resolvedCount = counts.resolved;
   const [countsLoading, setCountsLoading] = useState<boolean>(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [isCountsSynced, setIsCountsSynced] = useState(false);
   const [hasLoadedResolved, setHasLoadedResolved] = useState(false);
   const [isLoadingResolved, setIsLoadingResolved] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const countsSyncGenRef = useRef(0);
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const itemsRef = useRef<Feedback[]>([]);
-  const countsDirtyRef = useRef(false);
-  const countsDebounceRef = useRef<number | null>(null);
 
   const onNewTicketFromRealtimeRef = useRef(onNewTicketFromRealtime);
-  onNewTicketFromRealtimeRef.current = onNewTicketFromRealtime;
 
   const prevIdsRef = useRef<Set<string>>(new Set());
   const firstSnapshotRef = useRef(true);
-  const firstSnapshotCountsRef = useRef(true);
 
   const sortByCreatedAtDesc = useCallback((list: Feedback[]): Feedback[] => {
     const deduped = dedupeFeedbackById(list);
@@ -192,32 +187,20 @@ export function useSessionFeedbackPaginated(
   }, [sessionId]);
 
   useEffect(() => {
-    return () => {
-      if (countsDebounceRef.current !== null) {
-        clearTimeout(countsDebounceRef.current);
-        countsDebounceRef.current = null;
-      }
-    };
-  }, []);
+    onNewTicketFromRealtimeRef.current = onNewTicketFromRealtime;
+  }, [onNewTicketFromRealtime]);
 
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
 
   useLayoutEffect(() => {
-    setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
-    setCountsState(ZERO_COUNTS);
     firstSnapshotRef.current = true;
-    firstSnapshotCountsRef.current = true;
     prevIdsRef.current = new Set();
     setHasLoadedResolved(false);
     setIsLoadingResolved(true);
-    if (countsDebounceRef.current !== null) {
-      clearTimeout(countsDebounceRef.current);
-      countsDebounceRef.current = null;
-    }
-    countsDirtyRef.current = false;
-  }, [sessionId, setCanonicalFeedback]);
+    setIsCountsSynced(false);
+  }, [sessionId]);
 
   const canonicalFeedback = items;
   const openFeedback = useMemo(
@@ -233,8 +216,10 @@ export function useSessionFeedbackPaginated(
 
   /** Firestore: full session list, ordered newest first — real-time updates across tabs. */
   useEffect(() => {
-    // CRITICAL: Do not run query until custom claims + workspace are ready (Firestore rules).
-    if (!claimsReady || !sessionId || !workspaceId) return;
+    // CRITICAL: Do not run query until full identity boundary (Firestore rules + no cross-workspace leak).
+    if (!isIdentityResolved || !sessionId || !workspaceId) {
+      return;
+    }
 
     setInitialLoading(true);
     setHasLoadedResolved(false);
@@ -251,13 +236,32 @@ export function useSessionFeedbackPaginated(
       (snapshot) => {
         if (sessionIdRef.current !== sessionId) return;
 
+        const syncGen = ++countsSyncGenRef.current;
+        setIsCountsSynced(false);
+
+        const syncCountsAfterList = () => {
+          void (async () => {
+            const sid = sessionId;
+            if (sessionIdRef.current !== sid) return;
+            try {
+              const next = await fetchCountsDedup(sid);
+              if (sessionIdRef.current !== sid) return;
+              setStoreCounts(sid, next);
+            } catch (err) {
+              console.error("[ECHLY] counts refresh failed", err);
+            }
+            if (sessionIdRef.current !== sid || countsSyncGenRef.current !== syncGen) return;
+            setIsCountsSynced(true);
+          })();
+        };
+
         if (snapshot.empty) {
           prevIdsRef.current = new Set();
           setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
           setInitialLoading(false);
           setHasLoadedResolved(true);
           setIsLoadingResolved(false);
-          firstSnapshotCountsRef.current = false;
+          syncCountsAfterList();
           return;
         }
 
@@ -283,28 +287,7 @@ export function useSessionFeedbackPaginated(
         setInitialLoading(false);
         setHasLoadedResolved(true);
         setIsLoadingResolved(false);
-
-        if (!firstSnapshotCountsRef.current) {
-          countsDirtyRef.current = true;
-          if (countsDebounceRef.current !== null) {
-            clearTimeout(countsDebounceRef.current);
-          }
-          countsDebounceRef.current = window.setTimeout(() => {
-            if (!countsDirtyRef.current) return;
-            countsDirtyRef.current = false;
-            const sid = sessionIdRef.current;
-            if (!sid) return;
-            void fetchCountsDedup(sid)
-              .then((next) => {
-                if (sessionIdRef.current !== sid) return;
-                setStoreCounts(sid, next);
-              })
-              .catch((err) => {
-                console.error("[ECHLY] counts refresh failed", err);
-              });
-          }, 500);
-        }
-        firstSnapshotCountsRef.current = false;
+        syncCountsAfterList();
       },
       (err) => {
         console.error("[ECHLY] feedback onSnapshot failed", err);
@@ -312,29 +295,26 @@ export function useSessionFeedbackPaginated(
         setInitialLoading(false);
         setHasLoadedResolved(true);
         setIsLoadingResolved(false);
+        setIsCountsSynced(true);
       }
     );
 
     return () => {
       unsubscribe();
-      if (countsDebounceRef.current !== null) {
-        clearTimeout(countsDebounceRef.current);
-        countsDebounceRef.current = null;
-      }
     };
-  }, [claimsReady, sessionId, workspaceId, finalizeList, setCanonicalFeedback]);
+  }, [isIdentityResolved, sessionId, workspaceId, finalizeList, setCanonicalFeedback]);
 
   useEffect(() => {
     if (!sessionId) {
-      if (countsDebounceRef.current !== null) {
-        clearTimeout(countsDebounceRef.current);
-        countsDebounceRef.current = null;
-      }
-      countsDirtyRef.current = false;
       setInitialLoading(false);
       setCountsLoading(false);
       setCountsState(ZERO_COUNTS);
+      setIsCountsSynced(false);
       setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
+    if (!isIdentityResolved) {
+      setCountsLoading(true);
       return;
     }
     setInitialLoading(true);
@@ -363,15 +343,15 @@ export function useSessionFeedbackPaginated(
     return () => {
       cancelled = true;
     };
-  }, [sessionId, setCanonicalFeedback]);
+  }, [sessionId, isIdentityResolved, setCanonicalFeedback]);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !isIdentityResolved) return;
     return subscribeCounts(sessionId, (nextCounts) => {
       setCountsState(nextCounts);
       setCountsLoading(false);
     });
-  }, [sessionId]);
+  }, [sessionId, isIdentityResolved]);
 
   return {
     canonicalFeedback,
@@ -390,5 +370,6 @@ export function useSessionFeedbackPaginated(
     hasLoadedResolved,
     isLoadingResolved,
     loadMoreRef,
+    isCountsSynced,
   };
 }

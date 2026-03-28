@@ -30,6 +30,8 @@ let snapshot: WorkspaceStoreSnapshot = {
 
 let unsubscribe: (() => void) | null = null;
 let currentWorkspaceId: string | null = null;
+/** Consumers that need `workspaces/{id}`; listener stays until count hits zero (avoids one UI unmount clearing others). */
+let workspaceFirestoreRetainCount = 0;
 const listeners = new Set<() => void>();
 
 function emitChange() {
@@ -101,6 +103,45 @@ export function useWorkspaceRealtimeStore(): WorkspaceStoreSnapshot {
   );
 }
 
+function tearDownWorkspaceFirestoreListener(): void {
+  if (unsubscribe) {
+    unsubscribe();
+    unsubscribe = null;
+  }
+  currentWorkspaceId = null;
+  setSnapshot({
+    workspaceId: null,
+    workspace: null,
+    data: null,
+    loading: false,
+    error: null,
+  });
+}
+
+/**
+ * Increment retain count and ensure `workspaces/{workspaceId}` is listened to.
+ * Always call the returned function on unmount / disable so other surfaces keep the listener alive.
+ */
+export function retainWorkspaceFirestoreListener(workspaceId: string): () => void {
+  const wid = typeof workspaceId === "string" ? workspaceId.trim() : "";
+  if (!wid) {
+    return () => {};
+  }
+
+  workspaceFirestoreRetainCount += 1;
+  subscribeWorkspace(wid);
+
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    workspaceFirestoreRetainCount = Math.max(0, workspaceFirestoreRetainCount - 1);
+    if (workspaceFirestoreRetainCount === 0) {
+      tearDownWorkspaceFirestoreListener();
+    }
+  };
+}
+
 export function subscribeWorkspace(workspaceId: string): void {
   if (!workspaceId || !workspaceId.trim()) {
     if (unsubscribe) {
@@ -139,6 +180,9 @@ export function subscribeWorkspace(workspaceId: string): void {
   unsubscribe = onSnapshot(
     doc(db, "workspaces", normalizedWorkspaceId),
     (snap) => {
+      if (snap.id !== normalizedWorkspaceId || currentWorkspaceId !== normalizedWorkspaceId) {
+        return;
+      }
       if (!snap.exists()) {
         setSnapshot({
           workspace: null,
@@ -166,6 +210,7 @@ export function subscribeWorkspace(workspaceId: string): void {
       }
     },
     (err) => {
+      if (currentWorkspaceId !== normalizedWorkspaceId) return;
       setSnapshot({
         workspace: null,
         data: null,
@@ -176,17 +221,8 @@ export function subscribeWorkspace(workspaceId: string): void {
   );
 }
 
+/** Auth sign-out or full reset: drops retain count and tears down the Firestore listener. */
 export function clearWorkspaceSubscription(): void {
-  if (unsubscribe) {
-    unsubscribe();
-    unsubscribe = null;
-  }
-  currentWorkspaceId = null;
-  setSnapshot({
-    workspaceId: null,
-    workspace: null,
-    data: null,
-    loading: false,
-    error: null,
-  });
+  workspaceFirestoreRetainCount = 0;
+  tearDownWorkspaceFirestoreListener();
 }

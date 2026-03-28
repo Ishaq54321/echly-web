@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { authFetch } from "@/lib/authFetch";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { TicketDetailsPanelSkeleton } from "@/components/discussion/discussionSkeletons";
 
 export interface TicketDetailsPanelProps {
   feedbackId: string | null;
@@ -15,17 +16,22 @@ interface TicketData {
 }
 
 export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
-  const { claimsReady } = useWorkspace();
+  const { isIdentityResolved } = useWorkspace();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!feedbackId) {
       setTicket(null);
+      setLoading(false);
       return;
     }
 
-    if (!claimsReady) return;
+    setTicket(null);
+    if (!isIdentityResolved) {
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);
@@ -51,7 +57,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [feedbackId, claimsReady]);
+  }, [feedbackId, isIdentityResolved]);
 
   if (!feedbackId) {
     return (
@@ -64,12 +70,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
   }
 
   if (loading || !ticket) {
-    return (
-      <div className="w-[320px] shrink-0 flex flex-col p-6 border-r border-neutral-200 bg-white">
-        <div className="h-5 w-3/4 bg-neutral-200 rounded animate-pulse" />
-        <div className="mt-4 h-24 bg-neutral-100 rounded-xl animate-pulse" />
-      </div>
-    );
+    return <TicketDetailsPanelSkeleton />;
   }
 
   const steps = ticket.actionSteps;

@@ -75,7 +75,7 @@ function PriorityBadge({ priority }: { priority: FeedbackPriority }) {
 
 function formatRelative(createdAt: { seconds: number } | null | undefined, clientTs?: number | null): string {
   const ms = createdAt?.seconds != null ? createdAt.seconds * 1000 : (clientTs ?? 0);
-  if (!ms) return "—";
+  if (!ms) return "";
   const d = new Date(ms);
   const now = new Date();
   const diff = now.getTime() - d.getTime();
@@ -324,6 +324,7 @@ export function FeedbackCommandPanel({
               const priority = defaultPriority();
               const isSelected = item.id === selectedId;
               const isChecked = selectedIds.has(item.id);
+              const createdRel = formatRelative(item.createdAt, item.clientTimestamp);
 
               return (
                 <div
@@ -370,9 +371,11 @@ export function FeedbackCommandPanel({
                   <StatusDot status={status} />
                   <PriorityBadge priority={priority} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-medium text-[hsl(var(--text-primary-strong))] truncate leading-tight">
-                      {item.title}
-                    </div>
+                    {item.title?.trim() ? (
+                      <div className="text-[13px] font-medium text-[hsl(var(--text-primary-strong))] truncate leading-tight">
+                        {item.title}
+                      </div>
+                    ) : null}
                     {item.contextSummary && (
                       <div className="text-[11px] text-[hsl(var(--text-tertiary))] truncate mt-0.5 leading-tight">
                         {item.contextSummary}
@@ -387,9 +390,11 @@ export function FeedbackCommandPanel({
                           {tag}
                         </span>
                       ))}
-                      <span className="text-[10px] text-[hsl(var(--text-tertiary))] tabular-nums">
-                        {formatRelative(item.createdAt, item.clientTimestamp)}
-                      </span>
+                      {createdRel ? (
+                        <span className="text-[10px] text-[hsl(var(--text-tertiary))] tabular-nums">
+                          {createdRel}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -398,11 +403,7 @@ export function FeedbackCommandPanel({
           )}
         </div>
         {loadMoreRef && <div ref={loadMoreRef} />}
-        {loadingMore && (
-          <div className="px-3 py-2 text-center text-[12px] text-[hsl(var(--text-tertiary))]">
-            Loading…
-          </div>
-        )}
+        {loadingMore ? <div className="px-3 py-2 min-h-[2.5rem]" aria-hidden /> : null}
       </div>
     </aside>
   );

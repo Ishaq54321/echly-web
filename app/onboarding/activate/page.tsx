@@ -4,6 +4,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "re
 import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motion"
 import {
   Globe,
+  Loader2,
   MessageSquare,
   Mic,
   MousePointerClick,
@@ -307,7 +308,7 @@ export default function ActivationPage() {
         {dashboardPhase === "loading" ? (
           <div className="flex items-center justify-center h-[440px] rounded-2xl border border-gray-200 bg-white shadow-xl">
             <div className="flex flex-col items-center gap-4">
-              <Spinner />
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-hidden />
               <p className="text-sm font-medium text-gray-600">Loading feedback...</p>
             </div>
           </div>
@@ -386,15 +387,6 @@ export default function ActivationPage() {
         Go to dashboard
       </button>
     </div>
-  )
-}
-
-function Spinner() {
-  return (
-    <div
-      className="w-8 h-8 rounded-full border-2 border-gray-200 border-t-blue-500 animate-spin"
-      aria-hidden
-    />
   )
 }
 
@@ -554,7 +546,15 @@ function BrowserDemo({
               className="absolute inset-0"
               style={{ willChange: "opacity" }}
             >
-              <WebsiteSkeleton />
+              <div
+                className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-white to-gray-50"
+                aria-busy="true"
+                aria-hidden
+              >
+                {!showWebsite ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-hidden />
+                ) : null}
+              </div>
             </motion.div>
 
             <motion.div
@@ -711,56 +711,6 @@ function BrowserDemo({
           />
         </div>
       ) : null}
-    </div>
-  )
-}
-
-function WebsiteSkeleton() {
-  return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between">
-        <div className="h-8 w-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500">
-          <Globe className="h-4 w-4" />
-        </div>
-        <div className="h-8 w-20 rounded-full bg-gray-100" />
-      </div>
-
-      <div className="mt-10">
-        <div className="text-[28px] leading-tight font-semibold text-gray-900 max-w-[620px]">
-          Build better products with structured feedback
-        </div>
-        <div className="mt-2 text-sm text-gray-600 max-w-[640px]">
-          Capture website issues instantly and convert them into actionable tickets.
-        </div>
-      </div>
-
-      <div className="mt-8 grid grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Fast setup</div>
-          <div className="mt-1 text-xs text-gray-600">Start capturing feedback in seconds</div>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Clean UI</div>
-          <div className="mt-1 text-xs text-gray-600">Simple interface designed for teams</div>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Better feedback</div>
-          <div className="mt-1 text-xs text-gray-600">Turn comments into structured tickets automatically</div>
-        </div>
-      </div>
-
-      <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 flex-1">
-        <div className="h-4 bg-gray-100 rounded w-[260px]" />
-        <div className="mt-4 space-y-3">
-          <div className="h-3 bg-gray-100 rounded w-[92%]" />
-          <div className="h-3 bg-gray-100 rounded w-[86%]" />
-          <div className="h-3 bg-gray-100 rounded w-[78%]" />
-          <div className="h-3 bg-gray-100 rounded w-[88%]" />
-        </div>
-      </div>
     </div>
   )
 }
@@ -1132,33 +1082,6 @@ function VoiceFeedbackPopup({
           max-height: 140px;
           overflow: hidden;
         }
-
-        .shimmer-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 9999px;
-          background: rgba(148, 163, 184, 0.9);
-          box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.35);
-          animation: shimmerDot 1.05s infinite ease-in-out;
-          will-change: transform, opacity, box-shadow;
-        }
-        @keyframes shimmerDot {
-          0% {
-            transform: translateY(0px) scale(0.95);
-            opacity: 0.45;
-            box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.15);
-          }
-          50% {
-            transform: translateY(-1px) scale(1);
-            opacity: 0.85;
-            box-shadow: 0 0 0 6px rgba(148, 163, 184, 0.06);
-          }
-          100% {
-            transform: translateY(0px) scale(0.95);
-            opacity: 0.45;
-            box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.15);
-          }
-        }
       `}</style>
       <div className="px-4 py-4">
         <div className="font-semibold text-gray-900 text-[13px]">Voice Feedback</div>
@@ -1192,7 +1115,7 @@ function VoiceFeedbackPopup({
 }
 
 function LoadingIndicator() {
-  return <span className="shimmer-dot" aria-hidden="true" />
+  return <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-slate-400" aria-hidden />
 }
 
 function ProcessingStack() {

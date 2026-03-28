@@ -71,6 +71,7 @@ export default function CaptureWidget({
   sessionStartErrorBanner,
   onSessionStartErrorDismiss,
   environment,
+  assertIdentityBeforeWorkspaceMutations,
   onPreviousSessions,
   onSetCaptureMode,
   onOpenBilling,
@@ -131,6 +132,7 @@ export default function CaptureWidget({
     },
     captureRootParent,
     environment,
+    assertIdentityBeforeWorkspaceMutations,
   });
 
   /** Session limit: prop (from parent e.g. extension) takes precedence; otherwise use hook state (set when startSession returns limitReached). */

@@ -14,7 +14,7 @@ const MAX_ITEMS = 5;
 export function RecentlyActiveSection({ sessions, onView }: RecentlyActiveSectionProps) {
   const sorted = useMemo(() => {
     return [...sessions]
-      .filter((s) => s.counts.total > 0)
+      .filter((s) => (s.counts?.total ?? 0) > 0)
       .sort((a, b) => {
         const ta = a.session.updatedAt as { seconds?: number } | null | undefined;
         const tb = b.session.updatedAt as { seconds?: number } | null | undefined;
@@ -35,9 +35,15 @@ export function RecentlyActiveSection({ sessions, onView }: RecentlyActiveSectio
       </h2>
       <ul className="flex flex-col gap-0.5">
         {sorted.map(({ session, counts }) => {
-          const open = counts.open;
-          const total = counts.total;
-          const pct = total > 0 ? Math.round((counts.resolved / total) * 100) : 0;
+          const open = counts?.open ?? 0;
+          const total = counts?.total ?? 0;
+          const pct =
+            counts && total > 0 ? Math.round((counts.resolved / total) * 100) : 0;
+          const last = formatLastActivity(session.updatedAt);
+          const subParts = [
+            `${open} open`,
+            total > 0 ? `${pct}% done` : null,
+          ].filter(Boolean) as string[];
           return (
             <li key={session.id}>
               <button
@@ -46,16 +52,22 @@ export function RecentlyActiveSection({ sessions, onView }: RecentlyActiveSectio
                 className="w-full text-left px-3 py-2.5 rounded-lg bg-transparent hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 ease-out focus:outline-none focus:ring-1 focus:ring-[var(--color-primary-ring)] flex items-center justify-between gap-4"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="text-[14px] font-semibold leading-[1.4] text-[hsl(var(--text-primary-strong))] truncate">
-                    {session.title || "Untitled Session"}
-                  </div>
-                  <div className="text-[12px] text-[hsl(var(--text-tertiary))] mt-0.5 tabular-nums">
-                    {open} open · {pct}% done
-                  </div>
+                  {session.title?.trim() ? (
+                    <div className="text-[14px] font-semibold leading-[1.4] text-[hsl(var(--text-primary-strong))] truncate">
+                      {session.title}
+                    </div>
+                  ) : null}
+                  {subParts.length > 0 ? (
+                    <div className="text-[12px] text-[hsl(var(--text-tertiary))] mt-0.5 tabular-nums">
+                      {subParts.join(" · ")}
+                    </div>
+                  ) : null}
                 </div>
-                <span className="text-[12px] text-[hsl(var(--text-tertiary))] shrink-0 tabular-nums">
-                  {formatLastActivity(session.updatedAt)}
-                </span>
+                {last ? (
+                  <span className="text-[12px] text-[hsl(var(--text-tertiary))] shrink-0 tabular-nums">
+                    {last}
+                  </span>
+                ) : null}
               </button>
             </li>
           );

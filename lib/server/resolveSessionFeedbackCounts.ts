@@ -33,11 +33,17 @@ export async function resolveSessionFeedbackCounts(
   let realOpen = 0;
   let realResolved = 0;
 
-  const snapshot = await adminDb
-    .collection("feedback")
-    .where("sessionId", "==", sessionId)
-    .where("workspaceId", "==", workspaceId)
-    .get();
+  console.time("Firestore query");
+  let snapshot;
+  try {
+    snapshot = await adminDb
+      .collection("feedback")
+      .where("sessionId", "==", sessionId)
+      .where("workspaceId", "==", workspaceId)
+      .get();
+  } finally {
+    console.timeEnd("Firestore query");
+  }
 
   snapshot.forEach((docSnap) => {
     if (docSnap.data().isDeleted === true) return;

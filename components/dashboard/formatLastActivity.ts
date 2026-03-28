@@ -1,11 +1,11 @@
 /** Relative date: within 24h → "2h ago"; within 7 days → "Mon"; else "Mar 2". */
 export function formatLastActivity(updatedAt: unknown): string {
-  if (updatedAt == null) return "—";
+  if (updatedAt == null) return "";
   const sec =
     typeof (updatedAt as { seconds?: number }).seconds === "number"
       ? (updatedAt as { seconds: number }).seconds
       : null;
-  if (sec == null) return "—";
+  if (sec == null) return "";
   const d = new Date(sec * 1000);
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();

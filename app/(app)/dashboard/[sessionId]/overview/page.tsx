@@ -5,7 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Share2, Settings, LayoutPanelLeft, Loader2 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
 import { useSessionOverview } from "./hooks/useSessionOverview";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { OverviewActivityItem } from "./hooks/useSessionOverview";
@@ -15,6 +18,49 @@ import type { Timestamp } from "firebase/firestore";
 
 function resolutionLabel(isResolved: boolean): string {
   return isResolved ? "Done" : "Open";
+}
+
+function OverviewHeaderSkeleton() {
+  return (
+    <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--layer-1-border)] animate-pulse">
+      <div className="space-y-2 flex-1 max-w-md">
+        <div className="h-6 bg-neutral-200/80 rounded-md w-[45%]" />
+        <div className="h-4 bg-neutral-100 rounded-md w-[30%]" />
+      </div>
+      <div className="flex gap-2 shrink-0">
+        <div className="h-9 w-16 bg-neutral-100 rounded-lg" />
+        <div className="h-9 w-40 bg-neutral-200/80 rounded-lg" />
+        <div className="h-10 w-10 bg-neutral-100 rounded-lg" />
+      </div>
+    </header>
+  );
+}
+
+function OverviewMainSkeleton() {
+  return (
+    <div className="animate-pulse px-6 py-4 max-w-6xl mx-auto" aria-busy="true" aria-label="Loading overview">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="rounded-lg border border-[var(--layer-2-border)] h-[72px] bg-white"
+          />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="h-52 rounded-lg border border-[var(--layer-2-border)] bg-white" />
+            <div className="h-52 rounded-lg border border-[var(--layer-2-border)] bg-white" />
+          </div>
+        </div>
+        <div className="space-y-6">
+          <div className="h-44 rounded-lg border border-[var(--layer-2-border)] bg-white" />
+          <div className="h-64 rounded-lg border border-[var(--layer-2-border)] bg-white" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ----- Session header -----
@@ -36,15 +82,20 @@ function OverviewSessionHeader({
   const normalizedCreatedAt =
     typeof createdAt === "string" ? new Date(createdAt) : createdAt ?? null;
   const dateStr = formatOverviewDate(normalizedCreatedAt as any);
+  const metaLine = [dateStr || null].filter(Boolean).join(" · ");
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--layer-1-border)]">
       <div>
-        <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
-          {title || "Session"}
-        </h1>
-        <p className="text-[13px] text-[hsl(var(--text-tertiary))] mt-2">
-          {dateStr} • Owner • —
-        </p>
+        {title?.trim() ? (
+          <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
+            {title}
+          </h1>
+        ) : null}
+        {metaLine ? (
+          <p className="text-[13px] text-[hsl(var(--text-tertiary))] mt-2">
+            {metaLine}
+          </p>
+        ) : null}
       </div>
       <div className="flex items-center gap-2">
         <button
@@ -54,7 +105,7 @@ function OverviewSessionHeader({
           className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {copyBusy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Share2 size={14} />}
-          {copyBusy ? "Copying…" : copied ? "Copied" : "Share"}
+          {copyBusy ? "" : copied ? "Copied" : "Share"}
         </button>
         <Link
           href={`/dashboard/${sessionId}`}
@@ -113,15 +164,20 @@ function FeedbackPreviewRow({
   item: Feedback;
   showStatus?: boolean;
 }) {
+  const createdStr = formatOverviewDate(item.createdAt);
   return (
     <div className="flex items-center gap-3 py-2 border-b border-[var(--layer-1-border)] last:border-0">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-[hsl(var(--text-primary))] truncate">
-          {item.title}
-        </p>
-        <p className="text-xs text-[hsl(var(--text-muted))] mt-0.5">
-          {formatOverviewDate(item.createdAt)}
-        </p>
+        {item.title?.trim() ? (
+          <p className="text-sm font-medium text-[hsl(var(--text-primary))] truncate">
+            {item.title}
+          </p>
+        ) : null}
+        {createdStr ? (
+          <p className="text-xs text-[hsl(var(--text-muted))] mt-0.5">
+            {createdStr}
+          </p>
+        ) : null}
       </div>
       {showStatus && (
         <span className="text-xs font-medium text-[hsl(var(--text-secondary))] shrink-0 px-2 py-0.5 rounded-md border border-[var(--layer-2-border)] bg-white">
@@ -216,22 +272,31 @@ function RecentActivity({ items }: { items: OverviewActivityItem[] }) {
         </p>
       ) : (
         <ul className="divide-y divide-[var(--layer-1-border)]">
-          {items.map((item, i) => (
-            <li key={i} className="px-4 py-2.5 flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-[hsl(var(--text-primary))]">
-                  {item.actorName}
-                </p>
-                <p className="text-xs text-[hsl(var(--text-secondary))] truncate" title={item.targetTitle !== "—" ? item.targetTitle : undefined}>
-                  {item.action}
-                  {item.targetTitle !== "—" && ` · ${item.targetTitle}`}
-                </p>
-              </div>
-              <span className="text-xs text-[hsl(var(--text-muted))] shrink-0">
-                {formatActivityTime(item.timestamp)}
-              </span>
-            </li>
-          ))}
+          {items.map((item, i) => {
+            const timeLabel = formatActivityTime(item.timestamp);
+            const targetTrim = item.targetTitle.trim();
+            return (
+              <li key={i} className="px-4 py-2.5 flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-[hsl(var(--text-primary))]">
+                    {item.actorName}
+                  </p>
+                  <p
+                    className="text-xs text-[hsl(var(--text-secondary))] truncate"
+                    title={targetTrim ? item.targetTitle : undefined}
+                  >
+                    {item.action}
+                    {targetTrim ? ` · ${item.targetTitle}` : ""}
+                  </p>
+                </div>
+                {timeLabel ? (
+                  <span className="text-xs text-[hsl(var(--text-muted))] shrink-0">
+                    {timeLabel}
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -246,13 +311,13 @@ export default function SessionOverviewPage() {
     useReplace: true,
   });
   const { data, loading, error } = useSessionOverview(sessionId);
-  const { workspaceId, claimsReady, authUid } = useWorkspace();
+  const { workspaceId, isIdentityResolved, authUid } = useWorkspace();
   const [copied, setCopied] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
 
   useEffect(() => {
     if (
-      !claimsReady ||
+      !isIdentityResolved ||
       authLoading ||
       loading ||
       !data.session ||
@@ -265,7 +330,7 @@ export default function SessionOverviewPage() {
       router.replace("/dashboard");
     }
   }, [
-    claimsReady,
+    isIdentityResolved,
     authLoading,
     authUser,
     loading,
@@ -276,22 +341,30 @@ export default function SessionOverviewPage() {
 
   const handleCopy = useCallback(async () => {
     if (!sessionId || copyBusy) return;
+    assertIdentityResolved(isIdentityResolved);
     const ok = await copySessionLink(sessionId, authUid, { onBusy: setCopyBusy });
     if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [sessionId, copyBusy]);
+  }, [sessionId, copyBusy, authUid, isIdentityResolved]);
 
-  if (
-    !claimsReady ||
-    authLoading ||
-    (loading && !data.session)
-  ) {
-    return (
-      <div className="h-full flex items-center justify-center bg-[var(--canvas-base)]">
-        <p className="text-sm text-[hsl(var(--text-muted))]">Loading…</p>
-      </div>
-    );
+  const session = data.session;
+  const showOverviewSkeleton =
+    !isIdentityResolved ||
+    !workspaceId ||
+    (Boolean(sessionId) && loading && !session);
+
+  const shouldRedirectMissingSession =
+    Boolean(sessionId) &&
+    !loading &&
+    !authLoading &&
+    isIdentityResolved &&
+    Boolean(workspaceId) &&
+    !session;
+
+  if (!sessionId) {
+    router.replace("/dashboard");
+    return null;
   }
 
   if (error) {
@@ -302,8 +375,7 @@ export default function SessionOverviewPage() {
     );
   }
 
-  const session = data.session;
-  if (!sessionId || !session) {
+  if (shouldRedirectMissingSession) {
     router.replace("/dashboard");
     return null;
   }
@@ -314,51 +386,59 @@ export default function SessionOverviewPage() {
 
   return (
     <div className="h-full bg-[var(--canvas-base)]">
-      <OverviewSessionHeader
-        title={session.title}
-        createdAt={session.createdAt ?? null}
-        sessionId={sessionId}
-        copied={copied}
-        copyBusy={copyBusy}
-        onCopy={handleCopy}
-      />
+      {session && !showOverviewSkeleton ? (
+        <OverviewSessionHeader
+          title={session.title}
+          createdAt={session.createdAt ?? null}
+          sessionId={sessionId}
+          copied={copied}
+          copyBusy={copyBusy}
+          onCopy={handleCopy}
+        />
+      ) : (
+        <OverviewHeaderSkeleton />
+      )}
 
-      <main className="px-6 py-4 max-w-6xl mx-auto">
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <MetricCard label="Total Feedback" value={totalCount} />
-          <MetricCard label="Open" value={countsByStatus.open} />
-          <MetricCard label="Done" value={doneCount} />
-          <MetricCard
-            label="Completion %"
-            value={`${Math.round(completionPercent)}%`}
-            progressPercent={completionPercent}
-          />
-        </section>
+      {showOverviewSkeleton || !session ? (
+        <OverviewMainSkeleton />
+      ) : (
+        <main className="px-6 py-4 max-w-6xl mx-auto">
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <MetricCard label="Total Feedback" value={totalCount} />
+            <MetricCard label="Open" value={countsByStatus.open} />
+            <MetricCard label="Done" value={doneCount} />
+            <MetricCard
+              label="Completion %"
+              value={`${Math.round(completionPercent)}%`}
+              progressPercent={completionPercent}
+            />
+          </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <StatusSection
-                label="Open"
-                count={countsByStatus.open}
-                items={statusPreview.open}
-                viewAllHref={`/dashboard/${sessionId}`}
-              />
-              <StatusSection
-                label="Done"
-                count={countsByStatus.resolved}
-                items={statusPreview.resolved}
-                viewAllHref={`/dashboard/${sessionId}`}
-              />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <StatusSection
+                  label="Open"
+                  count={countsByStatus.open}
+                  items={statusPreview.open}
+                  viewAllHref={`/dashboard/${sessionId}`}
+                />
+                <StatusSection
+                  label="Done"
+                  count={countsByStatus.resolved}
+                  items={statusPreview.resolved}
+                  viewAllHref={`/dashboard/${sessionId}`}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <TagDistribution tagCounts={tagCounts} />
+              <RecentActivity items={recentActivity} />
             </div>
           </div>
-
-          <div className="space-y-6">
-            <TagDistribution tagCounts={tagCounts} />
-            <RecentActivity items={recentActivity} />
-          </div>
-        </div>
-      </main>
+        </main>
+      )}
     </div>
   );
 }

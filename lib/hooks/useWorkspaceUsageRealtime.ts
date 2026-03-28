@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  clearWorkspaceSubscription,
-  subscribeWorkspace,
+  retainWorkspaceFirestoreListener,
   useWorkspaceRealtimeStore,
   type WorkspaceUsageRealtimeData,
 } from "@/lib/realtime/workspaceStore";
@@ -17,7 +16,7 @@ export function useWorkspaceUsageRealtime(options?: {
   error: string | null;
 } {
   const enabled = options?.enabled ?? true;
-  const { workspaceId: ctxWorkspaceId, claimsReady } = useWorkspace();
+  const { workspaceId: ctxWorkspaceId, isIdentityResolved } = useWorkspace();
   const workspaceState = useWorkspaceRealtimeStore();
   const [targetWorkspaceId, setTargetWorkspaceId] = useState<string | null>(null);
 
@@ -27,8 +26,7 @@ export function useWorkspaceUsageRealtime(options?: {
       return;
     }
 
-    if (!claimsReady) {
-      clearWorkspaceSubscription();
+    if (!isIdentityResolved) {
       setTargetWorkspaceId(null);
       return;
     }
@@ -38,19 +36,18 @@ export function useWorkspaceUsageRealtime(options?: {
         ? ctxWorkspaceId.trim()
         : null;
     if (trimmed == null) {
-      clearWorkspaceSubscription();
       setTargetWorkspaceId(null);
       return;
     }
 
     setTargetWorkspaceId(trimmed);
-    subscribeWorkspace(trimmed);
+    const release = retainWorkspaceFirestoreListener(trimmed);
 
     return () => {
-      clearWorkspaceSubscription();
+      release();
       setTargetWorkspaceId(null);
     };
-  }, [enabled, claimsReady, ctxWorkspaceId]);
+  }, [enabled, isIdentityResolved, ctxWorkspaceId]);
 
   if (!enabled) {
     return { data: null, loading: false, error: null };
@@ -58,7 +55,7 @@ export function useWorkspaceUsageRealtime(options?: {
 
   const widReady =
     ctxWorkspaceId != null && ctxWorkspaceId.trim() !== "";
-  const waitingForClaimsOrWorkspace = !claimsReady || !widReady;
+  const waitingForClaimsOrWorkspace = !isIdentityResolved || !widReady;
 
   const isMatchingWorkspace =
     targetWorkspaceId != null && workspaceState.workspaceId === targetWorkspaceId;

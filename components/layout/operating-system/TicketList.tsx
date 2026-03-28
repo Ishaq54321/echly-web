@@ -82,7 +82,7 @@ function TicketListSectionLoading() {
 }
 
 function TicketListInner({
-  sessionTitle = "Session",
+  sessionTitle = "",
   counts,
   countsLoading = false,
   isEditingSessionTitle = false,
@@ -186,19 +186,14 @@ function TicketListInner({
   const { total, open, resolved } = counts;
 
   const meta = (() => {
-    // Keep header pills consistent with the "…" loading treatment.
-    // The `total` value must not be derived from lazy-loaded list length.
-    if (countsLoading) return `… total · loading…`;
-
+    if (countsLoading) return null;
     const base =
       total > 0
         ? [`${total} total`, `${open} open`, `${resolved} resolved`].join(" · ")
         : "0 total";
-
     return base;
   })();
 
-  const loadingValueClass = countsLoading ? "animate-pulse opacity-70" : "";
 
   // Detect user-driven scroll so we don't fight the browser during manual navigation.
   useEffect(() => {
@@ -358,7 +353,7 @@ function TicketListInner({
                 <input
                   ref={titleInputRef}
                   type="text"
-                  value={sessionTitleDraft ?? sessionTitle}
+                  value={sessionTitleDraft ?? sessionTitle ?? ""}
                   onChange={(e) => onSessionTitleChange?.(e.target.value)}
                   onBlur={() => {
                     if (skipTitleBlurSaveRef.current) {
@@ -398,15 +393,15 @@ function TicketListInner({
                     <button
                       type="button"
                       onClick={() => onSessionTitleEdit?.()}
-                      className="min-w-0 flex-1 text-left truncate bg-transparent border-0 p-0 shadow-none cursor-text text-[15px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFBFC] rounded-sm"
+                      className="min-w-0 flex-1 min-h-[1.35rem] text-left truncate bg-transparent border-0 p-0 shadow-none cursor-text text-[15px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFBFC] rounded-sm"
                     >
-                      {sessionTitle}
+                      {sessionTitle?.trim() ? sessionTitle : null}
                     </button>
-                  ) : (
+                  ) : sessionTitle?.trim() ? (
                     <h1 className="text-[15px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] truncate">
                       {sessionTitle}
                     </h1>
-                  )}
+                  ) : null}
                   {saveSessionTitleSuccess && (
                     <Check className="h-3.5 w-3.5 text-[var(--color-success)] shrink-0" aria-hidden />
                   )}
@@ -482,9 +477,11 @@ function TicketListInner({
               </>
             )}
           </div>
-          <p className="mt-1.5 text-[12px] text-[hsl(var(--text-tertiary))] leading-relaxed">
-            {meta}
-          </p>
+          {meta ? (
+            <p className="mt-1.5 text-[12px] text-[hsl(var(--text-tertiary))] leading-relaxed">
+              {meta}
+            </p>
+          ) : null}
           {showTicketSearch ? (
             <div className="mt-3">
               <div className="search-container">
@@ -547,7 +544,7 @@ function TicketListInner({
             aria-expanded={openExpanded}
           >
             <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-primary-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-primary)]">
-              <span className={loadingValueClass}>{countsLoading ? "…" : open}</span>
+              <span>{countsLoading ? "" : open}</span>
             </span>
             <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
               Open
@@ -604,7 +601,7 @@ function TicketListInner({
             aria-expanded={resolvedExpanded}
           >
             <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-success-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-success)]">
-              <span className={loadingValueClass}>{countsLoading ? "…" : resolved}</span>
+              <span>{countsLoading ? "" : resolved}</span>
             </span>
             <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
               Resolved

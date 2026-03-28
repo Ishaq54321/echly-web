@@ -11,7 +11,6 @@ import {
   Check,
   Minus,
 } from "lucide-react";
-import { authFetch } from "@/lib/authFetch";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { usePlanCatalog } from "@/lib/hooks/usePlanCatalog";
 import { Button } from "@/components/ui/Button";
@@ -19,7 +18,10 @@ import { Card } from "@/components/ui/Card";
 import { Switch } from "@/components/ui/Switch";
 import { Modal } from "@/components/ui/Modal";
 import type { Workspace } from "@/lib/domain/workspace";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
 import { BillingUsageProvider } from "@/lib/billing/BillingUsageProvider";
 import {
   listenToWorkspace,
@@ -28,6 +30,12 @@ import {
   updateWorkspaceNotifications,
   updateWorkspaceSettings,
 } from "@/lib/repositories/workspacesRepository";
+import {
+  SkeletonCard,
+  SkeletonHeader,
+  SkeletonBase,
+  SkeletonTableRow,
+} from "@/components/ui/skeletons";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
@@ -67,7 +75,13 @@ type TabId = (typeof TABS)[number]["id"];
 
 function SettingsPageInner() {
   const { user, loading: authLoading } = useAuthGuard();
-  const { workspaceId, claimsReady, workspaceError, workspaceLoading } = useWorkspace();
+  const {
+    workspaceId,
+    claimsReady,
+    workspaceError,
+    workspaceLoading,
+    isIdentityResolved,
+  } = useWorkspace();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>("general");
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -80,36 +94,29 @@ function SettingsPageInner() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!claimsReady || !workspaceId) {
+    if (!isIdentityResolved || !workspaceId) {
       setWorkspace(null);
       return;
     }
     const unsub = listenToWorkspace(workspaceId, setWorkspace, claimsReady);
     return () => unsub();
-  }, [workspaceId, claimsReady]);
+  }, [workspaceId, claimsReady, isIdentityResolved]);
 
   const loadingWorkspace = Boolean(
     user &&
       (workspaceLoading ||
         !workspaceId ||
-        !claimsReady ||
-        (workspace === null && Boolean(workspaceId) && claimsReady))
+        !isIdentityResolved ||
+        (workspace === null && Boolean(workspaceId) && isIdentityResolved))
   );
-
-  if (authLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center bg-white">
-        <div className="text-sm text-neutral-500">Loading settings…</div>
-      </div>
-    );
-  }
+  const sectionLoading = authLoading || loadingWorkspace;
 
   if (
     user &&
     (workspaceError ||
       (!workspaceLoading &&
         !loadingWorkspace &&
-        claimsReady &&
+        isIdentityResolved &&
         (!workspaceId || workspaceId.trim() === "")))
   ) {
     return (
@@ -173,7 +180,7 @@ function SettingsPageInner() {
           <GeneralTab
             workspace={workspace}
             workspaceId={workspaceId}
-            loading={loadingWorkspace}
+            loading={sectionLoading}
             onNavigateToBilling={() => setActiveTab("billing")}
           />
         )}
@@ -191,15 +198,28 @@ function SettingsPageInner() {
   );
 }
 
+function SettingsShellPlaceholder() {
+  return (
+    <div className="flex flex-1 min-h-0 bg-white overflow-auto" aria-busy="true" aria-live="polite">
+      <div className="flex-1 min-w-0 max-w-[1280px] mx-auto px-12 py-10 w-full min-h-[520px]">
+        <SkeletonHeader className="mb-8" />
+        <div className="flex items-center gap-10 border-b border-[var(--border-default)] mb-8 pb-3">
+          {TABS.map((t) => (
+            <SkeletonBase key={t.id} className="h-4 w-20" />
+          ))}
+        </div>
+        <div className={`${CARD_GAP}`}>
+          <SkeletonCard className="min-h-[168px] rounded-[12px]" lines={4} />
+          <SkeletonCard className="min-h-[168px] rounded-[12px]" lines={4} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center bg-white">
-          <div className="text-sm text-neutral-500">Loading settings…</div>
-        </div>
-      }
-    >
+    <Suspense fallback={<SettingsShellPlaceholder />}>
       <SettingsPageInner />
     </Suspense>
   );
@@ -217,8 +237,31 @@ function GeneralTab({
   loading: boolean;
   onNavigateToBilling: () => void;
 }) {
+  if (loading) {
+    return (
+      <div className={`${CARD_GAP} pb-16 min-h-[920px]`} aria-busy="true" aria-live="polite">
+        <SkeletonCard
+          className="rounded-[12px] border-[var(--border-default)] min-h-[200px]"
+          lines={6}
+        />
+        <SkeletonCard
+          className="rounded-[12px] border-[var(--border-default)] min-h-[260px]"
+          lines={5}
+        />
+        <SkeletonCard
+          className="rounded-[12px] border-[var(--border-default)] min-h-[320px]"
+          lines={5}
+        />
+        <SkeletonCard
+          className="rounded-[12px] border-[var(--border-default)] min-h-[140px]"
+          lines={2}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className={`${CARD_GAP} pb-16`}>
+    <div className={`${CARD_GAP} pb-16 ech-content-enter`}>
       <WorkspaceCard workspace={workspace} workspaceId={workspaceId} loading={loading} />
       <AppearanceCard
         workspace={workspace}
@@ -241,6 +284,7 @@ function WorkspaceCard({
   workspaceId: string | null;
   loading: boolean;
 }) {
+  const { isIdentityResolved } = useWorkspace();
   const [nameDraft, setNameDraft] = useState("");
   const lastWorkspaceIdRef = useRef<string | null>(null);
 
@@ -272,10 +316,12 @@ function WorkspaceCard({
             disabled={loading || !workspaceId}
             onChange={(e) => setNameDraft(e.target.value)}
             onBlur={() => {
-              if (!workspaceId) return;
+              assertIdentityResolved(isIdentityResolved);
+              const wid = workspaceId?.trim();
+              if (!wid) throw new Error("Workspace id missing");
               const next = nameDraft.trim() || "My Workspace";
               if (workspace?.name === next) return;
-              updateWorkspaceName(workspaceId, next).catch((e) =>
+              updateWorkspaceName(wid, next).catch((e) =>
                 console.error("Failed to update workspace name:", e)
               );
             }}
@@ -317,6 +363,7 @@ function NotificationsCard({
   workspaceId: string | null;
   loading: boolean;
 }) {
+  const { isIdentityResolved } = useWorkspace();
   const email = workspace?.notifications?.email;
   const state = {
     feedbackSubmitted: email?.feedbackSubmitted ?? true,
@@ -345,7 +392,9 @@ function NotificationsCard({
               checked={state[key as keyof typeof state]}
               disabled={loading || !workspaceId}
               onChange={(v) => {
-                if (!workspaceId) return;
+                assertIdentityResolved(isIdentityResolved);
+                const wid = workspaceId?.trim();
+                if (!wid) throw new Error("Workspace id missing");
                 const next = {
                   ...(workspace?.notifications ?? { email: state }),
                   email: {
@@ -353,7 +402,7 @@ function NotificationsCard({
                     [key]: v,
                   },
                 } as Workspace["notifications"];
-                updateWorkspaceNotifications(workspaceId, next).catch((e) =>
+                updateWorkspaceNotifications(wid, next).catch((e) =>
                   console.error("Failed to update notifications:", e)
                 );
               }}
@@ -406,6 +455,7 @@ function AppearanceCard({
   loading: boolean;
   onNavigateToBilling: () => void;
 }) {
+  const { isIdentityResolved } = useWorkspace();
   const isPro = false; // TODO: from plan/subscription
   const appearance = workspace?.appearance;
   const logoOnScreen = appearance?.logoOnFeedbackScreen ?? false;
@@ -445,7 +495,7 @@ function AppearanceCard({
         <Switch
           checked={checked}
           onChange={onChange}
-          disabled={locked}
+          disabled={locked || loading || !workspaceId}
           className="shrink-0 transition-all duration-200 ease-out"
         />
       </div>
@@ -464,7 +514,9 @@ function AppearanceCard({
           preview="Add your company logo to feedback sessions."
           checked={logoOnScreen}
           onChange={(v) => {
-            if (!workspaceId) return;
+            assertIdentityResolved(isIdentityResolved);
+            const wid = workspaceId?.trim();
+            if (!wid) throw new Error("Workspace id missing");
             const next = {
               ...(workspace?.appearance ?? {
                 logoOnFeedbackScreen: false,
@@ -473,7 +525,7 @@ function AppearanceCard({
               }),
               logoOnFeedbackScreen: v,
             };
-            updateWorkspaceAppearance(workspaceId, next).catch((e) =>
+            updateWorkspaceAppearance(wid, next).catch((e) =>
               console.error("Failed to update appearance:", e)
             );
           }}
@@ -483,7 +535,9 @@ function AppearanceCard({
           preview="Match the feedback UI to your brand color."
           checked={accentColorEnabled}
           onChange={(v) => {
-            if (!workspaceId) return;
+            assertIdentityResolved(isIdentityResolved);
+            const wid = workspaceId?.trim();
+            if (!wid) throw new Error("Workspace id missing");
             const next = {
               ...(workspace?.appearance ?? {
                 logoOnFeedbackScreen: false,
@@ -492,7 +546,7 @@ function AppearanceCard({
               }),
               accentColor: v ? (appearance?.accentColor ?? "#155DFC") : null,
             };
-            updateWorkspaceAppearance(workspaceId, next).catch((e) =>
+            updateWorkspaceAppearance(wid, next).catch((e) =>
               console.error("Failed to update appearance:", e)
             );
           }}
@@ -502,7 +556,9 @@ function AppearanceCard({
           preview="Hide Echly logo and branding on shared feedback pages."
           checked={removeBranding}
           onChange={(v) => {
-            if (!workspaceId) return;
+            assertIdentityResolved(isIdentityResolved);
+            const wid = workspaceId?.trim();
+            if (!wid) throw new Error("Workspace id missing");
             const next = {
               ...(workspace?.appearance ?? {
                 logoOnFeedbackScreen: false,
@@ -511,7 +567,7 @@ function AppearanceCard({
               }),
               removeEchlyBranding: v,
             };
-            updateWorkspaceAppearance(workspaceId, next).catch((e) =>
+            updateWorkspaceAppearance(wid, next).catch((e) =>
               console.error("Failed to update appearance:", e)
             );
           }}
@@ -536,6 +592,7 @@ function AdvancedSettingsCard({
   workspaceId: string | null;
   loading: boolean;
 }) {
+  const { isIdentityResolved } = useWorkspace();
   const [open, setOpen] = useState(false); /* collapsed by default */
   const state = {
     autoCreateTicket: workspace?.automations?.autoCreateTicketOnFeedback ?? false,
@@ -574,9 +631,11 @@ function AdvancedSettingsCard({
                 checked={state[key as keyof typeof state]}
                 disabled={loading || !workspaceId}
                 onChange={(v) => {
-                  if (!workspaceId) return;
+                  assertIdentityResolved(isIdentityResolved);
+                  const wid = workspaceId?.trim();
+                  if (!wid) throw new Error("Workspace id missing");
                   if (key === "autoCreateTicket") {
-                    updateWorkspaceSettings(workspaceId, {
+                    updateWorkspaceSettings(wid, {
                       automations: {
                         ...(workspace?.automations ?? { autoCreateTicketOnFeedback: false }),
                         autoCreateTicketOnFeedback: v,
@@ -585,7 +644,7 @@ function AdvancedSettingsCard({
                     return;
                   }
                   if (key === "guestComments") {
-                    updateWorkspaceSettings(workspaceId, {
+                    updateWorkspaceSettings(wid, {
                       permissions: {
                         ...(workspace?.permissions ?? { allowGuestComments: false }),
                         allowGuestComments: v,
@@ -594,7 +653,7 @@ function AdvancedSettingsCard({
                     return;
                   }
                   if (key === "aiActionSteps") {
-                    updateWorkspaceSettings(workspaceId, {
+                    updateWorkspaceSettings(wid, {
                       ai: {
                         ...(workspace?.ai ?? { actionStepsEnabled: true }),
                         actionStepsEnabled: v,
@@ -957,36 +1016,6 @@ function CheckMarkIcon() {
   );
 }
 
-function BillingSkeleton() {
-  return (
-    <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
-      <header className="billing-container text-center" style={{ marginBottom: 32 }}>
-        <div className="h-12 w-[480px] max-w-full mx-auto rounded-lg bg-neutral-100 animate-pulse" style={{ marginBottom: 24 }} />
-      </header>
-      <div className="billing-container flex flex-wrap items-center justify-center gap-8" style={{ marginBottom: 32 }}>
-        <div className="h-9 w-32 rounded-lg bg-neutral-100 animate-pulse" />
-        <div className="h-9 w-48 rounded-lg bg-neutral-100 animate-pulse" />
-      </div>
-      <div className="billing-container">
-        <section className="billing-pricing-grid mb-[72px] items-stretch">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="billing-card">
-              <div className="h-6 w-24 rounded bg-neutral-100 animate-pulse" />
-              <div className="mt-4 h-8 w-16 rounded bg-neutral-100 animate-pulse" />
-              <ul className="plan-features flex-1 mt-4 space-y-3">
-                {[1, 2, 3, 4].map((j) => (
-                  <li key={j} className="h-4 rounded bg-neutral-50 animate-pulse" />
-                ))}
-              </ul>
-              <div className="mt-6 h-10 w-full rounded-lg bg-neutral-100 animate-pulse" />
-            </div>
-          ))}
-        </section>
-      </div>
-    </div>
-  );
-}
-
 function BillingTab() {
   const router = useRouter();
   const [billingPeriod, setBillingPeriod] = useState<"annual" | "monthly">("monthly");
@@ -1068,7 +1097,58 @@ function BillingTab() {
   }, [plans, teamSizeNumber, billingPeriod]);
 
   if (loading) {
-    return <BillingSkeleton />;
+    return (
+      <div
+        className={`flex flex-col ${BILLING_CONTAINER} pb-20 min-h-[640px]`}
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <div className="billing-container space-y-8">
+          <SkeletonBase className="mx-auto h-12 w-full max-w-2xl rounded-xl" />
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            <SkeletonBase className="h-10 w-28 rounded-lg" />
+            <SkeletonBase className="h-10 w-44 rounded-lg" />
+          </div>
+          <section className="billing-pricing-grid mb-[72px] items-stretch">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="billing-card min-h-[320px] pointer-events-none select-none"
+                aria-hidden
+              >
+                <div className="space-y-4 flex-1 flex flex-col">
+                  <SkeletonBase className="h-6 w-2/5 max-w-[140px]" />
+                  <SkeletonBase className="h-10 w-1/3 max-w-[120px]" />
+                  <div className="space-y-3 flex-1 pt-2">
+                    {Array.from({ length: 6 }).map((__, j) => (
+                      <div key={j} className="flex gap-2 items-start">
+                        <SkeletonBase className="h-[18px] w-[18px] shrink-0 rounded-full" />
+                        <SkeletonBase className="h-3.5 flex-1 max-w-[95%]" />
+                      </div>
+                    ))}
+                  </div>
+                  <SkeletonBase className="h-10 w-full rounded-[10px] mt-4" />
+                </div>
+              </div>
+            ))}
+          </section>
+          <section className="mb-[72px] overflow-x-auto">
+            <div
+              className="rounded-[18px] border overflow-hidden min-w-[640px]"
+              style={{ borderColor: "rgba(0,0,0,0.08)" }}
+            >
+              <table className="w-full text-left border-collapse">
+                <tbody>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <SkeletonTableRow key={i} cols={5} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
   }
 
   if (!plans || plans.length === 0) {

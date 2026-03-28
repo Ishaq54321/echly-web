@@ -5,9 +5,8 @@ import { authFetch } from "@/lib/authFetch";
 import { getBillingUsageCached, invalidateBillingUsageCache } from "@/lib/cachedBillingUsage";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import {
-  clearWorkspaceSubscription,
   getWorkspaceRealtimeSnapshot,
-  subscribeWorkspace,
+  retainWorkspaceFirestoreListener,
   subscribeWorkspaceStore,
 } from "@/lib/realtime/workspaceStore";
 
@@ -53,7 +52,7 @@ export function useBillingUsage(
   refetch: () => Promise<void>;
 } {
   const { enabled = true } = options;
-  const { workspaceId: ctxWorkspaceId, claimsReady, authUid } = useWorkspace();
+  const { workspaceId: ctxWorkspaceId, isIdentityResolved, authUid } = useWorkspace();
   const [data, setData] = useState<BillingUsageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,8 +82,8 @@ export function useBillingUsage(
       return;
     }
 
-    setLoading(true);
     let cancelled = false;
+    let releaseFirestore: (() => void) | null = null;
     const workspaceStoreUnsub: { current: (() => void) | null } = {
       current: null,
     };
@@ -100,48 +99,34 @@ export function useBillingUsage(
       });
     };
 
+    const trimmedWorkspace =
+      ctxWorkspaceId != null && ctxWorkspaceId.trim() !== ""
+        ? ctxWorkspaceId.trim()
+        : null;
+
+    if (!authUid || !isIdentityResolved || trimmedWorkspace == null) {
+      setData(null);
+      setLoading(false);
+      setError(null);
+      return () => {
+        cancelled = true;
+        if (idleHandle != null) cancelIdleTask(idleHandle);
+        workspaceStoreUnsub.current?.();
+        workspaceStoreUnsub.current = null;
+      };
+    }
+
+    releaseFirestore = retainWorkspaceFirestoreListener(trimmedWorkspace);
+
     void (async () => {
-      if (!authUid) {
-        if (workspaceStoreUnsub.current) {
-          workspaceStoreUnsub.current();
-          workspaceStoreUnsub.current = null;
-        }
-        clearWorkspaceSubscription();
-        setData(null);
-        setLoading(false);
-        return;
-      }
-
       if (cancelled) return;
-
-      if (!claimsReady) {
-        if (workspaceStoreUnsub.current) {
-          workspaceStoreUnsub.current();
-          workspaceStoreUnsub.current = null;
-        }
-        clearWorkspaceSubscription();
-        return;
-      }
-
-      const trimmedWorkspace =
-        ctxWorkspaceId != null && ctxWorkspaceId.trim() !== ""
-          ? ctxWorkspaceId.trim()
-          : null;
-      if (trimmedWorkspace == null) {
-        if (workspaceStoreUnsub.current) {
-          workspaceStoreUnsub.current();
-          workspaceStoreUnsub.current = null;
-        }
-        clearWorkspaceSubscription();
-        return;
-      }
+      setLoading(true);
       try {
         if (workspaceStoreUnsub.current) {
           workspaceStoreUnsub.current();
           workspaceStoreUnsub.current = null;
         }
         let seenInitialSnapshot = false;
-        subscribeWorkspace(trimmedWorkspace);
         workspaceStoreUnsub.current = subscribeWorkspaceStore(() => {
           const snap = getWorkspaceRealtimeSnapshot();
           if (snap.workspaceId !== trimmedWorkspace || snap.loading) return;
@@ -193,8 +178,9 @@ export function useBillingUsage(
       if (idleHandle != null) cancelIdleTask(idleHandle);
       workspaceStoreUnsub.current?.();
       workspaceStoreUnsub.current = null;
+      releaseFirestore?.();
     };
-  }, [enabled, refetch, claimsReady, ctxWorkspaceId, authUid]);
+  }, [enabled, refetch, isIdentityResolved, ctxWorkspaceId, authUid]);
 
   return { data, loading, error, refetch };
 }

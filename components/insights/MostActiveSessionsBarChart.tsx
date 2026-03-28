@@ -27,18 +27,17 @@ export function MostActiveSessionsBarChart({
   if (!data || data.length === 0) {
     return (
       <p className="text-sm text-gray-500 text-center py-10">
-        No feedback yet — insights will appear once you start collecting feedback.
+        No feedback yet. Insights will appear once you start collecting feedback.
       </p>
     );
   }
 
-  const formatted = data.map((d) => ({
-    ...d,
-    label:
-      d.sessionName.length > 28
-        ? `${d.sessionName.slice(0, 25)}…`
-        : d.sessionName,
-  }));
+  const formatted = data.map((d) => {
+    const name = d.sessionName.trim();
+    const label =
+      !name ? "" : name.length > 28 ? `${name.slice(0, 25)}…` : name;
+    return { ...d, label };
+  });
 
   const barColors = ["#3B82F6", "#74A5F6", "#94B9F6", "#ACC8F6", "#C5D7F6"];
 
@@ -82,8 +81,8 @@ export function MostActiveSessionsBarChart({
 
               const item = payload[0];
               const count = item.value as number;
-              const label =
-                item.payload?.sessionName ?? item.name ?? "Session";
+              const rawName = String(item.payload?.sessionName ?? "").trim();
+              const label = rawName || "";
 
               return (
                 <div
@@ -97,15 +96,17 @@ export function MostActiveSessionsBarChart({
                     fontSize: 12,
                   }}
                 >
-                  <div
-                    style={{
-                      marginBottom: 4,
-                      color: "#6B7280",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {label}
-                  </div>
+                  {label ? (
+                    <div
+                      style={{
+                        marginBottom: 4,
+                        color: "#6B7280",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {label}
+                    </div>
+                  ) : null}
 
                   <div
                     style={{

@@ -117,7 +117,13 @@ export async function getWorkspaceSessionsRepo(
     .where("workspaceId", "==", workspaceId);
   if (archivedOnly === true) q = q.where("archived", "==", true);
   q = q.orderBy("updatedAt", "desc").limit(max);
-  const snapshot = await q.get();
+  console.time("Firestore query");
+  let snapshot;
+  try {
+    snapshot = await q.get();
+  } finally {
+    console.timeEnd("Firestore query");
+  }
 
   return snapshot.docs
     .filter((docSnap) => {

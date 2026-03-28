@@ -8,8 +8,12 @@ import { db } from "@/lib/firebase";
 import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
-import { useWorkspace } from "@/lib/client/workspaceContext";
-import { FeedbackPremiumLoader } from "@/components/session/FeedbackPremiumLoader";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
+import { useStableState } from "@/lib/client/perception/useStableState";
+import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
 import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
 import type { Feedback } from "@/lib/domain/feedback";
@@ -75,48 +79,6 @@ function preloadImage(src: string, preloaded: Set<string>) {
   img.src = src;
 }
 
-function SessionPageSkeleton() {
-  return (
-    <div className="flex h-full min-h-0 overflow-hidden">
-      <aside className="w-[280px] h-screen shrink-0 self-start flex flex-col rounded-none bg-[#FAFBFC]">
-        <div className="flex-1 min-h-0 overflow-y-auto p-4">
-          <div className="space-y-3">
-            <div className="h-4 w-40 rounded bg-neutral-200/50 animate-feedback-placeholder-pulse" />
-            <div className="h-3 w-56 rounded bg-neutral-100/70 animate-feedback-placeholder-pulse" />
-            <div className="h-3 w-52 rounded bg-neutral-100/70 animate-feedback-placeholder-pulse" />
-          </div>
-        </div>
-      </aside>
-      <div className="content-divider shrink-0" aria-hidden />
-      <main className="surface-main flex-1 h-full overflow-y-auto min-h-0 flex flex-col">
-        <div className="h-full flex flex-col min-w-0">
-          <div className="max-w-4xl mx-auto w-full px-12 py-9 border-b border-[var(--layer-1-border)] shrink-0">
-            <div className="flex justify-between items-center gap-4">
-              <div className="min-w-0 flex-1">
-                <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
-                  Session
-                </h1>
-                <p className="text-[13px] text-[hsl(var(--text-tertiary))] mt-2">
-                  Loading…
-                </p>
-              </div>
-              <div className="text-[13px] text-secondary flex-shrink-0">
-                —
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-4xl mx-auto w-full px-10 py-8">
-              <div className="h-6 w-72 rounded bg-neutral-200/70 animate-feedback-placeholder-pulse" />
-              <div className="mt-4 h-28 w-full rounded bg-neutral-100/90 animate-feedback-placeholder-pulse" />
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
-
 export default function SessionPageClient({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -128,13 +90,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
 
   const { loading: authLoading } = useAuthGuard({ router });
-  const { workspaceId, claimsReady, authUid } = useWorkspace();
+  const { workspaceId, authUid, isIdentityResolved } = useWorkspace();
 
   const feedbackSessionId =
-    claimsReady && workspaceId && authUid && sessionId ? sessionId : undefined;
+    isIdentityResolved && sessionId ? sessionId : undefined;
 
   const listScrollRef = useRef<HTMLDivElement | null>(null);
-  const [listScrollReady, setListScrollReady] = useState(0);
   const [openExpanded, setOpenExpanded] = useState(true);
   const [resolvedExpanded, setResolvedExpanded] = useState(false);
 
@@ -184,6 +145,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [isSearchMode]);
 
   useEffect(() => {
+    if (!isIdentityResolved) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
     const q = searchQuery.trim();
     if (!q) {
       setSearchResults([]);
@@ -221,12 +187,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [searchQuery, feedbackSessionId]);
+  }, [searchQuery, feedbackSessionId, isIdentityResolved]);
 
   const {
-    canonicalFeedback,
-    openFeedback,
-    resolvedFeedback,
     feedback,
     setFeedback,
     total: feedbackTotal,
@@ -234,23 +197,72 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     resolvedCount: feedbackResolvedCount,
     countsLoading: feedbackCountsLoading,
     loading: feedbackLoading,
+    isCountsSynced,
     hasMore: hasMoreFeedback,
     hasReachedLimit: feedbackReachedLimit,
     loadingMore: feedbackLoadingMore,
     isLoadingResolved: feedbackLoadingResolved,
     loadMoreRef: feedbackLoadMoreRef,
-  } = useSessionFeedbackPaginated(
-    feedbackSessionId,
-    listScrollRef,
-    listScrollReady,
-    (newestTicketId) => {
-      setSelectedId(newestTicketId);
-      setNewTicketId(newestTicketId);
-    },
-    resolvedExpanded,
-    openExpanded,
-    isSearchMode
+  } = useSessionFeedbackPaginated(feedbackSessionId, (newestTicketId) => {
+    setSelectedId(newestTicketId);
+    setNewTicketId(newestTicketId);
+  });
+
+  const feedbackScoped = useMemo(
+    () => feedback.filter((f) => f.sessionId === sessionId),
+    [feedback, sessionId]
   );
+  const stableScopedFeedback = useStableState(
+    feedbackScoped,
+    !feedbackLoading && isIdentityResolved,
+    sessionId
+  );
+  const stableOpenFeedback = useMemo(
+    () =>
+      stableScopedFeedback.filter(
+        (item) => normalizeTicketStatus(getTicketStatus(item)) === "open"
+      ),
+    [stableScopedFeedback]
+  );
+  const stableResolvedFeedback = useMemo(
+    () =>
+      stableScopedFeedback.filter(
+        (item) => normalizeTicketStatus(getTicketStatus(item)) === "resolved"
+      ),
+    [stableScopedFeedback]
+  );
+  const stableCanonicalFeedback = stableScopedFeedback;
+
+  const prevSessionIdForSelectionRef = useRef(sessionId);
+  if (prevSessionIdForSelectionRef.current !== sessionId) {
+    prevSessionIdForSelectionRef.current = sessionId;
+    setSelectedId(null);
+  }
+
+  const effectiveSelectedId = useMemo(() => {
+    const url = ticketIdFromUrl;
+    if (url) {
+      const urlHit = stableScopedFeedback.find((f) => f.id === url);
+      if (urlHit) return url;
+    }
+    if (selectedId) {
+      const selHit = stableScopedFeedback.find((f) => f.id === selectedId);
+      if (selHit) return selectedId;
+    }
+    if (stableScopedFeedback.length > 0) {
+      return stableScopedFeedback[0]!.id;
+    }
+    return null;
+  }, [ticketIdFromUrl, stableScopedFeedback, selectedId, sessionId]);
+
+  if (stableScopedFeedback.length > 0 && selectedId === null) {
+    const url = ticketIdFromUrl;
+    if (url && stableScopedFeedback.some((f) => f.id === url)) {
+      setSelectedId(url);
+    } else {
+      setSelectedId(stableScopedFeedback[0]!.id);
+    }
+  }
 
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [isCommentMode, setIsCommentMode] = useState(false);
@@ -383,7 +395,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /* ================= AUTH + LOAD SESSION (title/meta only) ================= */
   useEffect(() => {
     if (authLoading) return;
-    if (!claimsReady || !authUid || !sessionId || !workspaceId) {
+    if (!isIdentityResolved || !authUid || !sessionId || !workspaceId) {
       setSession(null);
       return;
     }
@@ -421,7 +433,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return () => {
       cancelled = true;
     };
-  }, [sessionId, authUid, authLoading, router, workspaceId, claimsReady]);
+  }, [sessionId, authUid, authLoading, router, workspaceId, isIdentityResolved]);
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
@@ -435,6 +447,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [sessionId, ticketIdFromUrl]);
 
   useEffect(() => {
+    if (!isIdentityResolved) return;
     if (!ticketIdFromUrl || !feedbackSessionId) return;
     if (feedbackLoading) return;
     if (feedback.some((f) => f.id === ticketIdFromUrl)) return;
@@ -471,6 +484,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       cancelled = true;
     };
   }, [
+    isIdentityResolved,
     ticketIdFromUrl,
     feedbackSessionId,
     sessionId,
@@ -504,13 +518,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
   }, [ticketIdFromUrl, feedback]);
 
-  // Select first feedback when first page loads and none selected (no ticket param).
-  useEffect(() => {
-    if (feedback.length > 0 && selectedId === null && !ticketIdFromUrl) {
-      setSelectedId(feedback[0].id);
-    }
-  }, [feedback, selectedId, ticketIdFromUrl]);
-
   // Clear new-ticket highlight after animation completes (1.2s).
   useEffect(() => {
     if (!newTicketId) return;
@@ -520,68 +527,75 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   /* ================= SELECTED ITEM (derived from feedback list) ================= */
 
-  const selectedIndex = canonicalFeedback.findIndex((f) => f.id === selectedId);
+  const selectedIndex = stableCanonicalFeedback.findIndex((f) => f.id === effectiveSelectedId);
 
   // Preload only the next 1-2 ticket screenshots from the current selection.
   useEffect(() => {
     if (selectedIndex === -1) return;
-    const nextItems = [feedback[selectedIndex + 1], feedback[selectedIndex + 2]].filter(Boolean);
+    const nextItems = [
+      stableScopedFeedback[selectedIndex + 1],
+      stableScopedFeedback[selectedIndex + 2],
+    ].filter(Boolean);
     nextItems.forEach((item) => {
       const url = item?.screenshotUrl;
       if (!url) return;
       preloadImage(url, preloadedScreenshotUrlsRef.current);
     });
-  }, [selectedIndex, feedback]);
+  }, [selectedIndex, stableScopedFeedback]);
 
   const contextualPosition = useMemo(() => {
-    if (!selectedId) return { index: 0, total: -1 };
+    if (!effectiveSelectedId) return { index: 0, total: -1 };
 
-    const openIndex = openFeedback.findIndex((ticket) => ticket.id === selectedId);
+    const totalForBucket = (n: number) =>
+      !isCountsSynced || feedbackCountsLoading ? -1 : Math.max(0, n);
+
+    const openIndex = stableOpenFeedback.findIndex((ticket) => ticket.id === effectiveSelectedId);
     if (openIndex >= 0) {
       return {
         index: openIndex + 1,
-        total: feedbackCountsLoading ? -1 : Math.max(0, feedbackActiveCount),
+        total: totalForBucket(feedbackActiveCount),
       };
     }
 
-    const resolvedIndex = resolvedFeedback.findIndex((ticket) => ticket.id === selectedId);
+    const resolvedIndex = stableResolvedFeedback.findIndex((ticket) => ticket.id === effectiveSelectedId);
     if (resolvedIndex >= 0) {
       return {
         index: resolvedIndex + 1,
-        total: feedbackCountsLoading ? -1 : Math.max(0, feedbackResolvedCount),
+        total: totalForBucket(feedbackResolvedCount),
       };
     }
 
     // Fallback: selected ticket not present in filtered subsets; use canonical/global position.
-    const globalIndex = canonicalFeedback.findIndex((ticket) => ticket.id === selectedId);
+    const globalIndex = stableCanonicalFeedback.findIndex((ticket) => ticket.id === effectiveSelectedId);
     if (globalIndex >= 0) {
       return {
         index: globalIndex + 1,
-        total: feedbackCountsLoading ? -1 : Math.max(0, feedbackTotal),
+        total: totalForBucket(feedbackTotal),
       };
     }
 
     return { index: 0, total: -1 };
   }, [
-    selectedId,
-    openFeedback,
-    resolvedFeedback,
-    canonicalFeedback,
+    effectiveSelectedId,
+    stableOpenFeedback,
+    stableResolvedFeedback,
+    stableCanonicalFeedback,
     feedbackCountsLoading,
     feedbackTotal,
     feedbackActiveCount,
     feedbackResolvedCount,
+    isCountsSynced,
   ]);
 
   const selectedItem = useMemo(() => {
-    const ticket = canonicalFeedback.find((t) => t.id === selectedId) ?? null;
+    const ticket = stableCanonicalFeedback.find((t) => t.id === effectiveSelectedId) ?? null;
     if (!ticket) return null;
     return {
       ...ticket,
       index: Math.max(0, contextualPosition.index),
       total: contextualPosition.total >= 0 ? Math.max(0, contextualPosition.total) : -1,
     };
-  }, [canonicalFeedback, selectedId, contextualPosition.index, contextualPosition.total]);
+  }, [stableCanonicalFeedback, effectiveSelectedId, contextualPosition.index, contextualPosition.total]);
 
   const sessionActionCaps = useMemo(() => {
     if (!authUid || !session) {
@@ -624,6 +638,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const handleSetSessionArchivedFromMenu = useCallback(
     async (id: string, archived: boolean) => {
       if (id !== sessionId) return;
+      assertIdentityResolved(isIdentityResolved);
       const snapshot = session;
       if (snapshot) {
         setSession({ ...snapshot, archived, isArchived: archived });
@@ -647,15 +662,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         if (snapshot) setSession(snapshot);
       }
     },
-    [sessionId, session, router]
+    [sessionId, session, router, isIdentityResolved]
   );
 
-  const handleRequestDeleteSessionFromMenu = useCallback((_s: Session) => {
+  const handleRequestDeleteSessionFromMenu = useCallback((session: Session) => {
+    void session;
     setDeleteSessionModalOpen(true);
   }, []);
 
   const confirmDeleteSessionFromMenu = useCallback(async () => {
     if (!sessionId) return;
+    assertIdentityResolved(isIdentityResolved);
     const res = await authFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
     if (!res) return;
     const data = (await res.json()) as { success?: boolean; error?: string };
@@ -663,7 +680,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       throw new Error(data?.error ?? "Delete failed");
     }
     router.push("/dashboard");
-  }, [sessionId, router]);
+  }, [sessionId, router, isIdentityResolved]);
 
   const {
     comments,
@@ -676,7 +693,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     deleteComment,
   } = useFeedbackDetailController({
     sessionId,
-    feedbackId: selectedId,
+    feedbackId: effectiveSelectedId,
     canComment: sessionActionCaps.canComment,
     canResolve: sessionActionCaps.canResolve,
   });
@@ -688,16 +705,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /* ================= SAVE TITLE (optimistic update, then PATCH) ================= */
 
   const saveTitle = async (newTitle: string): Promise<void> => {
-    if (!sessionActionCaps.canResolve || !selectedId || newTitle.trim() === "") return;
+    if (!sessionActionCaps.canResolve || !effectiveSelectedId || newTitle.trim() === "") return;
+    assertIdentityResolved(isIdentityResolved);
     const trimmed = newTitle.trim();
     const previousTitle = selectedItem?.title;
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === selectedId ? { ...item, title: trimmed } : item
+        item.id === effectiveSelectedId ? { ...item, title: trimmed } : item
       )
     );
     try {
-      const res = await authFetch(`/api/tickets/${selectedId}`, {
+      const res = await authFetch(`/api/tickets/${effectiveSelectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: trimmed }),
@@ -710,7 +728,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       if (data.success && data.ticket) {
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === selectedId ? { ...item, ...data.ticket } : item
+            item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
           )
         );
         broadcastTicketUpdated(data.ticket);
@@ -719,7 +737,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       console.error("[ECHLY] saveTitle failed", err);
       setFeedback((prev) =>
         prev.map((item) =>
-          item.id === selectedId
+          item.id === effectiveSelectedId
             ? { ...item, title: previousTitle ?? trimmed }
             : item
         )
@@ -730,15 +748,16 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /* ================= SAVE ACTION STEPS (optimistic update, then PATCH) ================= */
 
   const saveActionSteps = async (actionSteps: string[]) => {
-    if (!sessionActionCaps.canResolve || !selectedId) return;
+    if (!sessionActionCaps.canResolve || !effectiveSelectedId) return;
+    assertIdentityResolved(isIdentityResolved);
     const previous = selectedItem?.actionSteps ?? null;
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === selectedId ? { ...item, actionSteps } : item
+        item.id === effectiveSelectedId ? { ...item, actionSteps } : item
       )
     );
     try {
-      const res = await authFetch(`/api/tickets/${selectedId}`, {
+      const res = await authFetch(`/api/tickets/${effectiveSelectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ actionSteps }),
@@ -751,7 +770,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       if (data.success && data.ticket) {
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === selectedId ? { ...item, ...data.ticket } : item
+            item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
           )
         );
         broadcastTicketUpdated(data.ticket);
@@ -760,23 +779,24 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       console.error("[ECHLY] saveActionSteps failed", err);
       setFeedback((prev) =>
         prev.map((item) =>
-          item.id === selectedId ? { ...item, actionSteps: previous } : item
+          item.id === effectiveSelectedId ? { ...item, actionSteps: previous } : item
         )
       );
     }
   };
 
   const saveTags = async (suggestedTags: string[]) => {
-    if (!sessionActionCaps.canResolve || !selectedId) return;
+    if (!sessionActionCaps.canResolve || !effectiveSelectedId) return;
+    assertIdentityResolved(isIdentityResolved);
     const nextTags = Array.isArray(suggestedTags) ? suggestedTags : null;
     const previous = selectedItem?.suggestedTags ?? null;
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === selectedId ? { ...item, suggestedTags: nextTags } : item
+        item.id === effectiveSelectedId ? { ...item, suggestedTags: nextTags } : item
       )
     );
     try {
-      const res = await authFetch(`/api/tickets/${selectedId}`, {
+      const res = await authFetch(`/api/tickets/${effectiveSelectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ suggestedTags }),
@@ -789,7 +809,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       if (data.success && data.ticket) {
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === selectedId ? { ...item, ...data.ticket } : item
+            item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
           )
         );
         broadcastTicketUpdated(data.ticket);
@@ -798,14 +818,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       console.error("[ECHLY] saveTags failed", err);
       setFeedback((prev) =>
         prev.map((item) =>
-          item.id === selectedId ? { ...item, suggestedTags: previous } : item
+          item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
         )
       );
     }
   };
 
   const saveResolved = async (isResolved: boolean) => {
-    if (!sessionActionCaps.canResolve || !selectedId) return;
+    if (!sessionActionCaps.canResolve || !effectiveSelectedId) return;
+    assertIdentityResolved(isIdentityResolved);
     const previousStatus = selectedItem ? getTicketStatus(selectedItem) : "open";
     const nextStatus = isResolved ? "resolved" : "open";
     const previousResolved = Boolean(selectedItem?.isResolved);
@@ -813,12 +834,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === selectedId ? { ...item, isResolved } : item
+        item.id === effectiveSelectedId ? { ...item, isResolved } : item
       )
     );
     applyCountTransition(previousStatus, nextStatus);
     try {
-      const res = await authFetch(`/api/tickets/${selectedId}`, {
+      const res = await authFetch(`/api/tickets/${effectiveSelectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isResolved }),
@@ -826,7 +847,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       if (!res) {
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === selectedId
+            item.id === effectiveSelectedId
               ? { ...item, isResolved: previousResolved }
               : item
           )
@@ -843,7 +864,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       if (data.success && data.ticket) {
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === selectedId ? { ...item, ...data.ticket } : item
+            item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
           )
         );
         broadcastTicketUpdated(data.ticket);
@@ -852,7 +873,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       console.error("[ECHLY] saveResolved failed", err);
       setFeedback((prev) =>
         prev.map((item) =>
-          item.id === selectedId
+          item.id === effectiveSelectedId
             ? { ...item, isResolved: previousResolved }
             : item
         )
@@ -864,12 +885,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   };
 
   const handleResolveAndNext = async () => {
-    if (!selectedId || !selectedItem) return;
+    if (!effectiveSelectedId || !selectedItem) return;
     await saveResolved(true);
-    const openIdx = openFeedback.findIndex((f) => f.id === selectedId);
+    const openIdx = stableOpenFeedback.findIndex((f) => f.id === effectiveSelectedId);
     if (openIdx === -1) return;
-    const nextOpen = openFeedback[openIdx + 1] ?? openFeedback[0];
-    if (nextOpen && nextOpen.id !== selectedId) {
+    const nextOpen =
+      stableOpenFeedback[openIdx + 1] ?? stableOpenFeedback[0];
+    if (nextOpen && nextOpen.id !== effectiveSelectedId) {
       setSelectedId(nextOpen.id);
     }
   };
@@ -877,8 +899,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const handleSessionTitleBlur = useCallback(async () => {
     if (!sessionId || !session) return;
     const trimmed = sessionTitleDraft.trim();
-    const prevDisplay = (session.title ?? "").trim() || "Untitled Session";
-    const safeTitle = trimmed.length > 0 ? trimmed : "Untitled Session";
+    const prevDisplay = (session.title ?? "").trim();
+    const safeTitle = trimmed;
     if (safeTitle === prevDisplay) {
       setIsEditingSessionTitle(false);
       setSessionTitleDraft(prevDisplay);
@@ -893,6 +915,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     setSaveSessionTitleSuccess(true);
     setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
     try {
+      assertIdentityResolved(isIdentityResolved);
       const res = await authFetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -907,7 +930,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         setSession((prev: Session | null) =>
           prev ? ({ ...prev, ...data.session } as Session) : prev
         );
-        const apiTitle = ((data.session.title as string) ?? safeTitle).trim() || "Untitled Session";
+        const apiTitle = ((data.session.title as string) ?? safeTitle).trim();
         setSessionTitleDraft(apiTitle);
         if (typeof window !== "undefined" && "chrome" in window) {
           try {
@@ -926,12 +949,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setSession((prev: Session | null) =>
         prev ? ({ ...prev, title: previousTitle } as Session) : prev
       );
-      setSessionTitleDraft((previousTitle || "").trim() || "Untitled Session");
+      setSessionTitleDraft((previousTitle || "").trim());
     }
-  }, [sessionId, session, sessionTitleDraft]);
+  }, [sessionId, session, sessionTitleDraft, isIdentityResolved]);
 
   const handleMarkAllResolved = useCallback(async () => {
     if (!sessionActionCaps.canResolve) return;
+    assertIdentityResolved(isIdentityResolved);
     const active = feedback.filter((item) => getTicketStatus(item) === "open");
     if (active.length === 0) return;
     const previousFeedback = feedback;
@@ -978,10 +1002,18 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
       return;
     }
-  }, [feedback, sessionId, setFeedback, ensureCountsSeeded, sessionActionCaps.canResolve]);
+  }, [
+    feedback,
+    sessionId,
+    setFeedback,
+    ensureCountsSeeded,
+    sessionActionCaps.canResolve,
+    isIdentityResolved,
+  ]);
 
   const handleMarkAllUnresolved = useCallback(async () => {
     if (!sessionActionCaps.canResolve) return;
+    assertIdentityResolved(isIdentityResolved);
     const resolved = feedback.filter((item) => getTicketStatus(item) === "resolved");
     if (resolved.length === 0) return;
     const previousFeedback = feedback;
@@ -1030,18 +1062,27 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
       return;
     }
-  }, [feedback, sessionId, setFeedback, ensureCountsSeeded, sessionActionCaps.canResolve]);
+  }, [
+    feedback,
+    sessionId,
+    setFeedback,
+    ensureCountsSeeded,
+    sessionActionCaps.canResolve,
+    isIdentityResolved,
+  ]);
 
   const handleDeleteFeedback = async (id: string) => {
     if (!sessionActionCaps.canResolve) return;
+    assertIdentityResolved(isIdentityResolved);
+    const selectionBeforeDelete = effectiveSelectedId;
     const deletedItem = feedback.find((f) => f.id === id);
     const deletedStatus = deletedItem ? getTicketStatus(deletedItem) : "open";
     const prevFeedback = feedback;
     const prevCounts = sessionId ? getCachedCounts(sessionId) : null;
     const nextSelected =
-      selectedId === id
+      selectionBeforeDelete === id
         ? feedback.filter((item) => item.id !== id)[0]?.id ?? null
-        : selectedId;
+        : selectionBeforeDelete;
     setFeedback((prev) => prev.filter((item) => item.id !== id));
     ensureCountsSeeded();
     updateCachedCounts(sessionId, (c) => {
@@ -1064,18 +1105,24 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       if (sessionId && prevCounts) {
         setCachedCounts(sessionId, prevCounts);
       }
-      setSelectedId(selectedId);
+      setSelectedId(selectionBeforeDelete);
     }
   };
 
-  // If auth is still settling, keep the UI stable but show a lightweight skeleton.
-  if (authLoading) return <SessionPageSkeleton />;
-
   const renderExecutionContent = () => {
-    if (feedbackLoading) {
-      return <FeedbackPremiumLoader />;
-    }
-    if (feedback.length === 0) {
+    if (stableScopedFeedback.length === 0) {
+      if (feedbackLoading) {
+        return (
+          <ExecutionView
+            item={null}
+            setIsImageExpanded={setIsImageExpanded}
+            isCommentMode={false}
+            canComment={false}
+            canResolve={false}
+            comments={[]}
+          />
+        );
+      }
       return (
         <div className="mt-16">
           <div className="text-[16px] font-medium text-[hsl(var(--text-primary-strong))]">
@@ -1131,28 +1178,28 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       <div className="flex h-full min-h-0 overflow-hidden">
         <aside className="sidebar hidden lg:flex w-[300px] h-screen overflow-hidden shrink-0 self-start min-h-0 flex-col sticky top-0">
           <TicketList
-            sessionTitle={(session?.title ?? "").trim() || "Untitled Session"}
+            sessionTitle={session ? (session.title ?? "").trim() : ""}
             counts={{
               total: feedbackTotal,
               open: feedbackActiveCount,
               resolved: feedbackResolvedCount,
             }}
-            countsLoading={feedbackCountsLoading}
+            countsLoading={!isCountsSynced || feedbackCountsLoading}
             isEditingSessionTitle={isEditingSessionTitle}
             sessionTitleDraft={sessionTitleDraft}
             onSessionTitleChange={setSessionTitleDraft}
             onSessionTitleSave={handleSessionTitleBlur}
             onSessionTitleCancel={() => {
               setIsEditingSessionTitle(false);
-              setSessionTitleDraft((session?.title ?? "").trim() || "Untitled Session");
+              setSessionTitleDraft((session?.title ?? "").trim());
             }}
             onSessionTitleEdit={() => {
-              setSessionTitleDraft((session?.title ?? "").trim() || "Untitled Session");
+              setSessionTitleDraft((session?.title ?? "").trim());
               setIsEditingSessionTitle(true);
             }}
             saveSessionTitleSuccess={saveSessionTitleSuccess}
-            items={feedback}
-            selectedId={selectedId}
+            items={stableScopedFeedback}
+            selectedId={effectiveSelectedId}
             onSelect={setSelectedId}
             newTicketId={newTicketId}
             loadingMore={isSearchMode ? false : feedbackLoadingMore}
@@ -1160,7 +1207,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             hasReachedLimit={feedbackReachedLimit}
             loadMoreRef={feedbackLoadMoreRef}
             scrollContainerRef={listScrollRef}
-            onScrollContainerReady={() => setListScrollReady((n) => n + 1)}
             onMarkAllTicketsResolved={
               sessionActionCaps.canResolve ? handleMarkAllResolved : undefined
             }
@@ -1186,7 +1232,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         <div className="main-area flex min-h-0 min-w-0 flex-1 flex-col">
           <TopControlBar
             sessionId={sessionId}
-            sessionTitle={session?.title}
+            sessionTitle={session ? (session.title ?? "").trim() : ""}
             session={session}
             onSessionRenameSuccess={
               sessionActionCaps.canResolve ? handleSessionRenameFromMenu : undefined
@@ -1257,28 +1303,28 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             onClick={(e) => e.stopPropagation()}
           >
             <TicketList
-              sessionTitle={(session?.title ?? "").trim() || "Untitled Session"}
+              sessionTitle={session ? (session.title ?? "").trim() : ""}
               counts={{
                 total: feedbackTotal,
                 open: feedbackActiveCount,
                 resolved: feedbackResolvedCount,
               }}
-              countsLoading={feedbackCountsLoading}
+              countsLoading={!isCountsSynced || feedbackCountsLoading}
               isEditingSessionTitle={isEditingSessionTitle}
               sessionTitleDraft={sessionTitleDraft}
               onSessionTitleChange={setSessionTitleDraft}
               onSessionTitleSave={handleSessionTitleBlur}
               onSessionTitleCancel={() => {
                 setIsEditingSessionTitle(false);
-                setSessionTitleDraft((session?.title ?? "").trim() || "Untitled Session");
+                setSessionTitleDraft((session?.title ?? "").trim());
               }}
               onSessionTitleEdit={() => {
-                setSessionTitleDraft((session?.title ?? "").trim() || "Untitled Session");
+                setSessionTitleDraft((session?.title ?? "").trim());
                 setIsEditingSessionTitle(true);
               }}
               saveSessionTitleSuccess={saveSessionTitleSuccess}
-              items={feedback}
-              selectedId={selectedId}
+              items={stableScopedFeedback}
+              selectedId={effectiveSelectedId}
               onSelect={(id) => {
                 setSelectedId(id);
                 setIsTicketNavigatorOpen(false);
@@ -1289,7 +1335,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               hasReachedLimit={feedbackReachedLimit}
               loadMoreRef={feedbackLoadMoreRef}
               scrollContainerRef={listScrollRef}
-              onScrollContainerReady={() => setListScrollReady((n) => n + 1)}
               onMarkAllTicketsResolved={
                 sessionActionCaps.canResolve ? handleMarkAllResolved : undefined
               }
@@ -1331,11 +1376,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       <DeleteSessionModal
         open={deleteSessionModalOpen}
         onClose={() => setDeleteSessionModalOpen(false)}
-        sessionTitle={(session?.title ?? "").trim() || "Untitled Session"}
+        sessionTitle={session ? (session.title ?? "").trim() : ""}
         onConfirm={confirmDeleteSessionFromMenu}
       />
 
-      {showDeleteModal && selectedId && (
+      {showDeleteModal && effectiveSelectedId && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
           onClick={() => setShowDeleteModal(false)}
@@ -1366,7 +1411,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               </button>
               <button
                 type="button"
-                onClick={() => handleDeleteFeedback(selectedId)}
+                onClick={() => handleDeleteFeedback(effectiveSelectedId)}
                 className="px-4 py-2 text-[13px] font-medium rounded-xl bg-[#ef4444] text-white hover:bg-[#dc2626] focus:outline-none focus:ring-2 focus:ring-[#ef4444]/40 transition-colors duration-[120ms] cursor-pointer"
               >
                 Delete

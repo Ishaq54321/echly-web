@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAsyncGeneration } from "@/lib/hooks/useSafeAsync";
 import { getSessionRecentComments } from "@/lib/comments";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import {
@@ -48,6 +49,16 @@ const initialCountsPlaceholder: SessionFeedbackCounts = {
   resolved: 0,
 };
 
+const EMPTY_SESSION_OVERVIEW: SessionOverviewData = {
+  session: null,
+  countsByStatus: initialCountsPlaceholder,
+  totalCount: 0,
+  recentFeedback: [],
+  statusPreview: { open: [], resolved: [] },
+  recentActivity: [],
+  tagCounts: [],
+};
+
 function extractTagCounts(feedback: Feedback[]): { tag: string; count: number }[] {
   const map = new Map<string, number>();
   for (const f of feedback) {
@@ -81,7 +92,8 @@ function timestampToDate(
 }
 
 export function useSessionOverview(sessionId: string | undefined) {
-  const { workspaceId, claimsReady } = useWorkspace();
+  const { workspaceId, isIdentityResolved } = useWorkspace();
+  const { nextToken, isCurrent } = useAsyncGeneration();
   const [data, setData] = useState<SessionOverviewData>({
     session: null,
     countsByStatus: initialCountsPlaceholder,
@@ -91,19 +103,26 @@ export function useSessionOverview(sessionId: string | undefined) {
     recentActivity: [],
     tagCounts: [],
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
+      nextToken();
+      setData(EMPTY_SESSION_OVERVIEW);
       setLoading(false);
+      setError(null);
       return;
     }
-    if (!claimsReady || !workspaceId) {
-      setLoading(true);
+    if (!isIdentityResolved || !workspaceId) {
+      nextToken();
+      setData(EMPTY_SESSION_OVERVIEW);
+      setLoading(false);
+      setError(null);
       return;
     }
     const sid: string = sessionId;
+    const token = nextToken();
 
     let cancelled = false;
 
@@ -130,7 +149,7 @@ export function useSessionOverview(sessionId: string | undefined) {
             getSessionRecentComments(wid, sid, RECENT_ACTIVITY_LIMIT),
           ]);
 
-        if (cancelled) return;
+        if (cancelled || !isCurrent(token)) return;
 
         const feedbackIds = [...new Set(recentComments.map((c) => c.feedbackId))];
         const feedbackList = await getFeedbackByIds(feedbackIds.slice(0, 10), 10);
@@ -142,7 +161,7 @@ export function useSessionOverview(sessionId: string | undefined) {
           (c) => ({
             actorName: c.userName ?? "Someone",
             action: "Commented",
-            targetTitle: titleByFeedbackId.get(c.feedbackId) ?? "—",
+            targetTitle: titleByFeedbackId.get(c.feedbackId) ?? "",
             timestamp: timestampToDate(c.createdAt),
           })
         );
@@ -153,6 +172,8 @@ export function useSessionOverview(sessionId: string | undefined) {
         }
         const recentFeedback = [...byId.values()];
         const tagCounts = extractTagCounts(recentFeedback);
+
+        if (cancelled || !isCurrent(token)) return;
 
         setData({
           session: session ?? null,
@@ -167,9 +188,11 @@ export function useSessionOverview(sessionId: string | undefined) {
           tagCounts,
         });
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e : new Error(String(e)));
+        if (!cancelled && isCurrent(token)) {
+          setError(e instanceof Error ? e : new Error(String(e)));
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && isCurrent(token)) setLoading(false);
       }
     }
 
@@ -177,7 +200,7 @@ export function useSessionOverview(sessionId: string | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [claimsReady, workspaceId, sessionId]);
+  }, [isIdentityResolved, workspaceId, sessionId, nextToken, isCurrent]);
 
   return { data, loading, error };
 }

@@ -4,11 +4,22 @@ import { useState, useRef, useEffect } from "react";
 import { Eye, MessageCircle, FileText, Loader2 } from "lucide-react";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import type { Session } from "@/lib/domain/session";
+import type { Timestamp } from "firebase/firestore";
 import { formatDistanceToNowStrict } from "date-fns/formatDistanceToNowStrict";
+import { toDate } from "@/lib/utils/date";
 import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
 
 const TOOLTIP_HOVER_DELAY_MS = 300;
 const COPIED_TOOLTIP_MS = 2000;
+
+function sessionUpdatedToDate(updatedAt: Session["updatedAt"]): Date | null {
+  if (updatedAt == null) return null;
+  if (typeof updatedAt === "string") {
+    const d = new Date(updatedAt);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return toDate(updatedAt as Date | Timestamp | null | undefined);
+}
 
 export interface WorkspaceCardProps {
   item: SessionWithCounts;
@@ -29,14 +40,12 @@ export function WorkspaceCard({
 }: WorkspaceCardProps) {
   const { session, counts } = item;
   const isOptimistic = Boolean(session.isOptimistic);
-  const updatedAt = typeof session.updatedAt === "string" ? session.updatedAt : null;
-  const updatedAtDate = updatedAt ? new Date(updatedAt) : null;
+  const updatedAtDate = sessionUpdatedToDate(session.updatedAt);
   const updatedAtLabel =
     updatedAtDate && !Number.isNaN(updatedAtDate.getTime())
       ? formatDistanceToNowStrict(updatedAtDate, { addSuffix: true })
-      : "—";
-  const feedbackCount = counts.total;
-  const openCount = counts.open;
+      : "";
+  const countsPending = !isOptimistic && counts == null;
   const viewCount = session.viewCount ?? 0;
   const commentCount = session.commentCount ?? 0;
 
@@ -194,29 +203,52 @@ export function WorkspaceCard({
               <FileText size={20} aria-hidden />
             </div>
             <div className="flex flex-col min-w-0 flex-1">
-              <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2 overflow-hidden text-ellipsis min-w-0">
-                {session.title}
-              </h3>
-              <div className="text-xs text-meta font-medium mt-1 flex items-center gap-2 min-w-0">
+              {session.title?.trim() ? (
+                <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2 overflow-hidden text-ellipsis min-w-0">
+                  {session.title}
+                </h3>
+              ) : null}
+              <div className="text-xs text-meta font-medium mt-1 flex items-center gap-2 min-w-0 min-h-[14px]">
                 {isOptimistic || isOpening ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                    {isOptimistic ? "Creating…" : "Opening…"}
-                  </>
-                ) : (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : updatedAtLabel ? (
                   <>Updated: {updatedAtLabel}</>
+                ) : (
+                  <div
+                    className="h-3.5 w-28 max-w-[70%] rounded bg-neutral-200/90 animate-pulse"
+                    aria-hidden
+                  />
                 )}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mb-4">
-            <span className="px-2.5 py-1 rounded-full text-xs bg-neutral-100 text-neutral-700 tabular-nums">
-              {feedbackCount} feedback
-            </span>
-            <span className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-600 tabular-nums">
-              {openCount} open
-            </span>
+          <div className="flex min-h-[28px] flex-wrap items-center gap-2 mb-4">
+            {countsPending ? (
+              <>
+                <div className="h-6 w-16 rounded-full bg-neutral-200 animate-pulse" aria-hidden />
+                <div className="h-6 w-8 rounded-full bg-neutral-200 animate-pulse" aria-hidden />
+                <div className="h-6 w-10 rounded-full bg-neutral-200 animate-pulse" aria-hidden />
+              </>
+            ) : (
+              <>
+                {counts != null && counts.total > 0 ? (
+                  <span className="px-2.5 py-1 rounded-full text-xs bg-neutral-100 text-neutral-700 tabular-nums">
+                    {counts.total} feedback
+                  </span>
+                ) : null}
+                {counts != null && counts.open > 0 ? (
+                  <span className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-600 tabular-nums">
+                    {counts.open} open
+                  </span>
+                ) : null}
+                {counts != null && counts.resolved > 0 ? (
+                  <span className="px-2.5 py-1 rounded-full text-xs bg-green-50 text-green-700 tabular-nums">
+                    {counts.resolved} resolved
+                  </span>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
 

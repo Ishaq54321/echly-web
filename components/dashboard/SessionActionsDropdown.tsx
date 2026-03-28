@@ -24,7 +24,10 @@ import type { Session } from "@/lib/domain/session";
 import { ShareModal } from "@/components/share/ShareModal";
 import { RenameSessionModal } from "@/components/dashboard/RenameSessionModal";
 import { copySessionLink } from "@/utils/copySessionLink";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
 import { PORTAL_DROPDOWN_Z_INDEX } from "@/lib/ui/zIndex";
 import {
   getPortalDropdownFixedPosition,
@@ -88,7 +91,7 @@ export function SessionActionsDropdown({
   onOpenChange,
   hideActions,
 }: SessionActionsDropdownProps) {
-  const { authUid } = useWorkspace();
+  const { authUid, isIdentityResolved } = useWorkspace();
   const [moreOpen, setMoreOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
@@ -218,6 +221,7 @@ export function SessionActionsDropdown({
     e.preventDefault();
     e.stopPropagation();
     if (copyLinkBusy) return;
+    assertIdentityResolved(isIdentityResolved);
     const ok = await copySessionLink(session.id, authUid, {
       onBusy: setCopyLinkBusy,
     });
@@ -263,6 +267,7 @@ export function SessionActionsDropdown({
   };
 
   const handleRenameSave = async (title: string) => {
+    assertIdentityResolved(isIdentityResolved);
     const res = await authFetch(`/api/sessions/${session.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

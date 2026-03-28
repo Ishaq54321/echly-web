@@ -37,13 +37,13 @@ const VALUE_BULLETS = [
 
 export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeModalProps) {
   const router = useRouter();
-  const { claimsReady, workspaceId } = useWorkspace();
+  const { isIdentityResolved, workspaceId } = useWorkspace();
   const currentPlan = currentPlanFromUpgrade(upgradePlan);
   const currentPlanLabel = PLAN_LABEL[currentPlan] ?? currentPlan;
   const { data: workspaceUsage } = useWorkspaceUsageRealtime({
     enabled:
       open &&
-      claimsReady &&
+      isIdentityResolved &&
       workspaceId != null &&
       workspaceId.trim() !== "",
   });

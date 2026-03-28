@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -25,12 +26,24 @@ export type WorkspaceContextValue = {
   claimsReady: boolean;
   /** True after the first Firebase auth callback for this mount (signed-in or signed-out). */
   authReady: boolean;
+  /**
+   * True when auth, custom claims, and workspace id are all ready — gate data subscriptions and mutations.
+   * Do not use for shell render (see `useRenderReadiness` / NBIB).
+   */
+  isIdentityResolved: boolean;
   /** Firebase Auth uid when signed in; null when signed out. */
   authUid: string | null;
   authEmail: string | null;
   authDisplayName: string | null;
   authPhotoUrl: string | null;
 };
+
+/** Throws if identity is not ready; use before destructive or workspace-scoped API calls. */
+export function assertIdentityResolved(resolved: boolean): asserts resolved is true {
+  if (!resolved) {
+    throw new Error("Identity not ready");
+  }
+}
 
 function normalizeWorkspaceId(value: string | null | undefined): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -168,6 +181,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const isIdentityResolved = useMemo(
+    () =>
+      authReady &&
+      claimsReady &&
+      Boolean(workspaceId && workspaceId.trim()),
+    [authReady, claimsReady, workspaceId]
+  );
+
   return (
     <WorkspaceContext.Provider
       value={{
@@ -176,6 +197,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         workspaceLoading,
         claimsReady,
         authReady,
+        isIdentityResolved,
         authUid,
         authEmail,
         authDisplayName,

@@ -16,7 +16,7 @@ export interface ContextPanelProps {
 }
 
 function formatTimeAgo(date: Date | null): string {
-  if (!date || Number.isNaN(date.getTime())) return "—";
+  if (!date || Number.isNaN(date.getTime())) return "";
   const diffMs = Date.now() - date.getTime();
   const diffMinutes = Math.floor(diffMs / 60000);
   if (diffMinutes < 1) return "Just now";
@@ -50,14 +50,15 @@ export function ContextPanel({
 
   const lastActionLabel = useMemo(() => {
     if (lastComment && lastCommentDate) {
-      return `Comment by ${lastComment.userName} · ${formatTimeAgo(
-        lastCommentDate
-      )}`;
+      const ago = formatTimeAgo(lastCommentDate);
+      return ago
+        ? `Comment by ${lastComment.userName} · ${ago}`
+        : `Comment by ${lastComment.userName}`;
     }
     if (isResolved) {
       return "Marked resolved";
     }
-    return "No recent activity";
+    return null;
   }, [lastComment, lastCommentDate, isResolved]);
 
   const resolveHistoryLabel = useMemo(() => {
@@ -103,35 +104,37 @@ export function ContextPanel({
             assignee={assignee ?? null}
           />
           <dl className="space-y-1.5 text-[12px]">
-            <div>
-              <dt className="text-[hsl(var(--text-tertiary))]">Tags</dt>
-              <dd className="mt-0.5 flex flex-wrap gap-1.5">
-                {safeTags.length === 0 ? (
-                  <span className="text-[hsl(var(--text-tertiary))]">None</span>
-                ) : (
-                  safeTags.map((tag) => (
+            {safeTags.length > 0 ? (
+              <div>
+                <dt className="text-[hsl(var(--text-tertiary))]">Tags</dt>
+                <dd className="mt-0.5 flex flex-wrap gap-1.5">
+                  {safeTags.map((tag) => (
                     <span
                       key={tag}
                       className="inline-flex items-center rounded-full border border-[var(--layer-2-border)] px-2 py-0.5 text-[11px] text-[hsl(var(--text-secondary-soft))]"
                     >
                       {tag}
                     </span>
-                  ))
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[hsl(var(--text-tertiary))]">Priority</dt>
-              <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))] font-medium">
-                {priorityLabel ?? "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[hsl(var(--text-tertiary))]">Estimated effort</dt>
-              <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))] font-medium">
-                {estimatedEffortLabel ?? "—"}
-              </dd>
-            </div>
+                  ))}
+                </dd>
+              </div>
+            ) : null}
+            {priorityLabel?.trim() ? (
+              <div>
+                <dt className="text-[hsl(var(--text-tertiary))]">Priority</dt>
+                <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))] font-medium">
+                  {priorityLabel}
+                </dd>
+              </div>
+            ) : null}
+            {estimatedEffortLabel?.trim() ? (
+              <div>
+                <dt className="text-[hsl(var(--text-tertiary))]">Estimated effort</dt>
+                <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))] font-medium">
+                  {estimatedEffortLabel}
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </section>
 
@@ -140,12 +143,14 @@ export function ContextPanel({
             Activity summary
           </h2>
           <dl className="space-y-1.5 text-[12px]">
-            <div>
-              <dt className="text-[hsl(var(--text-tertiary))]">Last action</dt>
-              <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))]">
-                {lastActionLabel}
-              </dd>
-            </div>
+            {lastActionLabel ? (
+              <div>
+                <dt className="text-[hsl(var(--text-tertiary))]">Last action</dt>
+                <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))]">
+                  {lastActionLabel}
+                </dd>
+              </div>
+            ) : null}
             <div>
               <dt className="text-[hsl(var(--text-tertiary))]">Resolve history</dt>
               <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))]">

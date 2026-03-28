@@ -1,0 +1,57 @@
+import type { SVGProps } from "react";
+
+function InlineLogo(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      viewBox="0 0 440 504"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        className="logo-part part-1"
+        d="M0 191.028V125.615L74.1404 167.811V84.0432L132.219 50.8506V267.372L0 191.028Z"
+        fill="#2B7FFF"
+      />
+      <path
+        className="logo-part part-2"
+        d="M164.602 181.733V33.4519L220.006 0V83.7757L294.139 41.4826L351.95 76.0124L164.602 181.733Z"
+        fill="#2B7FFF"
+      />
+      <path
+        className="logo-part part-3"
+        d="M381.569 92.333L252.566 168.167L439.558 275.581V210.638L367.476 167.454L438.489 126.06L381.569 92.333Z"
+        fill="#2B7FFF"
+      />
+      <path
+        className="logo-part part-4"
+        d="M439.914 312.696V378.003L367.119 336.253V419.397L308.951 452.946L309.664 235.257L439.914 312.696Z"
+        fill="#2B7FFF"
+      />
+      <path
+        className="logo-part part-5"
+        d="M222.947 503.975L279.154 470.782V320.37L93.4102 427.962L149.609 461.69L220.273 420.467L222.947 503.975Z"
+        fill="#2B7FFF"
+      />
+      <path
+        className="logo-part part-6"
+        d="M3.83382 378.36L60.5757 412.614L189.043 336.254L1.33789 226.335V292.713L75.2109 335.54L3.83382 378.36Z"
+        fill="#2B7FFF"
+      />
+    </svg>
+  );
+}
+
+export default function LogoLoader() {
+  return (
+    <div
+      id="loader_visual_polish_phase3_v1"
+      className="logo-loader"
+      aria-hidden
+    >
+      <div className="logo-container">
+        <InlineLogo className="logo-svg" aria-hidden />
+      </div>
+    </div>
+  );
+}

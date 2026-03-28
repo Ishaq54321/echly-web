@@ -32,7 +32,7 @@ export function CriticalIssuesSection({
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         {items.map((item) => {
           const swc = sessionsById.get(item.sessionId);
-          const open = swc ? swc.counts.open : 0;
+          const open = swc?.counts?.open;
           return (
             <button
               key={item.id}
@@ -40,12 +40,16 @@ export function CriticalIssuesSection({
               onClick={() => onView(item.sessionId)}
               className="dashboard-card text-left w-full hover:border-[var(--layer-2-hover-border)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-1"
             >
-              <div className="text-[14px] font-semibold leading-[1.4] text-[hsl(var(--text-primary-strong))] truncate">
-                {item.title}
-              </div>
-              <div className="text-[12px] text-[hsl(var(--text-tertiary))] mt-1 tabular-nums">
-                {open} open
-              </div>
+              {item.title?.trim() ? (
+                <div className="text-[14px] font-semibold leading-[1.4] text-[hsl(var(--text-primary-strong))] truncate">
+                  {item.title}
+                </div>
+              ) : null}
+              {open != null ? (
+                <div className="text-[12px] text-[hsl(var(--text-tertiary))] mt-1 tabular-nums">
+                  {open} open
+                </div>
+              ) : null}
             </button>
           );
         })}

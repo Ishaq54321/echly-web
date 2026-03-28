@@ -12,6 +12,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { MessageSquare } from "lucide-react";
+import { DiscussionFeedSkeleton } from "@/components/discussion/discussionSkeletons";
 import { db } from "@/lib/firebase";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { getTicketStatus } from "@/lib/domain/feedback";
@@ -57,15 +58,15 @@ export function DiscussionFeed({
   onSelect,
   refreshKey = 0,
 }: DiscussionFeedProps) {
-  const { workspaceId, claimsReady, authUid } = useWorkspace();
+  const { workspaceId, isIdentityResolved } = useWorkspace();
   const [items, setItems] = useState<DiscussionFeedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // CRITICAL: Do not run query until workspaceId is resolved
     // Prevents Firestore permission errors
-    if (!claimsReady || !authUid || !workspaceId) return;
+    if (!isIdentityResolved || !workspaceId) return;
 
     let cancelled = false;
     setLoading(true);
@@ -150,7 +151,7 @@ export function DiscussionFeed({
 
               for (const s of sessionDocs) {
                 if (s) {
-                  sessionMap.set(s.id, s.title ?? "Unknown Session");
+                  sessionMap.set(s.id, s.title ?? "");
                 }
               }
             })
@@ -161,11 +162,12 @@ export function DiscussionFeed({
         const list: DiscussionFeedItem[] = sorted.map((item) => {
           const status = (item.status as string) ?? "open";
           const isResolved = status === "resolved" || item.isResolved === true;
+          const titleStr = typeof item.title === "string" ? item.title.trim() : "";
           return {
             id: String(item.id ?? ""),
-            title: String(item.title ?? "Untitled"),
+            title: titleStr,
             sessionId: String(item.sessionId ?? ""),
-            sessionName: sessionMap.get(item.sessionId as string) ?? "Unknown Session",
+            sessionName: sessionMap.get(item.sessionId as string) ?? "",
             commentCount: typeof item.commentCount === "number" ? item.commentCount : 0,
             lastCommentPreview: typeof item.lastCommentPreview === "string" ? item.lastCommentPreview : undefined,
             status: getTicketStatus({ isResolved }),
@@ -187,19 +189,12 @@ export function DiscussionFeed({
     return () => {
       cancelled = true;
     };
-  }, [claimsReady, authUid, workspaceId, refreshKey]);
+  }, [isIdentityResolved, workspaceId, refreshKey]);
 
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="h-24 rounded-xl bg-neutral-200/60 animate-pulse"
-          />
-        ))}
-      </div>
-    );
+  const showSkeleton = !error && (!isIdentityResolved || !workspaceId || loading);
+
+  if (showSkeleton) {
+    return <DiscussionFeedSkeleton />;
   }
 
   if (error) {
@@ -244,11 +239,13 @@ export function DiscussionFeed({
               ${isSelected ? "border-[#155DFC] ring-1 ring-[#155DFC40] shadow-md" : ""}
             `}
           >
-            <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2">
-              {item.title}
-            </h3>
+            {item.title ? (
+              <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2">
+                {item.title}
+              </h3>
+            ) : null}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-secondary">
-              <span>{item.sessionName ?? "Unknown Session"}</span>
+              {item.sessionName?.trim() ? <span>{item.sessionName}</span> : null}
               {item.commentCount != null && item.commentCount > 0 && (
                 <span>· {item.commentCount} comments</span>
               )}

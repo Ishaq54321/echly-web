@@ -9,7 +9,6 @@ type Args = {
   workspaceId: string | null | undefined;
   sessionId: string | null | undefined;
   feedbackId: string | null | undefined;
-  claimsReady: boolean;
   /**
    * When false, tears down any listener without writing to `onComments`
    * (caller clears state if needed).
@@ -25,20 +24,22 @@ export function useCommentsRepoSubscription({
   workspaceId,
   sessionId,
   feedbackId,
-  claimsReady,
   enabled = true,
   onComments,
 }: Args): void {
-  const { authUid } = useWorkspace();
+  const { isIdentityResolved } = useWorkspace();
   const onCommentsRef = useRef(onComments);
-  onCommentsRef.current = onComments;
+
+  useEffect(() => {
+    onCommentsRef.current = onComments;
+  }, [onComments]);
 
   useEffect(() => {
     const ws = typeof workspaceId === "string" ? workspaceId.trim() : "";
     const sid = typeof sessionId === "string" ? sessionId.trim() : "";
     const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
 
-    if (!enabled || !claimsReady || !authUid || !ws || !sid || !fid) {
+    if (!enabled || !isIdentityResolved || !ws || !sid || !fid) {
       return;
     }
 
@@ -49,5 +50,5 @@ export function useCommentsRepoSubscription({
     return () => {
       unsubComments();
     };
-  }, [workspaceId, sessionId, feedbackId, claimsReady, enabled, authUid]);
+  }, [workspaceId, sessionId, feedbackId, isIdentityResolved, enabled]);
 }

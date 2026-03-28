@@ -12,7 +12,10 @@ import {
   setCounts as setCachedCounts,
 } from "@/lib/state/sessionCountsStore";
 import { fetchCounts } from "@/lib/state/fetchCountsDedup";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
 
 const SESSIONS_CACHE_PREFIX = "echly_sessions";
 const SESSION_COUNT_CACHE_PREFIX = "echly_session_count";
@@ -77,13 +80,16 @@ function writeCachedSessionCount(workspaceId: string, count: number) {
 
 async function hydrateCountsForSessionIds(
   sessionIds: string[],
-  setCountsBySessionId: Dispatch<SetStateAction<Record<string, SessionFeedbackCounts>>>
+  setCountsBySessionId: Dispatch<SetStateAction<Record<string, SessionFeedbackCounts>>>,
+  shouldApply?: () => boolean
 ): Promise<void> {
   await Promise.all(
     sessionIds.map(async (sessionId) => {
       if (!sessionId) return;
+      if (shouldApply && !shouldApply()) return;
       const cached = getCounts(sessionId);
       if (cached) {
+        if (shouldApply && !shouldApply()) return;
         setCountsBySessionId((prev) =>
           prev[sessionId] ? prev : { ...prev, [sessionId]: cached }
         );
@@ -91,14 +97,12 @@ async function hydrateCountsForSessionIds(
       }
       try {
         const normalizedCounts = await fetchCounts(sessionId);
+        if (shouldApply && !shouldApply()) return;
         setCachedCounts(sessionId, normalizedCounts);
         setCountsBySessionId((prev) => ({ ...prev, [sessionId]: normalizedCounts }));
       } catch {
-        setCountsBySessionId((prev) =>
-          prev[sessionId]
-            ? prev
-            : { ...prev, [sessionId]: { total: 0, open: 0, resolved: 0 } }
-        );
+        if (shouldApply && !shouldApply()) return;
+        // Leave counts undefined — no placeholder zeros (UI uses field-level skeletons).
       }
     })
   );
@@ -106,14 +110,15 @@ async function hydrateCountsForSessionIds(
 
 export interface SessionWithCounts {
   session: Session;
-  counts: SessionFeedbackCounts;
+  /** Undefined until counts are loaded for this session (avoids a fake 0 → N jump). */
+  counts?: SessionFeedbackCounts;
 }
 
 export type ViewMode = "all" | "archived";
 
 /** Single Firestore subscription; consume via `WorkspaceOverviewProvider` + `useWorkspaceOverview`. */
 export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
-  const { workspaceId, claimsReady, authUid } = useWorkspace();
+  const { workspaceId, claimsReady, authUid, isIdentityResolved } = useWorkspace();
   const router = useRouter();
   const workspaceIdRef = useRef<string | null>(null);
   const allSessionsRef = useRef<Session[]>([]);
@@ -121,10 +126,16 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
   const [countsBySessionId, setCountsBySessionId] = useState<
     Record<string, SessionFeedbackCounts>
   >({});
-  const [loading, setLoading] = useState(true);
+  const [isCountsReady, setIsCountsReady] = useState(false);
+  /** True until the first Firestore sessions snapshot for the current workspace (counts never gate this). */
+  const [awaitingSessionSnapshot, setAwaitingSessionSnapshot] = useState(false);
+  const refreshCountsGenRef = useRef(0);
   const expectedCountRef = useRef<number | null>(
     workspaceId ? readCachedSessionCount(workspaceId) : null
   );
+  const sessionsSnapshotGenRef = useRef(0);
+  /** Workspace id that `allSessions` / counts state was last committed for (avoids one frame of wrong-workspace UI). */
+  const sessionsSourceWorkspaceRef = useRef<string | null>(null);
   const userId = authUid;
 
   useEffect(() => {
@@ -138,49 +149,59 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
   const archivedOnly = viewMode === "archived";
 
   const refreshSessions = useCallback(async () => {
-    if (!workspaceIdRef.current || !claimsReady) return;
-    setLoading(true);
-    try {
-      const ids = allSessionsRef.current
-        .map((s) => s.id)
-        .filter((id) => Boolean(id) && !id.startsWith("temp-"));
-      if (ids.length === 0) {
-        setCountsBySessionId({});
-      } else {
-        await hydrateCountsForSessionIds(ids, setCountsBySessionId);
-      }
-    } catch (error) {
-      console.error("[ECHLY] Failed to refresh session counts", error);
-    } finally {
-      setLoading(false);
+    if (!isIdentityResolved || !workspaceIdRef.current || !claimsReady) return;
+    const gen = ++refreshCountsGenRef.current;
+    const shouldApply = () => refreshCountsGenRef.current === gen;
+    const ids = allSessionsRef.current
+      .map((s) => s.id)
+      .filter((id) => Boolean(id) && !id.startsWith("temp-"));
+    if (ids.length === 0) {
+      setCountsBySessionId({});
+      return;
     }
-  }, [claimsReady]);
+    void hydrateCountsForSessionIds(ids, setCountsBySessionId, shouldApply).catch((error) => {
+      console.error("[ECHLY] Failed to refresh session counts", error);
+    });
+  }, [claimsReady, isIdentityResolved]);
 
   useEffect(() => {
-    if (!userId || !workspaceId) return;
+    if (!userId || !workspaceId) {
+      sessionsSourceWorkspaceRef.current = null;
+      setAwaitingSessionSnapshot(false);
+      return;
+    }
     const wid = workspaceId;
+    refreshCountsGenRef.current += 1;
+    sessionsSourceWorkspaceRef.current = wid;
+    setIsCountsReady(false);
     expectedCountRef.current = readCachedSessionCount(wid);
     const cachedSessions = readCachedSessions(wid);
     if (Array.isArray(cachedSessions) && cachedSessions.length > 0) {
       setAllSessions(cachedSessions);
       const cachedCounts = Object.fromEntries(
-        cachedSessions.map((session) => [
-          session.id,
-          getCounts(session.id) ?? { total: 0, open: 0, resolved: 0 },
-        ])
+        cachedSessions
+          .map((session) => [session.id, getCounts(session.id)] as const)
+          .filter((entry): entry is [string, SessionFeedbackCounts] => entry[1] != null)
       );
       setCountsBySessionId(cachedCounts);
     } else {
       setAllSessions([]);
       setCountsBySessionId({});
     }
-    setLoading(true);
-  }, [userId, workspaceId]);
+    if (isIdentityResolved) {
+      setAwaitingSessionSnapshot(true);
+    } else {
+      setAwaitingSessionSnapshot(false);
+    }
+  }, [userId, workspaceId, isIdentityResolved]);
 
   useEffect(() => {
-    if (!claimsReady || !userId || !workspaceId) return;
+    if (!isIdentityResolved || !userId || !workspaceId) {
+      return;
+    }
 
     const wid = workspaceId;
+
     const q = query(
       collection(db, "sessions"),
       where("workspaceId", "==", wid),
@@ -191,6 +212,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
     const unsubscribe = onSnapshot(
       q,
       (snap) => {
+        sessionsSourceWorkspaceRef.current = wid;
         const dbSessions: Session[] = snap.docs.map((docSnap) => {
           const data = docSnap.data() as Partial<Session> & { archived?: boolean; isArchived?: boolean };
           const archived = (data.isArchived ?? data.archived) === true;
@@ -205,6 +227,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         });
 
         const dbIds = new Set(dbSessions.map((s) => s.id));
+        const snapshotGen = ++sessionsSnapshotGenRef.current;
         setAllSessions((prev) => {
           const optimistic = prev.filter((s) => Boolean(s.isOptimistic) && !dbIds.has(s.id));
           const next = [...optimistic, ...dbSessions];
@@ -215,36 +238,50 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         });
 
         const ids = dbSessions.map((s) => s.id).filter((id): id is string => Boolean(id));
-        void hydrateCountsForSessionIds(ids, setCountsBySessionId);
 
-        setLoading(false);
+        setAwaitingSessionSnapshot(false);
+        setIsCountsReady(true);
+
+        void hydrateCountsForSessionIds(
+          ids,
+          setCountsBySessionId,
+          () => sessionsSnapshotGenRef.current === snapshotGen && workspaceIdRef.current === wid
+        ).catch((error) => {
+          console.error("[ECHLY] Failed to hydrate counts after sessions snapshot — non-fatal", error);
+        });
       },
       (err) => {
         console.error("[ECHLY] Firestore sessions subscription failed", err);
-        setLoading(false);
+        setIsCountsReady(true);
+        setAwaitingSessionSnapshot(false);
       }
     );
 
-    return () => unsubscribe();
-  }, [claimsReady, userId, workspaceId]);
+    return () => {
+      unsubscribe();
+    };
+  }, [isIdentityResolved, userId, workspaceId]);
 
-  const sessions = filterSessionsByView(allSessions, archivedOnly);
+  const overviewDataAligned =
+    Boolean(workspaceId && userId) &&
+    sessionsSourceWorkspaceRef.current === workspaceId;
+
+  const allSessionsForView = overviewDataAligned ? allSessions : [];
+  const countsForView = overviewDataAligned ? countsBySessionId : {};
+
+  const sessions = filterSessionsByView(allSessionsForView, archivedOnly);
 
   const sessionsWithCounts: SessionWithCounts[] = sessions.map((session) => ({
     session,
-    counts: countsBySessionId[session.id] ?? {
-      total: 0,
-      open: 0,
-      resolved: 0,
-    },
+    counts: countsForView[session.id],
   }));
 
   const handleCreateSession = useCallback(
     async (
       onPlanLimitReached?: (payload: { message: string; upgradePlan: string | null }) => void
     ) => {
+      assertIdentityResolved(isIdentityResolved);
       if (!claimsReady || !workspaceIdRef.current) return;
-      const wid = workspaceIdRef.current;
       const tempSessionId = `temp-${Date.now()}`;
       const tempSession: Session = {
         id: tempSessionId,
@@ -254,10 +291,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         isOptimistic: true,
       };
       setAllSessions((prev) => [tempSession, ...prev]);
-      setCountsBySessionId((prev) => ({
-        ...prev,
-        [tempSessionId]: { total: 0, open: 0, resolved: 0 },
-      }));
 
       try {
         const res = await authFetch("/api/sessions", { method: "POST" });
@@ -341,15 +374,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
           )
         );
         setCountsBySessionId((prev) => {
-          const tempCounts = prev[tempSessionId] ?? {
-            total: 0,
-            open: 0,
-            resolved: 0,
-          };
-          const next: Record<string, SessionFeedbackCounts> = {
-            ...prev,
-            [sessionId]: tempCounts,
-          };
+          const next = { ...prev };
           delete next[tempSessionId];
           return next;
         });
@@ -365,7 +390,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         console.error("[ECHLY] Create session failed", err);
       }
     },
-    [claimsReady, router]
+    [claimsReady, isIdentityResolved, router]
   );
 
   const updateSession = useCallback((sessionId: string, patch: Partial<Session>) => {
@@ -376,6 +401,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
 
   const setSessionArchived = useCallback(async (sessionId: string, archived: boolean) => {
     if (!sessionId) return;
+    assertIdentityResolved(isIdentityResolved);
     const wid = workspaceIdRef.current;
 
     let hasRollback = false;
@@ -428,7 +454,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
       console.error("[ECHLY] setSessionArchived failed", err);
       throw err;
     }
-  }, []);
+  }, [isIdentityResolved]);
 
   const removeSession = useCallback((sessionId: string) => {
     setAllSessions((prev) => prev.filter((s) => s.id !== sessionId));
@@ -441,6 +467,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
 
   const deleteSession = useCallback(
     async (session: Session) => {
+      assertIdentityResolved(isIdentityResolved);
       const sessionId = session.id;
       const wid = workspaceIdRef.current;
       setAllSessions((prev) => {
@@ -461,10 +488,10 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
             if (wid) writeCachedSessions(wid, next);
             return next;
           });
-          setCountsBySessionId((prev) => ({
-            ...prev,
-            [sessionId]: prev[sessionId] ?? { total: 0, open: 0, resolved: 0 },
-          }));
+          setCountsBySessionId((prev) => {
+            const cached = getCounts(sessionId);
+            return cached ? { ...prev, [sessionId]: cached } : prev;
+          });
           return;
         }
         if (!res.ok) {
@@ -480,21 +507,22 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
           if (wid) writeCachedSessions(wid, next);
           return next;
         });
-        setCountsBySessionId((prev) => ({
-          ...prev,
-          [sessionId]: prev[sessionId] ?? { total: 0, open: 0, resolved: 0 },
-        }));
+        setCountsBySessionId((prev) => {
+          const cached = getCounts(sessionId);
+          return cached ? { ...prev, [sessionId]: cached } : prev;
+        });
         console.error("[ECHLY] Delete session failed", err);
         throw err;
       }
     },
-    []
+    [isIdentityResolved]
   );
 
   return {
     sessions: sessionsWithCounts,
-    loading,
-    expectedSessionCount: expectedCountRef.current,
+    loading: overviewDataAligned ? awaitingSessionSnapshot : true,
+    isCountsReady: overviewDataAligned ? isCountsReady : false,
+    expectedSessionCount: overviewDataAligned ? expectedCountRef.current : null,
     handleCreateSession,
     refreshSessions,
     updateSession,

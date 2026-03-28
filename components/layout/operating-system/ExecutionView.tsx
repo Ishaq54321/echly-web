@@ -80,18 +80,7 @@ export function ExecutionView({
   readOnlyDescription = null,
   shareGating,
 }: ExecutionViewProps) {
-
-  if (!item) {
-    return (
-      <div className="flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-6 py-12 gap-4">
-          <p className="text-[14px] text-[#6B7280] text-center">
-            Select a ticket from the navigator to start executing.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const displayItem = item;
 
   const isShareSurface = shareGating != null;
   const isPublicReadOnly =
@@ -100,7 +89,7 @@ export function ExecutionView({
   return (
     <div className="flex-1 min-h-0 flex flex-col min-w-0">
       <SessionFeedbackHeader
-        item={item}
+        item={displayItem}
         impactScore={impactScore}
         onResolvedChange={
           isPublicReadOnly || isShareSurface ? undefined : canResolve ? onResolvedChange : undefined
@@ -138,32 +127,34 @@ export function ExecutionView({
         }
       >
         <div className={isShareSurface ? "pt-0 pb-2" : "pt-0 pb-4"}>
-          <FeedbackContent
-            item={item}
-            readOnlyDescription={readOnlyDescription}
-            onSaveActionSteps={
-              isPublicReadOnly || isShareSurface ? undefined : canResolve ? onSaveActionSteps : undefined
-            }
-            onSaveTags={
-              isPublicReadOnly || isShareSurface ? undefined : canResolve ? onSaveTags : undefined
-            }
-            onExpandImage={() => setIsImageExpanded(true)}
-            isCommentMode={
-              !isPublicReadOnly && !isShareSurface && canComment && isCommentMode
-            }
-            comments={comments}
-            pinComments={comments.filter((c): c is Comment & { position: NonNullable<Comment["position"]> } => c.type === "pin" && c.position != null)}
-            activePinId={activePinIdForPopover ?? undefined}
-            activeThreadId={activeThreadId}
-            onPinClick={onPinClick}
-            onOpenThreadPanel={onOpenThreadPanel}
-            onCloseInlinePopover={onCloseInlinePopover}
-            sendPinComment={sendPinComment}
-            updateComment={updateComment}
-            sendTextComment={sendTextComment}
-            onCommentPlaced={onCommentPlaced}
-            updatePinPosition={updatePinPosition}
-          />
+          {displayItem ? (
+            <FeedbackContent
+              item={displayItem}
+              readOnlyDescription={readOnlyDescription}
+              onSaveActionSteps={
+                isPublicReadOnly || isShareSurface ? undefined : canResolve ? onSaveActionSteps : undefined
+              }
+              onSaveTags={
+                isPublicReadOnly || isShareSurface ? undefined : canResolve ? onSaveTags : undefined
+              }
+              onExpandImage={() => setIsImageExpanded(true)}
+              isCommentMode={
+                !isPublicReadOnly && !isShareSurface && canComment && isCommentMode
+              }
+              comments={comments}
+              pinComments={comments.filter((c): c is Comment & { position: NonNullable<Comment["position"]> } => c.type === "pin" && c.position != null)}
+              activePinId={activePinIdForPopover ?? undefined}
+              activeThreadId={activeThreadId}
+              onPinClick={onPinClick}
+              onOpenThreadPanel={onOpenThreadPanel}
+              onCloseInlinePopover={onCloseInlinePopover}
+              sendPinComment={sendPinComment}
+              updateComment={updateComment}
+              sendTextComment={sendTextComment}
+              onCommentPlaced={onCommentPlaced}
+              updatePinPosition={updatePinPosition}
+            />
+          ) : null}
         </div>
       </div>
     </div>

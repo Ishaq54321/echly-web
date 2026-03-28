@@ -70,9 +70,11 @@ export function SessionNavigator({
         <span className="shrink-0 w-2 flex items-center justify-center" aria-hidden>
           {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-amber-400/90" />}
         </span>
-        <span className="truncate text-[13px] text-[hsl(var(--text-primary-strong))]">
-          {s.session.title || "Untitled"}
-        </span>
+        {s.session.title?.trim() ? (
+          <span className="truncate text-[13px] text-[hsl(var(--text-primary-strong))]">
+            {s.session.title}
+          </span>
+        ) : null}
         <span className="shrink-0 text-[11px] tabular-nums text-[hsl(var(--text-tertiary))]">
           {open}
         </span>

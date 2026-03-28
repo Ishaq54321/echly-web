@@ -6,7 +6,6 @@ import {
   Calendar,
   CircleDashed,
   Link,
-  Loader2,
   RotateCcw,
   Trash2,
   Check,
@@ -20,7 +19,10 @@ import { SessionsViewModeToggle } from "@/components/dashboard/SessionsViewModeT
 import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
 import { Modal } from "@/components/ui/Modal";
 import { copySessionLink } from "@/utils/copySessionLink";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
 
 export interface SessionWorkspaceSection {
   title: string;
@@ -31,6 +33,8 @@ export interface SessionWorkspaceSection {
 
 export interface SessionsWorkspaceProps {
   sections?: SessionWorkspaceSection[];
+  /** When the session list is empty (e.g. snapshot pending), render this many inert list rows with field-level skeletons. */
+  listPlaceholderCount?: number;
   /** Controls whether bulk bar shows Archive vs Unarchive. */
   activeTab?: "sessions" | "archived";
   onView: (sessionId: string) => void;
@@ -42,15 +46,11 @@ export interface SessionsWorkspaceProps {
   /** When set with onViewModeChange, view toggle is controlled by the parent (e.g. dashboard header). */
   viewMode?: "list" | "grid";
   onViewModeChange?: (mode: "list" | "grid") => void;
-  /** Inline-loading mode: render placeholder rows using the same row component. */
-  isLoading?: boolean;
-  /** Number of inline-loading rows when `isLoading` is true (default: 3). */
-  loadingRowCount?: number;
 }
 
 function formatSessionUpdatedShort(session: Session): string {
   const u = session.updatedAt;
-  if (u == null) return "—";
+  if (u == null) return "";
   let ms: number | null = null;
   if (
     typeof u === "object" &&
@@ -71,7 +71,7 @@ function formatSessionUpdatedShort(session: Session): string {
   } else if (typeof u === "string") {
     ms = new Date(u).getTime();
   }
-  if (ms == null || Number.isNaN(ms)) return "—";
+  if (ms == null || Number.isNaN(ms)) return "";
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(ms);
 }
 
@@ -85,9 +85,8 @@ function SessionWorkspaceRow({
   isSelectionMode,
   isSelected,
   onToggleSelected,
-  isLoading,
 }: {
-  item?: SessionWithCounts;
+  item?: SessionWithCounts | undefined;
   rowIndex: number;
   onView?: (sessionId: string) => void;
   onRenameSuccess?: SessionsWorkspaceProps["onRenameSuccess"];
@@ -96,9 +95,8 @@ function SessionWorkspaceRow({
   isSelectionMode?: boolean;
   isSelected?: boolean;
   onToggleSelected?: (sessionId: string) => void;
-  isLoading?: boolean;
 }) {
-  const { authUid } = useWorkspace();
+  const { authUid, isIdentityResolved } = useWorkspace();
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [copyLinkBusy, setCopyLinkBusy] = useState(false);
@@ -110,34 +108,65 @@ function SessionWorkspaceRow({
     return () => window.clearTimeout(t);
   }, [copied]);
 
-  if (isLoading) {
+  if (!item) {
     return (
-      <div className="flex items-center justify-between px-4 py-4 rounded-lg">
-        <div className="flex items-center gap-4">
-          <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
-          <div className="h-4 w-36 bg-gray-200 rounded-md animate-pulse" />
+      <div
+        className="group flex w-full items-center justify-between rounded-lg px-4 py-4"
+        aria-busy="true"
+        aria-label="Loading session row"
+      >
+        <div className="flex min-w-0 items-center gap-4">
+          <div
+            className="relative flex h-8 w-8 shrink-0 items-center justify-center"
+            aria-hidden
+          >
+            <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200/90 animate-pulse" />
+          </div>
+          <div className="min-w-0">
+            <div
+              className="h-4 max-w-[55%] rounded-md bg-neutral-200/85 animate-pulse sm:w-48"
+              aria-hidden
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="h-8 w-[90px] rounded-full bg-gray-200 animate-pulse" />
-          <div className="h-8 w-[110px] rounded-full bg-gray-200 animate-pulse" />
-          <div className="h-8 w-[95px] rounded-full bg-gray-200 animate-pulse" />
-          <div className="h-8 w-[85px] rounded-full bg-gray-200 animate-pulse" />
-          <div className="flex -space-x-2">
-            <div className="w-7 h-7 rounded-full bg-gray-300 animate-pulse" />
-            <div className="w-7 h-7 rounded-full bg-gray-300 animate-pulse" />
-            <div className="w-7 h-7 rounded-full bg-gray-300 animate-pulse" />
+        <div className="flex min-h-[36px] shrink-0 items-center gap-3.5">
+          <div
+            className="flex h-7 min-w-[4.5rem] items-center justify-center rounded-full border border-gray-200 bg-white px-3 py-1.5"
+            aria-hidden
+          >
+            <div className="h-4 w-8 rounded bg-neutral-200/90 animate-pulse" />
+          </div>
+          <div
+            className="flex h-7 min-w-[5.5rem] items-center justify-center rounded-full border border-gray-200 bg-white px-3 py-1.5"
+            aria-hidden
+          >
+            <div className="h-4 w-8 rounded bg-neutral-200/90 animate-pulse" />
+          </div>
+          <div
+            className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm"
+            aria-hidden
+          >
+            <div className="h-4 w-4 shrink-0 rounded bg-neutral-200/90 animate-pulse" />
+            <div className="h-4 w-16 rounded bg-neutral-200/90 animate-pulse" />
+          </div>
+          <div className="flex items-center gap-2" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-7 w-7 shrink-0 rounded-full border-2 border-white bg-neutral-200/90 animate-pulse"
+              />
+            ))}
           </div>
         </div>
       </div>
     );
   }
 
-  if (!item) return null;
-
   const { session, counts } = item;
   const sessionId = session.id;
   const isOptimistic = Boolean(session.isOptimistic);
+  const countsUnknown = !isOptimistic && counts == null;
 
   const handleRowActivate = () => {
     if (isSelectionMode) {
@@ -164,10 +193,14 @@ function SessionWorkspaceRow({
     }
   };
 
-  const open = counts.open ?? 0;
-  const resolved = counts.resolved ?? 0;
-  const total = open + resolved;
-  let progress = total === 0 ? 0 : (resolved / total) * 100;
+  const open = counts != null ? counts.open : undefined;
+  const resolved = counts != null ? counts.resolved : undefined;
+  const total =
+    counts == null ? null : (counts.open ?? 0) + (counts.resolved ?? 0);
+  const updatedShort = formatSessionUpdatedShort(session);
+  const resolvedForPie = resolved ?? 0;
+  let progress =
+    total == null || total === 0 ? 0 : (resolvedForPie / total) * 100;
   if (progress >= 100) progress = 99.999;
 
   const mockAssigneeInitials = (() => {
@@ -241,43 +274,79 @@ function SessionWorkspaceRow({
                   aria-hidden
                 />
               </div>
+            ) : countsUnknown ? (
+              <div
+                className="h-8 w-8 shrink-0 rounded-full bg-neutral-200/90 animate-pulse"
+                aria-hidden
+              />
             ) : (
               <ProgressPie value={progress} size={32} />
             )}
           </button>
 
           <div className="min-w-0">
-            <span className="truncate block text-[15px] font-medium text-gray-900">
-              {session.title || "Untitled Session"}
-            </span>
+            {session.title?.trim() ? (
+              <span className="truncate block text-[15px] font-medium text-gray-900">
+                {session.title}
+              </span>
+            ) : null}
             {(isOptimistic || openingId === session.id) && (
-              <div className="mt-1 inline-flex items-center gap-1.5 text-sm text-gray-600">
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-gray-600" aria-hidden />
-                {isOptimistic ? "Creating…" : "Opening…"}
-              </div>
+              <div
+                className="mt-1.5 h-3.5 w-28 max-w-[55%] rounded-md bg-neutral-200/85 animate-pulse"
+                aria-hidden
+              />
             )}
           </div>
         </div>
 
-        <div className="flex items-center shrink-0 gap-3.5">
-          {open > 0 && (
-            <div className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
-              <CircleDashed className="h-4 w-4 shrink-0 text-blue-500" aria-hidden />
-              <span className="whitespace-nowrap font-medium tracking-tight">{open} open</span>
-            </div>
+        <div className="flex min-h-[36px] items-center shrink-0 gap-3.5">
+          {countsUnknown ? (
+            <>
+              <div
+                className="h-7 min-w-[4.5rem] rounded-full border border-gray-200 bg-white px-3 py-1.5 flex items-center justify-center"
+                aria-hidden
+              >
+                <div className="h-4 w-8 rounded bg-neutral-200/90 animate-pulse" />
+              </div>
+              <div
+                className="h-7 min-w-[5.5rem] rounded-full border border-gray-200 bg-white px-3 py-1.5 flex items-center justify-center"
+                aria-hidden
+              >
+                <div className="h-4 w-8 rounded bg-neutral-200/90 animate-pulse" />
+              </div>
+            </>
+          ) : (
+            <>
+              {open != null && open > 0 && (
+                <div className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+                  <CircleDashed className="h-4 w-4 shrink-0 text-blue-500" aria-hidden />
+                  <span className="whitespace-nowrap font-medium tracking-tight">{open} open</span>
+                </div>
+              )}
+              {resolved != null && resolved > 0 && (
+                <div className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+                  <Check className="h-4 w-4 shrink-0 text-green-500" strokeWidth={2.5} aria-hidden />
+                  <span className="whitespace-nowrap font-medium tracking-tight">{resolved} resolved</span>
+                </div>
+              )}
+            </>
           )}
-          {resolved > 0 && (
-            <div className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
-              <Check className="h-4 w-4 shrink-0 text-green-500" strokeWidth={2.5} aria-hidden />
-              <span className="whitespace-nowrap font-medium tracking-tight">{resolved} resolved</span>
+          {updatedShort ? (
+            <div className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm">
+              <Calendar className="h-4 w-4 shrink-0 text-orange-500" strokeWidth={2.5} aria-hidden />
+              <span className="whitespace-nowrap font-medium tracking-tight text-gray-700">
+                {updatedShort}
+              </span>
             </div>
-          )}
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm">
-            <Calendar className="h-4 w-4 shrink-0 text-orange-500" strokeWidth={2.5} aria-hidden />
-            <span className="whitespace-nowrap font-medium tracking-tight text-gray-700">
-              {formatSessionUpdatedShort(session)}
-            </span>
-          </div>
+          ) : !isOptimistic ? (
+            <div
+              className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm"
+              aria-hidden
+            >
+              <div className="h-4 w-4 shrink-0 rounded bg-neutral-200/90 animate-pulse" />
+              <div className="h-4 w-16 rounded bg-neutral-200/90 animate-pulse" />
+            </div>
+          ) : null}
 
           <div className="flex items-center relative">
             <div
@@ -312,6 +381,7 @@ function SessionWorkspaceRow({
                 onClick={(e) => {
                   e.stopPropagation();
                   if (isOptimistic || copyLinkBusy) return;
+                  assertIdentityResolved(isIdentityResolved);
                   void copySessionLink(session.id, authUid, {
                     onBusy: setCopyLinkBusy,
                   }).then((ok) => {
@@ -325,7 +395,10 @@ function SessionWorkspaceRow({
                 title={copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"}
               >
                 {copyLinkBusy ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-gray-500" aria-hidden />
+                  <span
+                    className="inline-flex h-5 w-5 rounded-full bg-neutral-300/90 animate-pulse"
+                    aria-hidden
+                  />
                 ) : copied ? (
                   <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 ) : (
@@ -360,6 +433,7 @@ function SessionWorkspaceRow({
 
 export function SessionsWorkspace({
   sections,
+  listPlaceholderCount: listPlaceholderCountProp,
   activeTab = "sessions",
   onView,
   onRenameSuccess,
@@ -368,9 +442,9 @@ export function SessionsWorkspace({
   onDeleteSession,
   viewMode: viewModeProp,
   onViewModeChange,
-  isLoading,
-  loadingRowCount = 3,
 }: SessionsWorkspaceProps) {
+  const listPlaceholderCount = listPlaceholderCountProp ?? 0;
+  const { isIdentityResolved } = useWorkspace();
   const [internalViewMode, setInternalViewMode] = useState<"list" | "grid">("list");
   const isControlled = viewModeProp !== undefined && typeof onViewModeChange === "function";
   const viewMode = isControlled ? viewModeProp! : internalViewMode;
@@ -402,6 +476,7 @@ export function SessionsWorkspace({
   const archiveSelected = useCallback(async () => {
     if (!onSetArchived) return;
     if (bulkBusy) return;
+    assertIdentityResolved(isIdentityResolved);
     const ids = selectedSessions.slice();
     if (ids.length === 0) return;
     setBulkArchiving(true);
@@ -411,11 +486,12 @@ export function SessionsWorkspace({
     } finally {
       setBulkArchiving(false);
     }
-  }, [onSetArchived, selectedSessions, bulkBusy]);
+  }, [onSetArchived, selectedSessions, bulkBusy, isIdentityResolved]);
 
   const unarchiveSelected = useCallback(async () => {
     if (!onSetArchived) return;
     if (bulkBusy) return;
+    assertIdentityResolved(isIdentityResolved);
     const ids = selectedSessions.slice();
     if (ids.length === 0) return;
     setBulkArchiving(true);
@@ -425,11 +501,12 @@ export function SessionsWorkspace({
     } finally {
       setBulkArchiving(false);
     }
-  }, [onSetArchived, selectedSessions, bulkBusy]);
+  }, [onSetArchived, selectedSessions, bulkBusy, isIdentityResolved]);
 
   const deleteSelected = useCallback(async () => {
     if (!onDeleteSession) return;
     if (bulkBusy) return;
+    assertIdentityResolved(isIdentityResolved);
     const ids = selectedSessions.slice();
     if (ids.length === 0) return;
     const byId = sessionById();
@@ -442,7 +519,7 @@ export function SessionsWorkspace({
     } finally {
       setBulkDeleting(false);
     }
-  }, [onDeleteSession, selectedSessions, bulkBusy, sessionById]);
+  }, [onDeleteSession, selectedSessions, bulkBusy, sessionById, isIdentityResolved]);
 
   const handleBulkDelete = useCallback(() => {
     if (bulkBusy) return;
@@ -457,36 +534,26 @@ export function SessionsWorkspace({
     setDeleteModalOpen(false);
   }, [deleteSelected, selectedSessions.length]);
 
-  if (isLoading) {
-    return (
-      <div className={`flex w-full flex-col gap-4 ${isControlled ? "mt-0" : "mt-4"}`}>
-        {!isControlled ? (
-          <div className="flex w-full justify-end">
-            <SessionsViewModeToggle value={viewMode} onChange={setViewMode} />
-          </div>
-        ) : null}
+  const sectionsInput = sections ?? [];
+  const flatItemCount = sectionsInput.reduce((n, s) => n + s.items.length, 0);
+  const listShellActive =
+    listPlaceholderCount > 0 && flatItemCount === 0 && viewMode === "list";
+  const showGridShell =
+    listPlaceholderCount > 0 && flatItemCount === 0 && viewMode === "grid";
+  const hasRenderableSessions = sectionsInput.some((s) => s.items.length > 0);
 
-        {viewMode === "list" ? (
-          <div className="w-full mt-0 space-y-3">
-            {Array.from({ length: loadingRowCount }).map((_, i) => (
-              <SessionWorkspaceRow key={`session-loading-${i}`} rowIndex={i} isLoading />
-            ))}
-          </div>
-        ) : (
-          <div className="mt-2 w-full">
-            <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
-              {Array.from({ length: Math.min(loadingRowCount, 10) }).map((_, i) => (
-                <div key={`session-loading-card-${i}`} className="h-[140px] rounded-xl bg-neutral-100 animate-pulse" />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
+  if (!listShellActive && !showGridShell && !hasRenderableSessions) return null;
 
-  const visibleSections = (sections ?? []).filter((s) => s.items.length > 0);
-  if (visibleSections.length === 0) return null;
+  const sectionsForRender =
+    listShellActive && sectionsInput.length === 0
+      ? [
+          {
+            title: "",
+            markerClassName: "bg-blue-500",
+            items: [] as SessionWithCounts[],
+          },
+        ]
+      : sectionsInput;
 
   const byId = sessionById();
   const selectedSessionObjects = selectedSessions
@@ -504,70 +571,120 @@ export function SessionsWorkspace({
         </div>
       ) : null}
 
-      {visibleSections.map((section, sectionIndex) => {
-        const showSectionHead = section.title.trim().length > 0;
-        const headingSlug = section.title.trim().replace(/\s+/g, "-") || "section";
-        const headingId = `workspace-section-${sectionIndex}-${headingSlug}`;
-        const listWrap = "w-full";
-        const sectionHead = showSectionHead ? (
-          <div className="mb-2 flex items-center justify-between px-0">
-            <div className="flex items-center gap-2">
-              <div
-                className={`h-2 w-2 shrink-0 rounded-full ${section.markerClassName ?? "bg-blue-500"}`}
-                aria-hidden
-              />
-              <span id={headingId} className="text-[16px] font-semibold text-neutral-900">
-                {section.title}
-              </span>
+      {showGridShell ? (
+        <section className="w-full" aria-busy="true">
+          <div className="mt-2 w-full">
+            <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
+              {Array.from({ length: listPlaceholderCount }, (_, i) => (
+                <div
+                  key={`grid-slot-${i}`}
+                  className="h-[min(200px,40vw)] min-h-[160px] w-full rounded-xl border border-gray-200 bg-neutral-50/80 px-4 py-4"
+                  aria-hidden
+                >
+                  <div className="mb-4 h-5 w-3/4 max-w-[12rem] rounded-md bg-neutral-200/90 animate-pulse" />
+                  <div className="mb-3 h-3 w-full max-w-[8rem] rounded bg-neutral-200/80 animate-pulse" />
+                  <div className="mt-6 flex gap-2">
+                    <div className="h-6 w-16 rounded-full bg-neutral-200/85 animate-pulse" />
+                    <div className="h-6 w-16 rounded-full bg-neutral-200/85 animate-pulse" />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        ) : null;
+        </section>
+      ) : (
+        sectionsForRender.map((section, sectionIndex) => {
+          const isPrimaryListShell =
+            listShellActive &&
+            sectionIndex === 0 &&
+            section.items.length === 0;
+          const skipEmptySection =
+            section.items.length === 0 && !isPrimaryListShell;
+          if (skipEmptySection) return null;
 
-        return (
-          <section
-            key={`${section.title}-${sectionIndex}`}
-            aria-labelledby={showSectionHead ? headingId : undefined}
-            className="w-full"
-          >
-            <div className={viewMode === "list" ? listWrap : "w-full"}>{sectionHead}</div>
+          const rowCount = isPrimaryListShell
+            ? listPlaceholderCount
+            : section.items.length;
 
-            {viewMode === "list" ? (
-              <div className={`${listWrap} mt-0 space-y-3`}>
-                {section.items.map((item, rowIndex) => (
-                  <SessionWorkspaceRow
-                    key={`${sectionIndex}-${item.session.id}-${rowIndex}`}
-                    item={item}
-                    rowIndex={rowIndex}
-                    onView={onView}
-                    onRenameSuccess={onRenameSuccess}
-                    onSetArchived={onSetArchived}
-                    onRequestDelete={onRequestDelete}
-                    isSelectionMode={isSelectionMode}
-                    isSelected={selectedSessions.includes(item.session.id)}
-                    onToggleSelected={toggleSelected}
-                  />
-                ))}
+          const showSectionHead = section.title.trim().length > 0;
+          const headingSlug =
+            section.title.trim().replace(/\s+/g, "-") || "section";
+          const headingId = `workspace-section-${sectionIndex}-${headingSlug}`;
+          const listWrap = "w-full";
+          const sectionHead = showSectionHead ? (
+            <div className="mb-2 flex items-center justify-between px-0">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`h-2 w-2 shrink-0 rounded-full ${section.markerClassName ?? "bg-blue-500"}`}
+                  aria-hidden
+                />
+                <span
+                  id={headingId}
+                  className="text-[16px] font-semibold text-neutral-900"
+                >
+                  {section.title}
+                </span>
               </div>
-            ) : (
-              <div className="mt-2 w-full">
-                <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
-                  {section.items.map((item, index) => (
-                    <WorkspaceCard
-                      key={`${sectionIndex}-${item.session.id}-${index}`}
-                      item={item}
-                      onView={onView}
-                      index={index}
-                      onRenameSuccess={onRenameSuccess}
-                      onSetArchived={onSetArchived}
-                      onRequestDelete={onRequestDelete}
-                    />
-                  ))}
+            </div>
+          ) : null;
+
+          return (
+            <section
+              key={`${section.title}-${sectionIndex}`}
+              aria-labelledby={showSectionHead ? headingId : undefined}
+              className="w-full"
+              aria-busy={isPrimaryListShell ? true : undefined}
+            >
+              <div className={viewMode === "list" ? listWrap : "w-full"}>
+                {sectionHead}
+              </div>
+
+              {viewMode === "list" ? (
+                <div className={`${listWrap} mt-0 space-y-3`}>
+                  {Array.from({ length: rowCount }, (_, rowIndex) => {
+                    const rowItem = section.items[rowIndex];
+                    const rowKey = `slot-${sectionIndex}-${rowIndex}`;
+                    return (
+                      <SessionWorkspaceRow
+                        key={rowKey}
+                        item={rowItem}
+                        rowIndex={rowIndex}
+                        onView={onView}
+                        onRenameSuccess={onRenameSuccess}
+                        onSetArchived={onSetArchived}
+                        onRequestDelete={onRequestDelete}
+                        isSelectionMode={isSelectionMode}
+                        isSelected={
+                          rowItem
+                            ? selectedSessions.includes(rowItem.session.id)
+                            : false
+                        }
+                        onToggleSelected={toggleSelected}
+                      />
+                    );
+                  })}
                 </div>
-              </div>
-            )}
-          </section>
-        );
-      })}
+              ) : (
+                <div className="mt-2 w-full">
+                  <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5">
+                    {section.items.map((item, index) => (
+                      <WorkspaceCard
+                        key={`${sectionIndex}-${item.session.id}-${index}`}
+                        item={item}
+                        onView={onView}
+                        index={index}
+                        onRenameSuccess={onRenameSuccess}
+                        onSetArchived={onSetArchived}
+                        onRequestDelete={onRequestDelete}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          );
+        })
+      )}
 
       {selectedSessions.length > 0 ? (
         <div

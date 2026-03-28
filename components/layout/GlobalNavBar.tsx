@@ -11,7 +11,10 @@ import {
   Bell,
 } from "lucide-react";
 import { useState, useCallback } from "react";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
 import { getOrCreateShareLink } from "@/lib/share/getOrCreateShareLink";
 
 function dashboardSessionIdFromPath(pathname: string | null): string | null {
@@ -24,19 +27,22 @@ function dashboardSessionIdFromPath(pathname: string | null): string | null {
 
 export function GlobalNavBar() {
   const pathname = usePathname();
-  const { authUid } = useWorkspace();
+  const { authUid, isIdentityResolved } = useWorkspace();
   const sessionId = dashboardSessionIdFromPath(pathname);
   const [copied, setCopied] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
 
   const handleCopyLink = useCallback(async () => {
     if (typeof window === "undefined" || copyBusy) return;
-    if (!sessionId || !authUid) return;
+    if (!sessionId) return;
+    assertIdentityResolved(isIdentityResolved);
+    const uid = authUid?.trim();
+    if (!uid) throw new Error("Auth uid missing");
     setCopyBusy(true);
     try {
       const url = await getOrCreateShareLink({
         sessionId,
-        userId: authUid,
+        userId: uid,
         origin: window.location.origin,
       });
       await navigator.clipboard.writeText(url);
@@ -47,7 +53,7 @@ export function GlobalNavBar() {
     } finally {
       setCopyBusy(false);
     }
-  }, [sessionId, copyBusy, authUid]);
+  }, [sessionId, copyBusy, authUid, isIdentityResolved]);
 
   const iconButtonClass =
     "h-10 w-10 flex items-center justify-center rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer shrink-0";

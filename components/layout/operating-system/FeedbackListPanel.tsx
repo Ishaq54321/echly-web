@@ -137,9 +137,13 @@ export function FeedbackListPanel({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <div className={`text-[13px] truncate ${isUnread ? "font-semibold" : "font-normal"} text-[hsl(var(--text-primary-strong))]`}>
-            {item.title || "Untitled"}
-          </div>
+          {item.title?.trim() ? (
+            <div
+              className={`text-[13px] truncate ${isUnread ? "font-semibold" : "font-normal"} text-[hsl(var(--text-primary-strong))]`}
+            >
+              {item.title}
+            </div>
+          ) : null}
         </div>
       </div>
     );

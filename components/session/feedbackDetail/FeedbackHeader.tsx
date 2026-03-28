@@ -23,11 +23,11 @@ function toDate(value: string | Timestamp | null | undefined): Date | null {
 
 function formatRelative(isoOrTimestamp: string | Timestamp | null | undefined): string {
   const d = toDate(isoOrTimestamp);
-  if (!d) return "—";
+  if (!d) return "";
   try {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   } catch {
-    return "—";
+    return "";
   }
 }
 
@@ -50,7 +50,6 @@ export function FeedbackHeader({
 }: FeedbackHeaderProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(item.title);
-  const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -73,17 +72,13 @@ export function FeedbackHeader({
       setTitleDraft(item.title);
       return;
     }
-    setIsSaving(true);
     onSaveTitle(titleDraft.trim())
       .then(() => {
-        setIsSaving(false);
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 1200);
         setIsEditingTitle(false);
       })
-      .catch(() => {
-        setIsSaving(false);
-      });
+      .catch(() => {});
   };
 
   const handleTitleKeyDown = (e: React.KeyboardEvent) => {
@@ -99,11 +94,32 @@ export function FeedbackHeader({
     }
   };
 
+  const showPosition =
+    typeof item.index === "number" &&
+    typeof item.total === "number" &&
+    item.total >= 0 &&
+    item.index >= 1;
+
+  const createdRel =
+    item.createdAt != null ? formatRelative(item.createdAt) : "";
+  const updatedRel =
+    item.updatedAt != null ? formatRelative(item.updatedAt) : "";
+  const metaLine =
+    item.updatedAt != null && updatedRel && item.createdAt != null && createdRel
+      ? `Created ${createdRel} • Updated ${updatedRel}`
+      : item.updatedAt != null && updatedRel
+        ? `Updated ${updatedRel}`
+        : item.createdAt != null && createdRel
+          ? `Created ${createdRel}`
+          : null;
+
   return (
     <div className="pt-0 pb-4">
-      <div className="text-[13px] text-[hsl(var(--text-tertiary))] mb-1.5">
-        {item.index} of {item.total}
-      </div>
+      {showPosition ? (
+        <div className="text-[13px] text-[hsl(var(--text-tertiary))] mb-1.5">
+          {item.index} of {item.total}
+        </div>
+      ) : null}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           {isEditingTitle && onSaveTitle ? (
@@ -122,11 +138,6 @@ export function FeedbackHeader({
               <p className="text-[14px] text-[hsl(var(--text-tertiary))] mt-1">
                 Enter to save
               </p>
-              {isSaving && (
-                <p className="text-[14px] text-[hsl(var(--text-tertiary))] mt-0.5 transition-opacity duration-150">
-                  Saving...
-                </p>
-              )}
             </>
           ) : (
             <div
@@ -142,9 +153,11 @@ export function FeedbackHeader({
               }}
               aria-label={onSaveTitle ? "Edit title" : undefined}
             >
-              <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))] truncate">
-                {item.title}
-              </h1>
+              {item.title?.trim() ? (
+                <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))] truncate">
+                  {item.title}
+                </h1>
+              ) : null}
               {onSaveTitle && (
                 saveSuccess ? (
                   <Check size={14} className="text-secondary shrink-0 flex-shrink-0" aria-hidden />
@@ -196,11 +209,9 @@ export function FeedbackHeader({
           </button>
         </div>
       </div>
-      {(item.createdAt != null || item.updatedAt != null) && (
+      {metaLine != null && (
         <div className="mt-1 text-[13px] text-[hsl(var(--text-tertiary))]">
-          {item.updatedAt != null
-            ? `Created ${formatRelative(item.createdAt ?? null)} • Updated ${formatRelative(item.updatedAt)}`
-            : `Created ${formatRelative(item.createdAt ?? null)}`}
+          {metaLine}
         </div>
       )}
     </div>

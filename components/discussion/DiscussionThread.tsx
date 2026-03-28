@@ -4,12 +4,16 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Expand, Paperclip, Send } from "lucide-react";
+import { DiscussionThreadBodySkeleton } from "@/components/discussion/discussionSkeletons";
 import { authFetch } from "@/lib/authFetch";
 import { addComment, updateComment, deleteComment } from "@/lib/comments";
 import type { Comment, CommentAttachment } from "@/lib/domain/comment";
 import { AttachmentUploadModal } from "@/components/discussion/AttachmentUploadModal";
 import { CommentItem } from "@/components/comments/CommentItem";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 
 export interface DiscussionThreadProps {
@@ -35,7 +39,7 @@ export function DiscussionThread({
 }: DiscussionThreadProps) {
   const {
     workspaceId,
-    claimsReady,
+    isIdentityResolved,
     authUid,
     authDisplayName,
     authPhotoUrl,
@@ -62,6 +66,7 @@ export function DiscussionThread({
   const handleAttachmentSend = useCallback(
     async (attachment: CommentAttachment) => {
       if (!authUid || !feedbackId || !ticket?.sessionId || !workspaceId) return;
+      assertIdentityResolved(isIdentityResolved);
       const optimisticComment: Comment = {
         id: `temp-attach-${Date.now()}`,
         workspaceId,
@@ -103,6 +108,7 @@ export function DiscussionThread({
       authUid,
       authDisplayName,
       authPhotoUrl,
+      isIdentityResolved,
     ]
   );
 
@@ -110,10 +116,16 @@ export function DiscussionThread({
     if (!feedbackId) {
       setTicket(null);
       setSessionName("");
+      setLoading(false);
       return;
     }
 
-    if (!claimsReady) return;
+    setTicket(null);
+    setSessionName("");
+    if (!isIdentityResolved) {
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);
@@ -153,20 +165,19 @@ export function DiscussionThread({
     return () => {
       cancelled = true;
     };
-  }, [feedbackId, claimsReady]);
+  }, [feedbackId, isIdentityResolved]);
 
   useEffect(() => {
-    if (!workspaceId || !feedbackId || !ticket?.sessionId || !claimsReady) {
+    if (!workspaceId || !feedbackId || !ticket?.sessionId || !isIdentityResolved) {
       setComments([]);
       setCommentsInitialized(false);
     }
-  }, [workspaceId, feedbackId, ticket?.sessionId, claimsReady]);
+  }, [workspaceId, feedbackId, ticket?.sessionId, isIdentityResolved]);
 
   useCommentsRepoSubscription({
     workspaceId,
     sessionId: ticket?.sessionId,
     feedbackId,
-    claimsReady,
     onComments: (incoming) => {
       setComments([...incoming]);
       setCommentsInitialized(true);
@@ -175,6 +186,7 @@ export function DiscussionThread({
 
   const handleSendComment = async () => {
     if (!authUid || !feedbackId || !ticket?.sessionId || !workspaceId) return;
+    assertIdentityResolved(isIdentityResolved);
     const trimmed = commentDraft.trim();
     if (!trimmed) return;
     const optimisticComment: Comment = {
@@ -229,31 +241,7 @@ export function DiscussionThread({
   }
 
   if (loading || !ticket) {
-    return (
-      <div className="flex-1 flex flex-col p-8 bg-white overflow-auto min-w-0">
-        <div className="w-full space-y-4 max-w-[720px] mx-auto">
-          <div className="h-48 w-full skeleton rounded-xl" />
-          <div className="h-5 w-3/4 skeleton max-w-[240px]" />
-          <div className="space-y-2">
-            <div className="h-3 w-full skeleton" />
-            <div className="h-3 w-4/5 skeleton" />
-            <div className="h-3 w-2/3 skeleton" />
-          </div>
-          <div className="rounded-2xl border border-neutral-200 p-6 mt-5 space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex gap-2.5">
-                <div className="w-8 h-8 rounded-full skeleton shrink-0" />
-                <div className="flex-1 min-w-0 space-y-2">
-                  <div className="h-3 w-24 skeleton" />
-                  <div className="h-3 w-full skeleton" />
-                  <div className="h-3 w-4/5 skeleton" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <DiscussionThreadBodySkeleton />;
   }
 
   const rootComments = comments.filter((c) => !c.threadId);
@@ -280,7 +268,7 @@ export function DiscussionThread({
           <div className="mt-5 first:mt-0">
             <div className="ticket-header flex items-center justify-between gap-4">
               <h2 className="ticket-title text-lg font-semibold text-neutral-900 truncate min-w-0">
-                {ticket.title ?? "Untitled"}
+                {ticket.title?.trim() ? ticket.title : null}
               </h2>
               {ticket.sessionId && feedbackId ? (
                 <Link
@@ -347,14 +335,14 @@ export function DiscussionThread({
           <div className="w-full rounded-2xl border border-neutral-200 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.05)] p-6 mt-5">
             <div className="space-y-0">
               {!commentsInitialized ? (
-                <div className="space-y-4" aria-hidden>
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="flex gap-2.5">
-                      <div className="w-8 h-8 rounded-full skeleton shrink-0" />
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="h-3 w-32 skeleton" />
-                        <div className="h-3 w-56 skeleton" />
-                        <div className="h-3 w-40 skeleton" />
+                <div className="space-y-4 py-4" aria-busy="true" aria-label="Loading comments">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200/80 animate-pulse" />
+                      <div className="flex-1 space-y-2 pt-0.5">
+                        <div className="h-3 w-24 rounded-md bg-neutral-200/80 animate-pulse" />
+                        <div className="h-3 w-full rounded-md bg-neutral-200/70 animate-pulse" />
+                        <div className="h-3 w-[88%] rounded-md bg-neutral-200/70 animate-pulse" />
                       </div>
                     </div>
                   ))}

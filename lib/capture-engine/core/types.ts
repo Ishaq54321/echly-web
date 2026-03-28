@@ -202,6 +202,12 @@ export type CaptureWidgetProps = {
   onSessionStartErrorDismiss?: () => void;
   /** Optional capture environment adapter (extension, dashboard, etc.). When provided, useCaptureWidget uses it instead of direct props/callbacks. */
   environment?: CaptureEnvironment;
+  /**
+   * Called immediately before workspace-scoped API calls (transcribe, ticket PATCH, share-link).
+   * Web app: pass `() => assertIdentityResolved(isIdentityResolved)`.
+   * Extension: pass a no-op once extension auth is satisfied (identity enforced by the extension host).
+   */
+  assertIdentityBeforeWorkspaceMutations: () => void;
   /** Extension: open Previous Sessions modal. Replaces chrome.runtime.sendMessage ECHLY_OPEN_PREVIOUS_SESSIONS. */
   onPreviousSessions?: () => void;
   /** Extension: set capture mode (voice/text). Replaces chrome.runtime.sendMessage ECHLY_SET_CAPTURE_MODE. */

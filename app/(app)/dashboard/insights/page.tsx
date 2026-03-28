@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { ActivityTrendChart, type ActivityTrendPoint } from "@/components/insights/ActivityTrendChart";
@@ -15,6 +15,12 @@ import {
   type WorkspaceInsightsDoc,
 } from "@/lib/repositories/insightsRepository";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { useStableRenderState } from "@/lib/client/perception/useStableRenderState";
+import {
+  SkeletonCard,
+  SkeletonHeader,
+} from "@/components/ui/skeletons";
+import { PageEmptyState } from "@/components/ui/empty/PageEmptyState";
 
 interface InsightsApiResponse {
   lifetime: {
@@ -38,17 +44,27 @@ interface InsightsApiResponse {
 const CARD_CLASS =
   "rounded-2xl border border-gray-200 bg-white shadow-sm";
 
-function SkeletonCard({ className }: { className?: string }) {
+function InsightsPageSkeleton({ animate }: { animate: boolean }) {
   return (
-    <div className={`animate-pulse rounded-xl bg-neutral-100 ${className ?? ""}`} style={{ minHeight: 100 }} />
-  );
-}
-
-function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="text-center py-10">
-      <div className="text-sm font-medium text-neutral-900">{title}</div>
-      <div className="mt-1 text-sm text-gray-500">{body}</div>
+    <div
+      className="space-y-10 min-h-[720px]"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <div
+        className={`mt-6 h-36 rounded-2xl border border-neutral-200 ${
+          animate ? "animate-pulse bg-neutral-50" : "bg-neutral-100/90"
+        }`}
+      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+        <SkeletonCard className="h-32 py-5" lines={2} animate={animate} />
+        <SkeletonCard className="h-32 py-5" lines={2} animate={animate} />
+      </div>
+      <SkeletonCard className="h-72 py-6" lines={5} animate={animate} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SkeletonCard className="min-h-[320px]" lines={6} animate={animate} />
+        <SkeletonCard className="min-h-[320px]" lines={6} animate={animate} />
+      </div>
     </div>
   );
 }
@@ -72,13 +88,19 @@ const RANGE_OPTIONS: Array<{ value: "7d" | "30d" | "90d" | "1y"; label: string; 
  */
 export default function InsightsPage() {
   const { user: authUser, loading: authLoading } = useAuthGuard();
-  const { workspaceId, claimsReady } = useWorkspace();
+  const { workspaceId, isIdentityResolved } = useWorkspace();
   const [data, setData] = useState<InsightsApiResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<"7d" | "30d" | "90d" | "1y">("7d");
   const [isRangeOpen, setIsRangeOpen] = useState(false);
   const [sessionTitleMap, setSessionTitleMap] = useState<Record<string, string>>({});
+  const insightsDocWidRef = useRef<string | null>(null);
+  const workspaceIdLiveRef = useRef<string | null>(workspaceId);
+
+  useEffect(() => {
+    workspaceIdLiveRef.current = workspaceId;
+  }, [workspaceId]);
 
   useEffect(() => {
     if (!isRangeOpen) return;
@@ -134,17 +156,21 @@ export default function InsightsPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!authUser) return;
-    if (!claimsReady) return;
+    if (!isIdentityResolved) {
+      return;
+    }
     if (workspaceId == null || workspaceId.trim() === "") return;
 
     setLoading(true);
     setError(null);
     // Realtime: keep Insights UI synced to the insights doc (no queries).
     const wid = workspaceId.trim();
+    insightsDocWidRef.current = wid;
     const ref = workspaceInsightsRef(wid);
     const unsubscribe = onSnapshot(
       ref,
       (snap) => {
+        if (insightsDocWidRef.current !== wid) return;
         if (!snap.exists()) {
           setData(mapDocToApi(emptyWorkspaceInsightsDoc()));
           setLoading(false);
@@ -154,13 +180,19 @@ export default function InsightsPage() {
         setLoading(false);
       },
       (err) => {
+        if (insightsDocWidRef.current !== wid) return;
         console.error("[ECHLY] insights onSnapshot failed", err);
         setError("Failed to load insights.");
         setLoading(false);
       }
     );
-    return () => unsubscribe();
-  }, [authLoading, authUser?.uid, workspaceId, claimsReady]);
+    return () => {
+      if (insightsDocWidRef.current === wid) {
+        insightsDocWidRef.current = null;
+      }
+      unsubscribe();
+    };
+  }, [authLoading, authUser?.uid, workspaceId, isIdentityResolved]);
 
   const filteredDaily = useMemo(() => {
     return filterDaily(data?.analytics?.daily ?? {}, rangeDays);
@@ -220,7 +252,7 @@ export default function InsightsPage() {
     entries.sort((a, b) => (Number(b[1]) || 0) - (Number(a[1]) || 0));
     return entries.slice(0, 5).map(([sessionId, issues]) => ({
       sessionId,
-      sessionName: sessionTitleMap[sessionId] || "Untitled session",
+      sessionName: sessionTitleMap[sessionId] ?? "",
       issues: Number(issues) || 0,
     }));
   }, [data?.analytics?.sessionCounts, sessionTitleMap]);
@@ -240,7 +272,7 @@ export default function InsightsPage() {
     // Prevents Firestore permission errors
     if (authLoading) return;
     if (!authUser) return;
-    if (!claimsReady) return;
+    if (!isIdentityResolved) return;
     if (workspaceId == null || workspaceId.trim() === "") return;
     const wid = workspaceId.trim();
     if (topSessionIds.length === 0) {
@@ -260,7 +292,7 @@ export default function InsightsPage() {
               const sd = snap.data() as DocumentData;
               if (sd.workspaceId !== wid) return null;
               const title = (typeof sd.title === "string" ? sd.title : "").trim();
-              return [sessionId, title || "Untitled session"] as const;
+              return [sessionId, title] as const;
             } catch (err) {
               console.error("[ECHLY] insights session title read failed", sessionId, err);
               return null;
@@ -268,6 +300,8 @@ export default function InsightsPage() {
           })
         );
         if (cancelled) return;
+        const liveWid = workspaceIdLiveRef.current?.trim() ?? "";
+        if (liveWid !== wid) return;
         setSessionTitleMap((prev) => {
           const next: Record<string, string> = { ...prev };
           for (const id of ids) delete next[id];
@@ -283,13 +317,30 @@ export default function InsightsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, authUser?.uid, workspaceId, claimsReady, topSessionIdsKey]);
+  }, [authLoading, authUser?.uid, workspaceId, isIdentityResolved, topSessionIdsKey]);
 
   const topSession = useMemo(() => {
     return sessionBars[0] ?? null;
   }, [sessionBars]);
 
-  const showSkeleton = authLoading || loading || !data;
+  const showInsightsSkeleton =
+    !error &&
+    !(!authLoading && !authUser) &&
+    !data &&
+    (authLoading ||
+      loading ||
+      (Boolean(authUser) && (!isIdentityResolved || !workspaceId?.trim())));
+
+  const insightsSkeletonImmediate =
+    authLoading ||
+    (Boolean(authUser) &&
+      (!isIdentityResolved || !workspaceId?.trim()));
+  const { active: insightsPlaceholder, showAnimated: insightsSkeletonPulse } =
+    useStableRenderState(showInsightsSkeleton, {
+      immediate: insightsSkeletonImmediate,
+    });
+
+  const showUnauthenticatedCard = !authLoading && !authUser;
   const timeSaved = formatMinutesToHoursMinutes(data?.lifetime?.timeSavedMinutes ?? 0);
   const formattedTimeSaved = `${timeSaved.hours}h ${timeSaved.minutes}m saved`;
   const totalFeedback = data?.lifetime?.totalFeedback ?? 0;
@@ -305,14 +356,36 @@ export default function InsightsPage() {
   return (
     <div className="flex-1 bg-white flex flex-col w-full min-h-0">
       <div className="pt-10 pb-12 max-w-[1200px] mx-auto px-6 w-full">
-        <div className="mb-8 space-y-1">
-          <h1 className="text-xl font-semibold">Insights</h1>
-          <p className="text-sm text-muted-foreground">
-            A decision engine for what to fix next.
-          </p>
+        <div className="mb-8 min-h-[52px] space-y-1">
+          {insightsPlaceholder ? (
+            <SkeletonHeader />
+          ) : (
+            <>
+              <h1 className="text-xl font-semibold">Insights</h1>
+              <p className="text-sm text-muted-foreground">
+                A decision engine for what to fix next.
+              </p>
+            </>
+          )}
         </div>
 
-        <div className="space-y-10">
+        <div className="space-y-10 min-h-[720px]">
+          {error ? (
+            <section className={`${CARD_CLASS} p-7`}>
+              <p className="text-sm text-red-600">{error}</p>
+            </section>
+          ) : showUnauthenticatedCard ? (
+            <div className="flex justify-center py-6">
+              <PageEmptyState
+                title="Sign in required"
+                description="You need to be signed in to view workspace insights."
+                action={{ label: "Go to login", href: "/login" }}
+              />
+            </div>
+          ) : insightsPlaceholder ? (
+            <InsightsPageSkeleton animate={insightsSkeletonPulse} />
+          ) : data ? (
+            <div className="ech-content-enter space-y-10">
           {/* Premium hero */}
           <div className="mt-6 relative rounded-2xl p-[1px] bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-purple-500/20">
             <div className="rounded-2xl bg-white px-6 py-6 flex items-center justify-between gap-6">
@@ -331,21 +404,13 @@ export default function InsightsPage() {
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Time saved</p>
                   <div className="text-3xl font-semibold tracking-tight tabular-nums text-neutral-900">
-                    {showSkeleton ? (
-                      <span className="inline-block h-9 w-44 rounded bg-neutral-100 animate-pulse align-middle" />
-                    ) : (
-                      formattedTimeSaved
-                    )}
+                    {formattedTimeSaved}
                   </div>
                   <p className="text-muted-foreground">
                     Based on{" "}
-                    {showSkeleton ? (
-                      <span className="inline-block h-4 w-10 rounded bg-neutral-100 animate-pulse align-middle" />
-                    ) : (
-                      <span className="tabular-nums font-semibold text-neutral-900">
-                        {totalFeedback}
-                      </span>
-                    )}{" "}
+                    <span className="tabular-nums font-semibold text-neutral-900">
+                      {totalFeedback}
+                    </span>{" "}
                     feedback items captured.
                   </p>
                 </div>
@@ -353,31 +418,15 @@ export default function InsightsPage() {
             </div>
           </div>
 
-          {error ? (
-            <section className={`${CARD_CLASS} p-7`}>
-              <p className="text-sm text-red-600">{error}</p>
-            </section>
-          ) : showSkeleton ? (
-            <>
-              <SkeletonCard className="min-h-[72px]" />
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <SkeletonCard className="p-7 h-[140px]" />
-                <SkeletonCard className="p-7 h-[140px]" />
-              </section>
-              <SkeletonCard className="p-7 h-[420px]" />
-              <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <SkeletonCard className="p-7 h-[360px]" />
-                <SkeletonCard className="p-7 h-[360px]" />
-              </section>
-            </>
-          ) : (data.lifetime?.totalFeedback ?? 0) === 0 &&
+          {(data.lifetime?.totalFeedback ?? 0) === 0 &&
             (data.lifetime?.totalComments ?? 0) === 0 ? (
-            <section className={`${CARD_CLASS} p-7`}>
-              <EmptyState
+            <div className="flex justify-center py-6">
+              <PageEmptyState
                 title="No feedback yet"
-                body="Insights will appear once you start collecting feedback."
+                description="Insights will appear once you start collecting feedback."
+                action={{ label: "Open sessions", href: "/dashboard" }}
               />
-            </section>
+            </div>
           ) : (
             <>
             {/* 2) Focus section (2 cards side-by-side) */}
@@ -396,9 +445,11 @@ export default function InsightsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className={`${CARD_CLASS} p-7`}>
                   <div className="text-sm text-gray-500">Top issue</div>
-                  <div className="mt-2 text-lg font-semibold text-neutral-900 capitalize truncate">
-                    {topIssue?.issueName ?? "—"}
-                  </div>
+                  {topIssue?.issueName?.trim() ? (
+                    <div className="mt-2 text-lg font-semibold text-neutral-900 capitalize truncate">
+                      {topIssue.issueName}
+                    </div>
+                  ) : null}
                   <div className="mt-1 text-sm text-gray-500 tabular-nums">
                     {topIssue ? `${topIssue.count} reports` : "No issue data yet"}
                   </div>
@@ -406,9 +457,11 @@ export default function InsightsPage() {
 
                 <div className={`${CARD_CLASS} p-7`}>
                   <div className="text-sm text-gray-500">Most active session</div>
-                  <div className="mt-2 text-lg font-semibold text-neutral-900 truncate">
-                    {topSession?.sessionName ?? "Untitled session"}
-                  </div>
+                  {topSession?.sessionName?.trim() ? (
+                    <div className="mt-2 text-lg font-semibold text-neutral-900 truncate">
+                      {topSession.sessionName}
+                    </div>
+                  ) : null}
                   <div className="mt-1 text-sm text-gray-500 tabular-nums">
                     {topSession ? `${topSession.issues} issues` : "No session data yet"}
                   </div>
@@ -521,6 +574,10 @@ export default function InsightsPage() {
               </div>
             </section>
             </>
+          )}
+            </div>
+          ) : (
+            <InsightsPageSkeleton animate={insightsSkeletonPulse} />
           )}
         </div>
       </div>

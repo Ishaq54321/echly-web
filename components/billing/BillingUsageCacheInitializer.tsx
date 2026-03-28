@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { fetchBillingUsage } from "@/lib/api/fetchBillingUsage";
 import { billingStore } from "@/lib/store/billingStore";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 function schedulePostPaint(task: () => void): number {
   if (typeof window !== "undefined" && "requestIdleCallback" in window) {
@@ -20,7 +21,11 @@ function cancelScheduled(handle: number): void {
 }
 
 export function BillingUsageCacheInitializer() {
+  const { isIdentityResolved } = useWorkspace();
+
   useEffect(() => {
+    if (!isIdentityResolved) return;
+
     let cancelled = false;
     const handle = schedulePostPaint(() => {
       if (cancelled) return;
@@ -43,7 +48,7 @@ export function BillingUsageCacheInitializer() {
       cancelled = true;
       cancelScheduled(handle);
     };
-  }, []);
+  }, [isIdentityResolved]);
 
   return null;
 }

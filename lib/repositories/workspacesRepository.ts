@@ -10,7 +10,7 @@ import type { PlanId } from "@/lib/billing/plans";
 import { authFetch } from "@/lib/authFetch";
 import {
   getWorkspaceRealtimeSnapshot,
-  subscribeWorkspace,
+  retainWorkspaceFirestoreListener,
   subscribeWorkspaceStore,
 } from "@/lib/realtime/workspaceStore";
 
@@ -44,18 +44,22 @@ export function listenToWorkspace(
     callback(null);
     return () => {};
   }
-  subscribeWorkspace(wid);
+  const releaseFirestore = retainWorkspaceFirestoreListener(wid);
   const emit = () => {
     const snap = getWorkspaceRealtimeSnapshot();
     if (snap.workspaceId !== wid) return;
     callback(snap.workspace);
   };
   emit();
-  return subscribeWorkspaceStore(() => {
+  const unsubStore = subscribeWorkspaceStore(() => {
     const snap = getWorkspaceRealtimeSnapshot();
     if (snap.workspaceId !== wid) return;
     callback(snap.workspace);
   });
+  return () => {
+    unsubStore();
+    releaseFirestore();
+  };
 }
 
 /**

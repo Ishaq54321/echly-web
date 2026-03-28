@@ -25,7 +25,7 @@ export interface ExecutionCanvasProps {
   sessionId?: string;
   /** Current ticket for header; null = empty state */
   item: ExecutionCanvasHeaderItem | null;
-  /** Index in list for breadcrumb (e.g. "Ticket #3") */
+  /** Index in list for breadcrumb ("n of m"); omit when unknown. */
   index?: number;
   total?: number;
   onResolve?: (resolved: boolean) => void;
@@ -68,8 +68,8 @@ export function ExecutionCanvas({
   sessionTitle,
   sessionId,
   item,
-  index = 1,
-  total = 1,
+  index,
+  total,
   onResolve,
   onRequestDelete,
   onSaveTitle,
@@ -116,6 +116,13 @@ export function ExecutionCanvas({
     onSaveTitle(titleDraft.trim()).then(() => setEditingTitle(false));
   };
 
+  const sessionTitleTrim = sessionTitle?.trim() ?? "";
+  const showTicketPosition =
+    typeof index === "number" &&
+    typeof total === "number" &&
+    total >= 0 &&
+    index >= 1;
+
   if (!item) {
     return (
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-[var(--canvas-base)]">
@@ -139,21 +146,29 @@ export function ExecutionCanvas({
           >
             {workspaceName}
           </Link>
-          <ChevronRight className="h-3.5 w-3 shrink-0" aria-hidden />
-          {sessionId ? (
-            <Link
-              href={`/dashboard/${sessionId}`}
-              className="hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 truncate"
-            >
-              {sessionTitle ?? "Session"}
-            </Link>
-          ) : (
-            <span className="truncate">{sessionTitle ?? "Session"}</span>
-          )}
-          <ChevronRight className="h-3.5 w-3 shrink-0" aria-hidden />
-          <span className="text-[hsl(var(--text-primary-strong))] truncate">
-            Ticket {typeof index === "number" && typeof total === "number" ? `${index} of ${total}` : ""}
-          </span>
+          {sessionTitleTrim ? (
+            <>
+              <ChevronRight className="h-3.5 w-3 shrink-0" aria-hidden />
+              {sessionId ? (
+                <Link
+                  href={`/dashboard/${sessionId}`}
+                  className="hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 truncate"
+                >
+                  {sessionTitleTrim}
+                </Link>
+              ) : (
+                <span className="truncate">{sessionTitleTrim}</span>
+              )}
+            </>
+          ) : null}
+          {showTicketPosition ? (
+            <>
+              <ChevronRight className="h-3.5 w-3 shrink-0" aria-hidden />
+              <span className="text-[hsl(var(--text-primary-strong))] truncate">
+                Ticket {index} of {total}
+              </span>
+            </>
+          ) : null}
         </nav>
       </div>
 
@@ -192,9 +207,11 @@ export function ExecutionCanvas({
                   }
                 }}
               >
-                <h1 className="text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] truncate">
-                  {item.title}
-                </h1>
+                {item.title?.trim() ? (
+                  <h1 className="text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] truncate">
+                    {item.title}
+                  </h1>
+                ) : null}
                 {onSaveTitle && (
                   <Pencil className="h-4 w-4 shrink-0 text-[hsl(var(--text-tertiary))] opacity-0 group-hover:opacity-70 transition-opacity duration-120" aria-hidden />
                 )}

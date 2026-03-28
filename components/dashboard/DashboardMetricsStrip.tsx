@@ -7,8 +7,9 @@ export interface DashboardMetricsStripProps {
   inProgress?: number;
   blocked?: number;
   resolved: number;
-  avgResolutionTime?: string;
-  aiAccuracyPercent?: number;
+  /** When omitted, the metric cell is not shown. */
+  avgResolutionTime?: string | null;
+  aiAccuracyPercent?: number | null;
 }
 
 function Metric({
@@ -41,7 +42,7 @@ export function DashboardMetricsStrip({
   inProgress = 0,
   blocked = 0,
   resolved,
-  avgResolutionTime = "—",
+  avgResolutionTime,
   aiAccuracyPercent,
 }: DashboardMetricsStripProps) {
   return (
@@ -53,12 +54,12 @@ export function DashboardMetricsStrip({
       <Metric label="In Progress" value={inProgress} />
       <Metric label="Blocked" value={blocked} />
       <Metric label="Resolved" value={resolved} />
-      <Metric label="Avg resolution time" value={avgResolutionTime} muted />
-      <Metric
-        label="AI accuracy"
-        value={aiAccuracyPercent != null ? `${aiAccuracyPercent}%` : "—"}
-        muted
-      />
+      {avgResolutionTime != null && avgResolutionTime !== "" ? (
+        <Metric label="Avg resolution time" value={avgResolutionTime} muted />
+      ) : null}
+      {aiAccuracyPercent != null ? (
+        <Metric label="AI accuracy" value={`${aiAccuracyPercent}%`} muted />
+      ) : null}
     </section>
   );
 }

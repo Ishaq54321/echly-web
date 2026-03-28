@@ -21,7 +21,7 @@ const PANEL_WIDTH = 300;
 
 function formatRelative(createdAt: { seconds: number } | null | undefined, clientTs?: number | null): string {
   const ms = createdAt?.seconds != null ? createdAt.seconds * 1000 : (clientTs ?? 0);
-  if (!ms) return "—";
+  if (!ms) return "";
   const d = new Date(ms);
   const now = new Date();
   const diff = now.getTime() - d.getTime();
@@ -152,6 +152,7 @@ export function SignalStream({
               const isSelected = s.id === selectedId;
               const isChecked = selectedIds.has(s.id);
               const isUnread = !s.isResolved;
+              const createdRel = formatRelative(s.createdAt, s.clientTimestamp);
               return (
                 <div
                   key={s.id}
@@ -183,12 +184,24 @@ export function SignalStream({
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className={`text-[13px] truncate leading-tight ${isUnread ? "font-semibold text-[hsl(var(--text-primary-strong))]" : "font-medium text-[hsl(var(--text-primary-strong))]"}`}>{s.title}</div>
+                    {s.title?.trim() ? (
+                      <div
+                        className={`text-[13px] truncate leading-tight ${isUnread ? "font-semibold text-[hsl(var(--text-primary-strong))]" : "font-medium text-[hsl(var(--text-primary-strong))]"}`}
+                      >
+                        {s.title}
+                      </div>
+                    ) : null}
                     <div className="flex items-center gap-2 mt-1 text-[11px] text-[hsl(var(--text-tertiary))] flex-wrap">
-                      <span className="tabular-nums">{s.impactScore}</span>
+                      {s.impactScore != null ? (
+                        <span className="tabular-nums">{s.impactScore}</span>
+                      ) : null}
                       <span className="truncate">{s.status}</span>
-                      {s.ownerName && <span className="truncate">{s.ownerName}</span>}
-                      <span className="tabular-nums shrink-0">{formatRelative(s.createdAt, s.clientTimestamp)}</span>
+                      {s.ownerName?.trim() ? (
+                        <span className="truncate">{s.ownerName}</span>
+                      ) : null}
+                      {createdRel ? (
+                        <span className="tabular-nums shrink-0">{createdRel}</span>
+                      ) : null}
                     </div>
                     {/* Cluster only on hover */}
                     <div className="mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-120 text-[10px] text-[hsl(var(--text-tertiary))]">
@@ -201,7 +214,7 @@ export function SignalStream({
           )}
         </div>
         {loadMoreRef && <div ref={loadMoreRef} />}
-        {loadingMore && <p className="px-3 py-2 text-center text-[12px] text-[hsl(var(--text-tertiary))]">Loading…</p>}
+        {loadingMore ? <div className="px-3 py-2 min-h-[2.5rem]" aria-hidden /> : null}
       </div>
     </aside>
   );

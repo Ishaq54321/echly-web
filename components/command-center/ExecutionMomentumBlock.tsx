@@ -29,7 +29,7 @@ export function ExecutionMomentumBlock({ momentum }: ExecutionMomentumBlockProps
       ? momentum.avgResolutionTimeHours < 1
         ? `${Math.round(momentum.avgResolutionTimeHours * 60)}m`
         : `${momentum.avgResolutionTimeHours.toFixed(1)}h`
-      : "—";
+      : null;
 
   return (
     <section
@@ -50,14 +50,16 @@ export function ExecutionMomentumBlock({ momentum }: ExecutionMomentumBlockProps
             <Trend direction={momentum.resolutionVelocityTrend} />
           </p>
         </div>
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">
-            Avg resolution time
-          </p>
-          <p className="mt-1 text-[13px] font-medium text-[hsl(var(--text-primary-strong))] tabular-nums">
-            {avgTime}
-          </p>
-        </div>
+        {avgTime ? (
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">
+              Avg resolution time
+            </p>
+            <p className="mt-1 text-[13px] font-medium text-[hsl(var(--text-primary-strong))] tabular-nums">
+              {avgTime}
+            </p>
+          </div>
+        ) : null}
         <div>
           <p className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">
             Confidence trend
@@ -76,7 +78,7 @@ export function ExecutionMomentumBlock({ momentum }: ExecutionMomentumBlockProps
                 key={o.ownerId}
                 className="text-[12px] text-[hsl(var(--text-secondary-soft))] flex justify-between gap-2"
               >
-                <span className="truncate">{o.ownerName || "Unassigned"}</span>
+                <span className="truncate">{o.ownerName?.trim() || ""}</span>
                 <span className="tabular-nums shrink-0">{o.openCount}</span>
               </li>
             ))}

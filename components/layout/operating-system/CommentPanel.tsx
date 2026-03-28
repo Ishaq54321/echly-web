@@ -237,9 +237,7 @@ const CommentThreadList = memo(function CommentThreadList({
   const [resolvedCollapsed, setResolvedCollapsed] = useState(true);
 
   if (loading) {
-    return (
-      <div className="py-6 text-[13px] text-[hsl(var(--text-tertiary))]">Loading…</div>
-    );
+    return <div className="py-6 min-h-[4.5rem]" aria-hidden />;
   }
 
   if (roots.length === 0) {

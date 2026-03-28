@@ -37112,7 +37112,8 @@
     onDevicesEnumerated,
     onVoiceMicrophoneSelect,
     captureRootParent,
-    environment
+    environment,
+    assertIdentityBeforeWorkspaceMutations
   }) {
     if (typeof window !== "undefined" && !window.__ECHLY_CAPTURE_STATE__) {
       window.__ECHLY_CAPTURE_STATE__ = {
@@ -37152,6 +37153,12 @@
     const [micDeviceOverride, setMicDeviceOverride] = (0, import_react4.useState)(null);
     const sessionMode = globalSessionModeActive ?? false;
     const sessionPaused = globalSessionPaused ?? false;
+    const guardWorkspaceMutation = (0, import_react4.useCallback)(() => {
+      if (!assertIdentityBeforeWorkspaceMutations) {
+        throw new Error("Identity guard missing in capture widget");
+      }
+      assertIdentityBeforeWorkspaceMutations();
+    }, [assertIdentityBeforeWorkspaceMutations]);
     const sessionStatus = sessionMode ? "active" : startSessionPending ? "starting" : "idle";
     const sessionModeRef = (0, import_react4.useRef)(sessionMode);
     const sessionPausedRef = (0, import_react4.useRef)(sessionPaused);
@@ -37558,6 +37565,7 @@
           if (!environment?.authenticatedFetch) {
             throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for transcription).");
           }
+          guardWorkspaceMutation();
           const res = await environment.authenticatedFetch("/api/transcribe-audio", {
             method: "POST",
             body: formData,
@@ -37745,7 +37753,17 @@
         setState("idle");
         setIsFinishing(false);
       }
-    }, [isFinishing, onComplete, extensionMode, removeCaptureRoot, restoreWidget, environment, setPending, stopListeningAudio]);
+    }, [
+      isFinishing,
+      onComplete,
+      extensionMode,
+      removeCaptureRoot,
+      restoreWidget,
+      environment,
+      setPending,
+      stopListeningAudio,
+      guardWorkspaceMutation
+    ]);
     const discardListening = (0, import_react4.useCallback)(() => {
       echlyLog("RECORDING", "discard");
       setVoiceError(null);
@@ -37784,6 +37802,7 @@
     }, [captureRootReady, discardListening]);
     const handleShare = (0, import_react4.useCallback)(async () => {
       try {
+        guardWorkspaceMutation();
         const origin = window.location.origin;
         const url = await getOrCreateShareLink({
           sessionId,
@@ -37794,7 +37813,7 @@
       } catch (err) {
         logger.error("error", "share_clipboard_failed", err);
       }
-    }, [sessionId, userId]);
+    }, [sessionId, userId, guardWorkspaceMutation]);
     const resetSession = (0, import_react4.useCallback)(() => {
       setRecordings([]);
       setActiveRecordingId(null);
@@ -37834,6 +37853,7 @@
       }
       try {
         logger.debug("extension", "api_fetch_feedback");
+        guardWorkspaceMutation();
         const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -37849,7 +37869,7 @@
         setEditingId(id);
         setErrorMessage("Could not save changes. Try again.");
       }
-    }, [editedTitle, editedSteps, environment]);
+    }, [editedTitle, editedSteps, environment, guardWorkspaceMutation]);
     const updatePointer = (0, import_react4.useCallback)(
       async (id, payload) => {
         try {
@@ -37861,6 +37881,7 @@
             throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch or onUpdate required).");
           }
           logger.debug("extension", "api_fetch_feedback");
+          guardWorkspaceMutation();
           const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -37876,7 +37897,7 @@
           throw err;
         }
       },
-      [onUpdate, environment]
+      [onUpdate, environment, guardWorkspaceMutation]
     );
     const getFullTabImage = (0, import_react4.useCallback)(async () => {
       if (!environment?.captureTabScreenshot) {
@@ -40499,6 +40520,7 @@
     sessionStartErrorBanner,
     onSessionStartErrorDismiss,
     environment,
+    assertIdentityBeforeWorkspaceMutations,
     onPreviousSessions,
     onSetCaptureMode,
     onOpenBilling,
@@ -40553,7 +40575,8 @@
         setSelectedMicrophone(deviceId);
       },
       captureRootParent,
-      environment
+      environment,
+      assertIdentityBeforeWorkspaceMutations
     });
     const effectiveSessionLimitReached = sessionLimitReached ?? state.sessionLimitReached;
     const isControlled = expanded !== void 0;
@@ -41922,6 +41945,8 @@
           sessionStartErrorBanner,
           onSessionStartErrorDismiss: () => setSessionStartErrorBanner(null),
           environment,
+          assertIdentityBeforeWorkspaceMutations: () => {
+          },
           onPreviousSessions: () => {
             logger.debug("extension", "previous_sessions_handler_fired");
             setOpenResumeModalFromMessage(true);

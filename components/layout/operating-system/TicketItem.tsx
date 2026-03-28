@@ -39,15 +39,17 @@ function TicketItemInner({
       aria-current={active ? "true" : undefined}
     >
       <span className="relative min-w-0 flex-1 truncate text-[13px] leading-[1.4] py-0.5">
-        <span
-          className={`truncate block ${
-            active
-              ? "text-[#1D4ED8] font-medium"
-              : "text-[hsl(var(--text-secondary-soft))]"
-          }`}
-        >
-          {title || "Untitled"}
-        </span>
+        {title?.trim() ? (
+          <span
+            className={`truncate block ${
+              active
+                ? "text-[#1D4ED8] font-medium"
+                : "text-[hsl(var(--text-secondary-soft))]"
+            }`}
+          >
+            {title}
+          </span>
+        ) : null}
       </span>
       {impactLabel && (
         <span className="shrink-0 rounded-full border border-[var(--layer-2-border)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em] text-[hsl(var(--text-tertiary))] bg-[var(--layer-1-bg)]">

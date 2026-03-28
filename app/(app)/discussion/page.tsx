@@ -2,12 +2,12 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { MessageSquareMore, Layers } from "lucide-react";
+import { Layers, MessageSquareMore } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { DiscussionList, type ProjectItem, type DiscussionItem } from "@/components/discussion/DiscussionList";
 import { DiscussionThread } from "@/components/discussion/DiscussionThread";
-import { DiscussionSkeleton } from "@/components/discussion/DiscussionSkeleton";
 import { ResizeHandle } from "@/components/discussion/ResizeHandle";
+import { DiscussionSidebarSkeleton } from "@/components/discussion/DiscussionSidebarSkeleton";
 
 const MIN_SIDEBAR = 200;
 const MAX_SIDEBAR = 360;
@@ -22,7 +22,6 @@ export default function DiscussionPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [listItems, setListItems] = useState<DiscussionItem[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [isEmpty, setIsEmpty] = useState<boolean | null>(null);
   const [sidebarBasis, setSidebarBasis] = useState(260);
   const [listBasis, setListBasis] = useState(DEFAULT_LIST_BASIS);
@@ -48,38 +47,7 @@ export default function DiscussionPage() {
     setListBasis((prev) => Math.min(MAX_LIST, Math.max(MIN_LIST, prev + delta)));
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-0 w-full flex-1 flex-col bg-white pt-6">
-        <div className="w-full px-6 flex flex-1 flex-col min-h-0">
-          <div className="mb-0 shrink-0">
-            <h1 className="text-3xl font-semibold text-neutral-900">Discussion</h1>
-            <p className="text-sm text-secondary mt-1">
-              All feedback conversations across sessions
-            </p>
-          </div>
-          <div className="border-b border-neutral-300 mt-6 shrink-0" />
-          <div className="discussion-layout flex flex-1 min-h-0 w-full pt-0 items-stretch">
-            <div
-              className="shrink-0 bg-white px-3 py-2 space-y-0.5 overflow-y-auto min-h-0"
-              style={{ flex: "0 0 260px" }}
-            >
-              <div className="h-10 rounded-lg skeleton" />
-            </div>
-            <div
-              className="shrink-0 bg-white overflow-y-auto min-h-0 px-3 py-2 border-l border-neutral-300"
-              style={{ flex: `1 1 ${DEFAULT_LIST_BASIS}px`, minWidth: MIN_LIST }}
-            >
-              <DiscussionSkeleton />
-            </div>
-            <div className="discussion-panel-right flex-1 min-w-0 bg-white flex justify-center px-4 py-4 min-h-0 overflow-hidden" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
+  if (!user && !loading) {
     return (
       <div className="flex min-h-0 w-full flex-1 flex-col bg-white pt-6">
         <div className="w-full px-6 flex flex-1 flex-col min-h-0">
@@ -116,14 +84,14 @@ export default function DiscussionPage() {
 
         <div className="border-b border-neutral-300 mt-6 shrink-0" />
 
-        <div className="discussion-layout flex flex-1 min-h-0 w-full pt-0 items-stretch">
+        <div className="discussion-layout flex flex-1 min-h-[420px] w-full pt-0 items-stretch">
           {/* LEFT: Projects — Navigation (light) */}
           <div
             className="discussion-panel-sidebar shrink-0 bg-white px-3 py-2 space-y-0.5 overflow-y-auto min-h-0"
             style={{ flex: `0 0 ${sidebarBasis}px`, minWidth: MIN_SIDEBAR, maxWidth: MAX_SIDEBAR }}
           >
             {projects.length === 0 && isEmpty === false ? (
-              <div className="py-2 text-sm text-secondary">Loading…</div>
+              <DiscussionSidebarSkeleton rows={5} />
             ) : (
               <>
                 <button
@@ -178,7 +146,7 @@ export default function DiscussionPage() {
                 </p>
                 <Link
                   href="/dashboard"
-                  className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#155DFC] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[#0F4ED1] transition"
+                  className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#155DFC] text-white px-5 py-2.5 text-sm font-semibold transition-colors duration-200 hover:bg-[#0F4ED1] active:scale-[0.99]"
                 >
                   Open Sessions
                 </Link>
@@ -187,7 +155,6 @@ export default function DiscussionPage() {
               <DiscussionList
                 selectedId={selectedId}
                 onSelect={setSelectedId}
-                refreshKey={refreshKey}
                 filterBySessionId={selectedProjectId}
                 onEmptyChange={handleEmptyChange}
                 onProjectsLoaded={handleProjectsLoaded}

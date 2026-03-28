@@ -102,6 +102,7 @@ export function useCaptureWidget({
   onVoiceMicrophoneSelect,
   captureRootParent,
   environment,
+  assertIdentityBeforeWorkspaceMutations,
 }: CaptureWidgetProps) {
   if (typeof window !== "undefined" && !(window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__) {
     (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__ = {
@@ -148,6 +149,14 @@ export function useCaptureWidget({
 
   const sessionMode = globalSessionModeActive ?? false;
   const sessionPaused = globalSessionPaused ?? false;
+
+  const guardWorkspaceMutation = useCallback(() => {
+    if (!assertIdentityBeforeWorkspaceMutations) {
+      throw new Error("Identity guard missing in capture widget");
+    }
+    assertIdentityBeforeWorkspaceMutations();
+  }, [assertIdentityBeforeWorkspaceMutations]);
+
   const sessionStatus: "idle" | "starting" | "active" = sessionMode
     ? "active"
     : startSessionPending
@@ -608,6 +617,7 @@ export function useCaptureWidget({
         if (!environment?.authenticatedFetch) {
           throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for transcription).");
         }
+        guardWorkspaceMutation();
         const res = await environment.authenticatedFetch("/api/transcribe-audio", {
           method: "POST",
           body: formData,
@@ -801,7 +811,17 @@ export function useCaptureWidget({
       setState("idle");
       setIsFinishing(false);
     }
-  }, [isFinishing, onComplete, extensionMode, removeCaptureRoot, restoreWidget, environment, setPending, stopListeningAudio]);
+  }, [
+    isFinishing,
+    onComplete,
+    extensionMode,
+    removeCaptureRoot,
+    restoreWidget,
+    environment,
+    setPending,
+    stopListeningAudio,
+    guardWorkspaceMutation,
+  ]);
 
   const discardListening = useCallback(() => {
     echlyLog("RECORDING", "discard");
@@ -846,6 +866,7 @@ export function useCaptureWidget({
 
   const handleShare = useCallback(async () => {
     try {
+      guardWorkspaceMutation();
       const origin = window.location.origin;
       const url = await getOrCreateShareLink({
         sessionId,
@@ -856,7 +877,7 @@ export function useCaptureWidget({
     } catch (err) {
       logger.error("error", "share_clipboard_failed", err);
     }
-  }, [sessionId, userId]);
+  }, [sessionId, userId, guardWorkspaceMutation]);
 
   const resetSession = useCallback(() => {
     setRecordings([]);
@@ -905,6 +926,7 @@ export function useCaptureWidget({
     }
     try {
       logger.debug("extension", "api_fetch_feedback");
+      guardWorkspaceMutation();
       const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -920,7 +942,7 @@ export function useCaptureWidget({
       setEditingId(id);
       setErrorMessage("Could not save changes. Try again.");
     }
-  }, [editedTitle, editedSteps, environment]);
+  }, [editedTitle, editedSteps, environment, guardWorkspaceMutation]);
 
   const updatePointer = useCallback(
     async (id: string, payload: { title: string; actionSteps: string[] }) => {
@@ -933,6 +955,7 @@ export function useCaptureWidget({
           throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch or onUpdate required).");
         }
         logger.debug("extension", "api_fetch_feedback");
+        guardWorkspaceMutation();
         const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -951,7 +974,7 @@ export function useCaptureWidget({
         throw err;
       }
     },
-    [onUpdate, environment]
+    [onUpdate, environment, guardWorkspaceMutation]
   );
 
   /* ================= CAPTURE ================= */

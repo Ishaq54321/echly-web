@@ -8,7 +8,10 @@ import { GlobalNotificationButton } from "@/components/layout/GlobalNotification
 import { ProfileDropdown } from "@/components/layout/ProfileDropdown";
 import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
 import { copySessionLink } from "@/utils/copySessionLink";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  assertIdentityResolved,
+  useWorkspace,
+} from "@/lib/client/workspaceContext";
 import type { Session } from "@/lib/domain/session";
 
 export function TopControlBar({
@@ -33,7 +36,7 @@ export function TopControlBar({
   ) => Promise<void> | void;
   onRequestDeleteSession?: (session: Session) => void;
 }) {
-  const { authUid } = useWorkspace();
+  const { authUid, isIdentityResolved } = useWorkspace();
   const copyTimerRef = useRef<number | null>(null);
 
   const [shareOpen, setShareOpen] = useState(false);
@@ -43,6 +46,7 @@ export function TopControlBar({
 
   const copyCurrentLink = useCallback(async () => {
     if (linkCopyBusy) return;
+    assertIdentityResolved(isIdentityResolved);
     const ok = await copySessionLink(sessionId, authUid, {
       onBusy: setLinkCopyBusy,
     });
@@ -50,7 +54,7 @@ export function TopControlBar({
     setLinkCopied(true);
     if (copyTimerRef.current != null) window.clearTimeout(copyTimerRef.current);
     copyTimerRef.current = window.setTimeout(() => setLinkCopied(false), 2000);
-  }, [sessionId, linkCopyBusy, authUid]);
+  }, [sessionId, linkCopyBusy, authUid, isIdentityResolved]);
 
   useEffect(() => {
     return () => {
@@ -83,10 +87,7 @@ export function TopControlBar({
             onClick={copyCurrentLink}
           >
             {linkCopyBusy ? (
-              <>
-                <Loader2 size={20} strokeWidth={2} className="animate-spin" aria-hidden />
-                <span className="copy-link-label">Copying…</span>
-              </>
+              <Loader2 size={20} strokeWidth={2} className="animate-spin" aria-hidden />
             ) : linkCopied ? (
               <>
                 <Check size={18} strokeWidth={2.5} aria-hidden />

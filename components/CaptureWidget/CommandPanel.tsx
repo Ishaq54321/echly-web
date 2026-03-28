@@ -95,7 +95,7 @@ export default function CommandPanel({
                   onClick={() => onSelectSession(s.id)}
                   className="echly-recent-session-item"
                 >
-                  <span>{s.title?.trim() || "Untitled Session"}</span>
+                  {s.title?.trim() ? <span>{s.title}</span> : null}
                 </button>
               ))
             : onOpenPreviousSession && (

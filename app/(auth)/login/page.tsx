@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { signInWithGoogle, signInWithEmailPassword } from "../../../lib/auth/authActions";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { Loader2 } from "lucide-react";
 
 /** Safe return path after login: only relative paths starting with /. Used by extension-auth broker. */
 function getReturnPath(searchParams: ReturnType<typeof useSearchParams>): string | null {
@@ -36,7 +37,6 @@ async function createSessionCookie(user: { getIdToken: () => Promise<string> }) 
       body: JSON.stringify({ idToken }),
       credentials: "include",
     });
-    console.log("Session API response", res.status);
     if (!res.ok) throw new Error("Session API failed");
   } catch (e) {
     console.error("Session creation failed", e);
@@ -280,13 +280,20 @@ function LoginPageContent() {
   );
 }
 
+function LoginSuspenseFallback() {
+  return (
+    <div
+      className="relative h-full bg-[#f9fafc] flex items-center justify-center"
+      aria-busy="true"
+    >
+      <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-hidden />
+    </div>
+  );
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="relative h-full bg-[#f9fafc] flex items-center justify-center">
-        <div className="animate-pulse text-gray-500">Loading…</div>
-      </div>
-    }>
+    <Suspense fallback={<LoginSuspenseFallback />}>
       <LoginPageContent />
     </Suspense>
   );
