@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "phase8:dashboard": "node -r ./scripts/stub-server-only.cjs ./node_modules/tsx/dist/cli.mjs scripts/phase8-dashboard-validation.ts",
     "build:extension": "npm run build:extension:css && npm run build:extension:js",
     "build:extension:css": "npx postcss app/globals.css -o echly-extension/popup.css && node -e \"const fs=require('fs'); const f=fs.readFileSync('echly-extension/extension-fonts.css','utf8'); const m=fs.readFileSync('echly-extension/popup.css','utf8'); fs.writeFileSync('echly-extension/popup.css', f+m);\"",
     "build:extension:js": "node esbuild-extension.mjs"
@@ -39,12 +40,15 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.3.1",
     "esbuild": "^0.24.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "postcss-cli": "^11.0.1",
+    "server-only": "^0.0.1",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

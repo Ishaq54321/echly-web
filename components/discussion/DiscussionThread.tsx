@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Expand, Paperclip, Send } from "lucide-react";
-import { DiscussionThreadBodySkeleton } from "@/components/discussion/discussionSkeletons";
+import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
 import {
   addComment,
@@ -257,7 +257,11 @@ export function DiscussionThread({
   }
 
   if (loading || !ticket) {
-    return <DiscussionThreadBodySkeleton />;
+    return (
+      <div className="flex h-full min-h-0 min-w-0 flex-1 items-center justify-center bg-white">
+        <MinimalLoader label="Loading conversation…" />
+      </div>
+    );
   }
 
   const rootComments = comments.filter((c) => !c.threadId);
@@ -351,17 +355,12 @@ export function DiscussionThread({
           <div className="w-full rounded-2xl border border-neutral-200 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.05)] p-6 mt-5">
             <div className="space-y-0">
               {!commentsInitialized ? (
-                <div className="space-y-4 py-4" aria-busy="true" aria-label="Loading comments">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex gap-3">
-                      <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200/80 animate-pulse" />
-                      <div className="flex-1 space-y-2 pt-0.5">
-                        <div className="h-3 w-24 rounded-md bg-neutral-200/80 animate-pulse" />
-                        <div className="h-3 w-full rounded-md bg-neutral-200/70 animate-pulse" />
-                        <div className="h-3 w-[88%] rounded-md bg-neutral-200/70 animate-pulse" />
-                      </div>
-                    </div>
-                  ))}
+                <div
+                  className="flex justify-center py-6"
+                  aria-busy="true"
+                  aria-label="Loading comments"
+                >
+                  <MinimalLoader compact label="Loading comments…" />
                 </div>
               ) : rootComments.length === 0 ? (
                 <p className="text-sm text-secondary">No comments yet.</p>

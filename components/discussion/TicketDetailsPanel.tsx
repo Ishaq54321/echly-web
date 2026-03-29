@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { authFetch } from "@/lib/authFetch";
 import { useWorkspace } from "@/lib/client/workspaceContext";
-import { TicketDetailsPanelSkeleton } from "@/components/discussion/discussionSkeletons";
+import { MinimalLoader } from "@/components/ui/MinimalLoader";
 
 export interface TicketDetailsPanelProps {
   feedbackId: string | null;
@@ -70,7 +70,11 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
   }
 
   if (loading || !ticket) {
-    return <TicketDetailsPanelSkeleton />;
+    return (
+      <div className="flex h-full min-h-[200px] w-[320px] shrink-0 flex-col items-center justify-center border-r border-neutral-200 bg-white p-8">
+        <MinimalLoader label="Loading details…" />
+      </div>
+    );
   }
 
   const steps = ticket.actionSteps;

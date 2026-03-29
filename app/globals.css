@@ -402,6 +402,67 @@ button[aria-disabled="true"],
 }
 
 /* ======================================
+   HOMEPAGE DASHBOARD — BRAND LOADER (CSS)
+====================================== */
+
+.loader {
+  transform-origin: center;
+  animation: loader-rotate 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes loader-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Base track */
+.loader-track {
+  fill: none;
+  stroke: #e5e7eb;
+  stroke-width: 4;
+}
+
+/* Arc */
+.loader-arc {
+  fill: none;
+  stroke: url(#grad);
+  stroke-width: 4;
+  stroke-linecap: round;
+
+  stroke-dasharray: 12 113;
+  stroke-dashoffset: 0;
+
+  animation: loader-dash 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* PERFECTLY SYNCED */
+@keyframes loader-dash {
+  0% {
+    stroke-dasharray: 12 113;
+    stroke-dashoffset: 0;
+  }
+
+  30% {
+    stroke-dasharray: 60 113;
+    stroke-dashoffset: -25;
+  }
+
+  60% {
+    stroke-dasharray: 75 113;
+    stroke-dashoffset: -60;
+  }
+
+  100% {
+    stroke-dasharray: 12 113;
+    stroke-dashoffset: -113;
+  }
+}
+
+/* ======================================
    WORKSPACE DASHBOARD — SECTION FADE
 ====================================== */
 
@@ -5495,96 +5556,6 @@ html.dark .echly-mic-item.is-active {
   border-color: #e5e7eb;
   box-shadow: none;
   background-color: #fafafa;
-}
-
-/* ----- Full-screen boot shell (LogoLoader overlay) ----- */
-.logo-loader-wrapper {
-  background: #f6f7f9;
-}
-
-.dark .logo-loader-wrapper {
-  background: #0f1115;
-}
-
-/* ----- LogoLoader (loader_visual_polish_phase3_v1) — sizing + centering; loop timing unchanged ----- */
-.logo-loader {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 100vh;
-}
-
-.logo-loader .logo-container {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  flex-shrink: 0;
-  will-change: opacity, transform;
-}
-
-.logo-loader .logo-svg {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  z-index: 2;
-  display: block;
-}
-
-.logo-loader .logo-svg .logo-part {
-  opacity: 0;
-  transform: translateY(4px);
-  animation: logo-build-loop 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-.logo-loader .logo-svg .part-1 {
-  animation-delay: 0.05s;
-}
-.logo-loader .logo-svg .part-2 {
-  animation-delay: 0.12s;
-}
-.logo-loader .logo-svg .part-3 {
-  animation-delay: 0.18s;
-}
-.logo-loader .logo-svg .part-4 {
-  animation-delay: 0.24s;
-}
-.logo-loader .logo-svg .part-5 {
-  animation-delay: 0.3s;
-}
-.logo-loader .logo-svg .part-6 {
-  animation-delay: 0.36s;
-}
-
-@keyframes logo-build-loop {
-  /* BUILD */
-  0% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  18% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  /* SHORT SETTLE */
-  45% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  /* SOFT RESET */
-  70% {
-    opacity: 0.25;
-    transform: translateY(2px);
-  }
-
-  /* PREP FOR NEXT LOOP */
-  100% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
 }
 
 /* Phase 4 — perception: first paint of swapped-in content */

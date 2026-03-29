@@ -20,49 +20,6 @@ function resolutionLabel(isResolved: boolean): string {
   return isResolved ? "Done" : "Open";
 }
 
-function OverviewHeaderSkeleton() {
-  return (
-    <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--layer-1-border)] animate-pulse">
-      <div className="space-y-2 flex-1 max-w-md">
-        <div className="h-6 bg-neutral-200/80 rounded-md w-[45%]" />
-        <div className="h-4 bg-neutral-100 rounded-md w-[30%]" />
-      </div>
-      <div className="flex gap-2 shrink-0">
-        <div className="h-9 w-16 bg-neutral-100 rounded-lg" />
-        <div className="h-9 w-40 bg-neutral-200/80 rounded-lg" />
-        <div className="h-10 w-10 bg-neutral-100 rounded-lg" />
-      </div>
-    </header>
-  );
-}
-
-function OverviewMainSkeleton() {
-  return (
-    <div className="animate-pulse px-6 py-4 max-w-6xl mx-auto" aria-busy="true" aria-label="Loading overview">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="rounded-lg border border-[var(--layer-2-border)] h-[72px] bg-white"
-          />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="h-52 rounded-lg border border-[var(--layer-2-border)] bg-white" />
-            <div className="h-52 rounded-lg border border-[var(--layer-2-border)] bg-white" />
-          </div>
-        </div>
-        <div className="space-y-6">
-          <div className="h-44 rounded-lg border border-[var(--layer-2-border)] bg-white" />
-          <div className="h-64 rounded-lg border border-[var(--layer-2-border)] bg-white" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ----- Session header -----
 function OverviewSessionHeader({
   title,
@@ -349,7 +306,7 @@ export default function SessionOverviewPage() {
   }, [sessionId, copyBusy, authUid, isIdentityResolved]);
 
   const session = data.session;
-  const showOverviewSkeleton =
+  const showOverviewLoading =
     !isIdentityResolved ||
     !workspaceId ||
     (Boolean(sessionId) && loading && !session);
@@ -386,7 +343,7 @@ export default function SessionOverviewPage() {
 
   return (
     <div className="h-full bg-[var(--canvas-base)]">
-      {session && !showOverviewSkeleton ? (
+      {session && !showOverviewLoading ? (
         <OverviewSessionHeader
           title={session.title}
           createdAt={session.createdAt ?? null}
@@ -396,11 +353,21 @@ export default function SessionOverviewPage() {
           onCopy={handleCopy}
         />
       ) : (
-        <OverviewHeaderSkeleton />
+        <header
+          className="flex min-h-[73px] items-center border-b border-[var(--layer-1-border)] px-6 py-4"
+          aria-busy="true"
+          aria-label="Loading session"
+        />
       )}
 
-      {showOverviewSkeleton || !session ? (
-        <OverviewMainSkeleton />
+      {showOverviewLoading || !session ? (
+        <div
+          className="flex min-h-[50vh] flex-col items-center justify-center px-6 py-16"
+          aria-busy="true"
+          aria-label="Loading overview"
+        >
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" strokeWidth={2} aria-hidden />
+        </div>
       ) : (
         <main className="px-6 py-4 max-w-6xl mx-auto">
           <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

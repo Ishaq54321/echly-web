@@ -45,7 +45,6 @@ export function WorkspaceCard({
     updatedAtDate && !Number.isNaN(updatedAtDate.getTime())
       ? formatDistanceToNowStrict(updatedAtDate, { addSuffix: true })
       : "";
-  const countsPending = false;
   const viewCount = session.viewCount ?? 0;
   const commentCount = session.commentCount ?? 0;
 
@@ -213,42 +212,27 @@ export function WorkspaceCard({
                   <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                 ) : updatedAtLabel ? (
                   <>Updated: {updatedAtLabel}</>
-                ) : (
-                  <div
-                    className="h-3.5 w-28 max-w-[70%] rounded bg-neutral-200/90 animate-pulse"
-                    aria-hidden
-                  />
-                )}
+                ) : null}
               </div>
             </div>
           </div>
 
           <div className="flex min-h-[28px] flex-wrap items-center gap-2 mb-4">
-            {countsPending ? (
-              <>
-                <div className="h-6 w-16 rounded-full bg-neutral-200 animate-pulse" aria-hidden />
-                <div className="h-6 w-8 rounded-full bg-neutral-200 animate-pulse" aria-hidden />
-                <div className="h-6 w-10 rounded-full bg-neutral-200 animate-pulse" aria-hidden />
-              </>
-            ) : (
-              <>
-                {counts != null && counts.total > 0 ? (
-                  <span className="px-2.5 py-1 rounded-full text-xs bg-neutral-100 text-neutral-700 tabular-nums">
-                    {counts.total} feedback
-                  </span>
-                ) : null}
-                {counts != null && counts.open > 0 ? (
-                  <span className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-600 tabular-nums">
-                    {counts.open} open
-                  </span>
-                ) : null}
-                {counts != null && counts.resolved > 0 ? (
-                  <span className="px-2.5 py-1 rounded-full text-xs bg-green-50 text-green-700 tabular-nums">
-                    {counts.resolved} resolved
-                  </span>
-                ) : null}
-              </>
-            )}
+            {counts != null && counts.total > 0 ? (
+              <span className="px-2.5 py-1 rounded-full text-xs bg-neutral-100 text-neutral-700 tabular-nums">
+                {counts.total} feedback
+              </span>
+            ) : null}
+            {counts != null && counts.open > 0 ? (
+              <span className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-600 tabular-nums">
+                {counts.open} open
+              </span>
+            ) : null}
+            {counts != null && counts.resolved > 0 ? (
+              <span className="px-2.5 py-1 rounded-full text-xs bg-green-50 text-green-700 tabular-nums">
+                {counts.resolved} resolved
+              </span>
+            ) : null}
           </div>
         </div>
 

@@ -30,12 +30,7 @@ import {
   updateWorkspaceNotifications,
   updateWorkspaceSettings,
 } from "@/lib/repositories/workspacesRepository";
-import {
-  SkeletonCard,
-  SkeletonHeader,
-  SkeletonBase,
-  SkeletonTableRow,
-} from "@/components/ui/skeletons";
+import { MinimalLoader } from "@/components/ui/MinimalLoader";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
@@ -199,20 +194,11 @@ function SettingsPageInner() {
   );
 }
 
-function SettingsShellPlaceholder() {
+function SettingsSuspenseFallback() {
   return (
     <div className="flex flex-1 min-h-0 bg-white overflow-auto" aria-busy="true" aria-live="polite">
-      <div className="flex-1 min-w-0 max-w-[1280px] mx-auto px-12 py-10 w-full min-h-[520px]">
-        <SkeletonHeader className="mb-8" />
-        <div className="flex items-center gap-10 border-b border-[var(--border-default)] mb-8 pb-3">
-          {TABS.map((t) => (
-            <SkeletonBase key={t.id} className="h-4 w-20" />
-          ))}
-        </div>
-        <div className={`${CARD_GAP}`}>
-          <SkeletonCard className="min-h-[168px] rounded-[12px]" lines={4} />
-          <SkeletonCard className="min-h-[168px] rounded-[12px]" lines={4} />
-        </div>
+      <div className="flex flex-1 min-h-[520px] min-w-0 max-w-[1280px] mx-auto w-full items-center justify-center px-12 py-10">
+        <MinimalLoader label="Loading settings…" />
       </div>
     </div>
   );
@@ -220,7 +206,7 @@ function SettingsShellPlaceholder() {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<SettingsShellPlaceholder />}>
+    <Suspense fallback={<SettingsSuspenseFallback />}>
       <SettingsPageInner />
     </Suspense>
   );
@@ -240,23 +226,12 @@ function GeneralTab({
 }) {
   if (loading) {
     return (
-      <div className={`${CARD_GAP} pb-16 min-h-[920px]`} aria-busy="true" aria-live="polite">
-        <SkeletonCard
-          className="rounded-[12px] border-[var(--border-default)] min-h-[200px]"
-          lines={6}
-        />
-        <SkeletonCard
-          className="rounded-[12px] border-[var(--border-default)] min-h-[260px]"
-          lines={5}
-        />
-        <SkeletonCard
-          className="rounded-[12px] border-[var(--border-default)] min-h-[320px]"
-          lines={5}
-        />
-        <SkeletonCard
-          className="rounded-[12px] border-[var(--border-default)] min-h-[140px]"
-          lines={2}
-        />
+      <div
+        className="flex min-h-[920px] items-center justify-center pb-16"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <MinimalLoader label="Loading settings…" />
       </div>
     );
   }
@@ -1100,54 +1075,11 @@ function BillingTab() {
   if (loading) {
     return (
       <div
-        className={`flex flex-col ${BILLING_CONTAINER} pb-20 min-h-[640px]`}
+        className={`flex min-h-[640px] flex-col items-center justify-center ${BILLING_CONTAINER} pb-20`}
         aria-busy="true"
         aria-live="polite"
       >
-        <div className="billing-container space-y-8">
-          <SkeletonBase className="mx-auto h-12 w-full max-w-2xl rounded-xl" />
-          <div className="flex flex-wrap items-center justify-center gap-8">
-            <SkeletonBase className="h-10 w-28 rounded-lg" />
-            <SkeletonBase className="h-10 w-44 rounded-lg" />
-          </div>
-          <section className="billing-pricing-grid mb-[72px] items-stretch">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={i}
-                className="billing-card min-h-[320px] pointer-events-none select-none"
-                aria-hidden
-              >
-                <div className="space-y-4 flex-1 flex flex-col">
-                  <SkeletonBase className="h-6 w-2/5 max-w-[140px]" />
-                  <SkeletonBase className="h-10 w-1/3 max-w-[120px]" />
-                  <div className="space-y-3 flex-1 pt-2">
-                    {Array.from({ length: 6 }).map((__, j) => (
-                      <div key={j} className="flex gap-2 items-start">
-                        <SkeletonBase className="h-[18px] w-[18px] shrink-0 rounded-full" />
-                        <SkeletonBase className="h-3.5 flex-1 max-w-[95%]" />
-                      </div>
-                    ))}
-                  </div>
-                  <SkeletonBase className="h-10 w-full rounded-[10px] mt-4" />
-                </div>
-              </div>
-            ))}
-          </section>
-          <section className="mb-[72px] overflow-x-auto">
-            <div
-              className="rounded-[18px] border overflow-hidden min-w-[640px]"
-              style={{ borderColor: "rgba(0,0,0,0.08)" }}
-            >
-              <table className="w-full text-left border-collapse">
-                <tbody>
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <SkeletonTableRow key={i} cols={5} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
+        <MinimalLoader label="Loading billing…" />
       </div>
     );
   }

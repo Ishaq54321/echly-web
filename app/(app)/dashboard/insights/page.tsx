@@ -15,11 +15,7 @@ import {
   type WorkspaceInsightsDoc,
 } from "@/lib/repositories/insightsRepository";
 import { useWorkspace } from "@/lib/client/workspaceContext";
-import { useStableRenderState } from "@/lib/client/perception/useStableRenderState";
-import {
-  SkeletonCard,
-  SkeletonHeader,
-} from "@/components/ui/skeletons";
+import { Loader2 } from "lucide-react";
 import { PageEmptyState } from "@/components/ui/empty/PageEmptyState";
 
 interface InsightsApiResponse {
@@ -43,31 +39,6 @@ interface InsightsApiResponse {
 
 const CARD_CLASS =
   "rounded-2xl border border-gray-200 bg-white shadow-sm";
-
-function InsightsPageSkeleton({ animate }: { animate: boolean }) {
-  return (
-    <div
-      className="space-y-10 min-h-[720px]"
-      aria-busy="true"
-      aria-live="polite"
-    >
-      <div
-        className={`mt-6 h-36 rounded-2xl border border-neutral-200 ${
-          animate ? "animate-pulse bg-neutral-50" : "bg-neutral-100/90"
-        }`}
-      />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
-        <SkeletonCard className="h-32 py-5" lines={2} animate={animate} />
-        <SkeletonCard className="h-32 py-5" lines={2} animate={animate} />
-      </div>
-      <SkeletonCard className="h-72 py-6" lines={5} animate={animate} />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SkeletonCard className="min-h-[320px]" lines={6} animate={animate} />
-        <SkeletonCard className="min-h-[320px]" lines={6} animate={animate} />
-      </div>
-    </div>
-  );
-}
 
 function formatMinutesToHoursMinutes(totalMinutes: number): { hours: number; minutes: number } {
   const safe = Math.max(0, Math.floor(Number(totalMinutes) || 0));
@@ -323,22 +294,13 @@ export default function InsightsPage() {
     return sessionBars[0] ?? null;
   }, [sessionBars]);
 
-  const showInsightsSkeleton =
+  const showInsightsLoading =
     !error &&
     !(!authLoading && !authUser) &&
     !data &&
     (authLoading ||
       loading ||
       (Boolean(authUser) && (!isIdentityResolved || !workspaceId?.trim())));
-
-  const insightsSkeletonImmediate =
-    authLoading ||
-    (Boolean(authUser) &&
-      (!isIdentityResolved || !workspaceId?.trim()));
-  const { active: insightsPlaceholder, showAnimated: insightsSkeletonPulse } =
-    useStableRenderState(showInsightsSkeleton, {
-      immediate: insightsSkeletonImmediate,
-    });
 
   const showUnauthenticatedCard = !authLoading && !authUser;
   const timeSaved = formatMinutesToHoursMinutes(data?.lifetime?.timeSavedMinutes ?? 0);
@@ -357,16 +319,10 @@ export default function InsightsPage() {
     <div className="flex-1 bg-white flex flex-col w-full min-h-0">
       <div className="pt-10 pb-12 max-w-[1200px] mx-auto px-6 w-full">
         <div className="mb-8 min-h-[52px] space-y-1">
-          {insightsPlaceholder ? (
-            <SkeletonHeader />
-          ) : (
-            <>
-              <h1 className="text-xl font-semibold">Insights</h1>
-              <p className="text-sm text-muted-foreground">
-                A decision engine for what to fix next.
-              </p>
-            </>
-          )}
+          <h1 className="text-xl font-semibold">Insights</h1>
+          <p className="text-sm text-muted-foreground">
+            A decision engine for what to fix next.
+          </p>
         </div>
 
         <div className="space-y-10 min-h-[720px]">
@@ -382,8 +338,14 @@ export default function InsightsPage() {
                 action={{ label: "Go to login", href: "/login" }}
               />
             </div>
-          ) : insightsPlaceholder ? (
-            <InsightsPageSkeleton animate={insightsSkeletonPulse} />
+          ) : showInsightsLoading ? (
+            <div
+              className="flex min-h-[480px] flex-col items-center justify-center gap-3 py-16"
+              aria-busy="true"
+              aria-label="Loading insights"
+            >
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" strokeWidth={2} aria-hidden />
+            </div>
           ) : data ? (
             <div className="ech-content-enter space-y-10">
           {/* Premium hero */}
@@ -577,7 +539,13 @@ export default function InsightsPage() {
           )}
             </div>
           ) : (
-            <InsightsPageSkeleton animate={insightsSkeletonPulse} />
+            <div
+              className="flex min-h-[480px] flex-col items-center justify-center gap-3 py-16"
+              aria-busy="true"
+              aria-label="Loading insights"
+            >
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" strokeWidth={2} aria-hidden />
+            </div>
           )}
         </div>
       </div>

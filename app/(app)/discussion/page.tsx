@@ -7,7 +7,7 @@ import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { DiscussionList, type ProjectItem, type DiscussionItem } from "@/components/discussion/DiscussionList";
 import { DiscussionThread } from "@/components/discussion/DiscussionThread";
 import { ResizeHandle } from "@/components/discussion/ResizeHandle";
-import { DiscussionSidebarSkeleton } from "@/components/discussion/DiscussionSidebarSkeleton";
+import { MinimalLoader } from "@/components/ui/MinimalLoader";
 
 const MIN_SIDEBAR = 200;
 const MAX_SIDEBAR = 360;
@@ -91,7 +91,9 @@ export default function DiscussionPage() {
             style={{ flex: `0 0 ${sidebarBasis}px`, minWidth: MIN_SIDEBAR, maxWidth: MAX_SIDEBAR }}
           >
             {projects.length === 0 && isEmpty === false ? (
-              <DiscussionSidebarSkeleton rows={5} />
+              <div className="flex flex-1 flex-col items-center justify-center py-8 px-2" aria-busy="true" aria-live="polite">
+                <MinimalLoader compact label="Loading projects…" />
+              </div>
             ) : (
               <>
                 <button

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { MessageSquareMore } from "lucide-react";
-import { DiscussionListSkeleton } from "@/components/discussion/discussionSkeletons";
+import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { formatRelativeTime } from "@/lib/utils/time";
@@ -152,12 +152,16 @@ export function DiscussionList({
     );
   }, [items, search, filterBySessionId]);
 
-  const showSkeleton = !error && (!authUid || loading);
+  const showLoading = !error && (!authUid || loading);
 
-  if (showSkeleton) {
+  if (showLoading) {
     return (
-      <div className="flex flex-col overflow-hidden bg-transparent h-full" style={{ minHeight: 200 }}>
-        <DiscussionListSkeleton />
+      <div
+        className="flex h-full min-h-[200px] flex-col items-center justify-center overflow-hidden bg-transparent py-8"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <MinimalLoader label="Loading discussions…" />
       </div>
     );
   }

@@ -13,17 +13,12 @@ import {
 } from "@/lib/client/workspaceContext";
 
 const SESSIONS_CACHE_PREFIX = "echly_sessions";
-const SESSION_COUNT_CACHE_PREFIX = "echly_session_count";
 
 /** Dashboard session list limit — must match GET /api/sessions ordering/limit (30). */
 const SESSION_LIST_LIMIT = 30;
 
 function sessionsCacheKey(workspaceId: string): string {
   return `${SESSIONS_CACHE_PREFIX}:${workspaceId}`;
-}
-
-function sessionCountCacheKey(workspaceId: string): string {
-  return `${SESSION_COUNT_CACHE_PREFIX}:${workspaceId}`;
 }
 
 function filterSessionsByView(sessions: Session[], archivedOnly: boolean): Session[] {
@@ -49,27 +44,6 @@ function writeCachedSessions(workspaceId: string, sessions: Session[]) {
     sessionStorage.setItem(sessionsCacheKey(workspaceId), JSON.stringify(sessions));
   } catch {
     // Ignore cache write errors (private mode/quota).
-  }
-}
-
-function readCachedSessionCount(workspaceId: string): number | null {
-  if (typeof window === "undefined" || !workspaceId) return null;
-  try {
-    const raw = localStorage.getItem(sessionCountCacheKey(workspaceId));
-    if (!raw) return null;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedSessionCount(workspaceId: string, count: number) {
-  if (typeof window === "undefined" || !workspaceId) return;
-  try {
-    localStorage.setItem(sessionCountCacheKey(workspaceId), String(count));
-  } catch {
-    // Ignore storage write errors.
   }
 }
 
@@ -133,9 +107,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   /** True until the first Firestore sessions snapshot for the current workspace. */
   const [awaitingSessionSnapshot, setAwaitingSessionSnapshot] = useState(false);
-  const expectedCountRef = useRef<number | null>(
-    workspaceId ? readCachedSessionCount(workspaceId) : null
-  );
   /** Workspace id that `allSessions` was last committed for (avoids one frame of wrong-workspace UI). */
   const sessionsSourceWorkspaceRef = useRef<string | null>(null);
   const userId = authUid;
@@ -162,7 +133,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
     }
     const wid = workspaceId;
     sessionsSourceWorkspaceRef.current = wid;
-    expectedCountRef.current = readCachedSessionCount(wid);
     const cachedSessions = readCachedSessions(wid);
     if (Array.isArray(cachedSessions) && cachedSessions.length > 0) {
       setAllSessions(cachedSessions);
@@ -201,8 +171,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
           const optimistic = prev.filter((s) => Boolean(s.isOptimistic) && !dbIds.has(s.id));
           const next = [...optimistic, ...dbSessions];
           writeCachedSessions(wid, next);
-          expectedCountRef.current = dbSessions.length;
-          writeCachedSessionCount(wid, dbSessions.length);
           return next;
         });
 
@@ -434,7 +402,6 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
     sessions: sessionsWithCounts,
     loading: overviewDataAligned ? awaitingSessionSnapshot : true,
     isCountsReady: overviewDataAligned ? true : false,
-    expectedSessionCount: overviewDataAligned ? expectedCountRef.current : null,
     handleCreateSession,
     refreshSessions,
     updateSession,

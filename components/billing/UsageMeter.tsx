@@ -1,6 +1,6 @@
 "use client";
 
-import { SkeletonBase } from "@/components/ui/skeletons";
+import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime";
 import { useBillingStore } from "@/lib/store/billingStore";
@@ -71,24 +71,11 @@ export function UsageMeter() {
   if (!workspaceGateReady || realtimeLoading || !isBillingLoaded) {
     return (
       <div
-        className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm min-h-[120px] space-y-4"
+        className="flex min-h-[120px] items-center justify-center rounded-xl border border-neutral-200 bg-white p-4 shadow-sm"
         aria-busy="true"
         aria-live="polite"
       >
-        <div className="flex items-center justify-between gap-3">
-          <SkeletonBase className="h-4 w-16" />
-          <SkeletonBase className="h-3 w-14" />
-        </div>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <SkeletonBase className="h-3 w-full max-w-[200px]" />
-            <SkeletonBase className="h-1.5 w-full rounded-full" />
-          </div>
-          <div className="space-y-1.5">
-            <SkeletonBase className="h-3 w-full max-w-[180px]" />
-            <SkeletonBase className="h-1.5 w-full rounded-full" />
-          </div>
-        </div>
+        <MinimalLoader compact label="Loading usage…" />
       </div>
     );
   }

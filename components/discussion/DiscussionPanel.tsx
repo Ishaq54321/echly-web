@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
-import { DiscussionPanelBodySkeleton } from "@/components/discussion/discussionSkeletons";
+import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
 import {
   addComment,
@@ -214,7 +214,9 @@ export function DiscussionPanel({
 
         <div className="flex-1 overflow-y-auto min-h-0">
           {loading || !ticket ? (
-            <DiscussionPanelBodySkeleton />
+            <div className="flex min-h-[240px] items-center justify-center p-6">
+              <MinimalLoader label="Loading discussion…" />
+            </div>
           ) : (
             <div className="p-6 space-y-6">
               <div>
@@ -231,8 +233,8 @@ export function DiscussionPanel({
                       {sessionName}
                     </Link>
                   ) : (
-                    <span className="inline-block align-middle" aria-busy="true">
-                      <span className="inline-block h-3.5 w-[7.5rem] rounded-md bg-neutral-200/80 animate-pulse" />
+                    <span className="text-sm text-neutral-400" aria-busy="true">
+                      Loading…
                     </span>
                   )}
                 </div>

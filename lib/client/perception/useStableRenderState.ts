@@ -12,7 +12,7 @@ export type UseStableRenderStateOptions = {
 };
 
 /**
- * Drives skeleton visibility and pulse: immediate for identity-style gates, short delay for data-only loads.
+ * Stabilizes loading placeholder visibility: immediate for identity-style gates, short delay for data-only loads.
  */
 export function useStableRenderState(
   showPlaceholder: boolean,

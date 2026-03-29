@@ -28,6 +28,7 @@ import type { Session } from "@/lib/domain/session";
 import { useSessionEntryCta } from "@/components/dashboard/hooks/useSessionEntryCta";
 import { useStableState } from "@/lib/client/perception/useStableState";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import BrandLoader from "@/components/ui/BrandLoader";
 
 function filterAndSortSessions(sessions: SessionWithCounts[], search: string): SessionWithCounts[] {
   const q = search.trim().toLowerCase();
@@ -58,7 +59,7 @@ function DashboardContent() {
   const { workspaceId, isIdentityResolved } = useWorkspace();
   const stableSessions = useStableState(sessions, true, workspaceId);
   const { search } = useSessionsSearch();
-  const showListPlaceholders =
+  const isLoading =
     !isIdentityResolved || (sessionsLoading && sessions.length === 0);
 
   const [captureOpen, setCaptureOpen] = useState(false);
@@ -119,7 +120,7 @@ function DashboardContent() {
 
         <main className="flex-1">
           <div className="pt-3">
-            <div className="transition-opacity duration-150">
+            <div>
               <SessionsListArchiveTabs
                 value={listArchiveTab}
                 onChange={setListArchiveTab}
@@ -148,27 +149,26 @@ function DashboardContent() {
                 }
               />
 
-              <div className="ech-content-enter">
-                {listArchiveTab === "sessions" &&
-                activeSessions.length === 0 &&
-                !showListPlaceholders ? (
+              <div>
+                {isLoading ? (
+                  <div
+                    className="mt-12 flex justify-center py-16"
+                    aria-busy="true"
+                    aria-label="Loading sessions"
+                  >
+                    <BrandLoader />
+                  </div>
+                ) : listArchiveTab === "sessions" && activeSessions.length === 0 ? (
                   <div className="mt-16">
                     <EmptySessionsCard />
                   </div>
-                ) : listArchiveTab === "archived" &&
-                  archivedSessions.length === 0 &&
-                  !showListPlaceholders ? (
+                ) : listArchiveTab === "archived" && archivedSessions.length === 0 ? (
                   <div className="mt-16">
                     <ArchiveEmptyState />
                   </div>
                 ) : (
                   <SessionsWorkspace
                     sections={workspaceSections}
-                    listPlaceholderCount={
-                      showListPlaceholders && tabFilteredSessions.length === 0
-                        ? 3
-                        : 0
-                    }
                     onView={handleView}
                     onRenameSuccess={(session) =>
                       updateSession(session.id, { title: session.title })

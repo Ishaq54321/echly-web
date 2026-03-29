@@ -12,7 +12,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { MessageSquare } from "lucide-react";
-import { DiscussionFeedSkeleton } from "@/components/discussion/discussionSkeletons";
+import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { db } from "@/lib/firebase";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { getTicketStatus } from "@/lib/domain/feedback";
@@ -191,10 +191,14 @@ export function DiscussionFeed({
     };
   }, [authUid, workspaceId, refreshKey]);
 
-  const showSkeleton = !error && (!authUid || !workspaceId || loading);
+  const showLoading = !error && (!authUid || !workspaceId || loading);
 
-  if (showSkeleton) {
-    return <DiscussionFeedSkeleton />;
+  if (showLoading) {
+    return (
+      <div className="flex min-h-[200px] flex-1 items-center justify-center py-12">
+        <MinimalLoader label="Loading discussions…" />
+      </div>
+    );
   }
 
   if (error) {
