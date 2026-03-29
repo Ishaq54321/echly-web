@@ -356,18 +356,6 @@ export async function getSessionFeedbackByResolvedRepo(
   return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
 }
 
-const OVERVIEW_FEEDBACK_BY_IDS_LIMIT = 10;
-
-/** Fetches a single feedback doc by ID. Returns null if not found. */
-export async function getFeedbackByIdRepo(
-  feedbackId: string
-): Promise<Feedback | null> {
-  const snap = await getDoc(doc(db, "feedback", feedbackId));
-  if (!snap.exists()) return null;
-  if (snap.data().isDeleted === true) return null;
-  return docToFeedback(snap as QueryDocumentSnapshot);
-}
-
 const USER_FEEDBACK_ALL_LIMIT = 100;
 
 /**
@@ -453,6 +441,8 @@ export async function getWorkspaceFeedbackWithCommentsRepo(
   const snapshot = await getDocs(q);
   return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
 }
+
+const OVERVIEW_FEEDBACK_BY_IDS_LIMIT = 10;
 
 /** Fetches feedback docs by IDs (e.g. for activity titles). Limited for cost safety. */
 export async function getFeedbackByIdsRepo(

@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+  useMemo,
+  type MutableRefObject,
+} from "react";
 import {
   collection,
   doc,
@@ -20,6 +28,18 @@ const ZERO_COUNTS = {
   total: 0,
   open: 0,
   resolved: 0,
+};
+
+const ZERO_COUNTS_DELTA = {
+  open: 0,
+  resolved: 0,
+  total: 0,
+} as const;
+
+export type SessionCountsDelta = {
+  open: number;
+  resolved: number;
+  total: number;
 };
 
 function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback | null {
@@ -66,12 +86,14 @@ export interface UseSessionFeedbackPaginatedResult {
   resolvedFeedback: Feedback[];
   feedback: Feedback[];
   setFeedback: React.Dispatch<React.SetStateAction<Feedback[]>>;
-  /** From `sessions/{id}` snapshot. */
+  /** Server baseline from `sessions/{id}` snapshot + optimistic `countsDelta`. */
   total: number;
-  /** From `sessions/{id}` snapshot. */
+  /** Server baseline from `sessions/{id}` snapshot + optimistic `countsDelta`. */
   activeCount: number;
-  /** From `sessions/{id}` snapshot. */
+  /** Server baseline from `sessions/{id}` snapshot + optimistic `countsDelta`. */
   resolvedCount: number;
+  /** Optimistic adjustment; reset to zero on every session snapshot. */
+  setCountsDelta: React.Dispatch<React.SetStateAction<SessionCountsDelta>>;
   /** False once session doc counters have been read. */
   countsLoading: boolean;
   loading: boolean;
@@ -122,18 +144,30 @@ function normalizeFeedbackItemStatus(item: Feedback): Feedback {
 }
 
 /**
- * Session ticket list from Firestore `feedback` query; counts from `sessions/{id}` only.
+ * Session ticket list from Firestore `feedback` query; counts from `sessions/{id}` snapshot
+ * plus optional client `countsDelta` (display = server + delta; delta cleared on snapshot).
  */
+export type SessionFeedbackRealtimeMergeOptions = {
+  /**
+   * Applied to each Firestore snapshot list before `setState`.
+   * Use to preserve in-flight optimistic fields so realtime does not flash stale server data.
+   */
+  mergeRealtimeListRef?: MutableRefObject<((list: Feedback[]) => Feedback[]) | null>;
+};
+
 export function useSessionFeedbackPaginated(
   sessionId: string | undefined,
-  onNewTicketFromRealtime?: (newestTicketId: string) => void
+  onNewTicketFromRealtime?: (newestTicketId: string) => void,
+  options?: SessionFeedbackRealtimeMergeOptions
 ): UseSessionFeedbackPaginatedResult {
   const { workspaceId, authUid } = useWorkspace();
   const [items, setItems] = useState<Feedback[]>([]);
+  /** Last session document counters from Firestore (never merge delta into this). */
   const [counts, setCountsState] = useState(ZERO_COUNTS);
-  const total = counts.total;
-  const activeCount = counts.open;
-  const resolvedCount = counts.resolved;
+  const [countsDelta, setCountsDelta] = useState<SessionCountsDelta>(ZERO_COUNTS_DELTA);
+  const total = Math.max(0, counts.total + countsDelta.total);
+  const activeCount = Math.max(0, counts.open + countsDelta.open);
+  const resolvedCount = Math.max(0, counts.resolved + countsDelta.resolved);
   const [countsLoading, setCountsLoading] = useState<boolean>(true);
   const [initialLoading, setInitialLoading] = useState(true);
   const [feedbackSnapshotReady, setFeedbackSnapshotReady] = useState(false);
@@ -145,6 +179,8 @@ export function useSessionFeedbackPaginated(
   const itemsRef = useRef<Feedback[]>([]);
 
   const onNewTicketFromRealtimeRef = useRef(onNewTicketFromRealtime);
+  const mergeRealtimeListOuterRef = useRef(options?.mergeRealtimeListRef);
+  mergeRealtimeListOuterRef.current = options?.mergeRealtimeListRef;
 
   const prevIdsRef = useRef<Set<string>>(new Set());
   const firstSnapshotRef = useRef(true);
@@ -194,6 +230,7 @@ export function useSessionFeedbackPaginated(
     setIsLoadingResolved(true);
     setFeedbackSnapshotReady(false);
     setSessionSnapshotReady(false);
+    setCountsDelta(ZERO_COUNTS_DELTA);
   }, [sessionId]);
 
   const isCountsSynced = feedbackSnapshotReady && sessionSnapshotReady;
@@ -214,6 +251,7 @@ export function useSessionFeedbackPaginated(
   useEffect(() => {
     if (!authUid || !sessionId || !workspaceId) {
       setCountsState(ZERO_COUNTS);
+      setCountsDelta(ZERO_COUNTS_DELTA);
       setCountsLoading(false);
       setSessionSnapshotReady(false);
       return;
@@ -229,6 +267,7 @@ export function useSessionFeedbackPaginated(
         if (sessionIdRef.current !== sessionId) return;
         if (!snap.exists()) {
           setCountsState(ZERO_COUNTS);
+          setCountsDelta(ZERO_COUNTS_DELTA);
           setCountsLoading(false);
           setSessionSnapshotReady(true);
           return;
@@ -237,19 +276,22 @@ export function useSessionFeedbackPaginated(
         const wid = typeof d.workspaceId === "string" ? d.workspaceId.trim() : "";
         if (wid !== workspaceId) {
           setCountsState(ZERO_COUNTS);
+          setCountsDelta(ZERO_COUNTS_DELTA);
           setCountsLoading(false);
           setSessionSnapshotReady(true);
           return;
         }
-        const open = typeof d.openCount === "number" ? d.openCount : 0;
-        const resolved = typeof d.resolvedCount === "number" ? d.resolvedCount : 0;
-        const totalN =
+        const open = Math.max(0, typeof d.openCount === "number" ? d.openCount : 0);
+        const resolved = Math.max(0, typeof d.resolvedCount === "number" ? d.resolvedCount : 0);
+        const rawTotal =
           typeof d.totalCount === "number"
             ? d.totalCount
             : typeof d.feedbackCount === "number"
               ? d.feedbackCount
               : 0;
+        const totalN = Math.max(0, rawTotal);
         setCountsState({ total: totalN, open, resolved });
+        setCountsDelta(ZERO_COUNTS_DELTA);
         setCountsLoading(false);
         setSessionSnapshotReady(true);
       },
@@ -299,7 +341,9 @@ export function useSessionFeedbackPaginated(
         const raw = snapshot.docs
           .map((d) => mapDocToFeedback(d))
           .filter((item): item is Feedback => item !== null);
-        const list = finalizeList(raw);
+        const finalized = finalizeList(raw);
+        const mergeFn = mergeRealtimeListOuterRef.current?.current;
+        const list = mergeFn ? mergeFn(finalized) : finalized;
 
         if (!firstSnapshotRef.current) {
           for (const item of list) {
@@ -340,6 +384,7 @@ export function useSessionFeedbackPaginated(
       setInitialLoading(false);
       setCountsLoading(false);
       setCountsState(ZERO_COUNTS);
+      setCountsDelta(ZERO_COUNTS_DELTA);
       setFeedbackSnapshotReady(false);
       setSessionSnapshotReady(false);
       setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
@@ -359,6 +404,7 @@ export function useSessionFeedbackPaginated(
     activeCount,
     resolvedCount,
     countsLoading,
+    setCountsDelta,
     setFeedback: setCanonicalFeedback,
     loading: initialLoading,
     hasMore: false,

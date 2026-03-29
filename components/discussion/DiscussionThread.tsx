@@ -76,8 +76,9 @@ export function DiscussionThread({
     async (attachment: CommentAttachment) => {
       if (!authUid || !feedbackId || !ticket?.sessionId || !workspaceId) return;
       assertIdentityResolved(isIdentityResolved);
+      const sid = ticket.sessionId;
       const optimisticComment = createOptimisticComment({
-        sessionId: ticket.sessionId,
+        sessionId: sid,
         feedbackId,
         data: {
           userId: authUid,
@@ -91,23 +92,25 @@ export function DiscussionThread({
       setComments((prev) => [...prev, optimisticComment]);
       setAttachmentModalOpen(false);
       onCommentAdded?.();
-      setSending(true);
-      try {
-        await addComment(ticket.sessionId, feedbackId, {
-          userId: authUid,
-          userName: authDisplayName || "User",
-          userAvatar: authPhotoUrl || "",
-          message: "",
-          type: "general",
-          attachment,
-        });
-      } catch (err) {
-        console.error("[DiscussionThread] send attachment comment:", err);
-        setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
-        showToast("Could not send attachment");
-      } finally {
-        setSending(false);
-      }
+      void (async () => {
+        setSending(true);
+        try {
+          await addComment(sid, feedbackId, {
+            userId: authUid,
+            userName: authDisplayName || "User",
+            userAvatar: authPhotoUrl || "",
+            message: "",
+            type: "general",
+            attachment,
+          });
+        } catch (err) {
+          console.error("[DiscussionThread] send attachment comment:", err);
+          setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
+          showToast("Could not send attachment");
+        } finally {
+          setSending(false);
+        }
+      })();
     },
     [
       feedbackId,

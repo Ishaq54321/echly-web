@@ -6,6 +6,7 @@ export type SessionControlPanelProps = {
   sessionPaused: boolean;
   pausePending?: boolean;
   endPending?: boolean;
+  __extensionSavingState?: boolean;
   onPause: () => void;
   onResume: () => void;
   onEnd: () => void;
@@ -42,10 +43,13 @@ export function SessionControlPanel({
   sessionPaused,
   pausePending = false,
   endPending = false,
+  __extensionSavingState,
   onPause,
   onResume,
   onEnd,
 }: SessionControlPanelProps) {
+  const saving = Boolean(__extensionSavingState);
+
   return (
     <div
       data-echly-ui="true"
@@ -155,6 +159,29 @@ export function SessionControlPanel({
         >
           <InlineSpinner />
           <span>Ending…</span>
+        </button>
+      ) : saving ? (
+        <button
+          type="button"
+          onClick={onEnd}
+          disabled={pausePending}
+          style={{
+            padding: "8px 14px",
+            borderRadius: 10,
+            border: "none",
+            background: "#EF4444",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 500,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            cursor: pausePending ? "default" : "pointer",
+            opacity: pausePending ? 0.7 : 1,
+          }}
+        >
+          <InlineSpinner />
+          <span>Saving…</span>
         </button>
       ) : (
         <button

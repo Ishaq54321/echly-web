@@ -29,13 +29,12 @@ export function CommentItem({
 }: CommentItemProps) {
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(comment.message);
-  const [saving, setSaving] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ url: string; fileName: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const canEditDelete = currentUserId != null && comment.userId === currentUserId;
+  const canEditDelete = comment.userId === currentUserId;
   const showMenu = (canEditDelete && (onUpdate || onDelete)) || Boolean(additionalMenuItems);
 
   useEffect(() => {
@@ -63,31 +62,21 @@ export function CommentItem({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [deleteModalOpen]);
 
-  const handleSaveEdit = useCallback(async () => {
+  const handleSaveEdit = useCallback(() => {
     const trimmed = editDraft.trim();
     if (trimmed === comment.message || !onUpdate) {
       setEditing(false);
       return;
     }
-    setSaving(true);
-    try {
-      await onUpdate(comment.id, { message: trimmed });
-      setEditing(false);
-    } finally {
-      setSaving(false);
-    }
+    setEditing(false);
+    void onUpdate(comment.id, { message: trimmed });
   }, [comment.id, comment.message, editDraft, onUpdate]);
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = useCallback(() => {
     if (!onDelete) return;
-    setSaving(true);
-    try {
-      await onDelete(comment.id);
-      setDeleteModalOpen(false);
-      setMenuOpen(false);
-    } finally {
-      setSaving(false);
-    }
+    setDeleteModalOpen(false);
+    setMenuOpen(false);
+    void onDelete(comment.id);
   }, [comment.id, onDelete]);
 
   const avatarSize = size === "compact" ? "w-6 h-6" : "w-8 h-8";
@@ -183,11 +172,11 @@ export function CommentItem({
               </button>
               <button
                 type="button"
-                onClick={() => void handleSaveEdit()}
-                disabled={saving || editDraft.trim() === comment.message}
+                onClick={handleSaveEdit}
+                disabled={editDraft.trim() === comment.message}
                 className="px-3 py-2 text-sm font-medium rounded-xl bg-[#155DFC] text-white hover:bg-[#0F4EDC] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? "Saving…" : "Save"}
+                Save
               </button>
             </div>
             {comment.attachment && (
@@ -273,18 +262,16 @@ export function CommentItem({
               <button
                 type="button"
                 onClick={() => setDeleteModalOpen(false)}
-                disabled={saving}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-60"
+                className="px-4 py-2.5 text-sm font-medium rounded-xl border border-neutral-300 text-neutral-700 hover:bg-neutral-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={() => void handleDelete()}
-                disabled={saving}
-                className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-red-500 text-white hover:bg-red-600 disabled:opacity-60"
+                onClick={handleDelete}
+                className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-red-500 text-white hover:bg-red-600"
               >
-                {saving ? "Deleting…" : "Delete"}
+                Delete
               </button>
             </div>
           </div>

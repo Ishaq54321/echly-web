@@ -1,15 +1,43 @@
 import "server-only";
 import { adminDb } from "@/lib/server/firebaseAdmin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldPath, FieldValue } from "firebase-admin/firestore";
 import type { CommentAttachment, CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import {
   getSessionByIdRepo,
-  incrementSessionCommentCountRepo,
   updateSessionUpdatedAtRepo,
 } from "@/lib/repositories/sessionsRepository.server";
-import { incrementFeedbackCommentCountRepo } from "@/lib/repositories/feedbackRepository.server";
 import { incrementInsightsOnCommentCreateRepo } from "@/lib/repositories/insightsRepository.server";
 import { fireAndForget } from "@/lib/server/fireAndForget";
+
+/** Thrown when the feedback doc is missing (e.g. hard-deleted); map to HTTP 404 in API routes. */
+export const ADD_COMMENT_FEEDBACK_MISSING = "ADD_COMMENT_FEEDBACK_MISSING";
+
+const COMMENT_QUERY_BY_FEEDBACK_CHUNK = 500;
+
+/** All comment docs for a ticket (paginated); used when hard-deleting feedback. */
+export async function getCommentSnapshotsByFeedbackIdRepo(
+  feedbackId: string
+): Promise<FirebaseFirestore.QueryDocumentSnapshot[]> {
+  const fid = feedbackId.trim();
+  if (!fid) return [];
+  const out: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+  for (;;) {
+    let q: FirebaseFirestore.Query = adminDb
+      .collection("comments")
+      .where("feedbackId", "==", fid)
+      .orderBy(FieldPath.documentId())
+      .limit(COMMENT_QUERY_BY_FEEDBACK_CHUNK);
+    if (cursor) q = q.startAfter(cursor);
+    const snap = await q.get();
+    if (snap.empty) break;
+    const docs = snap.docs as FirebaseFirestore.QueryDocumentSnapshot[];
+    out.push(...docs);
+    if (docs.length < COMMENT_QUERY_BY_FEEDBACK_CHUNK) break;
+    cursor = docs[docs.length - 1];
+  }
+  return out;
+}
 
 function requireUserId(userId: string, context: string): string {
   const trimmed = userId.trim();
@@ -17,6 +45,10 @@ function requireUserId(userId: string, context: string): string {
     throw new Error(`Missing userId - invalid state (${context})`);
   }
   return trimmed;
+}
+
+function num(value: unknown, fallback: number = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 export interface AddCommentData {
@@ -44,6 +76,11 @@ export async function addCommentRepo(
   if (!workspaceId) {
     throw new Error("Missing workspaceId on session");
   }
+  const feedbackRef = adminDb.doc(`feedback/${feedbackId}`);
+  const feedbackSnap = await feedbackRef.get();
+  if (!feedbackSnap.exists) {
+    throw new Error(ADD_COMMENT_FEEDBACK_MISSING);
+  }
   const payload: Record<string, unknown> = {
     userId: resolvedUserId,
     workspaceId,
@@ -60,24 +97,35 @@ export async function addCommentRepo(
   if (data.threadId != null) payload.threadId = data.threadId;
   if (data.attachment != null) payload.attachment = data.attachment;
 
-  const ref = await adminDb.collection("comments").add(payload);
-  await incrementSessionCommentCountRepo(sessionId);
-  await incrementFeedbackCommentCountRepo(feedbackId, data.message);
+  const commentRef = adminDb.collection("comments").doc();
+  const sessionRef = adminDb.doc(`sessions/${sessionId}`);
+  const workspaceRef = adminDb.doc(`workspaces/${workspaceId}`);
+  const preview = data.message.trim().slice(0, 120);
+
+  const batch = adminDb.batch();
+  batch.set(commentRef, payload);
+  batch.update(sessionRef, {
+    commentCount: FieldValue.increment(1),
+  });
+  batch.update(feedbackRef, {
+    commentCount: FieldValue.increment(1),
+    lastCommentPreview: preview || null,
+    lastCommentAt: FieldValue.serverTimestamp(),
+  });
+  batch.update(workspaceRef, {
+    "stats.totalComments": FieldValue.increment(1),
+    "stats.updatedAt": FieldValue.serverTimestamp(),
+  });
+  await batch.commit();
 
   fireAndForget("addCommentRepo-sessionUpdatedAt", () =>
     updateSessionUpdatedAtRepo(sessionId)
-  );
-  fireAndForget("addCommentRepo-workspaceStats", () =>
-    adminDb.doc(`workspaces/${workspaceId}`).update({
-      "stats.totalComments": FieldValue.increment(1),
-      "stats.updatedAt": FieldValue.serverTimestamp(),
-    })
   );
   fireAndForget("addCommentRepo-insights", () =>
     incrementInsightsOnCommentCreateRepo({ workspaceId })
   );
 
-  return ref.id;
+  return commentRef.id;
 }
 
 export interface UpdateCommentData {
@@ -131,15 +179,30 @@ export async function deleteCommentRepo(commentId: string): Promise<void> {
     const feedbackRef = adminDb.doc(`feedback/${feedbackId}`);
     const workspaceRef = adminDb.doc(`workspaces/${workspaceId}`);
 
+    const [sessionSnap, feedbackSnap, workspaceSnap] = await Promise.all([
+      tx.get(sessionRef),
+      tx.get(feedbackRef),
+      tx.get(workspaceRef),
+    ]);
+
+    const sessionRow = sessionSnap.data() ?? {};
+    const feedbackRow = feedbackSnap.data() ?? {};
+    const stats = (workspaceSnap.data()?.stats ?? {}) as Record<string, unknown>;
+    const nextSessionCc = Math.max(0, num((sessionRow as { commentCount?: unknown }).commentCount) - 1);
+    const nextFeedbackCc = Math.max(0, num((feedbackRow as { commentCount?: unknown }).commentCount) - 1);
+    const nextWorkspaceComments = Math.max(0, num(stats.totalComments) - 1);
+
     tx.delete(commentRef);
     tx.update(sessionRef, {
-      commentCount: FieldValue.increment(-1),
+      commentCount: nextSessionCc,
     });
-    tx.update(feedbackRef, {
-      commentCount: FieldValue.increment(-1),
-    });
+    if (feedbackSnap.exists) {
+      tx.update(feedbackRef, {
+        commentCount: nextFeedbackCc,
+      });
+    }
     tx.update(workspaceRef, {
-      "stats.totalComments": FieldValue.increment(-1),
+      "stats.totalComments": nextWorkspaceComments,
       "stats.updatedAt": FieldValue.serverTimestamp(),
     });
   });

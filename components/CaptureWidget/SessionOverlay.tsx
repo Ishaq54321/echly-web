@@ -45,6 +45,7 @@ export type SessionOverlayProps = {
   onSelectMicrophone?: (deviceId: string) => void;
   voiceMicDeviceId?: string;
   theme?: "light" | "dark";
+  __extensionSavingState?: boolean;
 };
 
 /**
@@ -77,6 +78,7 @@ export function SessionOverlay({
   onSelectMicrophone,
   voiceMicDeviceId = "",
   theme = "dark",
+  __extensionSavingState,
 }: SessionOverlayProps) {
   const cleanupRef = useRef<(() => void)[]>([]);
   const voiceStartedForPendingRef = useRef(false);
@@ -137,6 +139,8 @@ export function SessionOverlay({
 
   if (!sessionMode || !captureRoot) return null;
 
+  const saving = Boolean(__extensionSavingState);
+
   const content = (
     <>
       {sessionFeedbackPending && (
@@ -160,6 +164,7 @@ export function SessionOverlay({
         sessionPaused={sessionPaused}
         pausePending={pausePending}
         endPending={endPending}
+        __extensionSavingState={saving}
         onPause={onPause}
         onResume={onResume}
         onEnd={onEnd}

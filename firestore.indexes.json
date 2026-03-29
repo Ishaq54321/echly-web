@@ -45,6 +45,14 @@
       "collectionGroup": "comments",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "feedbackId", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "workspaceId", "order": "ASCENDING" },
         { "fieldPath": "sessionId", "order": "ASCENDING" }
       ]

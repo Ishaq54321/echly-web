@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  ADD_COMMENT_FEEDBACK_MISSING,
   addCommentRepo,
   deleteCommentRepo,
   getCommentByIdRepo,
@@ -67,6 +68,9 @@ export const POST = withAuthorization(
       const id = await addCommentRepo(user.uid, sessionId, feedbackId, data);
       return NextResponse.json({ success: true, id });
     } catch (err) {
+      if (err instanceof Error && err.message === ADD_COMMENT_FEEDBACK_MISSING) {
+        return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+      }
       console.error("POST /api/comments:", err);
       return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
     }
@@ -118,6 +122,18 @@ export const PATCH = withAuthorization(
 
     const feedbackId = typeof comment.feedbackId === "string" ? comment.feedbackId : "";
     if (!feedbackId) return badRequest("Invalid comment feedback relation");
+
+    const editsCommentBody =
+      data.message !== undefined || data.position !== undefined;
+    if (editsCommentBody) {
+      const authorId = typeof comment.userId === "string" ? comment.userId : "";
+      if (authorId !== user.uid) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden" },
+          { status: 403 }
+        );
+      }
+    }
 
     const pre = ctx.preloaded;
     const required = data.resolved !== undefined ? "resolve" : "comment";
@@ -194,6 +210,14 @@ export const DELETE = withAuthorization(
 
     const feedbackId = typeof comment.feedbackId === "string" ? comment.feedbackId : "";
     if (!feedbackId) return badRequest("Invalid comment feedback relation");
+
+    const authorId = typeof comment.userId === "string" ? comment.userId : "";
+    if (authorId !== user.uid) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
+    }
 
     const pre = ctx.preloaded;
     const context = await buildRequestContext({

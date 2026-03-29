@@ -78,6 +78,8 @@ export default function CaptureWidget({
   onOpenBilling,
   onOpenDashboard,
   getAssetUrl,
+  __extensionSavingState,
+  onExtensionSavingSignalsChange,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
@@ -138,6 +140,19 @@ export default function CaptureWidget({
 
   /** Session limit: prop (from parent e.g. extension) takes precedence; otherwise use hook state (set when startSession returns limitReached). */
   const effectiveSessionLimitReached = sessionLimitReached ?? state.sessionLimitReached;
+
+  useEffect(() => {
+    onExtensionSavingSignalsChange?.({
+      sessionFeedbackSaving: state.sessionFeedbackSaving,
+      pausePending: state.pausePending,
+      endPending: state.endPending,
+    });
+  }, [
+    onExtensionSavingSignalsChange,
+    state.sessionFeedbackSaving,
+    state.pausePending,
+    state.endPending,
+  ]);
 
   const isControlled = expanded !== undefined;
   const effectiveIsOpen = isControlled ? expanded : state.isOpen;
@@ -329,11 +344,20 @@ export default function CaptureWidget({
               handlers.resumeSession();
             }}
             onSessionEnd={() => {
+              const saving = Boolean(__extensionSavingState);
+              if (
+                saving &&
+                typeof window !== "undefined" &&
+                !window.confirm("Changes are still saving. Are you sure you want to end the session?")
+              ) {
+                return;
+              }
               handlers.endSession(() => {
                 setShowCommandScreen(true);
                 onSessionEndCallback?.();
               });
             }}
+            __extensionSavingState={__extensionSavingState}
             onSessionRecordVoice={handlers.handleSessionStartVoice}
             onSessionDoneVoice={handlers.finishListening}
             onSessionSaveText={handlers.handleSessionFeedbackSubmit}

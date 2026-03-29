@@ -6,6 +6,7 @@ import {
   getSessionRecentCommentsRepo,
 } from "@/lib/repositories/commentsRepository";
 import { authFetch } from "@/lib/authFetch";
+import { HttpError } from "@/lib/client/httpError";
 
 export interface AddCommentOptions {
   userId: string;
@@ -31,7 +32,7 @@ export function createOptimisticComment(args: {
 }): OptimisticComment {
   const { sessionId, feedbackId, data } = args;
   const optimisticCreatedAtMs = Date.now();
-  const tempId = "temp_" + optimisticCreatedAtMs;
+  const tempId = `temp-${optimisticCreatedAtMs}-${Math.random().toString(36).slice(2, 10)}`;
   const optimisticDate = new Date(optimisticCreatedAtMs);
 
   return {
@@ -140,7 +141,7 @@ export async function addComment(
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
-    throw new Error(msg || "Failed to add comment");
+    throw new HttpError(msg || "Failed to add comment", res.status);
   }
   const json = (await res.json()) as { id?: string };
   if (!json.id) throw new Error("Missing comment id");
@@ -159,7 +160,7 @@ export async function updatePinPosition(
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
-    throw new Error(msg || "Failed to update comment position");
+    throw new HttpError(msg || "Failed to update comment position", res.status);
   }
 }
 
@@ -173,7 +174,7 @@ export async function resolveFeedback(feedbackId: string, sessionId?: string) {
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
-    throw new Error(msg || "Failed to resolve feedback");
+    throw new HttpError(msg || "Failed to resolve feedback", res.status);
   }
 }
 
@@ -194,7 +195,7 @@ export async function updateComment(
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
-    throw new Error(msg || "Failed to update comment");
+    throw new HttpError(msg || "Failed to update comment", res.status);
   }
 }
 
@@ -207,7 +208,7 @@ export async function deleteComment(commentId: string): Promise<void> {
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
-    throw new Error(msg || "Failed to delete comment");
+    throw new HttpError(msg || "Failed to delete comment", res.status);
   }
 }
 

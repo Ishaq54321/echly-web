@@ -220,6 +220,14 @@ export type CaptureWidgetProps = {
   onOpenDashboard?: () => void;
   /** Extension: resolve asset URL (e.g. chrome.runtime.getURL). Replaces chrome.runtime.getURL in core. */
   getAssetUrl?: (path: string) => string;
+  /** Extension: derived “still saving” for session chrome (content script); optional everywhere else. */
+  __extensionSavingState?: boolean;
+  /** Extension: lift pause/end/session-feedback saving flags from the widget for derived saving UI in the host. */
+  onExtensionSavingSignalsChange?: (signals: {
+    sessionFeedbackSaving: boolean;
+    pausePending: boolean;
+    endPending: boolean;
+  }) => void;
 };
 
 /** One feedback job in the pipeline (processing or failed). Completed jobs are removed and the ticket appears in pointers. */

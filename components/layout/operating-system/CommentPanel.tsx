@@ -9,6 +9,13 @@ const PANEL_WIDTH = 380;
 
 export type CommentFilterTab = "all" | "unresolved" | "resolved";
 
+/** Root-thread counts for tab labels; when omitted, counts are derived from `comments` only. */
+export type CommentPanelThreadCounts = {
+  total: number;
+  open: number;
+  resolved: number;
+};
+
 export interface CommentPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -21,9 +28,8 @@ export interface CommentPanelProps {
   currentUserId?: string | null;
   updateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
   deleteComment?: (commentId: string) => Promise<void>;
-  /** When false, hides replies and comment resolve actions (link access view-only). */
-  canComment?: boolean;
-  canResolve?: boolean;
+  /** Display counts (e.g. optimistic merge); falls back to roots derived from `comments` when unset. */
+  threadCounts?: CommentPanelThreadCounts | null;
 }
 
 const CommentRow = memo(function CommentRow({
@@ -87,8 +93,6 @@ const ThreadBlock = memo(function ThreadBlock({
   deleteComment,
   sendReply,
   onSelectThread,
-  canComment = true,
-  canResolve = true,
 }: {
   root: Comment;
   replies: Comment[];
@@ -100,8 +104,6 @@ const ThreadBlock = memo(function ThreadBlock({
   deleteComment?: (id: string) => Promise<void>;
   sendReply?: (threadId: string, message: string) => Promise<void>;
   onSelectThread?: (threadId: string) => void;
-  canComment?: boolean;
-  canResolve?: boolean;
 }) {
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState("");
@@ -131,7 +133,7 @@ const ThreadBlock = memo(function ThreadBlock({
         currentUserId={currentUserId}
         updateComment={updateComment}
         deleteComment={deleteComment}
-        showResolve={canResolve}
+        showResolve={Boolean(updateComment)}
       />
       {replies.length > 0 && (
         <div className="ml-10 mt-1 space-y-0.5">
@@ -147,7 +149,7 @@ const ThreadBlock = memo(function ThreadBlock({
           ))}
         </div>
       )}
-      {canComment && sendReply && (
+      {sendReply && (
         <>
           {!replyOpen ? (
             <div className="ml-10 mt-1">
@@ -204,8 +206,7 @@ const CommentThreadList = memo(function CommentThreadList({
   deleteComment,
   sendReply,
   onSelectThread,
-  canComment = true,
-  canResolve = true,
+  displayThreadCounts,
 }: {
   comments: Comment[];
   loading: boolean;
@@ -219,8 +220,7 @@ const CommentThreadList = memo(function CommentThreadList({
   deleteComment?: (id: string) => Promise<void>;
   sendReply?: (threadId: string, message: string) => Promise<void>;
   onSelectThread?: (threadId: string) => void;
-  canComment?: boolean;
-  canResolve?: boolean;
+  displayThreadCounts: CommentPanelThreadCounts;
 }) {
   const roots = comments.filter((c) => !c.threadId);
   const byThreadId = new Map<string, Comment[]>();
@@ -283,7 +283,11 @@ const CommentThreadList = memo(function CommentThreadList({
                   : "text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] border-transparent hover:bg-[var(--layer-2-hover-bg)]"
               }`}
             >
-              {tab === "all" ? "All" : tab === "unresolved" ? "Unresolved" : "Resolved"}
+              {tab === "all"
+                ? `All (${displayThreadCounts.total})`
+                : tab === "unresolved"
+                  ? `Unresolved (${displayThreadCounts.open})`
+                  : `Resolved (${displayThreadCounts.resolved})`}
             </button>
           );
         })}
@@ -302,8 +306,6 @@ const CommentThreadList = memo(function CommentThreadList({
             deleteComment={deleteComment}
             sendReply={sendReply}
             onSelectThread={onSelectThread}
-            canComment={canComment}
-            canResolve={canResolve}
           />
         ))}
         {filterTab === "all" && resolvedRoots.length > 0 && (
@@ -331,8 +333,6 @@ const CommentThreadList = memo(function CommentThreadList({
                     deleteComment={deleteComment}
                     sendReply={sendReply}
                     onSelectThread={onSelectThread}
-                    canComment={canComment}
-                    canResolve={canResolve}
                   />
                 ))}
               </div>
@@ -352,8 +352,6 @@ const CommentThreadList = memo(function CommentThreadList({
             deleteComment={deleteComment}
             sendReply={sendReply}
             onSelectThread={onSelectThread}
-            canComment={canComment}
-            canResolve={canResolve}
           />
         ))}
       </div>
@@ -373,8 +371,7 @@ export function CommentPanel({
   currentUserId = null,
   updateComment,
   deleteComment,
-  canComment = true,
-  canResolve = true,
+  threadCounts: threadCountsProp,
 }: CommentPanelProps) {
   const [filterTab, setFilterTab] = useState<CommentFilterTab>("unresolved");
   const [highlightThreadId, setHighlightThreadId] = useState<string | null>(null);
@@ -402,6 +399,20 @@ export function CommentPanel({
   }, [isOpen, activeThreadId]);
 
   if (!isOpen) return null;
+
+  const rootsForCounts = comments.filter((c) => !c.threadId);
+  let openC = 0;
+  let resolvedC = 0;
+  for (const r of rootsForCounts) {
+    if (r.resolved) resolvedC += 1;
+    else openC += 1;
+  }
+  const fallbackCounts: CommentPanelThreadCounts = {
+    total: rootsForCounts.length,
+    open: openC,
+    resolved: resolvedC,
+  };
+  const displayThreadCounts = threadCountsProp ?? fallbackCounts;
 
   const panelContent = (
     <>
@@ -431,8 +442,7 @@ export function CommentPanel({
             deleteComment={deleteComment}
             sendReply={sendReply}
             onSelectThread={onSelectThread}
-            canComment={canComment}
-            canResolve={canResolve}
+            displayThreadCounts={displayThreadCounts}
           />
         </div>
       </div>

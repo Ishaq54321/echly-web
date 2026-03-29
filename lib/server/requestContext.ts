@@ -23,7 +23,7 @@ export interface RequestContext {
   canAccess: boolean;
   accessLevel?: string;
 
-  /** When canAccess is false and requiredTicketAccess was set; same strings as requireTicketActorPermission */
+  /** When canAccess is false and requiredTicketAccess was set */
   permissionError?: string;
 }
 
@@ -34,7 +34,7 @@ export async function buildRequestContext(params: {
   userWorkspaceId?: string;
   feedbackId?: string;
   sessionId?: string;
-  /** When set, applies the same rules as requireTicketActorPermission (single workspace read in this builder) */
+  /** When set, enforces ticket/session access + permission level in this builder */
   requiredTicketAccess?: AccessLevel;
   /** When provided (including null), skips getFeedbackByIdRepo for feedbackId */
   feedback?: Feedback | null;

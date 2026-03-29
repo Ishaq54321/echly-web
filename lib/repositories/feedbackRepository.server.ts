@@ -1,6 +1,6 @@
 import "server-only";
 import { adminDb } from "@/lib/server/firebaseAdmin";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
 import {
@@ -239,6 +239,60 @@ function assertValidFeedbackWriteStatus(value: unknown): asserts value is Feedba
   }
 }
 
+/** True when PATCH carries fields other than resolve/reopen status (title, body, tags, etc.). */
+function hasNonStatusResolvePayload(data: {
+  title?: string;
+  instruction?: string;
+  description?: string;
+  type?: string;
+  screenshotUrl?: string | null;
+  actionSteps?: string[] | null;
+  suggestedTags?: string[] | null;
+}): boolean {
+  return (
+    typeof data.title === "string" ||
+    typeof data.instruction === "string" ||
+    typeof data.description === "string" ||
+    typeof data.type === "string" ||
+    data.screenshotUrl !== undefined ||
+    data.actionSteps !== undefined ||
+    data.suggestedTags !== undefined
+  );
+}
+
+/**
+ * Session ticket counters after a status transition (single feedback row).
+ * Floors at zero; totalCount is always open + resolved (no recompute-on-read).
+ */
+function sessionTicketCountsAfterStatusChange(args: {
+  openCount: number;
+  resolvedCount: number;
+  wasStatus: FeedbackStatus;
+  toStatus: FeedbackStatus;
+}): { openCount: number; resolvedCount: number; totalCount: number } {
+  let open = Math.max(0, num(args.openCount));
+  let resolved = Math.max(0, num(args.resolvedCount));
+  if (args.wasStatus === args.toStatus) {
+    return {
+      openCount: open,
+      resolvedCount: resolved,
+      totalCount: open + resolved,
+    };
+  }
+  if (args.wasStatus === "open" && args.toStatus === "resolved") {
+    open = Math.max(0, open - 1);
+    resolved = Math.max(0, resolved + 1);
+  } else {
+    open = Math.max(0, open + 1);
+    resolved = Math.max(0, resolved - 1);
+  }
+  return {
+    openCount: open,
+    resolvedCount: resolved,
+    totalCount: open + resolved,
+  };
+}
+
 export async function updateFeedbackRepo(
   feedbackId: string,
   data: Partial<{
@@ -267,20 +321,17 @@ export async function updateFeedbackRepo(
   if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
   if (Object.keys(updates).length === 0) return;
-  let sessionIdForInvalidation: string | null = null;
-  if (updates.status !== undefined) {
-    const feedbackSnap = await adminDb.doc(`feedback/${feedbackId}`).get();
-    if (feedbackSnap.exists) {
-      const row = feedbackSnap.data();
-      const sessionId = (row as { sessionId?: unknown } | undefined)?.sessionId;
-      if (typeof sessionId === "string" && sessionId.trim() !== "") {
-        sessionIdForInvalidation = sessionId;
-      }
-    }
-  }
-  await adminDb.doc(`feedback/${feedbackId}`).update(updates);
-  void sessionIdForInvalidation;
+  const feedbackRef = adminDb.doc(`feedback/${feedbackId}`);
+  const feedbackSnap = await feedbackRef.get();
+  if (!feedbackSnap.exists) return;
+  await feedbackRef.update(updates);
 }
+
+/** Outcome of resolve/reopen + session counters (PATCH must map `missing` → 404). */
+export type UpdateFeedbackResolveAndSessionCountersResult =
+  | { kind: "missing" }
+  | { kind: "noop" }
+  | { kind: "applied"; insights?: { workspaceId: string; delta: number } };
 
 /**
  * Updates feedback (resolve / reopen) and session denormalized counters in one transaction.
@@ -298,7 +349,7 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     suggestedTags: string[] | null;
     status: FeedbackStatus;
   }>
-): Promise<void> {
+): Promise<UpdateFeedbackResolveAndSessionCountersResult> {
   const feedbackRef = adminDb.doc(`feedback/${feedbackId}`);
   if (typeof data.status !== "string") {
     throw new Error("updateFeedbackResolveAndSessionCountersRepo: missing status");
@@ -316,9 +367,9 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
   updates.status = toStatus;
 
-  const insightsFollowUp = await adminDb.runTransaction(async (tx) => {
+  const result = await adminDb.runTransaction(async (tx) => {
     const feedbackSnap = await tx.get(feedbackRef);
-    if (!feedbackSnap.exists) return null;
+    if (!feedbackSnap.exists) return { kind: "missing" as const };
     const fd = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
     const sessionId = (fd.sessionId as string) ?? "";
     const raw = typeof fd.status === "string" ? fd.status : "";
@@ -327,9 +378,10 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     let workspaceId =
       typeof fd.workspaceId === "string" ? fd.workspaceId.trim() : "";
     const sessionRef = adminDb.doc(`sessions/${sessionId}`);
+    // All transaction reads must complete before any writes.
+    const sessionSnap = await tx.get(sessionRef);
 
     if (!workspaceId) {
-      const sessionSnap = await tx.get(sessionRef);
       const s = sessionSnap.data() || {};
       workspaceId =
         typeof (s as { workspaceId?: unknown }).workspaceId === "string"
@@ -340,38 +392,58 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
       }
     }
 
+    if (wasStatus === toStatus && !hasNonStatusResolvePayload(data)) {
+      return { kind: "noop" as const };
+    }
+
+    const srow = sessionSnap.data() ?? {};
+    const counterTransition =
+      wasStatus !== toStatus
+        ? sessionTicketCountsAfterStatusChange({
+            openCount: num((srow as { openCount?: unknown }).openCount),
+            resolvedCount: num((srow as { resolvedCount?: unknown }).resolvedCount),
+            wasStatus,
+            toStatus,
+          })
+        : null;
+
     tx.update(feedbackRef, updates);
 
-    if (wasStatus !== toStatus) {
-      const dOpen =
-        (toStatus === "open" ? 1 : 0) - (wasStatus === "open" ? 1 : 0);
-      const dResolved =
-        (toStatus === "resolved" ? 1 : 0) - (wasStatus === "resolved" ? 1 : 0);
-      const dTotal = dOpen + dResolved;
-
-      tx.update(sessionRef, {
-        openCount: FieldValue.increment(dOpen),
-        resolvedCount: FieldValue.increment(dResolved),
-        totalCount: FieldValue.increment(dTotal),
-        feedbackCount: FieldValue.increment(dTotal),
-        skippedCount: FieldValue.delete(),
-        updatedAt: new Date(),
-      });
+    if (counterTransition) {
+      const { openCount, resolvedCount, totalCount } = counterTransition;
+      tx.set(
+        sessionRef,
+        {
+          openCount,
+          resolvedCount,
+          totalCount,
+          feedbackCount: totalCount,
+          skippedCount: FieldValue.delete(),
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      );
 
       const deltaResolved =
         (toStatus === "resolved" ? 1 : 0) - (wasStatus === "resolved" ? 1 : 0);
-      return { workspaceId, delta: deltaResolved };
+      return {
+        kind: "applied" as const,
+        insights: { workspaceId, delta: deltaResolved },
+      };
     }
 
-    tx.update(sessionRef, {
-      skippedCount: FieldValue.delete(),
-      updatedAt: new Date(),
-    });
-    return null;
+    if (hasNonStatusResolvePayload(data)) {
+      tx.set(
+        sessionRef,
+        { updatedAt: new Date(), skippedCount: FieldValue.delete() },
+        { merge: true }
+      );
+    }
+    return { kind: "applied" as const };
   });
 
-  if (insightsFollowUp) {
-    const { workspaceId, delta } = insightsFollowUp;
+  if (result.kind === "applied" && result.insights) {
+    const { workspaceId, delta } = result.insights;
     const insightsRef = workspaceInsightsRef(workspaceId);
     const day = new Date().toISOString().slice(0, 10);
     const patch: Record<string, unknown> = {
@@ -383,6 +455,8 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
       insightsRef.set(patch, { merge: true })
     );
   }
+
+  return result;
 }
 
 /** Cursor for server-side pagination. Opaque to callers; only repo uses it. */
@@ -722,44 +796,33 @@ export async function deleteFeedbackRepo(feedbackId: string): Promise<void> {
   await deleteFeedbackWithSessionCountersRepo(feedbackId);
 }
 
+/** Max comment docs read/deleted per feedback in one transaction (Firestore op budget). */
+const DELETE_FEEDBACK_COMMENT_TX_CHUNK = 400;
+
 /**
- * Deletes feedback and updates session denormalized counters in one transaction.
- * Migration-safe: reads session and floors counters at 0.
+ * Deletes feedback, all its comments, and session/workspace counters in one transaction.
+ * Migration-safe: floors session and workspace comment totals at 0.
  */
 export async function deleteFeedbackWithSessionCountersRepo(
   feedbackId: string
 ): Promise<void> {
-  const feedbackRef = adminDb.doc(`feedback/${feedbackId}`);
+  const fid = feedbackId.trim();
+  if (!fid) {
+    throw new Error("Missing feedbackId");
+  }
+  const feedbackRef = adminDb.doc(`feedback/${fid}`);
 
-  const result = await adminDb.runTransaction(async (tx) => {
+  await adminDb.runTransaction(async (tx) => {
     const feedbackSnap = await tx.get(feedbackRef);
-    if (!feedbackSnap.exists) return null;
+    if (!feedbackSnap.exists) return;
+
     const data = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
-    if (data.isDeleted === true) return null;
+    const isTombstone = data.isDeleted === true;
     const sessionId = (data.sessionId as string) ?? "";
-    const rawStatus = typeof data.status === "string" ? data.status : "";
-    const wasResolved = rawStatus === "resolved";
     const sessionRef = adminDb.doc(`sessions/${sessionId}`);
     const sessionSnap = await tx.get(sessionRef);
     const s = sessionSnap.data() || {};
-    let openCount = Math.max(0, num(s.openCount));
-    let resolvedCount = Math.max(0, num(s.resolvedCount));
-    if (wasResolved) resolvedCount = Math.max(0, resolvedCount - 1);
-    else openCount = Math.max(0, openCount - 1);
-    const totalCount = openCount + resolvedCount;
 
-    tx.update(feedbackRef, {
-      isDeleted: true,
-      deletedAt: new Date(),
-    });
-    tx.update(sessionRef, {
-      openCount,
-      resolvedCount,
-      totalCount,
-      feedbackCount: totalCount,
-      skippedCount: FieldValue.delete(),
-      updatedAt: new Date(),
-    });
     let resolvedWorkspaceId =
       typeof data.workspaceId === "string" ? data.workspaceId.trim() : "";
     if (!resolvedWorkspaceId) {
@@ -773,12 +836,82 @@ export async function deleteFeedbackWithSessionCountersRepo(
       throw new Error("Missing workspaceId on feedback/session");
     }
     const workspaceRef = adminDb.doc(`workspaces/${resolvedWorkspaceId}`);
+    const workspaceSnap = await tx.get(workspaceRef);
+
+    const commentRefsToDelete: DocumentReference[] = [];
+    let commentCursor: QueryDocumentSnapshot | undefined;
+    for (;;) {
+      let q: FirebaseFirestore.Query = adminDb
+        .collection("comments")
+        .where("feedbackId", "==", fid)
+        .orderBy(FieldPath.documentId())
+        .limit(DELETE_FEEDBACK_COMMENT_TX_CHUNK);
+      if (commentCursor) q = q.startAfter(commentCursor);
+      const commentSnap = await tx.get(q);
+      if (commentSnap.empty) break;
+      for (const d of commentSnap.docs) {
+        commentRefsToDelete.push(d.ref);
+      }
+      if (commentSnap.size < DELETE_FEEDBACK_COMMENT_TX_CHUNK) break;
+      commentCursor = commentSnap.docs[commentSnap.docs.length - 1] as QueryDocumentSnapshot;
+    }
+    const commentDeleteCount = commentRefsToDelete.length;
+
+    const sessionRow = sessionSnap.data() ?? {};
+    const nextSessionCommentCount = Math.max(
+      0,
+      num((sessionRow as { commentCount?: unknown }).commentCount) - commentDeleteCount
+    );
+
+    const stats = (workspaceSnap.data()?.stats ?? {}) as Record<string, unknown>;
+    const nextWorkspaceTotalComments = Math.max(
+      0,
+      num(stats.totalComments) - commentDeleteCount
+    );
+    const nextWorkspaceTotalFeedback = Math.max(0, num(stats.totalFeedback) - 1);
+
+    for (const ref of commentRefsToDelete) {
+      tx.delete(ref);
+    }
+
+    if (isTombstone) {
+      tx.delete(feedbackRef);
+      tx.update(sessionRef, {
+        commentCount: nextSessionCommentCount,
+        updatedAt: new Date(),
+      });
+      tx.update(workspaceRef, {
+        "stats.totalFeedback": nextWorkspaceTotalFeedback,
+        "stats.totalComments": nextWorkspaceTotalComments,
+        "stats.updatedAt": new Date(),
+      });
+      return;
+    }
+
+    const rawStatus = typeof data.status === "string" ? data.status : "";
+    const wasResolved = rawStatus === "resolved";
+    let openCount = Math.max(0, num(s.openCount));
+    let resolvedCount = Math.max(0, num(s.resolvedCount));
+    if (wasResolved) resolvedCount = Math.max(0, resolvedCount - 1);
+    else openCount = Math.max(0, openCount - 1);
+    const totalCount = openCount + resolvedCount;
+
+    tx.delete(feedbackRef);
+    tx.update(sessionRef, {
+      openCount,
+      resolvedCount,
+      totalCount,
+      feedbackCount: totalCount,
+      commentCount: nextSessionCommentCount,
+      skippedCount: FieldValue.delete(),
+      updatedAt: new Date(),
+    });
     tx.update(workspaceRef, {
+      "stats.totalFeedback": nextWorkspaceTotalFeedback,
+      "stats.totalComments": nextWorkspaceTotalComments,
       "stats.updatedAt": new Date(),
     });
-    return { sessionId, workspaceId: resolvedWorkspaceId };
   });
-  void result;
 }
 
 const DELETE_SESSION_FEEDBACK_LIMIT = 500;
@@ -892,29 +1025,6 @@ export async function getWorkspaceFeedbackForInsightsRepo(
 
   const snapshot = await q.get();
   return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
-}
-
-/**
- * Increments feedback.commentCount and updates lastCommentPreview/lastCommentAt.
- * Call when a comment is added.
- */
-export async function incrementFeedbackCommentCountRepo(
-  feedbackId: string,
-  lastMessage: string
-): Promise<void> {
-  const preview = lastMessage.trim().slice(0, 120);
-  const feedbackRef = adminDb.doc(`feedback/${feedbackId}`);
-  await adminDb.runTransaction(async (tx) => {
-    const snap = await tx.get(feedbackRef);
-    if (!snap.exists) return;
-    const row = snap.data() ?? {};
-    const current = num((row as any).commentCount);
-    tx.update(feedbackRef, {
-      commentCount: current + 1,
-      lastCommentPreview: preview || null,
-      lastCommentAt: new Date(),
-    });
-  });
 }
 
 /**

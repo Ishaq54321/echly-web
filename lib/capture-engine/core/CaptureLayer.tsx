@@ -58,6 +58,8 @@ export type CaptureLayerProps = {
   voiceMicDeviceId?: string;
   /** Matches widget theme for text feedback modal (light/dark glass). */
   theme?: "light" | "dark";
+  /** Extension: derived saving indicator for session chrome. */
+  __extensionSavingState?: boolean;
 };
 
 /**
@@ -98,6 +100,7 @@ export function CaptureLayer({
   onSelectMicrophone,
   voiceMicDeviceId = "",
   theme = "dark",
+  __extensionSavingState,
 }: CaptureLayerProps) {
   if (extensionMode && (!sessionMode || (!sessionIdProp && !optimisticSessionStarting))) return null;
   const showSessionOverlay =
@@ -140,6 +143,7 @@ export function CaptureLayer({
           onSaveText={onSessionSaveText}
           onCancel={onSessionFeedbackCancel}
           theme={theme}
+          __extensionSavingState={__extensionSavingState}
         />
       )}
       {showDimOverlay && (

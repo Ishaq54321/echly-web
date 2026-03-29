@@ -38480,6 +38480,7 @@
         sessionPaused,
         pausePending,
         endPending,
+        sessionFeedbackSaving,
         isFinishing,
         sessionFeedbackPending,
         sessionLimitReached,
@@ -39010,10 +39011,12 @@
     sessionPaused,
     pausePending = false,
     endPending = false,
+    __extensionSavingState,
     onPause,
     onResume,
     onEnd
   }) {
+    const saving = Boolean(__extensionSavingState);
     return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
       "div",
       {
@@ -39125,6 +39128,31 @@
               children: [
                 /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InlineSpinner, {}),
                 /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { children: "Ending\u2026" })
+              ]
+            }
+          ) : saving ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+            "button",
+            {
+              type: "button",
+              onClick: onEnd,
+              disabled: pausePending,
+              style: {
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: "none",
+                background: "#EF4444",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 500,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                cursor: pausePending ? "default" : "pointer",
+                opacity: pausePending ? 0.7 : 1
+              },
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InlineSpinner, {}),
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { children: "Saving\u2026" })
               ]
             }
           ) : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
@@ -39712,7 +39740,8 @@
     onRetryVoice,
     onSelectMicrophone,
     voiceMicDeviceId = "",
-    theme = "dark"
+    theme = "dark",
+    __extensionSavingState
   }) {
     const cleanupRef = (0, import_react11.useRef)([]);
     const voiceStartedForPendingRef = (0, import_react11.useRef)(false);
@@ -39761,6 +39790,7 @@
       if (!sessionFeedbackPending) voiceStartedForPendingRef.current = false;
     }, [sessionFeedbackPending]);
     if (!sessionMode || !captureRoot) return null;
+    const saving = Boolean(__extensionSavingState);
     const content = /* @__PURE__ */ import_react11.default.createElement(import_react11.default.Fragment, null, sessionFeedbackPending && /* @__PURE__ */ import_react11.default.createElement(
       "div",
       {
@@ -39786,6 +39816,7 @@
         sessionPaused,
         pausePending,
         endPending,
+        __extensionSavingState: saving,
         onPause,
         onResume,
         onEnd
@@ -39854,7 +39885,8 @@
     onRetryVoice,
     onSelectMicrophone,
     voiceMicDeviceId = "",
-    theme = "dark"
+    theme = "dark",
+    __extensionSavingState
   }) {
     if (extensionMode && (!sessionMode || !sessionIdProp && !optimisticSessionStarting)) return null;
     const showSessionOverlay = sessionMode && extensionMode && (!!globalSessionModeActive && !!sessionIdProp || optimisticSessionStarting);
@@ -39887,7 +39919,8 @@
           onDoneVoice: onSessionDoneVoice,
           onSaveText: onSessionSaveText,
           onCancel: onSessionFeedbackCancel,
-          theme
+          theme,
+          __extensionSavingState
         }
       ),
       showDimOverlay && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
@@ -40518,7 +40551,9 @@
     onSetCaptureMode,
     onOpenBilling,
     onOpenDashboard,
-    getAssetUrl
+    getAssetUrl,
+    __extensionSavingState,
+    onExtensionSavingSignalsChange
   }) {
     const [resumeModalOpen, setResumeModalOpen] = (0, import_react16.useState)(false);
     const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
@@ -40572,6 +40607,18 @@
       assertIdentityBeforeWorkspaceMutations
     });
     const effectiveSessionLimitReached = sessionLimitReached ?? state.sessionLimitReached;
+    (0, import_react16.useEffect)(() => {
+      onExtensionSavingSignalsChange?.({
+        sessionFeedbackSaving: state.sessionFeedbackSaving,
+        pausePending: state.pausePending,
+        endPending: state.endPending
+      });
+    }, [
+      onExtensionSavingSignalsChange,
+      state.sessionFeedbackSaving,
+      state.pausePending,
+      state.endPending
+    ]);
     const isControlled = expanded !== void 0;
     const effectiveIsOpen = isControlled ? expanded : state.isOpen;
     const listScrollRef = (0, import_react16.useRef)(null);
@@ -40722,11 +40769,16 @@
           handlers.resumeSession();
         },
         onSessionEnd: () => {
+          const saving = Boolean(__extensionSavingState);
+          if (saving && typeof window !== "undefined" && !window.confirm("Changes are still saving. Are you sure you want to end the session?")) {
+            return;
+          }
           handlers.endSession(() => {
             setShowCommandScreen(true);
             onSessionEndCallback?.();
           });
         },
+        __extensionSavingState,
         onSessionRecordVoice: handlers.handleSessionStartVoice,
         onSessionDoneVoice: handlers.finishListening,
         onSessionSaveText: handlers.handleSessionFeedbackSubmit,
@@ -41151,6 +41203,39 @@
       sessionId
     }).catch((err) => logSendMessageRejection("ECHLY_REFETCH_FEEDBACK_COUNT", err));
   }
+  function notifyTicketDeleted(ticketId) {
+    chrome.runtime.sendMessage({ type: "ECHLY_TICKET_DELETED", ticketId }).catch((err) => logSendMessageRejection("ECHLY_TICKET_DELETED", err));
+  }
+  function mergeGlobalFeedbackIntoLocal(prev, serverItems, pendingDeletes) {
+    const filteredServer = serverItems.filter((p) => !pendingDeletes.has(p.id));
+    const serverIds = new Set(serverItems.map((i) => i.id));
+    const merged = [...filteredServer];
+    for (const p of prev ?? []) {
+      if (pendingDeletes.has(p.id)) continue;
+      if (!serverIds.has(p.id)) merged.push(p);
+    }
+    return merged;
+  }
+  var BOOTSTRAP_GLOBAL_UI = {
+    visible: false,
+    expanded: false,
+    isRecording: false,
+    session: { id: null, status: "idle" },
+    sessionTitle: null,
+    sessionLoading: false,
+    feedback: {
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+      isFetching: true,
+      recovering: false,
+      recoveryAttempts: 0
+    },
+    counts: { total: 0 },
+    openCount: 0,
+    resolvedCount: 0,
+    captureMode: "voice"
+  };
   function ContentApp({ widgetRoot, initialTheme }) {
     const [user, setUser] = import_react17.default.useState(null);
     const [authState, setAuthState] = import_react17.default.useState("loading");
@@ -41163,9 +41248,68 @@
     const [sessionStartErrorBanner, setSessionStartErrorBanner] = import_react17.default.useState(null);
     const effectiveSessionId = globalState?.session.id ?? null;
     const widgetToggleRef = import_react17.default.useRef(null);
+    const pendingDeletesRef = import_react17.default.useRef(/* @__PURE__ */ new Set());
+    const deleteSnapshotsRef = import_react17.default.useRef(/* @__PURE__ */ new Map());
+    const editRollbackRef = import_react17.default.useRef(/* @__PURE__ */ new Map());
+    const prevSessionIdForLocalRef = import_react17.default.useRef(null);
+    const prevServerTotalRef = import_react17.default.useRef(null);
+    const [localFeedbackItems, setLocalFeedbackItems] = import_react17.default.useState(null);
+    const [countsDelta, setCountsDelta] = import_react17.default.useState(0);
+    const [localSessionTitle, setLocalSessionTitle] = import_react17.default.useState(null);
+    const localPendingOpsRef = import_react17.default.useRef(0);
+    const [localPendingBump, setLocalPendingBump] = import_react17.default.useState(0);
+    const startLocalOp = import_react17.default.useCallback(() => {
+      localPendingOpsRef.current += 1;
+      setLocalPendingBump((n) => n + 1);
+    }, []);
+    const endLocalOp = import_react17.default.useCallback(() => {
+      localPendingOpsRef.current = Math.max(0, localPendingOpsRef.current - 1);
+      setLocalPendingBump((n) => n + 1);
+    }, []);
+    const [extensionSavingSignals, setExtensionSavingSignals] = import_react17.default.useState({
+      sessionFeedbackSaving: false,
+      pausePending: false,
+      endPending: false
+    });
+    const onExtensionSavingSignalsChange = import_react17.default.useCallback(
+      (signals) => {
+        setExtensionSavingSignals(
+          (prev) => prev.sessionFeedbackSaving === signals.sessionFeedbackSaving && prev.pausePending === signals.pausePending && prev.endPending === signals.endPending ? prev : signals
+        );
+      },
+      []
+    );
+    const isSaving = import_react17.default.useMemo(
+      () => Boolean(extensionSavingSignals.sessionFeedbackSaving) || Boolean(extensionSavingSignals.pausePending) || Boolean(extensionSavingSignals.endPending) || localPendingOpsRef.current > 0,
+      [extensionSavingSignals, localPendingBump]
+    );
     import_react17.default.useEffect(() => {
       if (effectiveSessionId) setSessionStartErrorBanner(null);
     }, [effectiveSessionId]);
+    import_react17.default.useEffect(() => {
+      if (!globalState) return;
+      const sid = globalState.session.id;
+      if (sid !== prevSessionIdForLocalRef.current) {
+        prevSessionIdForLocalRef.current = sid;
+        pendingDeletesRef.current.clear();
+        editRollbackRef.current.clear();
+        setCountsDelta(0);
+        setLocalFeedbackItems(globalState.feedback.items);
+        setLocalSessionTitle(null);
+        return;
+      }
+      setLocalFeedbackItems(
+        (prev) => mergeGlobalFeedbackIntoLocal(prev, globalState.feedback.items, pendingDeletesRef.current)
+      );
+    }, [globalState]);
+    import_react17.default.useEffect(() => {
+      if (!globalState) return;
+      const t = globalState.counts.total;
+      if (prevServerTotalRef.current !== null && prevServerTotalRef.current !== t) {
+        setCountsDelta(0);
+      }
+      prevServerTotalRef.current = t;
+    }, [globalState?.counts.total, globalState]);
     const [isProcessingFeedback, setIsProcessingFeedback] = import_react17.default.useState(false);
     const [feedbackJobs, setFeedbackJobs] = import_react17.default.useState([]);
     import_react17.default.useEffect(() => {
@@ -41569,6 +41713,7 @@
           };
           setFeedbackJobs((prev) => [job, ...prev]);
         }
+        startLocalOp();
         try {
           setIsProcessingFeedback(true);
           const ticket = await processFeedbackPipeline({
@@ -41593,71 +41738,155 @@
           throw err;
         } finally {
           setIsProcessingFeedback(false);
+          endLocalOp();
         }
       },
-      [processFeedbackPipeline]
+      [processFeedbackPipeline, startLocalOp, endLocalOp]
     );
-    const handleDelete = import_react17.default.useCallback(async (id) => {
-      try {
-        const res = await apiFetch(`/api/tickets/${id}`, { method: "DELETE" });
-        throwIfHttpError(res, "DELETE ticket");
-        notifyFeedbackCountRefetch(effectiveSessionId);
-      } catch (err) {
-        logger.error("error", "delete_ticket_failed", err);
-        throw err;
-      }
-    }, [effectiveSessionId]);
+    const handleDelete = import_react17.default.useCallback(
+      async (id) => {
+        setLocalFeedbackItems((prev) => {
+          const list = prev ?? [];
+          const snap = list.find((i) => i.id === id);
+          if (snap) deleteSnapshotsRef.current.set(id, snap);
+          pendingDeletesRef.current.add(id);
+          return list.filter((i) => i.id !== id);
+        });
+        setCountsDelta((d) => d - 1);
+        startLocalOp();
+        try {
+          const res = await apiFetch(`/api/tickets/${id}`, { method: "DELETE" });
+          throwIfHttpError(res, "DELETE ticket");
+          pendingDeletesRef.current.delete(id);
+          deleteSnapshotsRef.current.delete(id);
+          notifyTicketDeleted(id);
+        } catch (err) {
+          logger.error("error", "delete_ticket_failed", err);
+          pendingDeletesRef.current.delete(id);
+          const restored = deleteSnapshotsRef.current.get(id);
+          deleteSnapshotsRef.current.delete(id);
+          if (restored) {
+            setLocalFeedbackItems((prev) => {
+              const list = prev ?? [];
+              if (list.some((i) => i.id === id)) return list;
+              return [restored, ...list];
+            });
+          }
+          setCountsDelta((d) => d + 1);
+        } finally {
+          endLocalOp();
+        }
+      },
+      [startLocalOp, endLocalOp]
+    );
     const handleUpdate = import_react17.default.useCallback(
       async (id, payload) => {
-        const res = await apiFetch(`/api/tickets/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: payload.title,
-            instruction: payload.actionSteps?.join("\n") ?? "",
-            actionSteps: payload.actionSteps ?? []
-          })
-        });
-        throwIfHttpError(res, "PATCH ticket");
-        const data = await res.json();
-        if (data.success && data.ticket) {
-          const ticket = data.ticket;
-          chrome.runtime.sendMessage({
-            type: "ECHLY_TICKET_UPDATED",
-            ticket: {
-              id: ticket.id,
-              title: ticket.title,
-              actionSteps: ticket.actionSteps ?? [],
-              type: ticket.type ?? "Feedback"
+        let typeForMessage = "Feedback";
+        setLocalFeedbackItems((prev) => {
+          const list = prev ?? [];
+          const cur = list.find((i) => i.id === id);
+          if (cur) {
+            typeForMessage = cur.type ?? "Feedback";
+            if (!editRollbackRef.current.has(id)) {
+              editRollbackRef.current.set(id, { ...cur });
             }
-          }).catch((err) => logSendMessageRejection("ECHLY_TICKET_UPDATED", err));
-        }
-      },
-      []
-    );
-    const onSessionTitleChange = import_react17.default.useCallback(
-      async (newTitle) => {
-        if (!effectiveSessionId) return;
+          }
+          return list.map(
+            (p) => p.id === id ? { ...p, title: payload.title, actionSteps: payload.actionSteps } : p
+          );
+        });
+        chrome.runtime.sendMessage({
+          type: "ECHLY_TICKET_UPDATED",
+          ticket: {
+            id,
+            title: payload.title,
+            actionSteps: payload.actionSteps,
+            type: typeForMessage
+          }
+        }).catch((err) => logSendMessageRejection("ECHLY_TICKET_UPDATED (optimistic)", err));
+        startLocalOp();
         try {
-          const res = await apiFetch(`/api/sessions/${effectiveSessionId}`, {
+          const res = await apiFetch(`/api/tickets/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: newTitle.trim() || "Untitled Session" })
+            body: JSON.stringify({
+              title: payload.title,
+              instruction: payload.actionSteps?.join("\n") ?? "",
+              actionSteps: payload.actionSteps ?? []
+            })
           });
-          throwIfHttpError(res, "PATCH session title");
+          throwIfHttpError(res, "PATCH ticket");
           const data = await res.json();
-          if (data.success) {
+          if (data.success && data.ticket) {
+            const ticket = data.ticket;
+            editRollbackRef.current.delete(id);
             chrome.runtime.sendMessage({
-              type: "ECHLY_SESSION_UPDATED",
-              sessionId: effectiveSessionId,
-              title: newTitle.trim() || "Untitled Session"
-            }).catch((err) => logSendMessageRejection("ECHLY_SESSION_UPDATED", err));
+              type: "ECHLY_TICKET_UPDATED",
+              ticket: {
+                id: ticket.id,
+                title: ticket.title,
+                actionSteps: ticket.actionSteps ?? [],
+                type: ticket.type ?? "Feedback"
+              }
+            }).catch((err) => logSendMessageRejection("ECHLY_TICKET_UPDATED", err));
+          } else {
+            throw new Error("PATCH ticket rejected");
           }
         } catch (err) {
-          logger.error("error", "session_title_update_failed", err);
+          logger.error("error", "update_ticket_failed", err);
+          const rolled = editRollbackRef.current.get(id);
+          editRollbackRef.current.delete(id);
+          if (rolled) {
+            setLocalFeedbackItems((prev) => (prev ?? []).map((p) => p.id === id ? rolled : p));
+            chrome.runtime.sendMessage({
+              type: "ECHLY_TICKET_UPDATED",
+              ticket: {
+                id: rolled.id,
+                title: rolled.title,
+                actionSteps: rolled.actionSteps ?? [],
+                type: rolled.type ?? "Feedback"
+              }
+            }).catch((e) => logSendMessageRejection("ECHLY_TICKET_UPDATED (rollback)", e));
+          }
+        } finally {
+          endLocalOp();
         }
       },
-      [effectiveSessionId]
+      [startLocalOp, endLocalOp]
+    );
+    const onSessionTitleChange = import_react17.default.useCallback(
+      (newTitle) => {
+        if (!effectiveSessionId) return;
+        const trimmed = newTitle.trim() || "Untitled Session";
+        setLocalSessionTitle(trimmed);
+        startLocalOp();
+        void (async () => {
+          try {
+            const res = await apiFetch(`/api/sessions/${effectiveSessionId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title: trimmed })
+            });
+            throwIfHttpError(res, "PATCH session title");
+            const data = await res.json();
+            if (data.success) {
+              chrome.runtime.sendMessage({
+                type: "ECHLY_SESSION_UPDATED",
+                sessionId: effectiveSessionId,
+                title: trimmed
+              }).catch((err) => logSendMessageRejection("ECHLY_SESSION_UPDATED", err));
+            } else {
+              setLocalSessionTitle(null);
+            }
+          } catch (err) {
+            logger.error("error", "session_title_update_failed", err);
+            setLocalSessionTitle(null);
+          } finally {
+            endLocalOp();
+          }
+        })();
+      },
+      [effectiveSessionId, startLocalOp, endLocalOp]
     );
     const fetchSessions = import_react17.default.useCallback(async () => {
       const sessions = await getSessionsCached(apiFetch);
@@ -41707,26 +41936,28 @@
       });
     }
     const onPreviousSessionSelect = import_react17.default.useCallback(
-      async (sessionId, _options) => {
+      (sessionId, _options) => {
         chrome.runtime.sendMessage({ type: "ECHLY_SET_ACTIVE_SESSION", sessionId }, () => {
           logRuntimeLastError("ECHLY_SET_ACTIVE_SESSION (onPreviousSessionSelect)");
         });
         chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(
           (err) => logSendMessageRejection("ECHLY_SESSION_MODE_START (onPreviousSessionSelect)", err)
         );
-        try {
-          const sessionRes = await apiFetch(`/api/sessions/${sessionId}`);
-          throwIfHttpError(sessionRes, "GET session for resume");
-          const sessionData = await sessionRes.json();
-          if (sessionData?.session?.url) {
-            chrome.runtime.sendMessage({
-              type: "ECHLY_OPEN_TAB",
-              url: sessionData.session.url
-            }).catch((err) => logSendMessageRejection("ECHLY_OPEN_TAB (resume session)", err));
+        void (async () => {
+          try {
+            const sessionRes = await apiFetch(`/api/sessions/${sessionId}`);
+            throwIfHttpError(sessionRes, "GET session for resume");
+            const sessionData = await sessionRes.json();
+            if (sessionData?.session?.url) {
+              chrome.runtime.sendMessage({
+                type: "ECHLY_OPEN_TAB",
+                url: sessionData.session.url
+              }).catch((err) => logSendMessageRejection("ECHLY_OPEN_TAB (resume session)", err));
+            }
+          } catch (e) {
+            console.error("[ECHLY] session URL fetch failed (optional tab open)", e);
           }
-        } catch (e) {
-          console.error("[ECHLY] session URL fetch failed (optional tab open)", e);
-        }
+        })();
       },
       []
     );
@@ -41746,42 +41977,34 @@
         (err) => logSendMessageRejection("ECHLY_TRIGGER_LOGIN", err)
       );
     }, []);
-    if (globalState === null) {
-      return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+    if (authState === "loading" && !user) {
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
         "div",
         {
           style: {
-            minWidth: 280,
-            padding: "16px",
-            borderRadius: 12,
+            minWidth: 200,
+            padding: "8px 12px",
+            borderRadius: 10,
             border: "1px solid #E6F0FF",
             background: "#F8FBFF",
-            color: "#374151",
-            fontSize: 14,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.08)"
+            color: "#4B5563",
+            fontSize: 13,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8
           },
-          children: "Syncing extension state\u2026"
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "echly-spinner", style: { width: 14, height: 14 }, "aria-hidden": true }),
+            "Checking sign-in\u2026"
+          ]
         }
       );
     }
-    if (authState === "loading") {
-      return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-        "div",
-        {
-          style: {
-            minWidth: 280,
-            padding: "16px",
-            borderRadius: 12,
-            border: "1px solid #E6F0FF",
-            background: "#F8FBFF",
-            color: "#374151",
-            fontSize: 14,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.08)"
-          },
-          children: "Checking authentication..."
-        }
-      );
-    }
+    const uiGlobal = globalState ?? BOOTSTRAP_GLOBAL_UI;
+    const displayFeedbackItems = localFeedbackItems ?? uiGlobal.feedback.items;
+    const displayTotalCount = Math.max(0, uiGlobal.counts.total + countsDelta);
+    const displaySessionTitle = localSessionTitle ?? uiGlobal.sessionTitle ?? void 0;
     if (authState === "unauthenticated" || !user) {
       return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
         "div",
@@ -41846,104 +42069,125 @@
       logger.error("error", "debug_log_failed", logErr);
     }
     try {
-      return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(import_jsx_runtime11.Fragment, { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(EchlyWidgetErrorBoundary, { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-        CaptureWidget,
-        {
-          sessionId: effectiveSessionId ?? "",
-          userId: user.uid,
-          extensionMode: true,
-          captureMode: globalState.captureMode,
-          onComplete: handleComplete,
-          onDelete: handleDelete,
-          onUpdate: handleUpdate,
-          widgetToggleRef,
-          onRecordingChange,
-          expanded: globalState.expanded,
-          onExpandRequest,
-          onCollapseRequest,
-          captureDisabled: false,
-          theme,
-          onThemeToggle,
-          fetchSessions,
-          hasPreviousSessions,
-          onPreviousSessionSelect,
-          pointers: globalState.feedback.items,
-          feedbackRecovering: globalState.feedback.recovering === true,
-          feedbackRecoveryAttempts: globalState.feedback.recoveryAttempts,
-          feedbackFetchFailed: globalState.feedback.recovering !== true && globalState.feedback.recoveryAttempts > 0,
-          totalCount: globalState.counts.total,
-          openCount: globalState.openCount,
-          resolvedCount: globalState.resolvedCount,
-          sessionLoading: globalState.sessionLoading,
-          sessionTitleProp: globalState.sessionTitle ?? void 0,
-          onSessionTitleChange,
-          isProcessingFeedback,
-          feedbackJobs,
-          onSessionEnd: () => {
-          },
-          onCreateSession: createSession,
-          onActiveSessionChange,
-          ensureAuthenticated,
-          verifySessionBeforeSessions,
-          onTriggerLogin,
-          globalSessionModeActive: globalState.session.status !== "idle",
-          globalSessionPaused: globalState.session.status === "paused",
-          onSessionModeStart: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(
-            (err) => logSendMessageRejection("ECHLY_SESSION_MODE_START", err)
-          ),
-          onSessionModePause: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(
-            (err) => logSendMessageRejection("ECHLY_SESSION_MODE_PAUSE", err)
-          ),
-          onSessionModeResume: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(
-            (err) => logSendMessageRejection("ECHLY_SESSION_MODE_RESUME", err)
-          ),
-          onSessionActivity: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch(
-            (err) => logSendMessageRejection("ECHLY_SESSION_ACTIVITY", err)
-          ),
-          onSessionModeEnd: () => {
-            const sessionId = globalState.session.id;
-            (async () => {
-              await new Promise((resolve, reject) => {
-                chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, () => {
-                  if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-                  else resolve();
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { style: { position: "relative" }, children: [
+        globalState === null && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          "div",
+          {
+            "aria-hidden": true,
+            style: {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 2,
+              background: "linear-gradient(90deg, #93c5fd, #3b82f6)",
+              opacity: 0.9,
+              pointerEvents: "none",
+              zIndex: 5
+            }
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(EchlyWidgetErrorBoundary, { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          CaptureWidget,
+          {
+            sessionId: effectiveSessionId ?? "",
+            userId: user.uid,
+            extensionMode: true,
+            __extensionSavingState: isSaving,
+            onExtensionSavingSignalsChange,
+            captureMode: uiGlobal.captureMode,
+            onComplete: handleComplete,
+            onDelete: handleDelete,
+            onUpdate: handleUpdate,
+            widgetToggleRef,
+            onRecordingChange,
+            expanded: uiGlobal.expanded,
+            onExpandRequest,
+            onCollapseRequest,
+            captureDisabled: false,
+            theme,
+            onThemeToggle,
+            fetchSessions,
+            hasPreviousSessions,
+            onPreviousSessionSelect,
+            pointers: displayFeedbackItems,
+            feedbackRecovering: uiGlobal.feedback.recovering === true,
+            feedbackRecoveryAttempts: uiGlobal.feedback.recoveryAttempts,
+            feedbackFetchFailed: uiGlobal.feedback.recovering !== true && uiGlobal.feedback.recoveryAttempts > 0,
+            totalCount: displayTotalCount,
+            openCount: uiGlobal.openCount,
+            resolvedCount: uiGlobal.resolvedCount,
+            sessionLoading: uiGlobal.sessionLoading,
+            sessionTitleProp: displaySessionTitle,
+            onSessionTitleChange,
+            isProcessingFeedback,
+            feedbackJobs,
+            onSessionEnd: () => {
+            },
+            onCreateSession: createSession,
+            onActiveSessionChange,
+            ensureAuthenticated,
+            verifySessionBeforeSessions,
+            onTriggerLogin,
+            globalSessionModeActive: uiGlobal.session.status !== "idle",
+            globalSessionPaused: uiGlobal.session.status === "paused",
+            onSessionModeStart: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch(
+              (err) => logSendMessageRejection("ECHLY_SESSION_MODE_START", err)
+            ),
+            onSessionModePause: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch(
+              (err) => logSendMessageRejection("ECHLY_SESSION_MODE_PAUSE", err)
+            ),
+            onSessionModeResume: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_RESUME" }).catch(
+              (err) => logSendMessageRejection("ECHLY_SESSION_MODE_RESUME", err)
+            ),
+            onSessionActivity: () => chrome.runtime.sendMessage({ type: "ECHLY_SESSION_ACTIVITY" }).catch(
+              (err) => logSendMessageRejection("ECHLY_SESSION_ACTIVITY", err)
+            ),
+            onSessionModeEnd: () => {
+              const sessionId = uiGlobal.session.id;
+              void (async () => {
+                await new Promise((resolve, reject) => {
+                  chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, () => {
+                    if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+                    else resolve();
+                  });
                 });
-              });
-              await new Promise((r) => setTimeout(r, 50));
-              if (sessionId) {
-                const url = `${APP_ORIGIN}/dashboard/${sessionId}`;
-                chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch(
-                  (err) => logSendMessageRejection("ECHLY_OPEN_TAB (session mode end)", err)
-                );
-              }
-            })().catch((err) => logSendMessageRejection("ECHLY_SESSION_MODE_END chain", err));
+                await new Promise((r) => setTimeout(r, 50));
+                if (sessionId) {
+                  const url = `${APP_ORIGIN}/dashboard/${sessionId}`;
+                  chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch(
+                    (err) => logSendMessageRejection("ECHLY_OPEN_TAB (session mode end)", err)
+                  );
+                }
+              })().catch((err) => logSendMessageRejection("ECHLY_SESSION_MODE_END chain", err));
+            },
+            captureRootParent: widgetRoot,
+            launcherLogoUrl,
+            openResumeModal: openResumeModalFromMessage,
+            onResumeModalClose: () => setOpenResumeModalFromMessage(false),
+            sessionLimitReached,
+            sessionStartErrorBanner,
+            onSessionStartErrorDismiss: () => setSessionStartErrorBanner(null),
+            environment,
+            assertIdentityBeforeWorkspaceMutations: () => {
+            },
+            onPreviousSessions: () => {
+              logger.debug("extension", "previous_sessions_handler_fired");
+              setOpenResumeModalFromMessage(true);
+              logger.debug("extension", "resume_modal_opened");
+            },
+            onSetCaptureMode: (mode) => chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(
+              (err) => logSendMessageRejection("ECHLY_SET_CAPTURE_MODE", err)
+            ),
+            onOpenBilling: () => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(
+              (err) => logSendMessageRejection("ECHLY_OPEN_BILLING", err)
+            ),
+            onOpenDashboard: () => environment.openDashboard(`${APP_ORIGIN}/dashboard`),
+            getAssetUrl
           },
-          captureRootParent: widgetRoot,
-          launcherLogoUrl,
-          openResumeModal: openResumeModalFromMessage,
-          onResumeModalClose: () => setOpenResumeModalFromMessage(false),
-          sessionLimitReached,
-          sessionStartErrorBanner,
-          onSessionStartErrorDismiss: () => setSessionStartErrorBanner(null),
-          environment,
-          assertIdentityBeforeWorkspaceMutations: () => {
-          },
-          onPreviousSessions: () => {
-            logger.debug("extension", "previous_sessions_handler_fired");
-            setOpenResumeModalFromMessage(true);
-            logger.debug("extension", "resume_modal_opened");
-          },
-          onSetCaptureMode: (mode) => chrome.runtime.sendMessage({ type: "ECHLY_SET_CAPTURE_MODE", mode }).catch(
-            (err) => logSendMessageRejection("ECHLY_SET_CAPTURE_MODE", err)
-          ),
-          onOpenBilling: () => chrome.runtime.sendMessage({ type: "ECHLY_OPEN_BILLING" }).catch(
-            (err) => logSendMessageRejection("ECHLY_OPEN_BILLING", err)
-          ),
-          onOpenDashboard: () => environment.openDashboard(`${APP_ORIGIN}/dashboard`),
-          getAssetUrl
-        },
-        widgetResetKey
-      ) }) });
+          widgetResetKey
+        ) })
+      ] });
     } catch (e) {
       logger.error("error", "extension_crash", e);
       return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { "data-echly-crashed": true, children: "CRASHED" });

@@ -261,15 +261,17 @@ function shouldForceRehydrate(sessionIdForRehydrate: string): boolean {
 type RehydrateMode = "cold" | "forced_recovery" | "stale_soft";
 
 function setRehydratingLoadingState(sessionId: string, mode: RehydrateMode = "cold"): void {
+  const previousSessionId = globalUIState.sessionId;
+  const sessionChanged = previousSessionId !== sessionId;
   activeSessionId = sessionId;
   globalUIState.sessionId = sessionId;
   globalUIState.sessionModeActive = true;
   globalUIState.sessionPaused = false;
-  globalUIState.sessionLoading = true;
+  // Same-session refresh: keep list visible; only block full chrome on session change / recovery.
+  globalUIState.sessionLoading = sessionChanged || mode === "forced_recovery";
   globalUIState.isFetching = true;
-  const clearList = mode === "cold" || mode === "forced_recovery";
+  const clearList = mode === "forced_recovery" || (mode === "cold" && sessionChanged);
   if (clearList) {
-    // Never show stale in-memory feedback during cold start or explicit recovery.
     globalUIState.pointers = [];
     globalUIState.totalCount = 0;
     globalUIState.openCount = 0;
@@ -298,7 +300,16 @@ async function rehydrateSession(sessionId: string, mode: RehydrateMode = "cold")
       ]);
 
       const feedbackJson = (await feedbackRes.json()) as FeedbackListResponse;
-      globalUIState.pointers = mapFeedbackToPointers(feedbackJson.feedback ?? []);
+      const serverPointers = mapFeedbackToPointers(feedbackJson.feedback ?? []);
+      if (mode === "forced_recovery") {
+        globalUIState.pointers = serverPointers;
+      } else {
+        const serverIds = new Set(serverPointers.map((p) => p.id));
+        globalUIState.pointers = [
+          ...serverPointers,
+          ...globalUIState.pointers.filter((p) => !serverIds.has(p.id)),
+        ];
+      }
       globalUIState.nextCursor =
         typeof feedbackJson.nextCursor === "string" && feedbackJson.nextCursor.length > 0
           ? feedbackJson.nextCursor
@@ -624,13 +635,6 @@ async function getOrRefreshToken(): Promise<string> {
     extensionTokenExpiresAt != null &&
     now < extensionTokenExpiresAt
   ) {
-    const sessionOk = await verifyDashboardSession();
-
-    if (!sessionOk) {
-      clearAuthState();
-      throw new Error("NOT_AUTHENTICATED");
-    }
-
     setExtensionToken(extensionToken);
     sw.extensionToken = extensionToken;
     return extensionToken;
@@ -853,7 +857,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   if (!echlyActive) return;
   const sessionIdForRehydrate = activeSessionId ?? globalUIState.sessionId;
   if (sessionIdForRehydrate && shouldForceRehydrate(sessionIdForRehydrate)) {
-    await rehydrateSession(sessionIdForRehydrate);
+    void rehydrateSession(sessionIdForRehydrate);
   }
   try {
     await ensureContentScriptInjected(activeInfo.tabId);
@@ -1057,6 +1061,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_GET_GLOBAL_STATE") {
+    sendResponse({ state: getCanonicalGlobalState() });
     void (async () => {
       const stored = await chrome.storage.local.get(["activeSessionId"]);
       const storedSessionId =
@@ -1065,9 +1070,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (sessionIdForRehydrate && shouldForceRehydrate(sessionIdForRehydrate)) {
         await rehydrateSession(sessionIdForRehydrate);
       }
-      sendResponse({ state: getCanonicalGlobalState() });
     })();
-    return true;
+    return false;
   }
 
   if (request.type === "ECHLY_GET_TRAY_STATE") {
@@ -1197,6 +1201,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           : p
       );
       broadcastUIState();
+    }
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === "ECHLY_TICKET_DELETED") {
+    const ticketId = (request as { ticketId?: string }).ticketId;
+    if (typeof ticketId === "string" && ticketId.length > 0) {
+      globalUIState.pointers = globalUIState.pointers.filter((p) => p.id !== ticketId);
+      resetSessionIdleTimer();
+      broadcastUIState();
+      const sid = globalUIState.sessionId;
+      if (sid) {
+        void (async () => {
+          try {
+            const c = await fetchFeedbackCountFresh(sid);
+            if (globalUIState.sessionId !== sid) return;
+            globalUIState.totalCount = c.total;
+            globalUIState.openCount = c.open;
+            globalUIState.resolvedCount = c.resolved;
+            broadcastUIState();
+          } catch (err) {
+            console.error("[ECHLY] refresh counts after ticket deleted failed", err);
+          }
+        })();
+      }
     }
     sendResponse({ ok: true });
     return false;

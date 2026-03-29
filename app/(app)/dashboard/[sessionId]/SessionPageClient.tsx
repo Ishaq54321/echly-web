@@ -1,7 +1,15 @@
 "use client";
 
 import { authFetch } from "@/lib/authFetch";
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  startTransition,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -19,8 +27,12 @@ import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
-import { hasPermission, normalizeAccessLevel } from "@/lib/domain/accessLevel";
-import { getEffectiveAccessLevel } from "@/lib/permissions/sessionEffectiveAccess";
+import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
+import {
+  handlePermissionError,
+  notifyPermissionDenied,
+  responseIsPermissionDenied,
+} from "@/lib/client/permissionError";
 import { warn } from "@/lib/utils/logger";
 import Image from "next/image";
 import {
@@ -72,6 +84,19 @@ function preloadImage(src: string, preloaded: Set<string>) {
   preloaded.add(src);
   const img = new window.Image();
   img.src = src;
+}
+
+function sameStringArrayContent(
+  a: string[] | null | undefined,
+  b: string[] | null | undefined
+): boolean {
+  const aa = Array.isArray(a) ? a : [];
+  const bb = Array.isArray(b) ? b : [];
+  if (aa.length !== bb.length) return false;
+  for (let i = 0; i < aa.length; i++) {
+    if (aa[i] !== bb[i]) return false;
+  }
+  return true;
 }
 
 export default function SessionPageClient({ sessionId }: { sessionId: string }) {
@@ -184,6 +209,37 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     };
   }, [searchQuery, feedbackSessionId, authUid]);
 
+  /** In-flight action steps per ticket — merged onto Firestore snapshots to avoid realtime flicker. */
+  const pendingOptimisticActionStepsRef = useRef(
+    new Map<string, { steps: string[] | null }>()
+  );
+  /** Monotonic save generation per ticket; stale PATCH responses must not overwrite UI. */
+  const actionStepsSaveLatestGenRef = useRef(new Map<string, number>());
+  const mergeRealtimeFeedbackListRef = useRef<
+    ((list: Feedback[]) => Feedback[]) | null
+  >(null);
+
+  const mergeRealtimeFeedbackList = useCallback((incoming: Feedback[]) => {
+    const pending = pendingOptimisticActionStepsRef.current;
+    if (pending.size === 0) return incoming;
+    return incoming.map((item) => {
+      const row = pending.get(item.id);
+      if (!row) return item;
+      return { ...item, actionSteps: row.steps };
+    });
+  }, []);
+
+  mergeRealtimeFeedbackListRef.current = mergeRealtimeFeedbackList;
+
+  useLayoutEffect(() => {
+    pendingOptimisticActionStepsRef.current.clear();
+    actionStepsSaveLatestGenRef.current.clear();
+  }, [sessionId]);
+
+  useLayoutEffect(() => {
+    setResolveOptimistic(null);
+  }, [sessionId]);
+
   const {
     feedback,
     setFeedback,
@@ -198,17 +254,39 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     loadingMore: feedbackLoadingMore,
     isLoadingResolved: feedbackLoadingResolved,
     loadMoreRef: feedbackLoadMoreRef,
-  } = useSessionFeedbackPaginated(feedbackSessionId, (newestTicketId) => {
-    setSelectedId(newestTicketId);
-    setNewTicketId(newestTicketId);
-  });
+    setCountsDelta: setSessionCountsDelta,
+  } = useSessionFeedbackPaginated(
+    feedbackSessionId,
+    (newestTicketId) => {
+      setSelectedId(newestTicketId);
+      setNewTicketId(newestTicketId);
+    },
+    { mergeRealtimeListRef: mergeRealtimeFeedbackListRef }
+  );
 
   const feedbackScoped = useMemo(
     () => feedback.filter((f) => f.sessionId === sessionId),
     [feedback, sessionId]
   );
+
+  /** Instant resolve UI: overlays `isResolved` until list state catches up (see `saveResolved`). */
+  const [resolveOptimistic, setResolveOptimistic] = useState<{
+    ticketId: string;
+    isResolved: boolean;
+  } | null>(null);
+  const [resolveAffirmationKey, setResolveAffirmationKey] = useState(0);
+
+  const feedbackScopedVisual = useMemo(() => {
+    if (!resolveOptimistic) return feedbackScoped;
+    return feedbackScoped.map((item) =>
+      item.id === resolveOptimistic.ticketId
+        ? { ...item, isResolved: resolveOptimistic.isResolved }
+        : item
+    );
+  }, [feedbackScoped, resolveOptimistic]);
+
   const stableScopedFeedback = useStableState(
-    feedbackScoped,
+    feedbackScopedVisual,
     !feedbackLoading && Boolean(authUid),
     sessionId
   );
@@ -551,27 +629,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     };
   }, [stableCanonicalFeedback, effectiveSelectedId, contextualPosition.index, contextualPosition.total]);
 
-  const sessionActionCaps = useMemo(() => {
-    if (!authUid || !session) {
-      return { canComment: false, canResolve: false };
-    }
-    const effective = getEffectiveAccessLevel({
-      session,
-      viewerWorkspaceId: workspaceId,
-      invitedPermission: null,
-    });
-    return {
-      canComment: hasPermission(effective, "comment"),
-      canResolve: hasPermission(effective, "resolve"),
-    };
-  }, [authUid, session, workspaceId]);
-
-  useEffect(() => {
-    if (!sessionActionCaps.canComment && isCommentMode) {
-      setIsCommentMode(false);
-    }
-  }, [sessionActionCaps.canComment, isCommentMode]);
-
   const handleSessionRenameFromMenu = useCallback(
     (updated: { id: string; title: string; updatedAt?: unknown }) => {
       if (updated.id !== sessionId) return;
@@ -597,15 +654,24 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       if (snapshot) {
         setSession({ ...snapshot, archived, isArchived: archived });
       }
+      let permissionDeniedNotified = false;
       try {
         const res = await authFetch(`/api/sessions/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ archived, isArchived: archived }),
         });
-        if (!res) return;
+        if (!res) {
+          if (snapshot) setSession(snapshot);
+          showToast("Could not update session");
+          return;
+        }
         if (!res.ok) {
           const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+          if (responseIsPermissionDenied(res)) {
+            notifyPermissionDenied(showToast);
+            permissionDeniedNotified = true;
+          }
           throw new Error(errBody?.error ?? "Archive failed");
         }
         if (archived) {
@@ -613,7 +679,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         }
       } catch (err) {
         console.error("[ECHLY] Session archive from menu failed", err);
-        showToast("Could not update session");
+        if (!permissionDeniedNotified) showToast("Could not update session");
         if (snapshot) setSession(snapshot);
       }
     },
@@ -629,17 +695,21 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (!sessionId) return;
     assertIdentityResolved(isIdentityResolved);
     const res = await authFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
-    if (!res) return;
+    if (!res) {
+      throw new Error("Delete failed");
+    }
     const data = (await res.json()) as { success?: boolean; error?: string };
     if (!res.ok || !data?.success) {
+      if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
       throw new Error(data?.error ?? "Delete failed");
     }
     router.push("/dashboard");
-  }, [sessionId, router, isIdentityResolved]);
+  }, [sessionId, router, isIdentityResolved, showToast]);
 
   const {
     comments,
     loadingComments,
+    displayCommentThreadCounts,
     sendReply,
     sendPinComment,
     sendTextComment,
@@ -649,8 +719,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   } = useFeedbackDetailController({
     sessionId,
     feedbackId: effectiveSelectedId,
-    canComment: sessionActionCaps.canComment,
-    canResolve: sessionActionCaps.canResolve,
   });
 
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -660,7 +728,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /* ================= SAVE TITLE (optimistic update, then PATCH) ================= */
 
   const saveTitle = async (newTitle: string): Promise<void> => {
-    if (!sessionActionCaps.canResolve || !effectiveSelectedId || newTitle.trim() === "") return;
+    if (!effectiveSelectedId || newTitle.trim() === "") return;
     assertIdentityResolved(isIdentityResolved);
     const trimmed = newTitle.trim();
     const previousTitle = selectedItem?.title;
@@ -675,19 +743,39 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: trimmed }),
       });
-      if (!res) return;
+      if (!res) {
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === effectiveSelectedId
+              ? { ...item, title: previousTitle ?? trimmed }
+              : item
+          )
+        );
+        showToast("Could not save title");
+        return;
+      }
       const data = (await res.json()) as {
         success?: boolean;
         ticket?: TicketFromApi;
       };
-      if (data.success && data.ticket) {
+      if (!res.ok || !data.success || !data.ticket) {
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
+            item.id === effectiveSelectedId
+              ? { ...item, title: previousTitle ?? trimmed }
+              : item
           )
         );
-        broadcastTicketUpdated(data.ticket);
+        if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
+        else showToast("Could not save title");
+        return;
       }
+      setFeedback((prev) =>
+        prev.map((item) =>
+          item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
+        )
+      );
+      broadcastTicketUpdated(data.ticket);
     } catch (err) {
       console.error("[ECHLY] saveTitle failed", err);
       showToast("Could not save title");
@@ -704,46 +792,84 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /* ================= SAVE ACTION STEPS (optimistic update, then PATCH) ================= */
 
   const saveActionSteps = async (actionSteps: string[]) => {
-    if (!sessionActionCaps.canResolve || !effectiveSelectedId) return;
+    if (!effectiveSelectedId) return;
     assertIdentityResolved(isIdentityResolved);
-    const previous = selectedItem?.actionSteps ?? null;
+    const ticketId = effectiveSelectedId;
+    const currentSteps = selectedItem?.actionSteps ?? null;
+    if (sameStringArrayContent(currentSteps, actionSteps)) return;
+
+    const previousSteps = currentSteps;
+    const priorGen = actionStepsSaveLatestGenRef.current.get(ticketId) ?? 0;
+    const myGen = priorGen + 1;
+    actionStepsSaveLatestGenRef.current.set(ticketId, myGen);
+    pendingOptimisticActionStepsRef.current.set(ticketId, { steps: actionSteps });
+
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === effectiveSelectedId ? { ...item, actionSteps } : item
+        item.id === ticketId ? { ...item, actionSteps } : item
       )
     );
-    try {
-      const res = await authFetch(`/api/tickets/${effectiveSelectedId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionSteps }),
-      });
-      if (!res) return;
-      const data = (await res.json()) as {
-        success?: boolean;
-        ticket?: TicketFromApi;
-      };
-      if (data.success && data.ticket) {
+
+    void (async () => {
+      const rollbackIfLatest = () => {
+        if (actionStepsSaveLatestGenRef.current.get(ticketId) !== myGen) return;
+        pendingOptimisticActionStepsRef.current.delete(ticketId);
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
+            item.id === ticketId
+              ? { ...item, actionSteps: previousSteps }
+              : item
+          )
+        );
+      };
+
+      try {
+        const res = await authFetch(`/api/tickets/${ticketId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ actionSteps }),
+        });
+        if (!res) {
+          rollbackIfLatest();
+          if (actionStepsSaveLatestGenRef.current.get(ticketId) === myGen) {
+            showToast("Could not save action items");
+          }
+          return;
+        }
+        const data = (await res.json()) as {
+          success?: boolean;
+          ticket?: TicketFromApi;
+        };
+        if (!res.ok || !data.success || !data.ticket) {
+          rollbackIfLatest();
+          if (actionStepsSaveLatestGenRef.current.get(ticketId) === myGen) {
+            if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
+            else showToast("Could not save action items");
+          }
+          return;
+        }
+        if (actionStepsSaveLatestGenRef.current.get(ticketId) !== myGen) {
+          return;
+        }
+        pendingOptimisticActionStepsRef.current.delete(ticketId);
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === ticketId ? { ...item, ...data.ticket } : item
           )
         );
         broadcastTicketUpdated(data.ticket);
+      } catch (err) {
+        console.error("[ECHLY] saveActionSteps failed", err);
+        rollbackIfLatest();
+        if (actionStepsSaveLatestGenRef.current.get(ticketId) === myGen) {
+          showToast("Could not save action items");
+        }
       }
-    } catch (err) {
-      console.error("[ECHLY] saveActionSteps failed", err);
-      showToast("Could not save action items");
-      setFeedback((prev) =>
-        prev.map((item) =>
-          item.id === effectiveSelectedId ? { ...item, actionSteps: previous } : item
-        )
-      );
-    }
+    })();
   };
 
   const saveTags = async (suggestedTags: string[]) => {
-    if (!sessionActionCaps.canResolve || !effectiveSelectedId) return;
+    if (!effectiveSelectedId) return;
     assertIdentityResolved(isIdentityResolved);
     const nextTags = Array.isArray(suggestedTags) ? suggestedTags : null;
     const previous = selectedItem?.suggestedTags ?? null;
@@ -758,19 +884,35 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ suggestedTags }),
       });
-      if (!res) return;
+      if (!res) {
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
+          )
+        );
+        showToast("Could not save tags");
+        return;
+      }
       const data = (await res.json()) as {
         success?: boolean;
         ticket?: TicketFromApi;
       };
-      if (data.success && data.ticket) {
+      if (!res.ok || !data.success || !data.ticket) {
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
+            item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
           )
         );
-        broadcastTicketUpdated(data.ticket);
+        if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
+        else showToast("Could not save tags");
+        return;
       }
+      setFeedback((prev) =>
+        prev.map((item) =>
+          item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
+        )
+      );
+      broadcastTicketUpdated(data.ticket);
     } catch (err) {
       console.error("[ECHLY] saveTags failed", err);
       showToast("Could not save tags");
@@ -783,16 +925,54 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   };
 
   const saveResolved = (isResolved: boolean) => {
-    if (!sessionActionCaps.canResolve || !effectiveSelectedId) return;
-    assertIdentityResolved(isIdentityResolved);
     const ticketId = effectiveSelectedId;
-    const previousResolved = Boolean(selectedItem?.isResolved);
-    setFeedback((prev) =>
-      prev.map((item) =>
-        item.id === ticketId ? { ...item, isResolved } : item
-      )
+    if (!ticketId) return;
+
+    const previousResolved = Boolean(
+      feedback.find((i) => i.id === ticketId)?.isResolved
     );
+
+    setResolveOptimistic({ ticketId, isResolved });
+    if (isResolved) {
+      setResolveAffirmationKey((k) => k + 1);
+    }
+
+    startTransition(() => {
+      setFeedback((prevList) =>
+        prevList.map((item) =>
+          item.id === ticketId ? { ...item, isResolved } : item
+        )
+      );
+    });
+
+    const countsTransition = previousResolved !== isResolved;
+    if (countsTransition) {
+      setSessionCountsDelta((prev) => ({
+        open: prev.open + (isResolved ? -1 : 1),
+        resolved: prev.resolved + (isResolved ? 1 : -1),
+        total: prev.total,
+      }));
+    }
+
     void (async () => {
+      const rollbackResolved = () => {
+        setResolveOptimistic(null);
+        if (countsTransition) {
+          setSessionCountsDelta((prev) => ({
+            open: prev.open + (isResolved ? 1 : -1),
+            resolved: prev.resolved + (isResolved ? -1 : 1),
+            total: prev.total,
+          }));
+        }
+        setFeedback((prevList) =>
+          prevList.map((item) =>
+            item.id === ticketId
+              ? { ...item, isResolved: previousResolved }
+              : item
+          )
+        );
+      };
+
       const perf =
         typeof window !== "undefined" &&
         typeof localStorage !== "undefined" &&
@@ -800,20 +980,16 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       const t0 = performance.now();
       if (perf) console.log("[ECHLY_PERF] CLIENT START (resolve ticket)", t0);
       try {
+        assertIdentityResolved(isIdentityResolved);
         const res = await authFetch(`/api/tickets/${ticketId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ isResolved }),
         });
-        if (!res) {
-          setFeedback((prev) =>
-            prev.map((item) =>
-              item.id === ticketId
-                ? { ...item, isResolved: previousResolved }
-                : item
-            )
-          );
-          showToast("Could not update ticket status");
+        if (!res || !res.ok) {
+          rollbackResolved();
+          if (res && responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
+          else showToast("Failed to update");
           return;
         }
         const data = (await res.json()) as {
@@ -827,17 +1003,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             "[ECHLY_PERF] Full breakdown: compare CLIENT total above with authFetch TOKEN/NETWORK lines and server [Resolve] logs for API vs Firestore."
           );
         }
-        if (!res.ok || !data.success || !data.ticket) {
-          showToast("Could not update ticket status");
-          setFeedback((prev) =>
-            prev.map((item) =>
-              item.id === ticketId
-                ? { ...item, isResolved: previousResolved }
-                : item
-            )
-          );
+        if (!data.success || !data.ticket) {
+          rollbackResolved();
+          showToast("Failed to update");
           return;
         }
+        setResolveOptimistic(null);
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === ticketId ? { ...item, ...data.ticket } : item
@@ -846,14 +1017,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         broadcastTicketUpdated(data.ticket);
       } catch (err) {
         console.error("[ECHLY] saveResolved failed", err);
-        showToast("Could not update ticket status");
-        setFeedback((prev) =>
-          prev.map((item) =>
-            item.id === ticketId
-              ? { ...item, isResolved: previousResolved }
-              : item
-          )
-        );
+        rollbackResolved();
+        showToast("Failed to update");
       }
     })();
   };
@@ -868,7 +1033,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         : stableOpenFeedback[0];
     saveResolved(true);
     if (nextOpen && nextOpen.id !== currentId) {
-      setSelectedId(nextOpen.id);
+      queueMicrotask(() => setSelectedId(nextOpen.id));
     }
   };
 
@@ -897,27 +1062,41 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: safeTitle }),
       });
-      if (!res) return;
+      if (!res) {
+        setSession((prev: Session | null) =>
+          prev ? ({ ...prev, title: previousTitle } as Session) : prev
+        );
+        setSessionTitleDraft((previousTitle || "").trim());
+        showToast("Could not save session name");
+        return;
+      }
       const data = (await res.json()) as {
         success?: boolean;
         session?: Record<string, unknown>;
       };
-      if (data.success && data.session) {
+      if (!res.ok || !data.success || !data.session) {
+        if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
+        else showToast("Could not save session name");
         setSession((prev: Session | null) =>
-          prev ? ({ ...prev, ...data.session } as Session) : prev
+          prev ? ({ ...prev, title: previousTitle } as Session) : prev
         );
-        const apiTitle = ((data.session.title as string) ?? safeTitle).trim();
-        setSessionTitleDraft(apiTitle);
-        if (typeof window !== "undefined" && "chrome" in window) {
-          try {
-            (window as Window & { chrome?: { runtime?: { sendMessage?: (msg: unknown) => void } } }).chrome?.runtime?.sendMessage?.({
-              type: "ECHLY_SESSION_UPDATED",
-              sessionId,
-              title: apiTitle,
-            });
-          } catch (err) {
-            console.error("[ECHLY] ECHLY_SESSION_UPDATED extension message failed", err);
-          }
+        setSessionTitleDraft((previousTitle || "").trim());
+        return;
+      }
+      setSession((prev: Session | null) =>
+        prev ? ({ ...prev, ...data.session } as Session) : prev
+      );
+      const apiTitle = ((data.session!.title as string) ?? safeTitle).trim();
+      setSessionTitleDraft(apiTitle);
+      if (typeof window !== "undefined" && "chrome" in window) {
+        try {
+          (window as Window & { chrome?: { runtime?: { sendMessage?: (msg: unknown) => void } } }).chrome?.runtime?.sendMessage?.({
+            type: "ECHLY_SESSION_UPDATED",
+            sessionId,
+            title: apiTitle,
+          });
+        } catch (err) {
+          console.error("[ECHLY] ECHLY_SESSION_UPDATED extension message failed", err);
         }
       }
     } catch (err) {
@@ -931,18 +1110,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [sessionId, session, sessionTitleDraft, isIdentityResolved, showToast]);
 
   const handleMarkAllResolved = useCallback(async () => {
-    if (!sessionActionCaps.canResolve) return;
     assertIdentityResolved(isIdentityResolved);
     const active = feedback.filter((item) => getTicketStatus(item) === "open");
     if (active.length === 0) return;
-    const previousFeedback = feedback;
+    const previousById = new Map(feedback.map((item) => [item.id, item]));
     setFeedback((prev) =>
       prev.map((item) =>
         getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
       )
     );
     try {
-      const results = await Promise.all(
+      const settled = await Promise.allSettled(
         active.map((item) =>
           authFetch(`/api/tickets/${item.id}`, {
             method: "PATCH",
@@ -952,32 +1130,44 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           })
         )
       );
-      if (results.some((r) => r == null || !r.ok)) {
-        setFeedback(previousFeedback);
-        showToast("Could not resolve all tickets");
-        return;
+      const failedIds = new Set<string>();
+      let anyPermissionDenied = false;
+      settled.forEach((entry, index) => {
+        const id = active[index].id;
+        if (entry.status === "rejected") {
+          failedIds.add(id);
+          return;
+        }
+        const r = entry.value;
+        if (r == null || !r.ok) {
+          failedIds.add(id);
+          if (r != null && responseIsPermissionDenied(r)) anyPermissionDenied = true;
+        }
+      });
+      if (failedIds.size > 0) {
+        setFeedback((prev) =>
+          prev.map((item) => {
+            if (!failedIds.has(item.id)) return item;
+            return previousById.get(item.id) ?? item;
+          })
+        );
+        if (anyPermissionDenied) notifyPermissionDenied(showToast);
+        else showToast("Could not resolve all tickets");
       }
     } catch (err) {
       warn("Mark all resolved failed:", err);
-      setFeedback(previousFeedback);
+      setFeedback((prev) =>
+        prev.map((item) => previousById.get(item.id) ?? item)
+      );
       showToast("Could not resolve all tickets");
-      return;
     }
-  }, [
-    feedback,
-    sessionId,
-    setFeedback,
-    sessionActionCaps.canResolve,
-    isIdentityResolved,
-    showToast,
-  ]);
+  }, [feedback, sessionId, setFeedback, isIdentityResolved, showToast]);
 
   const handleMarkAllUnresolved = useCallback(async () => {
-    if (!sessionActionCaps.canResolve) return;
     assertIdentityResolved(isIdentityResolved);
     const resolved = feedback.filter((item) => getTicketStatus(item) === "resolved");
     if (resolved.length === 0) return;
-    const previousFeedback = feedback;
+    const previousById = new Map(feedback.map((item) => [item.id, item]));
     setFeedback((prev) =>
       prev.map((item) =>
         getTicketStatus(item) === "resolved"
@@ -986,7 +1176,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       )
     );
     try {
-      const results = await Promise.all(
+      const settled = await Promise.allSettled(
         resolved.map((item) =>
           authFetch(`/api/tickets/${item.id}`, {
             method: "PATCH",
@@ -996,51 +1186,99 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           })
         )
       );
-      if (results.some((r) => r == null || !r.ok)) {
-        setFeedback(previousFeedback);
-        showToast("Could not reopen all tickets");
-        return;
+      const failedIds = new Set<string>();
+      let anyPermissionDenied = false;
+      settled.forEach((entry, index) => {
+        const id = resolved[index].id;
+        if (entry.status === "rejected") {
+          failedIds.add(id);
+          return;
+        }
+        const r = entry.value;
+        if (r == null || !r.ok) {
+          failedIds.add(id);
+          if (r != null && responseIsPermissionDenied(r)) anyPermissionDenied = true;
+        }
+      });
+      if (failedIds.size > 0) {
+        setFeedback((prev) =>
+          prev.map((item) => {
+            if (!failedIds.has(item.id)) return item;
+            return previousById.get(item.id) ?? item;
+          })
+        );
+        if (anyPermissionDenied) notifyPermissionDenied(showToast);
+        else showToast("Could not reopen all tickets");
       }
     } catch (err) {
       warn("Mark all unresolved failed:", err);
-      setFeedback(previousFeedback);
+      setFeedback((prev) =>
+        prev.map((item) => previousById.get(item.id) ?? item)
+      );
       showToast("Could not reopen all tickets");
-      return;
     }
-  }, [
-    feedback,
-    sessionId,
-    setFeedback,
-    sessionActionCaps.canResolve,
-    isIdentityResolved,
-    showToast,
-  ]);
+  }, [feedback, sessionId, setFeedback, isIdentityResolved, showToast]);
 
   const handleDeleteFeedback = async (id: string) => {
-    if (!sessionActionCaps.canResolve) return;
     assertIdentityResolved(isIdentityResolved);
+    const ticket = feedback.find((i) => i.id === id);
+    if (!ticket) return;
+
+    const wasResolved = Boolean(ticket.isResolved);
     const selectionBeforeDelete = effectiveSelectedId;
     const prevFeedback = feedback;
     const nextSelected =
       selectionBeforeDelete === id
         ? feedback.filter((item) => item.id !== id)[0]?.id ?? null
         : selectionBeforeDelete;
+
+    setSessionCountsDelta((prev) => ({
+      open: prev.open + (wasResolved ? 0 : -1),
+      resolved: prev.resolved + (wasResolved ? -1 : 0),
+      total: prev.total - 1,
+    }));
     setFeedback((prev) => prev.filter((item) => item.id !== id));
     setSelectedId(nextSelected);
     setShowDeleteModal(false);
+
+    const rollbackDelete = () => {
+      setSessionCountsDelta((prev) => ({
+        open: prev.open + (wasResolved ? 0 : 1),
+        resolved: prev.resolved + (wasResolved ? 1 : 0),
+        total: prev.total + 1,
+      }));
+      setFeedback(prevFeedback);
+      setSelectedId(selectionBeforeDelete);
+    };
+
     try {
       const res = await authFetch(`/api/tickets/${id}`, { method: "DELETE" });
-      if (!res) return;
+      if (!res) {
+        rollbackDelete();
+        showToast("Could not delete ticket");
+        return;
+      }
       const data = (await res.json()) as { success?: boolean; error?: string };
-      if (!res.ok || !data?.success) throw new Error(data?.error ?? "Delete failed");
+      if (!res.ok || !data?.success) {
+        rollbackDelete();
+        if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
+        else showToast("Could not delete ticket");
+        return;
+      }
       router.push(`/dashboard/${sessionId}`);
     } catch (err) {
       console.error("[ECHLY] handleDeleteFeedback failed", err);
-      showToast("Could not delete ticket");
-      setFeedback(prevFeedback);
-      setSelectedId(selectionBeforeDelete);
+      rollbackDelete();
+      if (!handlePermissionError(err, showToast)) {
+        showToast("Could not delete ticket");
+      }
     }
   };
+
+  const canDeleteSelectedTicket =
+    Boolean(authUid) &&
+    selectedItem != null &&
+    selectedItem.userId === authUid;
 
   const renderExecutionContent = () => {
     if (stableScopedFeedback.length === 0) {
@@ -1050,8 +1288,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             item={null}
             setIsImageExpanded={setIsImageExpanded}
             isCommentMode={false}
-            canComment={false}
-            canResolve={false}
             comments={[]}
           />
         );
@@ -1070,6 +1306,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return (
       <ExecutionView
         item={selectedItem}
+        resolveAffirmationKey={resolveAffirmationKey}
         onSaveTitle={saveTitle}
         onResolvedChange={saveResolved}
         onSaveActionSteps={saveActionSteps}
@@ -1079,11 +1316,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         onOpenComment={() => setIsCommentMode(true)}
         onCloseCommentMode={() => setIsCommentMode(false)}
         onResolveAndNext={handleResolveAndNext}
-        canComment={sessionActionCaps.canComment}
-        canResolve={sessionActionCaps.canResolve}
         impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
         comments={comments}
-        sendPinComment={sessionActionCaps.canComment ? sendPinComment ?? undefined : undefined}
+        sendPinComment={sendPinComment}
         sendReply={sendReply}
         activePinIdForPopover={activePinIdForPopover}
         activeThreadId={activeThreadId}
@@ -1094,13 +1329,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         }}
         onCloseInlinePopover={() => setActivePinIdForPopover(null)}
         updateComment={updateComment}
-        sendTextComment={
-          sessionActionCaps.canComment ? sendTextComment ?? undefined : undefined
-        }
+        sendTextComment={sendTextComment}
         onCommentPlaced={() => setIsCommentMode(false)}
-        updatePinPosition={sessionActionCaps.canComment ? updatePinPosition ?? undefined : undefined}
+        updatePinPosition={updatePinPosition}
         onDelete={
-          sessionActionCaps.canResolve ? () => setShowDeleteModal(true) : undefined
+          canDeleteSelectedTicket ? () => setShowDeleteModal(true) : undefined
         }
       />
     );
@@ -1140,12 +1373,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             hasReachedLimit={feedbackReachedLimit}
             loadMoreRef={feedbackLoadMoreRef}
             scrollContainerRef={listScrollRef}
-            onMarkAllTicketsResolved={
-              sessionActionCaps.canResolve ? handleMarkAllResolved : undefined
-            }
-            onMarkAllTicketsUnresolved={
-              sessionActionCaps.canResolve ? handleMarkAllUnresolved : undefined
-            }
+            onMarkAllTicketsResolved={handleMarkAllResolved}
+            onMarkAllTicketsUnresolved={handleMarkAllUnresolved}
             scrollToId={ticketIdFromUrl}
             openExpanded={openExpanded}
             onOpenExpandedChange={onOpenExpandedChange}
@@ -1167,15 +1396,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             sessionId={sessionId}
             sessionTitle={session ? (session.title ?? "").trim() : ""}
             session={session}
-            onSessionRenameSuccess={
-              sessionActionCaps.canResolve ? handleSessionRenameFromMenu : undefined
-            }
-            onSetSessionArchived={
-              sessionActionCaps.canResolve ? handleSetSessionArchivedFromMenu : undefined
-            }
-            onRequestDeleteSession={
-              sessionActionCaps.canResolve ? handleRequestDeleteSessionFromMenu : undefined
-            }
+            onSessionRenameSuccess={handleSessionRenameFromMenu}
+            onSetSessionArchived={handleSetSessionArchivedFromMenu}
+            onRequestDeleteSession={handleRequestDeleteSessionFromMenu}
           />
           <div className="flex flex-1 min-h-0 min-w-0">
             <main className="surface-main flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
@@ -1209,14 +1432,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                   onClose={() => setActiveThreadId(null)}
                   comments={comments}
                   loading={loadingComments}
+                  threadCounts={displayCommentThreadCounts}
                   sendReply={sendReply}
                   activeThreadId={activeThreadId}
                   onSelectThread={setActiveThreadId}
                   currentUserId={authUid}
                   updateComment={updateComment}
                   deleteComment={deleteComment}
-                  canComment={sessionActionCaps.canComment}
-                  canResolve={sessionActionCaps.canResolve}
                 />
               )}
             </div>
@@ -1268,12 +1490,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               hasReachedLimit={feedbackReachedLimit}
               loadMoreRef={feedbackLoadMoreRef}
               scrollContainerRef={listScrollRef}
-              onMarkAllTicketsResolved={
-                sessionActionCaps.canResolve ? handleMarkAllResolved : undefined
-              }
-              onMarkAllTicketsUnresolved={
-                sessionActionCaps.canResolve ? handleMarkAllUnresolved : undefined
-              }
+              onMarkAllTicketsResolved={handleMarkAllResolved}
+              onMarkAllTicketsUnresolved={handleMarkAllUnresolved}
               scrollToId={ticketIdFromUrl}
               openExpanded={openExpanded}
               onOpenExpandedChange={onOpenExpandedChange}

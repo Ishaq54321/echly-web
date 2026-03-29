@@ -1639,6 +1639,7 @@ export function useCaptureWidget({
       sessionPaused,
       pausePending,
       endPending,
+      sessionFeedbackSaving,
       isFinishing,
       sessionFeedbackPending,
       sessionLimitReached,

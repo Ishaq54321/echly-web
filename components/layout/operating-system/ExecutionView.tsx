@@ -8,6 +8,8 @@ import type { ResolvedPublicSharePermissions } from "@/lib/permissions/publicSha
 
 export interface ExecutionViewProps {
   item: (FeedbackItemShape & { index: number; total: number }) | null;
+  /** Increment after optimistic resolve for a brief header/status cue (dashboard). */
+  resolveAffirmationKey?: number;
   onSaveTitle?: (newTitle: string) => Promise<void>;
   onResolvedChange?: (isResolved: boolean) => void;
   onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
@@ -17,8 +19,6 @@ export interface ExecutionViewProps {
   onCloseCommentMode?: () => void;
   isCommentMode?: boolean;
   onResolveAndNext?: () => void;
-  canComment?: boolean;
-  canResolve?: boolean;
   impactScore?: number | null;
   comments?: Comment[];
   sendPinComment?: (position: { xPercent: number; yPercent: number }, message: string) => Promise<string | null>;
@@ -50,6 +50,7 @@ export interface ExecutionViewProps {
 
 export function ExecutionView({
   item,
+  resolveAffirmationKey = 0,
   onSaveTitle: _onSaveTitle,
   onResolvedChange,
   onSaveActionSteps,
@@ -59,8 +60,6 @@ export function ExecutionView({
   onCloseCommentMode,
   isCommentMode = false,
   onResolveAndNext,
-  canComment = true,
-  canResolve = true,
   impactScore,
   comments = [],
   sendPinComment,
@@ -90,15 +89,16 @@ export function ExecutionView({
     <div className="flex-1 min-h-0 flex flex-col min-w-0">
       <SessionFeedbackHeader
         item={displayItem}
+        resolveAffirmationKey={resolveAffirmationKey}
         impactScore={impactScore}
         onResolvedChange={
-          isPublicReadOnly || isShareSurface ? undefined : canResolve ? onResolvedChange : undefined
+          isPublicReadOnly || isShareSurface ? undefined : onResolvedChange
         }
         onResolveAndNext={
-          isPublicReadOnly || isShareSurface ? undefined : canResolve ? onResolveAndNext : undefined
+          isPublicReadOnly || isShareSurface ? undefined : onResolveAndNext
         }
         onOpenComment={
-          isPublicReadOnly || isShareSurface ? undefined : canComment ? onOpenComment : undefined
+          isPublicReadOnly || isShareSurface ? undefined : onOpenComment
         }
         onCloseCommentMode={onCloseCommentMode}
         isCommentMode={isCommentMode}
@@ -108,7 +108,7 @@ export function ExecutionView({
         shareGating={shareGating}
       />
 
-      {!isPublicReadOnly && !isShareSurface && canComment && isCommentMode && (
+      {!isPublicReadOnly && !isShareSurface && isCommentMode && (
         <div className="shrink-0 px-3 py-2.5 flex items-center justify-center bg-[#FAFBFC] -mx-6 mt-1">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 text-[11px] text-[#6B7280]">
             Comment mode · Click anywhere to add comment · Esc to exit
@@ -118,12 +118,12 @@ export function ExecutionView({
 
       <div
         className={`main-content flex-1 min-h-0 overflow-y-auto ${
-          !isPublicReadOnly && !isShareSurface && canComment && isCommentMode
+          !isPublicReadOnly && !isShareSurface && isCommentMode
             ? "cursor-crosshair"
             : ""
         }`}
         data-comment-mode={
-          !isPublicReadOnly && !isShareSurface && canComment && isCommentMode ? true : undefined
+          !isPublicReadOnly && !isShareSurface && isCommentMode ? true : undefined
         }
       >
         <div className={isShareSurface ? "pt-0 pb-2" : "pt-0 pb-4"}>
@@ -132,14 +132,14 @@ export function ExecutionView({
               item={displayItem}
               readOnlyDescription={readOnlyDescription}
               onSaveActionSteps={
-                isPublicReadOnly || isShareSurface ? undefined : canResolve ? onSaveActionSteps : undefined
+                isPublicReadOnly || isShareSurface ? undefined : onSaveActionSteps
               }
               onSaveTags={
-                isPublicReadOnly || isShareSurface ? undefined : canResolve ? onSaveTags : undefined
+                isPublicReadOnly || isShareSurface ? undefined : onSaveTags
               }
               onExpandImage={() => setIsImageExpanded(true)}
               isCommentMode={
-                !isPublicReadOnly && !isShareSurface && canComment && isCommentMode
+                !isPublicReadOnly && !isShareSurface && isCommentMode
               }
               comments={comments}
               pinComments={comments.filter((c): c is Comment & { position: NonNullable<Comment["position"]> } => c.type === "pin" && c.position != null)}

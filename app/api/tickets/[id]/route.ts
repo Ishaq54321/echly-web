@@ -215,10 +215,16 @@ export const PATCH = withAuthorization(
           Date.now() - start,
           "ms)"
         );
-        await updateFeedbackResolveAndSessionCountersRepo(id, {
+        const resolveResult = await updateFeedbackResolveAndSessionCountersRepo(id, {
           ...contentUpdates,
           status: patchStatus,
         });
+        if (resolveResult.kind === "missing") {
+          return NextResponse.json(
+            { success: false, error: "Not found" },
+            { status: 404 }
+          );
+        }
         console.log("[Resolve] Repo done:", Date.now() - start, "ms");
       } else {
         await updateFeedbackRepo(id, contentUpdates);
@@ -299,6 +305,14 @@ export const DELETE = withAuthorization(
       if (!context.canAccess) {
         return NextResponse.json(
           { success: false, error: context.permissionError ?? "Forbidden" },
+          { status: 403 }
+        );
+      }
+      const ticket = context.feedback as Feedback;
+      const ownerId = typeof ticket.userId === "string" ? ticket.userId : "";
+      if (ownerId !== user.uid) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden" },
           { status: 403 }
         );
       }

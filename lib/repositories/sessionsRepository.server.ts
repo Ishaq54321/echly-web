@@ -268,15 +268,6 @@ export async function updateSessionUpdatedAtRepo(sessionId: string): Promise<voi
 }
 
 /**
- * Atomically increment session.commentCount. Call when a comment is created.
- */
-export async function incrementSessionCommentCountRepo(sessionId: string): Promise<void> {
-  await adminDb.doc(`sessions/${sessionId}`).update({
-    commentCount: FieldValue.increment(1),
-  });
-}
-
-/**
  * Loom-style view tracking: sessionViews/{sessionId}/views/{viewerId}.
  * If viewer has not viewed this session, creates the viewer doc and atomically
  * increments session.viewCount. Only counts once per viewer per session.

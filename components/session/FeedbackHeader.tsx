@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   statusFromResolved,
   type FeedbackStatus,
@@ -52,6 +52,8 @@ function StatusBadge({ status }: { status: FeedbackStatus }) {
 
 export interface SessionFeedbackHeaderProps {
   item: (FeedbackItemShape & { index: number; total: number }) | null;
+  /** Increment when resolve is applied optimistically; drives a short status cue. */
+  resolveAffirmationKey?: number;
   impactScore?: number | null;
   onResolvedChange?: (isResolved: boolean) => void;
   onResolveAndNext?: () => void;
@@ -84,6 +86,7 @@ export interface SessionFeedbackHeaderProps {
  */
 export function SessionFeedbackHeader({
   item,
+  resolveAffirmationKey = 0,
   impactScore,
   onResolvedChange,
   onResolveAndNext,
@@ -95,6 +98,14 @@ export function SessionFeedbackHeader({
   readOnlyPermissions,
   shareGating,
 }: SessionFeedbackHeaderProps) {
+  const [resolveFlash, setResolveFlash] = useState(false);
+  useEffect(() => {
+    if (resolveAffirmationKey <= 0) return;
+    setResolveFlash(true);
+    const t = window.setTimeout(() => setResolveFlash(false), 420);
+    return () => window.clearTimeout(t);
+  }, [resolveAffirmationKey]);
+
   const isResolved = item?.isResolved === true;
   const status = statusFromResolved(item?.isResolved);
   const ro = readOnly === true && readOnlyPermissions != null && shareGating == null;
@@ -165,7 +176,17 @@ export function SessionFeedbackHeader({
                 {positionLabel}
               </span>
             ) : null}
-            {item != null ? <StatusBadge status={status} /> : null}
+            {item != null ? (
+              <span
+                className={`inline-flex transition-all duration-200 ease-out ${
+                  resolveFlash && isResolved
+                    ? "scale-105 opacity-100 ring-2 ring-emerald-300/70 ring-offset-2 ring-offset-white rounded-full"
+                    : "scale-100 opacity-100"
+                }`}
+              >
+                <StatusBadge status={status} />
+              </span>
+            ) : null}
             {item != null && impactScore != null ? (
               <span className="text-[11px] tabular-nums text-[#94A3B8] font-medium">
                 Impact {impactScore}
