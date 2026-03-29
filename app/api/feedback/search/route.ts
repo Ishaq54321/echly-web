@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import { getSessionFeedbackSearchCorpusForUserRepo } from "@/lib/repositories/feedbackRepository.server";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { getAccessContext } from "@/lib/access/getAccessContext";
 import { corsHeaders } from "@/lib/server/cors";
 import { verifyExtensionToken } from "@/lib/server/extensionAuth";
 import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
@@ -181,15 +181,6 @@ export async function GET(req: NextRequest) {
   }
 
   const userId = user.uid;
-  let workspaceId: string;
-  try {
-    workspaceId = await getUserWorkspaceIdRepo(userId);
-  } catch {
-    return NextResponse.json(
-      { error: "Missing workspaceId" },
-      { status: 403, headers: corsHeaders(req) }
-    );
-  }
 
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId")?.trim() ?? "";
@@ -203,8 +194,18 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const { access } = await getAccessContext({
+      sessionId,
+      user: { uid: userId, email: user.email ?? null },
+    });
+    if (!access?.canView) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403, headers: corsHeaders(req) }
+      );
+    }
+
     const corpus = await getSessionFeedbackSearchCorpusForUserRepo({
-      workspaceId,
       sessionId,
     });
 

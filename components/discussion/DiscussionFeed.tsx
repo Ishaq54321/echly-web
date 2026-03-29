@@ -1,19 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  collection,
-  doc,
-  getDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-} from "firebase/firestore";
 import { MessageSquare } from "lucide-react";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
-import { db } from "@/lib/firebase";
+import { authFetch } from "@/lib/authFetch";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { useWorkspace } from "@/lib/client/workspaceContext";
@@ -58,118 +48,38 @@ export function DiscussionFeed({
   onSelect,
   refreshKey = 0,
 }: DiscussionFeedProps) {
-  const { workspaceId, authUid } = useWorkspace();
+  const { authUid } = useWorkspace();
   const [items, setItems] = useState<DiscussionFeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // CRITICAL: Do not run query until workspaceId is resolved
-    // Prevents Firestore permission errors
-    if (!authUid || !workspaceId) return;
+    if (!authUid) return;
 
     let cancelled = false;
     setLoading(true);
     setError(null);
 
-    (async () => {
+    void (async () => {
       try {
-        const discussionsQuery = query(
-          collection(db, "feedback"),
-          where("workspaceId", "==", workspaceId),
-          where("commentCount", ">", 0),
-          orderBy("commentCount", "desc"),
-          limit(100)
-        );
-        const snapshot = await getDocs(discussionsQuery);
+        const url = "/api/feedback?conversationsOnly=true&limit=100";
+        const res = await authFetch(url, { cache: "no-store" });
+        if (!res?.ok) throw new Error("Failed to load discussions");
+        const data = (await res.json().catch(() => ({}))) as { feedback?: unknown[] };
         if (cancelled) return;
-
-        type RawDiscussionDoc = Record<string, unknown> & {
-          id: string;
-          lastCommentAt?: { seconds?: number } | string;
-          sessionId?: string;
-        };
-
-        const raw: RawDiscussionDoc[] = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() as Record<string, unknown>),
-        }));
-
-        // Sort by lastCommentAt descending (newest first)
-        const sorted = [...raw].sort((a, b) => {
-          const aLa = a.lastCommentAt;
-          const bLa = b.lastCommentAt;
-          const aTs =
-            typeof aLa === "string"
-              ? new Date(aLa).getTime()
-              : aLa?.seconds != null
-                ? aLa.seconds * 1000
-                : 0;
-          const bTs =
-            typeof bLa === "string"
-              ? new Date(bLa).getTime()
-              : bLa?.seconds != null
-                ? bLa.seconds * 1000
-                : 0;
-          return bTs - aTs;
-        });
-
-        const sessionIds = [...new Set(sorted.map((f) => f.sessionId as string).filter(Boolean))];
-        const sessionMap = new Map<string, string>();
-        if (sessionIds.length > 0) {
-          const sessionChunks: string[][] = [];
-          for (let i = 0; i < sessionIds.length; i += 10) {
-            sessionChunks.push(sessionIds.slice(i, i + 10));
-          }
-          await Promise.all(
-            sessionChunks.map(async (chunk) => {
-              const sessionDocs = await Promise.all(
-                chunk.map(async (sessionId) => {
-                  try {
-                    const ref = doc(db, "sessions", sessionId);
-                    const snap = await getDoc(ref);
-
-                    if (!snap.exists()) return null;
-
-                    const data = snap.data();
-
-                    if (data.workspaceId !== workspaceId) return null;
-
-                    return {
-                      id: snap.id,
-                      title: data.title as string | undefined,
-                    };
-                  } catch (error) {
-                    console.error("[DISCUSSION] session read failed", {
-                      sessionId,
-                      error,
-                    });
-                    return null;
-                  }
-                })
-              );
-
-              for (const s of sessionDocs) {
-                if (s) {
-                  sessionMap.set(s.id, s.title ?? "");
-                }
-              }
-            })
-          );
-        }
-        if (cancelled) return;
-
-        const list: DiscussionFeedItem[] = sorted.map((item) => {
+        const raw = Array.isArray(data.feedback) ? data.feedback : [];
+        const list: DiscussionFeedItem[] = raw.map((row: unknown) => {
+          const item = row as Record<string, unknown>;
           const status = (item.status as string) ?? "open";
           const isResolved = status === "resolved" || item.isResolved === true;
-          const titleStr = typeof item.title === "string" ? item.title.trim() : "";
           return {
             id: String(item.id ?? ""),
-            title: titleStr,
+            title: typeof item.title === "string" ? item.title.trim() : "",
             sessionId: String(item.sessionId ?? ""),
-            sessionName: sessionMap.get(item.sessionId as string) ?? "",
+            sessionName: typeof item.sessionName === "string" ? item.sessionName : undefined,
             commentCount: typeof item.commentCount === "number" ? item.commentCount : 0,
-            lastCommentPreview: typeof item.lastCommentPreview === "string" ? item.lastCommentPreview : undefined,
+            lastCommentPreview:
+              typeof item.lastCommentPreview === "string" ? item.lastCommentPreview : undefined,
             status: getTicketStatus({ isResolved }),
             updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : undefined,
             lastCommentAt: item.lastCommentAt as DiscussionFeedItem["lastCommentAt"],
@@ -179,7 +89,7 @@ export function DiscussionFeed({
         setItems(list);
       } catch (err) {
         if (!cancelled) {
-          setError("Unable to load discussions. Please refresh the page.");
+          setError(err instanceof Error ? err.message : "Unable to load discussions.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -189,9 +99,9 @@ export function DiscussionFeed({
     return () => {
       cancelled = true;
     };
-  }, [authUid, workspaceId, refreshKey]);
+  }, [authUid, refreshKey]);
 
-  const showLoading = !error && (!authUid || !workspaceId || loading);
+  const showLoading = !error && (!authUid || loading);
 
   if (showLoading) {
     return (

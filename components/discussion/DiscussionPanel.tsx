@@ -39,13 +39,7 @@ export function DiscussionPanel({
   onClose,
   onCommentAdded,
 }: DiscussionPanelProps) {
-  const {
-    workspaceId,
-    isIdentityResolved,
-    authUid,
-    authDisplayName,
-    authPhotoUrl,
-  } = useWorkspace();
+  const { isIdentityResolved, authUid, authDisplayName, authPhotoUrl } = useWorkspace();
   const { showToast } = useToast();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
@@ -112,13 +106,12 @@ export function DiscussionPanel({
   }, [feedbackId, authUid]);
 
   useEffect(() => {
-    if (!workspaceId || !feedbackId || !ticket?.sessionId || !authUid) {
+    if (!feedbackId || !ticket?.sessionId || !authUid) {
       setComments([]);
     }
-  }, [workspaceId, feedbackId, ticket?.sessionId, authUid]);
+  }, [feedbackId, ticket?.sessionId, authUid]);
 
   useCommentsRepoSubscription({
-    workspaceId,
     sessionId: ticket?.sessionId,
     feedbackId,
     onComments: (incoming) =>
@@ -127,7 +120,7 @@ export function DiscussionPanel({
 
   const handleSendComment = () => {
     const sid = ticket?.sessionId;
-    if (!authUid || !feedbackId || !sid || !workspaceId) return;
+    if (!authUid || !feedbackId || !sid) return;
     assertIdentityResolved(isIdentityResolved);
     const trimmed = commentDraft.trim();
     if (!trimmed) return;

@@ -46,7 +46,12 @@ export type AuthMeta = {
   usedFallback?: boolean;
 };
 
-export async function requireAuth(req: Request, meta?: AuthMeta): Promise<{ uid: string }> {
+export type AuthorizedRequestUser = { uid: string; email?: string };
+
+export async function requireAuth(
+  req: Request,
+  meta?: AuthMeta
+): Promise<AuthorizedRequestUser> {
   const token = getBearerToken(req);
   if (token) {
     try {
@@ -56,7 +61,11 @@ export async function requireAuth(req: Request, meta?: AuthMeta): Promise<{ uid:
         throw new AuthorizationError("Invalid ID token", 401, "NOT_AUTHENTICATED");
       }
       if (meta) meta.usedFallback = false;
-      return { uid };
+      const email =
+        typeof decoded.email === "string" && decoded.email.trim() !== ""
+          ? decoded.email.trim()
+          : undefined;
+      return { uid, email };
     } catch (err) {
       if (err instanceof AuthorizationError) {
         throw err;
@@ -76,7 +85,13 @@ export async function requireAuth(req: Request, meta?: AuthMeta): Promise<{ uid:
       route: req.url,
       uid: user.uid,
     });
-    return { uid: user.uid };
+    return {
+      uid: user.uid,
+      email:
+        typeof user.email === "string" && user.email.trim() !== ""
+          ? user.email.trim()
+          : undefined,
+    };
   } catch {
     throw new AuthorizationError("Not authenticated", 401, "NOT_AUTHENTICATED");
   }
@@ -103,14 +118,16 @@ export async function getUserRole(uid: string): Promise<Role> {
   return normalizeRole("resolver");
 }
 
+/**
+ * Identity is already enforced by `requireAuth` / route handlers.
+ * Resource access is enforced only via `resolveAccess` → `access.canX` in handlers.
+ * Logs only — must not throw or block the request.
+ */
 export async function authorize(input: {
   uid: string;
   action: Action | null;
   route?: string;
 }): Promise<{ role: Role }> {
-  if (!process.env.SKIP_AUTH_GUARD && !input.action) {
-    throw new Error("Authorization action missing");
-  }
   if (!input.action) {
     await logAuthDecision({
       uid: input.uid,
@@ -122,30 +139,24 @@ export async function authorize(input: {
     return { role: "resolver" };
   }
 
-  const allowedRoles = PERMISSIONS[input.action];
-  if (!allowedRoles) {
-    throw new AuthorizationError(`Unknown action: ${input.action}`, 500, "AUTH_CONFIG_ERROR");
-  }
-
-  const role = await getUserRole(input.uid);
-  const allowed = allowedRoles.includes(role);
-  if (!allowed) {
+  if (!PERMISSIONS[input.action]) {
     await logAuthDecision({
       uid: input.uid,
       action: input.action,
       route: input.route,
-      allowed: false,
-      reason: "insufficient_permissions",
-      role,
+      allowed: true,
+      reason: "unknownActionLoggedOnly",
     });
-    throw new AuthorizationError("Insufficient permissions", 403, "INSUFFICIENT_PERMISSIONS");
+    return { role: "resolver" };
   }
 
+  const role = await getUserRole(input.uid);
   await logAuthDecision({
     uid: input.uid,
     action: input.action,
     route: input.route,
     allowed: true,
+    reason: "accessDelegatedToResolveAccess",
     role,
   });
   return { role };

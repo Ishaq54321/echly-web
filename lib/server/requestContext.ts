@@ -1,11 +1,9 @@
 import "server-only";
 
-import type { AccessLevel } from "@/lib/domain/accessLevel";
-import { hasPermission } from "@/lib/domain/accessLevel";
+import { getAccessContext } from "@/lib/access/getAccessContext";
+import type { ResolvedAccess } from "@/lib/access/resolveAccess";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
-import { getEffectiveAccessLevel } from "@/lib/permissions/sessionEffectiveAccess";
-import { getSessionSharePermissionForEmailRepo } from "@/lib/repositories/sessionSharesRepository";
 import { getFeedbackByIdRepo } from "@/lib/repositories/feedbackRepository.server";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
@@ -15,39 +13,29 @@ export interface RequestContext {
 
   userWorkspaceId: string;
 
-  feedback?: any;
-  session?: any;
+  feedback?: Feedback | null;
+
+  session?: Session | null;
 
   sessionWorkspaceId?: string;
 
-  canAccess: boolean;
-  accessLevel?: string;
-
-  /** When canAccess is false and requiredTicketAccess was set */
-  permissionError?: string;
+  access: ResolvedAccess | null;
 }
 
 export async function buildRequestContext(params: {
   userId: string;
   userEmail?: string | null;
-  /** When provided (e.g. verified workspace from withAuthorization), skips getUserWorkspaceIdRepo */
+  /** When provided (e.g. viewer workspace from withAuthorization), skips getUserWorkspaceIdRepo */
   userWorkspaceId?: string;
   feedbackId?: string;
   sessionId?: string;
-  /** When set, enforces ticket/session access + permission level in this builder */
-  requiredTicketAccess?: AccessLevel;
   /** When provided (including null), skips getFeedbackByIdRepo for feedbackId */
   feedback?: Feedback | null;
   /** When provided (including null), skips session reads for the resolved path */
   session?: Session | null;
+  tokenString?: string;
 }): Promise<RequestContext> {
-  const {
-    userId,
-    userEmail,
-    feedbackId,
-    sessionId,
-    requiredTicketAccess,
-  } = params;
+  const { userId, userEmail, feedbackId, sessionId } = params;
 
   const usePreloadedFeedback = params.feedback !== undefined;
   const usePreloadedSession = params.session !== undefined;
@@ -66,16 +54,11 @@ export async function buildRequestContext(params: {
     typeof sessionId === "string" && sessionId.trim() !== "";
   const explicitSessionId = hasExplicitSessionId ? sessionId.trim() : "";
 
-  const shareExplicitPromise =
-    hasExplicitSessionId && userEmail
-      ? getSessionSharePermissionForEmailRepo(explicitSessionId, userEmail)
-      : Promise.resolve(null as AccessLevel | null);
-
   const skipFeedbackRepo = usePreloadedFeedback || !feedbackId;
   const skipSessionExplicitRepo =
     hasExplicitSessionId && usePreloadedSession;
 
-  const [userWorkspaceId, feedbackFetched, sessionFromExplicit, invitedIfExplicit] =
+  const [userWorkspaceId, feedbackFetched, sessionFromExplicit] =
     await Promise.all([
       workspacePromise,
       skipFeedbackRepo
@@ -84,37 +67,22 @@ export async function buildRequestContext(params: {
       hasExplicitSessionId && !skipSessionExplicitRepo
         ? getSessionByIdRepo(explicitSessionId)
         : Promise.resolve(null),
-      shareExplicitPromise,
     ]);
 
   const feedback = usePreloadedFeedback ? params.feedback! : feedbackFetched;
 
   let session: Session | null;
-  let invitedPermission: AccessLevel | null = null;
 
   if (hasExplicitSessionId) {
     session = usePreloadedSession
       ? params.session!
       : sessionFromExplicit;
-    if (userEmail) {
-      invitedPermission = invitedIfExplicit;
-    }
   } else if (feedback) {
     const sid = feedback.sessionId;
     if (usePreloadedSession) {
       session = params.session!;
-      invitedPermission = userEmail
-        ? await getSessionSharePermissionForEmailRepo(sid, userEmail)
-        : null;
     } else {
-      const [sessionFb, invitedFb] = await Promise.all([
-        getSessionByIdRepo(sid),
-        userEmail
-          ? getSessionSharePermissionForEmailRepo(sid, userEmail)
-          : Promise.resolve(null as AccessLevel | null),
-      ]);
-      session = sessionFb;
-      invitedPermission = invitedFb;
+      session = await getSessionByIdRepo(sid);
     }
   } else {
     session = usePreloadedSession ? params.session! : null;
@@ -125,39 +93,22 @@ export async function buildRequestContext(params: {
       ? session.workspaceId.trim()
       : undefined;
 
-  let canAccess = false;
-  let accessLevel: string | undefined;
-  let permissionError: string | undefined;
+  const sidForAccess =
+    explicitSessionId ||
+    (session?.id ? String(session.id).trim() : "") ||
+    (feedback?.sessionId ? String(feedback.sessionId).trim() : "");
 
-  if (requiredTicketAccess != null) {
-    if (!feedback || !session) {
-      canAccess = false;
-      permissionError = "Forbidden";
-    } else {
-      const actorOk =
-        feedback.workspaceId === userWorkspaceId ||
-        session.workspaceId === userWorkspaceId ||
-        invitedPermission != null;
-
-      const effective = getEffectiveAccessLevel({
-        session,
-        viewerWorkspaceId: userWorkspaceId,
-        invitedPermission,
-      });
-      accessLevel = effective;
-
-      if (!actorOk) {
-        canAccess = false;
-        permissionError = "Forbidden";
-      } else if (!hasPermission(effective, requiredTicketAccess)) {
-        canAccess = false;
-        permissionError = "Insufficient permission";
-      } else {
-        canAccess = true;
-      }
-    }
-  } else if (userWorkspaceId && sessionWorkspaceId) {
-    canAccess = userWorkspaceId === sessionWorkspaceId;
+  let access: ResolvedAccess | null = null;
+  if (sidForAccess) {
+    const trimmedWs = userWorkspaceId.trim();
+    const { access: resolved } = await getAccessContext({
+      sessionId: sidForAccess,
+      user: { uid: userId, email: userEmail ?? undefined },
+      session,
+      tokenString: params.tokenString,
+      viewerWorkspaceIdOverride: trimmedWs !== "" ? trimmedWs : null,
+    });
+    access = resolved;
   }
 
   return {
@@ -166,8 +117,6 @@ export async function buildRequestContext(params: {
     feedback,
     session,
     sessionWorkspaceId,
-    canAccess,
-    accessLevel,
-    ...(permissionError != null ? { permissionError } : {}),
+    access,
   };
 }

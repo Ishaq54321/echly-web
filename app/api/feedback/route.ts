@@ -3,11 +3,11 @@ import type { NextRequest } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import {
+  getDiscussionInboxFeedbackForUserRepo,
   getSessionFeedbackPageForUserWithStringCursorRepo,
-  getWorkspaceFeedbackAllRepo,
-  getWorkspaceFeedbackWithCommentsRepo,
 } from "@/lib/repositories/feedbackRepository.server";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { getAccessContext } from "@/lib/access/getAccessContext";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 import { corsHeaders } from "@/lib/server/cors";
 import { verifyExtensionToken } from "@/lib/server/extensionAuth";
 import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
@@ -167,15 +167,6 @@ export async function GET(req: NextRequest) {
   }
 
   const userId = user.uid;
-  let workspaceId: string;
-  try {
-    workspaceId = await getUserWorkspaceIdRepo(userId);
-  } catch {
-    return NextResponse.json(
-      { error: "Missing workspaceId" },
-      { status: 403, headers: corsHeaders(req) }
-    );
-  }
 
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId");
@@ -191,22 +182,32 @@ export async function GET(req: NextRequest) {
   const normalizedRequestedLimit = Number.isFinite(requestedLimit) ? Math.max(1, requestedLimit) : DEFAULT_LIMIT;
   const safeLimit = Math.min(normalizedRequestedLimit, 50);
 
-  // When sessionId is omitted, return feedback across sessions (Discussion inbox)
-  // Use conversationsOnly=true to fetch only feedback with comments (conversation feed)
+  // When sessionId is omitted, return Discussion inbox (session-scoped queries per accessible session).
   if (!sessionId || sessionId.trim() === "") {
-    const conversationsOnly = searchParams.get("conversationsOnly") === "true";
     try {
-      const feedback = conversationsOnly
-        ? await getWorkspaceFeedbackWithCommentsRepo({
-            workspaceId,
-            limit: safeLimit,
-            cursor,
-          })
-        : await getWorkspaceFeedbackAllRepo(workspaceId, safeLimit);
+      const feedback = await getDiscussionInboxFeedbackForUserRepo({
+        userId,
+        userEmail: user.email,
+        limit: safeLimit,
+      });
+
+      const sessionIds = [...new Set(feedback.map((f) => f.sessionId).filter(Boolean))];
+      const titleBySessionId = new Map<string, string>();
+      await Promise.all(
+        sessionIds.map(async (sid) => {
+          const row = await getSessionByIdRepo(sid);
+          if (row) titleBySessionId.set(sid, row.title ?? "");
+        })
+      );
+
+      const payload = feedback.map((f) => ({
+        ...serializeFeedbackMinimal(f),
+        sessionName: titleBySessionId.get(f.sessionId) ?? "",
+      }));
 
       return NextResponse.json(
         {
-          feedback: feedback.map(serializeFeedbackMinimal),
+          feedback: payload,
           nextCursor: null,
           hasMore: false,
         },
@@ -222,11 +223,22 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const sid = sessionId.trim();
+    const { access } = await getAccessContext({
+      sessionId: sid,
+      user: { uid: userId, email: user.email ?? null },
+    });
+    if (!access?.canView) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403, headers: corsHeaders(req) }
+      );
+    }
+
     const isFirstPage = !cursor || cursor.trim() === "";
 
     const pageResult = await getSessionFeedbackPageForUserWithStringCursorRepo({
-      workspaceId,
-      sessionId,
+      sessionId: sid,
       limit: safeLimit,
       cursor: isFirstPage ? undefined : cursor,
       ...(statusFilter ? { statusFilter } : {}),

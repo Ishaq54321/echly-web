@@ -12,6 +12,7 @@ import { log } from "@/lib/utils/logger";
 import {
   withAuthorization,
   type HandlerContext,
+  type HandlerUser,
 } from "@/lib/server/auth/withAuthorization";
 import { routeParamId } from "@/lib/server/routeParams";
 import { buildRequestContext } from "@/lib/server/requestContext";
@@ -21,13 +22,14 @@ type PatchBody = { title?: string; archived?: boolean; accessLevel?: string };
 
 async function resolveSessionWorkspaceId(
   _req: Request,
-  user: { uid: string },
+  user: HandlerUser,
   ctx: HandlerContext,
   viewerWorkspaceId: string
 ) {
   const id = await routeParamId(ctx);
   const context = await buildRequestContext({
     userId: user.uid,
+    userEmail: user.email,
     userWorkspaceId: viewerWorkspaceId,
     sessionId: id?.trim() || undefined,
   });
@@ -37,13 +39,20 @@ async function resolveSessionWorkspaceId(
   };
 }
 
+function shareTokenFromSessionRequest(req: Request): string | undefined {
+  const q = new URL(req.url).searchParams.get("shareToken")?.trim() ?? "";
+  const h = req.headers.get("x-share-token")?.trim() ?? "";
+  const raw = q || h;
+  return raw !== "" ? raw : undefined;
+}
+
 /** GET /api/sessions/:id — return session metadata (e.g. title for Discussion context). */
 export const GET = withAuthorization(
   "read_feedback",
   async (
-    _req: Request,
+    req: Request,
     ctx: HandlerContext,
-    { user, userWorkspaceId }: { user: { uid: string }; userWorkspaceId: string }
+    { user, userWorkspaceId }: { user: HandlerUser; userWorkspaceId: string }
   ) => {
     const id = await routeParamId(ctx);
     if (!id) {
@@ -53,21 +62,24 @@ export const GET = withAuthorization(
       return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
     }
     const loaded = ctx.preloaded.session as Session | null;
-    if (!loaded) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
-    }
     const context = await buildRequestContext({
       userId: user.uid,
+      userEmail: user.email,
       userWorkspaceId,
       sessionId: id,
       session: loaded,
+      tokenString: shareTokenFromSessionRequest(req),
     });
-    if (!context.canAccess) {
+    if (!context.access) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+    if (!context.session) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
     }
     return NextResponse.json({
       success: true,
-      session: serializeSession(loaded),
+      session: serializeSession(context.session),
+      ...(context.access != null ? { access: context.access } : {}),
     });
   },
   { resolveWorkspace: resolveSessionWorkspaceId }
@@ -79,7 +91,7 @@ export const PATCH = withAuthorization(
   async (
     req: Request,
     ctx: HandlerContext,
-    { user, userWorkspaceId }: { user: { uid: string }; userWorkspaceId: string }
+    { user, userWorkspaceId }: { user: HandlerUser; userWorkspaceId: string }
   ) => {
     const start = Date.now();
     log("[API] PATCH /api/sessions/[id] start");
@@ -104,21 +116,18 @@ export const PATCH = withAuthorization(
       return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
     }
     const existing = ctx.preloaded.session as Session | null;
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: "Not found" },
-        { status: 404 }
-      );
-    }
     const context = await buildRequestContext({
       userId: user.uid,
+      userEmail: user.email,
       userWorkspaceId,
       sessionId: id,
       session: existing,
     });
-    if (!context.canAccess) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    if (!context.session) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
     }
+    const sess = context.session;
+
     const hasTitle = typeof body.title === "string" && body.title.trim() !== "";
     const hasArchived = typeof body.archived === "boolean";
     const rawAccess = body.accessLevel;
@@ -131,10 +140,17 @@ export const PATCH = withAuthorization(
       return NextResponse.json({ success: false, error: "Invalid accessLevel" }, { status: 400 });
     }
 
+    if (validAccessLevel != null && !context.access?.canResolve) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+    if ((hasTitle || hasArchived) && !context.access?.canComment) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+
     if (!hasTitle && !hasArchived && validAccessLevel === null) {
       return NextResponse.json({
         success: true,
-        session: serializeSession(existing),
+        session: serializeSession(sess),
       });
     }
 
@@ -144,10 +160,9 @@ export const PATCH = withAuthorization(
         tasks.push(updateSessionTitleRepo(id, body.title!.trim()));
       }
       if (hasArchived) {
-        if (!existing.workspaceId) {
-          throw new Error("Session missing workspaceId");
-        }
-        tasks.push(updateSessionArchivedRepo(id, body.archived!, existing.workspaceId));
+        const wid =
+          typeof sess.workspaceId === "string" ? sess.workspaceId.trim() : "";
+        tasks.push(updateSessionArchivedRepo(id, body.archived!, wid));
       }
       if (validAccessLevel != null) {
         tasks.push(updateSessionAccessLevelRepo(id, validAccessLevel));
@@ -156,7 +171,7 @@ export const PATCH = withAuthorization(
         await Promise.all(tasks);
       }
       const updated: Session = {
-        ...existing,
+        ...sess,
         ...(hasTitle ? { title: body.title!.trim() } : {}),
         ...(hasArchived ? { archived: body.archived!, isArchived: body.archived! } : {}),
         ...(validAccessLevel != null ? { accessLevel: validAccessLevel } : {}),
@@ -185,7 +200,7 @@ export const DELETE = withAuthorization(
   async (
     _req: Request,
     ctx: HandlerContext,
-    { user, userWorkspaceId }: { user: { uid: string }; userWorkspaceId: string }
+    { user, userWorkspaceId }: { user: HandlerUser; userWorkspaceId: string }
   ) => {
     const start = Date.now();
     log("[API] DELETE /api/sessions/[id] start");
@@ -200,20 +215,18 @@ export const DELETE = withAuthorization(
       return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
     }
     const existing = ctx.preloaded.session as Session | null;
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: "Not found" },
-        { status: 404 }
-      );
-    }
     const context = await buildRequestContext({
       userId: user.uid,
+      userEmail: user.email,
       userWorkspaceId,
       sessionId: id,
       session: existing,
     });
-    if (!context.canAccess) {
+    if (!context.access?.canResolve) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+    if (!context.session) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
     }
     try {
       await deleteSessionRepo(id);

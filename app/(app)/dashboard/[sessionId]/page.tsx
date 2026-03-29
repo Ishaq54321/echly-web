@@ -1,3 +1,4 @@
+// Legacy route — will be deprecated in Phase 9.5
 import SessionPageClient from "./SessionPageClient";
 
 export default async function SessionPage({

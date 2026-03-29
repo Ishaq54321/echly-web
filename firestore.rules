@@ -6,39 +6,33 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function sameWorkspace(workspaceId) {
-      return request.auth != null
-        && request.auth.token.workspaceId != null
-        && workspaceId == request.auth.token.workspaceId;
-    }
-
     match /users/{uid} {
       allow read: if isAuthed() && request.auth.uid == uid;
       allow write: if false;
     }
 
     match /workspaces/{wid} {
-      allow read: if sameWorkspace(wid);
+      allow read: if isAuthed();
       allow write: if false;
     }
 
     match /workspaces/{wid}/insights/{docId} {
-      allow read: if sameWorkspace(wid);
+      allow read: if isAuthed();
       allow write: if false;
     }
 
     match /sessions/{id} {
-      allow read: if sameWorkspace(resource.data.workspaceId);
+      allow read: if isAuthed();
       allow write: if false;
     }
 
     match /feedback/{id} {
-      allow read: if sameWorkspace(resource.data.workspaceId);
+      allow read: if isAuthed();
       allow write: if false;
     }
 
     match /comments/{id} {
-      allow read: if sameWorkspace(resource.data.workspaceId);
+      allow read: if isAuthed();
       allow write: if false;
     }
 

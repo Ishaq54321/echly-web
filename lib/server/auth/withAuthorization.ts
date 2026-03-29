@@ -3,6 +3,7 @@ import {
   authorize,
   AuthorizationError,
   type Action,
+  type AuthorizedRequestUser,
   requireAuth,
   toAuthorizationResponse,
 } from "@/lib/server/auth/authorize";
@@ -31,14 +32,14 @@ export type ResolvedWorkspace =
       comment?: unknown;
     };
 
-type HandlerUser = { uid: string };
+export type HandlerUser = AuthorizedRequestUser;
 
 export type AuthorizedHandlerArgs = {
   user: HandlerUser;
   userId: string;
-  /** Resource workspace id (must match the viewer workspace when access is granted). */
+  /** Resource workspace id from `resolveWorkspace` (session scope); access is enforced in handlers via `getAccessContext` / `resolveAccess`. */
   workspaceId: string;
-  /** Viewer workspace from `users/{uid}.workspaceId` — single read per request. */
+  /** Viewer workspace from `users/{uid}.workspaceId` — empty when unset (e.g. invite-only viewer). */
   userWorkspaceId: string;
   isAdmin: boolean;
 };
@@ -53,8 +54,8 @@ type WithAuthorizationOptions = {
     ctx: HandlerContext
   ) => Promise<string>;
   /**
-   * Required. Must return the workspace id for the resource being accessed (never user.uid).
-   * `viewerWorkspaceId` is the caller's workspace (already loaded once); do not call getUserWorkspaceIdRepo again.
+   * Required. Return the resource session workspace id for routing/preload (never user.uid), or a sentinel for non-session admin routes.
+   * `viewerWorkspaceId` is the caller's `users/{uid}.workspaceId` (possibly empty). Access is enforced in handlers via `resolveAccess`, not here.
    */
   resolveWorkspace: (
     req: Request,
@@ -94,9 +95,6 @@ export function withAuthorization(
       const viewerWorkspaceIdRaw = await getUserWorkspaceIdRepo(user.uid);
       const viewerWorkspaceId =
         typeof viewerWorkspaceIdRaw === "string" ? viewerWorkspaceIdRaw.trim() : "";
-      if (!viewerWorkspaceId) {
-        throw new AuthorizationError("Missing workspaceId", 403, "FORBIDDEN");
-      }
 
       const resolvedWorkspace = await options.resolveWorkspace(
         req,
@@ -119,16 +117,6 @@ export function withAuthorization(
           session: resolvedWorkspace.session,
           comment: resolvedWorkspace.comment,
         };
-      }
-      if (!normalizedWorkspaceId) {
-        throw new AuthorizationError("Missing workspaceId", 403, "FORBIDDEN");
-      }
-
-      if (viewerWorkspaceId !== normalizedWorkspaceId) {
-        return Response.json(
-          { success: false, error: "FORBIDDEN", message: "Forbidden" },
-          { status: 403 }
-        );
       }
 
       const isAdmin = options?.isAdmin === true ? await isAdminUser(user.uid) : false;

@@ -1,6 +1,7 @@
 import "server-only";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldPath, FieldValue } from "firebase-admin/firestore";
+import { assertQueryLimit } from "@/lib/querySafety";
 import type { CommentAttachment, CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import {
   getSessionByIdRepo,
@@ -216,6 +217,23 @@ export async function getCommentByIdRepo(
   return { id: snap.id, ...(snap.data() ?? {}) };
 }
 
+/** Recent comments in a session (newest first). Composite index: comments (sessionId, createdAt DESC). */
+export async function listRecentCommentsForSessionRepo(
+  sessionId: string,
+  max: number
+): Promise<Array<Record<string, unknown> & { id: string }>> {
+  const sid = sessionId.trim();
+  if (!sid) return [];
+  assertQueryLimit(max, "listRecentCommentsForSessionRepo");
+  const snap = await adminDb
+    .collection("comments")
+    .where("sessionId", "==", sid)
+    .orderBy("createdAt", "desc")
+    .limit(max)
+    .get();
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() ?? {}) }));
+}
+
 /**
  * Server-only subset of comments repository.
  * Use this from API routes / other server repositories.
@@ -229,18 +247,10 @@ const DELETE_SESSION_COMMENTS_LIMIT = 500;
  * Deletes all comments for a session. Used when deleting a session.
  * Returns the number of docs deleted so callers can update workspace.stats.
  */
-export async function deleteAllCommentsForSessionRepo(
-  sessionId: string,
-  workspaceId: string
-): Promise<number> {
-  const wid = workspaceId.trim();
-  if (!wid) {
-    throw new Error("Missing workspaceId");
-  }
+export async function deleteAllCommentsForSessionRepo(sessionId: string): Promise<number> {
   const snapshot = await adminDb
     .collection("comments")
-    .where("workspaceId", "==", wid)
-    .where("sessionId", "==", sessionId)
+    .where("sessionId", "==", sessionId.trim())
     .limit(DELETE_SESSION_COMMENTS_LIMIT)
     .get();
   const count = snapshot.docs.length;

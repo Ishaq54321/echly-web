@@ -1,8 +1,8 @@
 /**
- * Canonical shareable path for the session feedback board.
- * Must stay in sync with `app/(app)/dashboard/[sessionId]/page.tsx`.
+ * Canonical path for the session feedback board (`/session/:sessionId`).
+ * Legacy `/dashboard/:sessionId` remains valid; keep app routes in sync.
  */
-export const SESSION_FEEDBACK_PATH = "/dashboard";
+export const SESSION_FEEDBACK_PATH = "/session";
 
 export function getSessionLink(sessionId: string | undefined | null): string {
   const id = typeof sessionId === "string" ? sessionId.trim() : "";

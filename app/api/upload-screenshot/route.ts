@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
 
     const accessCtx = await buildRequestContext({
       userId: user.uid,
+      userEmail: user.email,
       sessionId: sid,
     });
     if (!accessCtx.session) {
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
         { status: 404, headers: corsHeaders(req) }
       );
     }
-    if (!accessCtx.canAccess) {
+    if (!accessCtx.access?.canComment) {
       return NextResponse.json(
         { error: "Forbidden" },
         { status: 403, headers: corsHeaders(req) }

@@ -99,104 +99,6 @@ export async function getWorkspaceSessionCountRepo(
   return Math.max(0, total - archived);
 }
 
-/**
- * Lists workspace sessions. Sorted by most recent activity (updatedAt desc).
- * Composite index required: (workspaceId Ascending, updatedAt Descending).
- * When archivedOnly is true: (workspaceId Ascending, archived Ascending, updatedAt Descending).
- * When includeArchived is true, returns both active and archived sessions.
- */
-export async function getWorkspaceSessionsRepo(
-  workspaceId: string,
-  max: number = 50,
-  archivedOnly?: boolean,
-  includeArchived?: boolean
-): Promise<Session[]> {
-  assertQueryLimit(max, "getWorkspaceSessionsRepo");
-  let q: FirebaseFirestore.Query = adminDb
-    .collection("sessions")
-    .where("workspaceId", "==", workspaceId);
-  if (archivedOnly === true) q = q.where("archived", "==", true);
-  q = q.orderBy("updatedAt", "desc").limit(max);
-  console.time("Firestore query");
-  let snapshot;
-  try {
-    snapshot = await q.get();
-  } finally {
-    console.timeEnd("Firestore query");
-  }
-
-  return snapshot.docs
-    .filter((docSnap) => {
-      if (includeArchived) return true;
-      const archived = (docSnap.data() as { archived?: boolean }).archived === true;
-      return archivedOnly ? archived : !archived;
-    })
-    .map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as SessionDoc),
-    }));
-}
-
-/**
- * @deprecated Alias for getWorkspaceSessionsRepo (workspace-scoped).
- */
-export async function getUserSessionsRepo(
-  workspaceId: string,
-  max: number = 50,
-  archivedOnly?: boolean,
-  includeArchived?: boolean
-): Promise<Session[]> {
-  assertQueryLimit(max, "getUserSessionsRepo");
-  let q: FirebaseFirestore.Query = adminDb
-    .collection("sessions")
-    .where("workspaceId", "==", workspaceId);
-  if (archivedOnly === true) q = q.where("archived", "==", true);
-  q = q.orderBy("updatedAt", "desc").limit(max);
-  const snapshot = await q.get();
-
-  return snapshot.docs
-    .filter((docSnap) => {
-      if (includeArchived) return true;
-      const archived = (docSnap.data() as { archived?: boolean }).archived === true;
-      return archivedOnly ? archived : !archived;
-    })
-    .map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as SessionDoc),
-    }));
-}
-
-/** Limit for insights top sessions query. NEVER increase. */
-const INSIGHTS_TOP_SESSIONS_LIMIT = 10;
-
-/**
- * Bounded sessions fetch for /api/insights "most active sessions" chart.
- * Returns top sessions by feedbackCount. Composite index required: sessions (workspaceId ASC, feedbackCount DESC).
- */
-export async function getWorkspaceSessionsByFeedbackCountRepo(
-  workspaceId: string
-): Promise<Session[]> {
-  assertQueryLimit(INSIGHTS_TOP_SESSIONS_LIMIT, "getWorkspaceSessionsByFeedbackCountRepo");
-  const isSimple = process.env.INSIGHTS_SIMPLE_QUERY === "1";
-
-  const q = isSimple
-    ? adminDb
-        .collection("sessions")
-        .where("workspaceId", "==", workspaceId)
-        .limit(10)
-    : adminDb
-        .collection("sessions")
-        .where("workspaceId", "==", workspaceId)
-        .orderBy("feedbackCount", "desc")
-        .limit(INSIGHTS_TOP_SESSIONS_LIMIT);
-
-  const snapshot = await q.get();
-  return snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...(docSnap.data() as SessionDoc),
-  }));
-}
-
 export async function getSessionByIdRepo(
   sessionId: string
 ): Promise<Session | null> {
@@ -302,8 +204,8 @@ export async function deleteSessionRepo(sessionId: string): Promise<void> {
   );
 
   const [feedbackDeleted, commentsDeleted] = await Promise.all([
-    deleteAllFeedbackForSessionRepo(sessionId, workspaceId),
-    deleteAllCommentsForSessionRepo(sessionId, workspaceId),
+    deleteAllFeedbackForSessionRepo(sessionId),
+    deleteAllCommentsForSessionRepo(sessionId),
   ]);
 
   const viewsSnap = await adminDb.collection(`sessionViews/${sessionId}/views`).get();

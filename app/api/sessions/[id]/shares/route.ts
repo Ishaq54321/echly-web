@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { listSessionSharesRepo } from "@/lib/repositories/sessionSharesRepository";
-import { sessionWorkspaceId } from "@/lib/server/sessionWorkspaceScope";
 import { buildRequestContext } from "@/lib/server/requestContext";
 
-/** GET /api/sessions/:id/shares — list email shares for a session (owner only). */
+/** GET /api/sessions/:id/shares — list email shares (requires resolve capability). */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try {
@@ -20,22 +19,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const context = await buildRequestContext({
     userId: user.uid,
+    userEmail: user.email,
     sessionId: sessionId.trim(),
   });
+  if (!context.access?.canResolve) {
+    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
   if (!context.session) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
-  if (!context.canAccess) {
-    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-  }
-  const session = context.session;
 
   try {
-    const workspaceId = sessionWorkspaceId(session) ?? "";
-    if (!workspaceId) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-    }
-    const rows = await listSessionSharesRepo(sessionId, workspaceId);
+    const rows = await listSessionSharesRepo(sessionId.trim());
     const shares = rows.map((r) => ({
       email: r.email,
       permission: r.permission,

@@ -84,7 +84,6 @@ function omitSoftDeletedFeedback(items: Feedback[]): Feedback[] {
  * Composite index required: feedback (sessionId ASC, status ASC, createdAt DESC).
  */
 export async function getSessionFeedbackPageRepo(
-  workspaceId: string,
   sessionId: string,
   opts: {
     status?: "open" | "resolved" | "all";
@@ -98,7 +97,6 @@ export async function getSessionFeedbackPageRepo(
 
   const coll = collection(db, "feedback");
   const baseConstraints = [
-    where("workspaceId", "==", workspaceId),
     where("sessionId", "==", sessionId),
     orderBy("status", "asc"),
     orderBy("createdAt", "desc"),
@@ -134,7 +132,6 @@ export async function getSessionFeedbackPageRepo(
  * Used by API routes so cursors can be serialized as simple strings.
  */
 export async function getSessionFeedbackPageWithStringCursorRepo(
-  workspaceId: string,
   sessionId: string,
   limit: number,
   cursor?: string
@@ -145,17 +142,13 @@ export async function getSessionFeedbackPageWithStringCursorRepo(
       ? await getDoc(doc(db, "feedback", trimmed))
       : null;
 
-  const { feedback, lastVisibleDoc, hasMore } = await getSessionFeedbackPageRepo(
-    workspaceId,
-    sessionId,
-    {
-      status: "all",
-      limit,
-      cursor: cursorSnap && cursorSnap.exists()
-        ? (cursorSnap as QueryDocumentSnapshot)
-        : null,
-    }
-  );
+  const { feedback, lastVisibleDoc, hasMore } = await getSessionFeedbackPageRepo(sessionId, {
+    status: "all",
+    limit,
+    cursor: cursorSnap && cursorSnap.exists()
+      ? (cursorSnap as QueryDocumentSnapshot)
+      : null,
+  });
 
   return {
     feedback,
@@ -165,15 +158,10 @@ export async function getSessionFeedbackPageWithStringCursorRepo(
 }
 
 /**
- * Workspace-scoped session feedback page.
- * Composite index required: feedback (workspaceId ASC, sessionId ASC, createdAt DESC).
- *
- * NOTE: This is intentionally separate from getSessionFeedbackPageRepo to avoid
- * changing ordering/constraints for other callers.
+ * Session-scoped paginated feedback (newest first). Soft-deleted rows skipped client-side.
  */
 export async function getSessionFeedbackPageForUserWithStringCursorRepo(
   args: {
-    workspaceId: string;
     sessionId: string;
     limit: number;
     cursor?: string;
@@ -181,13 +169,12 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
     statusFilter?: "open" | "resolved";
   }
 ): Promise<{ feedback: Feedback[]; nextCursor: string | null; hasMore: boolean }> {
-  const { workspaceId, sessionId, limit: pageSize, cursor, statusFilter } = args;
+  const { sessionId, limit: pageSize, cursor, statusFilter } = args;
   assertQueryLimit(pageSize, "getSessionFeedbackPageForUserWithStringCursorRepo");
   const trimmed = cursor?.trim();
   const cursorSnap: DocumentSnapshot | null =
     trimmed && trimmed.length > 0 ? await getDoc(doc(db, "feedback", trimmed)) : null;
 
-  // Scope: workspaceId + sessionId.
   // Exclude soft-deleted rows by skipping `isDeleted === true`. We do not use
   // Firestore `where("isDeleted","!=",true)` here because it drops legacy docs
   // that omit the field; semantic is identical once all rows have `isDeleted`.
@@ -198,15 +185,12 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
 
   const indexHint =
     statusFilter != null
-      ? statusFilter === "open"
-        ? "feedback(workspaceId ASC, sessionId ASC, status ASC, createdAt DESC) — open uses status in [open, null]"
-        : "feedback(workspaceId ASC, sessionId ASC, status ASC, createdAt DESC)"
-      : "feedback(workspaceId ASC, sessionId ASC, createdAt DESC)";
+      ? "feedback(sessionId ASC, status ASC, createdAt DESC)"
+      : "feedback(sessionId ASC, createdAt DESC)";
 
-  /** Open list: include legacy rows with `status == null` (missing field still needs one-time backfill script). */
   const statusConstraints =
     statusFilter === "open"
-      ? [where("status", "in", ["open", null])]
+      ? [where("status", "==", "open")]
       : statusFilter === "resolved"
         ? [where("status", "==", "resolved")]
         : [];
@@ -214,7 +198,6 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
   const runQuery = () =>
     query(
       collection(db, "feedback"),
-      where("workspaceId", "==", workspaceId),
       where("sessionId", "==", sessionId),
       ...statusConstraints,
       orderBy("createdAt", "desc"),
@@ -231,7 +214,6 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.toLowerCase().includes("requires an index")) {
           console.warn(`[FIRESTORE] Missing composite index: ${indexHint}`, {
-            workspaceId,
             sessionId,
             statusFilter,
           });
@@ -269,7 +251,6 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.toLowerCase().includes("requires an index")) {
       console.warn(`[FIRESTORE] Missing composite index: ${indexHint}`, {
-        workspaceId,
         sessionId,
         statusFilter,
       });
@@ -296,10 +277,9 @@ const SESSION_SEARCH_CORPUS_MAX = 200;
  * (mixed status, newest first) for server-side search. Uses the same access path as list pagination.
  */
 export async function getSessionFeedbackSearchCorpusForUserRepo(args: {
-  workspaceId: string;
   sessionId: string;
 }): Promise<Feedback[]> {
-  const { workspaceId, sessionId } = args;
+  const { sessionId } = args;
   const maxDocs = SESSION_SEARCH_CORPUS_MAX;
   const batchLimit = 50;
   const out: Feedback[] = [];
@@ -307,7 +287,6 @@ export async function getSessionFeedbackSearchCorpusForUserRepo(args: {
 
   while (out.length < maxDocs) {
     const { feedback, nextCursor, hasMore } = await getSessionFeedbackPageForUserWithStringCursorRepo({
-      workspaceId,
       sessionId,
       limit: batchLimit,
       cursor,
@@ -334,10 +313,9 @@ const OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT = 3;
 
 /**
  * Fetches up to N feedback items for a session filtered by resolution, newest first.
- * Composite index: feedback (workspaceId ASC, sessionId ASC, status ASC, createdAt DESC).
+ * Composite-index: feedback (sessionId ASC, status ASC, createdAt DESC).
  */
 export async function getSessionFeedbackByResolvedRepo(
-  workspaceId: string,
   sessionId: string,
   isResolved: boolean,
   max: number = OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT
@@ -346,97 +324,10 @@ export async function getSessionFeedbackByResolvedRepo(
   const status = isResolved ? "resolved" : "open";
   const q = query(
     collection(db, "feedback"),
-    where("workspaceId", "==", workspaceId),
     where("sessionId", "==", sessionId),
     where("status", "==", status),
     orderBy("createdAt", "desc"),
     limit(max)
-  );
-  const snapshot = await getDocs(q);
-  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
-}
-
-const USER_FEEDBACK_ALL_LIMIT = 100;
-
-/**
- * Workspace-scoped Discussion inbox.
- * Composite index required: feedback (workspaceId ASC, createdAt DESC).
- */
-export async function getWorkspaceFeedbackAllRepo(
-  workspaceId: string,
-  max: number = USER_FEEDBACK_ALL_LIMIT
-): Promise<Feedback[]> {
-  assertQueryLimit(max, "getWorkspaceFeedbackAllRepo");
-  const coll = collection(db, "feedback");
-  const q = query(
-    coll,
-    where("workspaceId", "==", workspaceId),
-    orderBy("createdAt", "desc"),
-    limit(max)
-  );
-  const snapshot = await getDocs(q);
-  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
-}
-
-/** Limit for insights feedback query. NEVER increase. */
-const INSIGHTS_FEEDBACK_LIMIT = 150;
-
-/**
- * Bounded feedback fetch for /api/insights charts.
- * Composite index required: feedback (workspaceId ASC, createdAt DESC).
- */
-export async function getWorkspaceFeedbackForInsightsRepo(
-  workspaceId: string
-): Promise<Feedback[]> {
-  assertQueryLimit(INSIGHTS_FEEDBACK_LIMIT, "getWorkspaceFeedbackForInsightsRepo");
-  const isSimple = process.env.INSIGHTS_SIMPLE_QUERY === "1";
-  const limitValue = isSimple ? 10 : INSIGHTS_FEEDBACK_LIMIT;
-
-  const q = isSimple
-    ? query(
-        collection(db, "feedback"),
-        where("workspaceId", "==", workspaceId),
-        limit(10)
-      )
-    : query(
-        collection(db, "feedback"),
-        where("workspaceId", "==", workspaceId),
-        orderBy("createdAt", "desc"),
-        limit(INSIGHTS_FEEDBACK_LIMIT)
-      );
-
-  const snapshot = await getDocs(q);
-  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
-}
-
-
-/**
- * Workspace-scoped conversations only (commentCount > 0).
- * Composite index required: feedback (workspaceId ASC, commentCount DESC).
- */
-export async function getWorkspaceFeedbackWithCommentsRepo(
-  args: {
-    workspaceId: string;
-    limit: number;
-    cursor?: string;
-  }
-): Promise<Feedback[]> {
-  const { workspaceId, limit: pageSize, cursor } = args;
-  assertQueryLimit(pageSize, "getWorkspaceFeedbackWithCommentsRepo");
-  const coll = collection(db, "feedback");
-  const trimmedCursor = cursor?.trim();
-  const cursorSnap: DocumentSnapshot | null =
-    trimmedCursor && trimmedCursor.length > 0
-      ? await getDoc(doc(db, "feedback", trimmedCursor))
-      : null;
-
-  const q = query(
-    coll,
-    where("workspaceId", "==", workspaceId),
-    where("commentCount", ">", 0),
-    orderBy("commentCount", "desc"),
-    ...(cursorSnap && cursorSnap.exists() ? [startAfter(cursorSnap)] : []),
-    limit(pageSize)
   );
   const snapshot = await getDocs(q);
   return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));

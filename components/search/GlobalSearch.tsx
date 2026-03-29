@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkspaceOverview } from "@/lib/client/workspaceOverviewContext";
 import type { Session } from "@/lib/domain/session";
+import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 
 export const OPEN_SEARCH_EVENT = "echly:open-search-overlay";
 
@@ -114,7 +115,7 @@ export function GlobalSearch() {
   const showSearchResults = searchMatches.length > 0;
 
   const navigateToSession = (id: string) => {
-    router.push(`/dashboard/${id}`);
+    router.push(`${SESSION_FEEDBACK_PATH}/${id}`);
     setOpen(false);
     setQuery("");
   };

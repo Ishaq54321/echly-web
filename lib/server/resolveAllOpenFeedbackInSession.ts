@@ -35,7 +35,6 @@ export async function resolveAllOpenFeedbackInSession(
 
     const snapshot = await feedbackRef
       .where("sessionId", "==", sessionId)
-      .where("workspaceId", "==", wid)
       .where("status", "==", "open")
       .limit(BATCH_SIZE)
       .get();

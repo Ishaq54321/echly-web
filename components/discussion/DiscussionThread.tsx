@@ -45,13 +45,7 @@ export function DiscussionThread({
   onCommentAdded,
   listLoaded = true,
 }: DiscussionThreadProps) {
-  const {
-    workspaceId,
-    isIdentityResolved,
-    authUid,
-    authDisplayName,
-    authPhotoUrl,
-  } = useWorkspace();
+  const { isIdentityResolved, authUid, authDisplayName, authPhotoUrl } = useWorkspace();
   const { showToast } = useToast();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
@@ -74,7 +68,7 @@ export function DiscussionThread({
 
   const handleAttachmentSend = useCallback(
     async (attachment: CommentAttachment) => {
-      if (!authUid || !feedbackId || !ticket?.sessionId || !workspaceId) return;
+      if (!authUid || !feedbackId || !ticket?.sessionId) return;
       assertIdentityResolved(isIdentityResolved);
       const sid = ticket.sessionId;
       const optimisticComment = createOptimisticComment({
@@ -116,7 +110,6 @@ export function DiscussionThread({
       feedbackId,
       ticket?.sessionId,
       onCommentAdded,
-      workspaceId,
       authUid,
       authDisplayName,
       authPhotoUrl,
@@ -181,14 +174,13 @@ export function DiscussionThread({
   }, [feedbackId, authUid]);
 
   useEffect(() => {
-    if (!workspaceId || !feedbackId || !ticket?.sessionId || !authUid) {
+    if (!feedbackId || !ticket?.sessionId || !authUid) {
       setComments([]);
       setCommentsInitialized(false);
     }
-  }, [workspaceId, feedbackId, ticket?.sessionId, authUid]);
+  }, [feedbackId, ticket?.sessionId, authUid]);
 
   useCommentsRepoSubscription({
-    workspaceId,
     sessionId: ticket?.sessionId,
     feedbackId,
     onComments: (incoming) => {
@@ -199,7 +191,7 @@ export function DiscussionThread({
 
   const handleSendComment = () => {
     const sid = ticket?.sessionId;
-    if (!authUid || !feedbackId || !sid || !workspaceId) return;
+    if (!authUid || !feedbackId || !sid) return;
     assertIdentityResolved(isIdentityResolved);
     const trimmed = commentDraft.trim();
     if (!trimmed) return;

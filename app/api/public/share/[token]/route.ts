@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
+import { toShareSurfacePermissions } from "@/lib/access/resolveAccess";
+import { getAccessContextForPublicShareToken } from "@/lib/access/getAccessContext";
 import { getAllFeedbackForPublicShareBySessionIdRepo } from "@/lib/repositories/feedbackRepository.server";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 import { sanitizePublicFeedback, sanitizePublicSession } from "@/lib/server/publicShareSanitize";
-import { resolvePublicPermissions } from "@/lib/permissions/publicSharePermissions";
-import { resolveShareToken } from "@/lib/server/shareTokenResolver";
+import { updateShareLinkLastAccessedAt } from "@/lib/repositories/shareLinksRepository";
 import { checkRateLimit, clientKeyFromRequest } from "@/lib/server/rateLimit";
 
 /**
@@ -28,46 +28,24 @@ export async function GET(
     return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
   }
 
-  const resolved = await resolveShareToken(rawToken);
-  if (!resolved.valid) {
-    if (resolved.reason === "NOT_FOUND") {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    if (resolved.reason === "EXPIRED") {
-      return NextResponse.json({ error: "Gone" }, { status: 410 });
-    }
+  const { session, access, tokenCtx } = await getAccessContextForPublicShareToken(rawToken);
+
+  if (!access?.canView) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-
-  const session = await getSessionByIdRepo(resolved.sessionId);
   if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const sessionWorkspaceId =
-    typeof (session as { workspaceId?: unknown }).workspaceId === "string"
-      ? ((session as { workspaceId?: string }).workspaceId ?? "").trim()
-      : "";
-
-  if (!sessionWorkspaceId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (tokenCtx.ok && tokenCtx.isActive) {
+    void updateShareLinkLastAccessedAt(tokenCtx.linkDocId).catch(() => {});
   }
 
-  const ownerMatchesToken = resolved.workspaceId === sessionWorkspaceId;
-  if (!ownerMatchesToken) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const feedback = await getAllFeedbackForPublicShareBySessionIdRepo(
-    resolved.sessionId,
-    sessionWorkspaceId
-  );
+  const feedback = await getAllFeedbackForPublicShareBySessionIdRepo(session.id);
 
   return NextResponse.json({
     session: sanitizePublicSession(session),
     feedback: sanitizePublicFeedback(feedback),
-    permissions: resolvePublicPermissions({
-      generalAccess: resolved.generalAccess,
-    }),
+    permissions: toShareSurfacePermissions(access),
   });
 }

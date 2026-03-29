@@ -213,10 +213,6 @@ export async function deleteComment(commentId: string): Promise<void> {
 }
 
 /** Recent comments for a session (overview activity feed). Limited. */
-export async function getSessionRecentComments(
-  workspaceId: string,
-  sessionId: string,
-  max: number = 10
-) {
-  return getSessionRecentCommentsRepo(workspaceId, sessionId, max);
+export async function getSessionRecentComments(sessionId: string, max: number = 10) {
+  return getSessionRecentCommentsRepo(sessionId, max);
 }

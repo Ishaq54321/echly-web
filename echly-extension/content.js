@@ -13960,11 +13960,6 @@
 
   // lib/domain/accessLevel.ts
   var ACCESS_LEVELS = ["view", "comment", "resolve"];
-  var ORDER = {
-    view: 0,
-    comment: 1,
-    resolve: 2
-  };
   function normalizeAccessLevel(raw) {
     if (raw === "resolve" || raw === "comment" || raw === "view") return raw;
     if (raw === "edit") return "resolve";
@@ -13974,10 +13969,6 @@
     if (raw === "view" || raw === "comment" || raw === "resolve") return raw;
     if (raw === "edit") return "resolve";
     return null;
-  }
-  function hasPermission(effectiveLevel, requiredLevel) {
-    if (requiredLevel === "view") return true;
-    return ORDER[effectiveLevel] >= ORDER[requiredLevel];
   }
 
   // lib/domain/session.ts

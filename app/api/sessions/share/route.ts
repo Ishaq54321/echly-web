@@ -50,12 +50,10 @@ export async function POST(req: Request) {
 
   const context = await buildRequestContext({
     userId: user.uid,
+    userEmail: user.email,
     sessionId,
   });
-  if (!context.session) {
-    return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
-  }
-  if (!context.canAccess) {
+  if (!context.access?.canComment) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 

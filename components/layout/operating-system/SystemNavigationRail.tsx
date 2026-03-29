@@ -37,7 +37,13 @@ const NAV_GROUPS = [
 
 function isActive(href: string, label: string, pathname: string): boolean {
   if (href === "/dashboard") {
-    if (label === "Sessions") return pathname.startsWith("/dashboard/") && pathname !== "/dashboard" && !pathname.startsWith("/dashboard/insights");
+    if (label === "Sessions")
+      return (
+        pathname.startsWith("/session/") ||
+        (pathname.startsWith("/dashboard/") &&
+          pathname !== "/dashboard" &&
+          !pathname.startsWith("/dashboard/insights"))
+      );
     if (label === "Dashboard") return pathname === "/dashboard";
   }
   if (href === "/dashboard/insights") return pathname === "/dashboard/insights";

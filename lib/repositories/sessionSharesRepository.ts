@@ -65,15 +65,11 @@ export async function upsertSessionShareRepo(
   }
 }
 
-export async function listSessionSharesRepo(
-  sessionId: string,
-  workspaceId: string
-): Promise<SessionShare[]> {
+export async function listSessionSharesRepo(sessionId: string): Promise<SessionShare[]> {
   assertQueryLimit(SHARES_LIST_LIMIT, "listSessionSharesRepo");
   const snap = await adminDb
     .collection("session_shares")
     .where("sessionId", "==", sessionId)
-    .where("workspaceId", "==", workspaceId)
     .limit(SHARES_LIST_LIMIT)
     .get();
   return snap.docs.map((d) => {

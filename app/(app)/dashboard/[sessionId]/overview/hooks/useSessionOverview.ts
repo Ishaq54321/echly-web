@@ -2,16 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useAsyncGeneration } from "@/lib/hooks/useSafeAsync";
-import { getSessionRecentComments } from "@/lib/comments";
+import { authFetch } from "@/lib/authFetch";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
-import {
-  getFeedbackByIds,
-  getSessionFeedbackByResolved,
-} from "@/lib/feedback";
 import type { Feedback } from "@/lib/domain/feedback";
-import { getSessionById } from "@/lib/sessions";
+import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
+import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
 import type { Session } from "@/lib/domain/session";
-import { useWorkspace } from "@/lib/client/workspaceContext";
+import { Timestamp } from "firebase/firestore";
 
 const RECENT_ACTIVITY_LIMIT = 10;
 
@@ -37,7 +34,6 @@ export interface SessionOverviewData {
   tagCounts: { tag: string; count: number }[];
 }
 
-/** Placeholder before `load()` completes; never used as a substitute for fetched counts. */
 const initialCountsPlaceholder: SessionFeedbackCounts = {
   total: 0,
   open: 0,
@@ -82,25 +78,70 @@ function extractTagCounts(feedback: Feedback[]): { tag: string; count: number }[
     .sort((a, b) => b.count - a.count);
 }
 
-function timestampToDate(
-  ts: { toDate?: () => Date; seconds?: number } | null | undefined
-): Date | null {
-  if (!ts) return null;
-  try {
-    if (typeof (ts as { toDate?: () => Date }).toDate === "function") {
-      return (ts as { toDate: () => Date }).toDate();
+function parseOverviewFeedback(row: Record<string, unknown>, sid: string): Feedback | null {
+  const id = typeof row.id === "string" ? row.id : "";
+  if (!id) return null;
+  const title = typeof row.title === "string" ? row.title : "";
+  const rawStatus =
+    typeof row.status === "string" ? row.status : row.isResolved === true ? "resolved" : "open";
+  const normalizedStatus = normalizeTicketStatus(rawStatus);
+  const createdAtRaw = row.createdAt;
+  let createdAt: Feedback["createdAt"] = null;
+  if (typeof createdAtRaw === "string") {
+    const d = new Date(createdAtRaw);
+    if (!Number.isNaN(d.getTime())) {
+      createdAt = Timestamp.fromDate(d);
     }
-    if (typeof (ts as { seconds?: number }).seconds === "number") {
-      return new Date((ts as { seconds: number }).seconds * 1000);
-    }
-    return null;
-  } catch {
-    return null;
   }
+  return {
+    id,
+    sessionId: typeof row.sessionId === "string" ? row.sessionId : sid,
+    userId: typeof row.userId === "string" ? row.userId : "",
+    title,
+    instruction:
+      typeof row.instruction === "string"
+        ? row.instruction
+        : typeof row.description === "string"
+          ? row.description
+          : undefined,
+    description: typeof row.description === "string" ? row.description : undefined,
+    suggestion: typeof row.suggestion === "string" ? row.suggestion : "",
+    type: typeof row.type === "string" ? row.type : "Feedback",
+    isResolved: normalizedStatus === "resolved",
+    createdAt,
+    suggestedTags: Array.isArray(row.suggestedTags)
+      ? (row.suggestedTags as string[])
+      : null,
+    screenshotUrl: typeof row.screenshotUrl === "string" ? row.screenshotUrl : null,
+    commentCount: typeof row.commentCount === "number" ? row.commentCount : 0,
+    status: normalizedStatus,
+    isDeleted: false,
+  };
+}
+
+function sessionFromOverviewApi(raw: Record<string, unknown> | null): Session | null {
+  if (!raw || typeof raw.id !== "string") return null;
+  const session: Session = {
+    id: raw.id,
+    title: typeof raw.title === "string" ? raw.title : "Untitled Session",
+  };
+  if (typeof raw.workspaceId === "string") session.workspaceId = raw.workspaceId;
+  if (raw.accessLevel !== undefined) session.accessLevel = normalizeAccessLevel(raw.accessLevel);
+  const archived = raw.archived === true || raw.isArchived === true;
+  if (archived) {
+    session.archived = true;
+    session.isArchived = true;
+  }
+  if (typeof raw.createdAt === "string") session.createdAt = raw.createdAt;
+  if (typeof raw.updatedAt === "string") session.updatedAt = raw.updatedAt;
+  if (typeof raw.openCount === "number") session.openCount = raw.openCount;
+  if (typeof raw.resolvedCount === "number") session.resolvedCount = raw.resolvedCount;
+  if (typeof raw.totalCount === "number") session.totalCount = raw.totalCount;
+  if (typeof raw.feedbackCount === "number") session.feedbackCount = raw.feedbackCount;
+  return session;
 }
 
 export function useSessionOverview(sessionId: string | undefined) {
-  const { workspaceId, authUid } = useWorkspace();
   const { nextToken, isCurrent } = useAsyncGeneration();
   const [data, setData] = useState<SessionOverviewData>({
     session: null,
@@ -122,47 +163,61 @@ export function useSessionOverview(sessionId: string | undefined) {
       setError(null);
       return;
     }
-    if (!authUid || !workspaceId) {
-      nextToken();
-      setData(EMPTY_SESSION_OVERVIEW);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    const sid: string = sessionId;
+    const sid = sessionId;
     const token = nextToken();
 
     let cancelled = false;
 
     async function load() {
-      const wid = workspaceId;
-      if (!wid) return;
       setLoading(true);
       setError(null);
       try {
-        const [session, openPreview, resolvedPreview, recentComments] = await Promise.all([
-          getSessionById(sid),
-          getSessionFeedbackByResolved(wid, sid, false, 3),
-          getSessionFeedbackByResolved(wid, sid, true, 3),
-          getSessionRecentComments(wid, sid, RECENT_ACTIVITY_LIMIT),
-        ]);
-
-        const countsByStatus = countsFromSession(session);
+        const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/overview`, {
+          cache: "no-store",
+        });
+        if (!res?.ok) {
+          throw new Error(`Overview failed: ${res?.status ?? "?"}`);
+        }
+        const payload = (await res.json().catch(() => ({}))) as {
+          success?: boolean;
+          session?: Record<string, unknown>;
+          statusPreview?: { open?: unknown[]; resolved?: unknown[] };
+          recentActivity?: Array<{
+            actorName?: string;
+            action?: string;
+            targetTitle?: string;
+            timestamp?: string | null;
+          }>;
+        };
 
         if (cancelled || !isCurrent(token)) return;
+        if (!payload.success || !payload.session) {
+          setData(EMPTY_SESSION_OVERVIEW);
+          return;
+        }
 
-        const feedbackIds = [...new Set(recentComments.map((c) => c.feedbackId))];
-        const feedbackList = await getFeedbackByIds(feedbackIds.slice(0, 10), 10);
-        const titleByFeedbackId = new Map(
-          feedbackList.map((f) => [f.id, f.title])
-        );
+        const session = sessionFromOverviewApi(payload.session);
+        const openRaw = Array.isArray(payload.statusPreview?.open) ? payload.statusPreview!.open! : [];
+        const resolvedRaw = Array.isArray(payload.statusPreview?.resolved)
+          ? payload.statusPreview!.resolved!
+          : [];
 
-        const recentActivity: OverviewActivityItem[] = recentComments.map(
+        const openPreview = openRaw
+          .map((r) => parseOverviewFeedback(r as Record<string, unknown>, sid))
+          .filter((f): f is Feedback => f !== null);
+        const resolvedPreview = resolvedRaw
+          .map((r) => parseOverviewFeedback(r as Record<string, unknown>, sid))
+          .filter((f): f is Feedback => f !== null);
+
+        const countsByStatus = countsFromSession(session);
+        const recentActivityRaw = Array.isArray(payload.recentActivity) ? payload.recentActivity : [];
+        const recentActivity: OverviewActivityItem[] = recentActivityRaw.slice(0, RECENT_ACTIVITY_LIMIT).map(
           (c) => ({
-            actorName: c.userName ?? "Someone",
-            action: "Commented",
-            targetTitle: titleByFeedbackId.get(c.feedbackId) ?? "",
-            timestamp: timestampToDate(c.createdAt),
+            actorName: typeof c.actorName === "string" ? c.actorName : "Someone",
+            action: typeof c.action === "string" ? c.action : "Commented",
+            targetTitle: typeof c.targetTitle === "string" ? c.targetTitle : "",
+            timestamp:
+              typeof c.timestamp === "string" && c.timestamp ? new Date(c.timestamp) : null,
           })
         );
 
@@ -176,14 +231,11 @@ export function useSessionOverview(sessionId: string | undefined) {
         if (cancelled || !isCurrent(token)) return;
 
         setData({
-          session: session ?? null,
+          session,
           countsByStatus,
           totalCount: countsByStatus.total,
           recentFeedback,
-          statusPreview: {
-            open: openPreview,
-            resolved: resolvedPreview,
-          },
+          statusPreview: { open: openPreview, resolved: resolvedPreview },
           recentActivity,
           tagCounts,
         });
@@ -196,11 +248,11 @@ export function useSessionOverview(sessionId: string | undefined) {
       }
     }
 
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
-  }, [authUid, workspaceId, sessionId, nextToken, isCurrent]);
+  }, [sessionId, nextToken, isCurrent]);
 
   return { data, loading, error };
 }

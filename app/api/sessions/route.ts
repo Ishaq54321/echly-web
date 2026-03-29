@@ -10,8 +10,8 @@ import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
 import { corsHeaders } from "@/lib/server/cors";
-import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { listAccessibleSessionsForUser } from "@/lib/server/listAccessibleSessionsForUser";
 
 export const dynamic = "force-dynamic";
 
@@ -38,21 +38,20 @@ export async function GET(req: NextRequest) {
 
   console.time("API /sessions");
   try {
-    const workspaceId = await getUserWorkspaceIdRepo(user.uid);
     console.time("Firestore query");
-    let snap;
+    let sessionRows;
     try {
-      snap = await adminDb
-        .collection("sessions")
-        .where("workspaceId", "==", workspaceId)
-        .orderBy("updatedAt", "desc")
-        .limit(30)
-        .get();
+      sessionRows = await listAccessibleSessionsForUser({
+        userId: user.uid,
+        userEmail: user.email ?? null,
+        limit: 30,
+      });
     } finally {
       console.timeEnd("Firestore query");
     }
-    const sessions = snap.docs.map((docSnap) => {
-      const data = docSnap.data() as {
+    const sessions = sessionRows.map((docSnap) => {
+      const data = docSnap as {
+        id: string;
         title?: string;
         updatedAt?: { toDate?: () => Date } | string | null;
         createdAt?: { toDate?: () => Date } | string | null;
@@ -91,7 +90,7 @@ export async function GET(req: NextRequest) {
             : 0;
 
       return {
-        id: docSnap.id,
+        id: data.id,
         // Keep `title` for compatibility and include `name` as a normalized alias.
         title: data.title ?? "Untitled Session",
         name: data.title ?? "Untitled Session",

@@ -11,6 +11,7 @@ import { log } from "@/lib/utils/logger";
 import {
   withAuthorization,
   type HandlerContext,
+  type HandlerUser,
 } from "@/lib/server/auth/withAuthorization";
 import { routeParamId } from "@/lib/server/routeParams";
 import { buildRequestContext } from "@/lib/server/requestContext";
@@ -19,13 +20,14 @@ import type { Session } from "@/lib/domain/session";
 
 async function resolveTicketWorkspaceId(
   _req: Request,
-  user: { uid: string },
+  user: HandlerUser,
   ctx: HandlerContext,
   viewerWorkspaceId: string
 ) {
   const id = await routeParamId(ctx);
   const context = await buildRequestContext({
     userId: user.uid,
+    userEmail: user.email,
     userWorkspaceId: viewerWorkspaceId,
     feedbackId: id?.trim() || undefined,
   });
@@ -42,7 +44,7 @@ export const GET = withAuthorization(
   async (
     _req: Request,
     ctx: HandlerContext,
-    { user, userWorkspaceId }: { user: { uid: string }; userWorkspaceId: string }
+    { user, userWorkspaceId }: { user: HandlerUser; userWorkspaceId: string }
   ) => {
     const start = Date.now();
     log("[API] GET /api/tickets/[id] start");
@@ -57,9 +59,9 @@ export const GET = withAuthorization(
       const pre = ctx.preloaded;
       const context = await buildRequestContext({
         userId: user.uid,
+        userEmail: user.email,
         userWorkspaceId,
         feedbackId: id,
-        requiredTicketAccess: "view",
         ...(pre && pre.feedback !== undefined
           ? {
               feedback: pre.feedback as Feedback | null,
@@ -67,22 +69,22 @@ export const GET = withAuthorization(
             }
           : {}),
       });
+      if (!context.access) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden" },
+          { status: 403 }
+        );
+      }
       if (!context.feedback) {
         return NextResponse.json(
           { success: false, error: "Not found" },
           { status: 404 }
         );
       }
-      if (!context.canAccess) {
-        return NextResponse.json(
-          { success: false, error: context.permissionError ?? "Forbidden" },
-          { status: 403 }
-        );
-      }
       log("[API] GET /api/tickets/[id] duration:", Date.now() - start);
       return NextResponse.json({
         success: true,
-        ticket: serializeTicket(context.feedback as Feedback),
+        ticket: serializeTicket(context.feedback),
       });
     } catch (err) {
       console.error("GET /api/tickets/[id]:", err);
@@ -102,7 +104,7 @@ export const PATCH = withAuthorization(
   async (
     req: Request,
     ctx: HandlerContext,
-    { user, userWorkspaceId }: { user: { uid: string }; userWorkspaceId: string }
+    { user, userWorkspaceId }: { user: HandlerUser; userWorkspaceId: string }
   ) => {
     const start = Date.now();
     log("[API] PATCH /api/tickets/[id] start");
@@ -148,9 +150,9 @@ export const PATCH = withAuthorization(
     const pre = ctx.preloaded;
     const context = await buildRequestContext({
       userId: user.uid,
+      userEmail: user.email,
       userWorkspaceId,
       feedbackId: id,
-      requiredTicketAccess: "resolve",
       ...(pre && pre.feedback !== undefined
         ? {
             feedback: pre.feedback as Feedback | null,
@@ -162,17 +164,16 @@ export const PATCH = withAuthorization(
       console.log("[Resolve] Order: after buildRequestContext", Date.now() - start, "ms");
     }
 
+    if (!context.access) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
+    }
     if (!context.feedback) {
       return NextResponse.json(
         { success: false, error: "Not found" },
         { status: 404 }
-      );
-    }
-
-    if (!context.canAccess) {
-      return NextResponse.json(
-        { success: false, error: context.permissionError ?? "Forbidden" },
-        { status: 403 }
       );
     }
 
@@ -206,6 +207,19 @@ export const PATCH = withAuthorization(
         success: true,
         ticket: serializeTicket(existingForOwnership),
       });
+    }
+
+    if (hasContent && !context.access?.canComment) {
+      return NextResponse.json(
+        { success: false, error: "Insufficient permission" },
+        { status: 403 }
+      );
+    }
+    if (patchStatus !== undefined && !context.access?.canResolve) {
+      return NextResponse.json(
+        { success: false, error: "Insufficient permission" },
+        { status: 403 }
+      );
     }
 
     try {
@@ -270,7 +284,7 @@ export const DELETE = withAuthorization(
   async (
     req: Request,
     ctx: HandlerContext,
-    { user, userWorkspaceId }: { user: { uid: string }; userWorkspaceId: string }
+    { user, userWorkspaceId }: { user: HandlerUser; userWorkspaceId: string }
   ) => {
     const start = Date.now();
     log("[API] DELETE /api/tickets/[id] start");
@@ -286,9 +300,9 @@ export const DELETE = withAuthorization(
       const pre = ctx.preloaded;
       const context = await buildRequestContext({
         userId: user.uid,
+        userEmail: user.email,
         userWorkspaceId,
         feedbackId: id,
-        requiredTicketAccess: "resolve",
         ...(pre && pre.feedback !== undefined
           ? {
               feedback: pre.feedback as Feedback | null,
@@ -296,24 +310,16 @@ export const DELETE = withAuthorization(
             }
           : {}),
       });
+      if (!context.access?.canResolve) {
+        return NextResponse.json(
+          { success: false, error: "Insufficient permission" },
+          { status: 403 }
+        );
+      }
       if (!context.feedback) {
         return NextResponse.json(
           { success: false, error: "Not found" },
           { status: 404 }
-        );
-      }
-      if (!context.canAccess) {
-        return NextResponse.json(
-          { success: false, error: context.permissionError ?? "Forbidden" },
-          { status: 403 }
-        );
-      }
-      const ticket = context.feedback as Feedback;
-      const ownerId = typeof ticket.userId === "string" ? ticket.userId : "";
-      if (ownerId !== user.uid) {
-        return NextResponse.json(
-          { success: false, error: "Forbidden" },
-          { status: 403 }
         );
       }
       await deleteFeedbackWithSessionCountersRepo(id);

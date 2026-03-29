@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { PublicShareSessionView } from "@/components/share/PublicShareSessionView";
 import type { SanitizedPublicFeedback, SanitizedPublicSession } from "@/lib/server/publicShareSanitize";
-import type { ResolvedPublicSharePermissions } from "@/lib/permissions/publicSharePermissions";
+import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
 
 export const dynamic = "force-dynamic";
 
 type PublicShareSuccess = {
   session: SanitizedPublicSession;
   feedback: SanitizedPublicFeedback[];
-  permissions: ResolvedPublicSharePermissions;
+  permissions: ShareSurfacePermissions;
   token: string;
 };
 
@@ -100,11 +100,6 @@ export default async function PublicSharePage({ params }: PageProps) {
           <ShareErrorState
             title="Link not found"
             description="This share link does not exist or the session was removed."
-          />
-        ) : result.status === 410 ? (
-          <ShareErrorState
-            title="Link expired"
-            description="This share link is no longer active. Request a new link from the session owner."
           />
         ) : result.status === 403 ? (
           <ShareErrorState

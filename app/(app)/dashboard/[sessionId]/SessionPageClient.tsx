@@ -11,8 +11,6 @@ import {
   startTransition,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
@@ -105,15 +103,20 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const ticketIdFromUrl = searchParams.get("ticket");
 
   const [session, setSession] = useState<Session | null>(null);
+  /** Capability flags from GET /api/sessions/:id (resolveAccess); never inferred in the UI. */
+  const [sessionAccess, setSessionAccess] = useState<{
+    canComment: boolean;
+    canResolve: boolean;
+  } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
 
   const { loading: authLoading } = useAuthGuard({ router });
-  const { workspaceId, authUid, isIdentityResolved } = useWorkspace();
+  const { authUid, isIdentityResolved } = useWorkspace();
   const { showToast } = useToast();
 
-  const feedbackSessionId = authUid && sessionId ? sessionId : undefined;
+  const feedbackSessionId = sessionId || undefined;
 
   const listScrollRef = useRef<HTMLDivElement | null>(null);
   const [openExpanded, setOpenExpanded] = useState(true);
@@ -165,11 +168,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [isSearchMode]);
 
   useEffect(() => {
-    if (!authUid) {
-      setSearchResults([]);
-      setSearchLoading(false);
-      return;
-    }
     const q = searchQuery.trim();
     if (!q) {
       setSearchResults([]);
@@ -207,7 +205,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [searchQuery, feedbackSessionId, authUid]);
+  }, [searchQuery, feedbackSessionId]);
 
   /** In-flight action steps per ticket — merged onto Firestore snapshots to avoid realtime flicker. */
   const pendingOptimisticActionStepsRef = useRef(
@@ -285,11 +283,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     );
   }, [feedbackScoped, resolveOptimistic]);
 
-  const stableScopedFeedback = useStableState(
-    feedbackScopedVisual,
-    !feedbackLoading && Boolean(authUid),
-    sessionId
-  );
+  const stableScopedFeedback = useStableState(feedbackScopedVisual, !feedbackLoading, sessionId);
   const stableOpenFeedback = useMemo(
     () =>
       stableScopedFeedback.filter(
@@ -424,48 +418,61 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return () => window.removeEventListener("ECHLY_FEEDBACK_CREATED", handler);
   }, [sessionId, session, setFeedback]);
 
-  /* ================= AUTH + LOAD SESSION (title/meta only) ================= */
+  /* ================= AUTH + LOAD SESSION (title/meta only, access from resolveAccess) ================= */
   useEffect(() => {
     if (authLoading) return;
-    if (!authUid || !sessionId || !workspaceId) {
+    if (!sessionId) {
       setSession(null);
+      setSessionAccess(null);
       return;
     }
 
     let cancelled = false;
-    const sessionRef = doc(db, "sessions", sessionId);
-    getDoc(sessionRef).then((sessionSnap) => {
+    void (async () => {
+      const st = searchParams.get("shareToken")?.trim() ?? "";
+      const qs = st !== "" ? `?shareToken=${encodeURIComponent(st)}` : "";
+      const res = await authFetch(`/api/sessions/${encodeURIComponent(sessionId)}${qs}`);
       if (cancelled) return;
-      if (!sessionSnap.exists()) {
+      if (!res) {
+        setSession(null);
+        setSessionAccess(null);
+        return;
+      }
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        session?: Record<string, unknown>;
+        access?: { canComment?: boolean; canResolve?: boolean; canView?: boolean };
+      };
+      if (!res.ok || !data.success || !data.session) {
+        setSessionAccess(null);
         router.push("/dashboard");
         return;
       }
-      const data = sessionSnap.data();
-      const sw =
-        typeof (data as { workspaceId?: string }).workspaceId === "string"
-          ? (data as { workspaceId?: string }).workspaceId!.trim()
-          : "";
-      if (sw !== workspaceId) {
-        router.push("/dashboard");
-        return;
-      }
-      const raw = data as { accessLevel?: unknown };
+      const raw = data.session as { accessLevel?: unknown };
       setSession({
-        id: sessionSnap.id,
-        ...(data as object),
+        id: sessionId,
+        ...(data.session as object),
         accessLevel: normalizeAccessLevel(raw.accessLevel),
       } as Session);
+      setSessionAccess(
+        data.access
+          ? {
+              canComment: data.access.canComment === true,
+              canResolve: data.access.canResolve === true,
+            }
+          : null
+      );
       const viewerId = getViewerId(authUid ?? "");
       if (viewerId) {
-        recordSessionViewIfNew(sessionSnap.id, viewerId).catch((err) => {
+        recordSessionViewIfNew(sessionId, viewerId).catch((err) => {
           console.error("[ECHLY] recordSessionViewIfNew failed", err);
         });
       }
-    });
+    })();
     return () => {
       cancelled = true;
     };
-  }, [sessionId, authUid, authLoading, router, workspaceId]);
+  }, [sessionId, authUid, authLoading, router, searchParams]);
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
@@ -479,7 +486,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [sessionId, ticketIdFromUrl]);
 
   useEffect(() => {
-    if (!authUid) return;
     if (!ticketIdFromUrl || !feedbackSessionId) return;
     if (feedbackLoading) return;
     if (feedback.some((f) => f.id === ticketIdFromUrl)) return;
@@ -515,15 +521,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return () => {
       cancelled = true;
     };
-  }, [
-    authUid,
-    ticketIdFromUrl,
-    feedbackSessionId,
-    sessionId,
-    feedbackLoading,
-    feedback,
-    setFeedback,
-  ]);
+  }, [ticketIdFromUrl, feedbackSessionId, sessionId, feedbackLoading, feedback, setFeedback]);
 
   useEffect(() => {
     if (!ticketIdFromUrl || feedback.length === 0 || hasAppliedTicketParam.current) return;
@@ -1265,7 +1263,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         else showToast("Could not delete ticket");
         return;
       }
-      router.push(`/dashboard/${sessionId}`);
+      const currentPath = window.location.pathname;
+      router.push(currentPath);
     } catch (err) {
       console.error("[ECHLY] handleDeleteFeedback failed", err);
       rollbackDelete();
@@ -1276,9 +1275,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   };
 
   const canDeleteSelectedTicket =
-    Boolean(authUid) &&
-    selectedItem != null &&
-    selectedItem.userId === authUid;
+    Boolean(authUid) && selectedItem != null && sessionAccess?.canResolve === true;
 
   const renderExecutionContent = () => {
     if (stableScopedFeedback.length === 0) {

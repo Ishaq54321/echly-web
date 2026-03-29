@@ -8,6 +8,7 @@ import {
   workspaceInsightsRef,
 } from "@/lib/repositories/insightsRepository.server";
 import { fireAndForget } from "@/lib/server/fireAndForget";
+import { listAccessibleSessionsForUser } from "@/lib/server/listAccessibleSessionsForUser";
 
 type DocumentReference = FirebaseFirestore.DocumentReference;
 type DocumentSnapshot = FirebaseFirestore.DocumentSnapshot;
@@ -524,12 +525,67 @@ function omitSoftDeletedFeedback(items: Feedback[]): Feedback[] {
   return items.filter((f) => f.isDeleted !== true);
 }
 
+function lastCommentAtSortMs(item: Feedback): number {
+  const la = item.lastCommentAt as { seconds?: number; toDate?: () => Date } | null;
+  if (!la) return 0;
+  if (typeof la.seconds === "number") return la.seconds * 1000;
+  if (typeof la.toDate === "function") return la.toDate().getTime();
+  return 0;
+}
+
+const DISCUSSION_INBOX_PER_SESSION = 8;
+const DISCUSSION_INBOX_MAX_SESSIONS = 35;
+
+/**
+ * Discussion inbox: feedback with comments across sessions where {@link getAccessContext} grants view.
+ * Each session contributes up to {@link DISCUSSION_INBOX_PER_SESSION} rows; results merged and sorted by lastCommentAt.
+ */
+export async function getDiscussionInboxFeedbackForUserRepo(args: {
+  userId: string;
+  userEmail: string | null | undefined;
+  limit: number;
+}): Promise<Feedback[]> {
+  const pageSize = args.limit;
+  assertQueryLimit(pageSize, "getDiscussionInboxFeedbackForUserRepo");
+  const accessible = await listAccessibleSessionsForUser({
+    userId: args.userId,
+    userEmail: args.userEmail,
+    limit: DISCUSSION_INBOX_MAX_SESSIONS,
+    createdByLimit: DISCUSSION_INBOX_MAX_SESSIONS,
+  });
+  const sidList = accessible.map((s) => s.id).slice(0, DISCUSSION_INBOX_MAX_SESSIONS);
+  if (sidList.length === 0) return [];
+
+  const batches = await Promise.all(
+    sidList.map((sid) =>
+      adminDb
+        .collection("feedback")
+        .where("sessionId", "==", sid)
+        .where("commentCount", ">", 0)
+        .orderBy("commentCount", "desc")
+        .limit(DISCUSSION_INBOX_PER_SESSION)
+        .get()
+    )
+  );
+
+  const merged: Feedback[] = [];
+  for (const snap of batches) {
+    merged.push(...omitSoftDeletedFeedback(snap.docs.map(docToFeedback)));
+  }
+  merged.sort((a, b) => {
+    const tb = lastCommentAtSortMs(b);
+    const ta = lastCommentAtSortMs(a);
+    if (tb !== ta) return tb - ta;
+    return b.id.localeCompare(a.id);
+  });
+  return merged.slice(0, pageSize);
+}
+
 /**
  * Fetches one page of feedback for a session using cursor pagination.
- * Composite index required: feedback (workspaceId ASC, sessionId ASC, status ASC, createdAt DESC).
+ * Composite index required: feedback (sessionId ASC, status ASC, createdAt DESC).
  */
 export async function getSessionFeedbackPageRepo(
-  workspaceId: string,
   sessionId: string,
   opts: {
     status?: "open" | "resolved" | "all";
@@ -543,7 +599,6 @@ export async function getSessionFeedbackPageRepo(
 
   let q: FirebaseFirestore.Query = adminDb
     .collection("feedback")
-    .where("workspaceId", "==", workspaceId)
     .where("sessionId", "==", sessionId);
   if (status !== "all") q = q.where("status", "==", status);
   q = q.orderBy("status", "asc").orderBy("createdAt", "desc");
@@ -570,7 +625,6 @@ export async function getSessionFeedbackPageRepo(
  * Used by API routes so cursors can be serialized as simple strings.
  */
 export async function getSessionFeedbackPageWithStringCursorRepo(
-  workspaceId: string,
   sessionId: string,
   limit: number,
   cursor?: string
@@ -581,17 +635,14 @@ export async function getSessionFeedbackPageWithStringCursorRepo(
       ? await adminDb.doc(`feedback/${trimmed}`).get()
       : null;
 
-  const { feedback, lastVisibleDoc, hasMore } = await getSessionFeedbackPageRepo(
-    workspaceId,
-    sessionId,
-    {
-      status: "all",
-      limit,
-      cursor: cursorSnap && cursorSnap.exists
+  const { feedback, lastVisibleDoc, hasMore } = await getSessionFeedbackPageRepo(sessionId, {
+    status: "all",
+    limit,
+    cursor:
+      cursorSnap && cursorSnap.exists
         ? (cursorSnap as unknown as QueryDocumentSnapshot)
         : null,
-    }
-  );
+  });
 
   return {
     feedback,
@@ -610,8 +661,7 @@ const PUBLIC_SHARE_FEEDBACK_MAX = 10_000;
  * that requires `userId` from auth.
  */
 export async function getAllFeedbackForPublicShareBySessionIdRepo(
-  sessionId: string,
-  workspaceId: string
+  sessionId: string
 ): Promise<Feedback[]> {
   const out: Feedback[] = [];
   let cursor: QueryDocumentSnapshot | null = null;
@@ -620,7 +670,6 @@ export async function getAllFeedbackForPublicShareBySessionIdRepo(
     let q: FirebaseFirestore.Query = adminDb
       .collection("feedback")
       .where("sessionId", "==", sessionId)
-      .where("workspaceId", "==", workspaceId)
       .orderBy("createdAt", "desc");
     if (cursor) q = q.startAfter(cursor);
     const snapshot = await q.limit(PUBLIC_SHARE_FEEDBACK_PAGE_SIZE).get();
@@ -640,15 +689,11 @@ export async function getAllFeedbackForPublicShareBySessionIdRepo(
 }
 
 /**
- * Workspace-scoped session feedback page.
- * Composite index required: feedback (workspaceId ASC, sessionId ASC, createdAt DESC).
- *
- * NOTE: This is intentionally separate from getSessionFeedbackPageRepo to avoid
- * changing ordering/constraints for other callers.
+ * Session-scoped feedback page (newest first). Permission enforced at API via {@link getAccessContext}.
+ * Composite index: feedback (sessionId ASC, createdAt DESC) or (sessionId ASC, status ASC, createdAt DESC).
  */
 export async function getSessionFeedbackPageForUserWithStringCursorRepo(
   args: {
-    workspaceId: string;
     sessionId: string;
     limit: number;
     cursor?: string;
@@ -656,16 +701,23 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
     statusFilter?: "open" | "resolved";
   }
 ): Promise<{ feedback: Feedback[]; nextCursor: string | null; hasMore: boolean }> {
-  const { workspaceId, sessionId, limit: pageSize, cursor, statusFilter } = args;
+  const { sessionId: sidRaw, limit: pageSize, cursor, statusFilter } = args;
+  const sessionId = sidRaw.trim();
   assertQueryLimit(pageSize, "getSessionFeedbackPageForUserWithStringCursorRepo");
   const trimmed = cursor?.trim();
   const cursorSnap: DocumentSnapshot | null =
     trimmed && trimmed.length > 0 ? await adminDb.doc(`feedback/${trimmed}`).get() : null;
 
-  // Scope: workspaceId + sessionId.
-  // Exclude soft-deleted rows by skipping `isDeleted === true`. We do not use
-  // Firestore `where("isDeleted","!=",true)` here because it drops legacy docs
-  // that omit the field; semantic is identical once all rows have `isDeleted`.
+  if (cursorSnap?.exists) {
+    const csid =
+      typeof (cursorSnap.data() as { sessionId?: string }).sessionId === "string"
+        ? (cursorSnap.data() as { sessionId: string }).sessionId.trim()
+        : "";
+    if (csid !== sessionId) {
+      return { feedback: [], nextCursor: null, hasMore: false };
+    }
+  }
+
   let startAfterDoc: DocumentSnapshot | null =
     cursorSnap && cursorSnap.exists ? cursorSnap : null;
   const collected: QueryDocumentSnapshot[] = [];
@@ -673,17 +725,12 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
 
   const indexHint =
     statusFilter != null
-      ? statusFilter === "open"
-        ? "feedback(workspaceId ASC, sessionId ASC, status ASC, createdAt DESC)"
-        : statusFilter === "resolved"
-          ? "feedback(workspaceId ASC, sessionId ASC, status ASC, createdAt DESC)"
-          : "feedback(workspaceId ASC, sessionId ASC, status ASC, createdAt DESC)"
-      : "feedback(workspaceId ASC, sessionId ASC, createdAt DESC)";
+      ? "feedback(sessionId ASC, status ASC, createdAt DESC)"
+      : "feedback(sessionId ASC, createdAt DESC)";
 
   const runQuery = () => {
     let q: FirebaseFirestore.Query = adminDb
       .collection("feedback")
-      .where("workspaceId", "==", workspaceId)
       .where("sessionId", "==", sessionId);
     if (statusFilter) q = q.where("status", "==", statusFilter);
     q = q.orderBy("createdAt", "desc").limit(pageSize);
@@ -700,7 +747,6 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.toLowerCase().includes("requires an index")) {
           console.warn(`[FIRESTORE] Missing composite index: ${indexHint}`, {
-            workspaceId,
             sessionId,
             statusFilter,
           });
@@ -738,7 +784,6 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.toLowerCase().includes("requires an index")) {
       console.warn(`[FIRESTORE] Missing composite index: ${indexHint}`, {
-        workspaceId,
         sessionId,
         statusFilter,
       });
@@ -765,10 +810,9 @@ const SESSION_SEARCH_CORPUS_MAX = 200;
  * (mixed status, newest first) for server-side search. Uses the same access path as list pagination.
  */
 export async function getSessionFeedbackSearchCorpusForUserRepo(args: {
-  workspaceId: string;
   sessionId: string;
 }): Promise<Feedback[]> {
-  const { workspaceId, sessionId } = args;
+  const { sessionId } = args;
   const maxDocs = SESSION_SEARCH_CORPUS_MAX;
   const batchLimit = 50;
   const out: Feedback[] = [];
@@ -776,7 +820,6 @@ export async function getSessionFeedbackSearchCorpusForUserRepo(args: {
 
   while (out.length < maxDocs) {
     const { feedback, nextCursor, hasMore } = await getSessionFeedbackPageForUserWithStringCursorRepo({
-      workspaceId,
       sessionId,
       limit: batchLimit,
       cursor,
@@ -921,18 +964,10 @@ const DELETE_SESSION_FEEDBACK_LIMIT = 500;
  * Returns the number of docs deleted so callers can update workspace.stats.
  * Screenshot URLs in Storage are not removed here (TODO: optional cleanup).
  */
-export async function deleteAllFeedbackForSessionRepo(
-  sessionId: string,
-  workspaceId: string
-): Promise<number> {
-  const wid = workspaceId.trim();
-  if (!wid) {
-    throw new Error("Missing workspaceId");
-  }
+export async function deleteAllFeedbackForSessionRepo(sessionId: string): Promise<number> {
   const snapshot = await adminDb
     .collection("feedback")
-    .where("workspaceId", "==", wid)
-    .where("sessionId", "==", sessionId)
+    .where("sessionId", "==", sessionId.trim())
     .limit(DELETE_SESSION_FEEDBACK_LIMIT)
     .get();
   const count = snapshot.docs.length;
@@ -944,10 +979,9 @@ const OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT = 3;
 
 /**
  * Fetches up to N feedback items for a session filtered by resolution, newest first.
- * Composite index: feedback (workspaceId ASC, sessionId ASC, status ASC, createdAt DESC).
+ * Composite index: feedback (sessionId ASC, status ASC, createdAt DESC).
  */
 export async function getSessionFeedbackByResolvedRepo(
-  workspaceId: string,
   sessionId: string,
   isResolved: boolean,
   max: number = OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT
@@ -956,8 +990,7 @@ export async function getSessionFeedbackByResolvedRepo(
   const status = isResolved ? "resolved" : "open";
   const snapshot = await adminDb
     .collection("feedback")
-    .where("workspaceId", "==", workspaceId)
-    .where("sessionId", "==", sessionId)
+    .where("sessionId", "==", sessionId.trim())
     .where("status", "==", status)
     .orderBy("createdAt", "desc")
     .limit(max)
@@ -976,86 +1009,6 @@ export async function getFeedbackByIdRepo(
   const row = snap.data() as { isDeleted?: unknown } | undefined;
   if (row?.isDeleted === true) return null;
   return docToFeedback(snap as QueryDocumentSnapshot);
-}
-
-const USER_FEEDBACK_ALL_LIMIT = 100;
-
-/**
- * Workspace-scoped Discussion inbox.
- * Composite index required: feedback (workspaceId ASC, createdAt DESC).
- */
-export async function getWorkspaceFeedbackAllRepo(
-  workspaceId: string,
-  max: number = USER_FEEDBACK_ALL_LIMIT
-): Promise<Feedback[]> {
-  assertQueryLimit(max, "getWorkspaceFeedbackAllRepo");
-  const snapshot = await adminDb
-    .collection("feedback")
-    .where("workspaceId", "==", workspaceId)
-    .orderBy("createdAt", "desc")
-    .limit(max)
-    .get();
-  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
-}
-
-/** Limit for insights feedback query. NEVER increase. */
-const INSIGHTS_FEEDBACK_LIMIT = 150;
-
-/**
- * Bounded feedback fetch for /api/insights charts.
- * Composite index required: feedback (workspaceId ASC, createdAt DESC).
- */
-export async function getWorkspaceFeedbackForInsightsRepo(
-  workspaceId: string
-): Promise<Feedback[]> {
-  assertQueryLimit(INSIGHTS_FEEDBACK_LIMIT, "getWorkspaceFeedbackForInsightsRepo");
-  const isSimple = process.env.INSIGHTS_SIMPLE_QUERY === "1";
-  const limitValue = isSimple ? 10 : INSIGHTS_FEEDBACK_LIMIT;
-
-  const q = isSimple
-    ? adminDb
-        .collection("feedback")
-        .where("workspaceId", "==", workspaceId)
-        .limit(10)
-    : adminDb
-        .collection("feedback")
-        .where("workspaceId", "==", workspaceId)
-        .orderBy("createdAt", "desc")
-        .limit(limitValue);
-
-  const snapshot = await q.get();
-  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
-}
-
-/**
- * Workspace-scoped conversations only (commentCount > 0).
- * Composite index required: feedback (workspaceId ASC, commentCount DESC).
- */
-export async function getWorkspaceFeedbackWithCommentsRepo(
-  args: {
-    workspaceId: string;
-    limit: number;
-    cursor?: string;
-  }
-): Promise<Feedback[]> {
-  const { workspaceId, limit: pageSize, cursor } = args;
-  assertQueryLimit(pageSize, "getWorkspaceFeedbackWithCommentsRepo");
-  const trimmedCursor = cursor?.trim();
-  const cursorSnap: DocumentSnapshot | null =
-    trimmedCursor && trimmedCursor.length > 0
-      ? await adminDb.doc(`feedback/${trimmedCursor}`).get()
-      : null;
-
-  let q: FirebaseFirestore.Query = adminDb
-    .collection("feedback")
-    .where("workspaceId", "==", workspaceId)
-    .where("commentCount", ">", 0)
-    .orderBy("commentCount", "desc")
-    .limit(pageSize);
-  if (cursorSnap && cursorSnap.exists) q = q.startAfter(cursorSnap);
-
-  const snapshot = await q.get();
-  return omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
 }
 
 /** Fetches feedback docs by IDs (e.g. for activity titles). Limited for cost safety. */

@@ -85,8 +85,7 @@ export function useFeedbackDetailController(args: {
 }) {
   const { sessionId, feedbackId } = args;
   const { showToast } = useToast();
-  const { workspaceId, authUid, authDisplayName, authPhotoUrl, isIdentityResolved } =
-    useWorkspace();
+  const { authUid, authDisplayName, authPhotoUrl, isIdentityResolved } = useWorkspace();
 
   const [comments, setComments] = useState<LocalComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -125,14 +124,14 @@ export function useFeedbackDetailController(args: {
   }, [sessionId, feedbackId]);
 
   useEffect(() => {
-    if (!authUid || !workspaceId) {
+    if (!authUid) {
       pendingDeletedCommentIdsRef.current.clear();
       pendingCommentPatchesRef.current.clear();
       deleteRevertSnapshotRef.current = null;
       setComments([]);
       setLoadingComments(false);
     }
-  }, [workspaceId, authUid]);
+  }, [authUid]);
 
   useEffect(() => {
     if (!feedbackId) {
@@ -151,10 +150,9 @@ export function useFeedbackDetailController(args: {
   }, [sessionId, feedbackId]);
 
   useCommentsRepoSubscription({
-    workspaceId,
     sessionId,
     feedbackId,
-    enabled: Boolean(authUid),
+    enabled: Boolean(authUid && sessionId && feedbackId),
     onComments: (incomingComments) => {
       setLocalCountsOverride(null);
       const incomingIds = new Set(incomingComments.map((c) => c.id));

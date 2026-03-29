@@ -4,7 +4,7 @@ import type { FeedbackItemShape } from "@/components/session/feedbackDetail/type
 import { FeedbackContent } from "@/components/session/feedbackDetail/FeedbackContent";
 import { SessionFeedbackHeader } from "@/components/session/FeedbackHeader";
 import type { Comment } from "@/lib/domain/comment";
-import type { ResolvedPublicSharePermissions } from "@/lib/permissions/publicSharePermissions";
+import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
 
 export interface ExecutionViewProps {
   item: (FeedbackItemShape & { index: number; total: number }) | null;
@@ -40,7 +40,7 @@ export interface ExecutionViewProps {
   readOnlyDescription?: string | null;
   /** Public share: gated action bar (same chrome as dashboard; no auth hooks here). */
   shareGating?: {
-    permissions: ResolvedPublicSharePermissions;
+    permissions: ShareSurfacePermissions;
     onBlocked: (detail: {
       reason: "tier" | "app";
       action: "resolve" | "resolve_next" | "comment" | "assign" | "defer";

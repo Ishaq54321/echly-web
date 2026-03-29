@@ -17,7 +17,6 @@ import { getSessionUser } from "@/lib/server/session";
 import "@/lib/server/firebaseAdmin";
 import { getStorage } from "firebase-admin/storage";
 import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
-import { authorize } from "@/lib/server/auth/authorize";
 import { buildRequestContext } from "@/lib/server/requestContext";
 
 
@@ -281,7 +280,7 @@ export async function POST(req: NextRequest) {
       { status: 404, headers: corsHeaders(req) }
     );
   }
-  if (!accessCtx.canAccess) {
+  if (!accessCtx.access?.canComment) {
     return NextResponse.json(
       { success: false, error: "Forbidden" },
       { status: 403, headers: corsHeaders(req) }
@@ -289,15 +288,6 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = user.uid;
-  try {
-    await authorize({ uid: user.uid, action: "create_feedback" });
-  } catch (err) {
-    const authErr = err as { status?: number; code?: string; message?: string };
-    return NextResponse.json(
-      { success: false, error: authErr.code ?? "FORBIDDEN", message: authErr.message ?? "Forbidden" },
-      { status: authErr.status ?? 403, headers: corsHeaders(req) }
-    );
-  }
 
   const meta = body.metadata;
   const resolvedScreenshotUrl = await resolveScreenshotDownloadUrl(normalizedScreenshotId, sessionId);

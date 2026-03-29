@@ -6,7 +6,7 @@ import {
   type FeedbackStatus,
 } from "@/lib/domain/feedback-display";
 import type { FeedbackItemShape } from "@/components/session/feedbackDetail/types";
-import type { ResolvedPublicSharePermissions } from "@/lib/permissions/publicSharePermissions";
+import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
 import {
   CheckCircle,
   UserPlus,
@@ -72,7 +72,7 @@ export interface SessionFeedbackHeaderProps {
    * When set, `readOnly` / `readOnlyPermissions` are ignored for the action row, and Delete is hidden.
    */
   shareGating?: {
-    permissions: ResolvedPublicSharePermissions;
+    permissions: ShareSurfacePermissions;
     onBlocked: (detail: {
       reason: "tier" | "app";
       action: "resolve" | "resolve_next" | "comment" | "assign" | "defer";

@@ -8,7 +8,7 @@ import type { PublicShareGateDetail } from "@/components/share/PublicShareGateMo
 import { PublicShareSidebarShell } from "@/components/share/PublicShareSidebarShell";
 import { PublicShareTopBar } from "@/components/share/PublicShareTopBar";
 import type { Feedback } from "@/lib/domain/feedback";
-import type { ResolvedPublicSharePermissions } from "@/lib/permissions/publicSharePermissions";
+import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
 import {
   mapPublicFeedbackToFeedback,
   mapSanitizedToDetailItem,
@@ -21,7 +21,7 @@ import type {
 export type PublicSharePayload = {
   session: SanitizedPublicSession;
   feedback: SanitizedPublicFeedback[];
-  permissions: ResolvedPublicSharePermissions;
+  permissions: ShareSurfacePermissions;
   token: string;
 };
 
@@ -35,7 +35,7 @@ export function PublicShareSessionView({
   const [sanitizedFeedback, setSanitizedFeedback] = useState<SanitizedPublicFeedback[]>(
     initialFeedback
   );
-  const [permissions] = useState<ResolvedPublicSharePermissions>(initial.permissions);
+  const [permissions] = useState<ShareSurfacePermissions>(initial.permissions);
   const [phase, setPhase] = useState<"initial" | "ready">("initial");
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";

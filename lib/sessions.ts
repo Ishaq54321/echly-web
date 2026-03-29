@@ -1,11 +1,7 @@
 export type { Session, SessionCreatedBy } from "@/lib/domain/session";
 import type { Session } from "@/lib/domain/session";
 import { authFetch } from "@/lib/authFetch";
-import {
-  getSessionByIdRepo,
-  getUserSessionsRepo,
-  getWorkspaceSessionsRepo,
-} from "@/lib/repositories/sessionsRepository";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";
 
 /**
  * Session creation is only allowed via POST /api/sessions (plan limits enforced there).
@@ -30,37 +26,6 @@ export async function recordSessionViewIfNew(
     const msg = await res.text().catch(() => "");
     throw new Error(msg || "Failed to record session view");
   }
-}
-
-/* ================================
-   GET USER SESSIONS
-================================ */
-
-export async function getWorkspaceSessions(
-  workspaceId: string,
-  max?: number,
-  options?: { archivedOnly?: boolean; includeArchived?: boolean }
-): Promise<Session[]> {
-  return await getWorkspaceSessionsRepo(
-    workspaceId,
-    max ?? 50,
-    options?.archivedOnly,
-    options?.includeArchived
-  );
-}
-
-/** Legacy: pre-workspaces sessions list (fallback only). */
-export async function getUserSessions(
-  workspaceId: string,
-  max?: number,
-  options?: { archivedOnly?: boolean; includeArchived?: boolean }
-): Promise<Session[]> {
-  return await getUserSessionsRepo(
-    workspaceId,
-    max ?? 50,
-    options?.archivedOnly,
-    options?.includeArchived
-  );
 }
 
 /* ================================

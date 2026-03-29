@@ -57,12 +57,11 @@ export async function updateFeedback(
 
 /** Fetches one page of feedback; use for cursor-based pagination. */
 export async function getSessionFeedbackPage(
-  workspaceId: string,
   sessionId: string,
   pageSize: number = 20,
   cursor?: FeedbackPageCursor | null
 ): Promise<FeedbackPageResult> {
-  return getSessionFeedbackPageRepo(workspaceId, sessionId, {
+  return getSessionFeedbackPageRepo(sessionId, {
     limit: pageSize,
     cursor: cursor ?? null,
     status: "all",
@@ -70,12 +69,8 @@ export async function getSessionFeedbackPage(
 }
 
 /** First page only; for callers that need a single batch (e.g. CaptureWidget). Cost protection: always limited. */
-export async function getSessionFeedback(
-  workspaceId: string,
-  sessionId: string,
-  max: number = 50
-): Promise<Feedback[]> {
-  const { feedback } = await getSessionFeedbackPageRepo(workspaceId, sessionId, {
+export async function getSessionFeedback(sessionId: string, max: number = 50): Promise<Feedback[]> {
+  const { feedback } = await getSessionFeedbackPageRepo(sessionId, {
     limit: max,
     status: "all",
   });
@@ -84,12 +79,11 @@ export async function getSessionFeedback(
 
 /** Up to N feedback items by resolution for overview preview. */
 export async function getSessionFeedbackByResolved(
-  workspaceId: string,
   sessionId: string,
   isResolved: boolean,
   max: number = 3
 ): Promise<Feedback[]> {
-  return getSessionFeedbackByResolvedRepo(workspaceId, sessionId, isResolved, max);
+  return getSessionFeedbackByResolvedRepo(sessionId, isResolved, max);
 }
 
 /** Fetch feedback by IDs (e.g. for activity titles). Limited. */

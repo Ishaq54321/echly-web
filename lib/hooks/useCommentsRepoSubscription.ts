@@ -6,7 +6,6 @@ import type { Comment } from "@/lib/domain/comment";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 
 type Args = {
-  workspaceId: string | null | undefined;
   sessionId: string | null | undefined;
   feedbackId: string | null | undefined;
   /**
@@ -18,10 +17,9 @@ type Args = {
 };
 
 /**
- * One Firestore `onSnapshot` per (workspace, session, feedback) via `listenToCommentsRepo`.
+ * One Firestore `onSnapshot` per (session, feedback) via `listenToCommentsRepo`.
  */
 export function useCommentsRepoSubscription({
-  workspaceId,
   sessionId,
   feedbackId,
   enabled = true,
@@ -35,20 +33,19 @@ export function useCommentsRepoSubscription({
   }, [onComments]);
 
   useEffect(() => {
-    const ws = typeof workspaceId === "string" ? workspaceId.trim() : "";
     const sid = typeof sessionId === "string" ? sessionId.trim() : "";
     const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
 
-    if (!enabled || !authUid || !ws || !sid || !fid) {
+    if (!enabled || !authUid || !sid || !fid) {
       return;
     }
 
-    const unsubComments = listenToCommentsRepo(ws, sid, fid, (incoming) => {
+    const unsubComments = listenToCommentsRepo(sid, fid, (incoming) => {
       onCommentsRef.current(incoming);
     });
 
     return () => {
       unsubComments();
     };
-  }, [workspaceId, sessionId, feedbackId, authUid, enabled]);
+  }, [sessionId, feedbackId, authUid, enabled]);
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { Share2, Settings, LayoutPanelLeft, Loader2 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
@@ -268,33 +268,9 @@ export default function SessionOverviewPage() {
     useReplace: true,
   });
   const { data, loading, error } = useSessionOverview(sessionId);
-  const { workspaceId, isIdentityResolved, authUid } = useWorkspace();
+  const { isIdentityResolved, authUid } = useWorkspace();
   const [copied, setCopied] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
-
-  useEffect(() => {
-    if (
-      !isIdentityResolved ||
-      authLoading ||
-      loading ||
-      !data.session ||
-      !authUser ||
-      !workspaceId
-    ) {
-      return;
-    }
-    if (data.session.workspaceId !== workspaceId) {
-      router.replace("/dashboard");
-    }
-  }, [
-    isIdentityResolved,
-    authLoading,
-    authUser,
-    loading,
-    data.session,
-    router,
-    workspaceId,
-  ]);
 
   const handleCopy = useCallback(async () => {
     if (!sessionId || copyBusy) return;
@@ -306,17 +282,13 @@ export default function SessionOverviewPage() {
   }, [sessionId, copyBusy, authUid, isIdentityResolved]);
 
   const session = data.session;
-  const showOverviewLoading =
-    !isIdentityResolved ||
-    !workspaceId ||
-    (Boolean(sessionId) && loading && !session);
+  const showOverviewLoading = Boolean(sessionId) && loading && !session;
 
   const shouldRedirectMissingSession =
     Boolean(sessionId) &&
     !loading &&
     !authLoading &&
     isIdentityResolved &&
-    Boolean(workspaceId) &&
     !session;
 
   if (!sessionId) {

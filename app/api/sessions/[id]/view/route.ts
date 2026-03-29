@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
-import { getSessionByIdRepo, recordSessionViewIfNewRepo } from "@/lib/repositories/sessionsRepository.server";
-import {
-  authorize,
-  requireAuth,
-  toAuthorizationResponse,
-} from "@/lib/server/auth/authorize";
-import { resolveShareToken } from "@/lib/server/shareTokenResolver";
+import { recordSessionViewIfNewRepo } from "@/lib/repositories/sessionsRepository.server";
+import { requireAuth, toAuthorizationResponse } from "@/lib/server/auth/authorize";
+import { getAccessContext } from "@/lib/access/getAccessContext";
 import { checkRateLimit, clientKeyFromRequest } from "@/lib/server/rateLimit";
-import { buildRequestContext } from "@/lib/server/requestContext";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   let uid: string | null = null;
-  let isShareAuthorized = false;
+  let authEmail: string | undefined;
   const { id } = await params;
   if (!id) {
     return NextResponse.json({ success: false, error: "Missing session id" }, { status: 400 });
@@ -41,44 +36,21 @@ export async function POST(
   try {
     const user = await requireAuth(req);
     uid = user.uid;
+    authEmail = user.email;
   } catch (err) {
     if (!shareToken) {
       return toAuthorizationResponse(err);
     }
   }
 
-  if (!uid && shareToken) {
-    const shareResolution = await resolveShareToken(shareToken);
-    if (!shareResolution.valid || shareResolution.sessionId !== id) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-    }
-    isShareAuthorized = true;
-  }
+  const { access } = await getAccessContext({
+    sessionId: id,
+    user: uid ? { uid, email: authEmail } : null,
+    tokenString: shareToken || undefined,
+  });
 
-  if (uid && !isShareAuthorized) {
-    const accessCtx = await buildRequestContext({
-      userId: uid,
-      sessionId: id,
-    });
-    if (!accessCtx.session) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
-    }
-    if (!accessCtx.canAccess) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-    }
-  } else {
-    const session = await getSessionByIdRepo(id);
-    if (!session) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
-    }
-  }
-
-  if (uid && !isShareAuthorized) {
-    try {
-      await authorize({ uid, action: "read_feedback" });
-    } catch (err) {
-      return toAuthorizationResponse(err);
-    }
+  if (!access?.canView) {
+    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 
   try {

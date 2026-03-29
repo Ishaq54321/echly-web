@@ -25,10 +25,23 @@ import { ToastProvider } from "@/components/dashboard/context/ToastContext";
 import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
 import DashboardCaptureHost from "./components/DashboardCaptureHost";
 import type { Session } from "@/lib/domain/session";
+
+function sessionSortKey(session: Session): number {
+  const u = session.updatedAt;
+  if (typeof u === "string") {
+    const t = new Date(u).getTime();
+    return Number.isNaN(t) ? 0 : Math.floor(t / 1000);
+  }
+  if (u && typeof u === "object" && "seconds" in u && typeof (u as { seconds: number }).seconds === "number") {
+    return (u as { seconds: number }).seconds;
+  }
+  return 0;
+}
 import { useSessionEntryCta } from "@/components/dashboard/hooks/useSessionEntryCta";
 import { useStableState } from "@/lib/client/perception/useStableState";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import BrandLoader from "@/components/ui/BrandLoader";
+import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 
 function filterAndSortSessions(sessions: SessionWithCounts[], search: string): SessionWithCounts[] {
   const q = search.trim().toLowerCase();
@@ -38,13 +51,7 @@ function filterAndSortSessions(sessions: SessionWithCounts[], search: string): S
       )
     : [...sessions];
 
-  return [...list].sort((a, b) => {
-    const ta = a.session.updatedAt as { seconds?: number } | null | undefined;
-    const tb = b.session.updatedAt as { seconds?: number } | null | undefined;
-    const sa = ta?.seconds ?? 0;
-    const sb = tb?.seconds ?? 0;
-    return sb - sa;
-  });
+  return [...list].sort((a, b) => sessionSortKey(b.session) - sessionSortKey(a.session));
 }
 
 function DashboardContent() {
@@ -56,8 +63,8 @@ function DashboardContent() {
     setSessionArchived,
     deleteSession,
   } = useWorkspaceOverview();
-  const { workspaceId, isIdentityResolved } = useWorkspace();
-  const stableSessions = useStableState(sessions, true, workspaceId);
+  const { authUid, isIdentityResolved } = useWorkspace();
+  const stableSessions = useStableState(sessions, true, authUid);
   const { search } = useSessionsSearch();
   const isLoading =
     !isIdentityResolved || (sessionsLoading && sessions.length === 0);
@@ -110,7 +117,7 @@ function DashboardContent() {
   );
 
   const handleView = (sessionId: string) => {
-    router.push(`/dashboard/${sessionId}`);
+    router.push(`${SESSION_FEEDBACK_PATH}/${sessionId}`);
   };
 
   return (

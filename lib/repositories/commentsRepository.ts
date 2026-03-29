@@ -33,26 +33,23 @@ const COMMENTS_QUERY_LIMIT = 100;
  * switching feedback or unmounting to avoid stacking listeners.
  */
 export function listenToCommentsRepo(
-  workspaceId: string,
   sessionId: string,
   feedbackId: string,
   callback: (comments: Comment[]) => void
 ): Unsubscribe {
-  if (!workspaceId) {
-    throw new Error("workspaceId required");
-  }
-  if (!sessionId) {
+  const sid = typeof sessionId === "string" ? sessionId.trim() : "";
+  const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
+  if (!sid) {
     throw new Error("sessionId required");
   }
-  if (!feedbackId) {
+  if (!fid) {
     throw new Error("feedbackId required");
   }
   assertQueryLimit(COMMENTS_QUERY_LIMIT, "listenToCommentsRepo");
   const q = query(
     collection(db, "comments"),
-    where("workspaceId", "==", workspaceId),
-    where("sessionId", "==", sessionId),
-    where("feedbackId", "==", feedbackId),
+    where("sessionId", "==", sid),
+    where("feedbackId", "==", fid),
     orderBy("createdAt", "asc"),
     limit(COMMENTS_QUERY_LIMIT)
   );
@@ -76,24 +73,20 @@ const RECENT_ACTIVITY_LIMIT = 10;
 
 /**
  * Fetches most recent comments for a session (for overview activity feed).
- * Composite index: comments (sessionId ASC, createdAt DESC).
+ * Composite index: comments (sessionId+createdAt DESC).
  */
 export async function getSessionRecentCommentsRepo(
-  workspaceId: string,
   sessionId: string,
   max: number = RECENT_ACTIVITY_LIMIT
 ): Promise<Comment[]> {
-  if (!workspaceId) {
-    throw new Error("workspaceId required");
-  }
-  if (!sessionId) {
+  const sid = typeof sessionId === "string" ? sessionId.trim() : "";
+  if (!sid) {
     throw new Error("sessionId required");
   }
   assertQueryLimit(max, "getSessionRecentCommentsRepo");
   const q = query(
     collection(db, "comments"),
-    where("workspaceId", "==", workspaceId),
-    where("sessionId", "==", sessionId),
+    where("sessionId", "==", sid),
     orderBy("createdAt", "desc"),
     limit(max)
   );
@@ -107,41 +100,5 @@ export async function getSessionRecentCommentsRepo(
 export interface UpdateCommentData {
   message?: string;
   resolved?: boolean;
-}
-
-/** Limit for insights comments query. NEVER increase. */
-const INSIGHTS_COMMENTS_LIMIT = 100;
-
-/**
- * Bounded comments fetch for /api/insights charts.
- * Composite index required: comments (workspaceId ASC, createdAt DESC).
- */
-export async function getWorkspaceCommentsForInsightsRepo(
-  workspaceId: string
-): Promise<Comment[]> {
-  if (!workspaceId) {
-    throw new Error("workspaceId required");
-  }
-  assertQueryLimit(INSIGHTS_COMMENTS_LIMIT, "getWorkspaceCommentsForInsightsRepo");
-  const isSimple = process.env.INSIGHTS_SIMPLE_QUERY === "1";
-
-  const q = isSimple
-    ? query(
-        collection(db, "comments"),
-        where("workspaceId", "==", workspaceId),
-        limit(10)
-      )
-    : query(
-        collection(db, "comments"),
-        where("workspaceId", "==", workspaceId),
-        orderBy("createdAt", "desc"),
-        limit(INSIGHTS_COMMENTS_LIMIT)
-      );
-
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...(docSnap.data() as Omit<Comment, "id">),
-  }));
 }
 

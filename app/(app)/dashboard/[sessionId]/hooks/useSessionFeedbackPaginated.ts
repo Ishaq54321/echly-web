@@ -19,7 +19,6 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseClient";
-import { useWorkspace } from "@/lib/client/workspaceContext";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
@@ -160,7 +159,6 @@ export function useSessionFeedbackPaginated(
   onNewTicketFromRealtime?: (newestTicketId: string) => void,
   options?: SessionFeedbackRealtimeMergeOptions
 ): UseSessionFeedbackPaginatedResult {
-  const { workspaceId, authUid } = useWorkspace();
   const [items, setItems] = useState<Feedback[]>([]);
   /** Last session document counters from Firestore (never merge delta into this). */
   const [counts, setCountsState] = useState(ZERO_COUNTS);
@@ -184,7 +182,6 @@ export function useSessionFeedbackPaginated(
 
   const prevIdsRef = useRef<Set<string>>(new Set());
   const firstSnapshotRef = useRef(true);
-
   const sortByCreatedAtDesc = useCallback((list: Feedback[]): Feedback[] => {
     const deduped = dedupeFeedbackById(list);
     deduped.sort((a, b) => {
@@ -249,7 +246,7 @@ export function useSessionFeedbackPaginated(
 
   /** Session document counters (authoritative). */
   useEffect(() => {
-    if (!authUid || !sessionId || !workspaceId) {
+    if (!sessionId) {
       setCountsState(ZERO_COUNTS);
       setCountsDelta(ZERO_COUNTS_DELTA);
       setCountsLoading(false);
@@ -273,14 +270,6 @@ export function useSessionFeedbackPaginated(
           return;
         }
         const d = snap.data();
-        const wid = typeof d.workspaceId === "string" ? d.workspaceId.trim() : "";
-        if (wid !== workspaceId) {
-          setCountsState(ZERO_COUNTS);
-          setCountsDelta(ZERO_COUNTS_DELTA);
-          setCountsLoading(false);
-          setSessionSnapshotReady(true);
-          return;
-        }
         const open = Math.max(0, typeof d.openCount === "number" ? d.openCount : 0);
         const resolved = Math.max(0, typeof d.resolvedCount === "number" ? d.resolvedCount : 0);
         const rawTotal =
@@ -304,11 +293,11 @@ export function useSessionFeedbackPaginated(
     );
 
     return () => unsubscribe();
-  }, [authUid, sessionId, workspaceId]);
+  }, [sessionId]);
 
   /** Firestore: full session list — real-time updates across tabs. */
   useEffect(() => {
-    if (!authUid || !sessionId || !workspaceId) {
+    if (!sessionId) {
       return;
     }
 
@@ -319,7 +308,6 @@ export function useSessionFeedbackPaginated(
 
     const q = query(
       collection(db, "feedback"),
-      where("workspaceId", "==", workspaceId),
       where("sessionId", "==", sessionId)
     );
 
@@ -377,7 +365,7 @@ export function useSessionFeedbackPaginated(
     return () => {
       unsubscribe();
     };
-  }, [authUid, sessionId, workspaceId, finalizeList, setCanonicalFeedback]);
+  }, [sessionId, finalizeList, setCanonicalFeedback]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -390,10 +378,7 @@ export function useSessionFeedbackPaginated(
       setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
       return;
     }
-    if (!authUid) {
-      setCountsLoading(true);
-    }
-  }, [sessionId, authUid, setCanonicalFeedback]);
+  }, [sessionId, setCanonicalFeedback]);
 
   return {
     canonicalFeedback,
