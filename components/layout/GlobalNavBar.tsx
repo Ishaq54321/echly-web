@@ -15,12 +15,13 @@ import {
   assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
-import { getOrCreateShareLink } from "@/lib/share/getOrCreateShareLink";
+import { getSessionLink } from "@/utils/getSessionLink";
 
-function dashboardSessionIdFromPath(pathname: string | null): string | null {
+function sessionIdFromBoardPath(pathname: string | null): string | null {
   if (!pathname) return null;
-  const m = /^\/dashboard\/([^/]+)/.exec(pathname);
-  const id = m?.[1]?.trim() ?? "";
+  const dash = /^\/dashboard\/([^/]+)/.exec(pathname);
+  const sess = /^\/session\/([^/]+)/.exec(pathname);
+  const id = (dash?.[1] ?? sess?.[1] ?? "").trim();
   if (!id || id === "insights") return null;
   return id;
 }
@@ -28,7 +29,7 @@ function dashboardSessionIdFromPath(pathname: string | null): string | null {
 export function GlobalNavBar() {
   const pathname = usePathname();
   const { authUid, isIdentityResolved } = useWorkspace();
-  const sessionId = dashboardSessionIdFromPath(pathname);
+  const sessionId = sessionIdFromBoardPath(pathname);
   const [copied, setCopied] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
 
@@ -37,14 +38,11 @@ export function GlobalNavBar() {
     if (!sessionId) return;
     assertIdentityResolved(isIdentityResolved);
     const uid = authUid?.trim();
-    if (!uid) throw new Error("Auth uid missing");
+    if (!uid) return;
     setCopyBusy(true);
     try {
-      const url = await getOrCreateShareLink({
-        sessionId,
-        userId: uid,
-        origin: window.location.origin,
-      });
+      const url = getSessionLink(sessionId);
+      if (!url) return;
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

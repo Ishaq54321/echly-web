@@ -1,36 +1,35 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
 import { listSessionSharesRepo } from "@/lib/repositories/sessionSharesRepository";
-import { buildRequestContext } from "@/lib/server/requestContext";
+import { getAccessContext } from "@/lib/access/getAccessContext";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import { resolveOptionalSessionViewer } from "@/lib/server/requestContext";
 
-/** GET /api/sessions/:id/shares — list email shares (requires resolve capability). */
+/** GET /api/sessions/:id/shares — optional auth; read gated by `capabilities.canView` only. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  let user;
-  try {
-    user = await requireAuth(req);
-  } catch (res) {
-    return res as Response;
-  }
-
   const { id: sessionId } = await params;
   if (!sessionId?.trim()) {
     return NextResponse.json({ success: false, error: "Missing session id" }, { status: 400 });
   }
 
-  const context = await buildRequestContext({
-    userId: user.uid,
-    userEmail: user.email,
-    sessionId: sessionId.trim(),
+  const id = sessionId.trim();
+  const { viewerUser, tokenString } = await resolveOptionalSessionViewer(req);
+  const loaded = await getSessionByIdRepo(id);
+  const { session, access } = await getAccessContext({
+    sessionId: id,
+    user: viewerUser,
+    session: loaded,
+    tokenString,
   });
-  if (!context.access?.canResolve) {
+
+  if (!access?.capabilities.canView) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
-  if (!context.session) {
+  if (!session) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
 
   try {
-    const rows = await listSessionSharesRepo(sessionId.trim());
+    const rows = await listSessionSharesRepo(id);
     const shares = rows.map((r) => ({
       email: r.email,
       permission: r.permission,

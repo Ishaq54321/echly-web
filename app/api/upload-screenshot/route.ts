@@ -62,20 +62,26 @@ export async function POST(req: NextRequest) {
     const ssId = screenshotIdRaw || createScreenshotId();
 
     const accessCtx = await buildRequestContext({
-      userId: user.uid,
-      userEmail: user.email,
+      req,
+      authenticatedUser: user,
       sessionId: sid,
     });
+    if (!accessCtx.access?.capabilities.canView) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403, headers: corsHeaders(req) }
+      );
+    }
+    if (!accessCtx.access?.capabilities.canComment) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403, headers: corsHeaders(req) }
+      );
+    }
     if (!accessCtx.session) {
       return NextResponse.json(
         { error: "Session not found" },
         { status: 404, headers: corsHeaders(req) }
-      );
-    }
-    if (!accessCtx.access?.canComment) {
-      return NextResponse.json(
-        { error: "Forbidden" },
-        { status: 403, headers: corsHeaders(req) }
       );
     }
 

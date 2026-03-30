@@ -151,7 +151,7 @@ export function ExecutionCanvas({
               <ChevronRight className="h-3.5 w-3 shrink-0" aria-hidden />
               {sessionId ? (
                 <Link
-                  href={`/dashboard/${sessionId}`}
+                  href={`/session/${sessionId}`}
                   className="hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 truncate"
                 >
                   {sessionTitleTrim}

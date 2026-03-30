@@ -270,20 +270,26 @@ export async function POST(req: NextRequest) {
   }
 
   const accessCtx = await buildRequestContext({
-    userId: user.uid,
-    userEmail: user.email,
+    req,
+    authenticatedUser: { uid: user.uid, email: user.email },
     sessionId,
   });
+  if (!accessCtx.access?.capabilities.canView) {
+    return NextResponse.json(
+      { success: false, error: "Forbidden" },
+      { status: 403, headers: corsHeaders(req) }
+    );
+  }
+  if (!accessCtx.access?.capabilities.canComment) {
+    return NextResponse.json(
+      { success: false, error: "Forbidden" },
+      { status: 403, headers: corsHeaders(req) }
+    );
+  }
   if (!accessCtx.session) {
     return NextResponse.json(
       { success: false, error: "Session not found" },
       { status: 404, headers: corsHeaders(req) }
-    );
-  }
-  if (!accessCtx.access?.canComment) {
-    return NextResponse.json(
-      { success: false, error: "Forbidden" },
-      { status: 403, headers: corsHeaders(req) }
     );
   }
 
@@ -374,7 +380,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        ticket: serializeTicket(created),
+        ticket: serializeTicket(created, accessCtx.access!),
         ...(inserted ? {} : { alreadyExists: true }),
       },
       { headers: corsHeaders(req) }

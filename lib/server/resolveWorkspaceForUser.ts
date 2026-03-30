@@ -2,6 +2,7 @@ import "server-only";
 import { getUserWorkspaceIdRepo, invalidateUserWorkspaceIdCache } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace, invalidateWorkspaceDocCache } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { AuthorizationError } from "@/lib/server/auth/authorize";
 
 type RequestWithWorkspace = Request & { __workspaceId?: string };
 
@@ -25,7 +26,10 @@ export async function resolveWorkspaceForUserLight(
   const cached = getWorkspaceIdFromRequest(req);
   if (cached) return { workspaceId: cached };
 
-  const workspaceId = await getUserWorkspaceIdRepo(uid);
+  const workspaceId = (await getUserWorkspaceIdRepo(uid)).trim();
+  if (!workspaceId) {
+    throw new AuthorizationError("Missing workspaceId for user", 403, "FORBIDDEN");
+  }
 
   setWorkspaceIdOnRequest(req, workspaceId);
   return { workspaceId };

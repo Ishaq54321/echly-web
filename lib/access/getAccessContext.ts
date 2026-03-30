@@ -1,17 +1,24 @@
 import "server-only";
 
-import { resolveAccess, type ResolvedAccess } from "@/lib/access/resolveAccess";
+import {
+  resolveAccess,
+  buildCapabilities,
+  type AccessContext,
+} from "@/lib/access/resolveAccess";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
 import type { Session } from "@/lib/domain/session";
+import { normalizeGeneralAccess } from "@/lib/domain/session";
 import { getSessionSharePermissionForEmailRepo } from "@/lib/repositories/sessionSharesRepository";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import {
+  getUserWorkspaceIdRepo,
+  isShareAuthUid,
+} from "@/lib/repositories/usersRepository.server";
 import type { SessionUser } from "@/lib/server/session";
 import {
   resolveShareLinkTokenContext,
   type ResolvedShareLinkToken,
-  type ResolveShareLinkTokenContextResult,
 } from "@/lib/server/shareTokenResolver";
 
 export type AccessContextUser = SessionUser | { uid: string; email?: string | null };
@@ -21,6 +28,54 @@ type TokenPayload = {
   isActive: boolean;
   expiresAt: number | null;
 };
+
+/** Baseline policy: every loaded session row participates in resolveAccess with a defined tier. */
+function withSessionAccessBaseline(session: Session): Session {
+  return {
+    ...session,
+    accessLevel: normalizeAccessLevel(session.accessLevel ?? "view"),
+  };
+}
+
+/** Share link is an optional enhancer; only active rows are passed to {@link resolveAccess}. */
+function tokenPayloadForResolve(payload: TokenPayload | null) {
+  if (!payload?.isActive) return null;
+  return {
+    generalAccess: payload.generalAccess,
+    isActive: true,
+    expiresAt: payload.expiresAt,
+  };
+}
+
+function sessionOwnerUserId(
+  session: Pick<Session, "createdBy" | "userId" | "createdByUserId"> | null
+): string | null {
+  if (!session) return null;
+  const canonical = session.createdByUserId?.trim();
+  if (canonical) return canonical;
+  const fromCreatedBy = session.createdBy?.id?.trim();
+  if (fromCreatedBy) return fromCreatedBy;
+  const legacyUserId = session.userId?.trim();
+  return legacyUserId || null;
+}
+
+function toAccessContext(params: {
+  sessionId: string;
+  workspaceId: string;
+  user: AccessContextUser | null;
+  role: AccessContext["role"];
+}): AccessContext {
+  const { sessionId, workspaceId, user, role } = params;
+  const userId = user?.uid?.trim() ?? null;
+  return {
+    sessionId,
+    workspaceId,
+    role,
+    userId,
+    isPublicViewer: user === null,
+    capabilities: buildCapabilities(role, userId),
+  };
+}
 
 async function loadInviteAndToken(
   sid: string,
@@ -70,43 +125,47 @@ async function loadInviteAndToken(
   return { userWorkspaceId, inviteAccess, tokenPayload };
 }
 
-/** Session row missing: resolveAccess only when invite or an active link applies (avoids stub fallback-to-view leakage). */
+/** Session row missing: no `session.accessLevel` in Firestore — grant access only via invite or an active share link (no orphan baseline). */
 function accessForMissingSessionDoc(
   sid: string,
   user: AccessContextUser | null,
   userWorkspaceId: string | null,
   inviteAccess: AccessLevel | null,
   tokenPayload: TokenPayload | null
-): ResolvedAccess | null {
-  const tokenForResolve =
-    tokenPayload && tokenPayload.isActive
-      ? {
-          generalAccess: tokenPayload.generalAccess,
-          isActive: tokenPayload.isActive,
-          expiresAt: tokenPayload.expiresAt,
-        }
-      : null;
+): AccessContext | null {
+  const tokenForResolve = tokenPayloadForResolve(tokenPayload);
 
   if (inviteAccess == null && tokenForResolve == null) {
     return null;
   }
 
-  return resolveAccess({
+  const { role } = resolveAccess({
     session: {
       id: sid,
       workspaceId: "",
       accessLevel: normalizeAccessLevel("view"),
+      ownerUserId: null,
     },
     user: user ? { uid: user.uid, workspaceId: userWorkspaceId } : null,
     inviteAccess: inviteAccess ?? undefined,
     token: tokenForResolve,
+  });
+
+  return toAccessContext({
+    sessionId: sid,
+    workspaceId: "",
+    user,
+    role,
   });
 }
 
 export async function getAccessContext(options: {
   sessionId: string;
   user: AccessContextUser | null;
-  /** Raw share URL token; resolved only when `resolvedShareToken` is not passed. */
+  /**
+   * Share link token (`?shareToken=` or `x-share-token`). Resolved via {@link resolveShareLinkTokenContext} / `share_links` (no duplicate validation elsewhere).
+   * When present with `user: null`, the viewer is a public share identity: {@link AccessContext.isPublicViewer} is true and `userId` on the context is null; role comes from the link (and {@link resolveAccess}).
+   */
   tokenString?: string;
   /**
    * When set: use this session row (may be null if already known absent).
@@ -116,22 +175,22 @@ export async function getAccessContext(options: {
   /** When the share link row was already resolved for this request (avoids a second lookup). */
   resolvedShareToken?: ResolvedShareLinkToken;
   /**
-   * When set (and `user` is non-null), skips getUserWorkspaceIdRepo and uses the trimmed value
-   * (empty string → null workspace for resolveAccess).
+   * When defined (including `null` → treat as empty workspace), skips getUserWorkspaceIdRepo.
+   * Omit (`undefined`) to always load `users/{uid}.workspaceId` for real users.
    */
   viewerWorkspaceIdOverride?: string | null;
-}): Promise<{ session: Session | null; access: ResolvedAccess | null }> {
+}): Promise<{ session: Session | null; access: AccessContext | null }> {
   const sid = options.sessionId.trim();
   if (!sid) {
     return { session: null, access: null };
   }
 
-  const session =
+  const rawSession =
     options.session !== undefined
       ? options.session
       : await getSessionByIdRepo(sid);
 
-  if (!session) {
+  if (!rawSession) {
     const { userWorkspaceId, inviteAccess, tokenPayload } = await loadInviteAndToken(
       sid,
       options.user,
@@ -149,6 +208,8 @@ export async function getAccessContext(options: {
     return { session: null, access };
   }
 
+  const session = withSessionAccessBaseline(rawSession);
+
   const { userWorkspaceId, inviteAccess, tokenPayload } = await loadInviteAndToken(
     sid,
     options.user,
@@ -157,44 +218,62 @@ export async function getAccessContext(options: {
     options.resolvedShareToken
   );
 
-  const access = resolveAccess({
+  const generalAccess = normalizeGeneralAccess(session.generalAccess);
+  if (generalAccess === "restricted") {
+    const ownerId = sessionOwnerUserId(session);
+    const uid = options.user?.uid?.trim() ?? "";
+    const isOwner = uid !== "" && ownerId != null && uid === ownerId;
+    const sessionWs = (session.workspaceId ?? "").trim();
+    const viewerWs = (userWorkspaceId ?? "").trim();
+    const isWorkspaceMember =
+      uid !== "" &&
+      !isShareAuthUid(uid) &&
+      viewerWs !== "" &&
+      viewerWs === sessionWs;
+    const hasUserAccess = isOwner || isWorkspaceMember;
+    const hasShareAccess = tokenPayloadForResolve(tokenPayload) != null;
+    if (!hasUserAccess && !hasShareAccess) {
+      return {
+        session,
+        access: {
+          sessionId: sid,
+          workspaceId: (session.workspaceId ?? "").trim(),
+          role: "VIEWER",
+          userId: null,
+          isPublicViewer: true,
+          capabilities: {
+            canView: false,
+            canComment: false,
+            canResolve: false,
+            canAssign: false,
+            canDeleteOwnComment: false,
+            canDeleteTicket: false,
+          },
+        },
+      };
+    }
+  }
+
+  const { role } = resolveAccess({
     session: {
       id: session.id,
       workspaceId: (session.workspaceId ?? "").trim(),
-      accessLevel: normalizeAccessLevel(session.accessLevel),
+      accessLevel: normalizeAccessLevel(session.accessLevel ?? "view"),
+      ownerUserId: sessionOwnerUserId(session),
     },
     user: options.user
       ? { uid: options.user.uid, workspaceId: userWorkspaceId }
       : null,
     inviteAccess,
-    token: tokenPayload,
+    token: tokenPayloadForResolve(tokenPayload),
+  });
+
+  const access = toAccessContext({
+    sessionId: sid,
+    workspaceId: (session.workspaceId ?? "").trim(),
+    user: options.user,
+    role,
   });
 
   return { session, access };
-}
-
-/**
- * Public share entry: resolves the URL token then loads session + access in one place.
- * Callers must not run separate token routing / permission logic beyond rate limits.
- */
-export async function getAccessContextForPublicShareToken(tokenString: string): Promise<{
-  session: Session | null;
-  access: ResolvedAccess | null;
-  tokenCtx: ResolveShareLinkTokenContextResult;
-}> {
-  const trimmed = tokenString.trim();
-  if (!trimmed) {
-    return { session: null, access: null, tokenCtx: { ok: false, reason: "NOT_FOUND" } };
-  }
-  const tokenCtx = await resolveShareLinkTokenContext(trimmed);
-  const sessionId = tokenCtx.ok ? tokenCtx.sessionId.trim() : "";
-  if (!sessionId) {
-    return { session: null, access: null, tokenCtx };
-  }
-  const { session, access } = await getAccessContext({
-    sessionId,
-    user: null,
-    resolvedShareToken: tokenCtx.ok ? tokenCtx : undefined,
-  });
-  return { session, access, tokenCtx };
 }

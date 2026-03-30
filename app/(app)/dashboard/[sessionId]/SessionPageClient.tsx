@@ -1,6 +1,8 @@
 "use client";
 
-import { authFetch } from "@/lib/authFetch";
+import { authFetch, type AuthFetchInit } from "@/lib/authFetch";
+import { clearShareToken, getShareToken, setShareToken } from "@/lib/client/shareToken";
+import { ensureShareAuth } from "@/lib/client/firebaseAuth";
 import {
   useEffect,
   useLayoutEffect,
@@ -13,7 +15,6 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
-import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import {
   assertIdentityResolved,
   useWorkspace,
@@ -25,6 +26,7 @@ import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
+import type { AccessCapabilities } from "@/lib/access/resolveAccess";
 import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
 import {
   handlePermissionError,
@@ -84,6 +86,20 @@ function preloadImage(src: string, preloaded: Set<string>) {
   img.src = src;
 }
 
+async function authFetchOrAnonCookie(
+  url: string,
+  init?: AuthFetchInit
+): Promise<Response> {
+  const res = await authFetch(url, init);
+  if (res != null) return res;
+  const { timeout: _t, ...rest } = init ?? {};
+  return fetch(url, {
+    ...rest,
+    credentials: "include",
+    cache: "no-store",
+  });
+}
+
 function sameStringArrayContent(
   a: string[] | null | undefined,
   b: string[] | null | undefined
@@ -103,20 +119,50 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const ticketIdFromUrl = searchParams.get("ticket");
 
   const [session, setSession] = useState<Session | null>(null);
-  /** Capability flags from GET /api/sessions/:id (resolveAccess); never inferred in the UI. */
-  const [sessionAccess, setSessionAccess] = useState<{
-    canComment: boolean;
-    canResolve: boolean;
-  } | null>(null);
+  /** General-access gate (restricted mode + anonymous): server returned access with canView false. */
+  const [accessBlocked, setAccessBlocked] = useState(false);
+  /** Set when GET /api/sessions/:id fails after auth is known (anonymous-friendly). */
+  const [sessionFetchError, setSessionFetchError] = useState<
+    null | "forbidden" | "not_found" | "error"
+  >(null);
+  /** Capability flags from GET /api/sessions/:id (getAccessContext); never inferred in the UI. */
+  const [sessionAccess, setSessionAccess] = useState<AccessCapabilities | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
 
-  const { loading: authLoading } = useAuthGuard({ router });
-  const { authUid, isIdentityResolved } = useWorkspace();
+  const sessionRef = useRef<Session | null>(null);
+  sessionRef.current = session;
+
+  const { authUid, isIdentityResolved, authReady } = useWorkspace();
   const { showToast } = useToast();
 
   const feedbackSessionId = sessionId || undefined;
+
+  const shareTokenQs = searchParams.get("shareToken")?.trim() ?? "";
+  const shareTokenQsRef = useRef(shareTokenQs);
+  shareTokenQsRef.current = shareTokenQs;
+  const isAnonymousViewer = authReady && !authUid;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("shareToken");
+    if (token) {
+      setShareToken(token);
+    } else {
+      clearShareToken();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authReady || authUid) return;
+    const hasShare =
+      shareTokenQs !== "" || (typeof window !== "undefined" && (getShareToken()?.trim() ?? "") !== "");
+    if (!hasShare) return;
+    void ensureShareAuth(sessionId);
+  }, [authReady, authUid, sessionId, shareTokenQs]);
+
+  const restFeedbackFetch = useCallback((url: string) => authFetchOrAnonCookie(url), []);
 
   const listScrollRef = useRef<HTMLDivElement | null>(null);
   const [openExpanded, setOpenExpanded] = useState(true);
@@ -153,6 +199,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     setSearchQuery("");
     setSearchResults([]);
     setSearchLoading(false);
+    setAccessBlocked(false);
   }, [sessionId]);
 
   useEffect(() => {
@@ -184,10 +231,20 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     const handle = window.setTimeout(() => {
       void (async () => {
         try {
-          const url = `/api/feedback/search?sessionId=${encodeURIComponent(feedbackSessionId)}&query=${encodeURIComponent(q)}`;
-          const res = await authFetch(url);
-          if (!res) return;
+          const sp = new URLSearchParams({
+            sessionId: feedbackSessionId,
+            query: q,
+          });
+          if (shareTokenQsRef.current !== "") {
+            sp.set("shareToken", shareTokenQsRef.current);
+          }
+          const url = `/api/feedback/search?${sp.toString()}`;
+          const res = await authFetchOrAnonCookie(url);
           if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+              if (!cancelled) setSearchResults([]);
+              return;
+            }
             throw new Error(`search ${res.status}`);
           }
           const data = (await res.json()) as { feedback?: Feedback[] };
@@ -205,9 +262,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [searchQuery, feedbackSessionId]);
+  }, [searchQuery, feedbackSessionId, shareTokenQs]);
 
-  /** In-flight action steps per ticket — merged onto Firestore snapshots to avoid realtime flicker. */
+  /** In-flight action steps per ticket — merged onto list updates to avoid flicker. */
   const pendingOptimisticActionStepsRef = useRef(
     new Map<string, { steps: string[] | null }>()
   );
@@ -238,6 +295,44 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     setResolveOptimistic(null);
   }, [sessionId]);
 
+  const sessionRestTotal =
+    session == null
+      ? -1
+      : Math.max(
+          0,
+          typeof session.totalCount === "number"
+            ? session.totalCount
+            : typeof session.feedbackCount === "number"
+              ? session.feedbackCount
+              : 0
+        );
+  const sessionRestOpen =
+    session == null ? -1 : Math.max(0, typeof session.openCount === "number" ? session.openCount : 0);
+  const sessionRestResolved =
+    session == null ? -1 : Math.max(0, typeof session.resolvedCount === "number" ? session.resolvedCount : 0);
+
+  const feedbackHookOptions = useMemo(
+    () => ({
+      mergeRealtimeListRef: mergeRealtimeFeedbackListRef,
+      enabled: authReady,
+      shareToken: shareTokenQs || null,
+      restSessionCounts:
+        session != null
+          ? { total: sessionRestTotal, open: sessionRestOpen, resolved: sessionRestResolved }
+          : null,
+      restFetch: restFeedbackFetch,
+    }),
+    [
+      authReady,
+      shareTokenQs,
+      restFeedbackFetch,
+      session?.id ?? "",
+      sessionRestTotal,
+      sessionRestOpen,
+      sessionRestResolved,
+    ]
+  );
+
   const {
     feedback,
     setFeedback,
@@ -253,14 +348,20 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     isLoadingResolved: feedbackLoadingResolved,
     loadMoreRef: feedbackLoadMoreRef,
     setCountsDelta: setSessionCountsDelta,
-  } = useSessionFeedbackPaginated(
-    feedbackSessionId,
-    (newestTicketId) => {
-      setSelectedId(newestTicketId);
-      setNewTicketId(newestTicketId);
-    },
-    { mergeRealtimeListRef: mergeRealtimeFeedbackListRef }
-  );
+  } = useSessionFeedbackPaginated(feedbackSessionId, feedbackHookOptions);
+
+  const feedbackRef = useRef(feedback);
+  feedbackRef.current = feedback;
+
+  const deepLinkTicketInList =
+    Boolean(ticketIdFromUrl) && feedback.some((f) => f.id === ticketIdFromUrl);
+
+  const deepLinkTicketBucket: "" | "open" | "resolved" = (() => {
+    if (!ticketIdFromUrl) return "";
+    const t = feedback.find((f) => f.id === ticketIdFromUrl);
+    if (!t) return "";
+    return getTicketStatus(t) === "resolved" ? "resolved" : "open";
+  })();
 
   const feedbackScoped = useMemo(
     () => feedback.filter((f) => f.sessionId === sessionId),
@@ -384,11 +485,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     };
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
-  }, [sessionId, session]);
+  }, [sessionId, session != null]);
+
+  const sessionWorkspaceIdRef = useRef<string | undefined>(undefined);
+  sessionWorkspaceIdRef.current = session?.workspaceId;
 
   /* Local-first: insert ticket immediately when extension creates feedback (no refetch). */
   useEffect(() => {
-    if (!sessionId || !session) return;
+    if (!sessionId) return;
     const handler = (e: Event) => {
       const ev = e as CustomEvent<{
         ticket: { id: string; title: string; instruction?: string; description?: string; type?: string };
@@ -396,10 +500,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }>;
       const { ticket, sessionId: evSessionId } = ev.detail ?? {};
       if (evSessionId !== sessionId || !ticket) return;
+      const workspaceId = sessionWorkspaceIdRef.current;
+      if (workspaceId == null) return;
       const newItem: Feedback = {
         id: ticket.id,
         sessionId: evSessionId,
-        workspaceId: session.workspaceId,
+        workspaceId,
         title: ticket.title,
         instruction: ticket.instruction ?? ticket.description,
         description: ticket.description ?? ticket.instruction,
@@ -416,63 +522,102 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     };
     window.addEventListener("ECHLY_FEEDBACK_CREATED", handler);
     return () => window.removeEventListener("ECHLY_FEEDBACK_CREATED", handler);
-  }, [sessionId, session, setFeedback]);
+  }, [sessionId, session?.workspaceId ?? "", setFeedback]);
 
-  /* ================= AUTH + LOAD SESSION (title/meta only, access from resolveAccess) ================= */
+  /* ================= LOAD SESSION (optional auth; getAccessContext on server) ================= */
   useEffect(() => {
-    if (authLoading) return;
+    if (!authReady) return;
     if (!sessionId) {
       setSession(null);
       setSessionAccess(null);
+      setSessionFetchError(null);
+      setAccessBlocked(false);
       return;
     }
 
     let cancelled = false;
     void (async () => {
-      const st = searchParams.get("shareToken")?.trim() ?? "";
-      const qs = st !== "" ? `?shareToken=${encodeURIComponent(st)}` : "";
-      const res = await authFetch(`/api/sessions/${encodeURIComponent(sessionId)}${qs}`);
+      setAccessBlocked(false);
+      const tok = shareTokenQsRef.current;
+      const qs = tok !== "" ? `?shareToken=${encodeURIComponent(tok)}` : "";
+      const url = `/api/sessions/${encodeURIComponent(sessionId)}${qs}`;
+      const res = await authFetchOrAnonCookie(url);
       if (cancelled) return;
-      if (!res) {
-        setSession(null);
-        setSessionAccess(null);
-        return;
-      }
       const data = (await res.json().catch(() => ({}))) as {
         success?: boolean;
         session?: Record<string, unknown>;
-        access?: { canComment?: boolean; canResolve?: boolean; canView?: boolean };
+        access?: { capabilities?: Partial<AccessCapabilities> };
       };
-      if (!res.ok || !data.success || !data.session) {
+      if (res.status === 403) {
+        const cap = data.access?.capabilities;
+        if (cap && cap.canView === false) {
+          setAccessBlocked(true);
+          setSession(null);
+          setSessionFetchError(null);
+          setSessionAccess({
+            canView: false,
+            canComment: cap.canComment === true,
+            canResolve: cap.canResolve === true,
+            canAssign: cap.canAssign === true,
+            canDeleteOwnComment: cap.canDeleteOwnComment !== false,
+            canDeleteTicket: cap.canDeleteTicket === true,
+          });
+          return;
+        }
+        setAccessBlocked(false);
+        setSession(null);
         setSessionAccess(null);
-        router.push("/dashboard");
+        setSessionFetchError("forbidden");
         return;
       }
+      if (res.status === 404 || !data.success || !data.session) {
+        setAccessBlocked(false);
+        setSession(null);
+        setSessionAccess(null);
+        setSessionFetchError(res.status === 404 ? "not_found" : "error");
+        return;
+      }
+      setSessionFetchError(null);
       const raw = data.session as { accessLevel?: unknown };
       setSession({
         id: sessionId,
         ...(data.session as object),
         accessLevel: normalizeAccessLevel(raw.accessLevel),
       } as Session);
+      const cap = data.access?.capabilities;
       setSessionAccess(
-        data.access
+        cap
           ? {
-              canComment: data.access.canComment === true,
-              canResolve: data.access.canResolve === true,
+              canView: cap.canView !== false,
+              canComment: cap.canComment === true,
+              canResolve: cap.canResolve === true,
+              canAssign: cap.canAssign === true,
+              canDeleteOwnComment: cap.canDeleteOwnComment !== false,
+              canDeleteTicket: cap.canDeleteTicket === true,
             }
           : null
       );
-      const viewerId = getViewerId(authUid ?? "");
-      if (viewerId) {
-        recordSessionViewIfNew(sessionId, viewerId).catch((err) => {
-          console.error("[ECHLY] recordSessionViewIfNew failed", err);
+      // Authenticated: Loom-style view count via Bearer. Anonymous: cookie/shareToken only (getViewerId is always non-empty for anon).
+      if (authUid?.trim()) {
+        const viewerId = getViewerId(authUid);
+        void recordSessionViewIfNew(sessionId, viewerId).catch((err) => {
+          console.warn("[ECHLY] recordSessionViewIfNew failed", err);
         });
+      } else {
+        const viewUrl = `/api/sessions/${encodeURIComponent(sessionId)}/view`;
+        void authFetchOrAnonCookie(viewUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            shareToken: shareTokenQsRef.current !== "" ? shareTokenQsRef.current : undefined,
+          }),
+        }).catch(() => {});
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [sessionId, authUid, authLoading, router, searchParams]);
+  }, [sessionId, authUid, authReady, shareTokenQs]);
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
@@ -486,17 +631,21 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   }, [sessionId, ticketIdFromUrl]);
 
   useEffect(() => {
+    if (!authReady) return;
     if (!ticketIdFromUrl || !feedbackSessionId) return;
     if (feedbackLoading) return;
-    if (feedback.some((f) => f.id === ticketIdFromUrl)) return;
+    if (feedbackRef.current.some((f) => f.id === ticketIdFromUrl)) return;
     if (deepLinkHydrateAttempted.current === ticketIdFromUrl) return;
     deepLinkHydrateAttempted.current = ticketIdFromUrl;
 
     let cancelled = false;
     void (async () => {
       try {
-        const res = await authFetch(`/api/tickets/${ticketIdFromUrl}`);
-        if (!res) return;
+        const tok = shareTokenQsRef.current;
+        const qs = tok !== "" ? `?shareToken=${encodeURIComponent(tok)}` : "";
+        const url = `/api/tickets/${encodeURIComponent(ticketIdFromUrl)}${qs}`;
+        const res = await authFetchOrAnonCookie(url);
+        if (res.status === 403 || res.status === 404) return;
         const data = (await res.json()) as {
           success?: boolean;
           ticket?: TicketFromApi & { sessionId?: string; status?: string; createdAt?: string | null };
@@ -521,32 +670,37 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return () => {
       cancelled = true;
     };
-  }, [ticketIdFromUrl, feedbackSessionId, sessionId, feedbackLoading, feedback, setFeedback]);
+  }, [
+    authReady,
+    shareTokenQs,
+    ticketIdFromUrl,
+    feedbackSessionId,
+    sessionId,
+    feedbackLoading,
+    setFeedback,
+  ]);
 
   useEffect(() => {
-    if (!ticketIdFromUrl || feedback.length === 0 || hasAppliedTicketParam.current) return;
-    const exists = feedback.some((f) => f.id === ticketIdFromUrl);
-    if (exists) {
-      hasAppliedTicketParam.current = true;
-      setSelectedId(ticketIdFromUrl);
-    }
-  }, [ticketIdFromUrl, feedback]);
+    if (!ticketIdFromUrl || feedbackRef.current.length === 0 || hasAppliedTicketParam.current) return;
+    if (!deepLinkTicketInList) return;
+    hasAppliedTicketParam.current = true;
+    setSelectedId(ticketIdFromUrl);
+  }, [ticketIdFromUrl, deepLinkTicketInList]);
 
   // Deep link: expand the sidebar section that contains ?ticket= (once per ticket id; controlled sections).
   useEffect(() => {
     if (!ticketIdFromUrl) return;
     if (deepLinkSidebarExpansionDone.current === ticketIdFromUrl) return;
-    const ticket = feedback.find((f) => f.id === ticketIdFromUrl);
-    if (!ticket) return;
+    if (deepLinkTicketBucket === "") return;
     deepLinkSidebarExpansionDone.current = ticketIdFromUrl;
-    if (getTicketStatus(ticket) === "resolved") {
+    if (deepLinkTicketBucket === "resolved") {
       setResolvedExpanded(true);
       setOpenExpanded(false);
     } else {
       setOpenExpanded(true);
       setResolvedExpanded(false);
     }
-  }, [ticketIdFromUrl, feedback]);
+  }, [ticketIdFromUrl, deepLinkTicketBucket]);
 
   // Clear new-ticket highlight after animation completes (1.2s).
   useEffect(() => {
@@ -559,19 +713,20 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const selectedIndex = stableCanonicalFeedback.findIndex((f) => f.id === effectiveSelectedId);
 
+  const preloadNextScreenshotUrl =
+    selectedIndex >= 0 ? stableScopedFeedback[selectedIndex + 1]?.screenshotUrl ?? "" : "";
+  const preloadNext2ScreenshotUrl =
+    selectedIndex >= 0 ? stableScopedFeedback[selectedIndex + 2]?.screenshotUrl ?? "" : "";
+
   // Preload only the next 1-2 ticket screenshots from the current selection.
   useEffect(() => {
-    if (selectedIndex === -1) return;
-    const nextItems = [
-      stableScopedFeedback[selectedIndex + 1],
-      stableScopedFeedback[selectedIndex + 2],
-    ].filter(Boolean);
-    nextItems.forEach((item) => {
-      const url = item?.screenshotUrl;
-      if (!url) return;
-      preloadImage(url, preloadedScreenshotUrlsRef.current);
-    });
-  }, [selectedIndex, stableScopedFeedback]);
+    if (preloadNextScreenshotUrl) {
+      preloadImage(preloadNextScreenshotUrl, preloadedScreenshotUrlsRef.current);
+    }
+    if (preloadNext2ScreenshotUrl) {
+      preloadImage(preloadNext2ScreenshotUrl, preloadedScreenshotUrlsRef.current);
+    }
+  }, [selectedIndex, preloadNextScreenshotUrl, preloadNext2ScreenshotUrl]);
 
   const contextualPosition = useMemo(() => {
     if (!effectiveSelectedId) return { index: 0, total: -1 };
@@ -648,7 +803,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     async (id: string, archived: boolean) => {
       if (id !== sessionId) return;
       assertIdentityResolved(isIdentityResolved);
-      const snapshot = session;
+      const snapshot = sessionRef.current;
       if (snapshot) {
         setSession({ ...snapshot, archived, isArchived: archived });
       }
@@ -681,7 +836,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         if (snapshot) setSession(snapshot);
       }
     },
-    [sessionId, session, router, isIdentityResolved, showToast]
+    [sessionId, router, isIdentityResolved, showToast]
   );
 
   const handleRequestDeleteSessionFromMenu = useCallback((session: Session) => {
@@ -1036,16 +1191,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   };
 
   const handleSessionTitleBlur = useCallback(async () => {
-    if (!sessionId || !session) return;
+    const s = sessionRef.current;
+    if (!sessionId || !s) return;
     const trimmed = sessionTitleDraft.trim();
-    const prevDisplay = (session.title ?? "").trim();
+    const prevDisplay = (s.title ?? "").trim();
     const safeTitle = trimmed;
     if (safeTitle === prevDisplay) {
       setIsEditingSessionTitle(false);
       setSessionTitleDraft(prevDisplay);
       return;
     }
-    const previousTitle = session.title ?? "";
+    const previousTitle = s.title ?? "";
     setSession((prev: Session | null) =>
       prev ? ({ ...prev, title: safeTitle } as Session) : prev
     );
@@ -1105,13 +1261,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       );
       setSessionTitleDraft((previousTitle || "").trim());
     }
-  }, [sessionId, session, sessionTitleDraft, isIdentityResolved, showToast]);
+  }, [sessionId, sessionTitleDraft, isIdentityResolved, showToast]);
 
   const handleMarkAllResolved = useCallback(async () => {
     assertIdentityResolved(isIdentityResolved);
-    const active = feedback.filter((item) => getTicketStatus(item) === "open");
+    const feedbackList = feedbackRef.current;
+    const active = feedbackList.filter((item) => getTicketStatus(item) === "open");
     if (active.length === 0) return;
-    const previousById = new Map(feedback.map((item) => [item.id, item]));
+    const previousById = new Map(feedbackList.map((item) => [item.id, item]));
     setFeedback((prev) =>
       prev.map((item) =>
         getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
@@ -1159,13 +1316,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       );
       showToast("Could not resolve all tickets");
     }
-  }, [feedback, sessionId, setFeedback, isIdentityResolved, showToast]);
+  }, [sessionId, setFeedback, isIdentityResolved, showToast]);
 
   const handleMarkAllUnresolved = useCallback(async () => {
     assertIdentityResolved(isIdentityResolved);
-    const resolved = feedback.filter((item) => getTicketStatus(item) === "resolved");
+    const feedbackList = feedbackRef.current;
+    const resolved = feedbackList.filter((item) => getTicketStatus(item) === "resolved");
     if (resolved.length === 0) return;
-    const previousById = new Map(feedback.map((item) => [item.id, item]));
+    const previousById = new Map(feedbackList.map((item) => [item.id, item]));
     setFeedback((prev) =>
       prev.map((item) =>
         getTicketStatus(item) === "resolved"
@@ -1215,7 +1373,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       );
       showToast("Could not reopen all tickets");
     }
-  }, [feedback, sessionId, setFeedback, isIdentityResolved, showToast]);
+  }, [sessionId, setFeedback, isIdentityResolved, showToast]);
 
   const handleDeleteFeedback = async (id: string) => {
     assertIdentityResolved(isIdentityResolved);
@@ -1275,7 +1433,73 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   };
 
   const canDeleteSelectedTicket =
-    Boolean(authUid) && selectedItem != null && sessionAccess?.canResolve === true;
+    Boolean(authUid) && selectedItem != null && sessionAccess?.canDeleteTicket === true;
+
+  if (accessBlocked) {
+    return (
+      <div className="flex h-full min-h-[50vh] w-full items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <h2 className="text-[20px] font-semibold text-[hsl(var(--text-primary-strong))]">
+            Access restricted
+          </h2>
+          <p className="mt-3 text-[14px] text-[hsl(var(--text-secondary-soft))]">
+            Sign in or request access to view this session.
+          </p>
+          <button
+            type="button"
+            className="mt-6 rounded-lg border border-[hsl(var(--border-subtle))] bg-[hsl(var(--surface-elevated))] px-4 py-2 text-[14px] font-medium text-[hsl(var(--text-primary-strong))]"
+          >
+            Request access
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (sessionFetchError === "forbidden") {
+    return (
+      <div className="flex h-full min-h-[50vh] w-full items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <h1 className="text-[20px] font-semibold text-[hsl(var(--text-primary-strong))]">
+            Access denied
+          </h1>
+          <p className="mt-3 text-[14px] text-[hsl(var(--text-secondary-soft))]">
+            You don&apos;t have permission to view this session.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (sessionFetchError === "not_found") {
+    return (
+      <div className="flex h-full min-h-[50vh] w-full items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <h1 className="text-[20px] font-semibold text-[hsl(var(--text-primary-strong))]">
+            Session not found
+          </h1>
+          <p className="mt-3 text-[14px] text-[hsl(var(--text-secondary-soft))]">
+            This link may be invalid or the session was removed.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (sessionFetchError === "error") {
+    return (
+      <div className="flex h-full min-h-[50vh] w-full items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <h1 className="text-[20px] font-semibold text-[hsl(var(--text-primary-strong))]">
+            Couldn&apos;t load session
+          </h1>
+          <p className="mt-3 text-[14px] text-[hsl(var(--text-secondary-soft))]">
+            Check your connection and try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const renderExecutionContent = () => {
     if (stableScopedFeedback.length === 0) {
@@ -1332,6 +1556,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         onDelete={
           canDeleteSelectedTicket ? () => setShowDeleteModal(true) : undefined
         }
+        readOnly={
+          sessionAccess == null
+            ? true
+            : !sessionAccess.canComment && !sessionAccess.canResolve
+        }
+        readOnlyPermissions={{
+          canComment: sessionAccess?.canComment === true,
+          canResolve: sessionAccess?.canResolve === true,
+        }}
       />
     );
   };
@@ -1348,19 +1581,28 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               resolved: feedbackResolvedCount,
             }}
             countsLoading={!isCountsSynced || feedbackCountsLoading}
-            isEditingSessionTitle={isEditingSessionTitle}
-            sessionTitleDraft={sessionTitleDraft}
-            onSessionTitleChange={setSessionTitleDraft}
-            onSessionTitleSave={handleSessionTitleBlur}
-            onSessionTitleCancel={() => {
-              setIsEditingSessionTitle(false);
-              setSessionTitleDraft((session?.title ?? "").trim());
-            }}
-            onSessionTitleEdit={() => {
-              setSessionTitleDraft((session?.title ?? "").trim());
-              setIsEditingSessionTitle(true);
-            }}
-            saveSessionTitleSuccess={saveSessionTitleSuccess}
+            {...(isAnonymousViewer
+              ? {
+                  showTicketSearch: sessionAccess?.canView === true,
+                  showSessionOverflowMenu: false,
+                }
+              : {
+                  isEditingSessionTitle,
+                  sessionTitleDraft,
+                  onSessionTitleChange: setSessionTitleDraft,
+                  onSessionTitleSave: handleSessionTitleBlur,
+                  onSessionTitleCancel: () => {
+                    setIsEditingSessionTitle(false);
+                    setSessionTitleDraft((session?.title ?? "").trim());
+                  },
+                  onSessionTitleEdit: () => {
+                    setSessionTitleDraft((session?.title ?? "").trim());
+                    setIsEditingSessionTitle(true);
+                  },
+                  saveSessionTitleSuccess,
+                  onMarkAllTicketsResolved: handleMarkAllResolved,
+                  onMarkAllTicketsUnresolved: handleMarkAllUnresolved,
+                })}
             items={stableScopedFeedback}
             selectedId={effectiveSelectedId}
             onSelect={setSelectedId}
@@ -1370,8 +1612,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             hasReachedLimit={feedbackReachedLimit}
             loadMoreRef={feedbackLoadMoreRef}
             scrollContainerRef={listScrollRef}
-            onMarkAllTicketsResolved={handleMarkAllResolved}
-            onMarkAllTicketsUnresolved={handleMarkAllUnresolved}
             scrollToId={ticketIdFromUrl}
             openExpanded={openExpanded}
             onOpenExpandedChange={onOpenExpandedChange}
@@ -1396,6 +1636,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             onSessionRenameSuccess={handleSessionRenameFromMenu}
             onSetSessionArchived={handleSetSessionArchivedFromMenu}
             onRequestDeleteSession={handleRequestDeleteSessionFromMenu}
+            publicViewer={isAnonymousViewer}
           />
           <div className="flex flex-1 min-h-0 min-w-0">
             <main className="surface-main flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
@@ -1462,19 +1703,28 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 resolved: feedbackResolvedCount,
               }}
               countsLoading={!isCountsSynced || feedbackCountsLoading}
-              isEditingSessionTitle={isEditingSessionTitle}
-              sessionTitleDraft={sessionTitleDraft}
-              onSessionTitleChange={setSessionTitleDraft}
-              onSessionTitleSave={handleSessionTitleBlur}
-              onSessionTitleCancel={() => {
-                setIsEditingSessionTitle(false);
-                setSessionTitleDraft((session?.title ?? "").trim());
-              }}
-              onSessionTitleEdit={() => {
-                setSessionTitleDraft((session?.title ?? "").trim());
-                setIsEditingSessionTitle(true);
-              }}
-              saveSessionTitleSuccess={saveSessionTitleSuccess}
+              {...(isAnonymousViewer
+                ? {
+                    showTicketSearch: sessionAccess?.canView === true,
+                    showSessionOverflowMenu: false,
+                  }
+                : {
+                    isEditingSessionTitle,
+                    sessionTitleDraft,
+                    onSessionTitleChange: setSessionTitleDraft,
+                    onSessionTitleSave: handleSessionTitleBlur,
+                    onSessionTitleCancel: () => {
+                      setIsEditingSessionTitle(false);
+                      setSessionTitleDraft((session?.title ?? "").trim());
+                    },
+                    onSessionTitleEdit: () => {
+                      setSessionTitleDraft((session?.title ?? "").trim());
+                      setIsEditingSessionTitle(true);
+                    },
+                    saveSessionTitleSuccess,
+                    onMarkAllTicketsResolved: handleMarkAllResolved,
+                    onMarkAllTicketsUnresolved: handleMarkAllUnresolved,
+                  })}
               items={stableScopedFeedback}
               selectedId={effectiveSelectedId}
               onSelect={(id) => {
@@ -1487,8 +1737,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               hasReachedLimit={feedbackReachedLimit}
               loadMoreRef={feedbackLoadMoreRef}
               scrollContainerRef={listScrollRef}
-              onMarkAllTicketsResolved={handleMarkAllResolved}
-              onMarkAllTicketsUnresolved={handleMarkAllUnresolved}
               scrollToId={ticketIdFromUrl}
               openExpanded={openExpanded}
               onOpenExpandedChange={onOpenExpandedChange}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { authFetch } from "@/lib/authFetch";
 import type { PlanId } from "@/lib/billing/plans";
 
 export interface PlanCatalogItem {
@@ -35,7 +36,10 @@ export function usePlanCatalog(): UsePlanCatalogResult {
     setLoading(true);
     setError(null);
 
-    fetch(CATALOG_API, { cache: "no-store" })
+    (async () => {
+      const authed = await authFetch(CATALOG_API);
+      return authed ?? fetch(CATALOG_API, { cache: "no-store" });
+    })()
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to load plans"))))
       .then((data: PlanCatalogItem[]) => {
         if (!cancelled) {

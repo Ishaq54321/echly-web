@@ -651,43 +651,6 @@ export async function getSessionFeedbackPageWithStringCursorRepo(
   };
 }
 
-/** Safety cap for unauthenticated public share reads (cost / abuse bound). */
-const PUBLIC_SHARE_FEEDBACK_PAGE_SIZE = 100;
-const PUBLIC_SHARE_FEEDBACK_MAX = 10_000;
-
-/**
- * All non-deleted feedback for a session using session-scoped pagination only (no workspace / user).
- * Same underlying path as {@link getSessionFeedbackPageWithStringCursorRepo}; not the user-scoped query
- * that requires `userId` from auth.
- */
-export async function getAllFeedbackForPublicShareBySessionIdRepo(
-  sessionId: string
-): Promise<Feedback[]> {
-  const out: Feedback[] = [];
-  let cursor: QueryDocumentSnapshot | null = null;
-
-  while (out.length < PUBLIC_SHARE_FEEDBACK_MAX) {
-    let q: FirebaseFirestore.Query = adminDb
-      .collection("feedback")
-      .where("sessionId", "==", sessionId)
-      .orderBy("createdAt", "desc");
-    if (cursor) q = q.startAfter(cursor);
-    const snapshot = await q.limit(PUBLIC_SHARE_FEEDBACK_PAGE_SIZE).get();
-    if (snapshot.empty) break;
-
-    const rows = omitSoftDeletedFeedback(snapshot.docs.map(docToFeedback));
-    for (const row of rows) {
-      if (out.length >= PUBLIC_SHARE_FEEDBACK_MAX) break;
-      out.push(row);
-    }
-
-    if (snapshot.size < PUBLIC_SHARE_FEEDBACK_PAGE_SIZE) break;
-    cursor = snapshot.docs[snapshot.docs.length - 1] as QueryDocumentSnapshot;
-  }
-
-  return out.slice(0, PUBLIC_SHARE_FEEDBACK_MAX);
-}
-
 /**
  * Session-scoped feedback page (newest first). Permission enforced at API via {@link getAccessContext}.
  * Composite index: feedback (sessionId ASC, createdAt DESC) or (sessionId ASC, status ASC, createdAt DESC).

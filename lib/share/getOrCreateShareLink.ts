@@ -10,7 +10,8 @@ export type GetOrCreateShareLinkParams = {
 
 /**
  * Ensures an active `share_links` row exists for the session (server-side), then returns
- * `${origin}/s/${token}`. `userId` must match the signed-in user (enforced server-side via Bearer token).
+ * `${origin}/session/${sessionId}?shareToken=...` for anonymous-capable links.
+ * `userId` must match the signed-in user (enforced server-side via Bearer token).
  */
 export async function getOrCreateShareLink({
   sessionId,
@@ -51,5 +52,5 @@ export async function getOrCreateShareLink({
     throw new Error("Invalid share-link response");
   }
 
-  return `${base}/s/${encodeURIComponent(token)}`;
+  return `${base}/session/${encodeURIComponent(sid)}?shareToken=${encodeURIComponent(token)}`;
 }

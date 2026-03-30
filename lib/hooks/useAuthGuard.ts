@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { User } from "firebase/auth";
+import { usePathname } from "next/navigation";
 import {
   useWorkspace,
   type WorkspaceContextValue,
@@ -12,6 +13,11 @@ type UseAuthGuardOptions = {
   router?: { push: (url: string) => void; replace: (url: string) => void };
   /** Use replace instead of push for login redirect. Default false. */
   useReplace?: boolean;
+  /**
+   * When true, signed-out users are not sent to /login (caller handles public UI).
+   * `/session/*` skips redirect automatically so anonymous viewers can load the page.
+   */
+  skipLoginRedirect?: boolean;
 };
 
 function compatUser(ws: WorkspaceContextValue): User | null {
@@ -32,13 +38,16 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): {
   user: User | null;
   loading: boolean;
 } {
-  const { router, useReplace = false } = options;
+  const { router, useReplace = false, skipLoginRedirect = false } = options;
+  const pathname = usePathname();
+  const publicSessionSurface =
+    typeof pathname === "string" && pathname.startsWith("/session/");
   const ws = useWorkspace();
   const user = compatUser(ws);
   const loading = !ws.authReady;
 
   useEffect(() => {
-    if (!router || loading) return;
+    if (!router || loading || skipLoginRedirect || publicSessionSurface) return;
     if (user == null) {
       if (useReplace) {
         router.replace("/login");
@@ -46,7 +55,7 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): {
         router.push("/login");
       }
     }
-  }, [router, useReplace, loading, user]);
+  }, [router, useReplace, loading, user, skipLoginRedirect, publicSessionSurface]);
 
   return { user, loading };
 }

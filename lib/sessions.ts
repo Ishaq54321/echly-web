@@ -21,10 +21,14 @@ export async function recordSessionViewIfNew(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ viewerId }),
   });
-  if (!res) throw new Error("Not authenticated");
+  if (!res) return;
+  if (res.status === 401) {
+    // anonymous viewer — skip silently
+    return;
+  }
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
-    throw new Error(msg || "Failed to record session view");
+    console.warn("recordSessionView failed:", msg);
   }
 }
 

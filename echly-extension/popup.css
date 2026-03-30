@@ -511,9 +511,6 @@
   .z-\[45\] {
     z-index: 45;
   }
-  .z-\[60\] {
-    z-index: 60;
-  }
   .z-\[100\] {
     z-index: 100;
   }
@@ -882,14 +879,8 @@
   .h-\[60px\] {
     height: 60px;
   }
-  .h-\[68px\] {
-    height: 68px;
-  }
   .h-\[90px\] {
     height: 90px;
-  }
-  .h-\[100dvh\] {
-    height: 100dvh;
   }
   .h-\[120px\] {
     height: 120px;
@@ -990,9 +981,6 @@
   .min-h-\[60px\] {
     min-height: 60px;
   }
-  .min-h-\[70vh\] {
-    min-height: 70vh;
-  }
   .min-h-\[73px\] {
     min-height: 73px;
   }
@@ -1031,9 +1019,6 @@
   }
   .min-h-\[920px\] {
     min-height: 920px;
-  }
-  .min-h-full {
-    min-height: 100%;
   }
   .min-h-screen {
     min-height: 100vh;
@@ -1872,9 +1857,6 @@
   .border-\[\#D1D5DB\] {
     border-color: #D1D5DB;
   }
-  .border-\[\#D7E8FF\] {
-    border-color: #D7E8FF;
-  }
   .border-\[\#E2E8F0\] {
     border-color: #E2E8F0;
   }
@@ -1890,23 +1872,17 @@
   .border-\[\#E7ECF2\] {
     border-color: #E7ECF2;
   }
-  .border-\[\#E8EDF3\] {
-    border-color: #E8EDF3;
-  }
   .border-\[\#EAEAEA\] {
     border-color: #EAEAEA;
-  }
-  .border-\[\#EDF1F5\] {
-    border-color: #EDF1F5;
-  }
-  .border-\[\#EEF2F6\] {
-    border-color: #EEF2F6;
   }
   .border-\[\#e5e7eb\] {
     border-color: #e5e7eb;
   }
   .border-\[hsl\(var\(--border\)\)\] {
     border-color: hsl(var(--border));
+  }
+  .border-\[hsl\(var\(--border-subtle\)\)\] {
+    border-color: hsl(var(--border-subtle));
   }
   .border-\[hsl\(var\(--text-primary-strong\)\)\] {
     border-color: hsl(var(--text-primary-strong));
@@ -2085,9 +2061,6 @@
   .bg-\[\#EEF3FF\] {
     background-color: #EEF3FF;
   }
-  .bg-\[\#EEF5FF\] {
-    background-color: #EEF5FF;
-  }
   .bg-\[\#EFF6FF\] {
     background-color: #EFF6FF;
   }
@@ -2109,20 +2082,11 @@
   .bg-\[\#F8FAFC\] {
     background-color: #F8FAFC;
   }
-  .bg-\[\#FAFAFA\] {
-    background-color: #FAFAFA;
-  }
   .bg-\[\#FAFBFC\] {
     background-color: #FAFBFC;
   }
   .bg-\[\#FBFBFB\] {
     background-color: #FBFBFB;
-  }
-  .bg-\[\#FBFCFD\] {
-    background-color: #FBFCFD;
-  }
-  .bg-\[\#FCFDFE\] {
-    background-color: #FCFDFE;
   }
   .bg-\[\#FEF2F2\] {
     background-color: #FEF2F2;
@@ -2144,6 +2108,9 @@
   }
   .bg-\[hsl\(var\(--surface-2\)\)\] {
     background-color: hsl(var(--surface-2));
+  }
+  .bg-\[hsl\(var\(--surface-elevated\)\)\] {
+    background-color: hsl(var(--surface-elevated));
   }
   .bg-\[hsl\(var\(--text-active\)\)\] {
     background-color: hsl(var(--text-active));
@@ -3416,6 +3383,9 @@
   .line-through {
     text-decoration-line: line-through;
   }
+  .no-underline {
+    text-decoration-line: none;
+  }
   .underline {
     text-decoration-line: underline;
   }
@@ -3578,10 +3548,6 @@
   }
   .shadow-\[0_20px_60px_rgba\(0\,0\,0\,0\.25\)\] {
     --tw-shadow: 0 20px 60px var(--tw-shadow-color, rgba(0,0,0,0.25));
-    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-  }
-  .shadow-\[1px_0_0_rgba\(15\,23\,42\,0\.02\)\] {
-    --tw-shadow: 1px 0 0 var(--tw-shadow-color, rgba(15,23,42,0.02));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
   .shadow-\[var\(--elevation-1\)\] {
@@ -4226,13 +4192,6 @@
       }
     }
   }
-  .hover\:bg-\[\#F4F6F8\] {
-    &:hover {
-      @media (hover: hover) {
-        background-color: #F4F6F8;
-      }
-    }
-  }
   .hover\:bg-\[\#F5F7F6\] {
     &:hover {
       @media (hover: hover) {
@@ -4586,13 +4545,6 @@
     &:hover {
       @media (hover: hover) {
         color: #0F172A;
-      }
-    }
-  }
-  .hover\:text-\[\#111827\] {
-    &:hover {
-      @media (hover: hover) {
-        color: #111827;
       }
     }
   }
@@ -5186,11 +5138,6 @@
       opacity: 60%;
     }
   }
-  .sm\:inline-flex {
-    @media (width >= 40rem) {
-      display: inline-flex;
-    }
-  }
   .sm\:max-h-\[85vh\] {
     @media (width >= 40rem) {
       max-height: 85vh;
@@ -5224,11 +5171,6 @@
   .sm\:justify-end {
     @media (width >= 40rem) {
       justify-content: flex-end;
-    }
-  }
-  .sm\:px-6 {
-    @media (width >= 40rem) {
-      padding-inline: calc(var(--spacing) * 6);
     }
   }
   .sm\:text-2xl {

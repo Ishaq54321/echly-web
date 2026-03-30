@@ -3,7 +3,7 @@ import { withAuthorization } from "@/lib/server/auth/withAuthorization";
 
 /**
  * POST /api/admin/workspaces/actions
- * Obsolete endpoint: disabled for safety during userId migration.
+ * Obsolete endpoint: disabled.
  */
 export const POST = withAuthorization(
   "update_session",

@@ -1,4 +1,5 @@
 import { auth } from "@/lib/firebase";
+import { getShareToken } from "@/lib/client/shareToken";
 
 function echlyPerfEnabled(): boolean {
   return (
@@ -55,27 +56,38 @@ export async function authFetch(
   input: RequestInfo | URL,
   init: AuthFetchInit = {}
 ): Promise<Response | null> {
+  const shareToken = getShareToken()?.trim() ?? "";
   const user = auth.currentUser;
-
-  if (!user) {
-    return null;
-  }
 
   const perf = echlyPerfEnabled();
   const clientStart = perf ? performance.now() : 0;
   if (perf) {
     console.log("[ECHLY_PERF] CLIENT authFetch start", clientStart);
-    console.log("[ECHLY_PERF] TOKEN START");
-  }
-  const tokenStart = perf ? performance.now() : 0;
-  const token = await getIdTokenFresh(user);
-  const tokenMs = perf ? performance.now() - tokenStart : 0;
-  if (perf) {
-    console.log("[ECHLY_PERF] TOKEN END", tokenMs.toFixed(1), "ms");
   }
 
   const headers = new Headers(init.headers || {});
-  headers.set("Authorization", `Bearer ${token}`);
+
+  let tokenMs = 0;
+  /** Signed-in users always use Bearer so a stale sessionStorage share token cannot override auth. */
+  if (user) {
+    if (perf) {
+      console.log("[ECHLY_PERF] TOKEN START");
+    }
+    const tokenStart = perf ? performance.now() : 0;
+    const token = await getIdTokenFresh(user);
+    tokenMs = perf ? performance.now() - tokenStart : 0;
+    if (perf) {
+      console.log("[ECHLY_PERF] TOKEN END", tokenMs.toFixed(1), "ms");
+    }
+    headers.set("Authorization", `Bearer ${token}`);
+  } else if (shareToken !== "") {
+    headers.set("x-share-token", shareToken);
+    if (perf) {
+      console.log("[ECHLY_PERF] share token header set (no Firebase id token)");
+    }
+  } else {
+    return null;
+  }
 
   const timeoutMs = init.timeout !== undefined ? init.timeout : DEFAULT_TIMEOUT_MS;
   const { timeout: _t, ...restInit } = init;

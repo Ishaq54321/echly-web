@@ -1386,7 +1386,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               });
               await new Promise((r) => setTimeout(r, 50));
               if (sessionId) {
-                const url = `${APP_ORIGIN}/dashboard/${sessionId}`;
+                const url = `${APP_ORIGIN}/session/${sessionId}`;
                 chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch((err) =>
                   logSendMessageRejection("ECHLY_OPEN_TAB (session mode end)", err)
                 );

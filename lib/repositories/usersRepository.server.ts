@@ -116,7 +116,15 @@ export async function ensureUserRepo(user: UserLike): Promise<void> {
   );
 }
 
+/** UIDs minted by {@link createShareAuthToken} — no `users/{uid}` workspace row; API must not load workspace by user. */
+export function isShareAuthUid(uid: string): boolean {
+  return typeof uid === "string" && uid.startsWith("share_");
+}
+
 export async function getUserWorkspaceIdRepo(uid: string): Promise<string> {
+  if (isShareAuthUid(uid)) {
+    return "";
+  }
   const snap = await adminDb.doc(`users/${uid}`).get();
   if (!snap.exists) {
     throw new Error(MISSING_USER_WORKSPACE_ERROR);

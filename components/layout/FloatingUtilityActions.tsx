@@ -6,12 +6,14 @@ import { GlobalHeader } from "@/components/layout/GlobalHeader";
 export function FloatingUtilityActions() {
   const pathname = usePathname();
   const pathSegments = (pathname ?? "").split("/").filter(Boolean);
-  const isDashboardSessionRoute =
-    pathSegments[0] === "dashboard" &&
-    pathSegments.length >= 2 &&
-    !["sessions", "insights"].includes(pathSegments[1]);
+  /** Session detail / overview: session chrome (e.g. TopControlBar) replaces global header. */
+  const isSessionFocusedView =
+    (pathname ?? "").startsWith("/session/") ||
+    (pathSegments[0] === "dashboard" &&
+      pathSegments.length >= 2 &&
+      !["sessions", "insights"].includes(pathSegments[1]));
 
-  if (isDashboardSessionRoute) {
+  if (isSessionFocusedView) {
     return null;
   }
 

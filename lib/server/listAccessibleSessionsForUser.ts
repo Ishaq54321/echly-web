@@ -4,6 +4,10 @@ import { getAccessContext } from "@/lib/access/getAccessContext";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import type { Session } from "@/lib/domain/session";
 import { assertQueryLimit } from "@/lib/querySafety";
+import {
+  getUserWorkspaceIdRepo,
+  isShareAuthUid,
+} from "@/lib/repositories/usersRepository.server";
 
 const SHARE_EMAIL_LOOKUP_LIMIT = 100;
 const DEFAULT_CREATED_BY_LIMIT = 80;
@@ -20,8 +24,8 @@ function updatedAtMs(session: Session): number {
 }
 
 /**
- * Candidate session ids: created by the user plus email shares. Each row is kept only if
- * {@link getAccessContext} grants `canView` (single permission path).
+ * Candidate session ids: created by the user, sessions in the user's workspace, plus email shares.
+ * Each row is kept only if {@link getAccessContext} grants `capabilities.canView` (single path).
  */
 export async function listAccessibleSessionsForUser(args: {
   userId: string;
@@ -38,6 +42,7 @@ export async function listAccessibleSessionsForUser(args: {
 
   const uid = args.userId.trim();
   if (!uid) return [];
+  if (isShareAuthUid(uid)) return [];
 
   const ids = new Set<string>();
 
@@ -48,6 +53,15 @@ export async function listAccessibleSessionsForUser(args: {
     .limit(createdByLimit)
     .get();
   for (const d of createdSnap.docs) ids.add(d.id);
+
+  const workspaceId = await getUserWorkspaceIdRepo(uid);
+  const workspaceSnap = await adminDb
+    .collection("sessions")
+    .where("workspaceId", "==", workspaceId)
+    .orderBy("updatedAt", "desc")
+    .limit(createdByLimit)
+    .get();
+  for (const d of workspaceSnap.docs) ids.add(d.id);
 
   const email =
     typeof args.userEmail === "string" ? args.userEmail.trim().toLowerCase() : "";
@@ -72,7 +86,7 @@ export async function listAccessibleSessionsForUser(args: {
         sessionId,
         user: userPayload,
       });
-      if (!access?.canView || !session) return null;
+      if (!access?.capabilities.canView || !session) return null;
       return session;
     })
   );

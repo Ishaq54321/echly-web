@@ -65,7 +65,7 @@ function OverviewSessionHeader({
           {copyBusy ? "" : copied ? "Copied" : "Share"}
         </button>
         <Link
-          href={`/dashboard/${sessionId}`}
+          href={`/session/${sessionId}`}
           className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg bg-brand-primary text-white hover:opacity-90 transition-colors duration-200 ease-out font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
         >
           <LayoutPanelLeft size={14} />
@@ -360,13 +360,13 @@ export default function SessionOverviewPage() {
                   label="Open"
                   count={countsByStatus.open}
                   items={statusPreview.open}
-                  viewAllHref={`/dashboard/${sessionId}`}
+                  viewAllHref={`/session/${sessionId}`}
                 />
                 <StatusSection
                   label="Done"
                   count={countsByStatus.resolved}
                   items={statusPreview.resolved}
-                  viewAllHref={`/dashboard/${sessionId}`}
+                  viewAllHref={`/session/${sessionId}`}
                 />
               </div>
             </div>

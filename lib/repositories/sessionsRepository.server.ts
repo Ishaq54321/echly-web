@@ -2,8 +2,14 @@ import "server-only";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { assertQueryLimit } from "@/lib/querySafety";
-import type { Session, SessionCreatedBy } from "@/lib/domain/session";
+import type {
+  Session,
+  SessionCreatedBy,
+  SessionGeneralAccess,
+} from "@/lib/domain/session";
+import { normalizeGeneralAccess } from "@/lib/domain/session";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
+import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
 import type { Workspace } from "@/lib/domain/workspace";
 import { deleteAllCommentsForSessionRepo } from "@/lib/repositories/commentsRepository.server";
 import { deleteAllFeedbackForSessionRepo } from "@/lib/repositories/feedbackRepository.server";
@@ -50,6 +56,8 @@ export async function createSessionRepo(
     totalCount: 0,
     feedbackCount: 0,
     accessLevel: "view",
+    generalAccess: "restricted",
+    hasConfiguredShare: false,
   };
 
   await adminDb.runTransaction(async (tx) => {
@@ -68,7 +76,7 @@ export async function createSessionRepo(
 /**
  * Returns the number of *active* sessions in a workspace (active = sessionCount - archivedCount).
  * When workspace is provided and has sessionCount/archivedCount, uses those (instant).
- * Otherwise falls back to Firestore count queries (slow; temporary until workspaces are backfilled).
+ * Otherwise uses Firestore count queries (slower).
  */
 export async function getWorkspaceSessionCountRepo(
   workspaceId: string,
@@ -83,7 +91,6 @@ export async function getWorkspaceSessionCountRepo(
     return active;
   }
 
-  // Fallback: count queries (temporary until workspace.sessionCount/archivedCount are backfilled)
   const [allSnap, archivedSnap] = await Promise.all([
     adminDb.collection("sessions").where("workspaceId", "==", workspaceId).count().get(),
     adminDb
@@ -105,9 +112,13 @@ export async function getSessionByIdRepo(
   const snap = await adminDb.doc(`sessions/${sessionId}`).get();
   if (!snap.exists) return null;
 
+  const data = snap.data() as SessionDoc;
   return {
     id: snap.id,
-    ...(snap.data() as SessionDoc),
+    ...data,
+    accessLevel: normalizeAccessLevel(data.accessLevel ?? "view"),
+    generalAccess: normalizeGeneralAccess(data.generalAccess),
+    hasConfiguredShare: data.hasConfiguredShare === true,
   };
 }
 
@@ -127,6 +138,16 @@ export async function updateSessionAccessLevelRepo(
 ): Promise<void> {
   await adminDb.doc(`sessions/${sessionId}`).update({
     accessLevel,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
+export async function updateSessionGeneralAccessRepo(
+  sessionId: string,
+  generalAccess: SessionGeneralAccess
+): Promise<void> {
+  await adminDb.doc(`sessions/${sessionId}`).update({
+    generalAccess,
     updatedAt: FieldValue.serverTimestamp(),
   });
 }

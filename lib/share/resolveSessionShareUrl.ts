@@ -20,7 +20,7 @@ function trimUrlCache(): void {
 }
 
 /**
- * Resolves the canonical share URL `${origin}/s/${token}`, deduping concurrent
+ * Resolves `${origin}/session/:id?shareToken=...` after ensuring a share link exists, deduping concurrent
  * and repeat calls for the same session in one page lifetime.
  */
 export async function resolveSessionShareUrl(

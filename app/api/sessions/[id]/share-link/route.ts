@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 /** POST /api/sessions/:id/share-link — return existing active token or create one (comment access). */
 export const POST = withAuthorization(
   "update_session",
-  async (_req: Request, ctx: HandlerContext, { user, userWorkspaceId }) => {
+  async (req: Request, ctx: HandlerContext, { user, userWorkspaceId }) => {
     const id = await routeParamId(ctx);
     const sessionId = typeof id === "string" ? id.trim() : "";
     if (!sessionId) {
@@ -24,13 +24,16 @@ export const POST = withAuthorization(
     const session = ctx.preloaded.session as Session | null;
 
     const accessCtx = await buildRequestContext({
-      userId: user.uid,
-      userEmail: user.email,
+      req,
+      authenticatedUser: user,
       userWorkspaceId,
       sessionId,
       session,
     });
-    if (!accessCtx.access?.canComment) {
+    if (!accessCtx.access?.capabilities.canView) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+    if (!accessCtx.access?.capabilities.canComment) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
     if (!accessCtx.session) {
@@ -49,11 +52,11 @@ export const POST = withAuthorization(
     }
   },
   {
-    resolveWorkspace: async (_req, user, ctx, viewerWorkspaceId) => {
+    resolveWorkspace: async (req, user, ctx, viewerWorkspaceId) => {
       const sid = await routeParamId(ctx);
       const context = await buildRequestContext({
-        userId: user.uid,
-        userEmail: user.email,
+        req,
+        authenticatedUser: user,
         userWorkspaceId: viewerWorkspaceId,
         sessionId: sid?.trim() || undefined,
       });

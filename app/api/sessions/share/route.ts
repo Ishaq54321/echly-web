@@ -49,12 +49,18 @@ export async function POST(req: Request) {
   }
 
   const context = await buildRequestContext({
-    userId: user.uid,
-    userEmail: user.email,
+    req,
+    authenticatedUser: user,
     sessionId,
   });
-  if (!context.access?.canComment) {
+  if (!context.access?.capabilities.canView) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
+  if (!context.access?.capabilities.canComment) {
+    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
+  if (!context.session) {
+    return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
 
   try {

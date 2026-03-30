@@ -1,7 +1,4 @@
-/**
- * Canonical path for the session feedback board (`/session/:sessionId`).
- * Legacy `/dashboard/:sessionId` remains valid; keep app routes in sync.
- */
+/** Canonical path for the session feedback board (`/session/:sessionId`). */
 export const SESSION_FEEDBACK_PATH = "/session";
 
 export function getSessionLink(sessionId: string | undefined | null): string {

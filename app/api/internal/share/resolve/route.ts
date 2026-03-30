@@ -5,10 +5,14 @@ import { resolveShareToken } from "@/lib/server/shareTokenResolver";
 export const dynamic = "force-dynamic";
 
 /**
- * TEMPORARY: GET /api/internal/share/resolve?token=...
- * Authenticated-only debug endpoint to test share token resolution.
+ * Dev-only: GET /api/internal/share/resolve?token=...
+ * Disabled in production.
  */
 export async function GET(req: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   try {
     await requireAuth(req);
   } catch (res) {

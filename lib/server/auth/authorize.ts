@@ -3,7 +3,6 @@ import { getAuth } from "firebase-admin/auth";
 import { requireAuth as requireLegacyAuth } from "@/lib/server/auth";
 import { logAuthDecision } from "@/lib/server/auth/logAuth";
 
-export type Role = "viewer" | "commentator" | "resolver";
 export type Action =
   | "read_feedback"
   | "create_feedback"
@@ -11,15 +10,6 @@ export type Action =
   | "resolve_feedback"
   | "delete_feedback"
   | "update_session";
-
-export const PERMISSIONS: Record<Action, Role[]> = {
-  read_feedback: ["viewer", "commentator", "resolver"],
-  create_feedback: ["commentator", "resolver"],
-  comment: ["commentator", "resolver"],
-  resolve_feedback: ["resolver"],
-  delete_feedback: ["resolver"],
-  update_session: ["resolver"],
-};
 
 function getBearerToken(req: Request): string | null {
   const authHeader = req.headers.get("Authorization") ?? req.headers.get("authorization");
@@ -39,6 +29,14 @@ export class AuthorizationError extends Error {
     this.name = "AuthorizationError";
     this.status = status;
     this.code = code;
+  }
+}
+
+/** No Bearer/session user and no share token — API handlers that require an identity should map this to 401. */
+export class UnauthorizedError extends Error {
+  constructor(message = "Unauthorized") {
+    super(message);
+    this.name = "UnauthorizedError";
   }
 }
 
@@ -97,6 +95,15 @@ export async function requireAuth(
   }
 }
 
+/** Same verification as {@link requireAuth} but never throws — used for optional-auth and unified access resolution. */
+export async function tryGetAuthUser(req: Request): Promise<AuthorizedRequestUser | null> {
+  try {
+    return await requireAuth(req);
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveUserScope(uid: string): Promise<string> {
   const userId = typeof uid === "string" ? uid.trim() : "";
   if (!userId) {
@@ -105,29 +112,16 @@ export async function resolveUserScope(uid: string): Promise<string> {
   return userId;
 }
 
-function normalizeRole(rawRole: unknown): Role {
-  if (rawRole === "viewer" || rawRole === "commentator" || rawRole === "resolver") {
-    return rawRole;
-  }
-  return "resolver";
-}
-
-export async function getUserRole(uid: string): Promise<Role> {
-  void uid;
-  // User-owned model: authenticated owner can perform all actions on owned resources.
-  return normalizeRole("resolver");
-}
-
 /**
  * Identity is already enforced by `requireAuth` / route handlers.
- * Resource access is enforced only via `resolveAccess` → `access.canX` in handlers.
+ * Resource access is enforced only via `getAccessContext` → `access.capabilities` in handlers.
  * Logs only — must not throw or block the request.
  */
 export async function authorize(input: {
   uid: string;
   action: Action | null;
   route?: string;
-}): Promise<{ role: Role }> {
+}): Promise<void> {
   if (!input.action) {
     await logAuthDecision({
       uid: input.uid,
@@ -136,30 +130,16 @@ export async function authorize(input: {
       allowed: true,
       reason: "skipAuthorization",
     });
-    return { role: "resolver" };
+    return;
   }
 
-  if (!PERMISSIONS[input.action]) {
-    await logAuthDecision({
-      uid: input.uid,
-      action: input.action,
-      route: input.route,
-      allowed: true,
-      reason: "unknownActionLoggedOnly",
-    });
-    return { role: "resolver" };
-  }
-
-  const role = await getUserRole(input.uid);
   await logAuthDecision({
     uid: input.uid,
     action: input.action,
     route: input.route,
     allowed: true,
     reason: "accessDelegatedToResolveAccess",
-    role,
   });
-  return { role };
 }
 
 export function toAuthorizationResponse(err: unknown): Response {
@@ -171,6 +151,16 @@ export function toAuthorizationResponse(err: unknown): Response {
         message: err.message,
       },
       { status: err.status }
+    );
+  }
+  if (err instanceof UnauthorizedError) {
+    return Response.json(
+      {
+        success: false,
+        error: "NOT_AUTHENTICATED",
+        message: err.message,
+      },
+      { status: 401 }
     );
   }
   return Response.json(

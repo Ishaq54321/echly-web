@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
-import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
+import { serializeFeedback } from "@/lib/server/serializeFeedback";
 import { getSessionFeedbackSearchCorpusForUserRepo } from "@/lib/repositories/feedbackRepository.server";
 import { getAccessContext } from "@/lib/access/getAccessContext";
 import { corsHeaders } from "@/lib/server/cors";
 import { verifyExtensionToken } from "@/lib/server/extensionAuth";
 import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
 import { getSessionUser } from "@/lib/server/session";
+import { extractShareToken } from "@/lib/server/shareTokenFromRequest";
 
 function unauthorized(): Response {
   return Response.json(
@@ -43,6 +44,14 @@ function peekJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+async function tryRequireAuthFast(req: NextRequest): Promise<AuthUser | null> {
+  try {
+    return await requireAuthFast(req);
+  } catch {
+    return null;
+  }
+}
+
 async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
   const extensionToken = req.headers.get("x-extension-token")?.trim() ?? "";
   const origin = req.headers.get("origin")?.toLowerCase() ?? "";
@@ -74,50 +83,6 @@ async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
   const sessionUser = await getSessionUser(req);
   if (sessionUser) return { uid: sessionUser.uid, email: sessionUser.email ?? undefined };
   throw unauthorized();
-}
-
-function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
-  const createdAt = item.createdAt as { toDate?: () => Date; seconds?: number } | null;
-  const createdAtOut =
-    createdAt != null && typeof createdAt.toDate === "function"
-      ? createdAt.toDate().toISOString()
-      : null;
-
-  const lastCommentAt = item.lastCommentAt as { toDate?: () => Date; seconds?: number } | null | undefined;
-  const lastCommentAtOut =
-    lastCommentAt != null && typeof lastCommentAt.toDate === "function"
-      ? { seconds: Math.floor(lastCommentAt.toDate().getTime() / 1000) }
-      : lastCommentAt != null && typeof (lastCommentAt as { seconds?: number }).seconds === "number"
-        ? { seconds: (lastCommentAt as { seconds: number }).seconds }
-        : null;
-
-  const rawStatus =
-    typeof (item as { status?: string }).status === "string"
-      ? ((item as { status?: string }).status as string)
-      : (item as { isResolved?: boolean }).isResolved
-        ? "resolved"
-        : "open";
-  const normalizedStatus = normalizeTicketStatus(rawStatus);
-
-  return {
-    id: item.id,
-    sessionId: item.sessionId,
-    createdAt: createdAtOut,
-    title: item.title,
-    instruction: item.instruction ?? item.description,
-    description: item.description,
-    type: item.type,
-    actionSteps: item.actionSteps ?? undefined,
-    suggestedTags: item.suggestedTags ?? undefined,
-    commentCount: typeof item.commentCount === "number" ? item.commentCount : 0,
-    lastCommentPreview: item.lastCommentPreview,
-    lastCommentAt: lastCommentAtOut ?? undefined,
-    status: normalizedStatus,
-    isResolved: normalizedStatus === "resolved",
-    isDeleted: item.isDeleted ?? false,
-    screenshotUrl: item.screenshotUrl ?? null,
-    screenshotStatus: item.screenshotStatus ?? null,
-  };
 }
 
 function createdAtSeconds(item: Feedback): number {
@@ -168,19 +133,9 @@ export async function OPTIONS(req: NextRequest) {
  * Loads a capped session corpus from Firestore and returns matches (title, text, tags). No pagination.
  */
 export async function GET(req: NextRequest) {
-  let user: AuthUser;
-  try {
-    user = await requireAuthFast(req);
-  } catch (res) {
-    const errRes = res as Response;
-    return new NextResponse(errRes.body, {
-      status: errRes.status,
-      statusText: errRes.statusText,
-      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
-    });
-  }
-
-  const userId = user.uid;
+  const shareTok = extractShareToken(req);
+  const authUser = await tryRequireAuthFast(req);
+  const user = authUser ?? null;
 
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId")?.trim() ?? "";
@@ -196,9 +151,10 @@ export async function GET(req: NextRequest) {
   try {
     const { access } = await getAccessContext({
       sessionId,
-      user: { uid: userId, email: user.email ?? null },
+      user: user ? { uid: user.uid, email: user.email ?? null } : null,
+      tokenString: shareTok ?? undefined,
     });
-    if (!access?.canView) {
+    if (!access?.capabilities.canView) {
       return NextResponse.json(
         { error: "Forbidden" },
         { status: 403, headers: corsHeaders(req) }
@@ -223,7 +179,7 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json(
-      { feedback: matched.map(serializeFeedbackMinimal) },
+      { feedback: matched.map((item) => serializeFeedback(item, access)) },
       { headers: corsHeaders(req) }
     );
   } catch (err) {

@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 import { recordSessionViewIfNewRepo } from "@/lib/repositories/sessionsRepository.server";
-import { requireAuth, toAuthorizationResponse } from "@/lib/server/auth/authorize";
 import { getAccessContext } from "@/lib/access/getAccessContext";
 import { checkRateLimit, clientKeyFromRequest } from "@/lib/server/rateLimit";
+import { resolveOptionalSessionViewer } from "@/lib/server/requestContext";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  let uid: string | null = null;
-  let authEmail: string | undefined;
   const { id } = await params;
   if (!id) {
     return NextResponse.json({ success: false, error: "Missing session id" }, { status: 400 });
@@ -29,33 +27,24 @@ export async function POST(
 
   const shareTokenFromBody =
     typeof body.shareToken === "string" ? body.shareToken.trim() : "";
-  const shareTokenFromHeader = req.headers.get("x-share-token")?.trim() ?? "";
-  const shareTokenFromQuery = new URL(req.url).searchParams.get("shareToken")?.trim() ?? "";
-  const shareToken = shareTokenFromBody || shareTokenFromHeader || shareTokenFromQuery;
 
-  try {
-    const user = await requireAuth(req);
-    uid = user.uid;
-    authEmail = user.email;
-  } catch (err) {
-    if (!shareToken) {
-      return toAuthorizationResponse(err);
-    }
-  }
+  const { viewerUser, tokenString } = await resolveOptionalSessionViewer(req, {
+    bodyShareToken: shareTokenFromBody,
+  });
 
   const { access } = await getAccessContext({
     sessionId: id,
-    user: uid ? { uid, email: authEmail } : null,
-    tokenString: shareToken || undefined,
+    user: viewerUser,
+    tokenString,
   });
 
-  if (!access?.canView) {
+  if (!access?.capabilities.canView) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 
   try {
-    if (uid) {
-      await recordSessionViewIfNewRepo(id, uid);
+    if (viewerUser) {
+      await recordSessionViewIfNewRepo(id, viewerUser.uid);
     }
     return NextResponse.json({ success: true });
   } catch (err) {

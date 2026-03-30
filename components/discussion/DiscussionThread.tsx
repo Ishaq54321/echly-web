@@ -284,7 +284,7 @@ export function DiscussionThread({
               </h2>
               {ticket.sessionId && feedbackId ? (
                 <Link
-                  href={`/dashboard/${ticket.sessionId}?ticket=${feedbackId}`}
+                  href={`/session/${ticket.sessionId}?ticket=${feedbackId}`}
                   className="text-blue-600 hover:text-blue-700 font-medium inline-flex gap-1 items-center shrink-0 hover:underline"
                 >
                   View feedback ticket

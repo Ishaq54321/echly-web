@@ -8,7 +8,10 @@ import {
   toAuthorizationResponse,
 } from "@/lib/server/auth/authorize";
 import { isAdminUser } from "@/lib/server/adminAuth";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import {
+  getUserWorkspaceIdRepo,
+  isShareAuthUid,
+} from "@/lib/repositories/usersRepository.server";
 
 /** Data already loaded while resolving workspace (e.g. ticket + session); handlers must not re-fetch the same docs. */
 export type PreloadedTicketContext = {
@@ -92,7 +95,9 @@ export function withAuthorization(
         );
       }
 
-      const viewerWorkspaceIdRaw = await getUserWorkspaceIdRepo(user.uid);
+      const viewerWorkspaceIdRaw = isShareAuthUid(user.uid)
+        ? ""
+        : await getUserWorkspaceIdRepo(user.uid);
       const viewerWorkspaceId =
         typeof viewerWorkspaceIdRaw === "string" ? viewerWorkspaceIdRaw.trim() : "";
 

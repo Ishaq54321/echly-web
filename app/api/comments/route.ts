@@ -41,8 +41,8 @@ export const POST = withAuthorization(
 
     const pre = ctx.preloaded;
     const context = await buildRequestContext({
-      userId: user.uid,
-      userEmail: user.email,
+      req,
+      authenticatedUser: user,
       userWorkspaceId,
       feedbackId,
       ...(pre && pre.feedback !== undefined
@@ -52,7 +52,13 @@ export const POST = withAuthorization(
           }
         : {}),
     });
-    if (!context.access?.canComment) {
+    if (!context.access?.capabilities.canView) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+    if (!context.access?.capabilities.canComment) {
       return NextResponse.json(
         { success: false, error: "Insufficient permission" },
         { status: 403 }
@@ -79,8 +85,8 @@ export const POST = withAuthorization(
       };
       const feedbackId = typeof body.feedbackId === "string" ? body.feedbackId.trim() : "";
       const context = await buildRequestContext({
-        userId: user.uid,
-        userEmail: user.email,
+        req,
+        authenticatedUser: user,
         userWorkspaceId: viewerWorkspaceId,
         feedbackId: feedbackId || undefined,
       });
@@ -114,12 +120,9 @@ export const PATCH = withAuthorization(
       ctx.preloaded?.comment !== undefined
         ? (ctx.preloaded.comment as CommentRow | null)
         : await getCommentByIdRepo(commentId);
-    if (!comment) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-    }
 
-    const feedbackId = typeof comment.feedbackId === "string" ? comment.feedbackId : "";
-    if (!feedbackId) return badRequest("Invalid comment feedback relation");
+    const feedbackId =
+      comment && typeof comment.feedbackId === "string" ? comment.feedbackId.trim() : "";
 
     const editsCommentBody =
       data.message !== undefined || data.position !== undefined;
@@ -127,10 +130,10 @@ export const PATCH = withAuthorization(
     const pre = ctx.preloaded;
     const needsResolve = data.resolved !== undefined;
     const context = await buildRequestContext({
-      userId: user.uid,
-      userEmail: user.email,
+      req,
+      authenticatedUser: user,
       userWorkspaceId,
-      feedbackId,
+      feedbackId: feedbackId || undefined,
       ...(pre && pre.feedback !== undefined
         ? {
             feedback: pre.feedback as Feedback | null,
@@ -138,16 +141,26 @@ export const PATCH = withAuthorization(
           }
         : {}),
     });
-    if (!context.feedback) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    if (!context.access?.capabilities.canView) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
     }
-    if (needsResolve && !context.access?.canResolve) {
+    if (!comment) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+    }
+    if (!feedbackId) return badRequest("Invalid comment feedback relation");
+    if (!context.feedback) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+    }
+    if (needsResolve && !context.access?.capabilities.canResolve) {
       return NextResponse.json(
         { success: false, error: "Insufficient permission" },
         { status: 403 }
       );
     }
-    if (editsCommentBody && !context.access?.canComment) {
+    if (editsCommentBody && !context.access?.capabilities.canComment) {
       return NextResponse.json(
         { success: false, error: "Insufficient permission" },
         { status: 403 }
@@ -168,8 +181,8 @@ export const PATCH = withAuthorization(
       const comment = commentId ? await getCommentByIdRepo(commentId) : null;
       const feedbackId = typeof comment?.feedbackId === "string" ? comment.feedbackId : "";
       const context = await buildRequestContext({
-        userId: user.uid,
-        userEmail: user.email,
+        req,
+        authenticatedUser: user,
         userWorkspaceId: viewerWorkspaceId,
         feedbackId: feedbackId || undefined,
       });
@@ -200,19 +213,16 @@ export const DELETE = withAuthorization(
       ctx.preloaded?.comment !== undefined
         ? (ctx.preloaded.comment as CommentRow | null)
         : await getCommentByIdRepo(commentId);
-    if (!comment) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-    }
 
-    const feedbackId = typeof comment.feedbackId === "string" ? comment.feedbackId : "";
-    if (!feedbackId) return badRequest("Invalid comment feedback relation");
+    const feedbackId =
+      comment && typeof comment.feedbackId === "string" ? comment.feedbackId.trim() : "";
 
     const pre = ctx.preloaded;
     const context = await buildRequestContext({
-      userId: user.uid,
-      userEmail: user.email,
+      req,
+      authenticatedUser: user,
       userWorkspaceId,
-      feedbackId,
+      feedbackId: feedbackId || undefined,
       ...(pre && pre.feedback !== undefined
         ? {
             feedback: pre.feedback as Feedback | null,
@@ -220,10 +230,31 @@ export const DELETE = withAuthorization(
           }
         : {}),
     });
-    if (!context.feedback) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    if (!context.access?.capabilities.canView) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
     }
-    if (!context.access?.canResolve) {
+    if (!comment) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+    }
+    if (!feedbackId) return badRequest("Invalid comment feedback relation");
+    if (!context.feedback) {
+      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+    }
+    const commentAuthor =
+      typeof comment.userId === "string" ? comment.userId.trim() : "";
+    const isOwn = commentAuthor === user.uid;
+    const cap = context.access.capabilities;
+    if (isOwn) {
+      if (!cap.canDeleteOwnComment) {
+        return NextResponse.json(
+          { success: false, error: "Insufficient permission" },
+          { status: 403 }
+        );
+      }
+    } else if (!cap.canResolve) {
       return NextResponse.json(
         { success: false, error: "Insufficient permission" },
         { status: 403 }
@@ -244,8 +275,8 @@ export const DELETE = withAuthorization(
       const comment = commentId ? await getCommentByIdRepo(commentId) : null;
       const feedbackId = typeof comment?.feedbackId === "string" ? comment.feedbackId : "";
       const context = await buildRequestContext({
-        userId: user.uid,
-        userEmail: user.email,
+        req,
+        authenticatedUser: user,
         userWorkspaceId: viewerWorkspaceId,
         feedbackId: feedbackId || undefined,
       });

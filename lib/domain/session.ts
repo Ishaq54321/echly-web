@@ -2,6 +2,13 @@ import type { Timestamp } from "firebase/firestore";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
 
+/** Product-level gate: who may open the session without an account-specific invite row (see Phase 6). */
+export type SessionGeneralAccess = "restricted" | "link_view";
+
+export function normalizeGeneralAccess(value: unknown): SessionGeneralAccess {
+  return value === "link_view" ? "link_view" : "restricted";
+}
+
 export interface SessionCreatedBy {
   id: string;
   firstName: string;
@@ -47,6 +54,22 @@ export interface Session {
    * Default link access for visitors who are not workspace peers and have no email share row.
    */
   accessLevel?: AccessLevel;
+
+  /**
+   * Who may view the session when unauthenticated (invite system fills other cases).
+   * @default "restricted" when absent (legacy docs).
+   */
+  generalAccess?: SessionGeneralAccess;
+
+  /**
+   * Firestore creator uid when `createdBy` profile is not denormalized on the doc.
+   */
+  createdByUserId?: string;
+
+  /**
+   * First-time share configuration UX (persist only; logic deferred).
+   */
+  hasConfiguredShare?: boolean;
 
   /**
    * Client-only flag for optimistic UI rows (temp sessions).
@@ -99,6 +122,12 @@ export function sessionFromApiItem(item: unknown): Session | null {
 
   const accessLevel = Reflect.get(item, "accessLevel");
   session.accessLevel = normalizeAccessLevel(accessLevel);
+
+  const ga = Reflect.get(item, "generalAccess");
+  session.generalAccess = normalizeGeneralAccess(ga);
+
+  const hcs = Reflect.get(item, "hasConfiguredShare");
+  if (typeof hcs === "boolean") session.hasConfiguredShare = hcs;
 
   const readCount = (key: string): number | undefined => {
     const v = Reflect.get(item, key);

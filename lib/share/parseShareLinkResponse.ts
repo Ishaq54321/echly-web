@@ -1,11 +1,19 @@
 /**
- * Parses POST /api/sessions/:id/share-link JSON body into `${origin}/s/${token}`.
+ * Parses POST /api/sessions/:id/share-link JSON into a session URL with `shareToken` query.
  * Single implementation for web (authFetch) and extension (apiFetch).
  */
-export async function parseShareLinkResponse(res: Response, origin: string): Promise<string> {
+export async function parseShareLinkResponse(
+  res: Response,
+  origin: string,
+  sessionId: string
+): Promise<string> {
   const base = (origin || "").replace(/\/$/, "");
+  const sid = sessionId.trim();
   if (!base) {
     throw new Error("share-link: origin is required");
+  }
+  if (!sid) {
+    throw new Error("share-link: sessionId is required");
   }
 
   if (!res.ok) {
@@ -25,5 +33,5 @@ export async function parseShareLinkResponse(res: Response, origin: string): Pro
     throw new Error("Invalid share-link response");
   }
 
-  return `${base}/s/${encodeURIComponent(token)}`;
+  return `${base}/session/${encodeURIComponent(sid)}?shareToken=${encodeURIComponent(token)}`;
 }

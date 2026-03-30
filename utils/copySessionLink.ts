@@ -1,11 +1,11 @@
-import { getOrCreateShareLink } from "@/lib/share/getOrCreateShareLink";
+import { getSessionLink } from "@/utils/getSessionLink";
 
 export type CopySessionLinkOptions = {
-  /** Called around the network request (for button loading/success UX). */
+  /** Reserved for UX parity (copy is synchronous; no network). */
   onBusy?: (busy: boolean) => void;
 };
 
-/** Copies the public share URL (`/s/[token]`) after get-or-create on the server. */
+/** Copies the canonical session board URL (`/session/:id`); no share-link API call. */
 export async function copySessionLink(
   sessionId: string | undefined | null,
   userId: string | null | undefined,
@@ -17,12 +17,11 @@ export async function copySessionLink(
   if (!uid) return false;
   if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) return false;
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  if (!origin) return false;
+  const url = getSessionLink(id);
+  if (!url) return false;
 
   options?.onBusy?.(true);
   try {
-    const url = await getOrCreateShareLink({ sessionId: id, userId: uid, origin });
     await navigator.clipboard.writeText(url);
     return true;
   } catch {

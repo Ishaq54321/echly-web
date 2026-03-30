@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
-import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import {
   getDiscussionInboxFeedbackForUserRepo,
   getSessionFeedbackPageForUserWithStringCursorRepo,
 } from "@/lib/repositories/feedbackRepository.server";
 import { getAccessContext } from "@/lib/access/getAccessContext";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import { serializeFeedback } from "@/lib/server/serializeFeedback";
+import type { AccessContext } from "@/lib/access/resolveAccess";
 import { corsHeaders } from "@/lib/server/cors";
 import { verifyExtensionToken } from "@/lib/server/extensionAuth";
 import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
 import { getSessionUser } from "@/lib/server/session";
+import { extractShareToken } from "@/lib/server/shareTokenFromRequest";
 
 function unauthorized(): Response {
   return Response.json(
@@ -51,6 +53,14 @@ function peekJwtPayload(token: string): Record<string, unknown> | null {
     return parsed && typeof parsed === "object" ? parsed : null;
   } catch (err) {
     console.error("[feedback] peekJwtPayload parse failed:", err);
+    return null;
+  }
+}
+
+async function tryRequireAuthFast(req: NextRequest): Promise<AuthUser | null> {
+  try {
+    return await requireAuthFast(req);
+  } catch {
     return null;
   }
 }
@@ -95,53 +105,6 @@ export async function OPTIONS(req: NextRequest) {
   });
 }
 
-function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
-  const createdAt = item.createdAt as { toDate?: () => Date; seconds?: number } | null;
-  const createdAtOut =
-    createdAt != null && typeof createdAt.toDate === "function"
-      ? createdAt.toDate().toISOString()
-      : null;
-
-  const lastCommentAt = item.lastCommentAt as { toDate?: () => Date; seconds?: number } | null | undefined;
-  const lastCommentAtOut =
-    lastCommentAt != null && typeof lastCommentAt.toDate === "function"
-      ? { seconds: Math.floor(lastCommentAt.toDate().getTime() / 1000) }
-      : lastCommentAt != null && typeof (lastCommentAt as { seconds?: number }).seconds === "number"
-        ? { seconds: (lastCommentAt as { seconds: number }).seconds }
-        : null;
-
-  const rawStatus =
-    typeof (item as { status?: string }).status === "string"
-      ? ((item as { status?: string }).status as string)
-      : (item as { isResolved?: boolean }).isResolved
-        ? "resolved"
-        : "open";
-  const normalizedStatus = normalizeTicketStatus(rawStatus);
-
-  return {
-    id: item.id,
-    sessionId: item.sessionId,
-    createdAt: createdAtOut,
-
-    // Fields used by capture widget + discussion UI
-    title: item.title,
-    instruction: item.instruction ?? item.description,
-    description: item.description,
-    type: item.type,
-    actionSteps: item.actionSteps ?? undefined,
-
-    commentCount: typeof item.commentCount === "number" ? item.commentCount : 0,
-    lastCommentPreview: item.lastCommentPreview,
-    lastCommentAt: lastCommentAtOut ?? undefined,
-    status: normalizedStatus,
-    isResolved: normalizedStatus === "resolved",
-    isDeleted: item.isDeleted ?? false,
-
-    screenshotUrl: item.screenshotUrl ?? null,
-    screenshotStatus: item.screenshotStatus ?? null,
-  };
-}
-
 /**
  * GET /api/feedback?sessionId=ID&cursor=XYZ&limit=20&status=open|resolved
  * Returns { feedback: [], nextCursor: string | null, hasMore: boolean }
@@ -154,22 +117,8 @@ function serializeFeedbackMinimal(item: Feedback): Record<string, unknown> {
  * dropping legacy docs that omit `isDeleted` (see getSessionFeedbackPageForUserWithStringCursorRepo).
  */
 export async function GET(req: NextRequest) {
-  let user;
-  try {
-    user = await requireAuthFast(req);
-  } catch (res) {
-    const errRes = res as Response;
-    return new NextResponse(errRes.body, {
-      status: errRes.status,
-      statusText: errRes.statusText,
-      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
-    });
-  }
-
-  const userId = user.uid;
-
   const { searchParams } = new URL(req.url);
-  const sessionId = searchParams.get("sessionId");
+  const sessionIdRaw = searchParams.get("sessionId");
   const cursor = searchParams.get("cursor") ?? "";
   const limitParam = searchParams.get("limit");
   const statusParam = searchParams.get("status")?.trim().toLowerCase();
@@ -182,28 +131,55 @@ export async function GET(req: NextRequest) {
   const normalizedRequestedLimit = Number.isFinite(requestedLimit) ? Math.max(1, requestedLimit) : DEFAULT_LIMIT;
   const safeLimit = Math.min(normalizedRequestedLimit, 50);
 
-  // When sessionId is omitted, return Discussion inbox (session-scoped queries per accessible session).
-  if (!sessionId || sessionId.trim() === "") {
+  const trimmedSid = sessionIdRaw?.trim() ?? "";
+  const shareTok = extractShareToken(req);
+  const authUser = await tryRequireAuthFast(req);
+  const user = authUser ?? null;
+
+  if (trimmedSid === "") {
+    if (!user) {
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          error: "NOT_AUTHENTICATED",
+          message: "User is not authenticated",
+        }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders(req) } }
+      );
+    }
+
     try {
       const feedback = await getDiscussionInboxFeedbackForUserRepo({
-        userId,
+        userId: user.uid,
         userEmail: user.email,
         limit: safeLimit,
       });
 
       const sessionIds = [...new Set(feedback.map((f) => f.sessionId).filter(Boolean))];
       const titleBySessionId = new Map<string, string>();
+      const accessBySessionId = new Map<string, AccessContext>();
+
       await Promise.all(
         sessionIds.map(async (sid) => {
           const row = await getSessionByIdRepo(sid);
           if (row) titleBySessionId.set(sid, row.title ?? "");
+          const { access } = await getAccessContext({
+            sessionId: sid,
+            user: { uid: user.uid, email: user.email ?? null },
+            session: row,
+          });
+          if (access?.capabilities.canView) {
+            accessBySessionId.set(sid, access);
+          }
         })
       );
 
-      const payload = feedback.map((f) => ({
-        ...serializeFeedbackMinimal(f),
-        sessionName: titleBySessionId.get(f.sessionId) ?? "",
-      }));
+      const payload = feedback
+        .filter((f) => accessBySessionId.has(f.sessionId))
+        .map((f) => ({
+          ...serializeFeedback(f, accessBySessionId.get(f.sessionId)!),
+          sessionName: titleBySessionId.get(f.sessionId) ?? "",
+        }));
 
       return NextResponse.json(
         {
@@ -223,12 +199,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const sid = sessionId.trim();
     const { access } = await getAccessContext({
-      sessionId: sid,
-      user: { uid: userId, email: user.email ?? null },
+      sessionId: trimmedSid,
+      user: user ? { uid: user.uid, email: user.email ?? null } : null,
+      tokenString: shareTok ?? undefined,
     });
-    if (!access?.canView) {
+    if (!access?.capabilities.canView) {
       return NextResponse.json(
         { error: "Forbidden" },
         { status: 403, headers: corsHeaders(req) }
@@ -238,7 +214,7 @@ export async function GET(req: NextRequest) {
     const isFirstPage = !cursor || cursor.trim() === "";
 
     const pageResult = await getSessionFeedbackPageForUserWithStringCursorRepo({
-      sessionId: sid,
+      sessionId: trimmedSid,
       limit: safeLimit,
       cursor: isFirstPage ? undefined : cursor,
       ...(statusFilter ? { statusFilter } : {}),
@@ -246,15 +222,12 @@ export async function GET(req: NextRequest) {
     const { feedback, nextCursor, hasMore } = pageResult;
 
     const responseBody = {
-      feedback: feedback.map(serializeFeedbackMinimal),
+      feedback: feedback.map((f) => serializeFeedback(f, access)),
       nextCursor,
       hasMore,
     };
 
-    return NextResponse.json(
-      responseBody,
-      { headers: corsHeaders(req) }
-    );
+    return NextResponse.json(responseBody, { headers: corsHeaders(req) });
   } catch (err) {
     console.error("GET /api/feedback:", err);
     return NextResponse.json(

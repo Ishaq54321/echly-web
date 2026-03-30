@@ -13972,6 +13972,9 @@
   }
 
   // lib/domain/session.ts
+  function normalizeGeneralAccess(value) {
+    return value === "link_view" ? "link_view" : "restricted";
+  }
   function sessionsArrayFromApiPayload(data) {
     if (typeof data !== "object" || data === null) return [];
     const raw = Reflect.get(data, "sessions");
@@ -14006,6 +14009,10 @@
     }
     const accessLevel = Reflect.get(item, "accessLevel");
     session.accessLevel = normalizeAccessLevel(accessLevel);
+    const ga = Reflect.get(item, "generalAccess");
+    session.generalAccess = normalizeGeneralAccess(ga);
+    const hcs = Reflect.get(item, "hasConfiguredShare");
+    if (typeof hcs === "boolean") session.hasConfiguredShare = hcs;
     const readCount = (key) => {
       const v = Reflect.get(item, key);
       return typeof v === "number" && Number.isFinite(v) ? v : void 0;
@@ -37028,7 +37035,7 @@
     if (!data.success || !token) {
       throw new Error("Invalid share-link response");
     }
-    return `${base}/s/${encodeURIComponent(token)}`;
+    return `${base}/session/${encodeURIComponent(sid)}?shareToken=${encodeURIComponent(token)}`;
   }
 
   // lib/capture-engine/core/hooks/useCaptureWidget.ts
@@ -42145,7 +42152,7 @@
                 });
                 await new Promise((r) => setTimeout(r, 50));
                 if (sessionId) {
-                  const url = `${APP_ORIGIN}/dashboard/${sessionId}`;
+                  const url = `${APP_ORIGIN}/session/${sessionId}`;
                   chrome.runtime.sendMessage({ type: "ECHLY_OPEN_TAB", url }).catch(
                     (err) => logSendMessageRejection("ECHLY_OPEN_TAB (session mode end)", err)
                   );

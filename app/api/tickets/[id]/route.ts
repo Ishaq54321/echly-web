@@ -14,20 +14,27 @@ import {
   type HandlerUser,
 } from "@/lib/server/auth/withAuthorization";
 import { routeParamId } from "@/lib/server/routeParams";
-import { buildRequestContext } from "@/lib/server/requestContext";
+import {
+  buildRequestContext,
+  resolveOptionalSessionViewer,
+} from "@/lib/server/requestContext";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
+import { getAccessContext } from "@/lib/access/getAccessContext";
+import { accessContextToResponseBody } from "@/lib/access/resolveAccess";
+import { getFeedbackByIdRepo } from "@/lib/repositories/feedbackRepository.server";
+import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 
 async function resolveTicketWorkspaceId(
-  _req: Request,
+  req: Request,
   user: HandlerUser,
   ctx: HandlerContext,
   viewerWorkspaceId: string
 ) {
   const id = await routeParamId(ctx);
   const context = await buildRequestContext({
-    userId: user.uid,
-    userEmail: user.email,
+    req,
+    authenticatedUser: user,
     userWorkspaceId: viewerWorkspaceId,
     feedbackId: id?.trim() || undefined,
   });
@@ -38,65 +45,69 @@ async function resolveTicketWorkspaceId(
   };
 }
 
-/** GET /api/tickets/:id — return single ticket (feedback) from DB. */
-export const GET = withAuthorization(
-  "read_feedback",
-  async (
-    _req: Request,
-    ctx: HandlerContext,
-    { user, userWorkspaceId }: { user: HandlerUser; userWorkspaceId: string }
-  ) => {
-    const start = Date.now();
-    log("[API] GET /api/tickets/[id] start");
-    const id = await routeParamId(ctx);
-    if (!id) {
+/** GET /api/tickets/:id — optional auth; same access as GET /api/sessions/:id + share token. */
+export async function GET(req: Request, ctx: HandlerContext) {
+  const start = Date.now();
+  log("[API] GET /api/tickets/[id] start");
+  const id = await routeParamId(ctx);
+  if (!id) {
+    return NextResponse.json(
+      { success: false, error: "Missing ticket id" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const { viewerUser, tokenString } = await resolveOptionalSessionViewer(req);
+    const feedbackRow = await getFeedbackByIdRepo(id);
+    const sid = String(feedbackRow?.sessionId ?? "").trim();
+    const loadedSession = sid ? await getSessionByIdRepo(sid) : null;
+    const { access } = await getAccessContext({
+      sessionId: sid,
+      user: viewerUser,
+      session: loadedSession,
+      tokenString,
+    });
+
+    if (!access?.capabilities.canView) {
       return NextResponse.json(
-        { success: false, error: "Missing ticket id" },
-        { status: 400 }
+        { success: false, error: "Forbidden" },
+        { status: 403 }
       );
     }
-    try {
-      const pre = ctx.preloaded;
-      const context = await buildRequestContext({
-        userId: user.uid,
-        userEmail: user.email,
-        userWorkspaceId,
-        feedbackId: id,
-        ...(pre && pre.feedback !== undefined
-          ? {
-              feedback: pre.feedback as Feedback | null,
-              session: pre.session as Session | null,
-            }
-          : {}),
-      });
-      if (!context.access) {
-        return NextResponse.json(
-          { success: false, error: "Forbidden" },
-          { status: 403 }
-        );
-      }
-      if (!context.feedback) {
-        return NextResponse.json(
-          { success: false, error: "Not found" },
-          { status: 404 }
-        );
-      }
-      log("[API] GET /api/tickets/[id] duration:", Date.now() - start);
-      return NextResponse.json({
-        success: true,
-        ticket: serializeTicket(context.feedback),
-      });
-    } catch (err) {
-      console.error("GET /api/tickets/[id]:", err);
-      log("[API] GET /api/tickets/[id] duration (error):", Date.now() - start);
+
+    if (!feedbackRow) {
       return NextResponse.json(
-        { success: false, error: "Server error" },
-        { status: 500 }
+        { success: false, error: "Not found" },
+        { status: 404 }
       );
     }
-  },
-  { resolveWorkspace: resolveTicketWorkspaceId }
-);
+
+    if (!sid) {
+      return NextResponse.json(
+        { success: false, error: "Not found" },
+        { status: 404 }
+      );
+    }
+
+    const ticketJson = serializeTicket(feedbackRow, access);
+    const accessJson = accessContextToResponseBody(access);
+
+    log("[API] GET /api/tickets/[id] duration:", Date.now() - start);
+    return NextResponse.json({
+      success: true,
+      ticket: ticketJson,
+      access: accessJson,
+    });
+  } catch (err) {
+    console.error("GET /api/tickets/[id]:", err);
+    log("[API] GET /api/tickets/[id] duration (error):", Date.now() - start);
+    return NextResponse.json(
+      { success: false, error: "Server error" },
+      { status: 500 }
+    );
+  }
+}
 
 /** PATCH /api/tickets/:id — update ticket; body: { title?, instruction?, actionSteps?, suggestedTags?, isResolved? }. */
 export const PATCH = withAuthorization(
@@ -149,8 +160,8 @@ export const PATCH = withAuthorization(
 
     const pre = ctx.preloaded;
     const context = await buildRequestContext({
-      userId: user.uid,
-      userEmail: user.email,
+      req,
+      authenticatedUser: user,
       userWorkspaceId,
       feedbackId: id,
       ...(pre && pre.feedback !== undefined
@@ -164,7 +175,7 @@ export const PATCH = withAuthorization(
       console.log("[Resolve] Order: after buildRequestContext", Date.now() - start, "ms");
     }
 
-    if (!context.access) {
+    if (!context.access?.capabilities.canView) {
       return NextResponse.json(
         { success: false, error: "Forbidden" },
         { status: 403 }
@@ -205,17 +216,17 @@ export const PATCH = withAuthorization(
     if (!hasContent && patchStatus === undefined) {
       return NextResponse.json({
         success: true,
-        ticket: serializeTicket(existingForOwnership),
+        ticket: serializeTicket(existingForOwnership, context.access!),
       });
     }
 
-    if (hasContent && !context.access?.canComment) {
+    if (hasContent && !context.access?.capabilities.canComment) {
       return NextResponse.json(
         { success: false, error: "Insufficient permission" },
         { status: 403 }
       );
     }
-    if (patchStatus !== undefined && !context.access?.canResolve) {
+    if (patchStatus !== undefined && !context.access?.capabilities.canResolve) {
       return NextResponse.json(
         { success: false, error: "Insufficient permission" },
         { status: 403 }
@@ -264,7 +275,7 @@ export const PATCH = withAuthorization(
       }
       return NextResponse.json({
         success: true,
-        ticket: serializeTicket(updated),
+        ticket: serializeTicket(updated, context.access!),
       });
     } catch (err) {
       console.error("PATCH /api/tickets/[id]:", err);
@@ -299,8 +310,8 @@ export const DELETE = withAuthorization(
     try {
       const pre = ctx.preloaded;
       const context = await buildRequestContext({
-        userId: user.uid,
-        userEmail: user.email,
+        req,
+        authenticatedUser: user,
         userWorkspaceId,
         feedbackId: id,
         ...(pre && pre.feedback !== undefined
@@ -310,7 +321,13 @@ export const DELETE = withAuthorization(
             }
           : {}),
       });
-      if (!context.access?.canResolve) {
+      if (!context.access?.capabilities.canView) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden" },
+          { status: 403 }
+        );
+      }
+      if (!context.access?.capabilities.canDeleteTicket) {
         return NextResponse.json(
           { success: false, error: "Insufficient permission" },
           { status: 403 }

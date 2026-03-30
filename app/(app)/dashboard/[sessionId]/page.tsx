@@ -1,11 +1,11 @@
-// Legacy route — will be deprecated in Phase 9.5
-import SessionPageClient from "./SessionPageClient";
+import { redirect } from "next/navigation";
 
+/** Legacy URL; canonical session board is `/session/:sessionId`. */
 export default async function SessionPage({
   params,
 }: {
   params: Promise<{ sessionId: string }>;
 }) {
   const { sessionId } = await params;
-  return <SessionPageClient sessionId={sessionId} />;
+  redirect(`/session/${sessionId}`);
 }

@@ -10,7 +10,10 @@ import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
 import { corsHeaders } from "@/lib/server/cors";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import {
+  getUserWorkspaceIdRepo,
+  isShareAuthUid,
+} from "@/lib/repositories/usersRepository.server";
 import { listAccessibleSessionsForUser } from "@/lib/server/listAccessibleSessionsForUser";
 
 export const dynamic = "force-dynamic";
@@ -144,6 +147,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    if (isShareAuthUid(user.uid)) {
+      return new Response("Workspace not found", {
+        status: 403,
+        headers: corsHeaders(req),
+      });
+    }
     const workspaceId = await getUserWorkspaceIdRepo(user.uid);
     const workspace = await getWorkspace(workspaceId);
 

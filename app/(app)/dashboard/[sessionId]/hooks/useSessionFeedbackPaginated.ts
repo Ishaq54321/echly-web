@@ -9,16 +9,7 @@ import {
   useMemo,
   type MutableRefObject,
 } from "react";
-import {
-  collection,
-  doc,
-  onSnapshot,
-  query,
-  where,
-  type DocumentSnapshot,
-  type Timestamp,
-} from "firebase/firestore";
-import { db } from "@/lib/firebaseClient";
+import { Timestamp } from "firebase/firestore";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
@@ -41,76 +32,107 @@ export type SessionCountsDelta = {
   total: number;
 };
 
-function mapDocToFeedback(docSnap: DocumentSnapshot): Feedback | null {
-  const data = docSnap.data() ?? {};
-  if (data.isDeleted === true) return null;
-  const status = data.status === "resolved" ? "resolved" : "open";
-  const isResolved = data.isResolved === true || status === "resolved";
+function feedbackFromRestApiRow(
+  row: Record<string, unknown>,
+  sessionIdFallback: string
+): Feedback | null {
+  if (row.isDeleted === true) return null;
+  const id = typeof row.id === "string" ? row.id : "";
+  if (!id) return null;
+  const sessionId =
+    typeof row.sessionId === "string" && row.sessionId.trim() !== ""
+      ? row.sessionId
+      : sessionIdFallback;
+  const rawStatus =
+    typeof row.status === "string"
+      ? row.status
+      : row.isResolved === true
+        ? "resolved"
+        : "open";
+  const normalizedStatus = normalizeTicketStatus(rawStatus);
+  const isResolved = normalizedStatus === "resolved";
+  let createdAt: Timestamp | null = null;
+  if (typeof row.createdAt === "string" && row.createdAt.trim() !== "") {
+    const d = new Date(row.createdAt);
+    if (!Number.isNaN(d.getTime())) {
+      createdAt = Timestamp.fromDate(d);
+    }
+  }
+  let lastCommentAt: Timestamp | null = null;
+  const lastRaw = row.lastCommentAt as { seconds?: number } | string | null | undefined;
+  if (lastRaw != null && typeof lastRaw === "object" && typeof lastRaw.seconds === "number") {
+    lastCommentAt = new Timestamp(lastRaw.seconds, 0);
+  } else if (typeof lastRaw === "string" && lastRaw.trim() !== "") {
+    const d = new Date(lastRaw);
+    if (!Number.isNaN(d.getTime())) {
+      lastCommentAt = Timestamp.fromDate(d);
+    }
+  }
+
   return {
-    id: docSnap.id,
-    workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : undefined,
-    sessionId: data.sessionId as string,
-    userId: data.userId as string,
-    title: (data.title as string) ?? "",
-    instruction: ((data.instruction as string) ?? (data.description as string)) ?? "",
-    description: (data.description as string) ?? "",
-    suggestion: (data.suggestion as string) ?? "",
-    type: (data.type as string) ?? "Feedback",
+    id,
+    sessionId,
+    title: typeof row.title === "string" ? row.title : "",
+    instruction:
+      (typeof row.instruction === "string" ? row.instruction : "") ||
+      (typeof row.description === "string" ? row.description : "") ||
+      "",
+    description: typeof row.description === "string" ? row.description : "",
+    suggestion: "",
+    type: typeof row.type === "string" ? row.type : "Feedback",
     isResolved,
-    createdAt: (data.createdAt ?? null) as Timestamp | null,
-    contextSummary: (data.contextSummary as string | null) ?? null,
-    actionSteps: (data.actionSteps ?? data.actionItems ?? null) as string[] | null,
-    suggestedTags: (data.suggestedTags as string[] | null) ?? null,
-    url: (data.url as string | null) ?? null,
-    viewportWidth: (data.viewportWidth as number | null) ?? null,
-    viewportHeight: (data.viewportHeight as number | null) ?? null,
-    userAgent: (data.userAgent as string | null) ?? null,
-    clientTimestamp: (data.clientTimestamp as number | null) ?? null,
-    screenshotUrl: (data.screenshotUrl as string | null) ?? null,
-    screenshotStatus: data.screenshotStatus ?? null,
-    status,
-    commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
-    lastCommentPreview: typeof data.lastCommentPreview === "string" ? data.lastCommentPreview : undefined,
-    lastCommentAt: (data.lastCommentAt ?? null) as Timestamp | null,
-    isDeleted: data.isDeleted ?? false,
+    createdAt,
+    contextSummary: null,
+    actionSteps: Array.isArray(row.actionSteps)
+      ? (row.actionSteps as string[]).filter((s) => typeof s === "string")
+      : null,
+    suggestedTags: Array.isArray(row.suggestedTags)
+      ? (row.suggestedTags as unknown[]).filter((s): s is string => typeof s === "string")
+      : null,
+    url: null,
+    viewportWidth: null,
+    viewportHeight: null,
+    userAgent: null,
+    clientTimestamp: null,
+    screenshotUrl: typeof row.screenshotUrl === "string" ? row.screenshotUrl : null,
+    screenshotStatus:
+      row.screenshotStatus === "attached" ||
+      row.screenshotStatus === "pending" ||
+      row.screenshotStatus === "none" ||
+      row.screenshotStatus === "failed"
+        ? row.screenshotStatus
+        : null,
+    status: normalizedStatus,
+    commentCount: typeof row.commentCount === "number" ? row.commentCount : 0,
+    lastCommentPreview:
+      typeof row.lastCommentPreview === "string" ? row.lastCommentPreview : undefined,
+    lastCommentAt,
+    isDeleted: row.isDeleted === true,
   };
 }
 
 export interface UseSessionFeedbackPaginatedResult {
-  /** Canonical ticket list from Firestore `onSnapshot` (newest first). */
   canonicalFeedback: Feedback[];
-  /** Canonical list filtered to normalized "open" status. */
   openFeedback: Feedback[];
-  /** Canonical list filtered to normalized "resolved" status. */
   resolvedFeedback: Feedback[];
   feedback: Feedback[];
   setFeedback: React.Dispatch<React.SetStateAction<Feedback[]>>;
-  /** Server baseline from `sessions/{id}` snapshot + optimistic `countsDelta`. */
   total: number;
-  /** Server baseline from `sessions/{id}` snapshot + optimistic `countsDelta`. */
   activeCount: number;
-  /** Server baseline from `sessions/{id}` snapshot + optimistic `countsDelta`. */
   resolvedCount: number;
-  /** Optimistic adjustment; reset to zero on every session snapshot. */
   setCountsDelta: React.Dispatch<React.SetStateAction<SessionCountsDelta>>;
-  /** False once session doc counters have been read. */
   countsLoading: boolean;
   loading: boolean;
-  /** True while more open or (when expanded) more resolved pages exist to load. */
   hasMore: boolean;
   hasReachedLimit: boolean;
   loadingMore: boolean;
-  /** True after first resolved fetch completes (even if empty). */
   hasLoadedResolved: boolean;
-  /** True while the initial resolved page fetch is in flight. */
   isLoadingResolved: boolean;
-  /** Kept for compatibility with TicketList prop surface. */
   loadMoreRef: React.RefObject<HTMLDivElement | null>;
-  /** True after first feedback and session snapshots for this session. */
   isCountsSynced: boolean;
 }
 
-/** ISO string or Firestore `{ seconds }` — single source for sidebar ordering. */
+/** ISO string or Firestore `{ seconds }` — ordering for sidebar. */
 function getTimestamp(item: Feedback): number {
   if (!item) return 0;
   if (typeof item.createdAt === "string") {
@@ -142,25 +164,36 @@ function normalizeFeedbackItemStatus(item: Feedback): Feedback {
   };
 }
 
-/**
- * Session ticket list from Firestore `feedback` query; counts from `sessions/{id}` snapshot
- * plus optional client `countsDelta` (display = server + delta; delta cleared on snapshot).
- */
-export type SessionFeedbackRealtimeMergeOptions = {
+export type SessionFeedbackMergeOptions = {
   /**
-   * Applied to each Firestore snapshot list before `setState`.
-   * Use to preserve in-flight optimistic fields so realtime does not flash stale server data.
+   * Applied after each REST load before `setState`.
+   * Preserves in-flight optimistic fields (e.g. action steps).
    */
   mergeRealtimeListRef?: MutableRefObject<((list: Feedback[]) => Feedback[]) | null>;
+  /** When false, wait (e.g. until auth identity is ready). */
+  enabled?: boolean;
+  shareToken?: string | null;
+  /** From GET /api/sessions/:id (same source as session header). */
+  restSessionCounts?: { total: number; open: number; resolved: number } | null;
+  restFetch?: (url: string) => Promise<Response>;
 };
 
 export function useSessionFeedbackPaginated(
   sessionId: string | undefined,
-  onNewTicketFromRealtime?: (newestTicketId: string) => void,
-  options?: SessionFeedbackRealtimeMergeOptions
+  options?: SessionFeedbackMergeOptions
 ): UseSessionFeedbackPaginatedResult {
+  const enabled = options?.enabled !== false;
+  const shareTokenRest =
+    typeof options?.shareToken === "string" && options.shareToken.trim() !== ""
+      ? options.shareToken.trim()
+      : "";
+  const restSessionCounts = options?.restSessionCounts ?? null;
+  const restCountsAbsent = restSessionCounts == null;
+  const restCountsTotal = restSessionCounts?.total ?? -1;
+  const restCountsOpen = restSessionCounts?.open ?? -1;
+  const restCountsResolved = restSessionCounts?.resolved ?? -1;
+
   const [items, setItems] = useState<Feedback[]>([]);
-  /** Last session document counters from Firestore (never merge delta into this). */
   const [counts, setCountsState] = useState(ZERO_COUNTS);
   const [countsDelta, setCountsDelta] = useState<SessionCountsDelta>(ZERO_COUNTS_DELTA);
   const total = Math.max(0, counts.total + countsDelta.total);
@@ -176,12 +209,12 @@ export function useSessionFeedbackPaginated(
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const itemsRef = useRef<Feedback[]>([]);
 
-  const onNewTicketFromRealtimeRef = useRef(onNewTicketFromRealtime);
   const mergeRealtimeListOuterRef = useRef(options?.mergeRealtimeListRef);
   mergeRealtimeListOuterRef.current = options?.mergeRealtimeListRef;
 
-  const prevIdsRef = useRef<Set<string>>(new Set());
-  const firstSnapshotRef = useRef(true);
+  const restFetchRef = useRef(options?.restFetch);
+  restFetchRef.current = options?.restFetch;
+
   const sortByCreatedAtDesc = useCallback((list: Feedback[]): Feedback[] => {
     const deduped = dedupeFeedbackById(list);
     deduped.sort((a, b) => {
@@ -212,25 +245,25 @@ export function useSessionFeedbackPaginated(
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  useEffect(() => {
-    onNewTicketFromRealtimeRef.current = onNewTicketFromRealtime;
-  }, [onNewTicketFromRealtime]);
-
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
+  itemsRef.current = items;
 
   useLayoutEffect(() => {
-    firstSnapshotRef.current = true;
-    prevIdsRef.current = new Set();
     setHasLoadedResolved(false);
     setIsLoadingResolved(true);
     setFeedbackSnapshotReady(false);
     setSessionSnapshotReady(false);
     setCountsDelta(ZERO_COUNTS_DELTA);
-  }, [sessionId]);
+  }, [sessionId, enabled]);
 
   const isCountsSynced = feedbackSnapshotReady && sessionSnapshotReady;
+
+  useEffect(() => {
+    if (enabled && sessionId) return;
+    setInitialLoading(true);
+    setHasLoadedResolved(false);
+    setIsLoadingResolved(true);
+    setFeedbackSnapshotReady(false);
+  }, [enabled, sessionId]);
 
   const canonicalFeedback = items;
   const openFeedback = useMemo(
@@ -244,7 +277,6 @@ export function useSessionFeedbackPaginated(
 
   const hasReachedLimit = false;
 
-  /** Session document counters (authoritative). */
   useEffect(() => {
     if (!sessionId) {
       setCountsState(ZERO_COUNTS);
@@ -254,118 +286,97 @@ export function useSessionFeedbackPaginated(
       return;
     }
 
-    setSessionSnapshotReady(false);
-    setCountsLoading(true);
-
-    const sessionRef = doc(db, "sessions", sessionId);
-    const unsubscribe = onSnapshot(
-      sessionRef,
-      (snap) => {
-        if (sessionIdRef.current !== sessionId) return;
-        if (!snap.exists()) {
-          setCountsState(ZERO_COUNTS);
-          setCountsDelta(ZERO_COUNTS_DELTA);
-          setCountsLoading(false);
-          setSessionSnapshotReady(true);
-          return;
-        }
-        const d = snap.data();
-        const open = Math.max(0, typeof d.openCount === "number" ? d.openCount : 0);
-        const resolved = Math.max(0, typeof d.resolvedCount === "number" ? d.resolvedCount : 0);
-        const rawTotal =
-          typeof d.totalCount === "number"
-            ? d.totalCount
-            : typeof d.feedbackCount === "number"
-              ? d.feedbackCount
-              : 0;
-        const totalN = Math.max(0, rawTotal);
-        setCountsState({ total: totalN, open, resolved });
-        setCountsDelta(ZERO_COUNTS_DELTA);
-        setCountsLoading(false);
-        setSessionSnapshotReady(true);
-      },
-      (err) => {
-        console.error("[ECHLY] session onSnapshot (counts) failed", err);
-        if (sessionIdRef.current !== sessionId) return;
-        setCountsLoading(false);
-        setSessionSnapshotReady(true);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [sessionId]);
-
-  /** Firestore: full session list — real-time updates across tabs. */
-  useEffect(() => {
-    if (!sessionId) {
+    if (!enabled) {
+      setSessionSnapshotReady(false);
+      setCountsLoading(true);
       return;
     }
 
+    if (restCountsAbsent) {
+      setSessionSnapshotReady(false);
+      setCountsLoading(true);
+      return;
+    }
+
+    setCountsState({
+      total: Math.max(0, restCountsTotal),
+      open: Math.max(0, restCountsOpen),
+      resolved: Math.max(0, restCountsResolved),
+    });
+    setCountsDelta(ZERO_COUNTS_DELTA);
+    setCountsLoading(false);
+    setSessionSnapshotReady(true);
+  }, [
+    sessionId,
+    enabled,
+    restCountsAbsent,
+    restCountsTotal,
+    restCountsOpen,
+    restCountsResolved,
+  ]);
+
+  useEffect(() => {
+    if (!sessionId || !enabled) {
+      return;
+    }
+
+    let cancelled = false;
     setInitialLoading(true);
     setHasLoadedResolved(false);
     setIsLoadingResolved(true);
     setFeedbackSnapshotReady(false);
 
-    const q = query(
-      collection(db, "feedback"),
-      where("sessionId", "==", sessionId)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        if (sessionIdRef.current !== sessionId) return;
-
-        if (snapshot.empty) {
-          prevIdsRef.current = new Set();
-          setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
-          setInitialLoading(false);
-          setHasLoadedResolved(true);
-          setIsLoadingResolved(false);
-          setFeedbackSnapshotReady(true);
-          return;
-        }
-
-        const raw = snapshot.docs
-          .map((d) => mapDocToFeedback(d))
-          .filter((item): item is Feedback => item !== null);
-        const finalized = finalizeList(raw);
-        const mergeFn = mergeRealtimeListOuterRef.current?.current;
-        const list = mergeFn ? mergeFn(finalized) : finalized;
-
-        if (!firstSnapshotRef.current) {
-          for (const item of list) {
-            if (!prevIdsRef.current.has(item.id)) {
-              onNewTicketFromRealtimeRef.current?.(item.id);
-              break;
-            }
+    void (async () => {
+      const aggregated: Feedback[] = [];
+      let cursor = "";
+      try {
+        while (!cancelled) {
+          const q = new URLSearchParams({
+            sessionId,
+            limit: "50",
+          });
+          if (cursor) q.set("cursor", cursor);
+          if (shareTokenRest) q.set("shareToken", shareTokenRest);
+          const fetchPage =
+            restFetchRef.current ?? ((u: string) => fetch(u, { credentials: "include" }));
+          const res = await fetchPage(`/api/feedback?${q.toString()}`);
+          if (!res.ok) break;
+          const data = (await res.json()) as {
+            feedback?: Record<string, unknown>[];
+            nextCursor?: string | null;
+            hasMore?: boolean;
+          };
+          const rows = Array.isArray(data.feedback) ? data.feedback : [];
+          for (const r of rows) {
+            const f = feedbackFromRestApiRow(r, sessionId);
+            if (f) aggregated.push(f);
           }
+          const next = typeof data.nextCursor === "string" ? data.nextCursor : "";
+          const hasMore = data.hasMore === true && next.trim() !== "";
+          if (!hasMore) break;
+          cursor = next;
         }
-        firstSnapshotRef.current = false;
-        prevIdsRef.current = new Set(list.map((x) => x.id));
-
-        itemsRef.current = list;
-        setItems(list);
-
-        setInitialLoading(false);
-        setHasLoadedResolved(true);
-        setIsLoadingResolved(false);
-        setFeedbackSnapshotReady(true);
-      },
-      (err) => {
-        console.error("[ECHLY] feedback onSnapshot failed", err);
-        if (sessionIdRef.current !== sessionId) return;
-        setInitialLoading(false);
-        setHasLoadedResolved(true);
-        setIsLoadingResolved(false);
-        setFeedbackSnapshotReady(true);
+      } catch (err) {
+        console.error("[ECHLY] REST session feedback load failed", err);
       }
-    );
+
+      if (cancelled || sessionIdRef.current !== sessionId) return;
+
+      const finalized = finalizeList(aggregated);
+      const mergeFn = mergeRealtimeListOuterRef.current?.current;
+      const list = mergeFn ? mergeFn(finalized) : finalized;
+      itemsRef.current = list;
+      setItems(list);
+      setInitialLoading(false);
+      setHasLoadedResolved(true);
+      setIsLoadingResolved(false);
+      setFeedbackSnapshotReady(true);
+    })();
 
     return () => {
-      unsubscribe();
+      cancelled = true;
     };
-  }, [sessionId, finalizeList, setCanonicalFeedback]);
+  }, [sessionId, enabled, shareTokenRest, finalizeList]);
 
   useEffect(() => {
     if (!sessionId) {

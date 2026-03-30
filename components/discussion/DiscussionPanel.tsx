@@ -220,7 +220,7 @@ export function DiscussionPanel({
                   Session:{" "}
                   {sessionName ? (
                     <Link
-                      href={`/dashboard/${ticket.sessionId}`}
+                      href={`/session/${ticket.sessionId}`}
                       className="text-[#155DFC] hover:underline"
                     >
                       {sessionName}

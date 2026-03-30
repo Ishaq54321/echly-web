@@ -1,5 +1,5 @@
 import "server-only";
-import type { Action, Role } from "@/lib/server/auth/authorize";
+import type { Action } from "@/lib/server/auth/authorize";
 
 export function logAuthDecision(input: {
   uid: string;
@@ -7,7 +7,7 @@ export function logAuthDecision(input: {
   route?: string;
   allowed: boolean;
   reason?: string;
-  role?: Role;
+  role?: string | null;
 }): void {
   const payload = {
     uid: input.uid,

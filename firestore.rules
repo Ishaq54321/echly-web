@@ -6,33 +6,53 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isShareUser() {
+      return request.auth.token.isShareUser == true;
+    }
+
+    function isSessionMatch(sessionId) {
+      return request.auth.token.sessionId == sessionId;
+    }
+
+    function isWorkspaceMember(wid) {
+      return isAuthed()
+        && request.auth.token.isShareUser != true
+        && request.auth.token.workspaceId == wid;
+    }
+
     match /users/{uid} {
       allow read: if isAuthed() && request.auth.uid == uid;
       allow write: if false;
     }
 
     match /workspaces/{wid} {
-      allow read: if isAuthed();
+      allow read: if isWorkspaceMember(wid);
       allow write: if false;
     }
 
     match /workspaces/{wid}/insights/{docId} {
-      allow read: if isAuthed();
+      allow read: if isWorkspaceMember(wid);
       allow write: if false;
     }
 
     match /sessions/{id} {
-      allow read: if isAuthed();
+      allow read: if isWorkspaceMember(resource.data.workspaceId)
+        || (isShareUser() && isSessionMatch(id));
+
       allow write: if false;
     }
 
     match /feedback/{id} {
-      allow read: if isAuthed();
+      allow read: if isWorkspaceMember(resource.data.workspaceId)
+        || (isShareUser() && isSessionMatch(resource.data.sessionId));
+
       allow write: if false;
     }
 
     match /comments/{id} {
-      allow read: if isAuthed();
+      allow read: if isWorkspaceMember(resource.data.workspaceId)
+        || (isShareUser() && isSessionMatch(resource.data.sessionId));
+
       allow write: if false;
     }
 

@@ -64,7 +64,7 @@ export function SessionNavigator({
     const isCurrent = s.session.id === currentSessionId;
     const isUnread = open > 0;
     const isPinned = pinnedIds.has(s.session.id);
-    const href = `/dashboard/${s.session.id}`;
+    const href = `/session/${s.session.id}`;
     const content = (
       <>
         <span className="shrink-0 w-2 flex items-center justify-center" aria-hidden>
