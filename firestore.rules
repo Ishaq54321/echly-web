@@ -6,17 +6,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isShareUser() {
-      return request.auth.token.isShareUser == true;
-    }
-
-    function isSessionMatch(sessionId) {
-      return request.auth.token.sessionId == sessionId;
-    }
-
     function isWorkspaceMember(wid) {
       return isAuthed()
-        && request.auth.token.isShareUser != true
         && request.auth.token.workspaceId == wid;
     }
 
@@ -36,23 +27,17 @@ service cloud.firestore {
     }
 
     match /sessions/{id} {
-      allow read: if isWorkspaceMember(resource.data.workspaceId)
-        || (isShareUser() && isSessionMatch(id));
-
+      allow read: if isWorkspaceMember(resource.data.workspaceId);
       allow write: if false;
     }
 
     match /feedback/{id} {
-      allow read: if isWorkspaceMember(resource.data.workspaceId)
-        || (isShareUser() && isSessionMatch(resource.data.sessionId));
-
+      allow read: if isWorkspaceMember(resource.data.workspaceId);
       allow write: if false;
     }
 
     match /comments/{id} {
-      allow read: if isWorkspaceMember(resource.data.workspaceId)
-        || (isShareUser() && isSessionMatch(resource.data.sessionId));
-
+      allow read: if isWorkspaceMember(resource.data.workspaceId);
       allow write: if false;
     }
 

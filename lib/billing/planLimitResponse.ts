@@ -1,36 +1,15 @@
 import type { PlanLimitError } from "./checkPlanLimit";
 import type { PlanId } from "./plans";
-
-export interface PlanLimitReachedBody {
-  error: "PLAN_LIMIT_REACHED";
-  message: string;
-  upgradePlan: PlanId | null;
-}
+import type { ApiErrorParams } from "@/lib/server/apiResponse";
 
 /**
- * Returns the JSON body for a 403 plan limit response.
+ * Unified API error args for POST /api/sessions when {@link checkPlanLimit} fails.
  */
-export function planLimitReachedBody(err: PlanLimitError): PlanLimitReachedBody {
+export function planLimitReachedApiError(err: PlanLimitError): ApiErrorParams {
   return {
-    error: "PLAN_LIMIT_REACHED",
+    code: "FORBIDDEN",
     message: err.message,
-    upgradePlan: err.upgradePlan,
-  };
-}
-
-export interface PlanRequiredBody {
-  error: "PLAN_REQUIRED";
-  message: string;
-  upgradePlan: PlanId | null;
-}
-
-/**
- * Returns the JSON body for a 403 plan required response (e.g. insights not on free).
- */
-export function planRequiredBody(upgradePlan: PlanId | null): PlanRequiredBody {
-  return {
-    error: "PLAN_REQUIRED",
-    message: "This feature requires a paid plan",
-    upgradePlan,
+    status: 403,
+    data: { upgradePlan: err.upgradePlan as PlanId | null },
   };
 }

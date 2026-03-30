@@ -1,7 +1,7 @@
 import "server-only";
 
-import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export const runtime = "nodejs";
 
@@ -20,17 +20,17 @@ export async function GET() {
 
     const snap = await ref.get();
 
-    return NextResponse.json({
-      ok: true,
+    return apiSuccess({
       wrote: { path: ref.path, lastTouchedAt: now },
       read: { exists: snap.exists, data: snap.data() ?? null },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json(
-      {
-        ok: false,
-        error: message,
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message,
+      status: 500,
+      data: {
         hint: {
           credentials:
             "Set FIREBASE_SERVICE_ACCOUNT_JSON (recommended) or GOOGLE_APPLICATION_CREDENTIALS (ADC) before calling this route.",
@@ -38,8 +38,6 @@ export async function GET() {
             "If needed, set FIREBASE_PROJECT_ID (defaults to echly-b74cc in code).",
         },
       },
-      { status: 500 }
-    );
+    });
   }
 }
-

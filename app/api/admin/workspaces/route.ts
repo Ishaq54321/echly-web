@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository.server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
@@ -81,9 +81,13 @@ export async function GET(req: Request) {
         overrideLimit,
       });
     }
-    return NextResponse.json(rows);
+    return apiSuccess(rows);
   } catch (err) {
     console.error("GET /api/admin/workspaces:", err);
-    return NextResponse.json({ error: "Failed to list workspaces" }, { status: 500 });
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to list workspaces",
+      status: 500,
+    });
   }
 }

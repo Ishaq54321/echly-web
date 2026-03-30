@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { logAdminAction } from "@/lib/admin/adminLogs";
 import type { PlanDoc } from "@/lib/admin/types";
@@ -55,7 +55,7 @@ export async function GET(req: Request) {
       insightsEnabled: stored?.insightsEnabled ?? base.insightsEnabled,
     };
   });
-  return NextResponse.json(plans);
+  return apiSuccess(plans);
 }
 
 /**
@@ -74,11 +74,11 @@ export async function PATCH(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return apiError({ code: "INVALID_INPUT", message: "Invalid JSON", status: 400 });
   }
   const id = typeof body.id === "string" ? body.id.trim() : "";
   if (!id) {
-    return NextResponse.json({ error: "id is required" }, { status: 400 });
+    return apiError({ code: "INVALID_INPUT", message: "id is required", status: 400 });
   }
   const { id: _id, ...updates } = body;
   const ref = adminDb.doc(`${PLANS_COLLECTION}/${id}`);
@@ -90,7 +90,7 @@ export async function PATCH(req: Request) {
   if (updates.maxMembers !== undefined) payload.maxMembers = updates.maxMembers;
   if (typeof updates.insightsEnabled === "boolean") payload.insightsEnabled = updates.insightsEnabled;
   if (Object.keys(payload).length === 0) {
-    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    return apiError({ code: "INVALID_INPUT", message: "No fields to update", status: 400 });
   }
   try {
     await ref.set(payload, { merge: true });
@@ -100,9 +100,13 @@ export async function PATCH(req: Request) {
       action: "plans.update",
       metadata: { planId: id, updates: payload },
     });
-    return NextResponse.json({ success: true, id });
+    return apiSuccess({ id });
   } catch (err) {
     console.error("PATCH /api/admin/plans:", err);
-    return NextResponse.json({ error: "Failed to update plan" }, { status: 500 });
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to update plan",
+      status: 500,
+    });
   }
 }

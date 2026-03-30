@@ -94,9 +94,16 @@ export function DiscussionList({
       try {
         const res = await authFetch(url, { cache: "no-store" });
         if (!res || !res.ok) throw new Error("Failed to load feedback");
-        const data = (await res.json()) as { feedback?: unknown[] };
+        const data = (await res.json()) as {
+          data?: { feedback?: unknown[] };
+          feedback?: unknown[];
+        };
         if (cancelled) return;
-        const raw = Array.isArray(data.feedback) ? data.feedback : [];
+        const raw = Array.isArray(data.data?.feedback)
+          ? data.data.feedback
+          : Array.isArray(data.feedback)
+            ? data.feedback
+            : [];
         onEmptyChangeRef.current?.(raw.length === 0);
         const list: DiscussionItem[] = raw.map((f: unknown) => {
           const item = f as Record<string, unknown>;

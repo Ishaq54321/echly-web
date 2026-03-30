@@ -542,16 +542,14 @@ const DISCUSSION_INBOX_MAX_SESSIONS = 35;
  */
 export async function getDiscussionInboxFeedbackForUserRepo(args: {
   userId: string;
-  userEmail: string | null | undefined;
   limit: number;
 }): Promise<Feedback[]> {
   const pageSize = args.limit;
   assertQueryLimit(pageSize, "getDiscussionInboxFeedbackForUserRepo");
   const accessible = await listAccessibleSessionsForUser({
     userId: args.userId,
-    userEmail: args.userEmail,
     limit: DISCUSSION_INBOX_MAX_SESSIONS,
-    createdByLimit: DISCUSSION_INBOX_MAX_SESSIONS,
+    ownerSessionsQueryLimit: DISCUSSION_INBOX_MAX_SESSIONS,
   });
   const sidList = accessible.map((s) => s.id).slice(0, DISCUSSION_INBOX_MAX_SESSIONS);
   if (sidList.length === 0) return [];
@@ -849,6 +847,7 @@ export async function deleteFeedbackWithSessionCountersRepo(
     for (;;) {
       let q: FirebaseFirestore.Query = adminDb
         .collection("comments")
+        .where("workspaceId", "==", resolvedWorkspaceId)
         .where("feedbackId", "==", fid)
         .orderBy(FieldPath.documentId())
         .limit(DELETE_FEEDBACK_COMMENT_TX_CHUNK);

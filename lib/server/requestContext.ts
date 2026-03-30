@@ -8,21 +8,25 @@ import { getFeedbackByIdRepo } from "@/lib/repositories/feedbackRepository.serve
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import type { AuthorizedRequestUser } from "@/lib/server/auth/authorize";
-import { tryGetAuthUser, UnauthorizedError } from "@/lib/server/auth/authorize";
+import {
+  AuthorizationError,
+  tryGetAuthUser,
+  toAuthorizationResponse,
+  UnauthorizedError,
+} from "@/lib/server/auth/authorize";
 import { extractShareToken } from "@/lib/server/shareTokenFromRequest";
-
-export type RequestIdentity =
-  | { type: "USER"; userId: string }
-  | { type: "SHARE"; shareToken: string };
+import type { IdentityType, SystemContext } from "@/lib/server/systemContext";
 
 export type ResolvedAccessIdentity =
   | { type: "SHARE"; shareToken: string }
-  | { type: "USER"; user: AuthorizedRequestUser; shareToken?: string }
+  | { type: "USER"; user: AuthorizedRequestUser }
   | { type: "NONE" };
 
 /**
- * Application identity can combine Firebase `user` with an optional share link token.
- * When both exist, identity remains {@link RequestIdentity} `USER` and `shareToken` is still passed into {@link getAccessContext}.
+ * Single identity model:
+ * - USER when authenticated
+ * - SHARE when anonymous with share token
+ * - NONE otherwise
  */
 export async function resolveAccessIdentity(
   req: Request,
@@ -30,17 +34,33 @@ export async function resolveAccessIdentity(
     /** When set (e.g. after `withAuthorization`), skips {@link tryGetAuthUser}. Use `null` to force no user. */
     authenticatedUser?: AuthorizedRequestUser | null;
     bodyShareToken?: string | null;
+    /** Path-param share token (e.g. `GET /api/share/:token`) when not present in query/body/Bearer. */
+    pathShareToken?: string | null;
   }
 ): Promise<ResolvedAccessIdentity> {
-  const shareToken = extractShareToken(req, options?.bodyShareToken ?? undefined);
+  const fromPath =
+    typeof options?.pathShareToken === "string"
+      ? options.pathShareToken.trim()
+      : "";
+  const bodyTok =
+    options?.bodyShareToken === undefined || options?.bodyShareToken === null
+      ? undefined
+      : options.bodyShareToken;
+  const fromRequest = extractShareToken(req, bodyTok);
+  let shareToken: string | null;
+  if (fromRequest != null) {
+    shareToken = fromRequest;
+  } else if (fromPath !== "") {
+    shareToken = fromPath;
+  } else {
+    shareToken = null;
+  }
   const authUser =
     options?.authenticatedUser !== undefined
       ? options.authenticatedUser
       : await tryGetAuthUser(req);
   if (authUser) {
-    return shareToken
-      ? { type: "USER", user: authUser, shareToken }
-      : { type: "USER", user: authUser };
+    return { type: "USER", user: authUser };
   }
   if (shareToken) {
     return { type: "SHARE", shareToken };
@@ -63,19 +83,12 @@ export async function resolveOptionalSessionViewer(
     return { viewerUser: null, tokenString: id.shareToken };
   }
   if (id.type === "USER") {
-    return { viewerUser: id.user, tokenString: id.shareToken };
+    return { viewerUser: id.user, tokenString: undefined };
   }
   return { viewerUser: null, tokenString: undefined };
 }
 
-export interface RequestContext {
-  /** Authenticated Firebase uid when identity is USER; null for SHARE-only access. */
-  userId: string | null;
-
-  identity: RequestIdentity;
-
-  userWorkspaceId: string;
-
+export interface RequestContext extends SystemContext {
   feedback?: Feedback | null;
 
   session?: Session | null;
@@ -100,35 +113,44 @@ export async function buildRequestContext(params: {
   feedback?: Feedback | null;
   /** When provided (including null), skips session reads for the resolved path */
   session?: Session | null;
-  /** POST body field `shareToken` (merged with query/header in {@link extractShareToken}). */
+  /** POST body field `token` or `shareToken` (merged with query/Bearer in {@link extractShareToken}). */
   bodyShareToken?: string | null;
+  /** Same as {@link resolveAccessIdentity} `pathShareToken`. */
+  pathShareToken?: string | null;
+  /**
+   * When true, anonymous requests without a share token are allowed; `identityType` is `NONE`
+   * and access is resolved with `user: null` (e.g. GET session overview).
+   */
+  optionalAuth?: boolean;
 }): Promise<RequestContext> {
   const { feedbackId, sessionId } = params;
 
   const identityRes = await resolveAccessIdentity(params.req, {
     authenticatedUser: params.authenticatedUser,
     bodyShareToken: params.bodyShareToken,
+    pathShareToken: params.pathShareToken,
   });
 
   if (identityRes.type === "NONE") {
-    throw new UnauthorizedError();
+    if (!params.optionalAuth) {
+      throw new UnauthorizedError();
+    }
   }
 
-  const identity: RequestIdentity =
+  const identityType: IdentityType =
     identityRes.type === "SHARE"
-      ? { type: "SHARE", shareToken: identityRes.shareToken }
-      : { type: "USER", userId: identityRes.user.uid };
+      ? "SHARE"
+      : identityRes.type === "USER"
+        ? "USER"
+        : "NONE";
+
+  const shareTokenForContext: string | null =
+    identityRes.type === "SHARE" ? identityRes.shareToken : null;
 
   const viewerUser: AuthorizedRequestUser | null =
     identityRes.type === "USER" ? identityRes.user : null;
-  const tokenString =
-    identityRes.type === "SHARE"
-      ? identityRes.shareToken
-      : identityRes.type === "USER"
-        ? identityRes.shareToken
-        : undefined;
 
-  const userId = viewerUser?.uid ?? null;
+  const userId = viewerUser == null ? null : viewerUser.uid;
 
   const usePreloadedFeedback = params.feedback !== undefined;
   const usePreloadedSession = params.session !== undefined;
@@ -152,7 +174,7 @@ export async function buildRequestContext(params: {
   const skipFeedbackRepo = usePreloadedFeedback || !feedbackId;
   const skipSessionExplicitRepo = hasExplicitSessionId && usePreloadedSession;
 
-  const [userWorkspaceId, feedbackFetched, sessionFromExplicit] =
+  const [userWorkspaceIdRaw, feedbackFetched, sessionFromExplicit] =
     await Promise.all([
       workspacePromise,
       skipFeedbackRepo
@@ -180,40 +202,65 @@ export async function buildRequestContext(params: {
     session = usePreloadedSession ? params.session! : null;
   }
 
-  const sessionWorkspaceId =
-    session && typeof session.workspaceId === "string"
-      ? session.workspaceId.trim()
-      : undefined;
-
   const sidForAccess =
     explicitSessionId ||
     (session?.id ? String(session.id).trim() : "") ||
     (feedback?.sessionId ? String(feedback.sessionId).trim() : "");
 
+  const workspaceId: string | null =
+    viewerUser != null
+      ? (userWorkspaceIdRaw.trim() !== ""
+          ? userWorkspaceIdRaw.trim()
+          : null)
+      : null;
+
   let access: AccessContext | null = null;
+  let sessionOut: Session | null = session;
   if (sidForAccess) {
-    const trimmedWs = userWorkspaceId.trim();
-    const accessUser =
-      viewerUser == null
-        ? null
-        : { uid: viewerUser.uid, email: viewerUser.email };
-    const { access: resolved } = await getAccessContext({
+    const accessContextInput: SystemContext = {
+      userId,
+      workspaceId,
+      identityType,
+      shareToken: shareTokenForContext,
+    };
+    const resolved = await getAccessContext({
       sessionId: sidForAccess,
-      user: accessUser,
+      context: accessContextInput,
       session,
-      tokenString,
-      viewerWorkspaceIdOverride: trimmedWs !== "" ? trimmedWs : undefined,
     });
-    access = resolved;
+    access = resolved.access;
+    sessionOut = resolved.session;
   }
+
+  const sessionWorkspaceId =
+    sessionOut != null && typeof sessionOut.workspaceId === "string"
+      ? sessionOut.workspaceId.trim()
+      : undefined;
 
   return {
     userId,
-    identity,
-    userWorkspaceId,
+    workspaceId,
+    identityType,
+    shareToken: shareTokenForContext,
     feedback,
-    session,
+    session: sessionOut,
     sessionWorkspaceId,
     access,
   };
+}
+
+export async function tryBuildRequestContext(
+  params: Parameters<typeof buildRequestContext>[0]
+): Promise<
+  { ok: true; ctx: RequestContext } | { ok: false; response: Response }
+> {
+  try {
+    const ctx = await buildRequestContext(params);
+    return { ok: true, ctx };
+  } catch (e) {
+    if (e instanceof UnauthorizedError || e instanceof AuthorizationError) {
+      return { ok: false, response: toAuthorizationResponse(e) };
+    }
+    throw e;
+  }
 }

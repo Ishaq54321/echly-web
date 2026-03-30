@@ -143,9 +143,19 @@ export async function addComment(
     const msg = await res.text().catch(() => "");
     throw new HttpError(msg || "Failed to add comment", res.status);
   }
-  const json = (await res.json()) as { id?: string };
-  if (!json.id) throw new Error("Missing comment id");
-  return json.id;
+  const json = await res.json();
+
+  if (!json.success) {
+    throw new Error(json.error?.message || "Failed to add comment");
+  }
+
+  const id = json.data?.id;
+
+  if (!id) {
+    throw new Error("Missing comment id");
+  }
+
+  return id;
 }
 
 export async function updatePinPosition(
@@ -213,6 +223,10 @@ export async function deleteComment(commentId: string): Promise<void> {
 }
 
 /** Recent comments for a session (overview activity feed). Limited. */
-export async function getSessionRecentComments(sessionId: string, max: number = 10) {
-  return getSessionRecentCommentsRepo(sessionId, max);
+export async function getSessionRecentComments(
+  workspaceId: string,
+  sessionId: string,
+  max: number = 10
+) {
+  return getSessionRecentCommentsRepo(workspaceId, sessionId, max);
 }

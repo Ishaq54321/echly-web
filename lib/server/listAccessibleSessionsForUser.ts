@@ -4,16 +4,16 @@ import { getAccessContext } from "@/lib/access/getAccessContext";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import type { Session } from "@/lib/domain/session";
 import { assertQueryLimit } from "@/lib/querySafety";
-import {
-  getUserWorkspaceIdRepo,
-  isShareAuthUid,
-} from "@/lib/repositories/usersRepository.server";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { buildSystemContext } from "@/lib/server/systemContext";
 
-const SHARE_EMAIL_LOOKUP_LIMIT = 100;
-const DEFAULT_CREATED_BY_LIMIT = 80;
+const DEFAULT_OWNER_SESSIONS_QUERY_LIMIT = 80;
 
 function updatedAtMs(session: Session): number {
-  const t = session.updatedAt ?? session.createdAt;
+  const t =
+    session.updatedAt !== undefined && session.updatedAt !== null
+      ? session.updatedAt
+      : session.createdAt;
   if (t == null) return 0;
   if (typeof t === "string") return Date.parse(t) || 0;
   if (t instanceof Date) return t.getTime();
@@ -24,25 +24,28 @@ function updatedAtMs(session: Session): number {
 }
 
 /**
- * Candidate session ids: created by the user, sessions in the user's workspace, plus email shares.
+ * Candidate session ids: created by the user and sessions in the user's workspace.
  * Each row is kept only if {@link getAccessContext} grants `capabilities.canView` (single path).
  */
 export async function listAccessibleSessionsForUser(args: {
   userId: string;
-  userEmail: string | null | undefined;
   /** Max sessions returned (after access filter). */
   limit?: number;
-  /** Max sessions to read from createdByUserId query. */
-  createdByLimit?: number;
+  /** Max sessions to read per Firestore branch (owned + workspace lists). */
+  ownerSessionsQueryLimit?: number;
 }): Promise<Session[]> {
-  const outLimit = Math.min(args.limit ?? 30, 100);
-  const createdByLimit = Math.min(args.createdByLimit ?? DEFAULT_CREATED_BY_LIMIT, 120);
-  assertQueryLimit(createdByLimit, "listAccessibleSessionsForUser.createdBy");
+  const limitArg = args.limit !== undefined ? args.limit : 30;
+  const outLimit = Math.min(limitArg, 100);
+  const ownerLimitArg =
+    args.ownerSessionsQueryLimit !== undefined
+      ? args.ownerSessionsQueryLimit
+      : DEFAULT_OWNER_SESSIONS_QUERY_LIMIT;
+  const ownerSessionsQueryLimit = Math.min(ownerLimitArg, 120);
+  assertQueryLimit(ownerSessionsQueryLimit, "listAccessibleSessionsForUser.ownerSessionsQuery");
   assertQueryLimit(outLimit, "listAccessibleSessionsForUser.out");
 
   const uid = args.userId.trim();
   if (!uid) return [];
-  if (isShareAuthUid(uid)) return [];
 
   const ids = new Set<string>();
 
@@ -50,7 +53,7 @@ export async function listAccessibleSessionsForUser(args: {
     .collection("sessions")
     .where("createdByUserId", "==", uid)
     .orderBy("updatedAt", "desc")
-    .limit(createdByLimit)
+    .limit(ownerSessionsQueryLimit)
     .get();
   for (const d of createdSnap.docs) ids.add(d.id);
 
@@ -59,34 +62,23 @@ export async function listAccessibleSessionsForUser(args: {
     .collection("sessions")
     .where("workspaceId", "==", workspaceId)
     .orderBy("updatedAt", "desc")
-    .limit(createdByLimit)
+    .limit(ownerSessionsQueryLimit)
     .get();
   for (const d of workspaceSnap.docs) ids.add(d.id);
 
-  const email =
-    typeof args.userEmail === "string" ? args.userEmail.trim().toLowerCase() : "";
-  if (email) {
-    const shareSnap = await adminDb
-      .collection("session_shares")
-      .where("email", "==", email)
-      .limit(SHARE_EMAIL_LOOKUP_LIMIT)
-      .get();
-    for (const d of shareSnap.docs) {
-      const row = d.data() as { sessionId?: unknown };
-      const sid = typeof row.sessionId === "string" ? row.sessionId.trim() : "";
-      if (sid) ids.add(sid);
-    }
-  }
-
-  const userPayload = { uid, email: args.userEmail ?? null };
+  const wsTrim = workspaceId.trim();
+  const accessCallerContext = buildSystemContext({
+    userId: uid,
+    workspaceId: wsTrim === "" ? null : wsTrim,
+  });
 
   const resolved = await Promise.all(
     [...ids].map(async (sessionId) => {
       const { session, access } = await getAccessContext({
         sessionId,
-        user: userPayload,
+        context: accessCallerContext,
       });
-      if (!access?.capabilities.canView || !session) return null;
+      if (!access.capabilities.canView) return null;
       return session;
     })
   );

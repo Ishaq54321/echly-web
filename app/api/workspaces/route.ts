@@ -1,12 +1,16 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
-import { requireAuth } from "@/lib/server/auth";
+import {
+  requireAuth,
+  toAuthorizationResponse,
+} from "@/lib/server/auth/authorize";
 import { corsHeaders } from "@/lib/server/cors";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -41,18 +45,20 @@ export async function POST(req: NextRequest) {
   let user;
   try {
     user = await requireAuth(req);
-  } catch (res) {
-    return unauthorizedResponse(req, res as Response);
+  } catch (err) {
+    return unauthorizedResponse(req, toAuthorizationResponse(err));
   }
 
   let body: WorkspacePostBody;
   try {
     body = (await req.json()) as WorkspacePostBody;
   } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid JSON body" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Invalid JSON body",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   const name = typeof body.name === "string" && body.name.trim() ? body.name.trim() : "My Account";
@@ -69,8 +75,9 @@ export async function POST(req: NextRequest) {
           : "";
       if (preWid) {
         await setWorkspaceClaim(user.uid, preWid);
-        return NextResponse.json(
-          { success: true, workspaceId: preWid, userId: user.uid },
+        return apiSuccess(
+          { workspaceId: preWid, userId: user.uid },
+          null,
           { headers: corsHeaders(req) }
         );
       }
@@ -139,16 +146,19 @@ export async function POST(req: NextRequest) {
     }
 
     await setWorkspaceClaim(user.uid, resolvedWid);
-    return NextResponse.json(
-      { success: true, workspaceId: resolvedWid, userId: user.uid },
+    return apiSuccess(
+      { workspaceId: resolvedWid, userId: user.uid },
+      null,
       { headers: corsHeaders(req) }
     );
   } catch (err) {
     console.error("POST /api/workspaces:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to upsert user profile" },
-      { status: 500, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to upsert user profile",
+      status: 500,
+      init: { headers: corsHeaders(req) },
+    });
   }
 }
 
@@ -157,37 +167,43 @@ export async function PATCH(req: NextRequest) {
   let user;
   try {
     user = await requireAuth(req);
-  } catch (res) {
-    return unauthorizedResponse(req, res as Response);
+  } catch (err) {
+    return unauthorizedResponse(req, toAuthorizationResponse(err));
   }
 
   let body: WorkspacePatchBody;
   try {
     body = (await req.json()) as WorkspacePatchBody;
   } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid JSON body" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Invalid JSON body",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   const updates =
     body.updates && typeof body.updates === "object" ? body.updates : null;
 
   if (!updates || Object.keys(updates).length === 0) {
-    return NextResponse.json(
-      { success: false, error: "updates are required" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "updates are required",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   const forbiddenFields = ["billing", "plan", "usage", "ownerId"];
   for (const key of Object.keys(updates)) {
     if (forbiddenFields.includes(key)) {
-      return NextResponse.json(
-        { success: false, error: `Forbidden field: ${key}` },
-        { status: 403, headers: corsHeaders(req) }
-      );
+      return apiError({
+        code: "FORBIDDEN",
+        message: `Forbidden field: ${key}`,
+        status: 403,
+        init: { headers: corsHeaders(req) },
+      });
     }
   }
 
@@ -207,10 +223,12 @@ export async function PATCH(req: NextRequest) {
   );
 
   if (Object.keys(cleanedUpdates).length === 0) {
-    return NextResponse.json(
-      { success: false, error: "No valid fields to update" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "No valid fields to update",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   try {
@@ -222,12 +240,14 @@ export async function PATCH(req: NextRequest) {
       },
       { merge: true }
     );
-    return NextResponse.json({ success: true }, { headers: corsHeaders(req) });
+    return apiSuccess({}, null, { headers: corsHeaders(req) });
   } catch (err) {
     console.error("PATCH /api/workspaces:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to update workspace" },
-      { status: 500, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to update workspace",
+      status: 500,
+      init: { headers: corsHeaders(req) },
+    });
   }
 }

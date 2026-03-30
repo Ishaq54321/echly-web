@@ -336,23 +336,38 @@ export function useSessionFeedbackPaginated(
             limit: "50",
           });
           if (cursor) q.set("cursor", cursor);
-          if (shareTokenRest) q.set("shareToken", shareTokenRest);
+          if (shareTokenRest) q.set("token", shareTokenRest);
           const fetchPage =
             restFetchRef.current ?? ((u: string) => fetch(u, { credentials: "include" }));
           const res = await fetchPage(`/api/feedback?${q.toString()}`);
           if (!res.ok) break;
           const data = (await res.json()) as {
+            data?: {
+              feedback?: Record<string, unknown>[];
+              nextCursor?: string | null;
+              hasMore?: boolean;
+            };
             feedback?: Record<string, unknown>[];
             nextCursor?: string | null;
             hasMore?: boolean;
           };
-          const rows = Array.isArray(data.feedback) ? data.feedback : [];
+          const envelope = data.data;
+          const rows = Array.isArray(envelope?.feedback)
+            ? envelope.feedback
+            : Array.isArray(data.feedback)
+              ? data.feedback
+              : [];
           for (const r of rows) {
             const f = feedbackFromRestApiRow(r, sessionId);
             if (f) aggregated.push(f);
           }
-          const next = typeof data.nextCursor === "string" ? data.nextCursor : "";
-          const hasMore = data.hasMore === true && next.trim() !== "";
+          const next = typeof envelope?.nextCursor === "string"
+            ? envelope.nextCursor
+            : typeof data.nextCursor === "string"
+              ? data.nextCursor
+              : "";
+          const hasMoreFlag = envelope?.hasMore ?? data.hasMore;
+          const hasMore = hasMoreFlag === true && next.trim() !== "";
           if (!hasMore) break;
           cursor = next;
         }

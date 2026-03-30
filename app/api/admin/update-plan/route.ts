@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import {
+  requireAuth,
+  toAuthorizationResponse,
+} from "@/lib/server/auth/authorize";
 import { invalidateWorkspaceCache } from "@/lib/server/resolveWorkspaceForUser";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace, updateWorkspacePlanRepo } from "@/lib/repositories/workspacesRepository.server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 import type { PlanId } from "@/lib/billing/plans";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 const VALID_PLANS: PlanId[] = ["free", "starter", "business", "enterprise"];
 
@@ -19,18 +22,15 @@ export async function POST(req: Request) {
   let user;
   try {
     user = await requireAuth(req);
-  } catch (res) {
-    return res as Response;
+  } catch (err) {
+    return toAuthorizationResponse(err);
   }
 
   let body: { newPlan?: string };
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: "Invalid JSON body" },
-      { status: 400 }
-    );
+    return apiError({ code: "INVALID_INPUT", message: "Invalid JSON body", status: 400 });
   }
 
   const newPlan = typeof body.newPlan === "string" ? body.newPlan.trim().toLowerCase() : "";
@@ -40,32 +40,32 @@ export async function POST(req: Request) {
     workspaceId = await getUserWorkspaceIdRepo(user.uid);
   } catch (err) {
     console.error("POST /api/admin/update-plan: resolve workspace", err);
-    return NextResponse.json(
-      { error: "Could not resolve workspace for user" },
-      { status: 500 }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Could not resolve workspace for user",
+      status: 500,
+    });
   }
 
   if (!VALID_PLANS.includes(newPlan as PlanId)) {
-    return NextResponse.json(
-      { error: "newPlan must be one of: free, starter, business, enterprise" },
-      { status: 400 }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "newPlan must be one of: free, starter, business, enterprise",
+      status: 400,
+    });
   }
 
   const workspace = await getWorkspace(workspaceId);
   if (!workspace) {
-    return NextResponse.json(
-      { error: "Workspace not found" },
-      { status: 404 }
-    );
+    return apiError({ code: "NOT_FOUND", message: "Workspace not found", status: 404 });
   }
 
   if (workspace.ownerId !== user.uid) {
-    return NextResponse.json(
-      { error: "Only the workspace owner can change the plan" },
-      { status: 403 }
-    );
+    return apiError({
+      code: "FORBIDDEN",
+      message: "Only the workspace owner can change the plan",
+      status: 403,
+    });
   }
 
   try {
@@ -73,8 +73,7 @@ export async function POST(req: Request) {
     invalidateWorkspaceCache(user.uid);
     const catalog = await getPlanCatalog();
     const entry = catalog[newPlan as PlanId] ?? catalog.free;
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       plan: newPlan,
       limits: {
         maxSessions: entry.maxSessions,
@@ -84,9 +83,10 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error("POST /api/admin/update-plan:", err);
-    return NextResponse.json(
-      { error: "Failed to update plan" },
-      { status: 500 }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to update plan",
+      status: 500,
+    });
   }
 }

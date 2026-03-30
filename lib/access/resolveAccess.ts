@@ -1,9 +1,11 @@
 import type { AccessLevel } from "@/lib/domain/accessLevel";
-import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
+import { requireAccessLevel } from "@/lib/domain/accessLevel";
+import type { Role } from "@/lib/domain/role";
+import type { SessionGeneralAccess } from "@/lib/domain/session";
+import { assert } from "@/lib/utils/assert";
 
 export type { AccessLevel };
-
-export type Role = "COMMENTER" | "RESOLVER" | "OWNER" | "VIEWER";
+export type { Role };
 
 export type AccessCapabilities = {
   canView: boolean;
@@ -25,9 +27,10 @@ export type AccessContext = {
 
 export function buildCapabilities(
   role: Role,
-  userId: string | null
+  userId: string | null,
+  sessionGranted: boolean
 ): AccessCapabilities {
-  if (role === "VIEWER") {
+  if (!sessionGranted) {
     return {
       canView: false,
       canComment: false,
@@ -40,18 +43,35 @@ export function buildCapabilities(
 
   const isAuthenticated = !!userId;
 
+  if (role === "VIEWER") {
+    return {
+      canView: true,
+      canComment: isAuthenticated,
+      canResolve: false,
+      canAssign: false,
+      canDeleteOwnComment: isAuthenticated,
+      canDeleteTicket: false,
+    };
+  }
+
+  if (role === "RESOLVER") {
+    return {
+      canView: true,
+      canComment: isAuthenticated,
+      canResolve: isAuthenticated,
+      canAssign: isAuthenticated,
+      canDeleteOwnComment: isAuthenticated,
+      canDeleteTicket: false,
+    };
+  }
+
   return {
     canView: true,
-
-    canComment: isAuthenticated, // login required
-
-    canResolve: isAuthenticated && (role === "RESOLVER" || role === "OWNER"),
-
-    canAssign: isAuthenticated && (role === "RESOLVER" || role === "OWNER"), // future safe
-
+    canComment: isAuthenticated,
+    canResolve: isAuthenticated,
+    canAssign: isAuthenticated,
     canDeleteOwnComment: isAuthenticated,
-
-    canDeleteTicket: isAuthenticated && role === "OWNER",
+    canDeleteTicket: isAuthenticated,
   };
 }
 
@@ -79,15 +99,15 @@ type ResolveAccessInput = {
     id: string;
     workspaceId: string;
     accessLevel: AccessLevel;
-    /** Session owner uid: canonical `createdByUserId`, else `createdBy.id` / legacy `userId`. */
-    ownerUserId?: string | null;
+    /** Session owner uid from canonical `createdByUserId`. */
+    ownerUserId: string;
+    generalAccess: SessionGeneralAccess;
   };
   user: {
     uid: string;
-    workspaceId?: string | null;
+    workspaceId: string;
   } | null;
-  /** Email-invite tier when the viewer is not a workspace member. */
-  inviteAccess?: AccessLevel | null;
+  /** Present only when the share_links row is active; expiry downgrades tier, not grant. */
   token?: {
     generalAccess: AccessLevel;
     isActive: boolean;
@@ -95,46 +115,73 @@ type ResolveAccessInput = {
   } | null;
 };
 
-export type ResolveAccessResult = { role: Role };
+export type ResolveAccessResult = { role: Role; sessionGranted: boolean };
 
 /**
- * Single permission engine for role. Precedence for effective tier (before role mapping):
- * 1. Workspace membership (same workspace as session → resolve tier)
- * 2. Email invite row (`inviteAccess`)
- * 3. Active share link token (`token`) — optional; never required for access
- * 4. Session default (`session.accessLevel`, fallback `"view"`)
+ * Single access engine. Grant rule:
+ * - `link_view` → public session surface (anyone may enter; tier from session / token).
+ * - `restricted` → exactly one of: owner, same-workspace member, or share link row in context (`token`).
  *
- * Role mapping: session owner → OWNER; effective tier resolve → RESOLVER; else COMMENTER.
- * When `token` is null, omitted, inactive, or expired (handled here via expiresAt), the session baseline applies.
+ * Role: owner → OWNER; workspace member → RESOLVER; else tier from link (if any) or session `accessLevel` (view/comment → VIEWER; resolve → RESOLVER).
  */
 export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
-  const { session, user, inviteAccess, token } = input;
+  const { session, user, token } = input;
 
-  const ownerUid = session.ownerUserId?.trim() ?? "";
-  if (user && ownerUid && user.uid === ownerUid) {
-    return { role: "OWNER" };
+  assert(session.accessLevel, "Missing accessLevel");
+
+  const ownerUid = session.ownerUserId.trim();
+  const sw = session.workspaceId.trim();
+  const uid = user == null ? "" : user.uid.trim();
+  const uw = user == null ? "" : user.workspaceId.trim();
+  if (user != null) {
+    assert(uid, "Missing user uid");
   }
 
-  const sw = session.workspaceId.trim();
-  const uw = user?.workspaceId?.trim() ?? "";
+  const isOwner = !!user && !!ownerUid && uid === ownerUid;
+  const isWorkspaceMember =
+    !!user && uid !== "" && uw !== "" && uw === sw;
+
+  const hasShareLinkContext = token != null && token.isActive;
+  const tokenExpired =
+    hasShareLinkContext &&
+    token.expiresAt != null &&
+    Date.now() > token.expiresAt;
+
+  const isLinkView = session.generalAccess === "link_view";
+
+  const accessGranted =
+    isLinkView ||
+    isOwner ||
+    isWorkspaceMember ||
+    hasShareLinkContext;
+
+  if (!accessGranted) {
+    return { role: "VIEWER", sessionGranted: false };
+  }
+
+  const shareTokenIsOnlyGrant =
+    !isLinkView && !isOwner && !isWorkspaceMember && hasShareLinkContext;
+  if (shareTokenIsOnlyGrant && tokenExpired) {
+    return { role: "VIEWER", sessionGranted: false };
+  }
+
+  if (isOwner) {
+    return { role: "OWNER", sessionGranted: true };
+  }
+
+  if (isWorkspaceMember) {
+    return { role: "RESOLVER", sessionGranted: true };
+  }
 
   let level: AccessLevel;
-  if (user && uw !== "" && uw === sw) {
-    level = "resolve";
-  } else if (inviteAccess != null) {
-    level = normalizeAccessLevel(inviteAccess);
-  } else if (token?.isActive) {
-    if (token.expiresAt != null && Date.now() > token.expiresAt) {
-      level = "view";
-    } else {
-      level = normalizeAccessLevel(token.generalAccess);
-    }
+  if (hasShareLinkContext) {
+    level = tokenExpired ? "view" : requireAccessLevel(token.generalAccess);
   } else {
-    level = normalizeAccessLevel(session.accessLevel ?? "view");
+    level = requireAccessLevel(session.accessLevel);
   }
 
   if (level === "resolve") {
-    return { role: "RESOLVER" };
+    return { role: "RESOLVER", sessionGranted: true };
   }
-  return { role: "COMMENTER" };
+  return { role: "VIEWER", sessionGranted: true };
 }

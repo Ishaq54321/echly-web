@@ -1,9 +1,12 @@
-import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import {
+  requireAuth,
+  toAuthorizationResponse,
+} from "@/lib/server/auth/authorize";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +18,8 @@ export async function GET(req: Request) {
   let user;
   try {
     user = await requireAuth(req);
-  } catch {
-    return new Response("Unauthorized", { status: 401 });
+  } catch (err) {
+    return toAuthorizationResponse(err);
   }
 
   try {
@@ -24,11 +27,15 @@ export async function GET(req: Request) {
     const workspace = await getWorkspace(workspaceId);
 
     if (!workspace) {
-      return new Response("Workspace not found", { status: 403 });
+      return apiError({ code: "FORBIDDEN", message: "Workspace not found", status: 403 });
     }
 
     if (!workspace.billing?.plan) {
-      return new Response("Billing plan missing", { status: 500 });
+      return apiError({
+        code: "INTERNAL_ERROR",
+        message: "Billing plan missing",
+        status: 500,
+      });
     }
 
     const plan = workspace.billing.plan;
@@ -39,7 +46,7 @@ export async function GET(req: Request) {
         ? override // includes null = unlimited
         : catalog[plan]?.maxSessions ?? null;
 
-    return NextResponse.json({
+    return apiSuccess({
       plan,
       limits: {
         maxSessions,
@@ -47,8 +54,12 @@ export async function GET(req: Request) {
     });
   } catch (err) {
     if (err instanceof Error && err.message === MISSING_USER_WORKSPACE_ERROR) {
-      return new Response("Workspace not found", { status: 403 });
+      return apiError({ code: "FORBIDDEN", message: "Workspace not found", status: 403 });
     }
-    return new Response("Failed to load billing data", { status: 500 });
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to load billing data",
+      status: 500,
+    });
   }
 }

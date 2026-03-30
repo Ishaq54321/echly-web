@@ -531,7 +531,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const isAuthFailureResponse = React.useCallback((text: string | null): boolean => {
     return Boolean(
       text?.includes("Not authenticated") ||
-      text?.includes("NOT_AUTHENTICATED")
+      text?.includes("NOT_AUTHENTICATED") ||
+      text?.includes("UNAUTHORIZED")
     );
   }, []);
 
@@ -721,13 +722,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         suggestedTags?: string[];
         actionSteps?: string[];
       };
-      let structured:
-        | {
-            success?: boolean;
-            tickets?: StructureTicket[];
-            error?: string;
-          }
-        | null = null;
+      let structuredPayload: {
+        tickets?: StructureTicket[];
+        structuredSuccess?: boolean;
+      } | null = null;
+      let structuredErrorMessage: string | undefined;
       try {
         const res = await apiFetch("/api/structure-feedback", {
           method: "POST",
@@ -738,20 +737,27 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           }),
         });
         throwIfHttpError(res, "structure-feedback");
-        structured = (await res.json()) as {
+        const envelope = (await res.json()) as {
           success?: boolean;
-          tickets?: StructureTicket[];
-          error?: string;
+          data?: { tickets?: StructureTicket[]; structuredSuccess?: boolean };
+          error?: { message?: string };
         };
+        structuredPayload = envelope.data ?? null;
+        structuredErrorMessage = envelope.error?.message;
       } catch (e) {
         console.error("[ECHLY] structure-feedback request failed", e);
         throw e;
       }
 
-      if (!structured?.success || !structured.tickets?.length) {
-        throw new Error(structured?.error ?? "Structure feedback did not return a ticket");
+      if (
+        !structuredPayload?.structuredSuccess ||
+        !structuredPayload.tickets?.length
+      ) {
+        throw new Error(
+          structuredErrorMessage ?? "Structure feedback did not return a ticket"
+        );
       }
-      const normalized = structured.tickets[0];
+      const normalized = structuredPayload.tickets[0];
 
       try {
         if (!screenshot) {
@@ -825,13 +831,26 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           inFlightFeedbackIds.delete(feedbackId);
         }
 
-        const feedbackJson = feedbackResponse?.data;
-        const text = feedbackResponse?.error ?? "";
+        type CreatedTicket = {
+          id: string;
+          title: string;
+          instruction?: string;
+          description?: string;
+          type?: string;
+          actionSteps?: string[];
+        };
+        const feedbackJson = feedbackResponse?.data as
+          | { success?: boolean; data?: { ticket?: CreatedTicket }; ticket?: CreatedTicket }
+          | undefined;
+        const text =
+          typeof feedbackResponse?.error === "string"
+            ? feedbackResponse.error
+            : JSON.stringify(feedbackResponse?.error ?? "");
         if (!feedbackResponse?.success && isAuthFailureResponse(text)) {
           throw new Error("Not authenticated.");
         }
-        if (feedbackJson?.success && feedbackJson.ticket) {
-          const tick = feedbackJson.ticket;
+        const tick = feedbackJson?.data?.ticket ?? feedbackJson?.ticket;
+        if (feedbackJson?.success && tick) {
           const created: StructuredFeedback = {
             id: tick.id,
             title: tick.title,
@@ -1113,31 +1132,40 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     });
     const data = (await res.json()) as {
       success?: boolean;
+      data?: { session?: { id: string }; upgradePlan?: unknown };
       session?: { id: string };
-      error?: string;
-      message?: string;
-      upgradePlan?: unknown;
+      error?: { code?: string; message?: string };
     };
+    const created = data.data?.session ?? data.session;
+    const limitPayload =
+      data.data && typeof data.data === "object" && "upgradePlan" in data.data
+        ? (data.data as { upgradePlan?: unknown })
+        : null;
     logger.debug("extension", "session_create_response", {
       status: res.status,
       ok: res.ok,
       success: data.success,
-      sessionId: data.session?.id,
+      sessionId: created?.id,
       error: data.error,
     });
-    if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
+    if (
+      res.status === 403 &&
+      data.success === false &&
+      data.error?.code === "FORBIDDEN" &&
+      limitPayload
+    ) {
       logger.debug("extension", "session_limit_reached");
       return {
         limitReached: true,
-        message: data.message ?? "You've reached your session limit.",
-        upgradePlan: data.upgradePlan,
+        message: data.error.message ?? "You've reached your session limit.",
+        upgradePlan: limitPayload.upgradePlan,
       };
     }
-    if (!res.ok || !data.success || !data.session?.id) {
+    if (!res.ok || !data.success || !created?.id) {
       throw new Error("API_ERROR_" + res.status);
     }
     invalidateSessionsCache();
-    return { id: data.session.id };
+    return { id: created.id };
   }
 
   const environment = new ExtensionCaptureEnvironment({

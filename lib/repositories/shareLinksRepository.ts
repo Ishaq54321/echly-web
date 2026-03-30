@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
-import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
+import { requireAccessLevel } from "@/lib/domain/accessLevel";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
 export type ShareGeneralAccess = AccessLevel;
@@ -18,7 +18,7 @@ export interface ShareLinkRecord {
   userId: string;
   workspaceId: string;
   generalAccess: ShareGeneralAccess;
-  createdBy: string;
+  createdByUserId: string;
   createdAt: Timestamp | null;
   expiresAt: Timestamp | null;
   isActive: boolean;
@@ -40,7 +40,7 @@ export async function createShareLink(
   userId: string,
   sessionId: string,
   generalAccess: ShareGeneralAccess,
-  createdBy: string,
+  createdByUserId: string,
   options?: { expiresAt?: Date | null }
 ): Promise<CreateShareLinkResult> {
   const normalizedUserId = userId.trim();
@@ -51,23 +51,28 @@ export async function createShareLink(
   if (!trimmedSession) {
     throw new Error("createShareLink: sessionId is required");
   }
-  const uid = createdBy.trim();
+  const uid = createdByUserId.trim();
   if (!uid) {
-    throw new Error("createShareLink: createdBy is required");
+    throw new Error("createShareLink: createdByUserId is required");
   }
-  const level = normalizeAccessLevel(generalAccess) as ShareGeneralAccess;
+  const level = requireAccessLevel(generalAccess) as ShareGeneralAccess;
   const workspaceId = await getUserWorkspaceIdRepo(normalizedUserId);
   const token = generateUrlSafeToken();
   const ref = adminDb.collection("share_links").doc();
 
-  const exp = options?.expiresAt ?? null;
+  const exp =
+    options === undefined
+      ? null
+      : options.expiresAt === undefined
+        ? null
+        : options.expiresAt;
   await ref.set({
     userId: normalizedUserId,
     workspaceId,
     token,
     sessionId: trimmedSession,
     generalAccess: level,
-    createdBy: uid,
+    createdByUserId: uid,
     createdAt: FieldValue.serverTimestamp(),
     lastAccessedAt: null,
     ...(exp ? { expiresAt: Timestamp.fromDate(exp) } : {}),
@@ -79,7 +84,9 @@ export async function createShareLink(
 
 export async function updateShareLinkLastAccessedAt(shareLinkDocumentId: string): Promise<void> {
   const linkId = shareLinkDocumentId.trim();
-  if (!linkId) return;
+  if (!linkId) {
+    throw new Error("updateShareLinkLastAccessedAt: missing link id");
+  }
   await adminDb.doc(`share_links/${linkId}`).update({
     lastAccessedAt: FieldValue.serverTimestamp(),
   });
@@ -103,7 +110,7 @@ export async function getShareLinkByToken(token: string): Promise<ShareLinkRecor
     userId?: unknown;
     workspaceId?: unknown;
     generalAccess?: unknown;
-    createdBy?: unknown;
+    createdByUserId?: unknown;
     createdAt?: Timestamp | null;
     expiresAt?: unknown;
     isActive?: unknown;
@@ -112,12 +119,21 @@ export async function getShareLinkByToken(token: string): Promise<ShareLinkRecor
   const sessionId = typeof raw.sessionId === "string" ? raw.sessionId : "";
   if (!sessionId) return null;
 
+  if (raw.isActive !== true) {
+    return null;
+  }
+
   const userId = typeof raw.userId === "string" ? raw.userId.trim() : "";
   const workspaceIdRaw = typeof raw.workspaceId === "string" ? raw.workspaceId.trim() : "";
   if (!workspaceIdRaw) {
     throw new Error("Invalid share link: missing workspaceId");
   }
   const workspaceId = workspaceIdRaw;
+  const createdBy =
+    typeof raw.createdByUserId === "string" ? raw.createdByUserId.trim() : "";
+  if (!createdBy) {
+    throw new Error("Invalid share link: missing createdByUserId");
+  }
 
   return {
     id: d.id,
@@ -125,11 +141,11 @@ export async function getShareLinkByToken(token: string): Promise<ShareLinkRecor
     sessionId,
     userId,
     workspaceId,
-    generalAccess: normalizeAccessLevel(raw.generalAccess) as ShareGeneralAccess,
-    createdBy: typeof raw.createdBy === "string" ? raw.createdBy : "",
-    createdAt: raw.createdAt ?? null,
+    generalAccess: requireAccessLevel(raw.generalAccess) as ShareGeneralAccess,
+    createdByUserId: createdBy,
+    createdAt: raw.createdAt === undefined ? null : raw.createdAt,
     expiresAt: coerceExpiresAt(raw.expiresAt),
-    isActive: raw.isActive !== false,
+    isActive: true,
   };
 }
 

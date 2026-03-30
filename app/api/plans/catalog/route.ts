@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 import type { PlanId } from "@/lib/billing/plans";
+import { apiSuccess } from "@/lib/server/apiResponse";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +32,10 @@ export async function GET() {
         insightsEnabled: entry.insightsEnabled,
       };
     }).filter(Boolean) as PlansCatalogResponseItem[];
-    return NextResponse.json(plans);
+    return apiSuccess(plans);
   } catch {
     // getPlanCatalog already has its own fallbacks; in the unlikely case of
     // total failure, return an empty list rather than crashing the product.
-    return NextResponse.json([], { status: 200 });
+    return apiSuccess([], undefined, { status: 200 });
   }
 }
-

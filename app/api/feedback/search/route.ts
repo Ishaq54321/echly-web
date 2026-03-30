@@ -1,89 +1,10 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { Feedback } from "@/lib/domain/feedback";
 import { serializeFeedback } from "@/lib/server/serializeFeedback";
 import { getSessionFeedbackSearchCorpusForUserRepo } from "@/lib/repositories/feedbackRepository.server";
-import { getAccessContext } from "@/lib/access/getAccessContext";
 import { corsHeaders } from "@/lib/server/cors";
-import { verifyExtensionToken } from "@/lib/server/extensionAuth";
-import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
-import { getSessionUser } from "@/lib/server/session";
-import { extractShareToken } from "@/lib/server/shareTokenFromRequest";
-
-function unauthorized(): Response {
-  return Response.json(
-    {
-      success: false,
-      error: "NOT_AUTHENTICATED",
-      message: "User is not authenticated",
-    },
-    { status: 401 }
-  );
-}
-
-function missingExtensionToken(): Response {
-  return Response.json({ error: "MISSING_EXTENSION_TOKEN" }, { status: 401 });
-}
-
-function base64UrlDecodeToString(input: string): string {
-  const b64 = input.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-  return Buffer.from(padded, "base64").toString("utf8");
-}
-
-function peekJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const json = base64UrlDecodeToString(parts[1] ?? "");
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch (err) {
-    console.error("[feedback/search] peekJwtPayload parse failed:", err);
-    return null;
-  }
-}
-
-async function tryRequireAuthFast(req: NextRequest): Promise<AuthUser | null> {
-  try {
-    return await requireAuthFast(req);
-  } catch {
-    return null;
-  }
-}
-
-async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
-  const extensionToken = req.headers.get("x-extension-token")?.trim() ?? "";
-  const origin = req.headers.get("origin")?.toLowerCase() ?? "";
-  const isExtensionRequest = origin.startsWith("chrome-extension://");
-
-  if (isExtensionRequest && !extensionToken) {
-    throw missingExtensionToken();
-  }
-
-  if (extensionToken) {
-    const decoded = await verifyExtensionToken(extensionToken);
-    if (!decoded) throw unauthorized();
-    return { uid: decoded.uid, email: decoded.email ?? undefined };
-  }
-
-  const authHeader = req.headers.get("Authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7).trim();
-    const payload = peekJwtPayload(token);
-    if (payload && payload.type === "extension") {
-      const decoded = await verifyExtensionToken(token);
-      if (!decoded) throw unauthorized();
-      return { uid: decoded.uid, email: decoded.email ?? undefined };
-    }
-    const decoded = await verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email ?? undefined };
-  }
-
-  const sessionUser = await getSessionUser(req);
-  if (sessionUser) return { uid: sessionUser.uid, email: sessionUser.email ?? undefined };
-  throw unauthorized();
-}
+import { tryBuildRequestContext } from "@/lib/server/requestContext";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 function createdAtSeconds(item: Feedback): number {
   const c = item.createdAt as { seconds?: number; toDate?: () => Date } | null;
@@ -133,32 +54,41 @@ export async function OPTIONS(req: NextRequest) {
  * Loads a capped session corpus from Firestore and returns matches (title, text, tags). No pagination.
  */
 export async function GET(req: NextRequest) {
-  const shareTok = extractShareToken(req);
-  const authUser = await tryRequireAuthFast(req);
-  const user = authUser ?? null;
-
   const { searchParams } = new URL(req.url);
   const sessionId = searchParams.get("sessionId")?.trim() ?? "";
   const queryRaw = searchParams.get("query") ?? "";
 
   if (!sessionId) {
-    return NextResponse.json(
-      { error: "sessionId required" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "sessionId required",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   try {
-    const { access } = await getAccessContext({
+    const built = await tryBuildRequestContext({
+      req,
       sessionId,
-      user: user ? { uid: user.uid, email: user.email ?? null } : null,
-      tokenString: shareTok ?? undefined,
+      optionalAuth: true,
     });
+    if (!built.ok) {
+      return new Response(built.response.body, {
+        status: built.response.status,
+        statusText: built.response.statusText,
+        headers: { ...Object.fromEntries(built.response.headers), ...corsHeaders(req) },
+      });
+    }
+    const context = built.ctx;
+    const access = context.access;
     if (!access?.capabilities.canView) {
-      return NextResponse.json(
-        { error: "Forbidden" },
-        { status: 403, headers: corsHeaders(req) }
-      );
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+        init: { headers: corsHeaders(req) },
+      });
     }
 
     const corpus = await getSessionFeedbackSearchCorpusForUserRepo({
@@ -167,7 +97,7 @@ export async function GET(req: NextRequest) {
 
     const needle = queryRaw.trim();
     if (!needle) {
-      return NextResponse.json({ feedback: [] }, { headers: corsHeaders(req) });
+      return apiSuccess({ feedback: [] }, access, { headers: corsHeaders(req) });
     }
 
     const matched = corpus.filter((item) => feedbackMatchesQuery(item, needle));
@@ -178,15 +108,18 @@ export async function GET(req: NextRequest) {
       return b.id.localeCompare(a.id);
     });
 
-    return NextResponse.json(
+    return apiSuccess(
       { feedback: matched.map((item) => serializeFeedback(item, access)) },
+      access,
       { headers: corsHeaders(req) }
     );
   } catch (err) {
     console.error("GET /api/feedback/search:", err);
-    return NextResponse.json(
-      { error: "Server error" },
-      { status: 500, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Server error",
+      status: 500,
+      init: { headers: corsHeaders(req) },
+    });
   }
 }

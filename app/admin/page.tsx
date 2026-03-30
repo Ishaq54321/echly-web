@@ -19,8 +19,8 @@ export default function AdminPage() {
         if (!res || !res.ok) throw new Error("Failed to load usage");
         return res.json();
       })
-      .then((data: UsageStats) => {
-        if (!cancelled) setStats(data);
+      .then((envelope: { data?: UsageStats | null }) => {
+        if (!cancelled) setStats(envelope.data ?? null);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");

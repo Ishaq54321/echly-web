@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { resolveDebugUid } from "@/lib/server/debugUid";
 import { requireAuth, toAuthorizationResponse } from "@/lib/server/auth/authorize";
 import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
@@ -7,6 +6,7 @@ import {
   workspaceInsightsRef,
   type WorkspaceInsightsDoc,
 } from "@/lib/repositories/insightsRepository.server";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export interface InsightsApiResponse {
   lifetime: {
@@ -57,12 +57,12 @@ export async function GET(req: Request) {
 
     const cached = insightsCache.get(cacheKey);
     if (!disableCache && cached && now < cached.expiresAt) {
-      return NextResponse.json(cached.data);
+      return apiSuccess(cached.data);
     }
 
     const snap = await workspaceInsightsRef(workspaceId).get();
     if (!snap.exists) {
-      return new Response("Insights not found", { status: 404 });
+      return apiError({ code: "NOT_FOUND", message: "Insights not found", status: 404 });
     }
     const docData =
       (snap.data() as WorkspaceInsightsDoc) ?? emptyWorkspaceInsightsDoc();
@@ -91,7 +91,7 @@ export async function GET(req: Request) {
     };
 
     insightsCache.set(cacheKey, { data, expiresAt: now + INSIGHTS_CACHE_TTL_MS });
-    return NextResponse.json(data);
+    return apiSuccess(data);
   } catch (error) {
     console.error("INSIGHTS ERROR FULL:", error);
     throw error;

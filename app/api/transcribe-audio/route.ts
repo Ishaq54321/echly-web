@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import OpenAI from "openai";
-import { requireAuth } from "@/lib/server/auth";
+import {
+  requireAuth,
+  toAuthorizationResponse,
+} from "@/lib/server/auth/authorize";
 import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
-import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { WORKSPACE_SUSPENDED_MESSAGE } from "@/lib/server/assertWorkspaceActive";
 import { logger } from "@/lib/logger";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { NextResponse } from "next/server";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -110,8 +114,8 @@ export async function POST(req: NextRequest): Promise<Response> {
   let user;
   try {
     user = await requireAuth(req);
-  } catch (res) {
-    const errRes = res as Response;
+  } catch (err) {
+    const errRes = toAuthorizationResponse(err);
     return new NextResponse(errRes.body, {
       status: errRes.status,
       statusText: errRes.statusText,
@@ -120,19 +124,23 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   if (!checkRateLimit(user.uid)) {
-    return NextResponse.json(
-      { error: "Rate limit exceeded. Try again later." },
-      { status: 429, headers }
-    );
+    return apiError({
+      code: "FORBIDDEN",
+      message: "Rate limit exceeded. Try again later.",
+      status: 429,
+      init: { headers },
+    });
   }
 
   try {
     await resolveWorkspaceForUser(user.uid);
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
+      return apiError({
+        code: "FORBIDDEN",
+        message: WORKSPACE_SUSPENDED_MESSAGE,
         status: 403,
-        headers,
+        init: { headers },
       });
     }
     throw err;
@@ -147,10 +155,12 @@ export async function POST(req: NextRequest): Promise<Response> {
       fileExists: !!file,
       ...debugMeta,
     });
-    return NextResponse.json(
-      { error: "Expected multipart/form-data with field \"file\"" },
-      { status: 400, headers }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: 'Expected multipart/form-data with field "file"',
+      status: 400,
+      init: { headers },
+    });
   }
 
   let formData: FormData;
@@ -163,10 +173,12 @@ export async function POST(req: NextRequest): Promise<Response> {
       fileExists: !!file,
       ...debugMeta,
     });
-    return NextResponse.json(
-      { error: "Invalid multipart body" },
-      { status: 400, headers }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Invalid multipart body",
+      status: 400,
+      init: { headers },
+    });
   }
 
   file = formData.get("file");
@@ -185,10 +197,12 @@ export async function POST(req: NextRequest): Promise<Response> {
       fileExists: !!file,
       ...debugMeta,
     });
-    return NextResponse.json(
-      { error: "Missing required multipart field \"file\" (audio file)" },
-      { status: 400, headers }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: 'Missing required multipart field "file" (audio file)',
+      status: 400,
+      init: { headers },
+    });
   }
 
   const mime = (file.type ?? "").trim().toLowerCase();
@@ -201,13 +215,13 @@ export async function POST(req: NextRequest): Promise<Response> {
       isFileInstance: file instanceof File,
       typeofFile: typeof file,
     });
-    return NextResponse.json(
-      {
-        error:
-          "Invalid or unsupported audio type. Allowed: audio/webm, audio/mp3 (or audio/mpeg), audio/wav",
-      },
-      { status: 400, headers }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message:
+        "Invalid or unsupported audio type. Allowed: audio/webm, audio/mp3 (or audio/mpeg), audio/wav",
+      status: 400,
+      init: { headers },
+    });
   }
 
   if (file.size <= 0) {
@@ -219,10 +233,12 @@ export async function POST(req: NextRequest): Promise<Response> {
       isFileInstance: file instanceof File,
       typeofFile: typeof file,
     });
-    return NextResponse.json(
-      { error: "Audio file is empty" },
-      { status: 400, headers }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Audio file is empty",
+      status: 400,
+      init: { headers },
+    });
   }
 
   if (file.size > MAX_FILE_BYTES) {
@@ -234,10 +250,12 @@ export async function POST(req: NextRequest): Promise<Response> {
       isFileInstance: file instanceof File,
       typeofFile: typeof file,
     });
-    return NextResponse.json(
-      { error: "Audio file exceeds maximum size (10MB)" },
-      { status: 400, headers }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Audio file exceeds maximum size (10MB)",
+      status: 400,
+      init: { headers },
+    });
   }
 
   let openai: OpenAI;
@@ -245,10 +263,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     openai = getOpenAIClient();
   } catch {
     logger.error("error", "openai_configuration_missing");
-    return NextResponse.json(
-      { error: "Transcription service unavailable" },
-      { status: 500, headers }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Transcription service unavailable",
+      status: 500,
+      init: { headers },
+    });
   }
 
   try {
@@ -269,17 +289,24 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (!transcript || transcript.length < 3) {
       logger.error("error", "transcription_failed_empty_transcript");
       logger.error("transcribe", "failure");
-      return NextResponse.json({ error: "NO_SPEECH_DETECTED" }, { status: 400, headers });
+      return apiError({
+        code: "INVALID_INPUT",
+        message: "NO_SPEECH_DETECTED",
+        status: 400,
+        init: { headers },
+      });
     }
 
     logger.debug("transcribe", "success", { charCount: transcript.length });
-    return NextResponse.json({ transcript }, { headers });
+    return apiSuccess({ transcript }, null, { headers });
   } catch (err) {
     logger.error("error", "transcription_failed", err);
     logger.error("transcribe", "failure");
-    return NextResponse.json(
-      { error: "Transcription failed" },
-      { status: 500, headers }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Transcription failed",
+      status: 500,
+      init: { headers },
+    });
   }
 }

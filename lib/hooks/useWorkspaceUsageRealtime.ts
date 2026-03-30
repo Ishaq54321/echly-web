@@ -16,7 +16,7 @@ export function useWorkspaceUsageRealtime(options?: {
   error: string | null;
 } {
   const enabled = options?.enabled ?? true;
-  const { workspaceId: ctxWorkspaceId, authUid } = useWorkspace();
+  const { workspaceId: ctxWorkspaceId, isIdentityReady } = useWorkspace();
   const workspaceState = useWorkspaceRealtimeStore();
   const [targetWorkspaceId, setTargetWorkspaceId] = useState<string | null>(null);
 
@@ -26,7 +26,7 @@ export function useWorkspaceUsageRealtime(options?: {
       return;
     }
 
-    if (!authUid) {
+    if (!isIdentityReady) {
       setTargetWorkspaceId(null);
       return;
     }
@@ -47,7 +47,7 @@ export function useWorkspaceUsageRealtime(options?: {
       release();
       setTargetWorkspaceId(null);
     };
-  }, [enabled, authUid, ctxWorkspaceId]);
+  }, [enabled, isIdentityReady, ctxWorkspaceId]);
 
   if (!enabled) {
     return { data: null, loading: false, error: null };
@@ -55,7 +55,7 @@ export function useWorkspaceUsageRealtime(options?: {
 
   const widReady =
     ctxWorkspaceId != null && ctxWorkspaceId.trim() !== "";
-  const waitingForAuthOrWorkspace = !authUid || !widReady;
+  const waitingForAuthOrWorkspace = !isIdentityReady || !widReady;
 
   const isMatchingWorkspace =
     targetWorkspaceId != null && workspaceState.workspaceId === targetWorkspaceId;

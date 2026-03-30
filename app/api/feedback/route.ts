@@ -1,102 +1,15 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import type { Feedback } from "@/lib/domain/feedback";
 import {
   getDiscussionInboxFeedbackForUserRepo,
   getSessionFeedbackPageForUserWithStringCursorRepo,
 } from "@/lib/repositories/feedbackRepository.server";
-import { getAccessContext } from "@/lib/access/getAccessContext";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 import { serializeFeedback } from "@/lib/server/serializeFeedback";
 import type { AccessContext } from "@/lib/access/resolveAccess";
 import { corsHeaders } from "@/lib/server/cors";
-import { verifyExtensionToken } from "@/lib/server/extensionAuth";
-import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
-import { getSessionUser } from "@/lib/server/session";
-import { extractShareToken } from "@/lib/server/shareTokenFromRequest";
-
-function unauthorized(): Response {
-  return Response.json(
-    {
-      success: false,
-      error: "NOT_AUTHENTICATED",
-      message: "User is not authenticated",
-    },
-    {
-      status: 401,
-    }
-  );
-}
-
-function missingExtensionToken(): Response {
-  return Response.json(
-    { error: "MISSING_EXTENSION_TOKEN" },
-    {
-      status: 401,
-    }
-  );
-}
-
-function base64UrlDecodeToString(input: string): string {
-  const b64 = input.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-  // Node runtime (Next.js): Buffer exists.
-  return Buffer.from(padded, "base64").toString("utf8");
-}
-
-function peekJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const json = base64UrlDecodeToString(parts[1] ?? "");
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch (err) {
-    console.error("[feedback] peekJwtPayload parse failed:", err);
-    return null;
-  }
-}
-
-async function tryRequireAuthFast(req: NextRequest): Promise<AuthUser | null> {
-  try {
-    return await requireAuthFast(req);
-  } catch {
-    return null;
-  }
-}
-
-async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
-  const extensionToken = req.headers.get("x-extension-token")?.trim() ?? "";
-  const origin = req.headers.get("origin")?.toLowerCase() ?? "";
-  const isExtensionRequest = origin.startsWith("chrome-extension://");
-
-  if (isExtensionRequest && !extensionToken) {
-    throw missingExtensionToken();
-  }
-
-  if (extensionToken) {
-    const decoded = await verifyExtensionToken(extensionToken);
-    if (!decoded) throw unauthorized();
-    return { uid: decoded.uid, email: decoded.email ?? undefined };
-  }
-
-  const authHeader = req.headers.get("Authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7).trim();
-    const payload = peekJwtPayload(token);
-    if (payload && payload.type === "extension") {
-      const decoded = await verifyExtensionToken(token);
-      if (!decoded) throw unauthorized();
-      return { uid: decoded.uid, email: decoded.email ?? undefined };
-    }
-    const decoded = await verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email ?? undefined };
-  }
-
-  const sessionUser = await getSessionUser(req);
-  if (sessionUser) return { uid: sessionUser.uid, email: sessionUser.email ?? undefined };
-  throw unauthorized();
-}
+import { tryGetAuthUser } from "@/lib/server/auth/authorize";
+import { tryBuildRequestContext } from "@/lib/server/requestContext";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export async function OPTIONS(req: NextRequest) {
   return new Response(null, {
@@ -107,14 +20,8 @@ export async function OPTIONS(req: NextRequest) {
 
 /**
  * GET /api/feedback?sessionId=ID&cursor=XYZ&limit=20&status=open|resolved
- * Returns { feedback: [], nextCursor: string | null, hasMore: boolean }
  *
- * When `status` is omitted, returns the mixed-status session list.
- * When `status=open` or `status=resolved`, filters by Firestore `status` (paginated separately).
- *
- * Session-scoped pagination excludes soft-deleted feedback (`isDeleted === true`).
- * The repository applies the same rule as `where("isDeleted","!=",true)` without
- * dropping legacy docs that omit `isDeleted` (see getSessionFeedbackPageForUserWithStringCursorRepo).
+ * Session-scoped and inbox: `buildRequestContext` → `access.capabilities`.
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -132,26 +39,21 @@ export async function GET(req: NextRequest) {
   const safeLimit = Math.min(normalizedRequestedLimit, 50);
 
   const trimmedSid = sessionIdRaw?.trim() ?? "";
-  const shareTok = extractShareToken(req);
-  const authUser = await tryRequireAuthFast(req);
-  const user = authUser ?? null;
 
   if (trimmedSid === "") {
+    const user = await tryGetAuthUser(req);
     if (!user) {
-      return new NextResponse(
-        JSON.stringify({
-          success: false,
-          error: "NOT_AUTHENTICATED",
-          message: "User is not authenticated",
-        }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders(req) } }
-      );
+      return apiError({
+        code: "UNAUTHORIZED",
+        message: "User is not authenticated",
+        status: 401,
+        init: { headers: corsHeaders(req) },
+      });
     }
 
     try {
       const feedback = await getDiscussionInboxFeedbackForUserRepo({
         userId: user.uid,
-        userEmail: user.email,
         limit: safeLimit,
       });
 
@@ -162,53 +64,73 @@ export async function GET(req: NextRequest) {
       await Promise.all(
         sessionIds.map(async (sid) => {
           const row = await getSessionByIdRepo(sid);
-          if (row) titleBySessionId.set(sid, row.title ?? "");
-          const { access } = await getAccessContext({
+          if (!row) {
+            return;
+          }
+          titleBySessionId.set(sid, row.title);
+          const built = await tryBuildRequestContext({
+            req,
+            authenticatedUser: user,
             sessionId: sid,
-            user: { uid: user.uid, email: user.email ?? null },
             session: row,
           });
-          if (access?.capabilities.canView) {
-            accessBySessionId.set(sid, access);
+          if (!built.ok) {
+            return;
+          }
+          const rowCtx = built.ctx;
+          if (rowCtx.access?.capabilities.canView) {
+            accessBySessionId.set(sid, rowCtx.access);
           }
         })
       );
 
       const payload = feedback
         .filter((f) => accessBySessionId.has(f.sessionId))
-        .map((f) => ({
-          ...serializeFeedback(f, accessBySessionId.get(f.sessionId)!),
-          sessionName: titleBySessionId.get(f.sessionId) ?? "",
-        }));
+        .map((f) => {
+          const sid = f.sessionId;
+          const name = titleBySessionId.get(sid);
+          return {
+            ...serializeFeedback(f, accessBySessionId.get(sid)!),
+            sessionName: name === undefined ? "" : name,
+          };
+        });
 
-      return NextResponse.json(
-        {
-          feedback: payload,
-          nextCursor: null,
-          hasMore: false,
-        },
-        { headers: corsHeaders(req) }
-      );
+      return apiSuccess({ feedback: payload, nextCursor: null, hasMore: false }, null, {
+        headers: corsHeaders(req),
+      });
     } catch (err) {
       console.error("GET /api/feedback (all):", err);
-      return NextResponse.json(
-        { error: "Server error" },
-        { status: 500, headers: corsHeaders(req) }
-      );
+      return apiError({
+        code: "INTERNAL_ERROR",
+        message: "Server error",
+        status: 500,
+        init: { headers: corsHeaders(req) },
+      });
     }
   }
 
   try {
-    const { access } = await getAccessContext({
+    const built = await tryBuildRequestContext({
+      req,
       sessionId: trimmedSid,
-      user: user ? { uid: user.uid, email: user.email ?? null } : null,
-      tokenString: shareTok ?? undefined,
+      optionalAuth: true,
     });
+    if (!built.ok) {
+      return new Response(built.response.body, {
+        status: built.response.status,
+        statusText: built.response.statusText,
+        headers: { ...Object.fromEntries(built.response.headers), ...corsHeaders(req) },
+      });
+    }
+    const context = built.ctx;
+    const access = context.access;
     if (!access?.capabilities.canView) {
-      return NextResponse.json(
-        { error: "Forbidden" },
-        { status: 403, headers: corsHeaders(req) }
-      );
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+        init: { headers: corsHeaders(req) },
+      });
     }
 
     const isFirstPage = !cursor || cursor.trim() === "";
@@ -221,19 +143,23 @@ export async function GET(req: NextRequest) {
     });
     const { feedback, nextCursor, hasMore } = pageResult;
 
-    const responseBody = {
-      feedback: feedback.map((f) => serializeFeedback(f, access)),
-      nextCursor,
-      hasMore,
-    };
-
-    return NextResponse.json(responseBody, { headers: corsHeaders(req) });
+    return apiSuccess(
+      {
+        feedback: feedback.map((f) => serializeFeedback(f, access)),
+        nextCursor,
+        hasMore,
+      },
+      access,
+      { headers: corsHeaders(req) }
+    );
   } catch (err) {
     console.error("GET /api/feedback:", err);
-    return NextResponse.json(
-      { error: "Server error" },
-      { status: 500, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Server error",
+      status: 500,
+      init: { headers: corsHeaders(req) },
+    });
   }
 }
 

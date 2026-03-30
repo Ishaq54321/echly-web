@@ -81,9 +81,9 @@ export async function authFetch(
     }
     headers.set("Authorization", `Bearer ${token}`);
   } else if (shareToken !== "") {
-    headers.set("x-share-token", shareToken);
+    headers.set("Authorization", `Bearer ${shareToken}`);
     if (perf) {
-      console.log("[ECHLY_PERF] share token header set (no Firebase id token)");
+      console.log("[ECHLY_PERF] share link bearer set (no Firebase id token)");
     }
   } else {
     return null;
@@ -142,8 +142,11 @@ export async function authFetch(
       res
         .clone()
         .json()
-        .then((data: { error?: string }) => {
-          if (data?.error === "WORKSPACE_SUSPENDED") {
+        .then((data: { error?: { code?: string; message?: string } }) => {
+          if (
+            data?.error?.code === "FORBIDDEN" &&
+            data?.error?.message === "Workspace suspended"
+          ) {
             window.location.href = "/workspace-suspended";
           }
         })

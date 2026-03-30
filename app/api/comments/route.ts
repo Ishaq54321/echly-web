@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   ADD_COMMENT_FEEDBACK_MISSING,
   addCommentRepo,
@@ -11,9 +10,10 @@ import { withAuthorization } from "@/lib/server/auth/withAuthorization";
 import { buildRequestContext } from "@/lib/server/requestContext";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
-function badRequest(message: string): Response {
-  return NextResponse.json({ success: false, error: message }, { status: 400 });
+function badRequest(message: string) {
+  return apiError({ code: "INVALID_INPUT", message, status: 400 });
 }
 
 type CommentRow = Record<string, unknown> & { feedbackId?: string };
@@ -53,29 +53,23 @@ export const POST = withAuthorization(
         : {}),
     });
     if (!context.access?.capabilities.canView) {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 }
-      );
+      return apiError({ code: "FORBIDDEN", message: "You do not have access", status: 403 });
     }
     if (!context.access?.capabilities.canComment) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permission" },
-        { status: 403 }
-      );
+      return apiError({ code: "FORBIDDEN", message: "Insufficient permission", status: 403 });
     }
     if (context.session && context.session.id !== sessionId) {
-      return NextResponse.json({ success: false, error: "Session mismatch" }, { status: 400 });
+      return apiError({ code: "INVALID_INPUT", message: "Session mismatch", status: 400 });
     }
     try {
       const id = await addCommentRepo(user.uid, sessionId, feedbackId, data);
-      return NextResponse.json({ success: true, id });
+      return apiSuccess({ id });
     } catch (err) {
       if (err instanceof Error && err.message === ADD_COMMENT_FEEDBACK_MISSING) {
-        return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+        return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
       }
       console.error("POST /api/comments:", err);
-      return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },
   {
@@ -142,36 +136,27 @@ export const PATCH = withAuthorization(
         : {}),
     });
     if (!context.access?.capabilities.canView) {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 }
-      );
+      return apiError({ code: "FORBIDDEN", message: "You do not have access", status: 403 });
     }
     if (!comment) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
     if (!feedbackId) return badRequest("Invalid comment feedback relation");
     if (!context.feedback) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
     if (needsResolve && !context.access?.capabilities.canResolve) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permission" },
-        { status: 403 }
-      );
+      return apiError({ code: "FORBIDDEN", message: "Insufficient permission", status: 403 });
     }
     if (editsCommentBody && !context.access?.capabilities.canComment) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permission" },
-        { status: 403 }
-      );
+      return apiError({ code: "FORBIDDEN", message: "Insufficient permission", status: 403 });
     }
     try {
       await updateCommentRepo(commentId, data);
-      return NextResponse.json({ success: true });
+      return apiSuccess({});
     } catch (err) {
       console.error("PATCH /api/comments:", err);
-      return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },
   {
@@ -231,17 +216,14 @@ export const DELETE = withAuthorization(
         : {}),
     });
     if (!context.access?.capabilities.canView) {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 }
-      );
+      return apiError({ code: "FORBIDDEN", message: "You do not have access", status: 403 });
     }
     if (!comment) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
     if (!feedbackId) return badRequest("Invalid comment feedback relation");
     if (!context.feedback) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
     const commentAuthor =
       typeof comment.userId === "string" ? comment.userId.trim() : "";
@@ -249,23 +231,17 @@ export const DELETE = withAuthorization(
     const cap = context.access.capabilities;
     if (isOwn) {
       if (!cap.canDeleteOwnComment) {
-        return NextResponse.json(
-          { success: false, error: "Insufficient permission" },
-          { status: 403 }
-        );
+        return apiError({ code: "FORBIDDEN", message: "Insufficient permission", status: 403 });
       }
     } else if (!cap.canResolve) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permission" },
-        { status: 403 }
-      );
+      return apiError({ code: "FORBIDDEN", message: "Insufficient permission", status: 403 });
     }
     try {
       await deleteCommentRepo(commentId);
-      return NextResponse.json({ success: true });
+      return apiSuccess({});
     } catch (err) {
       console.error("DELETE /api/comments:", err);
-      return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },
   {

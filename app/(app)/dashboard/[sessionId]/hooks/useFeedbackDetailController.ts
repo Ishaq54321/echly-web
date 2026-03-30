@@ -85,7 +85,8 @@ export function useFeedbackDetailController(args: {
 }) {
   const { sessionId, feedbackId } = args;
   const { showToast } = useToast();
-  const { authUid, authDisplayName, authPhotoUrl, isIdentityResolved } = useWorkspace();
+  const { authUid, authDisplayName, authPhotoUrl, isIdentityResolved, isIdentityReady } =
+    useWorkspace();
 
   const [comments, setComments] = useState<LocalComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -152,7 +153,7 @@ export function useFeedbackDetailController(args: {
   useCommentsRepoSubscription({
     sessionId,
     feedbackId,
-    enabled: Boolean(authUid && sessionId && feedbackId),
+    enabled: Boolean(isIdentityReady && sessionId && feedbackId),
     onComments: (incomingComments) => {
       setLocalCountsOverride(null);
       const incomingIds = new Set(incomingComments.map((c) => c.id));

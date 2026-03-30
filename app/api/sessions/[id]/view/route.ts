@@ -1,8 +1,7 @@
-import { NextResponse } from "next/server";
 import { recordSessionViewIfNewRepo } from "@/lib/repositories/sessionsRepository.server";
-import { getAccessContext } from "@/lib/access/getAccessContext";
 import { checkRateLimit, clientKeyFromRequest } from "@/lib/server/rateLimit";
-import { resolveOptionalSessionViewer } from "@/lib/server/requestContext";
+import { tryBuildRequestContext } from "@/lib/server/requestContext";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export async function POST(
   req: Request,
@@ -10,45 +9,51 @@ export async function POST(
 ) {
   const { id } = await params;
   if (!id) {
-    return NextResponse.json({ success: false, error: "Missing session id" }, { status: 400 });
+    return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
   }
   const rateKey = `session-view:${id}:${clientKeyFromRequest(req)}`;
   const rate = checkRateLimit({ key: rateKey, max: 60, windowMs: 60_000 });
   if (!rate.allowed) {
-    return NextResponse.json({ success: false, error: "Too Many Requests" }, { status: 429 });
+    return apiError({
+      code: "FORBIDDEN",
+      message: "Too Many Requests",
+      status: 429,
+    });
   }
 
-  let body: { shareToken?: unknown } = {};
+  let body: { token?: unknown; shareToken?: unknown } = {};
   try {
-    body = (await req.json()) as { shareToken?: unknown };
+    body = (await req.json()) as { token?: unknown; shareToken?: unknown };
   } catch {
     body = {};
   }
 
-  const shareTokenFromBody =
-    typeof body.shareToken === "string" ? body.shareToken.trim() : "";
+  const tokenFromBody =
+    (typeof body.token === "string" ? body.token.trim() : "") ||
+    (typeof body.shareToken === "string" ? body.shareToken.trim() : "");
 
-  const { viewerUser, tokenString } = await resolveOptionalSessionViewer(req, {
-    bodyShareToken: shareTokenFromBody,
-  });
-
-  const { access } = await getAccessContext({
+  const built = await tryBuildRequestContext({
+    req,
     sessionId: id,
-    user: viewerUser,
-    tokenString,
+    optionalAuth: true,
+    bodyShareToken: tokenFromBody !== "" ? tokenFromBody : null,
   });
+  if (!built.ok) {
+    return built.response;
+  }
+  const context = built.ctx;
 
-  if (!access?.capabilities.canView) {
-    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  if (!context.access?.capabilities.canView) {
+    return apiError({ code: "FORBIDDEN", message: "You do not have access", status: 403 });
   }
 
   try {
-    if (viewerUser) {
-      await recordSessionViewIfNewRepo(id, viewerUser.uid);
+    if (context.userId) {
+      await recordSessionViewIfNewRepo(id, context.userId);
     }
-    return NextResponse.json({ success: true });
+    return apiSuccess({});
   } catch (err) {
     console.error("POST /api/sessions/[id]/view:", err);
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+    return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
   }
 }

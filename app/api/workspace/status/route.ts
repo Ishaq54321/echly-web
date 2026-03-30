@@ -1,5 +1,8 @@
-import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import {
+  requireAuth,
+  toAuthorizationResponse,
+} from "@/lib/server/auth/authorize";
+import { apiSuccess } from "@/lib/server/apiResponse";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +14,8 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request) {
   try {
     await requireAuth(_req);
-    return NextResponse.json({ suspended: false });
+    return apiSuccess({ suspended: false });
   } catch (e) {
-    if (e instanceof Response) return e;
-    console.error("GET /api/workspace/status:", e);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return toAuthorizationResponse(e);
   }
 }

@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { apiError } from "@/lib/server/apiResponse";
 import { requireAuth } from "@/lib/server/auth";
 
 export interface AdminUser {
@@ -18,10 +19,11 @@ export async function requireAdmin(request: Request): Promise<AdminUser> {
   const isAdmin = snap.exists && (snap.data() as { isAdmin?: boolean } | undefined)?.isAdmin === true;
 
   if (!isAdmin) {
-    throw new Response(
-      JSON.stringify({ error: "Forbidden - Admin access required" }),
-      { status: 403 }
-    );
+    throw apiError({
+      code: "FORBIDDEN",
+      message: "Admin access required",
+      status: 403,
+    });
   }
 
   return { uid: decoded.uid, isAdmin: true };

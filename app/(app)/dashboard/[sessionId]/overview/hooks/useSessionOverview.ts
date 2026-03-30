@@ -6,8 +6,9 @@ import { authFetch } from "@/lib/authFetch";
 import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
 import type { Feedback } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
-import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
+import { requireAccessLevel } from "@/lib/domain/accessLevel";
 import type { Session } from "@/lib/domain/session";
+import { requireGeneralAccess } from "@/lib/domain/session";
 import { Timestamp } from "firebase/firestore";
 
 const RECENT_ACTIVITY_LIMIT = 10;
@@ -121,12 +122,17 @@ function parseOverviewFeedback(row: Record<string, unknown>, sid: string): Feedb
 
 function sessionFromOverviewApi(raw: Record<string, unknown> | null): Session | null {
   if (!raw || typeof raw.id !== "string") return null;
+  if (typeof raw.workspaceId !== "string" || raw.workspaceId.trim() === "") return null;
+  if (typeof raw.createdByUserId !== "string" || raw.createdByUserId.trim() === "") return null;
+  if (typeof raw.title !== "string" || raw.title.trim() === "") return null;
   const session: Session = {
     id: raw.id,
-    title: typeof raw.title === "string" ? raw.title : "Untitled Session",
+    title: raw.title.trim(),
+    workspaceId: raw.workspaceId.trim(),
+    createdByUserId: raw.createdByUserId.trim(),
+    accessLevel: requireAccessLevel(raw.accessLevel),
+    generalAccess: requireGeneralAccess(raw.generalAccess),
   };
-  if (typeof raw.workspaceId === "string") session.workspaceId = raw.workspaceId;
-  if (raw.accessLevel !== undefined) session.accessLevel = normalizeAccessLevel(raw.accessLevel);
   const archived = raw.archived === true || raw.isArchived === true;
   if (archived) {
     session.archived = true;
@@ -180,6 +186,16 @@ export function useSessionOverview(sessionId: string | undefined) {
         }
         const payload = (await res.json().catch(() => ({}))) as {
           success?: boolean;
+          data?: {
+            session?: Record<string, unknown>;
+            statusPreview?: { open?: unknown[]; resolved?: unknown[] };
+            recentActivity?: Array<{
+              actorName?: string;
+              action?: string;
+              targetTitle?: string;
+              timestamp?: string | null;
+            }>;
+          };
           session?: Record<string, unknown>;
           statusPreview?: { open?: unknown[]; resolved?: unknown[] };
           recentActivity?: Array<{
@@ -190,16 +206,21 @@ export function useSessionOverview(sessionId: string | undefined) {
           }>;
         };
 
+        const inner = payload.data;
+        const sessionRaw = inner?.session ?? payload.session;
+        const statusPreviewRaw = inner?.statusPreview ?? payload.statusPreview;
+        const recentActivityRawTop = inner?.recentActivity ?? payload.recentActivity;
+
         if (cancelled || !isCurrent(token)) return;
-        if (!payload.success || !payload.session) {
+        if (!payload.success || !sessionRaw) {
           setData(EMPTY_SESSION_OVERVIEW);
           return;
         }
 
-        const session = sessionFromOverviewApi(payload.session);
-        const openRaw = Array.isArray(payload.statusPreview?.open) ? payload.statusPreview!.open! : [];
-        const resolvedRaw = Array.isArray(payload.statusPreview?.resolved)
-          ? payload.statusPreview!.resolved!
+        const session = sessionFromOverviewApi(sessionRaw);
+        const openRaw = Array.isArray(statusPreviewRaw?.open) ? statusPreviewRaw.open! : [];
+        const resolvedRaw = Array.isArray(statusPreviewRaw?.resolved)
+          ? statusPreviewRaw.resolved!
           : [];
 
         const openPreview = openRaw
@@ -210,7 +231,7 @@ export function useSessionOverview(sessionId: string | undefined) {
           .filter((f): f is Feedback => f !== null);
 
         const countsByStatus = countsFromSession(session);
-        const recentActivityRaw = Array.isArray(payload.recentActivity) ? payload.recentActivity : [];
+        const recentActivityRaw = Array.isArray(recentActivityRawTop) ? recentActivityRawTop : [];
         const recentActivity: OverviewActivityItem[] = recentActivityRaw.slice(0, RECENT_ACTIVITY_LIMIT).map(
           (c) => ({
             actorName: typeof c.actorName === "string" ? c.actorName : "Someone",

@@ -26,8 +26,8 @@ export default function AdminPlansPage() {
     try {
       const res = await authFetch("/api/admin/plans");
       if (!res || !res.ok) throw new Error("Failed to load plans");
-      const data = await res.json();
-      setPlans(data);
+      const envelope = (await res.json()) as { data?: PlanWithId[] };
+      setPlans(Array.isArray(envelope.data) ? envelope.data : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {

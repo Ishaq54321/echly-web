@@ -11,88 +11,15 @@ import {
 } from "@/lib/repositories/screenshotsRepository";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 import { corsHeaders } from "@/lib/server/cors";
-import { verifyExtensionToken } from "@/lib/server/extensionAuth";
-import { verifyIdToken, type AuthUser } from "@/lib/server/auth";
-import { getSessionUser } from "@/lib/server/session";
 import "@/lib/server/firebaseAdmin";
 import { getStorage } from "firebase-admin/storage";
 import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
-import { buildRequestContext } from "@/lib/server/requestContext";
-
-
-function unauthorized(): Response {
-  return Response.json(
-    {
-      success: false,
-      error: "NOT_AUTHENTICATED",
-      message: "User is not authenticated",
-    },
-    {
-      status: 401,
-    }
-  );
-}
-
-function missingExtensionToken(): Response {
-  return Response.json(
-    { error: "MISSING_EXTENSION_TOKEN" },
-    {
-      status: 401,
-    }
-  );
-}
-
-function base64UrlDecodeToString(input: string): string {
-  const b64 = input.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-  return Buffer.from(padded, "base64").toString("utf8");
-}
-
-function peekJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const json = base64UrlDecodeToString(parts[1] ?? "");
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch (err) {
-    console.error("[feedback] peekJwtPayload parse failed:", err);
-    return null;
-  }
-}
-
-async function requireAuthFast(req: NextRequest): Promise<AuthUser> {
-  const extensionToken = req.headers.get("x-extension-token")?.trim() ?? "";
-  const origin = req.headers.get("origin")?.toLowerCase() ?? "";
-  const isExtensionRequest = origin.startsWith("chrome-extension://");
-
-  if (isExtensionRequest && !extensionToken) {
-    throw missingExtensionToken();
-  }
-
-  if (extensionToken) {
-    const decoded = await verifyExtensionToken(extensionToken);
-    if (!decoded) throw unauthorized();
-    return { uid: decoded.uid, email: decoded.email ?? undefined };
-  }
-
-  const authHeader = req.headers.get("Authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7).trim();
-    const payload = peekJwtPayload(token);
-    if (payload && payload.type === "extension") {
-      const decoded = await verifyExtensionToken(token);
-      if (!decoded) throw unauthorized();
-      return { uid: decoded.uid, email: decoded.email ?? undefined };
-    }
-    const decoded = await verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email ?? undefined };
-  }
-
-  const sessionUser = await getSessionUser(req);
-  if (sessionUser) return { uid: sessionUser.uid, email: sessionUser.email ?? undefined };
-  throw unauthorized();
-}
+import { tryBuildRequestContext } from "@/lib/server/requestContext";
+import {
+  requireAuth,
+  toAuthorizationResponse,
+} from "@/lib/server/auth/authorize";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 async function resolveScreenshotDownloadUrl(
   screenshotId: string,
@@ -137,13 +64,13 @@ async function resolveScreenshotDownloadUrl(
 export async function POST(req: NextRequest) {
   let user;
   try {
-    user = await requireAuthFast(req);
-  } catch (res) {
-    const errRes = res as Response;
-    return new NextResponse(errRes.body, {
-      status: errRes.status,
-      statusText: errRes.statusText,
-      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
+    user = await requireAuth(req);
+  } catch (err) {
+    const res = toAuthorizationResponse(err);
+    return new NextResponse(res.body, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: { ...Object.fromEntries(res.headers.entries()), ...corsHeaders(req) },
     });
   }
 
@@ -171,29 +98,35 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch (err) {
     console.error("[feedback] invalid JSON body:", err);
-    return NextResponse.json(
-      { success: false, error: "Invalid JSON body" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Invalid JSON body",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   const incomingStatusRaw =
     typeof body.status === "string" ? body.status.trim().toLowerCase() : "open";
   if (incomingStatusRaw === "failed") {
-    return NextResponse.json(
-      { success: false, error: "invalid status" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "invalid status",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
   if (
     incomingStatusRaw !== "open" &&
     incomingStatusRaw !== "resolved" &&
     incomingStatusRaw !== "processing"
   ) {
-    return NextResponse.json(
-      { success: false, error: "invalid status" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "invalid status",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
   type FeedbackStatus = "open" | "resolved" | "processing";
   const incomingStatus = incomingStatusRaw as FeedbackStatus;
@@ -227,10 +160,12 @@ export async function POST(req: NextRequest) {
   const normalizedFeedbackId =
     feedbackIdRaw.length > 0 ? feedbackIdRaw : undefined;
   if (!sessionId) {
-    return NextResponse.json(
-      { success: false, error: "sessionId is required" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "sessionId is required",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
   const actionSteps =
     Array.isArray(body.actionSteps)
@@ -241,10 +176,12 @@ export async function POST(req: NextRequest) {
       ? generateTicketTitle(actionSteps)
       : (typeof body.title === "string" ? body.title.trim() : "");
   if (!title) {
-    return NextResponse.json(
-      { success: false, error: "title is required (or provide actionSteps)" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "title is required (or provide actionSteps)",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   const screenshotIdRaw =
@@ -257,40 +194,58 @@ export async function POST(req: NextRequest) {
       try {
         assert(hasScreenshotId, "ARCHITECTURE VIOLATION: screenshotId required");
       } catch {
-        return NextResponse.json(
-          { success: false, error: "ARCHITECTURE VIOLATION: screenshotId required" },
-          { status: 400, headers: corsHeaders(req) }
-        );
+        return apiError({
+          code: "INVALID_INPUT",
+          message: "ARCHITECTURE VIOLATION: screenshotId required",
+          status: 400,
+          init: { headers: corsHeaders(req) },
+        });
       }
     }
-    return NextResponse.json(
-      { success: false, error: "Atomic violation: screenshotId required" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Atomic violation: screenshotId required",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
-  const accessCtx = await buildRequestContext({
+  const built = await tryBuildRequestContext({
     req,
     authenticatedUser: { uid: user.uid, email: user.email },
     sessionId,
   });
+  if (!built.ok) {
+    return new Response(built.response.body, {
+      status: built.response.status,
+      statusText: built.response.statusText,
+      headers: { ...Object.fromEntries(built.response.headers), ...corsHeaders(req) },
+    });
+  }
+  const accessCtx = built.ctx;
   if (!accessCtx.access?.capabilities.canView) {
-    return NextResponse.json(
-      { success: false, error: "Forbidden" },
-      { status: 403, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "FORBIDDEN",
+      message: "You do not have access",
+      status: 403,
+      init: { headers: corsHeaders(req) },
+    });
   }
   if (!accessCtx.access?.capabilities.canComment) {
-    return NextResponse.json(
-      { success: false, error: "Forbidden" },
-      { status: 403, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "FORBIDDEN",
+      message: "You do not have access",
+      status: 403,
+      init: { headers: corsHeaders(req) },
+    });
   }
   if (!accessCtx.session) {
-    return NextResponse.json(
-      { success: false, error: "Session not found" },
-      { status: 404, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "NOT_FOUND",
+      message: "Session not found",
+      status: 404,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   const userId = user.uid;
@@ -306,19 +261,20 @@ export async function POST(req: NextRequest) {
           "ARCHITECTURE VIOLATION: screenshot must exist before create"
         );
       } catch {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "ARCHITECTURE VIOLATION: screenshot must exist before create",
-          },
-          { status: 409, headers: corsHeaders(req) }
-        );
+        return apiError({
+          code: "INVALID_INPUT",
+          message: "ARCHITECTURE VIOLATION: screenshot must exist before create",
+          status: 409,
+          init: { headers: corsHeaders(req) },
+        });
       }
     }
-    return NextResponse.json(
-      { success: false, error: "Atomic violation: screenshot URL unavailable" },
-      { status: 409, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Atomic violation: screenshot URL unavailable",
+      status: 409,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   const structuredData = {
@@ -369,28 +325,32 @@ export async function POST(req: NextRequest) {
     } else {
       const existing = result.existingFeedback;
       if (!existing) {
-        return NextResponse.json(
-          { success: false, error: "Idempotent create returned no document" },
-          { status: 500, headers: corsHeaders(req) }
-        );
+        return apiError({
+          code: "INTERNAL_ERROR",
+          message: "Idempotent create returned no document",
+          status: 500,
+          init: { headers: corsHeaders(req) },
+        });
       }
       created = existing;
     }
 
-    return NextResponse.json(
+    return apiSuccess(
       {
-        success: true,
         ticket: serializeTicket(created, accessCtx.access!),
         ...(inserted ? {} : { alreadyExists: true }),
       },
+      accessCtx.access!,
       { headers: corsHeaders(req) }
     );
   } catch (err) {
     console.error("POST /api/feedback:", err);
-    return NextResponse.json(
-      { success: false, error: "Server error" },
-      { status: 500, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Server error",
+      status: 500,
+      init: { headers: corsHeaders(req) },
+    });
   }
 }
 

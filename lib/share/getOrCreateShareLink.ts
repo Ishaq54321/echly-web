@@ -4,31 +4,25 @@ import { authFetch } from "@/lib/authFetch";
 
 export type GetOrCreateShareLinkParams = {
   sessionId: string;
-  userId: string;
   origin: string;
 };
 
 /**
  * Ensures an active `share_links` row exists for the session (server-side), then returns
- * `${origin}/session/${sessionId}?shareToken=...` for anonymous-capable links.
- * `userId` must match the signed-in user (enforced server-side via Bearer token).
+ * `${origin}/session/${sessionId}?token=...` for anonymous-capable links.
  */
 export async function getOrCreateShareLink({
   sessionId,
-  userId,
   origin,
 }: GetOrCreateShareLinkParams): Promise<string> {
   const sid = sessionId.trim();
-  const uid = userId.trim();
-  const base = (origin || "").replace(/\/$/, "");
+  const base = origin.replace(/\/$/, "");
   if (!sid) throw new Error("getOrCreateShareLink: sessionId is required");
-  if (!uid) throw new Error("getOrCreateShareLink: userId is required");
   if (!base) throw new Error("getOrCreateShareLink: origin is required");
 
   const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/share-link`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId: uid }),
   });
 
   if (!res) {
@@ -38,19 +32,24 @@ export async function getOrCreateShareLink({
   if (!res.ok) {
     let message = "share-link failed";
     try {
-      const err = (await res.json()) as { error?: string };
-      if (typeof err?.error === "string" && err.error) message = err.error;
+      const err = (await res.json()) as { error?: { message?: string } };
+      if (typeof err?.error?.message === "string" && err.error.message) {
+        message = err.error.message;
+      }
     } catch {
       /* ignore */
     }
     throw new Error(message);
   }
 
-  const data = (await res.json()) as { success?: boolean; token?: string };
-  const token = typeof data.token === "string" ? data.token.trim() : "";
+  const data = (await res.json()) as {
+    success?: boolean;
+    data?: { token?: string };
+  };
+  const token = typeof data.data?.token === "string" ? data.data.token.trim() : "";
   if (!data.success || !token) {
     throw new Error("Invalid share-link response");
   }
 
-  return `${base}/session/${encodeURIComponent(sid)}?shareToken=${encodeURIComponent(token)}`;
+  return `${base}/session/${encodeURIComponent(sid)}?token=${encodeURIComponent(token)}`;
 }

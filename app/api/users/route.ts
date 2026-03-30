@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import {
+  requireAuth,
+  toAuthorizationResponse,
+} from "@/lib/server/auth/authorize";
 import {
   ensureUserRepo,
   updateUserFieldsRepo,
@@ -9,6 +11,8 @@ import {
 import { corsHeaders } from "@/lib/server/cors";
 import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
 import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +41,8 @@ export async function POST(req: NextRequest) {
   let user;
   try {
     user = await requireAuth(req);
-  } catch (res) {
-    return unauthorizedResponse(req, res as Response);
+  } catch (err) {
+    return unauthorizedResponse(req, toAuthorizationResponse(err));
   }
 
   try {
@@ -54,24 +58,22 @@ export async function POST(req: NextRequest) {
         inner instanceof Error &&
         inner.message === MISSING_USER_WORKSPACE_ERROR
       ) {
-        return NextResponse.json(
-          { success: true, workspaceId: null },
-          { headers: corsHeaders(req) }
-        );
+        return apiSuccess({ workspaceId: null }, null, {
+          headers: corsHeaders(req),
+        });
       }
       throw inner;
     }
     await setWorkspaceClaim(user.uid, workspaceId);
-    return NextResponse.json(
-      { success: true, workspaceId },
-      { headers: corsHeaders(req) }
-    );
+    return apiSuccess({ workspaceId }, null, { headers: corsHeaders(req) });
   } catch (err) {
     console.error("POST /api/users:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to ensure user" },
-      { status: 500, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to ensure user",
+      status: 500,
+      init: { headers: corsHeaders(req) },
+    });
   }
 }
 
@@ -80,28 +82,32 @@ export async function PATCH(req: NextRequest) {
   let user;
   try {
     user = await requireAuth(req);
-  } catch (res) {
-    return unauthorizedResponse(req, res as Response);
+  } catch (err) {
+    return unauthorizedResponse(req, toAuthorizationResponse(err));
   }
 
   let body: UserPatchBody;
   try {
     body = (await req.json()) as UserPatchBody;
   } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid JSON body" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Invalid JSON body",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   const role = typeof body.role === "string" ? body.role.trim() : "";
   const companySize = typeof body.companySize === "string" ? body.companySize.trim() : "";
 
   if (!role && !companySize) {
-    return NextResponse.json(
-      { success: false, error: "No updates provided" },
-      { status: 400, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "No updates provided",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   try {
@@ -109,12 +115,14 @@ export async function PATCH(req: NextRequest) {
       role: role || undefined,
       companySize: companySize || undefined,
     });
-    return NextResponse.json({ success: true }, { headers: corsHeaders(req) });
+    return apiSuccess({}, null, { headers: corsHeaders(req) });
   } catch (err) {
     console.error("PATCH /api/users:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to update user" },
-      { status: 500, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to update user",
+      status: 500,
+      init: { headers: corsHeaders(req) },
+    });
   }
 }

@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { migrateWorkspaceEntitlementsToOverrides } from "@/lib/admin/migrateWorkspaceEntitlementsToOverrides";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 /**
  * POST /api/admin/migrate-workspace-entitlements
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
   try {
     const { updated, results } = await migrateWorkspaceEntitlementsToOverrides(dryRun);
-    return NextResponse.json({
+    return apiSuccess({
       dryRun,
       updated,
       results,
@@ -31,9 +31,10 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error("migrate-workspace-entitlements:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Migration failed" },
-      { status: 500 }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: err instanceof Error ? err.message : "Migration failed",
+      status: 500,
+    });
   }
 }

@@ -15,8 +15,8 @@ export default function AdminUsagePage() {
         if (!res) return null;
         return res.json();
       })
-      .then((data) => {
-        if (!cancelled) setStats(data ?? null);
+      .then((envelope: { data?: UsageStats | null }) => {
+        if (!cancelled) setStats(envelope.data ?? null);
       })
       .catch(() => {
         if (!cancelled) setStats(null);

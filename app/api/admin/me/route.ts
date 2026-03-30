@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { withAuthorization } from "@/lib/server/auth/withAuthorization";
+import { apiSuccess } from "@/lib/server/apiResponse";
 
 /**
  * GET /api/admin/me
@@ -8,7 +8,7 @@ import { withAuthorization } from "@/lib/server/auth/withAuthorization";
  */
 export const GET = withAuthorization(
   "read_feedback",
-  async (_req, _ctx, { isAdmin }) => NextResponse.json({ isAdmin }),
+  async (_req, _ctx, { isAdmin }) => apiSuccess({ isAdmin }),
   {
     isAdmin: true,
     allowNonAdmin: true,

@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server"
+import { apiSuccess } from "@/lib/server/apiResponse";
 
 export async function POST() {
-  const response = NextResponse.json({ success: true })
+  const response = apiSuccess({ loggedOut: true });
 
   response.cookies.set("echly_session", "", {
     httpOnly: true,
     path: "/",
-    maxAge: 0
-  })
+    maxAge: 0,
+  });
 
-  return response
+  return response;
 }

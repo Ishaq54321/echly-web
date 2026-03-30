@@ -24,10 +24,10 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         if (!res) return { isAdmin: false };
         return res.json();
       })
-      .then((data: { isAdmin?: boolean }) => {
+      .then((envelope: { data?: { isAdmin?: boolean } | null }) => {
         if (!cancelled) {
           setAdminChecked(true);
-          setIsAdmin(data.isAdmin === true);
+          setIsAdmin(envelope?.data?.isAdmin === true);
         }
       })
       .catch((err) => {

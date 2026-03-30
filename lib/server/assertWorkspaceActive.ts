@@ -12,8 +12,5 @@ export function assertWorkspaceActive(workspace: WorkspaceLike): void {
   }
 }
 
-/** Standard 403 body for suspended workspace. Use when catch(assertWorkspaceActive). */
-export const WORKSPACE_SUSPENDED_RESPONSE = {
-  error: "WORKSPACE_SUSPENDED" as const,
-  message: "Workspace suspended",
-};
+/** Message matched by clients for workspace billing suspension (see apiError FORBIDDEN). */
+export const WORKSPACE_SUSPENDED_MESSAGE = "Workspace suspended";

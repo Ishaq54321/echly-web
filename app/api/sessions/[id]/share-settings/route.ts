@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
 import type { Session } from "@/lib/domain/session";
-import { normalizeGeneralAccess, type SessionGeneralAccess } from "@/lib/domain/session";
+import { requireGeneralAccess, type SessionGeneralAccess } from "@/lib/domain/session";
 import { updateSessionGeneralAccessRepo } from "@/lib/repositories/sessionsRepository.server";
 import {
   withAuthorization,
@@ -9,6 +8,7 @@ import {
 } from "@/lib/server/auth/withAuthorization";
 import { buildRequestContext } from "@/lib/server/requestContext";
 import { routeParamId } from "@/lib/server/routeParams";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 async function resolveSessionWorkspaceId(
   req: Request,
@@ -41,10 +41,10 @@ export const GET = withAuthorization(
   ) => {
     const id = await routeParamId(ctx);
     if (!id) {
-      return NextResponse.json({ error: "Missing session id" }, { status: 400 });
+      return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
     }
     if (ctx.preloaded?.session === undefined) {
-      return NextResponse.json({ error: "Server error" }, { status: 500 });
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
     const existing = ctx.preloaded.session as Session | null;
     const context = await buildRequestContext({
@@ -55,14 +55,21 @@ export const GET = withAuthorization(
       session: existing,
     });
     if (!context.access?.capabilities.canDeleteTicket) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
     if (!context.session) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
-    return NextResponse.json({
-      generalAccess: normalizeGeneralAccess(context.session.generalAccess),
-    });
+    return apiSuccess(
+      {
+        generalAccess: context.session.generalAccess,
+      },
+      context.access!
+    );
   },
   { resolveWorkspace: resolveSessionWorkspaceId }
 );
@@ -81,16 +88,16 @@ export const PATCH = withAuthorization(
   ) => {
     const id = await routeParamId(ctx);
     if (!id) {
-      return NextResponse.json({ error: "Missing session id" }, { status: 400 });
+      return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
     }
     let body: PatchBody;
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+      return apiError({ code: "INVALID_INPUT", message: "Invalid JSON body", status: 400 });
     }
     if (ctx.preloaded?.session === undefined) {
-      return NextResponse.json({ error: "Server error" }, { status: 500 });
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
     const existing = ctx.preloaded.session as Session | null;
     const context = await buildRequestContext({
@@ -101,23 +108,26 @@ export const PATCH = withAuthorization(
       session: existing,
     });
     if (!context.access?.capabilities.canDeleteTicket) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
     if (!context.session) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
 
     const raw = body.generalAccess;
-    const generalAccess =
-      typeof raw === "string" && ["restricted", "link_view"].includes(raw)
-        ? (raw as SessionGeneralAccess)
-        : null;
-    if (!generalAccess) {
-      return NextResponse.json({ error: "Invalid value" }, { status: 400 });
+    let generalAccess: SessionGeneralAccess;
+    try {
+      generalAccess = requireGeneralAccess(raw);
+    } catch {
+      return apiError({ code: "INVALID_INPUT", message: "Invalid value", status: 400 });
     }
 
     await updateSessionGeneralAccessRepo(id, generalAccess);
-    return NextResponse.json({ success: true });
+    return apiSuccess({}, context.access!);
   },
   { resolveWorkspace: resolveSessionWorkspaceId }
 );

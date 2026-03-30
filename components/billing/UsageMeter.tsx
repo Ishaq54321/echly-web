@@ -57,9 +57,9 @@ function MeterRow({
 }
 
 export function UsageMeter() {
-  const { authUid, workspaceId } = useWorkspace();
+  const { isIdentityReady, workspaceId } = useWorkspace();
   const workspaceGateReady =
-    Boolean(authUid) &&
+    isIdentityReady &&
     workspaceId != null &&
     workspaceId.trim() !== "";
   const { data: realtimeUsage, loading: realtimeLoading, error: realtimeError } =

@@ -16,13 +16,13 @@ interface WorkspaceSuspendedGuardProps {
  */
 export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardProps) {
   const router = useRouter();
-  const { authUid } = useWorkspace();
+  const { authUid, isIdentityReady } = useWorkspace();
   const [suspended, setSuspended] = useState<boolean | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    if (!authUid) {
+    if (!isIdentityReady) {
       setSuspended(false);
       setStatusError(null);
       return;
@@ -50,7 +50,7 @@ export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardPro
     return () => {
       cancelled = true;
     };
-  }, [authUid]);
+  }, [isIdentityReady]);
 
   useEffect(() => {
     if (suspended === true) {

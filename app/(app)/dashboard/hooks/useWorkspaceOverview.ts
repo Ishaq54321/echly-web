@@ -69,7 +69,7 @@ export type ViewMode = "all" | "archived";
 
 /** Session list from GET /api/sessions (permission and scoping enforced on the server). */
 export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
-  const { claimsReady, authUid, isIdentityResolved } = useWorkspace();
+  const { claimsReady, authUid, isIdentityResolved, isIdentityReady } = useWorkspace();
   const router = useRouter();
   const userIdRef = useRef<string | null>(null);
   const allSessionsRef = useRef<Session[]>([]);
@@ -90,7 +90,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
 
   const refreshSessions = useCallback(async () => {
     const uid = userIdRef.current;
-    if (!uid) return;
+    if (!uid || !isIdentityReady) return;
     setAwaitingSessions(true);
     try {
       const res = await authFetch("/api/sessions", { cache: "no-store" });
@@ -112,12 +112,16 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
     } finally {
       setAwaitingSessions(false);
     }
-  }, []);
+  }, [isIdentityReady]);
 
   useEffect(() => {
     if (!userId) {
       sessionsSourceUserRef.current = null;
       setAwaitingSessions(false);
+      return;
+    }
+    if (!isIdentityReady) {
+      setAwaitingSessions(true);
       return;
     }
     sessionsSourceUserRef.current = userId;
@@ -157,7 +161,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, isIdentityReady]);
 
   const overviewDataAligned =
     Boolean(userId) && sessionsSourceUserRef.current === userId;
@@ -181,6 +185,10 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
       const tempSession: Session = {
         id: tempSessionId,
         title: "Untitled Session",
+        workspaceId: "",
+        createdByUserId: userIdRef.current,
+        accessLevel: "view",
+        generalAccess: "restricted",
         createdAt: new Date(),
         updatedAt: new Date(),
         isOptimistic: true,
@@ -204,16 +212,26 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
 
         if (res.status === 403) {
           setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
-          if (data.error === "PLAN_LIMIT_REACHED") {
+          const err = data.error as { code?: string; message?: string } | undefined;
+          const limitData = data.data as { upgradePlan?: string | null } | null | undefined;
+          const isPlanLimit =
+            data.success === false &&
+            err?.code === "FORBIDDEN" &&
+            limitData &&
+            "upgradePlan" in limitData;
+          if (isPlanLimit) {
             onPlanLimitReached?.({
-              message: data.message ?? "You've reached your plan limit.",
-              upgradePlan: data.upgradePlan ?? "starter",
+              message: err?.message ?? "You've reached your plan limit.",
+              upgradePlan: limitData.upgradePlan ?? "starter",
             });
             return;
           }
-          if (data.error === "WORKSPACE_SUSPENDED") {
+          if (
+            err?.code === "FORBIDDEN" &&
+            err?.message === "Workspace suspended"
+          ) {
             onPlanLimitReached?.({
-              message: data.message ?? "Workspace suspended. Contact support.",
+              message: err.message ?? "Workspace suspended. Contact support.",
               upgradePlan: null,
             });
             return;
@@ -221,9 +239,9 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
 
           onPlanLimitReached?.({
             message:
-              (data && typeof data.message === "string" && data.message) ||
+              (err && typeof err.message === "string" && err.message) ||
               "You don't have permission to create a session.",
-            upgradePlan: data?.upgradePlan ?? null,
+            upgradePlan: limitData?.upgradePlan ?? null,
           });
           return;
         }
@@ -234,7 +252,11 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
           return;
         }
 
-        const newSessionId = data.session?.id;
+        const payload = data as {
+          data?: { session?: { id?: string } };
+          session?: { id?: string };
+        };
+        const newSessionId = payload.data?.session?.id ?? payload.session?.id;
         if (!newSessionId) {
           setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
           return;
@@ -310,7 +332,14 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
       }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error((data && typeof data.error === "string" && data.error) || `Archive update failed: ${res.status}`);
+        const msg =
+          data &&
+          typeof data === "object" &&
+          data.error &&
+          typeof (data.error as { message?: string }).message === "string"
+            ? (data.error as { message: string }).message
+            : null;
+        throw new Error(msg || `Archive update failed: ${res.status}`);
       }
     } catch (err) {
       if (hasRollback) {
@@ -356,7 +385,14 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
             console.error("[ECHLY] JSON parse failed", err);
             return {};
           });
-          throw new Error((data && data.error) || "Failed to delete session");
+          const delMsg =
+            data &&
+            typeof data === "object" &&
+            data.error &&
+            typeof (data.error as { message?: string }).message === "string"
+              ? (data.error as { message: string }).message
+              : null;
+          throw new Error(delMsg || "Failed to delete session");
         }
       } catch (err) {
         setAllSessions((prev) => {

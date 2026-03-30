@@ -89,6 +89,25 @@ type FeedbackListResponse = {
   nextCursor?: string | null;
   hasMore?: boolean;
 };
+
+function parseFeedbackListResponse(raw: unknown): FeedbackListResponse {
+  if (typeof raw !== "object" || raw === null) return {};
+  const o = raw as Record<string, unknown>;
+  const inner = o.data;
+  if (typeof inner === "object" && inner !== null) {
+    const d = inner as Record<string, unknown>;
+    return {
+      feedback: Array.isArray(d.feedback) ? (d.feedback as FeedbackApiItem[]) : [],
+      nextCursor: typeof d.nextCursor === "string" ? d.nextCursor : null,
+      hasMore: d.hasMore === true,
+    };
+  }
+  return {
+    feedback: Array.isArray(o.feedback) ? (o.feedback as FeedbackApiItem[]) : [],
+    nextCursor: typeof o.nextCursor === "string" ? o.nextCursor : null,
+    hasMore: o.hasMore === true,
+  };
+}
 type SessionCounts = {
   total: number;
   open: number;
@@ -299,7 +318,7 @@ async function rehydrateSession(sessionId: string, mode: RehydrateMode = "cold")
         fetchFeedbackCountFresh(sessionId),
       ]);
 
-      const feedbackJson = (await feedbackRes.json()) as FeedbackListResponse;
+      const feedbackJson = parseFeedbackListResponse(await feedbackRes.json());
       const serverPointers = mapFeedbackToPointers(feedbackJson.feedback ?? []);
       if (mode === "forced_recovery") {
         globalUIState.pointers = serverPointers;
@@ -360,11 +379,13 @@ async function fetchFeedbackCountFresh(sessionId: string): Promise<SessionCounts
   if (!res.ok) {
     throw new Error("session_meta_failed_" + res.status);
   }
-  const json = (await res.json()) as {
+  const raw = await res.json();
+  const json = raw as {
     success?: boolean;
+    data?: { session?: Record<string, unknown> };
     session?: Record<string, unknown>;
   };
-  const s = json.session;
+  const s = json.data?.session ?? json.session;
   if (!s || json.success === false) {
     throw new Error("session_meta_missing");
   }
@@ -392,7 +413,7 @@ async function loadMore(): Promise<void> {
     const res = await apiFetch(
       `${API_BASE}/api/feedback?sessionId=${encodeURIComponent(sessionId)}&cursor=${encodeURIComponent(globalUIState.nextCursor)}&limit=20`
     );
-    const json = (await res.json()) as FeedbackListResponse;
+    const json = parseFeedbackListResponse(await res.json());
     const rawItems = json.feedback ?? [];
     const newItems = mapFeedbackToPointers(rawItems);
     const existingIds = new Set(globalUIState.pointers.map((p) => p.id));
@@ -651,11 +672,14 @@ async function getOrRefreshToken(): Promise<string> {
     throw new Error("NOT_AUTHENTICATED");
   }
 
-  const data = (await res.json()) as {
-    extensionToken?: string;
-    user?: { uid: string; email?: string | null };
+  const envelope = (await res.json()) as {
+    data?: {
+      extensionToken?: string;
+      user?: { uid: string; email?: string | null };
+    };
   };
-  const token = data?.extensionToken;
+  const payload = envelope?.data;
+  const token = payload?.extensionToken;
   if (!token) {
     clearAuthState();
     throw new Error("NOT_AUTHENTICATED");
@@ -665,11 +689,11 @@ async function getOrRefreshToken(): Promise<string> {
   extensionTokenExpiresAt = Date.now() + EXTENSION_TOKEN_TTL_MS;
   setExtensionToken(token);
   sw.extensionToken = token;
-  if (data.user?.uid) {
+  if (payload?.user?.uid) {
     sw.currentUser = {
-      uid: data.user.uid,
+      uid: payload.user.uid,
       name: null,
-      email: data.user.email ?? null,
+      email: payload.user.email ?? null,
       photoURL: null,
     };
     cachedSessionUser = sw.currentUser;
@@ -1558,18 +1582,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }),
         });
 
-        const data = (await res.json()) as {
-          screenshotId?: string;
-          url?: string;
-          error?: string;
+        const envelope = (await res.json()) as {
+          success?: boolean;
+          data?: { screenshotId?: string; url?: string };
+          error?: { message?: string };
         };
 
-        if (!res.ok) {
-          sendResponse({ error: data.error || "Upload failed" });
+        if (!res.ok || envelope.success === false) {
+          sendResponse({
+            error: envelope.error?.message || "Upload failed",
+          });
           return;
         }
 
-        sendResponse({ screenshotId: data.screenshotId, url: data.url });
+        sendResponse({
+          screenshotId: envelope.data?.screenshotId,
+          url: envelope.data?.url,
+        });
       } catch (err) {
         console.error("ECHLY_UPLOAD_SCREENSHOT error:", err);
         sendResponse({ error: String(err) });
@@ -1653,10 +1682,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           screenshotId,
         });
 
-        const data = (await feedbackRes.json()) as { error?: string };
+        const data = (await feedbackRes.json()) as {
+          success?: boolean;
+          error?: { message?: string };
+        };
 
-        if (!feedbackRes.ok) {
-          sendResponse({ success: false, error: data?.error || "API failed" });
+        if (!feedbackRes.ok || data.success === false) {
+          sendResponse({
+            success: false,
+            error: data?.error?.message || "API failed",
+          });
           return;
         }
 

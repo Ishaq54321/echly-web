@@ -1,4 +1,5 @@
 import { jwtVerify, createRemoteJWKSet } from "jose";
+import { apiError } from "@/lib/server/apiResponse";
 import { getSessionUser } from "@/lib/server/session";
 import { verifyExtensionToken } from "./extensionAuth";
 
@@ -34,17 +35,11 @@ export async function verifyIdToken(token: string): Promise<DecodedIdToken> {
 }
 
 function unauthorized(): Response {
-  return new Response(
-    JSON.stringify({
-      success: false,
-      error: "NOT_AUTHENTICATED",
-      message: "User is not authenticated",
-    }),
-    {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    }
-  );
+  return apiError({
+    code: "UNAUTHORIZED",
+    message: "User is not authenticated",
+    status: 401,
+  });
 }
 
 /**

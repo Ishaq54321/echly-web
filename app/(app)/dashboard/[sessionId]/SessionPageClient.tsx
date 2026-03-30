@@ -2,7 +2,6 @@
 
 import { authFetch, type AuthFetchInit } from "@/lib/authFetch";
 import { clearShareToken, getShareToken, setShareToken } from "@/lib/client/shareToken";
-import { ensureShareAuth } from "@/lib/client/firebaseAuth";
 import {
   useEffect,
   useLayoutEffect,
@@ -27,7 +26,7 @@ import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
 import type { AccessCapabilities } from "@/lib/access/resolveAccess";
-import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
+import { requireAccessLevel } from "@/lib/domain/accessLevel";
 import {
   handlePermissionError,
   notifyPermissionDenied,
@@ -139,28 +138,23 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const feedbackSessionId = sessionId || undefined;
 
-  const shareTokenQs = searchParams.get("shareToken")?.trim() ?? "";
+  const shareTokenQs =
+    searchParams.get("token")?.trim() ||
+    searchParams.get("shareToken")?.trim() ||
+    "";
   const shareTokenQsRef = useRef(shareTokenQs);
   shareTokenQsRef.current = shareTokenQs;
   const isAnonymousViewer = authReady && !authUid;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("shareToken");
+    const token = params.get("token") || params.get("shareToken");
     if (token) {
       setShareToken(token);
     } else {
       clearShareToken();
     }
   }, []);
-
-  useEffect(() => {
-    if (!authReady || authUid) return;
-    const hasShare =
-      shareTokenQs !== "" || (typeof window !== "undefined" && (getShareToken()?.trim() ?? "") !== "");
-    if (!hasShare) return;
-    void ensureShareAuth(sessionId);
-  }, [authReady, authUid, sessionId, shareTokenQs]);
 
   const restFeedbackFetch = useCallback((url: string) => authFetchOrAnonCookie(url), []);
 
@@ -236,7 +230,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             query: q,
           });
           if (shareTokenQsRef.current !== "") {
-            sp.set("shareToken", shareTokenQsRef.current);
+            sp.set("token", shareTokenQsRef.current);
           }
           const url = `/api/feedback/search?${sp.toString()}`;
           const res = await authFetchOrAnonCookie(url);
@@ -247,9 +241,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             }
             throw new Error(`search ${res.status}`);
           }
-          const data = (await res.json()) as { feedback?: Feedback[] };
+          const data = (await res.json()) as {
+            data?: { feedback?: Feedback[] };
+            feedback?: Feedback[];
+          };
           if (cancelled) return;
-          setSearchResults(data.feedback ?? []);
+          setSearchResults(data.data?.feedback ?? data.feedback ?? []);
         } catch (err) {
           console.error("[ECHLY] Session search failed", err);
           if (!cancelled) setSearchResults([]);
@@ -539,15 +536,17 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     void (async () => {
       setAccessBlocked(false);
       const tok = shareTokenQsRef.current;
-      const qs = tok !== "" ? `?shareToken=${encodeURIComponent(tok)}` : "";
+      const qs = tok !== "" ? `?token=${encodeURIComponent(tok)}` : "";
       const url = `/api/sessions/${encodeURIComponent(sessionId)}${qs}`;
       const res = await authFetchOrAnonCookie(url);
       if (cancelled) return;
       const data = (await res.json().catch(() => ({}))) as {
         success?: boolean;
+        data?: { session?: Record<string, unknown> };
         session?: Record<string, unknown>;
         access?: { capabilities?: Partial<AccessCapabilities> };
       };
+      const sessionPayload = data.data?.session ?? data.session;
       if (res.status === 403) {
         const cap = data.access?.capabilities;
         if (cap && cap.canView === false) {
@@ -570,7 +569,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         setSessionFetchError("forbidden");
         return;
       }
-      if (res.status === 404 || !data.success || !data.session) {
+      if (res.status === 404 || !data.success || !sessionPayload) {
         setAccessBlocked(false);
         setSession(null);
         setSessionAccess(null);
@@ -578,11 +577,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         return;
       }
       setSessionFetchError(null);
-      const raw = data.session as { accessLevel?: unknown };
+      const raw = sessionPayload as { accessLevel?: unknown };
       setSession({
         id: sessionId,
-        ...(data.session as object),
-        accessLevel: normalizeAccessLevel(raw.accessLevel),
+        ...(sessionPayload as object),
+        accessLevel: requireAccessLevel(raw.accessLevel),
       } as Session);
       const cap = data.access?.capabilities;
       setSessionAccess(
@@ -597,7 +596,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             }
           : null
       );
-      // Authenticated: Loom-style view count via Bearer. Anonymous: cookie/shareToken only (getViewerId is always non-empty for anon).
+      // Authenticated: Loom-style view count via Bearer. Anonymous: share link token (sessionStorage / URL) on the request.
       if (authUid?.trim()) {
         const viewerId = getViewerId(authUid);
         void recordSessionViewIfNew(sessionId, viewerId).catch((err) => {
@@ -642,16 +641,18 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     void (async () => {
       try {
         const tok = shareTokenQsRef.current;
-        const qs = tok !== "" ? `?shareToken=${encodeURIComponent(tok)}` : "";
+        const qs = tok !== "" ? `?token=${encodeURIComponent(tok)}` : "";
         const url = `/api/tickets/${encodeURIComponent(ticketIdFromUrl)}${qs}`;
         const res = await authFetchOrAnonCookie(url);
         if (res.status === 403 || res.status === 404) return;
         const data = (await res.json()) as {
           success?: boolean;
+          data?: { ticket?: TicketFromApi & { sessionId?: string; status?: string; createdAt?: string | null } };
           ticket?: TicketFromApi & { sessionId?: string; status?: string; createdAt?: string | null };
         };
-        if (cancelled || !data.success || !data.ticket) return;
-        const t = data.ticket;
+        const ticketPayload = data.data?.ticket ?? data.ticket;
+        if (cancelled || !data.success || !ticketPayload) return;
+        const t = ticketPayload;
         if (t.sessionId && t.sessionId !== sessionId) return;
         const isResolved =
           t.isResolved === true || t.status === "resolved";
@@ -851,10 +852,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (!res) {
       throw new Error("Delete failed");
     }
-    const data = (await res.json()) as { success?: boolean; error?: string };
+    const data = (await res.json()) as {
+      success?: boolean;
+      error?: { message?: string };
+    };
     if (!res.ok || !data?.success) {
       if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
-      throw new Error(data?.error ?? "Delete failed");
+      throw new Error(data?.error?.message ?? "Delete failed");
     }
     router.push("/dashboard");
   }, [sessionId, router, isIdentityResolved, showToast]);
@@ -909,9 +913,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
       const data = (await res.json()) as {
         success?: boolean;
+        data?: { ticket?: TicketFromApi };
         ticket?: TicketFromApi;
       };
-      if (!res.ok || !data.success || !data.ticket) {
+      const ticketPayload = data.data?.ticket ?? data.ticket;
+      if (!res.ok || !data.success || !ticketPayload) {
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === effectiveSelectedId
@@ -925,10 +931,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
       setFeedback((prev) =>
         prev.map((item) =>
-          item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
+          item.id === effectiveSelectedId ? { ...item, ...ticketPayload } : item
         )
       );
-      broadcastTicketUpdated(data.ticket);
+      broadcastTicketUpdated(ticketPayload);
     } catch (err) {
       console.error("[ECHLY] saveTitle failed", err);
       showToast("Could not save title");
@@ -991,9 +997,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         }
         const data = (await res.json()) as {
           success?: boolean;
+          data?: { ticket?: TicketFromApi };
           ticket?: TicketFromApi;
         };
-        if (!res.ok || !data.success || !data.ticket) {
+        const ticketPayload = data.data?.ticket ?? data.ticket;
+        if (!res.ok || !data.success || !ticketPayload) {
           rollbackIfLatest();
           if (actionStepsSaveLatestGenRef.current.get(ticketId) === myGen) {
             if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
@@ -1007,10 +1015,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         pendingOptimisticActionStepsRef.current.delete(ticketId);
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === ticketId ? { ...item, ...data.ticket } : item
+            item.id === ticketId ? { ...item, ...ticketPayload } : item
           )
         );
-        broadcastTicketUpdated(data.ticket);
+        broadcastTicketUpdated(ticketPayload);
       } catch (err) {
         console.error("[ECHLY] saveActionSteps failed", err);
         rollbackIfLatest();
@@ -1048,9 +1056,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
       const data = (await res.json()) as {
         success?: boolean;
+        data?: { ticket?: TicketFromApi };
         ticket?: TicketFromApi;
       };
-      if (!res.ok || !data.success || !data.ticket) {
+      const ticketPayload = data.data?.ticket ?? data.ticket;
+      if (!res.ok || !data.success || !ticketPayload) {
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
@@ -1062,10 +1072,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
       setFeedback((prev) =>
         prev.map((item) =>
-          item.id === effectiveSelectedId ? { ...item, ...data.ticket } : item
+          item.id === effectiveSelectedId ? { ...item, ...ticketPayload } : item
         )
       );
-      broadcastTicketUpdated(data.ticket);
+      broadcastTicketUpdated(ticketPayload);
     } catch (err) {
       console.error("[ECHLY] saveTags failed", err);
       showToast("Could not save tags");
@@ -1147,8 +1157,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         }
         const data = (await res.json()) as {
           success?: boolean;
+          data?: { ticket?: TicketFromApi };
           ticket?: TicketFromApi;
         };
+        const ticketPayload = data.data?.ticket ?? data.ticket;
         if (perf) {
           const clientTotal = performance.now() - t0;
           console.log("[ECHLY_PERF] CLIENT END (resolve ticket)", clientTotal.toFixed(1), "ms");
@@ -1156,7 +1168,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             "[ECHLY_PERF] Full breakdown: compare CLIENT total above with authFetch TOKEN/NETWORK lines and server [Resolve] logs for API vs Firestore."
           );
         }
-        if (!data.success || !data.ticket) {
+        if (!data.success || !ticketPayload) {
           rollbackResolved();
           showToast("Failed to update");
           return;
@@ -1164,10 +1176,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         setResolveOptimistic(null);
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === ticketId ? { ...item, ...data.ticket } : item
+            item.id === ticketId ? { ...item, ...ticketPayload } : item
           )
         );
-        broadcastTicketUpdated(data.ticket);
+        broadcastTicketUpdated(ticketPayload);
       } catch (err) {
         console.error("[ECHLY] saveResolved failed", err);
         rollbackResolved();
@@ -1226,9 +1238,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       }
       const data = (await res.json()) as {
         success?: boolean;
+        data?: { session?: Record<string, unknown> };
         session?: Record<string, unknown>;
       };
-      if (!res.ok || !data.success || !data.session) {
+      const patchSession = data.data?.session ?? data.session;
+      if (!res.ok || !data.success || !patchSession) {
         if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
         else showToast("Could not save session name");
         setSession((prev: Session | null) =>
@@ -1238,9 +1252,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         return;
       }
       setSession((prev: Session | null) =>
-        prev ? ({ ...prev, ...data.session } as Session) : prev
+        prev ? ({ ...prev, ...patchSession } as Session) : prev
       );
-      const apiTitle = ((data.session!.title as string) ?? safeTitle).trim();
+      const apiTitle = ((patchSession.title as string) ?? safeTitle).trim();
       setSessionTitleDraft(apiTitle);
       if (typeof window !== "undefined" && "chrome" in window) {
         try {
@@ -1414,7 +1428,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         showToast("Could not delete ticket");
         return;
       }
-      const data = (await res.json()) as { success?: boolean; error?: string };
+      const data = (await res.json()) as {
+        success?: boolean;
+        error?: { message?: string };
+      };
       if (!res.ok || !data?.success) {
         rollbackDelete();
         if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);

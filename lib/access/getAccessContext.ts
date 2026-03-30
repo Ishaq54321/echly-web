@@ -6,20 +6,14 @@ import {
   type AccessContext,
 } from "@/lib/access/resolveAccess";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
-import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
 import type { Session } from "@/lib/domain/session";
-import { normalizeGeneralAccess } from "@/lib/domain/session";
-import { getSessionSharePermissionForEmailRepo } from "@/lib/repositories/sessionSharesRepository";
+import { getShareLinkByToken } from "@/lib/repositories/shareLinksRepository";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
-import {
-  getUserWorkspaceIdRepo,
-  isShareAuthUid,
-} from "@/lib/repositories/usersRepository.server";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { AuthorizationError } from "@/lib/server/auth/authorize";
 import type { SessionUser } from "@/lib/server/session";
-import {
-  resolveShareLinkTokenContext,
-  type ResolvedShareLinkToken,
-} from "@/lib/server/shareTokenResolver";
+import type { SystemContext } from "@/lib/server/systemContext";
+import { assert } from "@/lib/utils/assert";
 
 export type AccessContextUser = SessionUser | { uid: string; email?: string | null };
 
@@ -28,14 +22,6 @@ type TokenPayload = {
   isActive: boolean;
   expiresAt: number | null;
 };
-
-/** Baseline policy: every loaded session row participates in resolveAccess with a defined tier. */
-function withSessionAccessBaseline(session: Session): Session {
-  return {
-    ...session,
-    accessLevel: normalizeAccessLevel(session.accessLevel ?? "view"),
-  };
-}
 
 /** Share link is an optional enhancer; only active rows are passed to {@link resolveAccess}. */
 function tokenPayloadForResolve(payload: TokenPayload | null) {
@@ -47,16 +33,29 @@ function tokenPayloadForResolve(payload: TokenPayload | null) {
   };
 }
 
-function sessionOwnerUserId(
-  session: Pick<Session, "createdBy" | "userId" | "createdByUserId"> | null
-): string | null {
-  if (!session) return null;
-  const canonical = session.createdByUserId?.trim();
-  if (canonical) return canonical;
-  const fromCreatedBy = session.createdBy?.id?.trim();
-  if (fromCreatedBy) return fromCreatedBy;
-  const legacyUserId = session.userId?.trim();
-  return legacyUserId || null;
+async function loadShareLinkPayloadForSession(
+  token: string,
+  sessionId: string
+): Promise<TokenPayload | null> {
+  const trimmed = token.trim();
+  if (!trimmed || trimmed.length < 20) {
+    return null;
+  }
+  const row = await getShareLinkByToken(trimmed);
+  if (!row || row.sessionId.trim() !== sessionId.trim()) {
+    return null;
+  }
+
+  let expiresAtMs: number | null = null;
+  if (row.expiresAt && typeof row.expiresAt.toMillis === "function") {
+    expiresAtMs = row.expiresAt.toMillis();
+  }
+
+  return {
+    generalAccess: row.generalAccess,
+    isActive: row.isActive,
+    expiresAt: expiresAtMs,
+  };
 }
 
 function toAccessContext(params: {
@@ -64,126 +63,113 @@ function toAccessContext(params: {
   workspaceId: string;
   user: AccessContextUser | null;
   role: AccessContext["role"];
+  sessionGranted: boolean;
 }): AccessContext {
-  const { sessionId, workspaceId, user, role } = params;
-  const userId = user?.uid?.trim() ?? null;
+  const { sessionId, workspaceId, user, role, sessionGranted } = params;
+  const userId = user == null ? null : user.uid.trim();
+  if (user != null) {
+    assert(userId, "Missing user uid for access context");
+  }
   return {
     sessionId,
     workspaceId,
     role,
     userId,
     isPublicViewer: user === null,
-    capabilities: buildCapabilities(role, userId),
+    capabilities: buildCapabilities(role, userId, sessionGranted),
   };
 }
 
-async function loadInviteAndToken(
+async function loadTokenContext(
   sid: string,
   user: AccessContextUser | null,
   viewerWorkspaceIdOverride: string | null | undefined,
-  tokenString: string | undefined,
-  resolvedShareToken: ResolvedShareLinkToken | undefined
+  tokenString: string | undefined
 ): Promise<{
-  userWorkspaceId: string | null;
-  inviteAccess: AccessLevel | null;
+  userWorkspaceId: string;
   tokenPayload: TokenPayload | null;
 }> {
-  let userWorkspaceId: string | null = null;
-  let inviteAccess: AccessLevel | null = null;
+  let userWorkspaceId = "";
 
   if (user) {
-    const ws =
-      viewerWorkspaceIdOverride !== undefined
-        ? String(viewerWorkspaceIdOverride ?? "").trim()
-        : (await getUserWorkspaceIdRepo(user.uid)).trim();
-    userWorkspaceId = ws || null;
-    const email = user.email?.trim();
-    if (email) {
-      inviteAccess = await getSessionSharePermissionForEmailRepo(sid, email);
+    let ws: string;
+    if (viewerWorkspaceIdOverride === undefined) {
+      ws = (await getUserWorkspaceIdRepo(user.uid)).trim();
+    } else if (viewerWorkspaceIdOverride === null) {
+      ws = "";
+    } else {
+      ws = viewerWorkspaceIdOverride.trim();
     }
+    userWorkspaceId = ws;
   }
 
   let tokenPayload: TokenPayload | null = null;
-  const preResolved = resolvedShareToken;
-  if (preResolved && preResolved.sessionId.trim() === sid) {
-    tokenPayload = {
-      generalAccess: preResolved.generalAccess,
-      isActive: preResolved.isActive,
-      expiresAt: preResolved.expiresAtMs,
-    };
-  } else if (tokenString) {
-    const ctx = await resolveShareLinkTokenContext(tokenString);
-    if (ctx.ok && ctx.sessionId.trim() === sid) {
-      tokenPayload = {
-        generalAccess: ctx.generalAccess,
-        isActive: ctx.isActive,
-        expiresAt: ctx.expiresAtMs,
-      };
-    }
+  if (tokenString) {
+    tokenPayload = await loadShareLinkPayloadForSession(tokenString, sid);
   }
 
-  return { userWorkspaceId, inviteAccess, tokenPayload };
+  return { userWorkspaceId, tokenPayload };
 }
 
-/** Session row missing: no `session.accessLevel` in Firestore — grant access only via invite or an active share link (no orphan baseline). */
-function accessForMissingSessionDoc(
-  sid: string,
-  user: AccessContextUser | null,
-  userWorkspaceId: string | null,
-  inviteAccess: AccessLevel | null,
-  tokenPayload: TokenPayload | null
-): AccessContext | null {
-  const tokenForResolve = tokenPayloadForResolve(tokenPayload);
-
-  if (inviteAccess == null && tokenForResolve == null) {
-    return null;
+function accessInputsFromContext(context: SystemContext): {
+  user: AccessContextUser | null;
+  tokenString: string | undefined;
+  viewerWorkspaceIdOverride: string | null | undefined;
+} {
+  if (context.identityType === "USER" && context.userId) {
+    const uid = context.userId.trim();
+    if (!uid) {
+      return {
+        user: null,
+        tokenString: undefined,
+        viewerWorkspaceIdOverride: undefined,
+      };
+    }
+    const ws = context.workspaceId == null ? "" : context.workspaceId.trim();
+    return {
+      user: { uid },
+      tokenString: undefined,
+      viewerWorkspaceIdOverride: ws !== "" ? ws : undefined,
+    };
   }
 
-  const { role } = resolveAccess({
-    session: {
-      id: sid,
-      workspaceId: "",
-      accessLevel: normalizeAccessLevel("view"),
-      ownerUserId: null,
-    },
-    user: user ? { uid: user.uid, workspaceId: userWorkspaceId } : null,
-    inviteAccess: inviteAccess ?? undefined,
-    token: tokenForResolve,
-  });
+  if (context.identityType === "SHARE") {
+    const tok =
+      context.shareToken == null || context.shareToken === ""
+        ? ""
+        : context.shareToken.trim();
+    return {
+      user: null,
+      tokenString: tok !== "" ? tok : undefined,
+      viewerWorkspaceIdOverride: undefined,
+    };
+  }
 
-  return toAccessContext({
-    sessionId: sid,
-    workspaceId: "",
-    user,
-    role,
-  });
+  return {
+    user: null,
+    tokenString: undefined,
+    viewerWorkspaceIdOverride: undefined,
+  };
 }
 
 export async function getAccessContext(options: {
   sessionId: string;
-  user: AccessContextUser | null;
+  context: SystemContext;
   /**
-   * Share link token (`?shareToken=` or `x-share-token`). Resolved via {@link resolveShareLinkTokenContext} / `share_links` (no duplicate validation elsewhere).
-   * When present with `user: null`, the viewer is a public share identity: {@link AccessContext.isPublicViewer} is true and `userId` on the context is null; role comes from the link (and {@link resolveAccess}).
-   */
-  tokenString?: string;
-  /**
-   * When set: use this session row (may be null if already known absent).
+   * When set: use this session row.
    * When omitted: load via `getSessionByIdRepo`.
    */
   session?: Session | null;
-  /** When the share link row was already resolved for this request (avoids a second lookup). */
-  resolvedShareToken?: ResolvedShareLinkToken;
-  /**
-   * When defined (including `null` → treat as empty workspace), skips getUserWorkspaceIdRepo.
-   * Omit (`undefined`) to always load `users/{uid}.workspaceId` for real users.
-   */
-  viewerWorkspaceIdOverride?: string | null;
-}): Promise<{ session: Session | null; access: AccessContext | null }> {
+}): Promise<{ session: Session; access: AccessContext }> {
   const sid = options.sessionId.trim();
   if (!sid) {
-    return { session: null, access: null };
+    throw new AuthorizationError("Missing session id", 400, "INVALID_INPUT");
   }
+
+  const { user, tokenString, viewerWorkspaceIdOverride } =
+    accessInputsFromContext(options.context);
+
+  const effectiveToken = user == null ? tokenString : undefined;
 
   const rawSession =
     options.session !== undefined
@@ -191,88 +177,36 @@ export async function getAccessContext(options: {
       : await getSessionByIdRepo(sid);
 
   if (!rawSession) {
-    const { userWorkspaceId, inviteAccess, tokenPayload } = await loadInviteAndToken(
-      sid,
-      options.user,
-      options.viewerWorkspaceIdOverride,
-      options.tokenString,
-      options.resolvedShareToken
-    );
-    const access = accessForMissingSessionDoc(
-      sid,
-      options.user,
-      userWorkspaceId,
-      inviteAccess,
-      tokenPayload
-    );
-    return { session: null, access };
+    throw new AuthorizationError("Not found", 404, "NOT_FOUND");
   }
 
-  const session = withSessionAccessBaseline(rawSession);
+  const session = rawSession;
 
-  const { userWorkspaceId, inviteAccess, tokenPayload } = await loadInviteAndToken(
+  const { userWorkspaceId, tokenPayload } = await loadTokenContext(
     sid,
-    options.user,
-    options.viewerWorkspaceIdOverride,
-    options.tokenString,
-    options.resolvedShareToken
+    user,
+    viewerWorkspaceIdOverride,
+    effectiveToken
   );
 
-  const generalAccess = normalizeGeneralAccess(session.generalAccess);
-  if (generalAccess === "restricted") {
-    const ownerId = sessionOwnerUserId(session);
-    const uid = options.user?.uid?.trim() ?? "";
-    const isOwner = uid !== "" && ownerId != null && uid === ownerId;
-    const sessionWs = (session.workspaceId ?? "").trim();
-    const viewerWs = (userWorkspaceId ?? "").trim();
-    const isWorkspaceMember =
-      uid !== "" &&
-      !isShareAuthUid(uid) &&
-      viewerWs !== "" &&
-      viewerWs === sessionWs;
-    const hasUserAccess = isOwner || isWorkspaceMember;
-    const hasShareAccess = tokenPayloadForResolve(tokenPayload) != null;
-    if (!hasUserAccess && !hasShareAccess) {
-      return {
-        session,
-        access: {
-          sessionId: sid,
-          workspaceId: (session.workspaceId ?? "").trim(),
-          role: "VIEWER",
-          userId: null,
-          isPublicViewer: true,
-          capabilities: {
-            canView: false,
-            canComment: false,
-            canResolve: false,
-            canAssign: false,
-            canDeleteOwnComment: false,
-            canDeleteTicket: false,
-          },
-        },
-      };
-    }
-  }
-
-  const { role } = resolveAccess({
+  const { role, sessionGranted } = resolveAccess({
     session: {
       id: session.id,
-      workspaceId: (session.workspaceId ?? "").trim(),
-      accessLevel: normalizeAccessLevel(session.accessLevel ?? "view"),
-      ownerUserId: sessionOwnerUserId(session),
+      workspaceId: session.workspaceId.trim(),
+      accessLevel: session.accessLevel,
+      ownerUserId: session.createdByUserId.trim(),
+      generalAccess: session.generalAccess,
     },
-    user: options.user
-      ? { uid: options.user.uid, workspaceId: userWorkspaceId }
-      : null,
-    inviteAccess,
+    user: user ? { uid: user.uid, workspaceId: userWorkspaceId } : null,
     token: tokenPayloadForResolve(tokenPayload),
   });
 
   const access = toAccessContext({
     sessionId: sid,
-    workspaceId: (session.workspaceId ?? "").trim(),
-    user: options.user,
+    workspaceId: session.workspaceId.trim(),
+    user,
     role,
+    sessionGranted,
   });
 
   return { session, access };

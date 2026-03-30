@@ -623,9 +623,15 @@ export function useCaptureWidget({
           body: formData,
           credentials: "include",
         });
-        let data: { transcript?: string; error?: string } = {};
+        let data: {
+          data?: { transcript?: string };
+          error?: { code?: string; message?: string };
+        } = {};
         try {
-          data = (await res.json()) as { transcript?: string; error?: string };
+          data = (await res.json()) as {
+            data?: { transcript?: string };
+            error?: { code?: string; message?: string };
+          };
         } catch {
           data = {};
         }
@@ -633,7 +639,7 @@ export function useCaptureWidget({
           logger.error("error", "voice_transcription_http_failed", { status: res.status });
           logger.error("voice", "transcription_failed", { status: res.status });
           const noSpeech =
-            res.status === 400 && data?.error === "NO_SPEECH_DETECTED";
+            res.status === 400 && data?.error?.message === "NO_SPEECH_DETECTED";
           if (voiceFailurePanelOpen) {
             setVoiceError(noSpeech ? "no_audio" : "transcription_failed");
           } else {
@@ -646,7 +652,7 @@ export function useCaptureWidget({
           setState("idle");
           return;
         }
-        const transcript = data?.transcript;
+        const transcript = data?.data?.transcript;
         if (!isTranscriptUsable(transcript)) {
           logger.error("error", "voice_invalid_transcript");
           logger.error("voice", "transcription_failed");
@@ -870,14 +876,13 @@ export function useCaptureWidget({
       const origin = window.location.origin;
       const url = await getOrCreateShareLink({
         sessionId,
-        userId,
         origin,
       });
       await navigator.clipboard.writeText(url);
     } catch (err) {
       logger.error("error", "share_clipboard_failed", err);
     }
-  }, [sessionId, userId, guardWorkspaceMutation]);
+  }, [sessionId, guardWorkspaceMutation]);
 
   const resetSession = useCallback(() => {
     setRecordings([]);
@@ -932,8 +937,13 @@ export function useCaptureWidget({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title || editedTitle, actionSteps }),
       });
-      const data = (await res.json()) as { success?: boolean; ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } };
-      if (!res.ok || !data.success || !data.ticket) {
+      const data = (await res.json()) as {
+        success?: boolean;
+        data?: { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } };
+        ticket?: { id: string; title: string; actionSteps?: string[]; type?: string };
+      };
+      const ticketPayload = data.data?.ticket ?? data.ticket;
+      if (!res.ok || !data.success || !ticketPayload) {
         throw new Error("Save failed: API_ERROR_" + res.status);
       }
       setEditingId(null);
@@ -966,9 +976,11 @@ export function useCaptureWidget({
         });
         const data = (await res.json()) as {
           success?: boolean;
+          data?: { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } };
           ticket?: { id: string; title: string; actionSteps?: string[]; type?: string };
         };
-        if (!res.ok || !data.success) throw new Error("Update failed");
+        const ticketPayload = data.data?.ticket ?? data.ticket;
+        if (!res.ok || !data.success || !ticketPayload) throw new Error("Update failed");
       } catch (err) {
         logger.error("error", "ticket_update_failed", err);
         throw err;

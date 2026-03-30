@@ -1,3 +1,5 @@
+import { apiError } from "@/lib/server/apiResponse";
+
 /**
  * x-debug-uid is only honored when NODE_ENV is "development" AND ENABLE_DEBUG_UID === "true",
  * and the UID appears in ALLOWED_DEBUG_UIDS (comma-separated). Never enable in staging/production.
@@ -33,10 +35,11 @@ export function resolveDebugUid(req: Request): DebugUidResult {
   if (!isDebugMode) {
     return {
       status: "forbidden",
-      response: new Response(
-        JSON.stringify({ error: "Debug UID not allowed" }),
-        { status: 403, headers: { "Content-Type": "application/json" } },
-      ),
+      response: apiError({
+        code: "FORBIDDEN",
+        message: "Debug UID not allowed",
+        status: 403,
+      }),
     };
   }
 
@@ -44,9 +47,10 @@ export function resolveDebugUid(req: Request): DebugUidResult {
   if (!allowedDebugUids.includes(debugUid)) {
     return {
       status: "forbidden",
-      response: new Response(JSON.stringify({ error: "Invalid debug UID" }), {
+      response: apiError({
+        code: "FORBIDDEN",
+        message: "Invalid debug UID",
         status: 403,
-        headers: { "Content-Type": "application/json" },
       }),
     };
   }

@@ -4997,10 +4997,6 @@ html.dark .echly-mic-item.is-active {
 }
 
 .share-dropdown.share-dropdown--role-pill .role-dot--viewer {
-  background: #9ca3af;
-}
-
-.share-dropdown.share-dropdown--role-pill .role-dot--commenter {
   background: #3b82f6;
 }
 

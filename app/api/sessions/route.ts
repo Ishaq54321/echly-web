@@ -1,22 +1,47 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import {
+  requireAuth,
+  toAuthorizationResponse,
+} from "@/lib/server/auth/authorize";
 import {
   createSessionRepo,
   getWorkspaceSessionCountRepo,
 } from "@/lib/repositories/sessionsRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
-import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { WORKSPACE_SUSPENDED_MESSAGE } from "@/lib/server/assertWorkspaceActive";
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
-import { planLimitReachedBody } from "@/lib/billing/planLimitResponse";
+import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { corsHeaders } from "@/lib/server/cors";
-import {
-  getUserWorkspaceIdRepo,
-  isShareAuthUid,
-} from "@/lib/repositories/usersRepository.server";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { listAccessibleSessionsForUser } from "@/lib/server/listAccessibleSessionsForUser";
+import type { Session } from "@/lib/domain/session";
+import { assert } from "@/lib/utils/assert";
+
+function sessionFieldToIso(value: Session["updatedAt"]): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+  const v = value as { toMillis?: () => number; toDate?: () => Date };
+  if (typeof v.toMillis === "function") {
+    return new Date(v.toMillis()).toISOString();
+  }
+  if (typeof v.toDate === "function") {
+    return v.toDate().toISOString();
+  }
+  return null;
+}
 
 export const dynamic = "force-dynamic";
+
+function withCors(req: NextRequest, res: Response): NextResponse {
+  return new NextResponse(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: { ...Object.fromEntries(res.headers), ...corsHeaders(req) },
+  });
+}
 
 export async function OPTIONS(req: NextRequest) {
   return new Response(null, {
@@ -30,129 +55,111 @@ export async function GET(req: NextRequest) {
   let user;
   try {
     user = await requireAuth(req);
-  } catch (res) {
-    const errRes = res as Response;
-    return new NextResponse(errRes.body, {
-      status: errRes.status,
-      statusText: errRes.statusText,
-      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
-    });
+  } catch (err) {
+    return withCors(req, toAuthorizationResponse(err));
   }
 
   console.time("API /sessions");
   try {
     console.time("Firestore query");
-    let sessionRows;
+    let sessions: Session[];
     try {
-      sessionRows = await listAccessibleSessionsForUser({
+      sessions = await listAccessibleSessionsForUser({
         userId: user.uid,
-        userEmail: user.email ?? null,
         limit: 30,
       });
     } finally {
       console.timeEnd("Firestore query");
     }
-    const sessions = sessionRows.map((docSnap) => {
-      const data = docSnap as {
-        id: string;
-        title?: string;
-        updatedAt?: { toDate?: () => Date } | string | null;
-        createdAt?: { toDate?: () => Date } | string | null;
-        archived?: boolean;
-        openCount?: number;
-        resolvedCount?: number;
-        totalCount?: number;
-        feedbackCount?: number;
-      };
-      const toIsoString = (
-        value: { toDate?: () => Date } | string | null | undefined
-      ): string | null => {
-        if (typeof value === "string") return value;
-        if (value != null && typeof value === "object" && typeof value.toDate === "function") {
-          return value.toDate().toISOString();
-        }
-        return null;
-      };
 
-      const updatedAt = toIsoString(data.updatedAt) ?? toIsoString(data.createdAt) ?? null;
+    sessions.forEach((s) => {
+      assert(s.accessLevel, "Session missing accessLevel");
+      assert(s.generalAccess, "Session missing generalAccess");
+    });
 
-      const openCount = typeof data.openCount === "number" ? data.openCount : 0;
+    const sessionsPayload = sessions.map((session) => {
+      const updatedAt =
+        sessionFieldToIso(session.updatedAt) ??
+        sessionFieldToIso(session.createdAt) ??
+        null;
+      const title =
+        typeof session.title === "string" && session.title.trim() !== ""
+          ? session.title.trim()
+          : "Untitled Session";
+      const openCount = typeof session.openCount === "number" ? session.openCount : 0;
       const resolvedCount =
-        typeof data.resolvedCount === "number" ? data.resolvedCount : 0;
+        typeof session.resolvedCount === "number" ? session.resolvedCount : 0;
       const totalCount =
-        typeof data.totalCount === "number"
-          ? data.totalCount
-          : typeof data.feedbackCount === "number"
-            ? data.feedbackCount
+        typeof session.totalCount === "number"
+          ? session.totalCount
+          : typeof session.feedbackCount === "number"
+            ? session.feedbackCount
             : 0;
       const feedbackCount =
-        typeof data.feedbackCount === "number"
-          ? data.feedbackCount
-          : typeof data.totalCount === "number"
-            ? data.totalCount
+        typeof session.feedbackCount === "number"
+          ? session.feedbackCount
+          : typeof session.totalCount === "number"
+            ? session.totalCount
             : 0;
 
       return {
-        id: data.id,
-        // Keep `title` for compatibility and include `name` as a normalized alias.
-        title: data.title ?? "Untitled Session",
-        name: data.title ?? "Untitled Session",
+        id: session.id,
+        workspaceId: session.workspaceId,
+        createdByUserId: session.createdByUserId,
+        title,
+        name: title,
+        accessLevel: session.accessLevel,
+        generalAccess: session.generalAccess,
         updatedAt,
-        archived: data.archived === true,
+        archived: session.archived === true || session.isArchived === true,
         openCount,
         resolvedCount,
         totalCount,
         feedbackCount,
       };
     });
-    return NextResponse.json({ sessions }, { headers: corsHeaders(req) });
+    return apiSuccess({ sessions: sessionsPayload }, null, { headers: corsHeaders(req) });
   } catch (err) {
     if (err instanceof Error && err.message === "Missing workspaceId for user") {
-      return new Response("Workspace not found", {
+      return apiError({
+        code: "FORBIDDEN",
+        message: "Workspace not found",
         status: 403,
-        headers: corsHeaders(req),
+        init: { headers: corsHeaders(req) },
       });
     }
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
+      return apiError({
+        code: "FORBIDDEN",
+        message: WORKSPACE_SUSPENDED_MESSAGE,
         status: 403,
-        headers: corsHeaders(req),
+        init: { headers: corsHeaders(req) },
       });
     }
     console.error("GET /api/sessions:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to load sessions" },
-      { status: 500, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to load sessions",
+      status: 500,
+      init: { headers: corsHeaders(req) },
+    });
   } finally {
     console.timeEnd("API /sessions");
   }
 }
 
 /**
- * POST /api/sessions — create a new session. Returns { success: true, session: { id } }.
- * Session limit is enforced ONLY here (at creation). Reducing maxSessions never deletes existing sessions.
+ * POST /api/sessions — create a new session. Returns `{ success, data: { session: { id } }, access: null }`.
  */
 export async function POST(req: NextRequest) {
   let user;
   try {
     user = await requireAuth(req);
-  } catch (res) {
-    const errRes = res as Response;
-    return new NextResponse(errRes.body, {
-      status: errRes.status,
-      statusText: errRes.statusText,
-      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders(req) },
-    });
+  } catch (err) {
+    return withCors(req, toAuthorizationResponse(err));
   }
 
   try {
-    if (isShareAuthUid(user.uid)) {
-      return new Response("Workspace not found", {
-        status: 403,
-        headers: corsHeaders(req),
-      });
-    }
     const workspaceId = await getUserWorkspaceIdRepo(user.uid);
     const workspace = await getWorkspace(workspaceId);
 
@@ -167,38 +174,39 @@ export async function POST(req: NextRequest) {
       } catch (limitErr) {
         const planErr = limitErr as PlanLimitError;
         if (planErr.code === "PLAN_LIMIT_REACHED") {
-          return NextResponse.json(planLimitReachedBody(planErr), {
-            status: 403,
-            headers: corsHeaders(req),
-          });
+          const errParams = planLimitReachedApiError(planErr);
+          return apiError({ ...errParams, init: { headers: corsHeaders(req) } });
         }
         throw limitErr;
       }
     }
 
-    const id = await createSessionRepo(workspaceId, user.uid, null);
+    const id = await createSessionRepo(workspaceId, user.uid);
 
-    return NextResponse.json(
-      { success: true, session: { id } },
-      { headers: corsHeaders(req) }
-    );
+    return apiSuccess({ session: { id } }, null, { headers: corsHeaders(req) });
   } catch (err) {
     if (err instanceof Error && err.message === "Missing workspaceId for user") {
-      return new Response("Workspace not found", {
+      return apiError({
+        code: "FORBIDDEN",
+        message: "Workspace not found",
         status: 403,
-        headers: corsHeaders(req),
+        init: { headers: corsHeaders(req) },
       });
     }
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
+      return apiError({
+        code: "FORBIDDEN",
+        message: WORKSPACE_SUSPENDED_MESSAGE,
         status: 403,
-        headers: corsHeaders(req),
+        init: { headers: corsHeaders(req) },
       });
     }
     console.error("POST /api/sessions:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to create session" },
-      { status: 500, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to create session",
+      status: 500,
+      init: { headers: corsHeaders(req) },
+    });
   }
 }

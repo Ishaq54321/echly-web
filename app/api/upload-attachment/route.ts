@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
 import { adminBucket } from "@/lib/server/firebaseAdmin";
-import { requireAuth } from "@/lib/server/auth";
+import {
+  requireAuth,
+  toAuthorizationResponse,
+} from "@/lib/server/auth/authorize";
 import { randomUUID } from "crypto";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
 const STORAGE_PREFIX = "discussion-attachments";
@@ -16,25 +19,27 @@ export async function POST(req: Request) {
     let user;
     try {
       user = await requireAuth(req);
-    } catch (res) {
-      return res as Response;
+    } catch (err) {
+      return toAuthorizationResponse(err);
     }
 
     const formData = await req.formData();
     const file = formData.get("file");
 
     if (!file || !(file instanceof File)) {
-      return NextResponse.json(
-        { error: "No file provided" },
-        { status: 400 }
-      );
+      return apiError({
+        code: "INVALID_INPUT",
+        message: "No file provided",
+        status: 400,
+      });
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "File must be smaller than 15 MB." },
-        { status: 400 }
-      );
+      return apiError({
+        code: "INVALID_INPUT",
+        message: "File must be smaller than 15 MB.",
+        status: 400,
+      });
     }
 
     const originalName = (file.name || "file").replace(/[/\\]/g, "").slice(0, 200);
@@ -53,16 +58,17 @@ export async function POST(req: Request) {
       expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
     });
 
-    return NextResponse.json({
+    return apiSuccess({
       url,
       name: originalName,
       size: file.size,
     });
   } catch (err) {
     console.error("upload-attachment error:", err);
-    return NextResponse.json(
-      { error: "Upload failed" },
-      { status: 500 }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Upload failed",
+      status: 500,
+    });
   }
 }

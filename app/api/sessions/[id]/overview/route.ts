@@ -1,17 +1,16 @@
-import { NextResponse } from "next/server";
 import { type HandlerContext } from "@/lib/server/auth/withAuthorization";
 import { routeParamId } from "@/lib/server/routeParams";
 import { serializeFeedback } from "@/lib/server/serializeFeedback";
 import { serializeSession } from "@/lib/server/serializeSession";
-import { getAccessContext } from "@/lib/access/getAccessContext";
-import { accessContextToResponseBody } from "@/lib/access/resolveAccess";
+import { buildRequestContext } from "@/lib/server/requestContext";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
-import { resolveOptionalSessionViewer } from "@/lib/server/requestContext";
 import {
   getFeedbackByIdsRepo,
   getSessionFeedbackByResolvedRepo,
 } from "@/lib/repositories/feedbackRepository.server";
 import { listRecentCommentsForSessionRepo } from "@/lib/repositories/commentsRepository.server";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+
 const PREVIEW_LIMIT = 3;
 const RECENT_ACTIVITY_LIMIT = 10;
 
@@ -35,31 +34,39 @@ function commentTimestampToIso(createdAt: unknown): string | null {
 export async function GET(req: Request, ctx: HandlerContext) {
   const id = await routeParamId(ctx);
   if (!id) {
-    return NextResponse.json({ success: false, error: "Missing session id" }, { status: 400 });
+    return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
   }
 
-  const { viewerUser, tokenString } = await resolveOptionalSessionViewer(req);
   const loaded = await getSessionByIdRepo(id);
-  const { session, access } = await getAccessContext({
+  if (!loaded) {
+    return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
+  }
+  const context = await buildRequestContext({
+    req,
     sessionId: id,
-    user: viewerUser,
     session: loaded,
-    tokenString,
+    optionalAuth: true,
   });
+  const { session, access } = context;
 
   if (!access?.capabilities.canView) {
-    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    return apiError({ code: "FORBIDDEN", message: "You do not have access", status: 403 });
   }
   if (!session) {
-    return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+    return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
   }
 
   const sid = id.trim();
+  const workspaceId =
+    typeof session.workspaceId === "string" ? session.workspaceId.trim() : "";
+  if (!workspaceId) {
+    return apiError({ code: "INTERNAL_ERROR", message: "Session missing workspace", status: 500 });
+  }
   try {
     const [openPreview, resolvedPreview, recentComments] = await Promise.all([
       getSessionFeedbackByResolvedRepo(sid, false, PREVIEW_LIMIT),
       getSessionFeedbackByResolvedRepo(sid, true, PREVIEW_LIMIT),
-      listRecentCommentsForSessionRepo(sid, RECENT_ACTIVITY_LIMIT),
+      listRecentCommentsForSessionRepo(workspaceId, sid, RECENT_ACTIVITY_LIMIT),
     ]);
     const feedbackIds = [
       ...new Set(
@@ -79,20 +86,20 @@ export async function GET(req: Request, ctx: HandlerContext) {
     }));
 
     const sessionJson = serializeSession(session, access);
-    const accessJson = accessContextToResponseBody(access);
 
-    return NextResponse.json({
-      success: true,
-      session: sessionJson,
-      access: accessJson,
-      statusPreview: {
-        open: openPreview.map((item) => serializeFeedback(item, access)),
-        resolved: resolvedPreview.map((item) => serializeFeedback(item, access)),
+    return apiSuccess(
+      {
+        session: sessionJson,
+        statusPreview: {
+          open: openPreview.map((item) => serializeFeedback(item, access)),
+          resolved: resolvedPreview.map((item) => serializeFeedback(item, access)),
+        },
+        recentActivity,
       },
-      recentActivity,
-    });
+      access
+    );
   } catch (e) {
     console.error("GET /api/sessions/[id]/overview:", e);
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+    return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
   }
 }

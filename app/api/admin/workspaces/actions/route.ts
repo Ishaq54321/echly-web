@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { withAuthorization } from "@/lib/server/auth/withAuthorization";
+import { apiError } from "@/lib/server/apiResponse";
 
 /**
  * POST /api/admin/workspaces/actions
@@ -8,15 +8,16 @@ import { withAuthorization } from "@/lib/server/auth/withAuthorization";
 export const POST = withAuthorization(
   "update_session",
   async (req: Request) => {
-  try {
-    await req.json().catch(() => null);
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-  return NextResponse.json(
-    { error: "Admin workspace actions are disabled" },
-    { status: 410 }
-  );
+    try {
+      await req.json().catch(() => null);
+    } catch {
+      return apiError({ code: "INVALID_INPUT", message: "Invalid JSON", status: 400 });
+    }
+    return apiError({
+      code: "FORBIDDEN",
+      message: "Admin workspace actions are disabled",
+      status: 410,
+    });
   },
   {
     isAdmin: true,

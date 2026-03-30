@@ -57,7 +57,8 @@ export default function AdminCustomersPage() {
     try {
       const res = await authFetch("/api/admin/workspaces");
       if (!res || !res.ok) throw new Error("Failed to load workspaces");
-      const data = await res.json();
+      const envelope = (await res.json()) as { data?: WorkspaceRow[] };
+      const data = Array.isArray(envelope.data) ? envelope.data : [];
       setRows(data);
       return data;
     } catch (e) {
@@ -89,8 +90,10 @@ export default function AdminCustomersPage() {
         throw new Error("Action failed");
       }
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as { error?: string }).error ?? "Action failed");
+        const err = (await res.json().catch(() => ({}))) as {
+          error?: { message?: string };
+        };
+        throw new Error(err.error?.message ?? "Action failed");
       }
       if (successToast) showToast(successToast);
       const data = await load();

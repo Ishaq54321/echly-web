@@ -72,11 +72,10 @@ function SettingsPageInner() {
   const { user, loading: authLoading } = useAuthGuard();
   const {
     workspaceId,
-    claimsReady,
     workspaceError,
     workspaceLoading,
     isIdentityResolved,
-    authUid,
+    isIdentityReady,
   } = useWorkspace();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>("general");
@@ -90,13 +89,13 @@ function SettingsPageInner() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!authUid || !workspaceId) {
+    if (!isIdentityReady || !workspaceId) {
       setWorkspace(null);
       return;
     }
-    const unsub = listenToWorkspace(workspaceId, setWorkspace, claimsReady);
+    const unsub = listenToWorkspace(workspaceId, setWorkspace, isIdentityReady);
     return () => unsub();
-  }, [workspaceId, claimsReady, authUid]);
+  }, [workspaceId, isIdentityReady]);
 
   const loadingWorkspace = Boolean(
     user &&

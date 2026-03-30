@@ -52,7 +52,7 @@ export function useBillingUsage(
   refetch: () => Promise<void>;
 } {
   const { enabled = true } = options;
-  const { workspaceId: ctxWorkspaceId, authUid } = useWorkspace();
+  const { workspaceId: ctxWorkspaceId, isIdentityReady } = useWorkspace();
   const [data, setData] = useState<BillingUsageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +104,7 @@ export function useBillingUsage(
         ? ctxWorkspaceId.trim()
         : null;
 
-    if (!authUid || trimmedWorkspace == null) {
+    if (!isIdentityReady || trimmedWorkspace == null) {
       setData(null);
       setLoading(false);
       setError(null);
@@ -180,7 +180,7 @@ export function useBillingUsage(
       workspaceStoreUnsub.current = null;
       releaseFirestore?.();
     };
-  }, [enabled, refetch, ctxWorkspaceId, authUid]);
+  }, [enabled, refetch, ctxWorkspaceId, isIdentityReady]);
 
   return { data, loading, error, refetch };
 }

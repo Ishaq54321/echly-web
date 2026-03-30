@@ -37,10 +37,10 @@ export async function getWorkspace(workspaceId: string): Promise<Workspace | nul
 export function listenToWorkspace(
   workspaceId: string,
   callback: (workspace: Workspace | null) => void,
-  claimsReady: boolean
+  identityReady: boolean
 ): Unsubscribe {
   const wid = workspaceId.trim();
-  if (!claimsReady || !wid) {
+  if (!identityReady || !wid) {
     callback(null);
     return () => {};
   }

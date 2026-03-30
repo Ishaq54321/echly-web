@@ -18,10 +18,8 @@ import {
   Pencil,
   RotateCcw,
   Trash2,
-  UserPlus,
 } from "lucide-react";
 import type { Session } from "@/lib/domain/session";
-import { ShareModal } from "@/components/share/ShareModal";
 import { RenameSessionModal } from "@/components/dashboard/RenameSessionModal";
 import { copySessionLink } from "@/utils/copySessionLink";
 import {
@@ -36,14 +34,12 @@ import {
 
 export type SessionActionMenuKey =
   | "copyLink"
-  | "share"
   | "rename"
   | "archive"
   | "delete";
 
 const SESSION_ACTION_MENU_ORDER: SessionActionMenuKey[] = [
   "copyLink",
-  "share",
   "rename",
   "archive",
   "delete",
@@ -100,7 +96,6 @@ export function SessionActionsDropdown({
   const [dropdownPlacement, setDropdownPlacement] = useState<"above" | "below">(
     "below"
   );
-  const [shareOpen, setShareOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [copyLinkBusy, setCopyLinkBusy] = useState(false);
@@ -229,13 +224,6 @@ export function SessionActionsDropdown({
     closeMenu();
   };
 
-  const handleShare = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setShareOpen(true);
-    closeMenu();
-  };
-
   const handleRenameClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -277,10 +265,12 @@ export function SessionActionsDropdown({
     if (!res.ok) throw new Error("Failed to rename");
     const data = (await res.json()) as {
       success?: boolean;
+      data?: { session?: { id: string; title: string; updatedAt?: unknown } };
       session?: { id: string; title: string; updatedAt?: unknown };
     };
-    if (data.success && data.session && onRenameSuccess) {
-      onRenameSuccess(data.session);
+    const renamed = data.data?.session ?? data.session;
+    if (data.success && renamed && onRenameSuccess) {
+      onRenameSuccess(renamed);
     }
   };
 
@@ -387,20 +377,6 @@ export function SessionActionsDropdown({
                       {copyLinkBusy ? "Copying…" : "Copy link"}
                     </button>
                   );
-                case "share":
-                  return (
-                    <button
-                      key={key}
-                      ref={itemRef}
-                      type="button"
-                      onClick={handleShare}
-                      className={menuItemClass}
-                      role="menuitem"
-                    >
-                      <UserPlus className="shrink-0" strokeWidth={1.6} aria-hidden />
-                      Share
-                    </button>
-                  );
                 case "rename":
                   return (
                     <button
@@ -477,12 +453,6 @@ export function SessionActionsDropdown({
           document.body
         )}
 
-      <ShareModal
-        isOpen={shareOpen}
-        onClose={() => setShareOpen(false)}
-        sessionId={session.id}
-        sessionTitle={session.title}
-      />
       <RenameSessionModal
         open={renameOpen}
         onClose={() => setRenameOpen(false)}

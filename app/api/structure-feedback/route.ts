@@ -1,11 +1,15 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import OpenAI from "openai";
-import { requireAuth } from "@/lib/server/auth";
+import {
+  requireAuth,
+  toAuthorizationResponse,
+} from "@/lib/server/auth/authorize";
 import { resolveWorkspaceForUser } from "@/lib/server/resolveWorkspaceForUser";
-import { WORKSPACE_SUSPENDED_RESPONSE } from "@/lib/server/assertWorkspaceActive";
+import { WORKSPACE_SUSPENDED_MESSAGE } from "@/lib/server/assertWorkspaceActive";
 import { runFeedbackPipeline } from "@/lib/ai/runFeedbackPipeline";
 import { corsHeaders } from "@/lib/server/cors";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { NextResponse } from "next/server";
 
 export async function OPTIONS(req: NextRequest) {
   return new Response(null, {
@@ -46,13 +50,6 @@ function checkRateLimit(uid: string): boolean {
   return true;
 }
 
-/** Stable response shape. One recording → one ticket; tickets[] has one element for compatibility. */
-type StructureResponse = {
-  success: boolean;
-  tickets: Array<Record<string, unknown>>;
-  error?: string;
-};
-
 /**
  * POST /api/structure-feedback
  *
@@ -60,17 +57,11 @@ type StructureResponse = {
  * All processing is delegated to the central pipeline (lib/ai/runFeedbackPipeline).
  */
 export async function POST(req: NextRequest): Promise<Response> {
-  const stableFailure = (error: string): NextResponse<StructureResponse> =>
-    NextResponse.json(
-      { success: false, tickets: [], error },
-      { status: 200, headers: corsHeaders(req) }
-    );
-
   let user;
   try {
     user = await requireAuth(req);
-  } catch (res) {
-    const errRes = res as Response;
+  } catch (err) {
+    const errRes = toAuthorizationResponse(err);
     return new NextResponse(errRes.body, {
       status: errRes.status,
       statusText: errRes.statusText,
@@ -78,19 +69,25 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
   if (!checkRateLimit(user.uid)) {
-    return NextResponse.json(
-      { success: false, tickets: [], error: "Rate limit exceeded. Try again later." },
-      { status: 429, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "FORBIDDEN",
+      message: "Rate limit exceeded. Try again later.",
+      status: 429,
+      data: { tickets: [] },
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   try {
     await resolveWorkspaceForUser(user.uid);
   } catch (err) {
     if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return NextResponse.json(WORKSPACE_SUSPENDED_RESPONSE, {
+      return apiError({
+        code: "FORBIDDEN",
+        message: WORKSPACE_SUSPENDED_MESSAGE,
         status: 403,
-        headers: corsHeaders(req),
+        data: { tickets: [] },
+        init: { headers: corsHeaders(req) },
       });
     }
     throw err;
@@ -100,24 +97,36 @@ export async function POST(req: NextRequest): Promise<Response> {
   try {
     client = getOpenAIClient();
   } catch {
-    return NextResponse.json(
-      { success: false, tickets: [], error: "Missing OpenAI API key" },
-      { status: 200, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Missing OpenAI API key",
+      status: 200,
+      data: { tickets: [] },
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   let body: { transcript?: unknown; context?: unknown };
   try {
     body = await req.json();
   } catch {
-    return stableFailure("Invalid request body");
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Invalid request body",
+      status: 200,
+      data: { tickets: [] },
+      init: { headers: corsHeaders(req) },
+    });
   }
   const transcript = body?.transcript;
   if (!transcript || typeof transcript !== "string") {
-    return NextResponse.json(
-      { success: false, tickets: [], error: "No valid transcript provided" },
-      { status: 200, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "No valid transcript provided",
+      status: 200,
+      data: { tickets: [] },
+      init: { headers: corsHeaders(req) },
+    });
   }
 
   try {
@@ -131,21 +140,22 @@ export async function POST(req: NextRequest): Promise<Response> {
       readyForPhase4: true,
     });
 
-    return NextResponse.json(
+    return apiSuccess(
       {
-        success: result.success,
         tickets: result.tickets ?? [],
+        structuredSuccess: result.success,
       },
-      {
-        status: 200,
-        headers: corsHeaders(req),
-      }
+      null,
+      { headers: corsHeaders(req), status: 200 }
     );
   } catch (err) {
     console.error("STRUCTURING ERROR:", err);
-    return NextResponse.json(
-      { success: false, tickets: [], error: "AI pipeline failed" },
-      { status: 500, headers: corsHeaders(req) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "AI pipeline failed",
+      status: 500,
+      data: { tickets: [] },
+      init: { headers: corsHeaders(req) },
+    });
   }
 }

@@ -65,9 +65,16 @@ export function DiscussionFeed({
         const url = "/api/feedback?conversationsOnly=true&limit=100";
         const res = await authFetch(url, { cache: "no-store" });
         if (!res?.ok) throw new Error("Failed to load discussions");
-        const data = (await res.json().catch(() => ({}))) as { feedback?: unknown[] };
+        const data = (await res.json().catch(() => ({}))) as {
+          data?: { feedback?: unknown[] };
+          feedback?: unknown[];
+        };
         if (cancelled) return;
-        const raw = Array.isArray(data.feedback) ? data.feedback : [];
+        const raw = Array.isArray(data.data?.feedback)
+          ? data.data.feedback
+          : Array.isArray(data.feedback)
+            ? data.feedback
+            : [];
         const list: DiscussionFeedItem[] = raw.map((row: unknown) => {
           const item = row as Record<string, unknown>;
           const status = (item.status as string) ?? "open";

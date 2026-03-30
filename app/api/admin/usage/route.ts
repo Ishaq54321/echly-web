@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository.server";
 import type { Workspace } from "@/lib/domain/workspace";
@@ -51,9 +51,13 @@ export async function GET(req: Request) {
       totalSessions,
       totalFeedbackCaptured,
     };
-    return NextResponse.json(stats);
+    return apiSuccess(stats);
   } catch (err) {
     console.error("GET /api/admin/usage:", err);
-    return NextResponse.json({ error: "Failed to get usage" }, { status: 500 });
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Failed to get usage",
+      status: 500,
+    });
   }
 }

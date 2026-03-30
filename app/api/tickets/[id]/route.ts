@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { serializeTicket } from "@/lib/server/serializeFeedback";
 import {
   updateFeedbackRepo,
@@ -16,14 +15,12 @@ import {
 import { routeParamId } from "@/lib/server/routeParams";
 import {
   buildRequestContext,
-  resolveOptionalSessionViewer,
+  tryBuildRequestContext,
 } from "@/lib/server/requestContext";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
-import { getAccessContext } from "@/lib/access/getAccessContext";
-import { accessContextToResponseBody } from "@/lib/access/resolveAccess";
 import { getFeedbackByIdRepo } from "@/lib/repositories/feedbackRepository.server";
-import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 async function resolveTicketWorkspaceId(
   req: Request,
@@ -51,61 +48,47 @@ export async function GET(req: Request, ctx: HandlerContext) {
   log("[API] GET /api/tickets/[id] start");
   const id = await routeParamId(ctx);
   if (!id) {
-    return NextResponse.json(
-      { success: false, error: "Missing ticket id" },
-      { status: 400 }
-    );
+    return apiError({ code: "INVALID_INPUT", message: "Missing ticket id", status: 400 });
   }
 
   try {
-    const { viewerUser, tokenString } = await resolveOptionalSessionViewer(req);
     const feedbackRow = await getFeedbackByIdRepo(id);
-    const sid = String(feedbackRow?.sessionId ?? "").trim();
-    const loadedSession = sid ? await getSessionByIdRepo(sid) : null;
-    const { access } = await getAccessContext({
-      sessionId: sid,
-      user: viewerUser,
-      session: loadedSession,
-      tokenString,
-    });
-
-    if (!access?.capabilities.canView) {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 }
-      );
-    }
-
     if (!feedbackRow) {
-      return NextResponse.json(
-        { success: false, error: "Not found" },
-        { status: 404 }
-      );
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
 
+    const built = await tryBuildRequestContext({
+      req,
+      feedbackId: id,
+      feedback: feedbackRow,
+      optionalAuth: true,
+    });
+    if (!built.ok) {
+      return built.response;
+    }
+    const context = built.ctx;
+
+    if (!context.access?.capabilities.canView) {
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
+    }
+
+    const sid = String(feedbackRow.sessionId ?? "").trim();
     if (!sid) {
-      return NextResponse.json(
-        { success: false, error: "Not found" },
-        { status: 404 }
-      );
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
 
-    const ticketJson = serializeTicket(feedbackRow, access);
-    const accessJson = accessContextToResponseBody(access);
+    const ticketJson = serializeTicket(feedbackRow, context.access!);
 
     log("[API] GET /api/tickets/[id] duration:", Date.now() - start);
-    return NextResponse.json({
-      success: true,
-      ticket: ticketJson,
-      access: accessJson,
-    });
+    return apiSuccess({ ticket: ticketJson }, context.access!);
   } catch (err) {
     console.error("GET /api/tickets/[id]:", err);
     log("[API] GET /api/tickets/[id] duration (error):", Date.now() - start);
-    return NextResponse.json(
-      { success: false, error: "Server error" },
-      { status: 500 }
-    );
+    return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
   }
 }
 
@@ -130,23 +113,14 @@ export const PATCH = withAuthorization(
     };
     let id: string;
     try {
-      const [idResult, jsonBody] = await Promise.all([
-        routeParamId(ctx),
-        req.json(),
-      ]);
+      const [idResult, jsonBody] = await Promise.all([routeParamId(ctx), req.json()]);
       id = idResult;
       body = jsonBody as typeof body;
     } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid JSON body" },
-        { status: 400 }
-      );
+      return apiError({ code: "INVALID_INPUT", message: "Invalid JSON body", status: 400 });
     }
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: "Missing ticket id" },
-        { status: 400 }
-      );
+      return apiError({ code: "INVALID_INPUT", message: "Missing ticket id", status: 400 });
     }
     const traceResolveFlow =
       typeof body.status === "string" || typeof body.isResolved === "boolean";
@@ -176,16 +150,14 @@ export const PATCH = withAuthorization(
     }
 
     if (!context.access?.capabilities.canView) {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 }
-      );
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
     if (!context.feedback) {
-      return NextResponse.json(
-        { success: false, error: "Not found" },
-        { status: 404 }
-      );
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
 
     const existingForOwnership = context.feedback as Feedback;
@@ -194,10 +166,11 @@ export const PATCH = withAuthorization(
     let patchStatus: TicketWriteStatus | undefined;
     if (typeof body.status === "string") {
       if (body.status !== "open" && body.status !== "resolved") {
-        return NextResponse.json(
-          { success: false, error: "Invalid status; allowed: open, resolved" },
-          { status: 400 }
-        );
+        return apiError({
+          code: "INVALID_INPUT",
+          message: "Invalid status; allowed: open, resolved",
+          status: 400,
+        });
       }
       patchStatus = body.status;
     } else if (typeof body.isResolved === "boolean") {
@@ -214,23 +187,25 @@ export const PATCH = withAuthorization(
     const hasContent = Object.keys(contentUpdates).length > 0;
 
     if (!hasContent && patchStatus === undefined) {
-      return NextResponse.json({
-        success: true,
-        ticket: serializeTicket(existingForOwnership, context.access!),
-      });
+      return apiSuccess(
+        { ticket: serializeTicket(existingForOwnership, context.access!) },
+        context.access!
+      );
     }
 
     if (hasContent && !context.access?.capabilities.canComment) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permission" },
-        { status: 403 }
-      );
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
     if (patchStatus !== undefined && !context.access?.capabilities.canResolve) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permission" },
-        { status: 403 }
-      );
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
 
     try {
@@ -245,10 +220,7 @@ export const PATCH = withAuthorization(
           status: patchStatus,
         });
         if (resolveResult.kind === "missing") {
-          return NextResponse.json(
-            { success: false, error: "Not found" },
-            { status: 404 }
-          );
+          return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
         }
         console.log("[Resolve] Repo done:", Date.now() - start, "ms");
       } else {
@@ -273,17 +245,14 @@ export const PATCH = withAuthorization(
       if (patchStatus !== undefined) {
         console.log("[Resolve] Total API time:", Date.now() - start, "ms");
       }
-      return NextResponse.json({
-        success: true,
-        ticket: serializeTicket(updated, context.access!),
-      });
+      return apiSuccess(
+        { ticket: serializeTicket(updated, context.access!) },
+        context.access!
+      );
     } catch (err) {
       console.error("PATCH /api/tickets/[id]:", err);
       log("[API] PATCH /api/tickets/[id] duration (error):", Date.now() - start);
-      return NextResponse.json(
-        { success: false, error: "Server error" },
-        { status: 500 }
-      );
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },
   { resolveWorkspace: resolveTicketWorkspaceId }
@@ -301,10 +270,7 @@ export const DELETE = withAuthorization(
     log("[API] DELETE /api/tickets/[id] start");
     const id = await routeParamId(ctx);
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: "Missing ticket id" },
-        { status: 400 }
-      );
+      return apiError({ code: "INVALID_INPUT", message: "Missing ticket id", status: 400 });
     }
 
     try {
@@ -322,33 +288,29 @@ export const DELETE = withAuthorization(
           : {}),
       });
       if (!context.access?.capabilities.canView) {
-        return NextResponse.json(
-          { success: false, error: "Forbidden" },
-          { status: 403 }
-        );
+        return apiError({
+          code: "FORBIDDEN",
+          message: "You do not have access",
+          status: 403,
+        });
       }
       if (!context.access?.capabilities.canDeleteTicket) {
-        return NextResponse.json(
-          { success: false, error: "Insufficient permission" },
-          { status: 403 }
-        );
+        return apiError({
+          code: "FORBIDDEN",
+          message: "You do not have access",
+          status: 403,
+        });
       }
       if (!context.feedback) {
-        return NextResponse.json(
-          { success: false, error: "Not found" },
-          { status: 404 }
-        );
+        return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
       }
       await deleteFeedbackWithSessionCountersRepo(id);
       log("[API] DELETE /api/tickets/[id] duration:", Date.now() - start);
-      return NextResponse.json({ success: true });
+      return apiSuccess({}, context.access!);
     } catch (err) {
       console.error("DELETE /api/tickets/[id]:", err);
       log("[API] DELETE /api/tickets/[id] duration (error):", Date.now() - start);
-      return NextResponse.json(
-        { success: false, error: "Server error" },
-        { status: 500 }
-      );
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },
   { resolveWorkspace: resolveTicketWorkspaceId }

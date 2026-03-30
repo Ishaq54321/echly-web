@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   deleteSessionRepo,
   getSessionByIdRepo,
@@ -16,13 +15,9 @@ import {
   type HandlerUser,
 } from "@/lib/server/auth/withAuthorization";
 import { routeParamId } from "@/lib/server/routeParams";
-import {
-  buildRequestContext,
-  resolveOptionalSessionViewer,
-} from "@/lib/server/requestContext";
+import { buildRequestContext } from "@/lib/server/requestContext";
 import type { Session } from "@/lib/domain/session";
-import { getAccessContext } from "@/lib/access/getAccessContext";
-import { accessContextToResponseBody } from "@/lib/access/resolveAccess";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 type PatchBody = { title?: string; archived?: boolean; accessLevel?: string };
 
@@ -47,45 +42,35 @@ async function resolveSessionWorkspaceId(
 
 /**
  * GET /api/sessions/:id — optional auth.
- * `access` and `session` JSON mirror {@link getAccessContext} for the resolved viewer (authenticated or anonymous + optional share token).
+ * Response: `{ success, data: { session }, access }` via {@link buildRequestContext} → {@link getAccessContext}.
  */
 export async function GET(req: Request, ctx: HandlerContext) {
   const id = await routeParamId(ctx);
   if (!id) {
-    return NextResponse.json({ success: false, error: "Missing session id" }, { status: 400 });
+    return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
   }
 
-  const { viewerUser, tokenString } = await resolveOptionalSessionViewer(req);
   const loaded = await getSessionByIdRepo(id);
-  const { session, access } = await getAccessContext({
+  if (!loaded) {
+    return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
+  }
+  const context = await buildRequestContext({
+    req,
     sessionId: id,
-    user: viewerUser,
     session: loaded,
-    tokenString,
+    optionalAuth: true,
   });
+  const { access, session } = context;
 
   if (!access?.capabilities.canView) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Forbidden",
-        ...(access ? { access: accessContextToResponseBody(access) } : {}),
-      },
-      { status: 403 }
-    );
+    return apiError({ code: "FORBIDDEN", message: "You do not have access", status: 403 });
   }
   if (!session) {
-    return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+    return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
   }
 
   const sessionJson = serializeSession(session, access);
-  const accessJson = accessContextToResponseBody(access);
-
-  return NextResponse.json({
-    success: true,
-    session: sessionJson,
-    access: accessJson,
-  });
+  return apiSuccess({ session: sessionJson }, access);
 }
 
 /** PATCH /api/sessions/:id — update session; body: { title?: string, archived?: boolean }. */
@@ -100,23 +85,17 @@ export const PATCH = withAuthorization(
     log("[API] PATCH /api/sessions/[id] start");
     const id = await routeParamId(ctx);
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: "Missing session id" },
-        { status: 400 }
-      );
+      return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
     }
     let body: PatchBody;
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid JSON body" },
-        { status: 400 }
-      );
+      return apiError({ code: "INVALID_INPUT", message: "Invalid JSON body", status: 400 });
     }
 
     if (ctx.preloaded?.session === undefined) {
-      return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
     const existing = ctx.preloaded.session as Session | null;
     const context = await buildRequestContext({
@@ -127,10 +106,14 @@ export const PATCH = withAuthorization(
       session: existing,
     });
     if (!context.access?.capabilities.canView) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
     if (!context.session) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
     const sess = context.session;
 
@@ -143,21 +126,29 @@ export const PATCH = withAuthorization(
       : null;
 
     if (hasAccessLevel && validAccessLevel === null) {
-      return NextResponse.json({ success: false, error: "Invalid accessLevel" }, { status: 400 });
+      return apiError({ code: "INVALID_INPUT", message: "Invalid accessLevel", status: 400 });
     }
 
     if (validAccessLevel != null && !context.access?.capabilities.canResolve) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
     if ((hasTitle || hasArchived) && !context.access?.capabilities.canComment) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
 
     if (!hasTitle && !hasArchived && validAccessLevel === null) {
-      return NextResponse.json({
-        success: true,
-        session: serializeSession(sess, context.access!),
-      });
+      return apiSuccess(
+        { session: serializeSession(sess, context.access!) },
+        context.access!
+      );
     }
 
     try {
@@ -184,17 +175,14 @@ export const PATCH = withAuthorization(
         ...(tasks.length > 0 ? { updatedAt: new Date() } : {}),
       };
       log("[API] PATCH /api/sessions/[id] duration:", Date.now() - start);
-      return NextResponse.json({
-        success: true,
-        session: serializeSession(updated, context.access!),
-      });
+      return apiSuccess(
+        { session: serializeSession(updated, context.access!) },
+        context.access!
+      );
     } catch (err) {
       console.error("PATCH /api/sessions/[id]:", err);
       log("[API] PATCH /api/sessions/[id] duration (error):", Date.now() - start);
-      return NextResponse.json(
-        { success: false, error: "Server error" },
-        { status: 500 }
-      );
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },
   { resolveWorkspace: resolveSessionWorkspaceId }
@@ -212,13 +200,10 @@ export const DELETE = withAuthorization(
     log("[API] DELETE /api/sessions/[id] start");
     const id = await routeParamId(ctx);
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: "Missing session id" },
-        { status: 400 }
-      );
+      return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
     }
     if (ctx.preloaded?.session === undefined) {
-      return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
     const existing = ctx.preloaded.session as Session | null;
     const context = await buildRequestContext({
@@ -229,25 +214,30 @@ export const DELETE = withAuthorization(
       session: existing,
     });
     if (!context.access?.capabilities.canView) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
     if (!context.access?.capabilities.canDeleteTicket) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
     if (!context.session) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
     try {
       await deleteSessionRepo(id);
       log("[API] DELETE /api/sessions/[id] duration:", Date.now() - start);
-      return NextResponse.json({ success: true });
+      return apiSuccess({}, context.access!);
     } catch (err) {
       console.error("DELETE /api/sessions/[id]:", err);
       log("[API] DELETE /api/sessions/[id] duration (error):", Date.now() - start);
-      return NextResponse.json(
-        { success: false, error: "Server error" },
-        { status: 500 }
-      );
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },
   { resolveWorkspace: resolveSessionWorkspaceId }

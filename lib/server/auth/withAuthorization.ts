@@ -7,11 +7,9 @@ import {
   requireAuth,
   toAuthorizationResponse,
 } from "@/lib/server/auth/authorize";
+import { apiError } from "@/lib/server/apiResponse";
 import { isAdminUser } from "@/lib/server/adminAuth";
-import {
-  getUserWorkspaceIdRepo,
-  isShareAuthUid,
-} from "@/lib/repositories/usersRepository.server";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
 /** Data already loaded while resolving workspace (e.g. ticket + session); handlers must not re-fetch the same docs. */
 export type PreloadedTicketContext = {
@@ -42,7 +40,7 @@ export type AuthorizedHandlerArgs = {
   userId: string;
   /** Resource workspace id from `resolveWorkspace` (session scope); access is enforced in handlers via `getAccessContext` / `resolveAccess`. */
   workspaceId: string;
-  /** Viewer workspace from `users/{uid}.workspaceId` — empty when unset (e.g. invite-only viewer). */
+  /** Viewer workspace from `users/{uid}.workspaceId` — empty when unset. */
   userWorkspaceId: string;
   isAdmin: boolean;
 };
@@ -74,30 +72,18 @@ export function withAuthorization(
   options: WithAuthorizationOptions
 ) {
   return async (req: Request, ctx: HandlerContext = {}) => {
-    const authMeta = { usedFallback: false };
     try {
-      const user = await requireAuth(req, authMeta);
-      if (authMeta.usedFallback) {
-        console.warn("[SECURITY] Fallback auth used", {
-          route: req.url,
-          uid: user?.uid,
-        });
-      }
+      const user = await requireAuth(req);
 
       const userId = options?.resolveUserId
         ? await options.resolveUserId(req, user, ctx)
         : user.uid;
       const normalizedUserId = userId.trim();
       if (!normalizedUserId) {
-        return Response.json(
-          { success: false, error: "FORBIDDEN", message: "Forbidden" },
-          { status: 403 }
-        );
+        return apiError({ code: "FORBIDDEN", message: "Forbidden", status: 403 });
       }
 
-      const viewerWorkspaceIdRaw = isShareAuthUid(user.uid)
-        ? ""
-        : await getUserWorkspaceIdRepo(user.uid);
+      const viewerWorkspaceIdRaw = await getUserWorkspaceIdRepo(user.uid);
       const viewerWorkspaceId =
         typeof viewerWorkspaceIdRaw === "string" ? viewerWorkspaceIdRaw.trim() : "";
 
@@ -126,10 +112,7 @@ export function withAuthorization(
 
       const isAdmin = options?.isAdmin === true ? await isAdminUser(user.uid) : false;
       if (options?.isAdmin === true && !isAdmin && !options.allowNonAdmin) {
-        return Response.json(
-          { success: false, error: "FORBIDDEN", message: "Admin access required" },
-          { status: 403 }
-        );
+        return apiError({ code: "FORBIDDEN", message: "Admin access required", status: 403 });
       }
 
       if (!options?.skipAuthorization) {

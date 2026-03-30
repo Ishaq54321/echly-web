@@ -41,9 +41,10 @@ export function usePlanCatalog(): UsePlanCatalogResult {
       return authed ?? fetch(CATALOG_API, { cache: "no-store" });
     })()
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to load plans"))))
-      .then((data: PlanCatalogItem[]) => {
+      .then((envelope: { data?: PlanCatalogItem[] | null }) => {
+        const data = Array.isArray(envelope?.data) ? envelope.data : null;
         if (!cancelled) {
-          setPlans(Array.isArray(data) && data.length > 0 ? data : null);
+          setPlans(data && data.length > 0 ? data : null);
           setError(null);
         }
       })

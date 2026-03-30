@@ -134,8 +134,9 @@ export function ProfileCommandPanel({
         if (!res || !res.ok) throw new Error("Failed to load insights");
         return res.json();
       })
-      .then((json: InsightsApiResponse) => {
-        if (!cancelled) {
+      .then((envelope: { data?: InsightsApiResponse | null }) => {
+        const json = envelope?.data;
+        if (!cancelled && json) {
           setAnalytics(json);
         }
       })

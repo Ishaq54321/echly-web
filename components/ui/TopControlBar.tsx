@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Link as LinkIcon, Loader2, UserPlus } from "lucide-react";
+import { Check, Link as LinkIcon, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ShareModal } from "@/components/share/ShareModal";
 import { GlobalSearchButton } from "@/components/layout/GlobalSearchButton";
 import { GlobalNotificationButton } from "@/components/layout/GlobalNotificationButton";
 import { ProfileDropdown } from "@/components/layout/ProfileDropdown";
@@ -43,7 +42,6 @@ export function TopControlBar({
   const { authUid, isIdentityResolved } = useWorkspace();
   const copyTimerRef = useRef<number | null>(null);
 
-  const [shareOpen, setShareOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkCopyBusy, setLinkCopyBusy] = useState(false);
@@ -87,19 +85,6 @@ export function TopControlBar({
         <div className="right flex shrink-0 items-center gap-2.5">
           <button
             type="button"
-            className="primary-btn"
-            aria-label="Share"
-            onClick={() => {
-              setNotificationsOpen(false);
-              setShareOpen(true);
-            }}
-          >
-            <UserPlus size={20} strokeWidth={2} />
-            Share
-          </button>
-
-          <button
-            type="button"
             className={`icon-btn copy-link-btn ${linkCopied ? "copy-link-btn--copied" : ""}`}
             aria-label={linkCopyBusy ? "Generating link…" : linkCopied ? "Copied" : "Copy link"}
             disabled={linkCopyBusy}
@@ -127,7 +112,7 @@ export function TopControlBar({
                 session={session}
                 variant="list"
                 flipPlacement
-                hideActions={["copyLink", "share"]}
+                hideActions={["copyLink"]}
                 onRenameSuccess={onSessionRenameSuccess}
                 onSetArchived={onSetSessionArchived}
                 onRequestDelete={onRequestDeleteSession}
@@ -145,14 +130,12 @@ export function TopControlBar({
 
           <GlobalSearchButton
             onBeforeOpen={() => {
-              setShareOpen(false);
               setNotificationsOpen(false);
             }}
           />
           <GlobalNotificationButton
             open={notificationsOpen}
             onOpenChange={(next) => {
-              if (next) setShareOpen(false);
               setNotificationsOpen(next);
             }}
           />
@@ -160,12 +143,6 @@ export function TopControlBar({
         </div>
       </div>
 
-      <ShareModal
-        isOpen={shareOpen}
-        onClose={() => setShareOpen(false)}
-        sessionId={sessionId}
-        sessionTitle={sessionTitle}
-      />
     </>
   );
 }

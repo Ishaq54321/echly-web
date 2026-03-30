@@ -17,15 +17,18 @@ const COMMENT_QUERY_BY_FEEDBACK_CHUNK = 500;
 
 /** All comment docs for a ticket (paginated); used when hard-deleting feedback. */
 export async function getCommentSnapshotsByFeedbackIdRepo(
+  workspaceId: string,
   feedbackId: string
 ): Promise<FirebaseFirestore.QueryDocumentSnapshot[]> {
+  const wid = workspaceId.trim();
   const fid = feedbackId.trim();
-  if (!fid) return [];
+  if (!wid || !fid) return [];
   const out: FirebaseFirestore.QueryDocumentSnapshot[] = [];
   let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
   for (;;) {
     let q: FirebaseFirestore.Query = adminDb
       .collection("comments")
+      .where("workspaceId", "==", wid)
       .where("feedbackId", "==", fid)
       .orderBy(FieldPath.documentId())
       .limit(COMMENT_QUERY_BY_FEEDBACK_CHUNK);
@@ -217,16 +220,19 @@ export async function getCommentByIdRepo(
   return { id: snap.id, ...(snap.data() ?? {}) };
 }
 
-/** Recent comments in a session (newest first). Composite index: comments (sessionId, createdAt DESC). */
+/** Recent comments in a session (newest first). Composite index: comments (workspaceId+sessionId, createdAt DESC). */
 export async function listRecentCommentsForSessionRepo(
+  workspaceId: string,
   sessionId: string,
   max: number
 ): Promise<Array<Record<string, unknown> & { id: string }>> {
+  const wid = workspaceId.trim();
   const sid = sessionId.trim();
-  if (!sid) return [];
+  if (!wid || !sid) return [];
   assertQueryLimit(max, "listRecentCommentsForSessionRepo");
   const snap = await adminDb
     .collection("comments")
+    .where("workspaceId", "==", wid)
     .where("sessionId", "==", sid)
     .orderBy("createdAt", "desc")
     .limit(max)
@@ -247,10 +253,17 @@ const DELETE_SESSION_COMMENTS_LIMIT = 500;
  * Deletes all comments for a session. Used when deleting a session.
  * Returns the number of docs deleted so callers can update workspace.stats.
  */
-export async function deleteAllCommentsForSessionRepo(sessionId: string): Promise<number> {
+export async function deleteAllCommentsForSessionRepo(
+  workspaceId: string,
+  sessionId: string
+): Promise<number> {
+  const wid = workspaceId.trim();
+  const sid = sessionId.trim();
+  if (!wid || !sid) return 0;
   const snapshot = await adminDb
     .collection("comments")
-    .where("sessionId", "==", sessionId.trim())
+    .where("workspaceId", "==", wid)
+    .where("sessionId", "==", sid)
     .limit(DELETE_SESSION_COMMENTS_LIMIT)
     .get();
   const count = snapshot.docs.length;

@@ -4,12 +4,11 @@ import { FieldValue } from "firebase-admin/firestore";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type {
   Session,
-  SessionCreatedBy,
   SessionGeneralAccess,
 } from "@/lib/domain/session";
-import { normalizeGeneralAccess } from "@/lib/domain/session";
+import { requireGeneralAccess } from "@/lib/domain/session";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
-import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
+import { requireAccessLevel } from "@/lib/domain/accessLevel";
 import type { Workspace } from "@/lib/domain/workspace";
 import { deleteAllCommentsForSessionRepo } from "@/lib/repositories/commentsRepository.server";
 import { deleteAllFeedbackForSessionRepo } from "@/lib/repositories/feedbackRepository.server";
@@ -36,19 +35,18 @@ function requireUserId(userId: string, context: string): string {
  */
 export async function createSessionRepo(
   workspaceId: string,
-  actorUserId: string,
-  createdBy?: SessionCreatedBy | null
+  actorUserId: string
 ): Promise<string> {
   const resolvedWorkspaceId = requireUserId(workspaceId, "createSessionRepo");
+  const resolvedActorUserId = requireUserId(actorUserId, "createSessionRepo");
   const sessionRef = adminDb.collection("sessions").doc();
   const workspaceRef = adminDb.doc(`workspaces/${resolvedWorkspaceId}`);
   const sessionData = {
     workspaceId: resolvedWorkspaceId,
-    createdByUserId: actorUserId,
+    createdByUserId: resolvedActorUserId,
     title: "Untitled Session",
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
-    createdBy: createdBy ?? null,
     viewCount: 0,
     commentCount: 0,
     openCount: 0,
@@ -113,11 +111,19 @@ export async function getSessionByIdRepo(
   if (!snap.exists) return null;
 
   const data = snap.data() as SessionDoc;
+  const workspaceId = typeof data.workspaceId === "string" ? data.workspaceId.trim() : "";
+  const createdByUserId =
+    typeof data.createdByUserId === "string" ? data.createdByUserId.trim() : "";
+  if (!workspaceId || !createdByUserId) {
+    return null;
+  }
   return {
     id: snap.id,
     ...data,
-    accessLevel: normalizeAccessLevel(data.accessLevel ?? "view"),
-    generalAccess: normalizeGeneralAccess(data.generalAccess),
+    workspaceId,
+    createdByUserId,
+    accessLevel: requireAccessLevel(data.accessLevel),
+    generalAccess: requireGeneralAccess(data.generalAccess),
     hasConfiguredShare: data.hasConfiguredShare === true,
   };
 }
@@ -226,7 +232,7 @@ export async function deleteSessionRepo(sessionId: string): Promise<void> {
 
   const [feedbackDeleted, commentsDeleted] = await Promise.all([
     deleteAllFeedbackForSessionRepo(sessionId),
-    deleteAllCommentsForSessionRepo(sessionId),
+    deleteAllCommentsForSessionRepo(workspaceId, sessionId),
   ]);
 
   const viewsSnap = await adminDb.collection(`sessionViews/${sessionId}/views`).get();

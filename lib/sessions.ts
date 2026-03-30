@@ -1,4 +1,4 @@
-export type { Session, SessionCreatedBy } from "@/lib/domain/session";
+export type { Session } from "@/lib/domain/session";
 import type { Session } from "@/lib/domain/session";
 import { authFetch } from "@/lib/authFetch";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository";

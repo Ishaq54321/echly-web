@@ -1,4 +1,4 @@
-const STORAGE_KEY = "echly_share_token";
+const STORAGE_KEY = "echlyShareLinkToken";
 
 export function setShareToken(token: string): void {
   if (!token || typeof sessionStorage === "undefined") return;

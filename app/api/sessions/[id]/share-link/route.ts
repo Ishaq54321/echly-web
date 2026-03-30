@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
 import { createShareLink } from "@/lib/repositories/shareLinksRepository";
 import { getActiveShareLinkForSession } from "@/lib/repositories/shareLinkActiveBySession";
 import { withAuthorization, type HandlerContext } from "@/lib/server/auth/withAuthorization";
 import { routeParamId } from "@/lib/server/routeParams";
 import { buildRequestContext } from "@/lib/server/requestContext";
 import type { Session } from "@/lib/domain/session";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +15,11 @@ export const POST = withAuthorization(
     const id = await routeParamId(ctx);
     const sessionId = typeof id === "string" ? id.trim() : "";
     if (!sessionId) {
-      return NextResponse.json({ success: false, error: "Missing session id" }, { status: 400 });
+      return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
     }
 
     if (ctx.preloaded?.session === undefined) {
-      return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
     const session = ctx.preloaded.session as Session | null;
 
@@ -31,24 +31,32 @@ export const POST = withAuthorization(
       session,
     });
     if (!accessCtx.access?.capabilities.canView) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
     if (!accessCtx.access?.capabilities.canComment) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return apiError({
+        code: "FORBIDDEN",
+        message: "You do not have access",
+        status: 403,
+      });
     }
     if (!accessCtx.session) {
-      return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+      return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
     try {
       const existing = await getActiveShareLinkForSession(sessionId);
       if (existing) {
-        return NextResponse.json({ success: true, token: existing.token });
+        return apiSuccess({ token: existing.token }, accessCtx.access!);
       }
       const { token } = await createShareLink(user.uid, sessionId, "comment", user.uid);
-      return NextResponse.json({ success: true, token });
+      return apiSuccess({ token }, accessCtx.access!);
     } catch (e) {
       console.error("POST /api/sessions/[id]/share-link:", e);
-      return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+      return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },
   {
@@ -58,7 +66,7 @@ export const POST = withAuthorization(
         req,
         authenticatedUser: user,
         userWorkspaceId: viewerWorkspaceId,
-        sessionId: sid?.trim() || undefined,
+        sessionId: typeof sid === "string" ? sid.trim() : undefined,
       });
       return {
         workspaceId: context.sessionWorkspaceId ?? "",

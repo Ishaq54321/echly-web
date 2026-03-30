@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SignJWT } from "jose";
 import { getSessionUser } from "@/lib/server/session";
 import { corsHeaders } from "@/lib/server/cors";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export const dynamic = "force-dynamic";
 
@@ -31,14 +31,12 @@ export async function OPTIONS(req: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getSessionUser(request);
   if (!user) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "NOT_AUTHENTICATED",
-        message: "User is not authenticated",
-      },
-      { status: 401, headers: corsHeaders(request) }
-    );
+    return apiError({
+      code: "UNAUTHORIZED",
+      message: "User is not authenticated",
+      status: 401,
+      init: { headers: corsHeaders(request) },
+    });
   }
 
   try {
@@ -56,7 +54,7 @@ export async function POST(request: NextRequest) {
       .setExpirationTime("15m")
       .sign(secret);
 
-    return NextResponse.json(
+    return apiSuccess(
       {
         extensionToken,
         user: {
@@ -64,13 +62,16 @@ export async function POST(request: NextRequest) {
           email,
         },
       },
+      null,
       { headers: corsHeaders(request) }
     );
   } catch (err) {
     console.error("Extension token generation failed:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500, headers: corsHeaders(request) }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Internal server error",
+      status: 500,
+      init: { headers: corsHeaders(request) },
+    });
   }
 }

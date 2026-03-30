@@ -13960,39 +13960,71 @@
 
   // lib/domain/accessLevel.ts
   var ACCESS_LEVELS = ["view", "comment", "resolve"];
-  function normalizeAccessLevel(raw) {
-    if (raw === "resolve" || raw === "comment" || raw === "view") return raw;
-    if (raw === "edit") return "resolve";
-    return "view";
+  function requireAccessLevel(raw) {
+    if (raw === "view" || raw === "comment" || raw === "resolve") return raw;
+    throw new Error(
+      `Invalid accessLevel: expected view|comment|resolve, got ${JSON.stringify(raw)}`
+    );
   }
   function parseAccessLevelStrict(raw) {
     if (raw === "view" || raw === "comment" || raw === "resolve") return raw;
-    if (raw === "edit") return "resolve";
     return null;
   }
 
   // lib/domain/session.ts
-  function normalizeGeneralAccess(value) {
-    return value === "link_view" ? "link_view" : "restricted";
+  function requireGeneralAccess(value) {
+    if (value === "link_view") return "link_view";
+    if (value === "restricted") return "restricted";
+    throw new Error(
+      `Invalid generalAccess: expected restricted|link_view, got ${JSON.stringify(value)}`
+    );
   }
   function sessionsArrayFromApiPayload(data) {
-    if (typeof data !== "object" || data === null) return [];
-    const raw = Reflect.get(data, "sessions");
-    if (!Array.isArray(raw)) return [];
-    const out = [];
-    for (const item of raw) {
-      const s = sessionFromApiItem(item);
-      if (s) out.push(s);
+    if (typeof data !== "object" || data === null) {
+      throw new Error("sessionsArrayFromApiPayload: expected object root");
     }
-    return out;
+    let raw = Reflect.get(data, "sessions");
+    if (!Array.isArray(raw)) {
+      const inner = Reflect.get(data, "data");
+      if (typeof inner === "object" && inner !== null) {
+        raw = Reflect.get(inner, "sessions");
+      }
+    }
+    if (!Array.isArray(raw)) {
+      throw new Error("sessionsArrayFromApiPayload: missing sessions array");
+    }
+    return raw.map((item) => sessionFromApiItem(item));
   }
   function sessionFromApiItem(item) {
-    if (typeof item !== "object" || item === null) return null;
+    if (typeof item !== "object" || item === null) {
+      throw new Error("sessionFromApiItem: expected object");
+    }
     const id = Reflect.get(item, "id");
-    if (typeof id !== "string") return null;
+    if (typeof id !== "string") {
+      throw new Error("sessionFromApiItem: missing id");
+    }
+    const workspaceId = Reflect.get(item, "workspaceId");
+    if (typeof workspaceId !== "string" || workspaceId.trim() === "") {
+      throw new Error("sessionFromApiItem: missing workspaceId");
+    }
+    const createdByUserId = Reflect.get(item, "createdByUserId");
+    if (typeof createdByUserId !== "string" || createdByUserId.trim() === "") {
+      throw new Error("sessionFromApiItem: missing createdByUserId");
+    }
     const titleRaw = Reflect.get(item, "title");
-    const title = typeof titleRaw === "string" ? titleRaw : "Untitled Session";
-    const session = { id, title };
+    if (typeof titleRaw !== "string" || titleRaw.trim() === "") {
+      throw new Error("sessionFromApiItem: missing title");
+    }
+    const accessLevelRaw = Reflect.get(item, "accessLevel");
+    const generalAccessRaw = Reflect.get(item, "generalAccess");
+    const session = {
+      id,
+      title: titleRaw.trim(),
+      workspaceId: workspaceId.trim(),
+      createdByUserId: createdByUserId.trim(),
+      accessLevel: requireAccessLevel(accessLevelRaw),
+      generalAccess: requireGeneralAccess(generalAccessRaw)
+    };
     const archived = Reflect.get(item, "archived");
     if (typeof archived === "boolean") {
       session.archived = archived;
@@ -14007,10 +14039,6 @@
     if (typeof updatedAt === "string" || updatedAt instanceof Date || updatedAt === null) {
       session.updatedAt = updatedAt;
     }
-    const accessLevel = Reflect.get(item, "accessLevel");
-    session.accessLevel = normalizeAccessLevel(accessLevel);
-    const ga = Reflect.get(item, "generalAccess");
-    session.generalAccess = normalizeGeneralAccess(ga);
     const hcs = Reflect.get(item, "hasConfiguredShare");
     if (typeof hcs === "boolean") session.hasConfiguredShare = hcs;
     const readCount = (key) => {
@@ -37004,19 +37032,15 @@
   // lib/share/getOrCreateShareLink.ts
   async function getOrCreateShareLink({
     sessionId,
-    userId,
     origin
   }) {
     const sid = sessionId.trim();
-    const uid = userId.trim();
-    const base = (origin || "").replace(/\/$/, "");
+    const base = origin.replace(/\/$/, "");
     if (!sid) throw new Error("getOrCreateShareLink: sessionId is required");
-    if (!uid) throw new Error("getOrCreateShareLink: userId is required");
     if (!base) throw new Error("getOrCreateShareLink: origin is required");
     const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/share-link`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: uid })
+      headers: { "Content-Type": "application/json" }
     });
     if (!res) {
       throw new Error("share-link failed");
@@ -37025,17 +37049,19 @@
       let message = "share-link failed";
       try {
         const err = await res.json();
-        if (typeof err?.error === "string" && err.error) message = err.error;
+        if (typeof err?.error?.message === "string" && err.error.message) {
+          message = err.error.message;
+        }
       } catch {
       }
       throw new Error(message);
     }
     const data = await res.json();
-    const token = typeof data.token === "string" ? data.token.trim() : "";
+    const token = typeof data.data?.token === "string" ? data.data.token.trim() : "";
     if (!data.success || !token) {
       throw new Error("Invalid share-link response");
     }
-    return `${base}/session/${encodeURIComponent(sid)}?shareToken=${encodeURIComponent(token)}`;
+    return `${base}/session/${encodeURIComponent(sid)}?token=${encodeURIComponent(token)}`;
   }
 
   // lib/capture-engine/core/hooks/useCaptureWidget.ts
@@ -37570,7 +37596,7 @@
           if (!res.ok) {
             logger.error("error", "voice_transcription_http_failed", { status: res.status });
             logger.error("voice", "transcription_failed", { status: res.status });
-            const noSpeech = res.status === 400 && data?.error === "NO_SPEECH_DETECTED";
+            const noSpeech = res.status === 400 && data?.error?.message === "NO_SPEECH_DETECTED";
             if (voiceFailurePanelOpen) {
               setVoiceError(noSpeech ? "no_audio" : "transcription_failed");
             } else {
@@ -37581,7 +37607,7 @@
             setState("idle");
             return;
           }
-          const transcript = data?.transcript;
+          const transcript = data?.data?.transcript;
           if (!isTranscriptUsable(transcript)) {
             logger.error("error", "voice_invalid_transcript");
             logger.error("voice", "transcription_failed");
@@ -37796,14 +37822,13 @@
         const origin = window.location.origin;
         const url = await getOrCreateShareLink({
           sessionId,
-          userId,
           origin
         });
         await navigator.clipboard.writeText(url);
       } catch (err) {
         logger.error("error", "share_clipboard_failed", err);
       }
-    }, [sessionId, userId, guardWorkspaceMutation]);
+    }, [sessionId, guardWorkspaceMutation]);
     const resetSession = (0, import_react4.useCallback)(() => {
       setRecordings([]);
       setActiveRecordingId(null);
@@ -37850,7 +37875,8 @@
           body: JSON.stringify({ title: title || editedTitle, actionSteps })
         });
         const data = await res.json();
-        if (!res.ok || !data.success || !data.ticket) {
+        const ticketPayload = data.data?.ticket ?? data.ticket;
+        if (!res.ok || !data.success || !ticketPayload) {
           throw new Error("Save failed: API_ERROR_" + res.status);
         }
         setEditingId(null);
@@ -37881,7 +37907,8 @@
             })
           });
           const data = await res.json();
-          if (!res.ok || !data.success) throw new Error("Update failed");
+          const ticketPayload = data.data?.ticket ?? data.ticket;
+          if (!res.ok || !data.success || !ticketPayload) throw new Error("Update failed");
         } catch (err) {
           logger.error("error", "ticket_update_failed", err);
           throw err;
@@ -41448,7 +41475,7 @@
     }, [globalState?.visible]);
     const isAuthFailureResponse = import_react17.default.useCallback((text) => {
       return Boolean(
-        text?.includes("Not authenticated") || text?.includes("NOT_AUTHENTICATED")
+        text?.includes("Not authenticated") || text?.includes("NOT_AUTHENTICATED") || text?.includes("UNAUTHORIZED")
       );
     }, []);
     const getExtensionToken = import_react17.default.useCallback(async () => {
@@ -41603,7 +41630,8 @@
           elementType: elementType || null
         };
         delete enrichedContext.ocrImageDataUrl;
-        let structured = null;
+        let structuredPayload = null;
+        let structuredErrorMessage;
         try {
           const res = await apiFetch("/api/structure-feedback", {
             method: "POST",
@@ -41614,15 +41642,19 @@
             })
           });
           throwIfHttpError(res, "structure-feedback");
-          structured = await res.json();
+          const envelope = await res.json();
+          structuredPayload = envelope.data ?? null;
+          structuredErrorMessage = envelope.error?.message;
         } catch (e) {
           console.error("[ECHLY] structure-feedback request failed", e);
           throw e;
         }
-        if (!structured?.success || !structured.tickets?.length) {
-          throw new Error(structured?.error ?? "Structure feedback did not return a ticket");
+        if (!structuredPayload?.structuredSuccess || !structuredPayload.tickets?.length) {
+          throw new Error(
+            structuredErrorMessage ?? "Structure feedback did not return a ticket"
+          );
         }
-        const normalized = structured.tickets[0];
+        const normalized = structuredPayload.tickets[0];
         try {
           if (!screenshot) {
             throw new Error("Screenshot is required.");
@@ -41675,12 +41707,12 @@
             inFlightFeedbackIds.delete(feedbackId);
           }
           const feedbackJson = feedbackResponse?.data;
-          const text = feedbackResponse?.error ?? "";
+          const text = typeof feedbackResponse?.error === "string" ? feedbackResponse.error : JSON.stringify(feedbackResponse?.error ?? "");
           if (!feedbackResponse?.success && isAuthFailureResponse(text)) {
             throw new Error("Not authenticated.");
           }
-          if (feedbackJson?.success && feedbackJson.ticket) {
-            const tick = feedbackJson.ticket;
+          const tick = feedbackJson?.data?.ticket ?? feedbackJson?.ticket;
+          if (feedbackJson?.success && tick) {
             const created = {
               id: tick.id,
               title: tick.title,
@@ -41902,26 +41934,28 @@
         body: "{}"
       });
       const data = await res.json();
+      const created = data.data?.session ?? data.session;
+      const limitPayload = data.data && typeof data.data === "object" && "upgradePlan" in data.data ? data.data : null;
       logger.debug("extension", "session_create_response", {
         status: res.status,
         ok: res.ok,
         success: data.success,
-        sessionId: data.session?.id,
+        sessionId: created?.id,
         error: data.error
       });
-      if (res.status === 403 && data.error === "PLAN_LIMIT_REACHED") {
+      if (res.status === 403 && data.success === false && data.error?.code === "FORBIDDEN" && limitPayload) {
         logger.debug("extension", "session_limit_reached");
         return {
           limitReached: true,
-          message: data.message ?? "You've reached your session limit.",
-          upgradePlan: data.upgradePlan
+          message: data.error.message ?? "You've reached your session limit.",
+          upgradePlan: limitPayload.upgradePlan
         };
       }
-      if (!res.ok || !data.success || !data.session?.id) {
+      if (!res.ok || !data.success || !created?.id) {
         throw new Error("API_ERROR_" + res.status);
       }
       invalidateSessionsCache();
-      return { id: data.session.id };
+      return { id: created.id };
     }
     const environment = new ExtensionCaptureEnvironment({
       createSession,

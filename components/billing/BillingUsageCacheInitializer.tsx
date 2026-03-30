@@ -21,10 +21,10 @@ function cancelScheduled(handle: number): void {
 }
 
 export function BillingUsageCacheInitializer() {
-  const { authUid } = useWorkspace();
+  const { isIdentityReady } = useWorkspace();
 
   useEffect(() => {
-    if (!authUid) return;
+    if (!isIdentityReady) return;
 
     let cancelled = false;
     const handle = schedulePostPaint(() => {
@@ -48,7 +48,7 @@ export function BillingUsageCacheInitializer() {
       cancelled = true;
       cancelScheduled(handle);
     };
-  }, [authUid]);
+  }, [isIdentityReady]);
 
   return null;
 }

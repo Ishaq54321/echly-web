@@ -1,27 +1,22 @@
 import type { Timestamp } from "firebase/firestore";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
-import { normalizeAccessLevel } from "@/lib/domain/accessLevel";
+import { requireAccessLevel } from "@/lib/domain/accessLevel";
 
 /** Product-level gate: who may open the session without an account-specific invite row (see Phase 6). */
 export type SessionGeneralAccess = "restricted" | "link_view";
 
-export function normalizeGeneralAccess(value: unknown): SessionGeneralAccess {
-  return value === "link_view" ? "link_view" : "restricted";
-}
-
-export interface SessionCreatedBy {
-  id: string;
-  firstName: string;
-  lastName: string;
-  avatarUrl?: string;
+export function requireGeneralAccess(value: unknown): SessionGeneralAccess {
+  if (value === "link_view") return "link_view";
+  if (value === "restricted") return "restricted";
+  throw new Error(
+    `Invalid generalAccess: expected restricted|link_view, got ${JSON.stringify(value)}`,
+  );
 }
 
 export interface Session {
   id: string;
   /** Workspace scope (primary). */
-  workspaceId?: string;
-  /** Legacy scope (pre-workspaces). */
-  userId?: string;
+  workspaceId: string;
   title: string;
   /**
    * Canonical archive flag used throughout the app today.
@@ -35,8 +30,6 @@ export interface Session {
   isArchived?: boolean;
   createdAt?: Timestamp | Date | string | null;
   updatedAt?: Timestamp | Date | string | null;
-  /** Set at creation. Creator profile for card display. */
-  createdBy?: SessionCreatedBy | null;
   /** Loom-style unique view count (one per viewer per session). */
   viewCount?: number;
   /** Total comment count across all feedback in this session. */
@@ -51,20 +44,17 @@ export interface Session {
   feedbackCount?: number;
 
   /**
-   * Default link access for visitors who are not workspace peers and have no email share row.
+   * Default link access tier for non-workspace viewers.
    */
-  accessLevel?: AccessLevel;
+  accessLevel: AccessLevel;
 
   /**
-   * Who may view the session when unauthenticated (invite system fills other cases).
-   * @default "restricted" when absent (legacy docs).
+   * Who may view the session when unauthenticated.
    */
-  generalAccess?: SessionGeneralAccess;
+  generalAccess: SessionGeneralAccess;
 
-  /**
-   * Firestore creator uid when `createdBy` profile is not denormalized on the doc.
-   */
-  createdByUserId?: string;
+  /** Firestore creator uid (session owner). */
+  createdByUserId: string;
 
   /**
    * First-time share configuration UX (persist only; logic deferred).
@@ -80,24 +70,52 @@ export interface Session {
 
 /** Narrow `/api/sessions`-shaped JSON into `Session` (no type assertions on callers). */
 export function sessionsArrayFromApiPayload(data: unknown): Session[] {
-  if (typeof data !== "object" || data === null) return [];
-  const raw = Reflect.get(data, "sessions");
-  if (!Array.isArray(raw)) return [];
-  const out: Session[] = [];
-  for (const item of raw) {
-    const s = sessionFromApiItem(item);
-    if (s) out.push(s);
+  if (typeof data !== "object" || data === null) {
+    throw new Error("sessionsArrayFromApiPayload: expected object root");
   }
-  return out;
+  let raw: unknown = Reflect.get(data, "sessions");
+  if (!Array.isArray(raw)) {
+    const inner = Reflect.get(data, "data");
+    if (typeof inner === "object" && inner !== null) {
+      raw = Reflect.get(inner, "sessions");
+    }
+  }
+  if (!Array.isArray(raw)) {
+    throw new Error("sessionsArrayFromApiPayload: missing sessions array");
+  }
+  return raw.map((item) => sessionFromApiItem(item));
 }
 
-export function sessionFromApiItem(item: unknown): Session | null {
-  if (typeof item !== "object" || item === null) return null;
+export function sessionFromApiItem(item: unknown): Session {
+  if (typeof item !== "object" || item === null) {
+    throw new Error("sessionFromApiItem: expected object");
+  }
   const id = Reflect.get(item, "id");
-  if (typeof id !== "string") return null;
+  if (typeof id !== "string") {
+    throw new Error("sessionFromApiItem: missing id");
+  }
+  const workspaceId = Reflect.get(item, "workspaceId");
+  if (typeof workspaceId !== "string" || workspaceId.trim() === "") {
+    throw new Error("sessionFromApiItem: missing workspaceId");
+  }
+  const createdByUserId = Reflect.get(item, "createdByUserId");
+  if (typeof createdByUserId !== "string" || createdByUserId.trim() === "") {
+    throw new Error("sessionFromApiItem: missing createdByUserId");
+  }
   const titleRaw = Reflect.get(item, "title");
-  const title = typeof titleRaw === "string" ? titleRaw : "Untitled Session";
-  const session: Session = { id, title };
+  if (typeof titleRaw !== "string" || titleRaw.trim() === "") {
+    throw new Error("sessionFromApiItem: missing title");
+  }
+  const accessLevelRaw = Reflect.get(item, "accessLevel");
+  const generalAccessRaw = Reflect.get(item, "generalAccess");
+  const session: Session = {
+    id,
+    title: titleRaw.trim(),
+    workspaceId: workspaceId.trim(),
+    createdByUserId: createdByUserId.trim(),
+    accessLevel: requireAccessLevel(accessLevelRaw),
+    generalAccess: requireGeneralAccess(generalAccessRaw),
+  };
 
   const archived = Reflect.get(item, "archived");
   if (typeof archived === "boolean") {
@@ -119,12 +137,6 @@ export function sessionFromApiItem(item: unknown): Session | null {
   ) {
     session.updatedAt = updatedAt;
   }
-
-  const accessLevel = Reflect.get(item, "accessLevel");
-  session.accessLevel = normalizeAccessLevel(accessLevel);
-
-  const ga = Reflect.get(item, "generalAccess");
-  session.generalAccess = normalizeGeneralAccess(ga);
 
   const hcs = Reflect.get(item, "hasConfiguredShare");
   if (typeof hcs === "boolean") session.hasConfiguredShare = hcs;

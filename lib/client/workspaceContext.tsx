@@ -10,8 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { authFetch, clearAuthTokenCache } from "@/lib/authFetch";
 import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
@@ -29,10 +28,11 @@ export type WorkspaceContextValue = {
   /** True while a signed-in user is being resolved and workspaceId is not yet known. */
   workspaceLoading: boolean;
   /**
-   * True when the app treats custom claims / identity as usable for gating.
-   * May flip true early from the persisted workspace hint or Firestore fast path; sync still runs and re-confirms (including after `getIdToken(true)`).
+   * True only after POST /api/users succeeds and `getIdToken(true)` has run — custom claims are usable for Firestore rules.
    */
   claimsReady: boolean;
+  /** `authUid && claimsReady` — gate all Firestore subscriptions and workspace-scoped fetches. */
+  isIdentityReady: boolean;
   /** True after the first Firebase auth callback for this mount (signed-in or signed-out). */
   authReady: boolean;
   /**
@@ -129,40 +129,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setWorkspaceError(null);
       setWorkspaceLoading(true);
 
+      setClaimsReady(false);
       const cachedWorkspaceId = getWorkspaceHint();
       if (cachedWorkspaceId) {
         commitWorkspaceId(cachedWorkspaceId);
-        setClaimsReady(true);
-      } else {
-        setClaimsReady(false);
       }
 
       void (async () => {
         try {
           if (cancelled) return;
           if (currentGen !== authSyncGenerationRef.current) return;
-
-          // FAST PATH — immediate workspace resolution (cache-first getDoc; sync still validates below)
-          let fastWorkspaceId: string | null = null;
-          try {
-            const userDoc = await getDoc(doc(db, "users", uid));
-            if (userDoc.exists()) {
-              const data = userDoc.data();
-              if (typeof data.workspaceId === "string" && data.workspaceId.trim()) {
-                fastWorkspaceId = data.workspaceId.trim();
-              }
-            }
-          } catch (e) {
-            console.warn("[ECHLY][bootstrap] fast workspace fetch failed", e);
-          }
-
-          if (cancelled) return;
-          if (currentGen !== authSyncGenerationRef.current) return;
-
-          if (fastWorkspaceId) {
-            commitWorkspaceId(fastWorkspaceId);
-            setClaimsReady(true);
-          }
 
           const res = await authFetch("/api/users", { method: "POST" });
 
@@ -182,6 +158,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
           if (cancelled) return;
           if (currentGen !== authSyncGenerationRef.current) return;
+
           await user.getIdToken(true);
 
           if (cancelled) return;
@@ -237,6 +214,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [authReady, claimsReady, workspaceId]
   );
 
+  const isIdentityReady = useMemo(
+    () => Boolean(authUid) && claimsReady,
+    [authUid, claimsReady]
+  );
+
+  useEffect(() => {
+    console.log("IDENTITY READY:", isIdentityReady);
+  }, [isIdentityReady]);
+
   return (
     <WorkspaceContext.Provider
       value={{
@@ -244,6 +230,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         workspaceError,
         workspaceLoading,
         claimsReady,
+        isIdentityReady,
         authReady,
         isIdentityResolved,
         authUid,

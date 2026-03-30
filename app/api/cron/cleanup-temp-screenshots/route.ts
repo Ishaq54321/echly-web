@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
 import { adminBucket } from "@/lib/server/firebaseAdmin";
 import {
   getTempScreenshotsOlderThanRepo,
   deleteScreenshotRepo,
 } from "@/lib/repositories/screenshotsRepository";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -28,7 +28,11 @@ async function runCleanup(req: Request): Promise<Response> {
     const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
     const headerSecret = req.headers.get("x-cron-secret");
     if (bearer !== secret && headerSecret !== secret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError({
+        code: "UNAUTHORIZED",
+        message: "Unauthorized",
+        status: 401,
+      });
     }
   }
 
@@ -52,16 +56,13 @@ async function runCleanup(req: Request): Promise<Response> {
       deleted += 1;
     }
 
-    return NextResponse.json({
-      success: true,
-      deleted,
-      storageErrors,
-    });
+    return apiSuccess({ deleted, storageErrors });
   } catch (err) {
     console.error("cleanup-temp-screenshots error:", err);
-    return NextResponse.json(
-      { error: "Cleanup failed" },
-      { status: 500 }
-    );
+    return apiError({
+      code: "INTERNAL_ERROR",
+      message: "Cleanup failed",
+      status: 500,
+    });
   }
 }
