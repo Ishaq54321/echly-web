@@ -42,7 +42,7 @@ async function resolveSessionWorkspaceId(
 
 /**
  * GET /api/sessions/:id — optional auth.
- * Response: `{ success, data: { session }, access }` via {@link buildRequestContext} → {@link getAccessContext}.
+ * Response: `{ success, data: { session, request }, access }` via {@link buildRequestContext} → {@link getAccessContext}.
  */
 export async function GET(req: Request, ctx: HandlerContext) {
   const id = await routeParamId(ctx);
@@ -70,7 +70,9 @@ export async function GET(req: Request, ctx: HandlerContext) {
   }
 
   const sessionJson = serializeSession(session, access);
-  return apiSuccess({ session: sessionJson }, access);
+  const request =
+    context.accessRequest ?? ({ pendingResolve: false } as const);
+  return apiSuccess({ session: sessionJson, request }, access);
 }
 
 /** PATCH /api/sessions/:id — update session; body: { title?: string, archived?: boolean }. */
@@ -82,7 +84,7 @@ export const PATCH = withAuthorization(
     { user, userWorkspaceId }: { user: HandlerUser; userWorkspaceId: string }
   ) => {
     const start = Date.now();
-    log("[API] PATCH /api/sessions/[id] start");
+    log("[API] PATCH /api/sessions/[sessionId] start");
     const id = await routeParamId(ctx);
     if (!id) {
       return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
@@ -174,14 +176,14 @@ export const PATCH = withAuthorization(
         ...(validAccessLevel != null ? { accessLevel: validAccessLevel } : {}),
         ...(tasks.length > 0 ? { updatedAt: new Date() } : {}),
       };
-      log("[API] PATCH /api/sessions/[id] duration:", Date.now() - start);
+      log("[API] PATCH /api/sessions/[sessionId] duration:", Date.now() - start);
       return apiSuccess(
         { session: serializeSession(updated, context.access!) },
         context.access!
       );
     } catch (err) {
-      console.error("PATCH /api/sessions/[id]:", err);
-      log("[API] PATCH /api/sessions/[id] duration (error):", Date.now() - start);
+      console.error("PATCH /api/sessions/[sessionId]:", err);
+      log("[API] PATCH /api/sessions/[sessionId] duration (error):", Date.now() - start);
       return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },
@@ -197,7 +199,7 @@ export const DELETE = withAuthorization(
     { user, userWorkspaceId }: { user: HandlerUser; userWorkspaceId: string }
   ) => {
     const start = Date.now();
-    log("[API] DELETE /api/sessions/[id] start");
+    log("[API] DELETE /api/sessions/[sessionId] start");
     const id = await routeParamId(ctx);
     if (!id) {
       return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
@@ -232,11 +234,11 @@ export const DELETE = withAuthorization(
     }
     try {
       await deleteSessionRepo(id);
-      log("[API] DELETE /api/sessions/[id] duration:", Date.now() - start);
+      log("[API] DELETE /api/sessions/[sessionId] duration:", Date.now() - start);
       return apiSuccess({}, context.access!);
     } catch (err) {
-      console.error("DELETE /api/sessions/[id]:", err);
-      log("[API] DELETE /api/sessions/[id] duration (error):", Date.now() - start);
+      console.error("DELETE /api/sessions/[sessionId]:", err);
+      log("[API] DELETE /api/sessions/[sessionId] duration (error):", Date.now() - start);
       return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },

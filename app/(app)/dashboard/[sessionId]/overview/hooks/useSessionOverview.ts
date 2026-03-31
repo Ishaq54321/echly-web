@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAsyncGeneration } from "@/lib/hooks/useSafeAsync";
 import { authFetch } from "@/lib/authFetch";
-import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
+import type { SessionFeedbackCounts } from "@/lib/domain/session";
 import type { Feedback } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import { requireAccessLevel } from "@/lib/domain/accessLevel";

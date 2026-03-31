@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
 import {
@@ -18,6 +18,7 @@ import {
   assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
+import { getShareToken } from "@/lib/client/shareToken";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 
 const PANEL_WIDTH = 420;
@@ -39,7 +40,10 @@ export function DiscussionPanel({
   onClose,
   onCommentAdded,
 }: DiscussionPanelProps) {
-  const { isIdentityResolved, authUid, authDisplayName, authPhotoUrl } = useWorkspace();
+  const { isIdentityResolved, authUid, authDisplayName, authPhotoUrl, authReady } =
+    useWorkspace();
+  const sharePresent = (getShareToken()?.trim() ?? "") !== "";
+
   const { showToast } = useToast();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
@@ -47,6 +51,14 @@ export function DiscussionPanel({
   const [loading, setLoading] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
   const [sending, setSending] = useState(false);
+
+  const commentsPollEnabled = useMemo(
+    () =>
+      authReady &&
+      Boolean(ticket?.sessionId?.trim() && feedbackId?.trim()) &&
+      (Boolean(authUid?.trim()) || sharePresent),
+    [authReady, ticket?.sessionId, feedbackId, authUid, sharePresent]
+  );
 
   useEffect(() => {
     if (!feedbackId) {
@@ -106,14 +118,15 @@ export function DiscussionPanel({
   }, [feedbackId, authUid]);
 
   useEffect(() => {
-    if (!feedbackId || !ticket?.sessionId || !authUid) {
+    if (!feedbackId || !ticket?.sessionId || !commentsPollEnabled) {
       setComments([]);
     }
-  }, [feedbackId, ticket?.sessionId, authUid]);
+  }, [feedbackId, ticket?.sessionId, commentsPollEnabled]);
 
-  useCommentsRepoSubscription({
+  const { refetch: refetchComments } = useCommentsRepoSubscription({
     sessionId: ticket?.sessionId,
     feedbackId,
+    enabled: commentsPollEnabled,
     onComments: (incoming) =>
       setComments((prev) => mergeRealtimeCommentsWithOptimistic(prev, incoming)),
   });
@@ -150,6 +163,7 @@ export function DiscussionPanel({
           message: trimmed,
           type: "general",
         });
+        void refetchComments();
       } catch (err) {
         console.error("[DiscussionPanel] send comment:", err);
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -234,9 +248,19 @@ export function DiscussionPanel({
               </div>
 
               <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-secondary mb-3">
-                  Comment thread
-                </h4>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-secondary">
+                    Comment thread
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => void refetchComments()}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[#155DFC] hover:text-[#0F4EDC] shrink-0 transition-colors"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+                    Refresh
+                  </button>
+                </div>
                 <div className="space-y-4">
                   {rootComments.length === 0 ? (
                     <p className="text-sm text-secondary">No comments yet.</p>

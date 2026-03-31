@@ -45,7 +45,15 @@ export interface ExecutionViewProps {
       reason: "tier" | "app";
       action: "resolve" | "resolve_next" | "comment" | "assign" | "defer";
     }) => void;
+    pendingResolve?: boolean;
+    onRequestResolveAccess?: () => void;
   };
+  accessResolve?: {
+    canResolve: boolean;
+    pendingResolve: boolean;
+    onRequestAccess: () => void;
+  };
+  accessResolveSubmitting?: boolean;
 }
 
 export function ExecutionView({
@@ -78,6 +86,8 @@ export function ExecutionView({
   readOnlyPermissions,
   readOnlyDescription = null,
   shareGating,
+  accessResolve,
+  accessResolveSubmitting,
 }: ExecutionViewProps) {
   const displayItem = item;
 
@@ -106,6 +116,8 @@ export function ExecutionView({
         readOnly={isPublicReadOnly}
         readOnlyPermissions={isPublicReadOnly ? readOnlyPermissions : undefined}
         shareGating={shareGating}
+        accessResolve={accessResolve}
+        accessResolveSubmitting={accessResolveSubmitting}
       />
 
       {!isPublicReadOnly && !isShareSurface && isCommentMode && (

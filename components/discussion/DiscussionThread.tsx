@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Expand, Paperclip, Send } from "lucide-react";
+import { ArrowUpRight, Expand, Paperclip, RefreshCw, Send } from "lucide-react";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
 import {
@@ -22,6 +22,7 @@ import {
   assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
+import { getShareToken } from "@/lib/client/shareToken";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 
 export interface DiscussionThreadProps {
@@ -45,7 +46,9 @@ export function DiscussionThread({
   onCommentAdded,
   listLoaded = true,
 }: DiscussionThreadProps) {
-  const { isIdentityResolved, authUid, authDisplayName, authPhotoUrl } = useWorkspace();
+  const { isIdentityResolved, authUid, authDisplayName, authPhotoUrl, authReady } =
+    useWorkspace();
+  const sharePresent = (getShareToken()?.trim() ?? "") !== "";
   const { showToast } = useToast();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
@@ -57,6 +60,14 @@ export function DiscussionThread({
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
   const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
 
+  const commentsPollEnabled = useMemo(
+    () =>
+      authReady &&
+      Boolean(ticket?.sessionId?.trim() && feedbackId?.trim()) &&
+      (Boolean(authUid?.trim()) || sharePresent),
+    [authReady, ticket?.sessionId, feedbackId, authUid, sharePresent]
+  );
+
   useEffect(() => {
     if (!screenshotModalOpen) return;
     const handleEscape = (e: KeyboardEvent) => {
@@ -65,58 +76,6 @@ export function DiscussionThread({
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
   }, [screenshotModalOpen]);
-
-  const handleAttachmentSend = useCallback(
-    async (attachment: CommentAttachment) => {
-      if (!authUid || !feedbackId || !ticket?.sessionId) return;
-      assertIdentityResolved(isIdentityResolved);
-      const sid = ticket.sessionId;
-      const optimisticComment = createOptimisticComment({
-        sessionId: sid,
-        feedbackId,
-        data: {
-          userId: authUid,
-          userName: authDisplayName || "User",
-          userAvatar: authPhotoUrl || "",
-          message: "",
-          type: "general",
-          attachment,
-        },
-      });
-      setComments((prev) => [...prev, optimisticComment]);
-      setAttachmentModalOpen(false);
-      onCommentAdded?.();
-      void (async () => {
-        setSending(true);
-        try {
-          await addComment(sid, feedbackId, {
-            userId: authUid,
-            userName: authDisplayName || "User",
-            userAvatar: authPhotoUrl || "",
-            message: "",
-            type: "general",
-            attachment,
-          });
-        } catch (err) {
-          console.error("[DiscussionThread] send attachment comment:", err);
-          setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
-          showToast("Could not send attachment");
-        } finally {
-          setSending(false);
-        }
-      })();
-    },
-    [
-      feedbackId,
-      ticket?.sessionId,
-      onCommentAdded,
-      authUid,
-      authDisplayName,
-      authPhotoUrl,
-      isIdentityResolved,
-      showToast,
-    ]
-  );
 
   useEffect(() => {
     if (!feedbackId) {
@@ -174,20 +133,75 @@ export function DiscussionThread({
   }, [feedbackId, authUid]);
 
   useEffect(() => {
-    if (!feedbackId || !ticket?.sessionId || !authUid) {
+    if (!feedbackId || !ticket?.sessionId || !commentsPollEnabled) {
       setComments([]);
       setCommentsInitialized(false);
     }
-  }, [feedbackId, ticket?.sessionId, authUid]);
+  }, [feedbackId, ticket?.sessionId, commentsPollEnabled]);
 
-  useCommentsRepoSubscription({
+  const { refetch: refetchComments } = useCommentsRepoSubscription({
     sessionId: ticket?.sessionId,
     feedbackId,
+    enabled: commentsPollEnabled,
     onComments: (incoming) => {
       setComments((prev) => mergeRealtimeCommentsWithOptimistic(prev, incoming));
       setCommentsInitialized(true);
     },
   });
+
+  const handleAttachmentSend = useCallback(
+    async (attachment: CommentAttachment) => {
+      if (!authUid || !feedbackId || !ticket?.sessionId) return;
+      assertIdentityResolved(isIdentityResolved);
+      const sid = ticket.sessionId;
+      const optimisticComment = createOptimisticComment({
+        sessionId: sid,
+        feedbackId,
+        data: {
+          userId: authUid,
+          userName: authDisplayName || "User",
+          userAvatar: authPhotoUrl || "",
+          message: "",
+          type: "general",
+          attachment,
+        },
+      });
+      setComments((prev) => [...prev, optimisticComment]);
+      setAttachmentModalOpen(false);
+      onCommentAdded?.();
+      void (async () => {
+        setSending(true);
+        try {
+          await addComment(sid, feedbackId, {
+            userId: authUid,
+            userName: authDisplayName || "User",
+            userAvatar: authPhotoUrl || "",
+            message: "",
+            type: "general",
+            attachment,
+          });
+          void refetchComments();
+        } catch (err) {
+          console.error("[DiscussionThread] send attachment comment:", err);
+          setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
+          showToast("Could not send attachment");
+        } finally {
+          setSending(false);
+        }
+      })();
+    },
+    [
+      feedbackId,
+      ticket?.sessionId,
+      onCommentAdded,
+      authUid,
+      authDisplayName,
+      authPhotoUrl,
+      isIdentityResolved,
+      showToast,
+      refetchComments,
+    ]
+  );
 
   const handleSendComment = () => {
     const sid = ticket?.sessionId;
@@ -220,6 +234,7 @@ export function DiscussionThread({
           message: trimmed,
           type: "general",
         });
+        void refetchComments();
       } catch (err) {
         console.error("[DiscussionThread] send comment:", err);
         setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
@@ -345,6 +360,16 @@ export function DiscussionThread({
 
           {/* Comments */}
           <div className="w-full rounded-2xl border border-neutral-200 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.05)] p-6 mt-5">
+            <div className="flex justify-end mb-3">
+              <button
+                type="button"
+                onClick={() => void refetchComments()}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-[#155DFC] hover:text-[#0F4EDC] transition-colors"
+              >
+                <RefreshCw className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+                Refresh comments
+              </button>
+            </div>
             <div className="space-y-0">
               {!commentsInitialized ? (
                 <div

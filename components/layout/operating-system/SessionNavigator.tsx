@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Pin, PinOff } from "lucide-react";
 import type { Session } from "@/lib/domain/session";
-import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
+import type { SessionFeedbackCounts } from "@/lib/domain/session";
 
 export interface SessionWithCounts {
   session: Session;

@@ -13,6 +13,7 @@ import {
   Clock,
   MessageSquare,
   Trash2,
+  Lock,
 } from "lucide-react";
 
 const iconBtn = {
@@ -23,6 +24,12 @@ const iconBtn = {
 
 const resolveBtn =
   "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-transparent bg-[#2563EB] text-white shadow-[0_1px_2px_rgba(0,0,0,0.08)] hover:bg-[#1D4ED8] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+
+const requestResolveAccessBtn =
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[var(--border-subtle)] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary-strong))] shadow-none hover:bg-[hsl(var(--surface-3))] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+
+const pendingResolveAccessBtn =
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF] cursor-default opacity-95 pointer-events-none select-none";
 
 const secondaryBtn =
   "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[#E7ECF2] bg-[#FAFBFC] text-[#374151] hover:bg-[#F1F4F8] hover:border-[#DCE4EE] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
@@ -77,7 +84,20 @@ export interface SessionFeedbackHeaderProps {
       reason: "tier" | "app";
       action: "resolve" | "resolve_next" | "comment" | "assign" | "defer";
     }) => void;
+    /** When set with {@link shareGating.onRequestResolveAccess}, resolve affordance follows request/pending UI. */
+    pendingResolve?: boolean;
+    onRequestResolveAccess?: () => void;
   };
+  /**
+   * Dashboard/authenticated: reflects `access.capabilities.canResolve` and `request.pendingResolve`; does not grant capability.
+   */
+  accessResolve?: {
+    canResolve: boolean;
+    pendingResolve: boolean;
+    onRequestAccess: () => void;
+  };
+  /** True while POST /request-access is in flight (dashboard). */
+  accessResolveSubmitting?: boolean;
 }
 
 /**
@@ -97,6 +117,8 @@ export function SessionFeedbackHeader({
   readOnly = false,
   readOnlyPermissions,
   shareGating,
+  accessResolve,
+  accessResolveSubmitting = false,
 }: SessionFeedbackHeaderProps) {
   const [resolveFlash, setResolveFlash] = useState(false);
   useEffect(() => {
@@ -205,19 +227,61 @@ export function SessionFeedbackHeader({
           {shareGating ? (
             isActionable ? (
               <>
-                <button
-                  type="button"
-                  onClick={gateResolve}
-                  disabled={isResolved}
-                  className={
-                    isResolved
-                      ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
-                      : resolveBtn
-                  }
-                >
-                  <CheckCircle {...iconBtn} aria-hidden />
-                  <span>{isResolved ? "Resolved" : "Resolve"}</span>
-                </button>
+                {shareGating.permissions.canResolve ? (
+                  <button
+                    type="button"
+                    onClick={gateResolve}
+                    disabled={isResolved}
+                    className={
+                      isResolved
+                        ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
+                        : resolveBtn
+                    }
+                  >
+                    <CheckCircle {...iconBtn} aria-hidden />
+                    <span>{isResolved ? "Resolved" : "Resolve"}</span>
+                  </button>
+                ) : shareGating.onRequestResolveAccess ? (
+                  isResolved ? (
+                    <button
+                      type="button"
+                      disabled
+                      className={`${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <CheckCircle {...iconBtn} aria-hidden />
+                      <span>Resolved</span>
+                    </button>
+                  ) : shareGating.pendingResolve ? (
+                    <button type="button" disabled className={pendingResolveAccessBtn}>
+                      <Clock {...iconBtn} aria-hidden />
+                      <span>Pending approval</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={shareGating.onRequestResolveAccess}
+                      disabled={accessResolveSubmitting}
+                      className={requestResolveAccessBtn}
+                    >
+                      <Lock {...iconBtn} aria-hidden />
+                      <span>Request resolve access</span>
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    onClick={gateResolve}
+                    disabled={isResolved}
+                    className={
+                      isResolved
+                        ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
+                        : resolveBtn
+                    }
+                  >
+                    <CheckCircle {...iconBtn} aria-hidden />
+                    <span>{isResolved ? "Resolved" : "Resolve"}</span>
+                  </button>
+                )}
                 <button type="button" className={secondaryBtn} onClick={gateAssign}>
                   <UserPlus {...iconBtn} aria-hidden />
                   Assign
@@ -226,12 +290,12 @@ export function SessionFeedbackHeader({
                   <Clock {...iconBtn} aria-hidden />
                   Defer
                 </button>
-                {!isResolved && (
+                {!isResolved && shareGating.permissions.canResolve ? (
                   <button type="button" onClick={gateResolveNext} className={secondaryBtn}>
                     <CheckCircle {...iconBtn} aria-hidden />
                     Resolve &amp; Next
                   </button>
-                )}
+                ) : null}
                 <button type="button" className={secondaryBtn} onClick={gateComment}>
                   <MessageSquare {...iconBtn} aria-hidden />
                   Comment
@@ -272,19 +336,47 @@ export function SessionFeedbackHeader({
           ) : isActionable ? (
             <>
               {onResolvedChange ? (
-                <button
-                  type="button"
-                  onClick={() => onResolvedChange(true)}
-                  disabled={isResolved}
-                  className={
-                    isResolved
-                      ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
-                      : resolveBtn
-                  }
-                >
-                  <CheckCircle {...iconBtn} aria-hidden />
-                  <span>{isResolved ? "Resolved" : "Resolve"}</span>
-                </button>
+                accessResolve != null && !accessResolve.canResolve ? (
+                  isResolved ? (
+                    <button
+                      type="button"
+                      disabled
+                      className={`${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <CheckCircle {...iconBtn} aria-hidden />
+                      <span>Resolved</span>
+                    </button>
+                  ) : accessResolve.pendingResolve ? (
+                    <button type="button" disabled className={pendingResolveAccessBtn}>
+                      <Clock {...iconBtn} aria-hidden />
+                      <span>Pending approval</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={accessResolve.onRequestAccess}
+                      disabled={accessResolveSubmitting}
+                      className={requestResolveAccessBtn}
+                    >
+                      <Lock {...iconBtn} aria-hidden />
+                      <span>Request resolve access</span>
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onResolvedChange(true)}
+                    disabled={isResolved}
+                    className={
+                      isResolved
+                        ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
+                        : resolveBtn
+                    }
+                  >
+                    <CheckCircle {...iconBtn} aria-hidden />
+                    <span>{isResolved ? "Resolved" : "Resolve"}</span>
+                  </button>
+                )
               ) : null}
               <button type="button" className={secondaryBtn}>
                 <UserPlus {...iconBtn} aria-hidden />
@@ -294,7 +386,9 @@ export function SessionFeedbackHeader({
                 <Clock {...iconBtn} aria-hidden />
                 Defer
               </button>
-              {onResolveAndNext && !isResolved ? (
+              {onResolveAndNext &&
+              !isResolved &&
+              (accessResolve == null || accessResolve.canResolve) ? (
                 <button type="button" onClick={onResolveAndNext} className={secondaryBtn}>
                   <CheckCircle {...iconBtn} aria-hidden />
                   Resolve &amp; Next

@@ -32,6 +32,7 @@ import {
   notifyPermissionDenied,
   responseIsPermissionDenied,
 } from "@/lib/client/permissionError";
+import { safeResolveAction } from "@/lib/client/safeResolveAction";
 import { warn } from "@/lib/utils/logger";
 import Image from "next/image";
 import {
@@ -42,6 +43,7 @@ import {
 import { TopControlBar } from "@/components/ui/TopControlBar";
 import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
 import { useToast } from "@/components/dashboard/context/ToastContext";
+import { RequestAccessModal } from "@/components/RequestAccessModal";
 
 /** Broadcast ticket update to extension tray so tray stays in sync. */
 function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps?: string[] | null; type?: string }) {
@@ -126,6 +128,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   >(null);
   /** Capability flags from GET /api/sessions/:id (getAccessContext); never inferred in the UI. */
   const [sessionAccess, setSessionAccess] = useState<AccessCapabilities | null>(null);
+  /** From GET /api/sessions/:id `data.request.pendingResolve` or successful POST /request-access. */
+  const [pendingResolveRequest, setPendingResolveRequest] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
@@ -133,8 +137,61 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const sessionRef = useRef<Session | null>(null);
   sessionRef.current = session;
 
+  const sessionAccessRef = useRef<AccessCapabilities | null>(null);
+  sessionAccessRef.current = sessionAccess;
+
+  const requestResolveAccessInFlightRef = useRef(false);
+
   const { authUid, isIdentityResolved, authReady } = useWorkspace();
   const { showToast } = useToast();
+
+  const handleRequestResolveAccess = useCallback(async () => {
+    const sid = sessionId?.trim();
+    if (!sid || !authUid?.trim()) return;
+    if (sessionAccessRef.current?.canResolve === true) return;
+    if (pendingResolveRequest) return;
+    if (requestResolveAccessInFlightRef.current) return;
+    requestResolveAccessInFlightRef.current = true;
+    try {
+      const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/request-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const raw = (await res?.json().catch(() => ({}))) as {
+        success?: boolean;
+        data?: { type?: string };
+      };
+      if (res?.ok && raw.success) {
+        const t = raw.data?.type;
+        if (t === "request_created" || t === "already_requested") {
+          setPendingResolveRequest(true);
+          return;
+        }
+      }
+      showToast("Could not submit access request");
+    } catch {
+      showToast("Could not submit access request");
+    } finally {
+      requestResolveAccessInFlightRef.current = false;
+    }
+  }, [sessionId, authUid, pendingResolveRequest, showToast]);
+
+  const [requestAccessModalOpen, setRequestAccessModalOpen] = useState(false);
+  const [requestAccessSubmitting, setRequestAccessSubmitting] = useState(false);
+
+  const openRequestAccessModal = useCallback(() => {
+    setRequestAccessModalOpen(true);
+  }, []);
+
+  const confirmRequestResolveAccess = useCallback(async () => {
+    setRequestAccessSubmitting(true);
+    try {
+      await handleRequestResolveAccess();
+    } finally {
+      setRequestAccessSubmitting(false);
+      setRequestAccessModalOpen(false);
+    }
+  }, [handleRequestResolveAccess]);
 
   const feedbackSessionId = sessionId || undefined;
 
@@ -529,6 +586,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setSessionAccess(null);
       setSessionFetchError(null);
       setAccessBlocked(false);
+      setPendingResolveRequest(false);
       return;
     }
 
@@ -542,7 +600,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       if (cancelled) return;
       const data = (await res.json().catch(() => ({}))) as {
         success?: boolean;
-        data?: { session?: Record<string, unknown> };
+        data?: {
+          session?: Record<string, unknown>;
+          request?: { pendingResolve?: boolean };
+        };
         session?: Record<string, unknown>;
         access?: { capabilities?: Partial<AccessCapabilities> };
       };
@@ -553,6 +614,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           setAccessBlocked(true);
           setSession(null);
           setSessionFetchError(null);
+          setPendingResolveRequest(false);
           setSessionAccess({
             canView: false,
             canComment: cap.canComment === true,
@@ -566,6 +628,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         setAccessBlocked(false);
         setSession(null);
         setSessionAccess(null);
+        setPendingResolveRequest(false);
         setSessionFetchError("forbidden");
         return;
       }
@@ -573,6 +636,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         setAccessBlocked(false);
         setSession(null);
         setSessionAccess(null);
+        setPendingResolveRequest(false);
         setSessionFetchError(res.status === 404 ? "not_found" : "error");
         return;
       }
@@ -596,6 +660,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             }
           : null
       );
+      setPendingResolveRequest(data.data?.request?.pendingResolve === true);
       // Authenticated: Loom-style view count via Bearer. Anonymous: share link token (sessionStorage / URL) on the request.
       if (authUid?.trim()) {
         const viewerId = getViewerId(authUid);
@@ -867,6 +932,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     comments,
     loadingComments,
     displayCommentThreadCounts,
+    refetchComments,
     sendReply,
     sendPinComment,
     sendTextComment,
@@ -876,6 +942,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   } = useFeedbackDetailController({
     sessionId,
     feedbackId: effectiveSelectedId,
+    canResolve: sessionAccess?.canResolve === true,
+    onRequestResolveAccess: openRequestAccessModal,
   });
 
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -1087,105 +1155,111 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
   };
 
-  const saveResolved = (isResolved: boolean) => {
+  const saveResolved = (isResolved: boolean): boolean => {
     const ticketId = effectiveSelectedId;
-    if (!ticketId) return;
+    if (!ticketId) return false;
 
-    const previousResolved = Boolean(
-      feedback.find((i) => i.id === ticketId)?.isResolved
-    );
+    return safeResolveAction({
+      canResolve: sessionAccessRef.current?.canResolve === true,
+      triggerRequestAccessFlow: openRequestAccessModal,
+      run: () => {
+        const previousResolved = Boolean(
+          feedback.find((i) => i.id === ticketId)?.isResolved
+        );
 
-    setResolveOptimistic({ ticketId, isResolved });
-    if (isResolved) {
-      setResolveAffirmationKey((k) => k + 1);
-    }
+        setResolveOptimistic({ ticketId, isResolved });
+        if (isResolved) {
+          setResolveAffirmationKey((k) => k + 1);
+        }
 
-    startTransition(() => {
-      setFeedback((prevList) =>
-        prevList.map((item) =>
-          item.id === ticketId ? { ...item, isResolved } : item
-        )
-      );
-    });
+        startTransition(() => {
+          setFeedback((prevList) =>
+            prevList.map((item) =>
+              item.id === ticketId ? { ...item, isResolved } : item
+            )
+          );
+        });
 
-    const countsTransition = previousResolved !== isResolved;
-    if (countsTransition) {
-      setSessionCountsDelta((prev) => ({
-        open: prev.open + (isResolved ? -1 : 1),
-        resolved: prev.resolved + (isResolved ? 1 : -1),
-        total: prev.total,
-      }));
-    }
-
-    void (async () => {
-      const rollbackResolved = () => {
-        setResolveOptimistic(null);
+        const countsTransition = previousResolved !== isResolved;
         if (countsTransition) {
           setSessionCountsDelta((prev) => ({
-            open: prev.open + (isResolved ? 1 : -1),
-            resolved: prev.resolved + (isResolved ? -1 : 1),
+            open: prev.open + (isResolved ? -1 : 1),
+            resolved: prev.resolved + (isResolved ? 1 : -1),
             total: prev.total,
           }));
         }
-        setFeedback((prevList) =>
-          prevList.map((item) =>
-            item.id === ticketId
-              ? { ...item, isResolved: previousResolved }
-              : item
-          )
-        );
-      };
 
-      const perf =
-        typeof window !== "undefined" &&
-        typeof localStorage !== "undefined" &&
-        localStorage.getItem("ECHLY_PERF") === "1";
-      const t0 = performance.now();
-      if (perf) console.log("[ECHLY_PERF] CLIENT START (resolve ticket)", t0);
-      try {
-        assertIdentityResolved(isIdentityResolved);
-        const res = await authFetch(`/api/tickets/${ticketId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isResolved }),
-        });
-        if (!res || !res.ok) {
-          rollbackResolved();
-          if (res && responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
-          else showToast("Failed to update");
-          return;
-        }
-        const data = (await res.json()) as {
-          success?: boolean;
-          data?: { ticket?: TicketFromApi };
-          ticket?: TicketFromApi;
-        };
-        const ticketPayload = data.data?.ticket ?? data.ticket;
-        if (perf) {
-          const clientTotal = performance.now() - t0;
-          console.log("[ECHLY_PERF] CLIENT END (resolve ticket)", clientTotal.toFixed(1), "ms");
-          console.log(
-            "[ECHLY_PERF] Full breakdown: compare CLIENT total above with authFetch TOKEN/NETWORK lines and server [Resolve] logs for API vs Firestore."
-          );
-        }
-        if (!data.success || !ticketPayload) {
-          rollbackResolved();
-          showToast("Failed to update");
-          return;
-        }
-        setResolveOptimistic(null);
-        setFeedback((prev) =>
-          prev.map((item) =>
-            item.id === ticketId ? { ...item, ...ticketPayload } : item
-          )
-        );
-        broadcastTicketUpdated(ticketPayload);
-      } catch (err) {
-        console.error("[ECHLY] saveResolved failed", err);
-        rollbackResolved();
-        showToast("Failed to update");
-      }
-    })();
+        void (async () => {
+          const rollbackResolved = () => {
+            setResolveOptimistic(null);
+            if (countsTransition) {
+              setSessionCountsDelta((prev) => ({
+                open: prev.open + (isResolved ? 1 : -1),
+                resolved: prev.resolved + (isResolved ? -1 : 1),
+                total: prev.total,
+              }));
+            }
+            setFeedback((prevList) =>
+              prevList.map((item) =>
+                item.id === ticketId
+                  ? { ...item, isResolved: previousResolved }
+                  : item
+              )
+            );
+          };
+
+          const perf =
+            typeof window !== "undefined" &&
+            typeof localStorage !== "undefined" &&
+            localStorage.getItem("ECHLY_PERF") === "1";
+          const t0 = performance.now();
+          if (perf) console.log("[ECHLY_PERF] CLIENT START (resolve ticket)", t0);
+          try {
+            assertIdentityResolved(isIdentityResolved);
+            const res = await authFetch(`/api/tickets/${ticketId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ isResolved }),
+            });
+            if (!res || !res.ok) {
+              rollbackResolved();
+              if (res && responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
+              else showToast("Failed to update");
+              return;
+            }
+            const data = (await res.json()) as {
+              success?: boolean;
+              data?: { ticket?: TicketFromApi };
+              ticket?: TicketFromApi;
+            };
+            const ticketPayload = data.data?.ticket ?? data.ticket;
+            if (perf) {
+              const clientTotal = performance.now() - t0;
+              console.log("[ECHLY_PERF] CLIENT END (resolve ticket)", clientTotal.toFixed(1), "ms");
+              console.log(
+                "[ECHLY_PERF] Full breakdown: compare CLIENT total above with authFetch TOKEN/NETWORK lines and server [Resolve] logs for API vs Firestore."
+              );
+            }
+            if (!data.success || !ticketPayload) {
+              rollbackResolved();
+              showToast("Failed to update");
+              return;
+            }
+            setResolveOptimistic(null);
+            setFeedback((prev) =>
+              prev.map((item) =>
+                item.id === ticketId ? { ...item, ...ticketPayload } : item
+              )
+            );
+            broadcastTicketUpdated(ticketPayload);
+          } catch (err) {
+            console.error("[ECHLY] saveResolved failed", err);
+            rollbackResolved();
+            showToast("Failed to update");
+          }
+        })();
+      },
+    });
   };
 
   const handleResolveAndNext = () => {
@@ -1196,7 +1270,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       openIdx >= 0
         ? stableOpenFeedback[openIdx + 1] ?? stableOpenFeedback[0]
         : stableOpenFeedback[0];
-    saveResolved(true);
+    if (!saveResolved(true)) return;
     if (nextOpen && nextOpen.id !== currentId) {
       queueMicrotask(() => setSelectedId(nextOpen.id));
     }
@@ -1277,117 +1351,133 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }
   }, [sessionId, sessionTitleDraft, isIdentityResolved, showToast]);
 
-  const handleMarkAllResolved = useCallback(async () => {
-    assertIdentityResolved(isIdentityResolved);
-    const feedbackList = feedbackRef.current;
-    const active = feedbackList.filter((item) => getTicketStatus(item) === "open");
-    if (active.length === 0) return;
-    const previousById = new Map(feedbackList.map((item) => [item.id, item]));
-    setFeedback((prev) =>
-      prev.map((item) =>
-        getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
-      )
-    );
-    try {
-      const settled = await Promise.allSettled(
-        active.map((item) =>
-          authFetch(`/api/tickets/${item.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ isResolved: true }),
-            timeout: 60000,
-          })
-        )
-      );
-      const failedIds = new Set<string>();
-      let anyPermissionDenied = false;
-      settled.forEach((entry, index) => {
-        const id = active[index].id;
-        if (entry.status === "rejected") {
-          failedIds.add(id);
-          return;
-        }
-        const r = entry.value;
-        if (r == null || !r.ok) {
-          failedIds.add(id);
-          if (r != null && responseIsPermissionDenied(r)) anyPermissionDenied = true;
-        }
-      });
-      if (failedIds.size > 0) {
-        setFeedback((prev) =>
-          prev.map((item) => {
-            if (!failedIds.has(item.id)) return item;
-            return previousById.get(item.id) ?? item;
-          })
-        );
-        if (anyPermissionDenied) notifyPermissionDenied(showToast);
-        else showToast("Could not resolve all tickets");
-      }
-    } catch (err) {
-      warn("Mark all resolved failed:", err);
-      setFeedback((prev) =>
-        prev.map((item) => previousById.get(item.id) ?? item)
-      );
-      showToast("Could not resolve all tickets");
-    }
-  }, [sessionId, setFeedback, isIdentityResolved, showToast]);
+  const handleMarkAllResolved = useCallback(() => {
+    safeResolveAction({
+      canResolve: sessionAccessRef.current?.canResolve === true,
+      triggerRequestAccessFlow: openRequestAccessModal,
+      run: () => {
+        void (async () => {
+          assertIdentityResolved(isIdentityResolved);
+          const feedbackList = feedbackRef.current;
+          const active = feedbackList.filter((item) => getTicketStatus(item) === "open");
+          if (active.length === 0) return;
+          const previousById = new Map(feedbackList.map((item) => [item.id, item]));
+          setFeedback((prev) =>
+            prev.map((item) =>
+              getTicketStatus(item) === "open" ? { ...item, isResolved: true } : item
+            )
+          );
+          try {
+            const settled = await Promise.allSettled(
+              active.map((item) =>
+                authFetch(`/api/tickets/${item.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ isResolved: true }),
+                  timeout: 60000,
+                })
+              )
+            );
+            const failedIds = new Set<string>();
+            let anyPermissionDenied = false;
+            settled.forEach((entry, index) => {
+              const id = active[index]!.id;
+              if (entry.status === "rejected") {
+                failedIds.add(id);
+                return;
+              }
+              const r = entry.value;
+              if (r == null || !r.ok) {
+                failedIds.add(id);
+                if (r != null && responseIsPermissionDenied(r)) anyPermissionDenied = true;
+              }
+            });
+            if (failedIds.size > 0) {
+              setFeedback((prev) =>
+                prev.map((item) => {
+                  if (!failedIds.has(item.id)) return item;
+                  return previousById.get(item.id) ?? item;
+                })
+              );
+              if (anyPermissionDenied) notifyPermissionDenied(showToast);
+              else showToast("Could not resolve all tickets");
+            }
+          } catch (err) {
+            warn("Mark all resolved failed:", err);
+            setFeedback((prev) =>
+              prev.map((item) => previousById.get(item.id) ?? item)
+            );
+            showToast("Could not resolve all tickets");
+          }
+        })();
+      },
+    });
+  }, [setFeedback, isIdentityResolved, showToast, openRequestAccessModal]);
 
-  const handleMarkAllUnresolved = useCallback(async () => {
-    assertIdentityResolved(isIdentityResolved);
-    const feedbackList = feedbackRef.current;
-    const resolved = feedbackList.filter((item) => getTicketStatus(item) === "resolved");
-    if (resolved.length === 0) return;
-    const previousById = new Map(feedbackList.map((item) => [item.id, item]));
-    setFeedback((prev) =>
-      prev.map((item) =>
-        getTicketStatus(item) === "resolved"
-          ? { ...item, isResolved: false }
-          : item
-      )
-    );
-    try {
-      const settled = await Promise.allSettled(
-        resolved.map((item) =>
-          authFetch(`/api/tickets/${item.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ isResolved: false }),
-            timeout: 60000,
-          })
-        )
-      );
-      const failedIds = new Set<string>();
-      let anyPermissionDenied = false;
-      settled.forEach((entry, index) => {
-        const id = resolved[index].id;
-        if (entry.status === "rejected") {
-          failedIds.add(id);
-          return;
-        }
-        const r = entry.value;
-        if (r == null || !r.ok) {
-          failedIds.add(id);
-          if (r != null && responseIsPermissionDenied(r)) anyPermissionDenied = true;
-        }
-      });
-      if (failedIds.size > 0) {
-        setFeedback((prev) =>
-          prev.map((item) => {
-            if (!failedIds.has(item.id)) return item;
-            return previousById.get(item.id) ?? item;
-          })
-        );
-        if (anyPermissionDenied) notifyPermissionDenied(showToast);
-        else showToast("Could not reopen all tickets");
-      }
-    } catch (err) {
-      warn("Mark all unresolved failed:", err);
-      setFeedback((prev) =>
-        prev.map((item) => previousById.get(item.id) ?? item)
-      );
-      showToast("Could not reopen all tickets");
-    }
-  }, [sessionId, setFeedback, isIdentityResolved, showToast]);
+  const handleMarkAllUnresolved = useCallback(() => {
+    safeResolveAction({
+      canResolve: sessionAccessRef.current?.canResolve === true,
+      triggerRequestAccessFlow: openRequestAccessModal,
+      run: () => {
+        void (async () => {
+          assertIdentityResolved(isIdentityResolved);
+          const feedbackList = feedbackRef.current;
+          const resolved = feedbackList.filter((item) => getTicketStatus(item) === "resolved");
+          if (resolved.length === 0) return;
+          const previousById = new Map(feedbackList.map((item) => [item.id, item]));
+          setFeedback((prev) =>
+            prev.map((item) =>
+              getTicketStatus(item) === "resolved"
+                ? { ...item, isResolved: false }
+                : item
+            )
+          );
+          try {
+            const settled = await Promise.allSettled(
+              resolved.map((item) =>
+                authFetch(`/api/tickets/${item.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ isResolved: false }),
+                  timeout: 60000,
+                })
+              )
+            );
+            const failedIds = new Set<string>();
+            let anyPermissionDenied = false;
+            settled.forEach((entry, index) => {
+              const id = resolved[index]!.id;
+              if (entry.status === "rejected") {
+                failedIds.add(id);
+                return;
+              }
+              const r = entry.value;
+              if (r == null || !r.ok) {
+                failedIds.add(id);
+                if (r != null && responseIsPermissionDenied(r)) anyPermissionDenied = true;
+              }
+            });
+            if (failedIds.size > 0) {
+              setFeedback((prev) =>
+                prev.map((item) => {
+                  if (!failedIds.has(item.id)) return item;
+                  return previousById.get(item.id) ?? item;
+                })
+              );
+              if (anyPermissionDenied) notifyPermissionDenied(showToast);
+              else showToast("Could not reopen all tickets");
+            }
+          } catch (err) {
+            warn("Mark all unresolved failed:", err);
+            setFeedback((prev) =>
+              prev.map((item) => previousById.get(item.id) ?? item)
+            );
+            showToast("Could not reopen all tickets");
+          }
+        })();
+      },
+    });
+  }, [setFeedback, isIdentityResolved, showToast, openRequestAccessModal]);
 
   const handleDeleteFeedback = async (id: string) => {
     assertIdentityResolved(isIdentityResolved);
@@ -1582,12 +1672,30 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           canComment: sessionAccess?.canComment === true,
           canResolve: sessionAccess?.canResolve === true,
         }}
+        accessResolve={
+          authUid &&
+          sessionAccess?.canView &&
+          sessionAccess.canResolve === false
+            ? {
+                canResolve: false,
+                pendingResolve: pendingResolveRequest,
+                onRequestAccess: openRequestAccessModal,
+              }
+            : undefined
+        }
+        accessResolveSubmitting={requestAccessSubmitting}
       />
     );
   };
 
   return (
     <>
+      <RequestAccessModal
+        open={requestAccessModalOpen}
+        onClose={() => setRequestAccessModalOpen(false)}
+        onConfirm={confirmRequestResolveAccess}
+        submitting={requestAccessSubmitting}
+      />
       <div className="flex h-full min-h-0 overflow-hidden">
         <aside className="sidebar hidden lg:flex w-[300px] h-screen overflow-hidden shrink-0 self-start min-h-0 flex-col sticky top-0">
           <TicketList
@@ -1654,6 +1762,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             onSetSessionArchived={handleSetSessionArchivedFromMenu}
             onRequestDeleteSession={handleRequestDeleteSessionFromMenu}
             publicViewer={isAnonymousViewer}
+            canManageShare={sessionAccess?.canResolve === true}
           />
           <div className="flex flex-1 min-h-0 min-w-0">
             <main className="surface-main flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
@@ -1688,6 +1797,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                   comments={comments}
                   loading={loadingComments}
                   threadCounts={displayCommentThreadCounts}
+                  onRefreshComments={() => void refetchComments()}
                   sendReply={sendReply}
                   activeThreadId={activeThreadId}
                   onSelectThread={setActiveThreadId}

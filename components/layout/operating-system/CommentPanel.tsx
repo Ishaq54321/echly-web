@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
-import { X, CheckCircle2, RotateCcw } from "lucide-react";
+import { X, CheckCircle2, RotateCcw, RefreshCw } from "lucide-react";
 import type { Comment } from "@/lib/domain/comment";
 import { CommentItem } from "@/components/comments/CommentItem";
 
@@ -30,6 +30,8 @@ export interface CommentPanelProps {
   deleteComment?: (commentId: string) => Promise<void>;
   /** Display counts (e.g. optimistic merge); falls back to roots derived from `comments` when unset. */
   threadCounts?: CommentPanelThreadCounts | null;
+  /** Manual sync when automatic polling is off. */
+  onRefreshComments?: () => void;
 }
 
 const CommentRow = memo(function CommentRow({
@@ -372,6 +374,7 @@ export function CommentPanel({
   updateComment,
   deleteComment,
   threadCounts: threadCountsProp,
+  onRefreshComments,
 }: CommentPanelProps) {
   const [filterTab, setFilterTab] = useState<CommentFilterTab>("unresolved");
   const [highlightThreadId, setHighlightThreadId] = useState<string | null>(null);
@@ -418,6 +421,17 @@ export function CommentPanel({
     <>
       <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-[var(--layer-2-border)]">
         <h2 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--text-tertiary))]">Comment</h2>
+        <div className="flex items-center gap-0.5">
+          {onRefreshComments ? (
+            <button
+              type="button"
+              onClick={onRefreshComments}
+              className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
+              aria-label="Refresh comments"
+            >
+              <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
+            </button>
+          ) : null}
         <button
           type="button"
           onClick={onClose}
@@ -426,6 +440,7 @@ export function CommentPanel({
         >
           <X className="h-4 w-4" strokeWidth={1.5} />
         </button>
+        </div>
       </div>
       <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden box-border">
         <div className="px-4 py-4 min-w-0 box-border">

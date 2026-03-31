@@ -2,11 +2,93 @@
 
 export type { Comment, CommentAttachment, CommentPosition, CommentTextRange, CommentType } from "@/lib/domain/comment";
 import type { Comment, CommentAttachment, CommentPosition, CommentTextRange } from "@/lib/domain/comment";
-import {
-  getSessionRecentCommentsRepo,
-} from "@/lib/repositories/commentsRepository";
 import { authFetch } from "@/lib/authFetch";
 import { HttpError } from "@/lib/client/httpError";
+
+function commentFromApiRow(row: unknown): Comment | null {
+  if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  const id = typeof r.id === "string" ? r.id : "";
+  const sessionId = typeof r.sessionId === "string" ? r.sessionId : "";
+  const feedbackId = typeof r.feedbackId === "string" ? r.feedbackId : "";
+  const userId = typeof r.userId === "string" ? r.userId : "";
+  if (!id || !sessionId || !feedbackId || !userId) return null;
+
+  const createdAtRaw = r.createdAt;
+  let createdAt: Comment["createdAt"] = null;
+  if (createdAtRaw && typeof createdAtRaw === "object") {
+    const t = createdAtRaw as { seconds?: number; nanoseconds?: number };
+    if (typeof t.seconds === "number") {
+      createdAt = {
+        seconds: t.seconds,
+        nanoseconds: typeof t.nanoseconds === "number" ? t.nanoseconds : 0,
+      } as Comment["createdAt"];
+    }
+  }
+
+  return {
+    id,
+    workspaceId: typeof r.workspaceId === "string" ? r.workspaceId : undefined,
+    sessionId,
+    feedbackId,
+    userId,
+    userName: typeof r.userName === "string" ? r.userName : "",
+    userAvatar: typeof r.userAvatar === "string" ? r.userAvatar : "",
+    message: typeof r.message === "string" ? r.message : "",
+    createdAt,
+    type: r.type === "pin" || r.type === "text" || r.type === "general" ? r.type : undefined,
+    position:
+      r.position && typeof r.position === "object"
+        ? (r.position as Comment["position"])
+        : undefined,
+    textRange:
+      r.textRange && typeof r.textRange === "object"
+        ? (r.textRange as Comment["textRange"])
+        : undefined,
+    threadId:
+      r.threadId === null || r.threadId === undefined
+        ? undefined
+        : typeof r.threadId === "string"
+          ? r.threadId
+          : undefined,
+    resolved: typeof r.resolved === "boolean" ? r.resolved : undefined,
+    attachment:
+      r.attachment && typeof r.attachment === "object"
+        ? (r.attachment as Comment["attachment"])
+        : undefined,
+  };
+}
+
+/**
+ * Loads session comments from the API (server-enforced canView). Caller filters by feedbackId if needed.
+ */
+export async function fetchComments(sessionId: string): Promise<Comment[]> {
+  const sid = typeof sessionId === "string" ? sessionId.trim() : "";
+  if (!sid) return [];
+
+  const res = await authFetch(`/api/comments/${encodeURIComponent(sid)}`);
+  if (!res) throw new Error("Not authenticated");
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new HttpError(msg || "Failed to load comments", res.status);
+  }
+  const json = (await res.json()) as {
+    success?: boolean;
+    data?: { comments?: unknown[] };
+    error?: { message?: string };
+  };
+  if (!json.success) {
+    throw new Error(json.error?.message || "Failed to load comments");
+  }
+  const rawList = json.data?.comments;
+  if (!Array.isArray(rawList)) return [];
+  const out: Comment[] = [];
+  for (const row of rawList) {
+    const c = commentFromApiRow(row);
+    if (c) out.push(c);
+  }
+  return out;
+}
 
 export interface AddCommentOptions {
   userId: string;
@@ -111,8 +193,7 @@ export function sameCommentPayload(
 }
 
 /**
- * Merge Firestore snapshot with in-flight optimistic rows. Listener stays source of truth;
- * pending locals drop once a matching real doc appears.
+ * Merge server-fetched list with in-flight optimistic rows; pending locals drop once a matching real row appears.
  */
 export function mergeRealtimeCommentsWithOptimistic(
   prev: LocalComment[],
@@ -220,13 +301,4 @@ export async function deleteComment(commentId: string): Promise<void> {
     const msg = await res.text().catch(() => "");
     throw new HttpError(msg || "Failed to delete comment", res.status);
   }
-}
-
-/** Recent comments for a session (overview activity feed). Limited. */
-export async function getSessionRecentComments(
-  workspaceId: string,
-  sessionId: string,
-  max: number = 10
-) {
-  return getSessionRecentCommentsRepo(workspaceId, sessionId, max);
 }

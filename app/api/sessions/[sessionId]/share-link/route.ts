@@ -55,7 +55,7 @@ export const POST = withAuthorization(
       const { token } = await createShareLink(user.uid, sessionId, "comment", user.uid);
       return apiSuccess({ token }, accessCtx.access!);
     } catch (e) {
-      console.error("POST /api/sessions/[id]/share-link:", e);
+      console.error("POST /api/sessions/[sessionId]/share-link:", e);
       return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
     }
   },

@@ -240,11 +240,39 @@ export async function listRecentCommentsForSessionRepo(
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() ?? {}) }));
 }
 
+/** Hard cap for GET /api/comments/:sessionId (cost protection). */
+const LIST_SESSION_COMMENTS_FOR_API_MAX = 3000;
+
+/**
+ * All comments in a session, oldest first (matches former client listener ordering).
+ * Uses workspaceId+sessionId+createdAt DESC index; results reversed in memory.
+ */
+export async function listCommentsForSessionChronologicalRepo(
+  workspaceId: string,
+  sessionId: string
+): Promise<Array<Record<string, unknown> & { id: string }>> {
+  const wid = workspaceId.trim();
+  const sid = sessionId.trim();
+  if (!wid || !sid) return [];
+  assertQueryLimit(
+    LIST_SESSION_COMMENTS_FOR_API_MAX,
+    "listCommentsForSessionChronologicalRepo"
+  );
+  const snap = await adminDb
+    .collection("comments")
+    .where("workspaceId", "==", wid)
+    .where("sessionId", "==", sid)
+    .orderBy("createdAt", "desc")
+    .limit(LIST_SESSION_COMMENTS_FOR_API_MAX)
+    .get();
+  const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() ?? {}) }));
+  rows.reverse();
+  return rows;
+}
+
 /**
  * Server-only subset of comments repository.
  * Use this from API routes / other server repositories.
- *
- * (Client realtime helpers stay in `commentsRepository.ts` for now.)
  */
 
 const DELETE_SESSION_COMMENTS_LIMIT = 500;

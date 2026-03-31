@@ -113,6 +113,8 @@ type ResolveAccessInput = {
     isActive: boolean;
     expiresAt?: number | null;
   } | null;
+  /** Direct session membership (`sessions/{id}/members/{userId}`); runs after workspace, before link. */
+  memberAccess?: "view" | "resolve" | null;
 };
 
 export type ResolveAccessResult = { role: Role; sessionGranted: boolean };
@@ -120,9 +122,9 @@ export type ResolveAccessResult = { role: Role; sessionGranted: boolean };
 /**
  * Single access engine. Grant rule:
  * - `link_view` → public session surface (anyone may enter; tier from session / token).
- * - `restricted` → exactly one of: owner, same-workspace member, or share link row in context (`token`).
+ * - `restricted` → owner, same-workspace member, session member (`memberAccess`), or active share link (`token`).
  *
- * Role: owner → OWNER; workspace member → RESOLVER; else tier from link (if any) or session `accessLevel` (view/comment → VIEWER; resolve → RESOLVER).
+ * Role precedence: OWNER → workspace RESOLVER → session member (view/resolve) → link / session `accessLevel` tier.
  */
 export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
   const { session, user, token } = input;
@@ -141,6 +143,9 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
   const isWorkspaceMember =
     !!user && uid !== "" && uw !== "" && uw === sw;
 
+  const hasMemberAccess =
+    input.memberAccess === "view" || input.memberAccess === "resolve";
+
   const hasShareLinkContext = token != null && token.isActive;
   const tokenExpired =
     hasShareLinkContext &&
@@ -153,6 +158,7 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
     isLinkView ||
     isOwner ||
     isWorkspaceMember ||
+    hasMemberAccess ||
     hasShareLinkContext;
 
   if (!accessGranted) {
@@ -160,7 +166,11 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
   }
 
   const shareTokenIsOnlyGrant =
-    !isLinkView && !isOwner && !isWorkspaceMember && hasShareLinkContext;
+    !isLinkView &&
+    !isOwner &&
+    !isWorkspaceMember &&
+    !hasMemberAccess &&
+    hasShareLinkContext;
   if (shareTokenIsOnlyGrant && tokenExpired) {
     return { role: "VIEWER", sessionGranted: false };
   }
@@ -171,6 +181,14 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
 
   if (isWorkspaceMember) {
     return { role: "RESOLVER", sessionGranted: true };
+  }
+
+  if (input.memberAccess) {
+    if (input.memberAccess === "resolve") {
+      return { role: "RESOLVER", sessionGranted: true };
+    }
+
+    return { role: "VIEWER", sessionGranted: true };
   }
 
   let level: AccessLevel;

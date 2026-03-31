@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   addComment,
   updatePinPosition,
@@ -19,8 +20,10 @@ import {
   assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
+import { getShareToken } from "@/lib/client/shareToken";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 import { handlePermissionError } from "@/lib/client/permissionError";
+import { safeResolveAction } from "@/lib/client/safeResolveAction";
 
 type PendingCommentPatch = { message?: string; resolved?: boolean };
 
@@ -76,17 +79,34 @@ function applyPendingCommentMutations(
 }
 
 /**
- * Controlled realtime comment list: one `listenToCommentsRepo` subscription at a time
- * (see `useCommentsRepoSubscription`). Cleanup on unmount / feedback change prevents leaks.
+ * Comment list from GET /api/comments/:sessionId via `useCommentsRepoSubscription` (initial fetch + manual `refetchComments`).
  */
 export function useFeedbackDetailController(args: {
   sessionId: string;
   feedbackId: string | null | undefined;
+  /** From {@link AccessCapabilities.canResolve}; required for resolve-thread mutations. */
+  canResolve: boolean;
+  onRequestResolveAccess: () => void;
 }) {
-  const { sessionId, feedbackId } = args;
+  const { sessionId, feedbackId, canResolve, onRequestResolveAccess } = args;
   const { showToast } = useToast();
-  const { authUid, authDisplayName, authPhotoUrl, isIdentityResolved, isIdentityReady } =
-    useWorkspace();
+  const {
+    authUid,
+    authDisplayName,
+    authPhotoUrl,
+    isIdentityResolved,
+    authReady,
+  } = useWorkspace();
+
+  const searchParams = useSearchParams();
+  const tokenFromUrl =
+    searchParams.get("token")?.trim() || searchParams.get("shareToken")?.trim() || "";
+  const shareTokenPresent =
+    tokenFromUrl !== "" || (getShareToken()?.trim() ?? "") !== "";
+  const commentsPollEnabled =
+    authReady &&
+    Boolean(sessionId?.trim() && feedbackId?.trim()) &&
+    (Boolean(authUid?.trim()) || shareTokenPresent);
 
   const [comments, setComments] = useState<LocalComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -96,9 +116,9 @@ export function useFeedbackDetailController(args: {
     counts: FeedbackCommentThreadCounts;
   } | null>(null);
 
-  /** Hide until server snapshot omits the id (avoids realtime resurrecting optimistically deleted rows). */
+  /** Hide until server data omits the id (avoids refetch resurrecting optimistically deleted rows). */
   const pendingDeletedCommentIdsRef = useRef(new Set<string>());
-  /** Overlay in-flight PATCH fields until success; merge uses Firestore as base and would otherwise wipe local edits. */
+  /** Overlay in-flight PATCH fields until success; merge uses the server list as base and would otherwise wipe local edits. */
   const pendingCommentPatchesRef = useRef(new Map<string, PendingCommentPatch>());
   const deleteRevertSnapshotRef = useRef<{
     comment: LocalComment;
@@ -125,14 +145,14 @@ export function useFeedbackDetailController(args: {
   }, [sessionId, feedbackId]);
 
   useEffect(() => {
-    if (!authUid) {
+    if (authReady && !authUid?.trim() && !shareTokenPresent) {
       pendingDeletedCommentIdsRef.current.clear();
       pendingCommentPatchesRef.current.clear();
       deleteRevertSnapshotRef.current = null;
       setComments([]);
       setLoadingComments(false);
     }
-  }, [authUid]);
+  }, [authReady, authUid, shareTokenPresent]);
 
   useEffect(() => {
     if (!feedbackId) {
@@ -150,10 +170,10 @@ export function useFeedbackDetailController(args: {
     setLoadingComments(true);
   }, [sessionId, feedbackId]);
 
-  useCommentsRepoSubscription({
+  const { refetch: refetchComments } = useCommentsRepoSubscription({
     sessionId,
     feedbackId,
-    enabled: Boolean(isIdentityReady && sessionId && feedbackId),
+    enabled: commentsPollEnabled,
     onComments: (incomingComments) => {
       setLocalCountsOverride(null);
       const incomingIds = new Set(incomingComments.map((c) => c.id));
@@ -194,6 +214,7 @@ export function useFeedbackDetailController(args: {
     void (async () => {
       try {
         await addComment(sessionId, feedbackId, payload);
+        void refetchComments();
       } catch (err) {
         console.error("[ECHLY] addComment failed", err);
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -223,6 +244,7 @@ export function useFeedbackDetailController(args: {
     void (async () => {
       try {
         await addComment(sessionId, feedbackId, payload);
+        void refetchComments();
       } catch (err) {
         console.error("[ECHLY] addComment reply failed", err);
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -268,6 +290,7 @@ export function useFeedbackDetailController(args: {
               : c
           )
         );
+        void refetchComments();
       } catch (err) {
         console.error("[ECHLY] sendPinComment failed", err);
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -314,6 +337,7 @@ export function useFeedbackDetailController(args: {
               : c
           )
         );
+        void refetchComments();
       } catch (err) {
         console.error("[ECHLY] sendTextComment failed", err);
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -354,78 +378,93 @@ export function useFeedbackDetailController(args: {
       return;
     }
 
-    let previousMessage: string | undefined;
-    let previousResolved: boolean | undefined;
-    let found = false;
-    let threadCountsOverride: FeedbackCommentThreadCounts | null = null;
+    const runUpdate = async () => {
+      let previousMessage: string | undefined;
+      let previousResolved: boolean | undefined;
+      let found = false;
+      let threadCountsOverride: FeedbackCommentThreadCounts | null = null;
 
-    setComments((prev) => {
-      const target = prev.find((c) => c.id === commentId);
-      if (!target) {
-        return prev;
-      }
-      found = true;
-      if (trimmedMessage !== undefined) previousMessage = target.message;
-      if (data.resolved !== undefined) previousResolved = Boolean(target.resolved);
-      const isRoot = target.threadId == null || target.threadId === "";
-      if (isRoot && data.resolved !== undefined) {
-        const before = threadCountsFromRoots(prev);
-        threadCountsOverride = applyRootResolveDelta(
-          before,
-          Boolean(target.resolved),
-          data.resolved
+      setComments((prev) => {
+        const target = prev.find((c) => c.id === commentId);
+        if (!target) {
+          return prev;
+        }
+        found = true;
+        if (trimmedMessage !== undefined) previousMessage = target.message;
+        if (data.resolved !== undefined) previousResolved = Boolean(target.resolved);
+        const isRoot = target.threadId == null || target.threadId === "";
+        if (isRoot && data.resolved !== undefined) {
+          const before = threadCountsFromRoots(prev);
+          threadCountsOverride = applyRootResolveDelta(
+            before,
+            Boolean(target.resolved),
+            data.resolved
+          );
+        }
+        const prevPatch = pendingCommentPatchesRef.current.get(commentId) ?? {};
+        pendingCommentPatchesRef.current.set(commentId, {
+          ...prevPatch,
+          ...(trimmedMessage !== undefined ? { message: trimmedMessage } : {}),
+          ...(data.resolved !== undefined ? { resolved: data.resolved } : {}),
+        });
+        return prev.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                ...(trimmedMessage !== undefined ? { message: trimmedMessage } : {}),
+                ...(data.resolved !== undefined ? { resolved: data.resolved } : {}),
+              }
+            : c
         );
-      }
-      const prevPatch = pendingCommentPatchesRef.current.get(commentId) ?? {};
-      pendingCommentPatchesRef.current.set(commentId, {
-        ...prevPatch,
-        ...(trimmedMessage !== undefined ? { message: trimmedMessage } : {}),
-        ...(data.resolved !== undefined ? { resolved: data.resolved } : {}),
       });
-      return prev.map((c) =>
-        c.id === commentId
-          ? {
-              ...c,
-              ...(trimmedMessage !== undefined ? { message: trimmedMessage } : {}),
-              ...(data.resolved !== undefined ? { resolved: data.resolved } : {}),
-            }
-          : c
-      );
-    });
 
-    if (!found) {
+      if (!found) {
+        return;
+      }
+
+      if (threadCountsOverride != null && sessionId && feedbackId) {
+        setLocalCountsOverride({
+          scope: `${sessionId}:${feedbackId}`,
+          counts: threadCountsOverride,
+        });
+      }
+
+      try {
+        await updateComment(commentId, payload);
+        pendingCommentPatchesRef.current.delete(commentId);
+      } catch (err) {
+        console.error("[ECHLY] updateComment failed", err);
+        pendingCommentPatchesRef.current.delete(commentId);
+        setLocalCountsOverride(null);
+        setComments((prev) =>
+          prev.map((c) => {
+            if (c.id !== commentId) return c;
+            let next: LocalComment = { ...c };
+            if (trimmedMessage !== undefined && previousMessage !== undefined) {
+              next = { ...next, message: previousMessage };
+            }
+            if (data.resolved !== undefined && previousResolved !== undefined) {
+              next = { ...next, resolved: previousResolved };
+            }
+            return next;
+          })
+        );
+        if (!handlePermissionError(err, showToast)) showToast("Failed to update comment");
+      }
+    };
+
+    if (data.resolved !== undefined) {
+      safeResolveAction({
+        canResolve,
+        triggerRequestAccessFlow: onRequestResolveAccess,
+        run: () => {
+          void runUpdate();
+        },
+      });
       return;
     }
 
-    if (threadCountsOverride != null && sessionId && feedbackId) {
-      setLocalCountsOverride({
-        scope: `${sessionId}:${feedbackId}`,
-        counts: threadCountsOverride,
-      });
-    }
-
-    try {
-      await updateComment(commentId, payload);
-      pendingCommentPatchesRef.current.delete(commentId);
-    } catch (err) {
-      console.error("[ECHLY] updateComment failed", err);
-      pendingCommentPatchesRef.current.delete(commentId);
-      setLocalCountsOverride(null);
-      setComments((prev) =>
-        prev.map((c) => {
-          if (c.id !== commentId) return c;
-          let next: LocalComment = { ...c };
-          if (trimmedMessage !== undefined && previousMessage !== undefined) {
-            next = { ...next, message: previousMessage };
-          }
-          if (data.resolved !== undefined && previousResolved !== undefined) {
-            next = { ...next, resolved: previousResolved };
-          }
-          return next;
-        })
-      );
-      if (!handlePermissionError(err, showToast)) showToast("Failed to update comment");
-    }
+    await runUpdate();
   };
 
   const deleteCommentHandler = async (commentId: string) => {
@@ -470,8 +509,9 @@ export function useFeedbackDetailController(args: {
     loadingComments,
     /** Derived from current comment list (root threads). */
     commentThreadCounts,
-    /** Merged: optimistic override until next Firestore snapshot, then server-derived list. */
+    /** Merged: optimistic override until next server fetch, then server-derived list. */
     displayCommentThreadCounts,
+    refetchComments,
     sendComment,
     sendReply,
     sendPinComment,

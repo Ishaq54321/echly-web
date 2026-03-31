@@ -5,13 +5,13 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
-  const { id } = await params;
-  if (!id) {
+  const { sessionId } = await params;
+  if (!sessionId) {
     return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
   }
-  const rateKey = `session-view:${id}:${clientKeyFromRequest(req)}`;
+  const rateKey = `session-view:${sessionId}:${clientKeyFromRequest(req)}`;
   const rate = checkRateLimit({ key: rateKey, max: 60, windowMs: 60_000 });
   if (!rate.allowed) {
     return apiError({
@@ -34,7 +34,7 @@ export async function POST(
 
   const built = await tryBuildRequestContext({
     req,
-    sessionId: id,
+    sessionId,
     optionalAuth: true,
     bodyShareToken: tokenFromBody !== "" ? tokenFromBody : null,
   });
@@ -49,11 +49,11 @@ export async function POST(
 
   try {
     if (context.userId) {
-      await recordSessionViewIfNewRepo(id, context.userId);
+      await recordSessionViewIfNewRepo(sessionId, context.userId);
     }
     return apiSuccess({});
   } catch (err) {
-    console.error("POST /api/sessions/[id]/view:", err);
+    console.error("POST /api/sessions/[sessionId]/view:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
   }
 }

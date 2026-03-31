@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/authFetch";
 import type { Session } from "@/lib/domain/session";
 import { sessionsArrayFromApiPayload } from "@/lib/domain/session";
-import type { SessionFeedbackCounts } from "@/lib/repositories/feedbackRepository";
+import type { SessionFeedbackCounts } from "@/lib/domain/session";
 import {
   assertIdentityResolved,
   useWorkspace,

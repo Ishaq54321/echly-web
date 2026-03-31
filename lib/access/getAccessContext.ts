@@ -6,16 +6,43 @@ import {
   type AccessContext,
 } from "@/lib/access/resolveAccess";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
+import type { AccessRequest } from "@/lib/domain/accessRequest";
+import type { SessionInvite } from "@/lib/domain/sessionInvite";
+import type { SessionMember } from "@/lib/domain/sessionMember";
 import type { Session } from "@/lib/domain/session";
 import { getShareLinkByToken } from "@/lib/repositories/shareLinksRepository";
+import {
+  activateInvite,
+  addSessionMember,
+  getInviteByEmail,
+  getSessionMember,
+} from "@/lib/repositories/sessionMembersRepository.server";
+import { getRequestByUser } from "@/lib/repositories/accessRequestsRepository.server";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { AuthorizationError } from "@/lib/server/auth/authorize";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 import type { SessionUser } from "@/lib/server/session";
 import type { SystemContext } from "@/lib/server/systemContext";
 import { assert } from "@/lib/utils/assert";
 
 export type AccessContextUser = SessionUser | { uid: string; email?: string | null };
+
+/** Resolve access-request state for UI; does not affect {@link resolveAccess} or roles. */
+export type AccessContextRequestAwareness = {
+  pendingResolve: boolean;
+};
+
+export type GetAccessContextResult = {
+  session: Session;
+  access: AccessContext;
+  request: AccessContextRequestAwareness;
+  debug: {
+    member: SessionMember | null;
+    invite: SessionInvite | null;
+    inviteIgnoredReason: "WORKSPACE_MEMBER" | null;
+  };
+};
 
 type TokenPayload = {
   generalAccess: AccessLevel;
@@ -80,37 +107,6 @@ function toAccessContext(params: {
   };
 }
 
-async function loadTokenContext(
-  sid: string,
-  user: AccessContextUser | null,
-  viewerWorkspaceIdOverride: string | null | undefined,
-  tokenString: string | undefined
-): Promise<{
-  userWorkspaceId: string;
-  tokenPayload: TokenPayload | null;
-}> {
-  let userWorkspaceId = "";
-
-  if (user) {
-    let ws: string;
-    if (viewerWorkspaceIdOverride === undefined) {
-      ws = (await getUserWorkspaceIdRepo(user.uid)).trim();
-    } else if (viewerWorkspaceIdOverride === null) {
-      ws = "";
-    } else {
-      ws = viewerWorkspaceIdOverride.trim();
-    }
-    userWorkspaceId = ws;
-  }
-
-  let tokenPayload: TokenPayload | null = null;
-  if (tokenString) {
-    tokenPayload = await loadShareLinkPayloadForSession(tokenString, sid);
-  }
-
-  return { userWorkspaceId, tokenPayload };
-}
-
 function accessInputsFromContext(context: SystemContext): {
   user: AccessContextUser | null;
   tokenString: string | undefined;
@@ -160,7 +156,7 @@ export async function getAccessContext(options: {
    * When omitted: load via `getSessionByIdRepo`.
    */
   session?: Session | null;
-}): Promise<{ session: Session; access: AccessContext }> {
+}): Promise<GetAccessContextResult> {
   const sid = options.sessionId.trim();
   if (!sid) {
     throw new AuthorizationError("Missing session id", 400, "INVALID_INPUT");
@@ -182,12 +178,87 @@ export async function getAccessContext(options: {
 
   const session = rawSession;
 
-  const { userWorkspaceId, tokenPayload } = await loadTokenContext(
-    sid,
-    user,
-    viewerWorkspaceIdOverride,
-    effectiveToken
-  );
+  let userEmail: string | null = null;
+  let userWorkspaceId = "";
+
+  if (user?.uid) {
+    const userSnap = await adminDb.doc(`users/${user.uid}`).get();
+    const userData = userSnap.data();
+    userEmail = userData?.email ?? null;
+
+    if (viewerWorkspaceIdOverride === undefined) {
+      userWorkspaceId = (await getUserWorkspaceIdRepo(user.uid)).trim();
+    } else if (viewerWorkspaceIdOverride === null) {
+      userWorkspaceId = "";
+    } else {
+      userWorkspaceId = viewerWorkspaceIdOverride.trim();
+    }
+  }
+
+  let member: SessionMember | null = null;
+  let invite: SessionInvite | null = null;
+
+  if (user?.uid) {
+    member = await getSessionMember(sid, user.uid);
+  }
+
+  if (userEmail) {
+    invite = await getInviteByEmail(sid, userEmail);
+  }
+
+  const isWorkspaceMember =
+    Boolean(user?.uid) &&
+    Boolean(userWorkspaceId) &&
+    Boolean(session.workspaceId?.trim()) &&
+    userWorkspaceId === session.workspaceId.trim();
+
+  const inviteIgnoredReason =
+    isWorkspaceMember && invite ? "WORKSPACE_MEMBER" : null;
+
+  if (isWorkspaceMember && invite) {
+    console.warn("Invite ignored: user already in workspace", {
+      userId: user?.uid,
+      email: userEmail,
+    });
+    invite = null;
+  }
+
+  if (!member && invite && user?.uid && userEmail) {
+    await addSessionMember({
+      sessionId: sid,
+      userId: user.uid,
+      email: userEmail,
+      access: invite.access,
+      addedBy: invite.invitedBy,
+    });
+
+    if (invite.status !== "active") {
+      await activateInvite({
+        sessionId: sid,
+        email: userEmail,
+      });
+    }
+
+    member = await getSessionMember(sid, user.uid);
+  }
+
+  let resolveAccessRequest: AccessRequest | null = null;
+  if (user?.uid) {
+    resolveAccessRequest = await getRequestByUser(sid, user.uid);
+  }
+  const pendingResolve = resolveAccessRequest?.status === "pending";
+
+  let tokenPayload: TokenPayload | null = null;
+  if (effectiveToken) {
+    tokenPayload = await loadShareLinkPayloadForSession(effectiveToken, sid);
+  }
+
+  console.log("INVITE ACTIVATION", {
+    userId: user?.uid,
+    email: userEmail,
+    invite,
+    member,
+  });
 
   const { role, sessionGranted } = resolveAccess({
     session: {
@@ -199,6 +270,7 @@ export async function getAccessContext(options: {
     },
     user: user ? { uid: user.uid, workspaceId: userWorkspaceId } : null,
     token: tokenPayloadForResolve(tokenPayload),
+    memberAccess: member?.access ?? null,
   });
 
   const access = toAccessContext({
@@ -209,5 +281,10 @@ export async function getAccessContext(options: {
     sessionGranted,
   });
 
-  return { session, access };
+  return {
+    session,
+    access,
+    request: { pendingResolve },
+    debug: { member, invite, inviteIgnoredReason },
+  };
 }

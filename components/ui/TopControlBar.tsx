@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { Check, Link as LinkIcon, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ShareButton } from "@/components/share/ShareButton";
+import { ShareModal } from "@/components/share/ShareModal";
+import { useShareController } from "@/components/share/useShareController";
 import { GlobalSearchButton } from "@/components/layout/GlobalSearchButton";
 import { GlobalNotificationButton } from "@/components/layout/GlobalNotificationButton";
 import { ProfileDropdown } from "@/components/layout/ProfileDropdown";
@@ -22,6 +25,7 @@ export function TopControlBar({
   onSetSessionArchived,
   onRequestDeleteSession,
   publicViewer = false,
+  canManageShare = false,
 }: {
   sessionId: string;
   sessionTitle?: string;
@@ -38,6 +42,7 @@ export function TopControlBar({
   onRequestDeleteSession?: (session: Session) => void;
   /** Anonymous `/session/:id` — no share/archive/delete or global chrome. */
   publicViewer?: boolean;
+  canManageShare?: boolean;
 }) {
   const { authUid, isIdentityResolved } = useWorkspace();
   const copyTimerRef = useRef<number | null>(null);
@@ -45,6 +50,12 @@ export function TopControlBar({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkCopyBusy, setLinkCopyBusy] = useState(false);
+
+  const share = useShareController(sessionId);
+  useEffect(() => {
+    if (!share.open) return;
+    void share.load().catch(() => {});
+  }, [share.open, share.load]);
 
   const copyCurrentLink = useCallback(async () => {
     if (linkCopyBusy) return;
@@ -83,6 +94,46 @@ export function TopControlBar({
     <>
       <div className="page-header sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-end gap-4 bg-[var(--layer-1-bg)] px-6">
         <div className="right flex shrink-0 items-center gap-2.5">
+          <ShareButton onClick={() => share.setOpen(true)} />
+          <ShareModal
+            open={share.open}
+            onClose={() => share.setOpen(false)}
+            canManageShare={canManageShare}
+            inviteEmail={share.inviteEmail}
+            setInviteEmail={share.setInviteEmail}
+            inviteAccess={share.inviteAccess}
+            setInviteAccess={share.setInviteAccess}
+            generalAccess={share.generalAccess}
+            loadingGeneralAccess={share.loadingGeneralAccess}
+            updatingGeneralAccess={share.updatingGeneralAccess}
+            items={share.items}
+            initialLoading={share.initialLoading}
+            inviting={share.inviting}
+            updatingId={share.updatingId}
+            removingId={share.removingId}
+            inviteError={share.inviteError}
+            listError={share.listError}
+            onInvite={() => {
+              void share.invite().catch(() => {});
+            }}
+            onUpdateGeneralAccess={(value) => {
+              void share.updateGeneralAccess(value).catch(() => {});
+            }}
+            onUpdateRole={(item, access) => {
+              void share.updateRole(item, access).catch(() => {});
+            }}
+            onRemove={(item) => {
+              void share.removeAccess(item).catch(() => {});
+            }}
+            accessRequests={share.accessRequests}
+            patchingAccessRequestId={share.patchingAccessRequestId}
+            onApproveAccessRequest={(id) => {
+              void share.patchAccessRequest(id, "approve").catch(() => {});
+            }}
+            onRejectAccessRequest={(id) => {
+              void share.patchAccessRequest(id, "reject").catch(() => {});
+            }}
+          />
           <button
             type="button"
             className={`icon-btn copy-link-btn ${linkCopied ? "copy-link-btn--copied" : ""}`}

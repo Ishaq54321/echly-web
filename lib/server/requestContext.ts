@@ -1,6 +1,9 @@
 import "server-only";
 
-import { getAccessContext } from "@/lib/access/getAccessContext";
+import {
+  getAccessContext,
+  type AccessContextRequestAwareness,
+} from "@/lib/access/getAccessContext";
 import type { AccessContext } from "@/lib/access/resolveAccess";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
@@ -96,6 +99,9 @@ export interface RequestContext extends SystemContext {
   sessionWorkspaceId?: string;
 
   access: AccessContext | null;
+
+  /** From {@link getAccessContext}; resolve-access request awareness for UI only. */
+  accessRequest: AccessContextRequestAwareness | null;
 }
 
 export async function buildRequestContext(params: {
@@ -215,6 +221,7 @@ export async function buildRequestContext(params: {
       : null;
 
   let access: AccessContext | null = null;
+  let accessRequest: AccessContextRequestAwareness | null = null;
   let sessionOut: Session | null = session;
   if (sidForAccess) {
     const accessContextInput: SystemContext = {
@@ -230,6 +237,7 @@ export async function buildRequestContext(params: {
     });
     access = resolved.access;
     sessionOut = resolved.session;
+    accessRequest = resolved.request;
   }
 
   const sessionWorkspaceId =
@@ -246,6 +254,7 @@ export async function buildRequestContext(params: {
     session: sessionOut,
     sessionWorkspaceId,
     access,
+    accessRequest,
   };
 }
 

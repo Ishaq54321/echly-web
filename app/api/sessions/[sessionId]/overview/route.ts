@@ -99,7 +99,7 @@ export async function GET(req: Request, ctx: HandlerContext) {
       access
     );
   } catch (e) {
-    console.error("GET /api/sessions/[id]/overview:", e);
+    console.error("GET /api/sessions/[sessionId]/overview:", e);
     return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
   }
 }

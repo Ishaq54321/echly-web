@@ -68,6 +68,13 @@ export interface Session {
   isOptimistic?: boolean;
 }
 
+/** Counts by status for one session (aligned with session denormalized count fields). */
+export interface SessionFeedbackCounts {
+  total: number;
+  open: number;
+  resolved: number;
+}
+
 /** Narrow `/api/sessions`-shaped JSON into `Session` (no type assertions on callers). */
 export function sessionsArrayFromApiPayload(data: unknown): Session[] {
   if (typeof data !== "object" || data === null) {
