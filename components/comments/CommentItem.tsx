@@ -6,6 +6,7 @@ import type { Comment } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
 import { CommentAttachmentCard } from "@/components/discussion/CommentAttachmentCard";
 import { ImageViewer } from "@/components/ImageViewer";
+import { Modal } from "@/components/ui/Modal";
 export interface CommentItemProps {
   comment: Comment;
   currentUserId: string | null;
@@ -49,18 +50,6 @@ export function CommentItem({
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [menuOpen]);
-
-  useEffect(() => {
-    if (!deleteModalOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setDeleteModalOpen(false);
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [deleteModalOpen]);
 
   const handleSaveEdit = useCallback(() => {
     const trimmed = editDraft.trim();
@@ -210,17 +199,13 @@ export function CommentItem({
       )}
 
       {deleteModalOpen && (
-        <div
-          className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50 font-sans"
-          onClick={(e) => e.target === e.currentTarget && setDeleteModalOpen(false)}
+        <Modal
+          open={deleteModalOpen}
+          onClose={() => setDeleteModalOpen(false)}
           role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="delete-comment-title"
+          ariaLabelledBy="delete-comment-title"
         >
-          <div
-            className="w-[420px] rounded-xl bg-white shadow-xl p-6 cursor-default"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="w-[420px] max-w-[calc(100vw-2rem)] rounded-xl bg-white shadow-xl p-6 cursor-default">
             <h2 id="delete-comment-title" className="text-lg font-semibold text-neutral-900">
               Delete comment
             </h2>
@@ -275,7 +260,7 @@ export function CommentItem({
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

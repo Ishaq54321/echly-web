@@ -1288,6 +1288,9 @@
   .max-w-\[1400px\] {
     max-width: 1400px;
   }
+  .max-w-\[calc\(100vw-2rem\)\] {
+    max-width: calc(100vw - 2rem);
+  }
   .max-w-full {
     max-width: 100%;
   }
@@ -4567,6 +4570,13 @@
       }
     }
   }
+  .hover\:text-\[\#0F4EDC\] {
+    &:hover {
+      @media (hover: hover) {
+        color: #0F4EDC;
+      }
+    }
+  }
   .hover\:text-\[\#0F172A\] {
     &:hover {
       @media (hover: hover) {
@@ -5465,9 +5475,9 @@
   --text-primary-strong: 220 14% 7%;
   --text-secondary-soft: 220 10% 36%;
   --text-tertiary: 220 9% 48%;
-  --glass-voice-capture-bg: rgba(255, 255, 255, 0.65);
-  --voice-capture-dim-bg: rgba(0, 0, 0, 0.15);
-  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  --glass-voice-capture-bg: rgba(255, 255, 255, 0.98);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.52);
+  --voice-capture-card-shadow: 0 14px 38px rgba(0, 0, 0, 0.18);
   --voice-capture-screenshot-fade: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0) 0%,
@@ -5480,9 +5490,9 @@
   --color-alert: #ef4444;
 }
 html.dark {
-  --glass-voice-capture-bg: rgba(20, 20, 20, 0.6);
-  --voice-capture-dim-bg: rgba(0, 0, 0, 0.45);
-  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --glass-voice-capture-bg: rgba(20, 20, 20, 0.98);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.62);
+  --voice-capture-card-shadow: 0 16px 44px rgba(0, 0, 0, 0.52);
   --voice-capture-screenshot-fade: linear-gradient(
     180deg,
     rgba(20, 20, 20, 0) 0%,
@@ -5627,12 +5637,15 @@ button[aria-disabled="true"],
 .echly-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 2147480000;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.48);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   font-family: "Plus Jakarta Sans", sans-serif;
+  padding: 16px;
 }
 .echly-modal-panel {
   background: #fff;
@@ -7058,6 +7071,9 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
   font-weight: 500;
   background: rgba(0, 0, 0, 0.04);
 }
+.echly-feedback-processing .echly-processing-text {
+  color: rgba(0, 0, 0, 0.72);
+}
 .dark .echly-feedback-processing {
   background: rgba(255, 255, 255, 0.05);
 }
@@ -7523,12 +7539,12 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
   -webkit-backdrop-filter: none;
   pointer-events: none;
   z-index: 2147483644;
-  transition: background 180ms ease, backdrop-filter 180ms ease, -webkit-backdrop-filter 180ms ease;
+  transition: background 180ms ease;
 }
 .echly-dim-layer.echly-dim-layer--visible {
   background: var(--voice-capture-dim-bg);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 .echly-text-modal {
   position: fixed;
@@ -7543,8 +7559,8 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
   flex-direction: column;
   border-radius: 16px;
   padding: 20px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transition: all 160ms ease;
   font-family: var(
     --echly-font,
@@ -7556,15 +7572,15 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
   );
 }
 .echly-text-modal.dark {
-  background: rgba(18, 18, 20, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6),
+  background: rgba(20, 20, 20, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.52),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .echly-text-modal.light {
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12),
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .echly-text-modal__shot-wrap {
@@ -7679,9 +7695,12 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
   box-shadow: var(--voice-capture-card-shadow);
   display: block;
   font-family: var(--echly-font);
-  background: transparent;
+  background: var(--glass-voice-capture-bg);
   color: var(--text-primary);
   border: 1px solid var(--border-subtle);
+  @supports (color: color-mix(in lab, red, red)) {
+    border: 1px solid color-mix(in srgb, var(--border-subtle) 82%, black 18%);
+  }
   overflow: hidden;
   visibility: hidden;
   pointer-events: none;
@@ -7708,8 +7727,8 @@ html.dark .echly-capture-card {
 .panel-bg {
   position: absolute;
   inset: 0;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   background: var(--glass-voice-capture-bg);
   border-radius: inherit;
   z-index: 0;
@@ -10000,7 +10019,7 @@ html.dark .echly-mic-item.is-active {
 }
 .share-dropdown-menu--portal {
   position: fixed;
-  z-index: 10050;
+  z-index: 2147480150;
   overflow: hidden;
   border-radius: 12px;
 }

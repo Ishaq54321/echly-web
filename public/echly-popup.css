@@ -5380,9 +5380,9 @@
   --text-primary-strong: 220 14% 7%;
   --text-secondary-soft: 220 10% 36%;
   --text-tertiary: 220 9% 48%;
-  --glass-voice-capture-bg: rgba(255, 255, 255, 0.65);
-  --voice-capture-dim-bg: rgba(0, 0, 0, 0.15);
-  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  --glass-voice-capture-bg: rgba(255, 255, 255, 0.98);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.52);
+  --voice-capture-card-shadow: 0 14px 38px rgba(0, 0, 0, 0.18);
   --voice-capture-screenshot-fade: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0) 0%,
@@ -5395,9 +5395,9 @@
   --color-alert: #ef4444;
 }
 html.dark {
-  --glass-voice-capture-bg: rgba(20, 20, 20, 0.6);
-  --voice-capture-dim-bg: rgba(0, 0, 0, 0.45);
-  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --glass-voice-capture-bg: rgba(20, 20, 20, 0.98);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.62);
+  --voice-capture-card-shadow: 0 16px 44px rgba(0, 0, 0, 0.52);
   --voice-capture-screenshot-fade: linear-gradient(
     180deg,
     rgba(20, 20, 20, 0) 0%,
@@ -6432,9 +6432,9 @@ textarea:focus-visible {
   --priority-low: rgba(255, 255, 255, 0.25);
   --confirm-icon-hover-bg: rgba(255, 255, 255, 0.08);
   --confirm-icon-active-bg: rgba(255, 255, 255, 0.12);
-  --glass-voice-capture-bg: rgba(20, 20, 20, 0.6);
-  --voice-capture-dim-bg: rgba(0, 0, 0, 0.45);
-  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --glass-voice-capture-bg: rgba(20, 20, 20, 0.98);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.62);
+  --voice-capture-card-shadow: 0 16px 44px rgba(0, 0, 0, 0.52);
   --voice-capture-screenshot-fade: linear-gradient(
     180deg,
     rgba(20, 20, 20, 0) 0%,
@@ -6482,9 +6482,9 @@ textarea:focus-visible {
   --priority-low: rgba(0, 0, 0, 0.25);
   --confirm-icon-hover-bg: rgba(0, 0, 0, 0.06);
   --confirm-icon-active-bg: rgba(0, 0, 0, 0.1);
-  --glass-voice-capture-bg: rgba(255, 255, 255, 0.65);
-  --voice-capture-dim-bg: rgba(0, 0, 0, 0.15);
-  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  --glass-voice-capture-bg: rgba(255, 255, 255, 0.98);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.52);
+  --voice-capture-card-shadow: 0 14px 38px rgba(0, 0, 0, 0.18);
   --voice-capture-screenshot-fade: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0) 0%,
@@ -6532,9 +6532,9 @@ textarea:focus-visible {
   --priority-low: rgba(255, 255, 255, 0.25);
   --confirm-icon-hover-bg: rgba(255, 255, 255, 0.08);
   --confirm-icon-active-bg: rgba(255, 255, 255, 0.12);
-  --glass-voice-capture-bg: rgba(20, 20, 20, 0.6);
-  --voice-capture-dim-bg: rgba(0, 0, 0, 0.45);
-  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --glass-voice-capture-bg: rgba(20, 20, 20, 0.98);
+  --voice-capture-dim-bg: rgba(0, 0, 0, 0.62);
+  --voice-capture-card-shadow: 0 16px 44px rgba(0, 0, 0, 0.52);
   --voice-capture-screenshot-fade: linear-gradient(
     180deg,
     rgba(20, 20, 20, 0) 0%,
@@ -6888,6 +6888,9 @@ textarea:focus-visible {
   font-size: 14px;
   font-weight: 500;
   background: rgba(0, 0, 0, 0.04);
+}
+.echly-feedback-processing .echly-processing-text {
+  color: rgba(0, 0, 0, 0.72);
 }
 .dark .echly-feedback-processing {
   background: rgba(255, 255, 255, 0.05);
@@ -7354,12 +7357,12 @@ textarea:focus-visible {
   -webkit-backdrop-filter: none;
   pointer-events: none;
   z-index: 2147483644;
-  transition: background 180ms ease, backdrop-filter 180ms ease, -webkit-backdrop-filter 180ms ease;
+  transition: background 180ms ease;
 }
 .echly-dim-layer.echly-dim-layer--visible {
   background: var(--voice-capture-dim-bg);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 .echly-text-modal {
   position: fixed;
@@ -7374,8 +7377,8 @@ textarea:focus-visible {
   flex-direction: column;
   border-radius: 16px;
   padding: 20px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transition: all 160ms ease;
   font-family: var(
     --echly-font,
@@ -7387,15 +7390,15 @@ textarea:focus-visible {
   );
 }
 .echly-text-modal.dark {
-  background: rgba(18, 18, 20, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6),
+  background: rgba(20, 20, 20, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.52),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .echly-text-modal.light {
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12),
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .echly-text-modal__shot-wrap {
@@ -7510,9 +7513,9 @@ textarea:focus-visible {
   box-shadow: var(--voice-capture-card-shadow);
   display: block;
   font-family: var(--echly-font);
-  background: transparent;
+  background: var(--glass-voice-capture-bg);
   color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 82%, black 18%);
   overflow: hidden;
   visibility: hidden;
   pointer-events: none;
@@ -7539,8 +7542,8 @@ html.dark .echly-capture-card {
 .panel-bg {
   position: absolute;
   inset: 0;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   background: var(--glass-voice-capture-bg);
   border-radius: inherit;
   z-index: 0;
@@ -8765,8 +8768,8 @@ html.dark .echly-mic-item.is-active {
   min-width: 44px;
   border-radius: 999px;
   background: rgba(28, 30, 36, 0.98);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   padding: 0;
   display: flex;
   align-items: center;

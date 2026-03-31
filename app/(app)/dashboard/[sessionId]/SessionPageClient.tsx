@@ -34,7 +34,6 @@ import {
 } from "@/lib/client/permissionError";
 import { safeResolveAction } from "@/lib/client/safeResolveAction";
 import { warn } from "@/lib/utils/logger";
-import Image from "next/image";
 import {
   TicketList,
   ExecutionView,
@@ -44,6 +43,8 @@ import { TopControlBar } from "@/components/ui/TopControlBar";
 import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import { RequestAccessModal } from "@/components/RequestAccessModal";
+import { ImageViewer } from "@/components/ImageViewer";
+import { Modal } from "@/components/ui/Modal";
 
 /** Broadcast ticket update to extension tray so tray stays in sync. */
 function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps?: string[] | null; type?: string }) {
@@ -1881,19 +1882,11 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       )}
 
       {isImageExpanded && selectedItem?.screenshotUrl && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-10 cursor-pointer"
-          onClick={() => setIsImageExpanded(false)}
-        >
-          <div className="relative w-full h-full max-w-5xl max-h-[90vh]">
-            <Image
-              src={selectedItem.screenshotUrl}
-              alt="Expanded Screenshot"
-              fill
-              className="object-contain rounded-xl"
-            />
-          </div>
-        </div>
+        <ImageViewer
+          imageUrl={selectedItem.screenshotUrl}
+          fileName={`ticket-${selectedItem.id}-screenshot`}
+          onClose={() => setIsImageExpanded(false)}
+        />
       )}
 
       <DeleteSessionModal
@@ -1904,16 +1897,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       />
 
       {showDeleteModal && effectiveSelectedId && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
-          onClick={() => setShowDeleteModal(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-ticket-title"
+        <Modal
+          open={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          role="alertdialog"
+          ariaLabelledBy="delete-ticket-title"
         >
           <div
-            className="bg-white rounded-2xl max-w-sm w-full p-6 border border-[var(--layer-2-border)] shadow-[var(--layer-2-shadow-hover)] cursor-default"
-            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-sm w-full p-6 border border-[var(--layer-2-border)] shadow-[var(--layer-2-shadow-hover)]"
           >
             <h2
               id="delete-ticket-title"
@@ -1941,7 +1932,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

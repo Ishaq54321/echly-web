@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId } from "react";
+import { useId } from "react";
 import { Loader2, Trash2, Users, X } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
 import type {
   ShareAccess,
   ShareAccessRequestItem,
@@ -92,32 +93,11 @@ export function ShareModal({
   const inviteAccessId = useId();
   const canWrite = canManageShare;
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/50"
-        aria-label="Close dialog"
-        onClick={onClose}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="modal share-modal relative z-[1] overflow-visible"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal open={open} onClose={onClose} ariaLabelledBy={titleId}>
+      <div className="modal share-modal relative overflow-visible" onClick={(e) => e.stopPropagation()}>
         <div className="share-modal-header">
           <h2 id={titleId} className="share-modal-title">
             Share session
@@ -340,6 +320,6 @@ export function ShareModal({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
