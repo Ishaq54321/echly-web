@@ -1,0 +1,109 @@
+/*
+  Echly Semantic Color Tokens (Phase 3 foundation)
+
+  This file is the single source of truth for UI color semantics.
+  Values map 1:1 to `color-role-map-final.md` (decision-locked).
+
+  Rules:
+  - Do not invent colors or merge roles.
+  - Use semantic tokens only (no direct hex in components).
+  - RGBA is allowed ONLY for:
+    * overlay (bg-overlay)
+    * glass surfaces (bg-glass)
+    * selected state (bg-selected)
+    * interaction rings (border-focus, accent-active)
+*/
+
+:root {
+  /* ==========================================================================
+     TEXT TOKENS
+     Used for typography only (body, labels, captions, and links).
+     Rules:
+     - Do not use text tokens for icon fills or backgrounds.
+     - `--color-text-link` is reserved for link/brand text and MUST NOT be reused
+       as primary button/CTA fill (collision rule).
+     ========================================================================== */
+  --color-text-primary: #0f172a; /* role: text-primary */
+  --color-text-secondary: #334155; /* role: text-secondary */
+  --color-text-muted: #64748b; /* role: text-muted (meta) */
+  --color-text-inverse: #ffffff; /* role: text-inverse */
+  --color-text-link: #155dfc; /* role: text-link (brand/link blue, not CTA fill) */
+
+  /* ==========================================================================
+     BACKGROUND TOKENS
+     Used for layout surfaces, hover states, selection, overlays, and glass UI.
+     Rules:
+     - Use `--color-bg-app` for the environment/page background.
+     - Use `--color-bg-surface` for cards/panels by default.
+     - `--color-bg-surface-subtle` usage lock:
+       Use ONLY for:
+       * nested surfaces (e.g. inner panels, grouped sections)
+       * secondary containers that sit inside primary surfaces
+       DO NOT:
+       * use as default surface background
+       * use as a replacement for --color-bg-surface
+       * use for hover states
+     - Hover MUST use `--color-bg-hover` (no inline alpha blacks).
+     ========================================================================== */
+  --color-bg-app: #f6f7f9; /* role: bg-app */
+  --color-bg-surface: #ffffff; /* role: bg-surface */
+  --color-bg-surface-subtle: #fafbfc; /* role: bg-surface variant (layer-2-bg) */
+  --color-bg-hover: #f4f5f7; /* role: bg-surface-hover (layer-2-hover-bg) */
+  --color-bg-selected: rgba(70, 110, 255, 0.12); /* role: bg-selected */
+  --color-bg-overlay: rgba(15, 23, 42, 0.48); /* role: bg-overlay / scrim */
+  --color-bg-glass: rgba(255, 255, 255, 0.7); /* role: bg-glass (glass-1-bg) */
+
+  /* ==========================================================================
+     BORDER TOKENS
+     Used for outlines, dividers, and focus rings (not fills).
+     Rules:
+     - `--color-border-default` is the global default border.
+     - `--color-border-focus` is a ring/glow; do not swap fills for “active”.
+     ========================================================================== */
+  --color-border-default: rgba(0, 0, 0, 0.08); /* role: border-default */
+  --color-border-strong: #e5e7eb; /* role: border-strong (primary) */
+  --color-border-focus: rgba(26, 86, 219, 0.35); /* role: border-focus / ring */
+
+  /* ==========================================================================
+     ACCENT TOKENS
+     Used for primary accent UI (especially primary CTA/button fills).
+     Rules:
+     - Primary CTA/button fills MUST use `--color-accent-primary` (collision rule).
+     - Link text MUST use `--color-text-link` and must not equal CTA fill.
+     - `--color-accent-primary` is ONLY for primary actions (buttons, key CTAs).
+       It MUST NOT be used for:
+       * text links (use --color-text-link)
+       * borders
+       * background surfaces
+     ========================================================================== */
+  --color-accent-primary: #1a56db; /* role: accent-primary (CTA fill) */
+  --color-accent-hover: #1648b8; /* role: accent-hover */
+  --color-accent-active: rgba(26, 86, 219, 0.35); /* role: accent-active (ring emphasis) */
+
+  /* ==========================================================================
+     STATE TOKENS
+     Used for semantic status (success, error, warning).
+     Rules:
+     - These are semantic-only; do not repurpose as brand/accent colors.
+     ========================================================================== */
+  --color-success: #059669; /* role: success */
+  --color-error: #dc2626; /* role: error */
+  --color-warning: #d97706; /* role: warning */
+}
+
+/* ============================================================================
+   DARK MODE STRUCTURE
+   Intentionally minimal in Phase 3. Dark values will be designed in a later phase.
+   ============================================================================ */
+.dark {
+  /* dark theme tokens go here */
+}
+
+/*
+TOKEN RULES:
+
+* No hex colors allowed in components
+* RGBA allowed ONLY for overlay/glass/selected and interaction rings (border-focus, accent-active)
+* Always use semantic tokens
+* Do not reuse tokens across roles
+*/
