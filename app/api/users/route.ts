@@ -10,7 +10,6 @@ import {
 } from "@/lib/repositories/usersRepository.server";
 import { corsHeaders } from "@/lib/server/cors";
 import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
-import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { NextResponse } from "next/server";
 
@@ -50,20 +49,7 @@ export async function POST(req: NextRequest) {
       uid: user.uid,
       email: user.email ?? null,
     });
-    let workspaceId: string;
-    try {
-      workspaceId = await getUserWorkspaceIdRepo(user.uid);
-    } catch (inner) {
-      if (
-        inner instanceof Error &&
-        inner.message === MISSING_USER_WORKSPACE_ERROR
-      ) {
-        return apiSuccess({ workspaceId: null }, null, {
-          headers: corsHeaders(req),
-        });
-      }
-      throw inner;
-    }
+    const workspaceId = await getUserWorkspaceIdRepo(user.uid);
     await setWorkspaceClaim(user.uid, workspaceId);
     return apiSuccess({ workspaceId }, null, { headers: corsHeaders(req) });
   } catch (err) {

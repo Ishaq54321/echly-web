@@ -114,8 +114,19 @@ export function SessionActionsDropdown({
   const closeMenu = useCallback(() => {
     setMoreOpen(false);
     setDropdownPosition(null);
-    onOpenChange?.(false);
-  }, [onOpenChange]);
+  }, []);
+
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+
+  const didMountOpenSyncRef = useRef(false);
+  useEffect(() => {
+    if (!didMountOpenSyncRef.current) {
+      didMountOpenSyncRef.current = true;
+      return;
+    }
+    onOpenChangeRef.current?.(moreOpen);
+  }, [moreOpen]);
 
   const syncDropdownPosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -305,11 +316,7 @@ export function SessionActionsDropdown({
         e.preventDefault();
         e.stopPropagation();
         if (isOptimistic || disabled) return;
-        setMoreOpen((prev) => {
-          const next = !prev;
-          onOpenChange?.(next);
-          return next;
-        });
+        setMoreOpen((prev) => !prev);
       }}
       aria-label={triggerAriaLabel}
       aria-expanded={moreOpen}

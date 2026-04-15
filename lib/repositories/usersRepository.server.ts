@@ -2,6 +2,10 @@ import "server-only";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
+import {
+  createWorkspaceRepo,
+  getWorkspace,
+} from "@/lib/repositories/workspacesRepository.server";
 
 export type UserLike = {
   uid: string;
@@ -16,6 +20,60 @@ function requireUserId(userId: string, context: string): string {
     throw new Error(`Missing userId - invalid state (${context})`);
   }
   return trimmed;
+}
+
+/**
+ * Resolves a non-empty workspace id for the user: reuse valid existing link,
+ * canonical workspaces/{uid}, any workspace owned by uid, or create workspaces/{uid}.
+ */
+async function resolveOrAssignWorkspaceIdRepo(
+  user: UserLike,
+  priorData: Record<string, unknown> | null
+): Promise<string> {
+  const uid = requireUserId(user.uid, "resolveOrAssignWorkspaceIdRepo");
+  const priorWid =
+    typeof priorData?.workspaceId === "string"
+      ? priorData.workspaceId.trim()
+      : "";
+
+  if (priorWid) {
+    const linked = await getWorkspace(priorWid);
+    if (linked) {
+      return priorWid;
+    }
+    console.error("CRITICAL: User without workspaceId (stale workspaceId)", {
+      uid,
+      priorWid,
+    });
+  }
+
+  const canonical = await getWorkspace(uid);
+  if (canonical) {
+    return uid;
+  }
+
+  const ownedSnap = await adminDb
+    .collection("workspaces")
+    .where("ownerId", "==", uid)
+    .limit(1)
+    .get();
+  if (!ownedSnap.empty) {
+    return ownedSnap.docs[0].id;
+  }
+
+  const displayName = user.displayName ?? null;
+  const name =
+    typeof displayName === "string" && displayName.trim()
+      ? displayName.trim()
+      : "My Workspace";
+
+  await createWorkspaceRepo({
+    userId: uid,
+    ownerId: uid,
+    name,
+    logoUrl: user.photoURL ?? null,
+  });
+  return uid;
 }
 
 export function invalidateUserWorkspaceIdCache(uid?: string): void {
@@ -71,60 +129,82 @@ export async function updateUserFieldsRepo(
   }
 
   if (!snap.exists) {
-    await userRef.set({
-      uid,
-      ...payload,
-      createdAt: FieldValue.serverTimestamp(),
-    });
+    await ensureUserRepo({ uid });
+    await userRef.set(payload, { merge: true });
     return;
   }
 
   await userRef.set(payload, { merge: true });
+
+  const row = ((await userRef.get()).data() ?? {}) as Record<string, unknown>;
+  const wid =
+    typeof row.workspaceId === "string" ? row.workspaceId.trim() : "";
+  if (!wid) {
+    await ensureUserRepo({
+      uid,
+      email: typeof row.email === "string" ? row.email : null,
+      displayName:
+        typeof row.displayName === "string"
+          ? row.displayName
+          : typeof row.name === "string"
+            ? row.name
+            : null,
+      photoURL: typeof row.photoURL === "string" ? row.photoURL : null,
+    });
+  }
 }
 
-/** Ensure a Firestore users/{uid} row exists (no workspace required). Used by POST /api/users before claims sync. */
+/**
+ * Ensure users/{uid} exists and always has a valid workspaceId (create or link workspace as needed).
+ * Used by POST /api/users before claims sync.
+ */
 export async function ensureUserRepo(user: UserLike): Promise<void> {
   const userRef = adminDb.doc(`users/${user.uid}`);
   const snap = await userRef.get();
   const email = user.email ?? null;
   const displayName = user.displayName ?? null;
+  const priorData = snap.exists
+    ? ((snap.data() ?? {}) as Record<string, unknown>)
+    : null;
+
+  const workspaceId = await resolveOrAssignWorkspaceIdRepo(user, priorData);
+
+  const profile = {
+    uid: user.uid,
+    email,
+    ...(displayName != null && displayName !== ""
+      ? { displayName, name: displayName }
+      : {}),
+    ...(user.photoURL != null
+      ? { photoURL: user.photoURL, avatarUrl: user.photoURL }
+      : {}),
+    workspaceId,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
 
   if (!snap.exists) {
     await userRef.set({
-      uid: user.uid,
-      email,
-      ...(displayName != null && displayName !== ""
-        ? { displayName, name: displayName }
-        : {}),
-      ...(user.photoURL != null ? { photoURL: user.photoURL, avatarUrl: user.photoURL } : {}),
+      ...profile,
       createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
     });
     return;
   }
 
-  await userRef.set(
-    {
-      email,
-      ...(displayName != null && displayName !== ""
-        ? { displayName, name: displayName }
-        : {}),
-      ...(user.photoURL != null ? { photoURL: user.photoURL, avatarUrl: user.photoURL } : {}),
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
+  await userRef.set(profile, { merge: true });
 }
 
+/** Returns the user's workspace id or throws — never a null/empty success path. */
 export async function getUserWorkspaceIdRepo(uid: string): Promise<string> {
   const snap = await adminDb.doc(`users/${uid}`).get();
   if (!snap.exists) {
+    console.error("CRITICAL: User without workspaceId", { uid, reason: "missing_user_doc" });
     throw new Error(MISSING_USER_WORKSPACE_ERROR);
   }
   const data = (snap.data() ?? {}) as Record<string, unknown>;
   const raw = typeof data.workspaceId === "string" ? data.workspaceId : "";
   const workspaceId = raw.trim();
   if (!workspaceId) {
+    console.error("CRITICAL: User without workspaceId", { uid, reason: "missing_workspaceId_field" });
     throw new Error(MISSING_USER_WORKSPACE_ERROR);
   }
   return workspaceId;
@@ -133,18 +213,8 @@ export async function getUserWorkspaceIdRepo(uid: string): Promise<string> {
 export async function ensureUserWorkspaceLinkRepo(
   user: UserLike
 ): Promise<{ workspaceId: string }> {
-  const userRef = adminDb.doc(`users/${user.uid}`);
-  const snap = await userRef.get();
-  if (!snap.exists) {
-    throw new Error("Missing user document");
-  }
-  const userRow = (snap.data() ?? {}) as Record<string, unknown>;
-  const raw =
-    typeof userRow.workspaceId === "string" ? userRow.workspaceId.trim() : "";
-  if (!raw) {
-    throw new Error("Missing workspaceId on user document");
-  }
-  return { workspaceId: requireUserId(raw, "ensureUserWorkspaceLinkRepo") };
+  const workspaceId = await getUserWorkspaceIdRepo(user.uid);
+  return { workspaceId: requireUserId(workspaceId, "ensureUserWorkspaceLinkRepo") };
 }
 
 export interface UserDoc {

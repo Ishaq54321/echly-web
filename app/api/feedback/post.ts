@@ -12,7 +12,6 @@ import {
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 import { corsHeaders } from "@/lib/server/cors";
 import "@/lib/server/firebaseAdmin";
-import { getStorage } from "firebase-admin/storage";
 import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import {
@@ -20,45 +19,6 @@ import {
   toAuthorizationResponse,
 } from "@/lib/server/auth/authorize";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
-
-async function resolveScreenshotDownloadUrl(
-  screenshotId: string,
-  sessionId: string
-): Promise<string | null> {
-  const screenshotRecord = await getScreenshotByIdRepo(screenshotId);
-
-  const storagePathRaw =
-    typeof screenshotRecord?.storagePath === "string"
-      ? screenshotRecord.storagePath.trim()
-      : "";
-
-  const fallbackStoragePath = `sessions/${sessionId}/screenshots/${screenshotId}.png`;
-
-  const storagePath =
-    storagePathRaw.length > 0 ? storagePathRaw : fallbackStoragePath;
-
-  try {
-    const bucket = getStorage().bucket();
-
-    const file = bucket.file(storagePath);
-
-    const [url] = await file.getSignedUrl({
-      action: "read",
-      expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
-    });
-
-    return url;
-  } catch (err) {
-    console.error("[feedback lifecycle] failed to resolve screenshot URL", {
-      screenshotId,
-      sessionId,
-      storagePath,
-      hasScreenshotRecord: !!screenshotRecord,
-      error: err,
-    });
-    return null;
-  }
-}
 
 /** POST /api/feedback — create feedback (ticket) for a session. Returns same shape as GET /api/tickets/:id. */
 export async function POST(req: NextRequest) {
@@ -251,13 +211,16 @@ export async function POST(req: NextRequest) {
   const userId = user.uid;
 
   const meta = body.metadata;
-  const resolvedScreenshotUrl = await resolveScreenshotDownloadUrl(normalizedScreenshotId, sessionId);
-  if (!resolvedScreenshotUrl) {
+  const screenshotRecord = await getScreenshotByIdRepo(normalizedScreenshotId);
+  const hasValidScreenshotReference =
+    typeof screenshotRecord?.storagePath === "string" &&
+    screenshotRecord.storagePath.trim().length > 0;
+  if (!hasValidScreenshotReference) {
     if (ECHLY_STRICT_MODE) {
       console.error("[GUARDRAIL] Invalid feedback create attempt", { feedbackId: normalizedFeedbackId });
       try {
         assert(
-          Boolean(resolvedScreenshotUrl),
+          hasValidScreenshotReference,
           "ARCHITECTURE VIOLATION: screenshot must exist before create"
         );
       } catch {
@@ -271,7 +234,7 @@ export async function POST(req: NextRequest) {
     }
     return apiError({
       code: "INVALID_INPUT",
-      message: "Atomic violation: screenshot URL unavailable",
+      message: "Atomic violation: screenshot reference unavailable",
       status: 409,
       init: { headers: corsHeaders(req) },
     });
@@ -293,7 +256,7 @@ export async function POST(req: NextRequest) {
     suggestedTags: Array.isArray(body.suggestedTags)
       ? body.suggestedTags
       : undefined,
-    screenshotUrl: resolvedScreenshotUrl,
+    screenshotId: normalizedScreenshotId,
     status: normalizedIncomingStatus,
     screenshotStatus: "attached" as const,
     url: meta?.url,
@@ -335,9 +298,22 @@ export async function POST(req: NextRequest) {
       created = existing;
     }
 
+    // 🚨 ARCHITECTURE RULE:
+    // Backend must NEVER generate or return access URLs.
+    // Only return storage references (screenshotId, storagePath).
+    const serializedTicket = serializeTicket(created, accessCtx.access!);
+    if (
+      ECHLY_STRICT_MODE &&
+      typeof serializedTicket === "object" &&
+      serializedTicket !== null &&
+      ((`screenshot${"Url"}` in serializedTicket) || (`image${"Url"}` in serializedTicket))
+    ) {
+      throw new Error("ARCHITECTURE VIOLATION: backend response must not contain legacy URL fields");
+    }
+
     return apiSuccess(
       {
-        ticket: serializeTicket(created, accessCtx.access!),
+        ticket: serializedTicket,
         ...(inserted ? {} : { alreadyExists: true }),
       },
       accessCtx.access!,

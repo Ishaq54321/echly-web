@@ -94,7 +94,7 @@ function feedbackFromRestApiRow(
     viewportHeight: null,
     userAgent: null,
     clientTimestamp: null,
-    screenshotUrl: typeof row.screenshotUrl === "string" ? row.screenshotUrl : null,
+    screenshotId: typeof row.screenshotId === "string" ? row.screenshotId : null,
     screenshotStatus:
       row.screenshotStatus === "attached" ||
       row.screenshotStatus === "pending" ||

@@ -4357,7 +4357,7 @@ html.dark .echly-mic-item.is-active {
 /* ======================================
    FEEDBACK TICKET — SCREENSHOT PLACEHOLDER (upload pending)
    Shown when ticket is created but screenshot is not yet uploaded.
-   Realtime Firestore update replaces with image when screenshotUrl arrives.
+   Realtime Firestore update replaces with image when screenshot data arrives.
 ====================================== */
 
 .echly-screenshot-placeholder {

@@ -100,7 +100,7 @@ export function FeedbackContent({
 
   const roDesc = typeof readOnlyDescription === "string" ? readOnlyDescription.trim() : "";
   const hasAttachmentContent =
-    Boolean(item.screenshotUrl?.trim()) || fileAttachments.length > 0;
+    Boolean(item.screenshotId?.trim()) || fileAttachments.length > 0;
 
   return (
     <div className="content-wrapper flex flex-col gap-4 min-w-0">
@@ -114,10 +114,10 @@ export function FeedbackContent({
             Attachments
           </div>
           <div className="attachments rounded-xl border border-[#E5E7EB] bg-white p-[14px] space-y-3">
-            {item.screenshotUrl ? (
+            {item.screenshotId ? (
               sendPinComment != null ? (
                 <ScreenshotWithPins
-                  screenshotUrl={item.screenshotUrl}
+                  screenshotId={item.screenshotId}
                   onExpand={onExpandImage}
                   isCommentMode={isCommentMode}
                   pins={pinComments ?? []}
@@ -135,7 +135,7 @@ export function FeedbackContent({
                 />
               ) : (
                 <ScreenshotBlock
-                  screenshotUrl={item.screenshotUrl}
+                  screenshotId={item.screenshotId}
                   onExpand={onExpandImage}
                   embeddedInCard
                 />

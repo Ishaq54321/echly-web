@@ -1584,7 +1584,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         const envelope = (await res.json()) as {
           success?: boolean;
-          data?: { screenshotId?: string; url?: string };
+          data?: { screenshotId?: string };
           error?: { message?: string };
         };
 
@@ -1597,7 +1597,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         sendResponse({
           screenshotId: envelope.data?.screenshotId,
-          url: envelope.data?.url,
         });
       } catch (err) {
         console.error("ECHLY_UPLOAD_SCREENSHOT error:", err);

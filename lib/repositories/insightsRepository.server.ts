@@ -172,3 +172,76 @@ export async function incrementInsightsOnFeedbackResolvedRepo(opts: {
   });
 }
 
+type ProcessInsightsEventType =
+  | "feedback_created"
+  | "comment_created"
+  | "feedback_resolved";
+
+export async function processInsightsEventWithIdempotencyRepo(opts: {
+  workspaceId: string;
+  idempotencyKey: string;
+  type: ProcessInsightsEventType;
+  payload: {
+    sessionId?: string;
+    issueType?: string;
+    resolved?: boolean;
+  };
+}): Promise<void> {
+  const workspaceId = requireWorkspaceId(
+    opts.workspaceId,
+    "processInsightsEventWithIdempotencyRepo"
+  );
+  const idempotencyKey = (opts.idempotencyKey ?? "").trim();
+  if (!idempotencyKey) {
+    throw new Error("Missing idempotencyKey - invalid state (insights event)");
+  }
+
+  const eventRef = adminDb.doc(
+    `workspaces/${workspaceId}/insights_events/${idempotencyKey}`
+  );
+  const { type, payload } = opts;
+
+  try {
+    await eventRef.create({
+      workspaceId,
+      type,
+      createdAt: new Date(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Firestore throws ALREADY_EXISTS when the marker doc was already created.
+    if (!/already exists/i.test(message)) {
+      throw error;
+    }
+    return;
+  }
+
+  if (type === "feedback_created") {
+    const sessionId = (payload.sessionId ?? "").trim();
+    if (!sessionId) {
+      throw new Error("Missing sessionId - invalid state (feedback_created)");
+    }
+    await incrementInsightsOnFeedbackCreateRepo({
+      workspaceId,
+      sessionId,
+      type: (payload.issueType ?? "").trim() || "general",
+    });
+    return;
+  }
+
+  if (type === "comment_created") {
+    await incrementInsightsOnCommentCreateRepo({ workspaceId });
+    return;
+  }
+
+  if (type === "feedback_resolved") {
+    await incrementInsightsOnFeedbackResolvedRepo({
+      workspaceId,
+      delta: payload.resolved === true ? 1 : -1,
+    });
+    return;
+  }
+
+  throw new Error(`Unsupported insights event type: ${String(type)}`);
+}
+

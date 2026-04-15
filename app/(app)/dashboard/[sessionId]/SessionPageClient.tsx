@@ -19,6 +19,8 @@ import {
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { useStableState } from "@/lib/client/perception/useStableState";
+import { resolveScreenshotUrl } from "@/lib/client/screenshotResolver";
+import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
 import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
@@ -76,7 +78,7 @@ type TicketFromApi = {
   isResolved?: boolean;
   actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
-  screenshotUrl?: string | null;
+  screenshotId?: string | null;
   [key: string]: unknown;
 };
 
@@ -456,6 +458,21 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   );
   const stableCanonicalFeedback = stableScopedFeedback;
 
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    const legacyScreenshotUrlKey = `screenshot${"Url"}`;
+    const foundLegacyUrl = stableScopedFeedback.find((item) => {
+      const row = item as unknown as Record<string, unknown>;
+      const raw = row[legacyScreenshotUrlKey];
+      return typeof raw === "string" && raw.trim() !== "";
+    });
+    if (!foundLegacyUrl) return;
+    console.error(
+      "[ARCHITECTURE VIOLATION] Legacy screenshot URL field detected in UI payload. Use screenshotId + useScreenshotUrl resolver path only.",
+      { feedbackId: foundLegacyUrl.id }
+    );
+  }, [stableScopedFeedback]);
+
   const prevSessionIdForSelectionRef = useRef(sessionId);
   if (prevSessionIdForSelectionRef.current !== sessionId) {
     prevSessionIdForSelectionRef.current = sessionId;
@@ -568,7 +585,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         isResolved: false,
         createdAt: null,
         clientTimestamp: Date.now(),
-        screenshotUrl: null,
+        screenshotId: null,
         screenshotStatus: null,
       };
       setFeedback((prev) => [newItem, ...prev.filter((x) => x.id !== newItem.id)]);
@@ -780,20 +797,31 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const selectedIndex = stableCanonicalFeedback.findIndex((f) => f.id === effectiveSelectedId);
 
-  const preloadNextScreenshotUrl =
-    selectedIndex >= 0 ? stableScopedFeedback[selectedIndex + 1]?.screenshotUrl ?? "" : "";
-  const preloadNext2ScreenshotUrl =
-    selectedIndex >= 0 ? stableScopedFeedback[selectedIndex + 2]?.screenshotUrl ?? "" : "";
+  const preloadNextScreenshotId =
+    selectedIndex >= 0 ? stableScopedFeedback[selectedIndex + 1]?.screenshotId ?? "" : "";
+  const preloadNext2ScreenshotId =
+    selectedIndex >= 0 ? stableScopedFeedback[selectedIndex + 2]?.screenshotId ?? "" : "";
 
   // Preload only the next 1-2 ticket screenshots from the current selection.
   useEffect(() => {
-    if (preloadNextScreenshotUrl) {
-      preloadImage(preloadNextScreenshotUrl, preloadedScreenshotUrlsRef.current);
-    }
-    if (preloadNext2ScreenshotUrl) {
-      preloadImage(preloadNext2ScreenshotUrl, preloadedScreenshotUrlsRef.current);
-    }
-  }, [selectedIndex, preloadNextScreenshotUrl, preloadNext2ScreenshotUrl]);
+    void (async () => {
+      if (preloadNextScreenshotId) {
+        const nextUrl = await resolveScreenshotUrl(preloadNextScreenshotId);
+        if (nextUrl) preloadImage(nextUrl, preloadedScreenshotUrlsRef.current);
+      }
+      if (preloadNext2ScreenshotId) {
+        const next2Url = await resolveScreenshotUrl(preloadNext2ScreenshotId);
+        if (next2Url) preloadImage(next2Url, preloadedScreenshotUrlsRef.current);
+      }
+    })();
+  }, [selectedIndex, preloadNextScreenshotId, preloadNext2ScreenshotId]);
+
+  const selectedBaseItem = useMemo(
+    () => stableCanonicalFeedback.find((t) => t.id === effectiveSelectedId) ?? null,
+    [stableCanonicalFeedback, effectiveSelectedId]
+  );
+  const selectedScreenshotId = selectedBaseItem?.screenshotId ?? null;
+  const { url: selectedScreenshotUrl } = useScreenshotUrl(selectedScreenshotId);
 
   const contextualPosition = useMemo(() => {
     if (!effectiveSelectedId) return { index: 0, total: -1 };
@@ -840,14 +868,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   ]);
 
   const selectedItem = useMemo(() => {
-    const ticket = stableCanonicalFeedback.find((t) => t.id === effectiveSelectedId) ?? null;
-    if (!ticket) return null;
+    if (!selectedBaseItem) return null;
     return {
-      ...ticket,
+      ...selectedBaseItem,
       index: Math.max(0, contextualPosition.index),
       total: contextualPosition.total >= 0 ? Math.max(0, contextualPosition.total) : -1,
     };
-  }, [stableCanonicalFeedback, effectiveSelectedId, contextualPosition.index, contextualPosition.total]);
+  }, [selectedBaseItem, contextualPosition.index, contextualPosition.total]);
 
   const handleSessionRenameFromMenu = useCallback(
     (updated: { id: string; title: string; updatedAt?: unknown }) => {
@@ -1881,9 +1908,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         </div>
       )}
 
-      {isImageExpanded && selectedItem?.screenshotUrl && (
+      {isImageExpanded && selectedItem?.screenshotId && selectedScreenshotUrl && (
         <ImageViewer
-          imageUrl={selectedItem.screenshotUrl}
+          imageUrl={selectedScreenshotUrl}
           fileName={`ticket-${selectedItem.id}-screenshot`}
           onClose={() => setIsImageExpanded(false)}
         />

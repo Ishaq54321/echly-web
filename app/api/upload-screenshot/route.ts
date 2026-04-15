@@ -25,7 +25,10 @@ export async function OPTIONS(req: NextRequest) {
 /**
  * POST /api/upload-screenshot
  * Body: { imageDataUrl: string, sessionId: string, screenshotId?: string }
- * Creates a TEMP screenshot record, uploads to Storage, returns { screenshotId, url }.
+ * 🚨 ARCHITECTURE RULE:
+ * Backend must NEVER generate or return access URLs.
+ * Only return storage references (screenshotId, storagePath).
+ * Uploads to Storage, then creates a TEMP screenshot record (with session-derived workspaceId).
  * When feedback is created with this screenshotId, the record is updated to ATTACHED.
  * TEMP screenshots never attached are cleaned up by a scheduled job.
  */
@@ -105,21 +108,26 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const workspaceId = accessCtx.session.workspaceId.trim();
+    if (!workspaceId) {
+      return apiError({
+        code: "INVALID_INPUT",
+        message: "Invalid session: missing workspaceId",
+        status: 400,
+        init: { headers: corsHeaders(req) },
+      });
+    }
+
     const userId = user.uid;
 
     const storagePath = `sessions/${sid}/screenshots/${ssId}.png`;
-
-    const existing = await getScreenshotByIdRepo(ssId);
-    if (existing?.status !== "ATTACHED") {
-      await createScreenshotRepoSync(userId, ssId, storagePath);
-    }
 
     const uploadStart = Date.now();
     // Convert data URL → buffer
     const base64Data = imageDataUrl.split(",")[1];
     const buffer = Buffer.from(base64Data, "base64");
 
-    // Upload to Firebase Storage via Admin SDK
+    // Upload to Firebase Storage via Admin SDK (after session/workspace validation)
     const file = bucket.file(storagePath);
 
     await file.save(buffer, {
@@ -129,14 +137,21 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const [url] = await file.getSignedUrl({
-      action: "read",
-      expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
-    });
-    const uploadDuration = Date.now() - uploadStart;
-    console.log(`[UPLOAD] screenshot upload duration: ${uploadDuration}ms`);
+    const existing = await getScreenshotByIdRepo(ssId);
+    if (existing?.status !== "ATTACHED") {
+      await createScreenshotRepoSync(
+        userId,
+        ssId,
+        storagePath,
+        sid,
+        workspaceId
+      );
+    }
 
-    return apiSuccess({ screenshotId: ssId, url }, null, {
+    const elapsedMs = Date.now() - uploadStart;
+    console.log(`[UPLOAD] screenshot upload (+ record) duration: ${elapsedMs}ms`);
+
+    return apiSuccess({ screenshotId: ssId, storagePath }, null, {
       headers: corsHeaders(req),
     });
   } catch (err) {

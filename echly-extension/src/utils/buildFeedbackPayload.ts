@@ -28,7 +28,6 @@ export function buildFeedbackPayload({
     suggestedTags: ticket.suggestedTags,
     screenshotId,
     status,
-    screenshotUrl: null,
     metadata: {
       clientTimestamp: Date.now(),
     },

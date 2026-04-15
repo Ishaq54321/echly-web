@@ -66,7 +66,7 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     lastCommentAt: lastCommentAtToApiShape(ticket.lastCommentAt),
     commentCount: typeof ticket.commentCount === "number" ? ticket.commentCount : 0,
     lastCommentPreview: ticket.lastCommentPreview ?? null,
-    screenshotUrl: ticket.screenshotUrl ?? null,
+    screenshotId: ticket.screenshotId ?? null,
     screenshotStatus: ticket.screenshotStatus ?? null,
     isDeleted: ticket.isDeleted ?? false,
   };

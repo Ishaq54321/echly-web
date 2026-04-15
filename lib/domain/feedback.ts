@@ -20,7 +20,10 @@ export interface StructuredFeedback {
   timestamp?: number;
 
   // Screenshot
-  screenshotUrl?: string | null;
+  // 🚨 IMPORTANT:
+  // Do NOT add legacy screenshot URL fields back.
+  // Use screenshotId + resolver for access.
+  screenshotId?: string | null;
   screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
   status?: "open" | "resolved" | "processing";
 }
@@ -73,7 +76,10 @@ export interface Feedback {
   clientTimestamp?: number | null;
 
   // Screenshot
-  screenshotUrl?: string | null;
+  // 🚨 IMPORTANT:
+  // Do NOT add legacy screenshot URL fields back.
+  // Use screenshotId + resolver for access.
+  screenshotId?: string | null;
   screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
   status?: "open" | "resolved" | "processing";
 

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Expand, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 import type { Comment } from "@/lib/domain/comment";
 import type { CommentPosition } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
@@ -19,7 +20,7 @@ const POPOVER_STYLE =
   "rounded-xl bg-white border border-neutral-200/80 shadow-[0_12px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04)] min-w-[300px] max-w-[380px] w-[min(380px,90vw)] p-6 animate-in fade-in zoom-in-95 duration-[120ms] ease-out";
 
 interface ScreenshotWithPinsProps {
-  screenshotUrl: string;
+  screenshotId: string | null | undefined;
   onExpand: () => void;
   isCommentMode?: boolean;
   pins?: Comment[];
@@ -150,7 +151,7 @@ const PinMarker = memo(function PinMarker({
 });
 
 const ScreenshotWithPinsInner = ({
-  screenshotUrl,
+  screenshotId,
   onExpand,
   isCommentMode = false,
   pins = [],
@@ -166,6 +167,7 @@ const ScreenshotWithPinsInner = ({
   onPinPositionChange,
   embeddedInCard = false,
 }: ScreenshotWithPinsProps) => {
+  const { url, loading: screenshotLoading, error: screenshotError } = useScreenshotUrl(screenshotId);
   const { authDisplayName, authEmail, authPhotoUrl } = useWorkspace();
   const containerRef = useRef<HTMLDivElement>(null);
   const threadPopoverRef = useRef<HTMLDivElement>(null);
@@ -177,14 +179,14 @@ const ScreenshotWithPinsInner = ({
   // Prevent "ghost" screenshot during ticket switch: reset loading before paint.
   useLayoutEffect(() => {
     setIsImageLoading(true);
-  }, [screenshotUrl]);
+  }, [url]);
   useEffect(() => {
     setIsImageLoading(true);
     const timeout = window.setTimeout(() => {
       setIsImageLoading(false);
     }, 5000);
     return () => window.clearTimeout(timeout);
-  }, [screenshotUrl]);
+  }, [url]);
 
   const handleImageClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -302,9 +304,10 @@ const ScreenshotWithPinsInner = ({
         aria-label={isCommentMode ? "Click to add comment pin" : undefined}
       >
         <div className="relative w-full max-h-[317px] aspect-video overflow-hidden rounded-lg">
+          {url ? (
           <img
-            key={screenshotUrl} // Hard reset the image element on ticket switch
-            src={screenshotUrl}
+            key={url} // Hard reset the image element on ticket switch
+            src={url}
             alt="Screenshot"
             className="w-full h-full object-contain max-h-[317px] pointer-events-none"
             style={{
@@ -319,10 +322,16 @@ const ScreenshotWithPinsInner = ({
             }}
             onError={() => setIsImageLoading(false)}
           />
+          ) : null}
 
-          {isImageLoading && (
+          {(screenshotLoading || (isImageLoading && Boolean(url))) && (
             <div className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none z-10 bg-[var(--layer-2-bg)]">
               <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--text-tertiary))]" strokeWidth={1.8} aria-hidden />
+            </div>
+          )}
+          {!screenshotLoading && screenshotId && !url && (
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)] text-[12px] text-[hsl(var(--text-tertiary))]">
+              {screenshotError ?? "Screenshot unavailable"}
             </div>
           )}
         </div>
@@ -486,7 +495,7 @@ const ScreenshotWithPinsInner = ({
             document.body
           )}
 
-        {!isCommentMode && (
+        {!isCommentMode && url && (
           <button
             type="button"
             onClick={(e) => {

@@ -51,6 +51,7 @@ export function WorkspaceCard({
   const [copyTooltip, setCopyTooltip] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState<boolean | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isOpening, setIsOpening] = useState(false);
 
@@ -63,6 +64,18 @@ export function WorkspaceCard({
   useEffect(() => {
     if (!isOptimistic) setIsOpening(false);
   }, [isOptimistic]);
+
+  useEffect(() => {
+    if (pendingOpen === null) return;
+
+    setActionsMenuOpen(pendingOpen);
+
+    if (pendingOpen) {
+      setShowTooltip(false);
+    }
+
+    setPendingOpen(null);
+  }, [pendingOpen]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("[data-card-actions]")) return;
@@ -153,8 +166,7 @@ export function WorkspaceCard({
               flipPlacement
               disabled={isOpening}
               onOpenChange={(open) => {
-                setActionsMenuOpen(open);
-                if (open) setShowTooltip(false);
+                setPendingOpen(open);
               }}
               onCopyLinkSuccess={() => {
                 setCopyTooltip(true);

@@ -52,7 +52,7 @@ const feedbackPayload = (
   userAgent: data.userAgent ?? null,
   clientTimestamp: data.timestamp ?? null,
 
-  screenshotUrl: data.screenshotUrl ?? null,
+  screenshotId: data.screenshotId ?? null,
   screenshotStatus: data.screenshotStatus ?? null,
   isDeleted: false,
 });
@@ -94,7 +94,7 @@ export function feedbackFromCreateInsert(args: {
     viewportHeight: row.viewportHeight ?? null,
     userAgent: row.userAgent ?? null,
     clientTimestamp: row.timestamp ?? null,
-    screenshotUrl: row.screenshotUrl ?? null,
+    screenshotId: row.screenshotId ?? null,
     screenshotStatus: row.screenshotStatus ?? null,
     commentCount: 0,
     lastCommentAt: null,
@@ -226,7 +226,7 @@ type FeedbackUpdate = Partial<{
   instruction: string;
   type: string;
   status: "open" | "resolved";
-  screenshotUrl: string | null;
+  screenshotId: string | null;
   screenshotStatus: "attached" | "pending" | "none" | "failed" | null;
   actionSteps: string[] | null;
   suggestedTags: string[] | null;
@@ -246,7 +246,7 @@ function hasNonStatusResolvePayload(data: {
   instruction?: string;
   description?: string;
   type?: string;
-  screenshotUrl?: string | null;
+  screenshotId?: string | null;
   actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
 }): boolean {
@@ -255,7 +255,7 @@ function hasNonStatusResolvePayload(data: {
     typeof data.instruction === "string" ||
     typeof data.description === "string" ||
     typeof data.type === "string" ||
-    data.screenshotUrl !== undefined ||
+    data.screenshotId !== undefined ||
     data.actionSteps !== undefined ||
     data.suggestedTags !== undefined
   );
@@ -302,7 +302,7 @@ export async function updateFeedbackRepo(
     description: string;
     type: string;
     status: "open" | "resolved";
-    screenshotUrl: string | null;
+    screenshotId: string | null;
     screenshotStatus: "attached" | "pending" | "none" | "failed" | null;
     actionSteps: string[] | null;
     suggestedTags: string[] | null;
@@ -317,7 +317,7 @@ export async function updateFeedbackRepo(
     assertValidFeedbackWriteStatus(data.status);
     updates.status = data.status;
   }
-  if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
+  if (data.screenshotId !== undefined) updates.screenshotId = data.screenshotId;
   if (data.screenshotStatus !== undefined) updates.screenshotStatus = data.screenshotStatus;
   if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
@@ -345,7 +345,7 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     instruction: string;
     description: string;
     type: string;
-    screenshotUrl: string | null;
+    screenshotId: string | null;
     actionSteps: string[] | null;
     suggestedTags: string[] | null;
     status: FeedbackStatus;
@@ -363,7 +363,7 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
   if (typeof data.instruction === "string") updates.instruction = data.instruction;
   else if (typeof data.description === "string") updates.instruction = data.description;
   if (typeof data.type === "string") updates.type = data.type;
-  if (data.screenshotUrl !== undefined) updates.screenshotUrl = data.screenshotUrl;
+  if (data.screenshotId !== undefined) updates.screenshotId = data.screenshotId;
   if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
   updates.status = toStatus;
@@ -510,7 +510,7 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     viewportHeight: data.viewportHeight ?? null,
     userAgent: data.userAgent ?? null,
     clientTimestamp: data.clientTimestamp ?? null,
-    screenshotUrl: data.screenshotUrl ?? null,
+    screenshotId: data.screenshotId ?? null,
     screenshotStatus:
       (data.screenshotStatus as Feedback["screenshotStatus"] | undefined) ?? null,
     commentCount: typeof data.commentCount === "number" ? data.commentCount : 0,
@@ -924,7 +924,7 @@ const DELETE_SESSION_FEEDBACK_LIMIT = 500;
 /**
  * Deletes all feedback (tickets) for a session. Used when deleting a session.
  * Returns the number of docs deleted so callers can update workspace.stats.
- * Screenshot URLs in Storage are not removed here (TODO: optional cleanup).
+ * Screenshot files in Storage are not removed here (TODO: optional cleanup).
  */
 export async function deleteAllFeedbackForSessionRepo(sessionId: string): Promise<number> {
   const snapshot = await adminDb

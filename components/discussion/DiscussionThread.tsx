@@ -24,6 +24,7 @@ import {
 } from "@/lib/client/workspaceContext";
 import { getShareToken } from "@/lib/client/shareToken";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
+import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 
 export interface DiscussionThreadProps {
   feedbackId: string | null;
@@ -36,7 +37,7 @@ interface TicketData {
   id: string;
   title?: string;
   sessionId?: string;
-  screenshotUrl?: string | null;
+  screenshotId?: string | null;
   actionSteps?: string[];
   createdAt?: string;
 }
@@ -59,6 +60,7 @@ export function DiscussionThread({
   const [sending, setSending] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
   const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
+  const { url: resolvedScreenshotSrc, loading: screenshotLoading } = useScreenshotUrl(ticket?.screenshotId);
 
   const commentsPollEnabled = useMemo(
     () =>
@@ -281,7 +283,7 @@ export function DiscussionThread({
     }
   });
 
-  const hasScreenshot = Boolean(ticket.screenshotUrl?.trim());
+  const hasScreenshot = Boolean(ticket.screenshotId?.trim());
   const steps = ticket.actionSteps;
   const hasSteps = steps && Array.isArray(steps) && steps.length > 0;
   const userInitial = authDisplayName?.charAt(0) ?? "?";
@@ -320,16 +322,26 @@ export function DiscussionThread({
               {hasScreenshot && (
                 <div className="w-full screenshot-container relative">
                   <div className="relative rounded-xl border border-[#e5e7eb] bg-white overflow-hidden flex items-center justify-center">
+                    {resolvedScreenshotSrc ? (
                     <Image
-                      src={ticket.screenshotUrl!}
+                      src={resolvedScreenshotSrc}
                       alt="Feedback screenshot"
                       width={800}
                       height={400}
                       sizes="(max-width: 720px) 100vw, 720px"
                       className="w-full max-h-[320px] object-contain"
                       loading="lazy"
-                      unoptimized={ticket.screenshotUrl!.startsWith("data:")}
+                      unoptimized={resolvedScreenshotSrc.startsWith("data:")}
                     />
+                    ) : screenshotLoading ? (
+                      <div className="w-full h-[220px] flex items-center justify-center text-sm text-secondary">
+                        Loading screenshot...
+                      </div>
+                    ) : (
+                      <div className="w-full h-[220px] flex items-center justify-center text-sm text-secondary">
+                        Screenshot unavailable
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={() => setScreenshotModalOpen(true)}
@@ -461,7 +473,7 @@ export function DiscussionThread({
       />
 
       {/* Screenshot modal overlay */}
-      {screenshotModalOpen && ticket?.screenshotUrl && (
+      {screenshotModalOpen && resolvedScreenshotSrc && (
         <div
           className="fixed inset-0 bg-black/35 flex items-center justify-center z-[1000]"
           role="dialog"
@@ -474,12 +486,12 @@ export function DiscussionThread({
             onClick={(e) => e.stopPropagation()}
           >
             <Image
-              src={ticket.screenshotUrl}
+              src={resolvedScreenshotSrc}
               alt="Feedback screenshot"
               width={1200}
               height={800}
               className="w-full h-full object-contain max-w-[85vw] max-h-[85vh]"
-              unoptimized={ticket.screenshotUrl.startsWith("data:")}
+              unoptimized={resolvedScreenshotSrc.startsWith("data:")}
             />
           </div>
         </div>

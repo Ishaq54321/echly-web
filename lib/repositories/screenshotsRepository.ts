@@ -10,25 +10,40 @@ export interface ScreenshotRecord {
   feedbackId?: string | null;
   /** Storage path for cleanup (delete from Firebase Storage when deleting TEMP). */
   storagePath?: string | null;
+  workspaceId?: string | null;
+  sessionId?: string | null;
 }
 
 /**
  * Create a new screenshot record with status TEMP.
- * Call this at the start of upload; when feedback is created, update to ATTACHED.
+ * Call after a successful Storage upload; when feedback is created, update to ATTACHED.
+ * workspaceId must come from the session document (server-side), never the client.
  */
 export async function createScreenshotRepoSync(
   userId: string,
   screenshotId: string,
-  storagePath: string
+  storagePath: string,
+  sessionId: string,
+  workspaceId: string
 ): Promise<void> {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId) {
     throw new Error("Missing userId - invalid state");
   }
+  const normalizedSessionId = sessionId.trim();
+  const normalizedWorkspaceId = workspaceId.trim();
+  if (!normalizedSessionId) {
+    throw new Error("Missing sessionId - invalid state");
+  }
+  if (!normalizedWorkspaceId) {
+    throw new Error("Missing workspaceId - invalid state");
+  }
   const ref = adminDb.doc(`screenshots/${screenshotId}`);
   await ref.set({
     userId: normalizedUserId,
     status: "TEMP",
+    sessionId: normalizedSessionId,
+    workspaceId: normalizedWorkspaceId,
     createdAt: FieldValue.serverTimestamp(),
     storagePath,
   });
@@ -49,6 +64,8 @@ export async function getScreenshotByIdRepo(
     createdAt: (d.createdAt ?? null) as FirebaseFirestore.Timestamp | Date | null,
     feedbackId: (d.feedbackId as string | null | undefined) ?? null,
     storagePath: (d.storagePath as string | null | undefined) ?? null,
+    workspaceId: (d.workspaceId as string | null | undefined) ?? null,
+    sessionId: (d.sessionId as string | null | undefined) ?? null,
   };
 }
 

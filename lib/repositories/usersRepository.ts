@@ -19,12 +19,17 @@ export async function getUserWorkspaceIdRepo(uid: string): Promise<string> {
       snap = await getDoc(ref);
     }
     if (!snap.exists()) {
+      console.error("CRITICAL: User without workspaceId", { uid, reason: "missing_user_doc" });
       throw new Error(MISSING_USER_WORKSPACE_ERROR);
     }
     const data = (snap.data() ?? {}) as Record<string, unknown>;
     const raw = typeof data.workspaceId === "string" ? data.workspaceId : "";
     const workspaceId = raw.trim();
     if (!workspaceId) {
+      console.error("CRITICAL: User without workspaceId", {
+        uid,
+        reason: "missing_workspaceId_field",
+      });
       throw new Error(MISSING_USER_WORKSPACE_ERROR);
     }
     return workspaceId;

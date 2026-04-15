@@ -12,7 +12,7 @@ export interface ExecutionCanvasHeaderItem {
   isResolved?: boolean;
   createdAt?: string | null;
   updatedAt?: string | null;
-  screenshotUrl?: string | null;
+  screenshotId?: string | null;
   /** 0–100 impact score for minimal header display */
   impactScore?: number;
 }

@@ -12,7 +12,10 @@ const STORAGE_PREFIX = "discussion-attachments";
 /**
  * POST /api/upload-attachment
  * multipart/form-data with field "file"
- * Validates 15 MB max, uploads to Firebase Storage, returns { url, name, size }.
+ * 🚨 ARCHITECTURE RULE:
+ * Backend must NEVER generate or return access URLs.
+ * Only return storage references (screenshotId, storagePath).
+ * Validates 15 MB max, uploads to Firebase Storage, returns reference-only metadata.
  */
 export async function POST(req: Request) {
   try {
@@ -53,13 +56,8 @@ export async function POST(req: Request) {
       },
     });
 
-    const [url] = await bucketFile.getSignedUrl({
-      action: "read",
-      expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
-    });
-
     return apiSuccess({
-      url,
+      storagePath,
       name: originalName,
       size: file.size,
     });

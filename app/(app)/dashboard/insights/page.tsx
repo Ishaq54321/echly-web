@@ -96,28 +96,39 @@ export default function InsightsPage() {
     return RANGE_OPTIONS.find((o) => o.value === range)?.days ?? 7;
   }, [range]);
 
-  const mapDocToApi = (docData: WorkspaceInsightsDoc): InsightsApiResponse => ({
-    lifetime: {
-      totalFeedback: Math.max(0, Number(docData.totalFeedback) || 0),
-      totalComments: Math.max(0, Number(docData.totalComments) || 0),
-      totalResolved: Math.max(0, Number(docData.totalResolved) || 0),
-      timeSavedMinutes: Math.max(0, Number(docData.timeSavedMinutes) || 0),
-      resolutionRate:
-        Number(docData.totalFeedback) > 0
-          ? Math.round(
-              (Math.max(0, Number(docData.totalResolved) || 0) /
-                Math.max(0, Number(docData.totalFeedback) || 0)) *
-                100
-            )
-          : 0,
-    },
-    analytics: {
-      daily: docData.daily ?? {},
-      issueTypes: docData.issueTypes ?? {},
-      sessionCounts: docData.sessionCounts ?? {},
-      response: docData.response ?? { totalFirstReplyMs: 0, count: 0 },
-    },
-  });
+  const mapDocToApi = (
+    rawDocData: WorkspaceInsightsDoc | DocumentData | null | undefined
+  ): InsightsApiResponse => {
+    const data = (rawDocData ?? {}) as Record<string, unknown>;
+    const asNonNegativeNumber = (value: unknown): number =>
+      Math.max(0, Number(value) || 0);
+    const asRecord = <T extends Record<string, unknown>>(value: unknown): T =>
+      value && typeof value === "object" && !Array.isArray(value) ? (value as T) : ({} as T);
+
+    const totalFeedback = asNonNegativeNumber(data.totalFeedback);
+    const totalResolved = asNonNegativeNumber(data.totalResolved);
+
+    return {
+      lifetime: {
+        totalFeedback,
+        totalComments: asNonNegativeNumber(data.totalComments),
+        totalResolved,
+        timeSavedMinutes: asNonNegativeNumber(data.timeSavedMinutes),
+        resolutionRate: totalFeedback > 0 ? Math.round((totalResolved / totalFeedback) * 100) : 0,
+      },
+      analytics: {
+        daily: asRecord<DailyInsights>(data.daily),
+        issueTypes: asRecord<Record<string, number>>(data.issueTypes),
+        sessionCounts: asRecord<Record<string, number>>(data.sessionCounts),
+        response: {
+          totalFirstReplyMs: asNonNegativeNumber(
+            asRecord<Record<string, unknown>>(data.response).totalFirstReplyMs
+          ),
+          count: asNonNegativeNumber(asRecord<Record<string, unknown>>(data.response).count),
+        },
+      },
+    };
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -125,29 +136,36 @@ export default function InsightsPage() {
   }, [authUser, authLoading]);
 
   useEffect(() => {
-    if (authLoading) return;
     if (!authUser) return;
-    if (!isIdentityReady) {
+    console.log("🔥 WORKSPACE READY:", workspaceId);
+    if (!workspaceId || !isIdentityReady || !isIdentityResolved) {
       return;
     }
-    if (workspaceId == null || workspaceId.trim() === "") return;
+    const wid = workspaceId.trim();
+    if (!wid) return;
 
     setLoading(true);
     setError(null);
     // Realtime: keep Insights UI synced to the insights doc (no queries).
-    const wid = workspaceId.trim();
     insightsDocWidRef.current = wid;
     const ref = workspaceInsightsRef(wid);
     const unsubscribe = onSnapshot(
       ref,
       (snap) => {
         if (insightsDocWidRef.current !== wid) return;
+        console.log("🔥 RAW FIRESTORE:", snap.data());
         if (!snap.exists()) {
-          setData(mapDocToApi(emptyWorkspaceInsightsDoc()));
+          const mapped = mapDocToApi(emptyWorkspaceInsightsDoc());
+          console.log("🔥 MAPPED DATA:", mapped);
+          setData(mapped);
+          console.log("🔥 STATE SET:", mapped);
           setLoading(false);
           return;
         }
-        setData(mapDocToApi(snap.data() as WorkspaceInsightsDoc));
+        const mapped = mapDocToApi(snap.data() as WorkspaceInsightsDoc);
+        console.log("🔥 MAPPED DATA:", mapped);
+        setData(mapped);
+        console.log("🔥 STATE SET:", mapped);
         setLoading(false);
       },
       (err) => {
@@ -163,7 +181,7 @@ export default function InsightsPage() {
       }
       unsubscribe();
     };
-  }, [authLoading, authUser?.uid, workspaceId, isIdentityReady]);
+  }, [workspaceId, isIdentityReady, isIdentityResolved, authUser]);
 
   const filteredDaily = useMemo(() => {
     return filterDaily(data?.analytics?.daily ?? {}, rangeDays);
@@ -314,6 +332,11 @@ export default function InsightsPage() {
       : resolutionRate >= 40
         ? "text-secondary"
         : "text-amber-600";
+  console.log("🔥 WORKSPACE ID:", workspaceId);
+  console.log("🔥 RENDER CHECK:", {
+    feedback: data?.lifetime?.totalFeedback,
+    comments: data?.lifetime?.totalComments,
+  });
 
   return (
     <div className="flex-1 bg-white flex flex-col w-full min-h-0">

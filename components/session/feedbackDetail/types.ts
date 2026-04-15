@@ -7,7 +7,7 @@ export interface FeedbackItemShape {
   type: string;
   timestamp?: number;
   isResolved?: boolean;
-  screenshotUrl?: string | null;
+  screenshotId?: string | null;
   instruction?: string;
   /** @deprecated Description layer removed; kept optional for backward compat with existing data. Do not display. */
   description?: string;

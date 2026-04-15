@@ -113,7 +113,7 @@ function parseOverviewFeedback(row: Record<string, unknown>, sid: string): Feedb
     suggestedTags: Array.isArray(row.suggestedTags)
       ? (row.suggestedTags as string[])
       : null,
-    screenshotUrl: typeof row.screenshotUrl === "string" ? row.screenshotUrl : null,
+    screenshotId: typeof row.screenshotId === "string" ? row.screenshotId : null,
     commentCount: typeof row.commentCount === "number" ? row.commentCount : 0,
     status: normalizedStatus,
     isDeleted: false,
