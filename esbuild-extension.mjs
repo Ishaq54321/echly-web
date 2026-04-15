@@ -51,8 +51,22 @@ function makeAliasPlugin(useContentAuthFetch = false) {
 
 const nodeEnv = process.env.NODE_ENV || "production";
 
+// ECHLY_WEB_APP_URL must be set in CI/CD for production builds.
+// Falls back to localhost for local development.
+const webAppUrl = process.env.ECHLY_WEB_APP_URL || "http://localhost:3000";
+const apiBase = process.env.ECHLY_API_BASE || webAppUrl;
+
+if (nodeEnv === "production" && webAppUrl === "http://localhost:3000") {
+  console.error(
+    "[esbuild] WARNING: Building in production mode but ECHLY_WEB_APP_URL is not set. " +
+    "The extension will point at localhost and will not work for real users."
+  );
+}
+
 const define = {
   "process.env.NODE_ENV": JSON.stringify(nodeEnv),
+  "process.env.ECHLY_WEB_APP_URL": JSON.stringify(webAppUrl),
+  "process.env.ECHLY_API_BASE": JSON.stringify(apiBase),
 };
 
 await esbuild.build({

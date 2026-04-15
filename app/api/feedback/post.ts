@@ -240,6 +240,17 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const sessionWorkspaceId = accessCtx.session.workspaceId?.trim() ?? "";
+  const screenshotWorkspaceId = screenshotRecord.workspaceId?.trim() ?? "";
+  if (!screenshotWorkspaceId || screenshotWorkspaceId !== sessionWorkspaceId) {
+    return apiError({
+      code: "FORBIDDEN",
+      message: "Screenshot does not belong to this workspace",
+      status: 403,
+      init: { headers: corsHeaders(req) },
+    });
+  }
+
   const structuredData = {
     title,
     instruction:

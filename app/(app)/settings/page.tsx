@@ -22,7 +22,7 @@ import {
   assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
-import { BillingUsageProvider } from "@/lib/billing/BillingUsageProvider";
+import { BillingUsageProvider, useBillingUsageContext } from "@/lib/billing/BillingUsageProvider";
 import {
   listenToWorkspace,
   updateWorkspaceAppearance,
@@ -171,23 +171,21 @@ function SettingsPageInner() {
         </nav>
 
         {/* Tab content */}
-        {activeTab === "general" && (
-          <GeneralTab
-            workspace={workspace}
-            workspaceId={workspaceId}
-            loading={sectionLoading}
-            onNavigateToBilling={() => setActiveTab("billing")}
-          />
-        )}
-        {activeTab === "security" && <SecurityTab user={user} />}
-        {activeTab === "integrations" && (
-          <IntegrationsTab onNavigateToBilling={() => setActiveTab("billing")} />
-        )}
-        {activeTab === "billing" && (
-          <BillingUsageProvider>
-            <BillingTab />
-          </BillingUsageProvider>
-        )}
+        <BillingUsageProvider>
+          {activeTab === "general" && (
+            <GeneralTab
+              workspace={workspace}
+              workspaceId={workspaceId}
+              loading={sectionLoading}
+              onNavigateToBilling={() => setActiveTab("billing")}
+            />
+          )}
+          {activeTab === "security" && <SecurityTab user={user} />}
+          {activeTab === "integrations" && (
+            <IntegrationsTab onNavigateToBilling={() => setActiveTab("billing")} />
+          )}
+          {activeTab === "billing" && <BillingTab />}
+        </BillingUsageProvider>
       </div>
     </div>
   );
@@ -431,7 +429,8 @@ function AppearanceCard({
   onNavigateToBilling: () => void;
 }) {
   const { isIdentityResolved } = useWorkspace();
-  const isPro = false; // TODO: from plan/subscription
+  const { data: billingData } = useBillingUsageContext();
+  const isPro = billingData != null && billingData.plan !== "free";
   const appearance = workspace?.appearance;
   const logoOnScreen = appearance?.logoOnFeedbackScreen ?? false;
   const accentColorEnabled = (appearance?.accentColor ?? null) != null;
