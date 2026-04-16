@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Archive,
   Calendar,
@@ -134,6 +134,34 @@ function SessionWorkspaceRow({
     }
   };
 
+  const handleActionsContainerClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+    },
+    []
+  );
+
+  const handleActionsContainerKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      e.stopPropagation();
+    },
+    []
+  );
+
+  const handleCopyLinkClick = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      if (isOptimistic || copyLinkBusy) return;
+      assertIdentityResolved(isIdentityResolved);
+      void copySessionLink(session.id, authUid, {
+        onBusy: setCopyLinkBusy,
+      }).then((ok) => {
+        if (ok) setCopied(true);
+      });
+    },
+    [authUid, copyLinkBusy, isIdentityResolved, isOptimistic, session.id]
+  );
+
   const open = counts.open;
   const resolved = counts.resolved;
   const total = (counts.open ?? 0) + (counts.resolved ?? 0);
@@ -152,6 +180,10 @@ function SessionWorkspaceRow({
     ];
     return rows[rowIndex % rows.length] ?? ["?"];
   })();
+  const assigneeLabels = useMemo(() => {
+    const baseLabels = mockAssigneeInitials.length > 0 ? mockAssigneeInitials : ["?"];
+    return [...baseLabels, "?", "?", "?"].slice(0, 3);
+  }, [mockAssigneeInitials]);
 
   return (
     <>
@@ -257,10 +289,7 @@ function SessionWorkspaceRow({
               className="flex -space-x-2 transition-opacity duration-150 group-hover:opacity-0"
               aria-label="Assignees"
             >
-              {(mockAssigneeInitials.length > 0 ? mockAssigneeInitials : ["?"])
-                .concat(["?", "?", "?"])
-                .slice(0, 3)
-                .map((label, i) => (
+              {assigneeLabels.map((label, i) => (
                 <div
                   key={`${session.id}-assignee-${i}-${label}`}
                   className={[
@@ -276,22 +305,13 @@ function SessionWorkspaceRow({
 
             <div
               className="absolute right-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
+              onClick={handleActionsContainerClick}
+              onKeyDown={handleActionsContainerKeyDown}
             >
               <button
                 type="button"
                 disabled={isOptimistic || copyLinkBusy}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isOptimistic || copyLinkBusy) return;
-                  assertIdentityResolved(isIdentityResolved);
-                  void copySessionLink(session.id, authUid, {
-                    onBusy: setCopyLinkBusy,
-                  }).then((ok) => {
-                    if (ok) setCopied(true);
-                  });
-                }}
+                onClick={handleCopyLinkClick}
                 className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30 disabled:opacity-50 disabled:pointer-events-none"
                 aria-label={
                   copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"
@@ -308,8 +328,8 @@ function SessionWorkspaceRow({
               </button>
               <div
                 className="relative"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
+                onClick={handleActionsContainerClick}
+                onKeyDown={handleActionsContainerKeyDown}
               >
                 <SessionActionsDropdown
                   session={session}
@@ -361,7 +381,7 @@ export function SessionsWorkspace({
     );
   }, []);
 
-  const sessionById = useCallback(() => {
+  const sessionById = useMemo(() => {
     const map = new Map<string, Session>();
     for (const section of sections ?? []) {
       for (const item of section.items) {
@@ -407,8 +427,7 @@ export function SessionsWorkspace({
     assertIdentityResolved(isIdentityResolved);
     const ids = selectedSessions.slice();
     if (ids.length === 0) return;
-    const byId = sessionById();
-    const sessionsToDelete: Session[] = ids.map((id) => byId.get(id)).filter(Boolean) as Session[];
+    const sessionsToDelete: Session[] = ids.map((id) => sessionById.get(id)).filter(Boolean) as Session[];
     if (sessionsToDelete.length === 0) return;
     setBulkDeleting(true);
     try {
@@ -435,9 +454,8 @@ export function SessionsWorkspace({
   const sectionsInput = sections ?? [];
   const flatItemCount = sectionsInput.reduce((n, s) => n + s.items.length, 0);
 
-  const byId = sessionById();
   const selectedSessionObjects = selectedSessions
-    .map((id) => byId.get(id))
+    .map((id) => sessionById.get(id))
     .filter(Boolean) as Session[];
   const allArchived =
     selectedSessionObjects.length > 0 &&

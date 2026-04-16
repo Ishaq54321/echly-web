@@ -201,6 +201,8 @@ export function useSessionFeedbackPaginated(
   const resolvedCount = Math.max(0, counts.resolved + countsDelta.resolved);
   const [countsLoading, setCountsLoading] = useState<boolean>(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [feedbackSnapshotReady, setFeedbackSnapshotReady] = useState(false);
   const [sessionSnapshotReady, setSessionSnapshotReady] = useState(false);
   const [hasLoadedResolved, setHasLoadedResolved] = useState(false);
@@ -208,6 +210,10 @@ export function useSessionFeedbackPaginated(
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const itemsRef = useRef<Feedback[]>([]);
+  const hasMoreRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  const nextCursorRef = useRef("");
+  const initialLoadCompleteRef = useRef(false);
 
   const mergeRealtimeListOuterRef = useRef(options?.mergeRealtimeListRef);
   mergeRealtimeListOuterRef.current = options?.mergeRealtimeListRef;
@@ -253,6 +259,12 @@ export function useSessionFeedbackPaginated(
     setFeedbackSnapshotReady(false);
     setSessionSnapshotReady(false);
     setCountsDelta(ZERO_COUNTS_DELTA);
+    setHasMore(false);
+    hasMoreRef.current = false;
+    setLoadingMore(false);
+    loadingMoreRef.current = false;
+    nextCursorRef.current = "";
+    initialLoadCompleteRef.current = false;
   }, [sessionId, enabled]);
 
   const isCountsSynced = feedbackSnapshotReady && sessionSnapshotReady;
@@ -263,6 +275,12 @@ export function useSessionFeedbackPaginated(
     setHasLoadedResolved(false);
     setIsLoadingResolved(true);
     setFeedbackSnapshotReady(false);
+    setHasMore(false);
+    hasMoreRef.current = false;
+    setLoadingMore(false);
+    loadingMoreRef.current = false;
+    nextCursorRef.current = "";
+    initialLoadCompleteRef.current = false;
   }, [enabled, sessionId]);
 
   const canonicalFeedback = items;
@@ -322,66 +340,72 @@ export function useSessionFeedbackPaginated(
 
     let cancelled = false;
     setInitialLoading(true);
+    setLoadingMore(false);
+    loadingMoreRef.current = false;
+    setHasMore(false);
+    hasMoreRef.current = false;
     setHasLoadedResolved(false);
     setIsLoadingResolved(true);
     setFeedbackSnapshotReady(false);
+    nextCursorRef.current = "";
+    initialLoadCompleteRef.current = false;
 
     void (async () => {
-      const aggregated: Feedback[] = [];
-      let cursor = "";
       try {
-        while (!cancelled) {
-          const q = new URLSearchParams({
-            sessionId,
-            limit: "50",
-          });
-          if (cursor) q.set("cursor", cursor);
-          if (shareTokenRest) q.set("token", shareTokenRest);
-          const fetchPage =
-            restFetchRef.current ?? ((u: string) => fetch(u, { credentials: "include" }));
-          const res = await fetchPage(`/api/feedback?${q.toString()}`);
-          if (!res.ok) break;
-          const data = (await res.json()) as {
-            data?: {
-              feedback?: Record<string, unknown>[];
-              nextCursor?: string | null;
-              hasMore?: boolean;
-            };
+        const q = new URLSearchParams({
+          sessionId,
+          limit: "50",
+        });
+        if (shareTokenRest) q.set("token", shareTokenRest);
+        const fetchPage =
+          restFetchRef.current ?? ((u: string) => fetch(u, { credentials: "include" }));
+        const res = await fetchPage(`/api/feedback?${q.toString()}`);
+        if (!res.ok) throw new Error(`Feedback page 1 fetch failed (${res.status})`);
+        const data = (await res.json()) as {
+          data?: {
             feedback?: Record<string, unknown>[];
             nextCursor?: string | null;
             hasMore?: boolean;
           };
-          const envelope = data.data;
-          const rows = Array.isArray(envelope?.feedback)
-            ? envelope.feedback
-            : Array.isArray(data.feedback)
-              ? data.feedback
-              : [];
-          for (const r of rows) {
-            const f = feedbackFromRestApiRow(r, sessionId);
-            if (f) aggregated.push(f);
-          }
-          const next = typeof envelope?.nextCursor === "string"
-            ? envelope.nextCursor
-            : typeof data.nextCursor === "string"
-              ? data.nextCursor
-              : "";
-          const hasMoreFlag = envelope?.hasMore ?? data.hasMore;
-          const hasMore = hasMoreFlag === true && next.trim() !== "";
-          if (!hasMore) break;
-          cursor = next;
+          feedback?: Record<string, unknown>[];
+          nextCursor?: string | null;
+          hasMore?: boolean;
+        };
+        const envelope = data.data;
+        const rows = Array.isArray(envelope?.feedback)
+          ? envelope.feedback
+          : Array.isArray(data.feedback)
+            ? data.feedback
+            : [];
+        const initialPage: Feedback[] = [];
+        for (const r of rows) {
+          const f = feedbackFromRestApiRow(r, sessionId);
+          if (f) initialPage.push(f);
         }
+        const next = typeof envelope?.nextCursor === "string"
+          ? envelope.nextCursor
+          : typeof data.nextCursor === "string"
+            ? data.nextCursor
+            : "";
+        const hasMoreFlag = envelope?.hasMore ?? data.hasMore;
+        const nextHasMore = hasMoreFlag === true && next.trim() !== "";
+
+        if (cancelled || sessionIdRef.current !== sessionId) return;
+
+        nextCursorRef.current = nextHasMore ? next : "";
+        hasMoreRef.current = nextHasMore;
+        setHasMore(nextHasMore);
+        initialLoadCompleteRef.current = true;
+
+        const finalized = finalizeList(initialPage);
+        const mergeFn = mergeRealtimeListOuterRef.current?.current;
+        const list = mergeFn ? mergeFn(finalized) : finalized;
+        itemsRef.current = list;
+        setItems(list);
       } catch (err) {
         console.error("[ECHLY] REST session feedback load failed", err);
       }
-
       if (cancelled || sessionIdRef.current !== sessionId) return;
-
-      const finalized = finalizeList(aggregated);
-      const mergeFn = mergeRealtimeListOuterRef.current?.current;
-      const list = mergeFn ? mergeFn(finalized) : finalized;
-      itemsRef.current = list;
-      setItems(list);
       setInitialLoading(false);
       setHasLoadedResolved(true);
       setIsLoadingResolved(false);
@@ -393,6 +417,95 @@ export function useSessionFeedbackPaginated(
     };
   }, [sessionId, enabled, shareTokenRest, finalizeList]);
 
+  const loadNextPage = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid || !enabled) return;
+    if (!initialLoadCompleteRef.current) return;
+    if (!hasMoreRef.current) return;
+    if (loadingMoreRef.current) return;
+    const cursor = nextCursorRef.current.trim();
+    if (!cursor) return;
+
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const q = new URLSearchParams({
+        sessionId: sid,
+        limit: "50",
+        cursor,
+      });
+      if (shareTokenRest) q.set("token", shareTokenRest);
+      const fetchPage =
+        restFetchRef.current ?? ((u: string) => fetch(u, { credentials: "include" }));
+      const res = await fetchPage(`/api/feedback?${q.toString()}`);
+      if (!res.ok) {
+        throw new Error(`Feedback pagination fetch failed (${res.status})`);
+      }
+      const data = (await res.json()) as {
+        data?: {
+          feedback?: Record<string, unknown>[];
+          nextCursor?: string | null;
+          hasMore?: boolean;
+        };
+        feedback?: Record<string, unknown>[];
+        nextCursor?: string | null;
+        hasMore?: boolean;
+      };
+      const envelope = data.data;
+      const rows = Array.isArray(envelope?.feedback)
+        ? envelope.feedback
+        : Array.isArray(data.feedback)
+          ? data.feedback
+          : [];
+      const nextPage: Feedback[] = [];
+      for (const r of rows) {
+        const f = feedbackFromRestApiRow(r, sid);
+        if (f) nextPage.push(f);
+      }
+
+      const next = typeof envelope?.nextCursor === "string"
+        ? envelope.nextCursor
+        : typeof data.nextCursor === "string"
+          ? data.nextCursor
+          : "";
+      const hasMoreFlag = envelope?.hasMore ?? data.hasMore;
+      const nextHasMore = hasMoreFlag === true && next.trim() !== "";
+      nextCursorRef.current = nextHasMore ? next : "";
+      hasMoreRef.current = nextHasMore;
+      setHasMore(nextHasMore);
+
+      if (sessionIdRef.current !== sid) return;
+      setCanonicalFeedback((prev) => [...prev, ...nextPage]);
+    } catch (err) {
+      console.error("[ECHLY] REST session feedback pagination failed", err);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [enabled, setCanonicalFeedback, shareTokenRest]);
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return;
+    if (!enabled || !sessionId) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          void loadNextPage();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "600px 0px",
+        threshold: 0,
+      }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [enabled, sessionId, loadNextPage]);
+
   useEffect(() => {
     if (!sessionId) {
       setInitialLoading(false);
@@ -401,6 +514,12 @@ export function useSessionFeedbackPaginated(
       setCountsDelta(ZERO_COUNTS_DELTA);
       setFeedbackSnapshotReady(false);
       setSessionSnapshotReady(false);
+    setHasMore(false);
+    hasMoreRef.current = false;
+    setLoadingMore(false);
+    loadingMoreRef.current = false;
+    nextCursorRef.current = "";
+    initialLoadCompleteRef.current = false;
       setCanonicalFeedback((prev) => (prev.length === 0 ? prev : []));
       return;
     }
@@ -418,9 +537,9 @@ export function useSessionFeedbackPaginated(
     setCountsDelta,
     setFeedback: setCanonicalFeedback,
     loading: initialLoading,
-    hasMore: false,
+    hasMore,
     hasReachedLimit,
-    loadingMore: false,
+    loadingMore,
     hasLoadedResolved,
     isLoadingResolved,
     loadMoreRef,

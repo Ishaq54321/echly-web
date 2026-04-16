@@ -34,6 +34,24 @@ function sessionFieldToIso(value: Session["updatedAt"]): string | null {
 }
 
 export const dynamic = "force-dynamic";
+const SESSION_PAGE_SIZE = 30;
+
+function decodeCursor(raw: string | null): number {
+  if (!raw) return 0;
+  try {
+    const decoded = Buffer.from(raw, "base64url").toString("utf8");
+    const n = Number.parseInt(decoded, 10);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return n;
+  } catch {
+    return 0;
+  }
+}
+
+function encodeCursor(index: number): string {
+  const safe = Math.max(0, Math.floor(index));
+  return Buffer.from(String(safe), "utf8").toString("base64url");
+}
 
 function withCors(req: NextRequest, res: Response): NextResponse {
   return new NextResponse(res.body, {
@@ -59,17 +77,23 @@ export async function GET(req: NextRequest) {
     return withCors(req, toAuthorizationResponse(err));
   }
 
-  console.time("API /sessions");
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const apiTimer = `API /sessions ${requestId}`;
+  console.time(apiTimer);
   try {
-    console.time("Firestore query");
+    const cursorParam = req.nextUrl.searchParams.get("cursor");
+    const offset = decodeCursor(cursorParam);
+
+    const queryTimer = `Firestore query ${requestId}`;
+    console.time(queryTimer);
     let sessions: Session[];
     try {
       sessions = await listAccessibleSessionsForUser({
         userId: user.uid,
-        limit: 30,
+        limit: 100,
       });
     } finally {
-      console.timeEnd("Firestore query");
+      console.timeEnd(queryTimer);
     }
 
     sessions.forEach((s) => {
@@ -77,7 +101,8 @@ export async function GET(req: NextRequest) {
       assert(s.generalAccess, "Session missing generalAccess");
     });
 
-    const sessionsPayload = sessions.map((session) => {
+    const pagedSessions = sessions.slice(offset, offset + SESSION_PAGE_SIZE);
+    const sessionsPayload = pagedSessions.map((session) => {
       const updatedAt =
         sessionFieldToIso(session.updatedAt) ??
         sessionFieldToIso(session.createdAt) ??
@@ -118,7 +143,14 @@ export async function GET(req: NextRequest) {
         feedbackCount,
       };
     });
-    return apiSuccess({ sessions: sessionsPayload }, null, { headers: corsHeaders(req) });
+    const nextOffset = offset + sessionsPayload.length;
+    const hasMore = nextOffset < sessions.length;
+    const nextCursor = hasMore ? encodeCursor(nextOffset) : null;
+    return apiSuccess(
+      { sessions: sessionsPayload, hasMore, nextCursor },
+      null,
+      { headers: corsHeaders(req) }
+    );
   } catch (err) {
     if (err instanceof Error && err.message === "Missing workspaceId for user") {
       return apiError({
@@ -144,7 +176,7 @@ export async function GET(req: NextRequest) {
       init: { headers: corsHeaders(req) },
     });
   } finally {
-    console.timeEnd("API /sessions");
+    console.timeEnd(apiTimer);
   }
 }
 

@@ -77,6 +77,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
             alt=""
             width={24}
             height={22}
+            sizes="24px"
             className="h-[22px] w-auto"
           />
         </Link>

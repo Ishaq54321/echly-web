@@ -1,0 +1,11 @@
+{
+  "name": "@echly/extension",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Chrome extension dependencies only. Bundled via esbuild-extension.mjs; do not import these packages from the Next.js web app.",
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "tesseract.js": "^7.0.0",
+    "wavesurfer.js": "^7.12.1"
+  }
+}

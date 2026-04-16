@@ -64,6 +64,8 @@ export async function GET(req: Request, ctx: HandlerContext) {
   if (!id?.trim()) {
     return apiError({ code: "INVALID_INPUT", message: "Missing session id", status: 400 });
   }
+  const url = new URL(req.url);
+  const feedbackId = url.searchParams.get("feedbackId")?.trim() || "";
 
   const sessionId = id.trim();
   const loaded = await getSessionByIdRepo(sessionId);
@@ -94,7 +96,11 @@ export async function GET(req: Request, ctx: HandlerContext) {
   }
 
   try {
-    const rows = await listCommentsForSessionChronologicalRepo(workspaceId, sessionId);
+    const rows = await listCommentsForSessionChronologicalRepo(
+      workspaceId,
+      sessionId,
+      feedbackId || undefined
+    );
     const comments = rows.map((r) => serializeCommentRow(r));
     return apiSuccess({ comments }, context.access);
   } catch (e) {

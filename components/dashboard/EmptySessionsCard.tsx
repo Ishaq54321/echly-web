@@ -28,6 +28,7 @@ export default function EmptySessionsCard() {
           alt="Welcome illustration"
           width={400}
           height={240}
+          sizes="(max-width: 640px) 40vw, 200px"
           className="mx-auto h-auto w-[40%] max-w-[200px] object-contain"
         />
       }

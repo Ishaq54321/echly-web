@@ -125,9 +125,19 @@ export async function addCommentRepo(
   fireAndForget("addCommentRepo-sessionUpdatedAt", () =>
     updateSessionUpdatedAtRepo(sessionId)
   );
-  fireAndForget("addCommentRepo-insights", () =>
-    incrementInsightsOnCommentCreateRepo({ workspaceId })
-  );
+  console.log("🔥 BEFORE insights update", {
+    workspaceId,
+    sessionId,
+    feedbackId,
+    type: "comment",
+  });
+  try {
+    await incrementInsightsOnCommentCreateRepo({ workspaceId });
+    console.log("✅ AFTER insights update");
+    console.log("✅ INSIGHTS WRITE SUCCESS");
+  } catch (e) {
+    console.error("❌ INSIGHTS WRITE FAILED", e);
+  }
 
   return commentRef.id;
 }
@@ -249,19 +259,25 @@ const LIST_SESSION_COMMENTS_FOR_API_MAX = 3000;
  */
 export async function listCommentsForSessionChronologicalRepo(
   workspaceId: string,
-  sessionId: string
+  sessionId: string,
+  feedbackId?: string
 ): Promise<Array<Record<string, unknown> & { id: string }>> {
   const wid = workspaceId.trim();
   const sid = sessionId.trim();
   if (!wid || !sid) return [];
+  const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
   assertQueryLimit(
     LIST_SESSION_COMMENTS_FOR_API_MAX,
     "listCommentsForSessionChronologicalRepo"
   );
-  const snap = await adminDb
+  let query: FirebaseFirestore.Query = adminDb
     .collection("comments")
     .where("workspaceId", "==", wid)
-    .where("sessionId", "==", sid)
+    .where("sessionId", "==", sid);
+  if (fid) {
+    query = query.where("feedbackId", "==", fid);
+  }
+  const snap = await query
     .orderBy("createdAt", "desc")
     .limit(LIST_SESSION_COMMENTS_FOR_API_MAX)
     .get();

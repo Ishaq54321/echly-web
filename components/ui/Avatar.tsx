@@ -55,6 +55,7 @@ export function Avatar({
         alt=""
         width={w}
         height={w}
+        sizes={`${w}px`}
         className={`rounded-full object-cover ${sizeClass} ${className}`}
         unoptimized
       />

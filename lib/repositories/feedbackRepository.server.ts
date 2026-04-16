@@ -7,7 +7,6 @@ import {
   incrementInsightsOnFeedbackCreateRepo,
   workspaceInsightsRef,
 } from "@/lib/repositories/insightsRepository.server";
-import { fireAndForget } from "@/lib/server/fireAndForget";
 import { listAccessibleSessionsForUser } from "@/lib/server/listAccessibleSessionsForUser";
 
 type DocumentReference = FirebaseFirestore.DocumentReference;
@@ -209,13 +208,22 @@ export async function addFeedbackWithSessionCountersRepo(
   });
 
   if (txResult.inserted) {
-    fireAndForget("addFeedbackWithSessionCountersRepo-insights", () =>
-      incrementInsightsOnFeedbackCreateRepo({
+    console.log("🔥 BEFORE insights update", {
+      workspaceId: resolvedWorkspaceId,
+      sessionId,
+      type: issueTypeForInsights,
+    });
+    try {
+      await incrementInsightsOnFeedbackCreateRepo({
         workspaceId: resolvedWorkspaceId,
         sessionId,
         type: issueTypeForInsights,
-      })
-    );
+      });
+      console.log("✅ AFTER insights update");
+      console.log("✅ INSIGHTS WRITE SUCCESS");
+    } catch (e) {
+      console.error("❌ INSIGHTS WRITE FAILED", e);
+    }
   }
 
   return txResult;
@@ -332,7 +340,7 @@ export async function updateFeedbackRepo(
 export type UpdateFeedbackResolveAndSessionCountersResult =
   | { kind: "missing" }
   | { kind: "noop" }
-  | { kind: "applied"; insights?: { workspaceId: string; delta: number } };
+  | { kind: "applied"; insights?: { workspaceId: string; sessionId: string; delta: number } };
 
 /**
  * Updates feedback (resolve / reopen) and session denormalized counters in one transaction.
@@ -429,7 +437,7 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
         (toStatus === "resolved" ? 1 : 0) - (wasStatus === "resolved" ? 1 : 0);
       return {
         kind: "applied" as const,
-        insights: { workspaceId, delta: deltaResolved },
+        insights: { workspaceId, sessionId, delta: deltaResolved },
       };
     }
 
@@ -444,17 +452,28 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
   });
 
   if (result.kind === "applied" && result.insights) {
-    const { workspaceId, delta } = result.insights;
-    const insightsRef = workspaceInsightsRef(workspaceId);
-    const day = new Date().toISOString().slice(0, 10);
-    const patch: Record<string, unknown> = {
-      totalResolved: FieldValue.increment(delta),
-      updatedAt: new Date(),
-    };
-    patch[`daily.${day}.resolved`] = FieldValue.increment(delta);
-    fireAndForget("updateFeedbackResolveAndSessionCountersRepo-insights", () =>
-      insightsRef.set(patch, { merge: true })
-    );
+    const { workspaceId, sessionId, delta } = result.insights;
+    console.log("🔥 BEFORE insights update", {
+      workspaceId,
+      sessionId,
+      type: "resolved_delta",
+      feedbackId,
+      delta,
+    });
+    try {
+      const insightsRef = workspaceInsightsRef(workspaceId);
+      const day = new Date().toISOString().slice(0, 10);
+      const patch: Record<string, unknown> = {
+        totalResolved: FieldValue.increment(delta),
+        updatedAt: new Date(),
+      };
+      patch[`daily.${day}.resolved`] = FieldValue.increment(delta);
+      await insightsRef.set(patch, { merge: true });
+      console.log("✅ AFTER insights update");
+      console.log("✅ INSIGHTS WRITE SUCCESS");
+    } catch (e) {
+      console.error("❌ INSIGHTS WRITE FAILED", e);
+    }
   }
 
   return result;

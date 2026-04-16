@@ -50,6 +50,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
           alt="Echly"
           width={96}
           height={24}
+          sizes="96px"
           className="h-6 w-auto dark:invert"
         />
         <button

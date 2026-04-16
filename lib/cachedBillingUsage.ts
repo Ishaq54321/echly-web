@@ -3,16 +3,30 @@
 import type { BillingUsageData } from "@/lib/hooks/useBillingUsage";
 
 /**
- * Shared fetch for GET /api/billing/usage. Always performs a fresh request.
+ * Shared fetch for GET /api/billing/usage with a short in-memory TTL cache.
  */
+const BILLING_USAGE_TTL_MS = 30_000;
+
+let cachedUsage: BillingUsageData | null = null;
+let cachedAtMs = 0;
+
 export async function getBillingUsageCached(
   fetchFn: (url: string) => Promise<Response | null>
 ): Promise<BillingUsageData | null> {
+  const now = Date.now();
+  if (cachedUsage && now - cachedAtMs < BILLING_USAGE_TTL_MS) {
+    return cachedUsage;
+  }
+
   const res = await fetchFn("/api/billing/usage");
   if (!res || !res.ok) return null;
-  return (await res.json()) as BillingUsageData;
+  const json = (await res.json()) as BillingUsageData;
+  cachedUsage = json;
+  cachedAtMs = now;
+  return json;
 }
 
 export function invalidateBillingUsageCache(): void {
-  // No-op: caching removed.
+  cachedUsage = null;
+  cachedAtMs = 0;
 }

@@ -84,6 +84,7 @@ export default function CommentThread({ comments }: Props) {
                   alt={comment.name}
                   width={36}
                   height={36}
+                  sizes="36px"
                   className="w-9 h-9 rounded-full object-cover flex-shrink-0"
                   unoptimized
                 />

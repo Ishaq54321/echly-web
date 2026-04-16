@@ -60,13 +60,21 @@ function commentFromApiRow(row: unknown): Comment | null {
 }
 
 /**
- * Loads session comments from the API (server-enforced canView). Caller filters by feedbackId if needed.
+ * Loads session comments from the API (server-enforced canView), optionally scoped by feedbackId.
  */
-export async function fetchComments(sessionId: string): Promise<Comment[]> {
+export async function fetchComments(
+  sessionId: string,
+  opts?: { feedbackId?: string | null | undefined }
+): Promise<Comment[]> {
   const sid = typeof sessionId === "string" ? sessionId.trim() : "";
   if (!sid) return [];
+  const feedbackId =
+    typeof opts?.feedbackId === "string" ? opts.feedbackId.trim() : "";
+  const query = feedbackId
+    ? `?feedbackId=${encodeURIComponent(feedbackId)}`
+    : "";
 
-  const res = await authFetch(`/api/comments/${encodeURIComponent(sid)}`);
+  const res = await authFetch(`/api/comments/${encodeURIComponent(sid)}${query}`);
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {
     const msg = await res.text().catch(() => "");

@@ -14,9 +14,6 @@ import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 
 const SESSIONS_CACHE_PREFIX = "echly_sessions";
 
-/** Dashboard session list limit — must match GET /api/sessions ordering/limit (30). */
-const SESSION_LIST_LIMIT = 30;
-
 function sessionsCacheKey(uid: string): string {
   return `${SESSIONS_CACHE_PREFIX}:${uid}`;
 }
@@ -44,6 +41,38 @@ function writeCachedSessions(uid: string, sessions: Session[]) {
     sessionStorage.setItem(sessionsCacheKey(uid), JSON.stringify(sessions));
   } catch {
     // Ignore cache write errors (private mode/quota).
+  }
+}
+
+type SessionsBootstrapResult =
+  | { ok: true; sessions: Session[]; hasMore: boolean; nextCursor: string | null }
+  | { ok: false };
+
+/**
+ * Parsed bootstrap result per uid (not `Response`) so Strict Mode remounts can await the same
+ * promise without double-consuming the body. Successful entries stay until logout / account switch.
+ */
+const sessionsBootstrapPromiseByUid = new Map<string, Promise<SessionsBootstrapResult>>();
+
+let lastSessionsBootstrapUid: string | null = null;
+
+async function fetchSessionsBootstrapFromNetwork(): Promise<SessionsBootstrapResult> {
+  try {
+    const res = await authFetch("/api/sessions", { cache: "no-store" });
+    if (!res?.ok) return { ok: false };
+    const data = await res.json().catch(() => ({}));
+    const list = sessionsArrayFromApiPayload(data);
+    const next = list.map((s) => {
+      const archived = (s.archived ?? s.isArchived) === true;
+      return { ...s, archived, isArchived: archived };
+    });
+    const payload = data as { data?: { nextCursor?: string | null; hasMore?: boolean } };
+    const envelope = payload?.data ?? {};
+    const hasMore = envelope.hasMore === true && typeof envelope.nextCursor === "string";
+    const nextCursor = hasMore ? envelope.nextCursor ?? null : null;
+    return { ok: true, sessions: next, hasMore, nextCursor };
+  } catch {
+    return { ok: false };
   }
 }
 
@@ -75,7 +104,12 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
   const allSessionsRef = useRef<Session[]>([]);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [awaitingSessions, setAwaitingSessions] = useState(false);
+  const [hasMoreSessions, setHasMoreSessions] = useState(false);
+  const [loadingMoreSessions, setLoadingMoreSessions] = useState(false);
   const sessionsSourceUserRef = useRef<string | null>(null);
+  const nextCursorRef = useRef<string | null>(null);
+  const bootstrapInFlightRef = useRef<Promise<SessionsBootstrapResult> | null>(null);
+  const bootstrapCompletedRef = useRef(false);
   const userId = authUid;
 
   useEffect(() => {
@@ -86,12 +120,22 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
     allSessionsRef.current = allSessions;
   }, [allSessions]);
 
+  useEffect(() => {
+    bootstrapCompletedRef.current = false;
+    bootstrapInFlightRef.current = null;
+
+    console.log("\u{1F504} RESET BOOTSTRAP (user changed)", { userId });
+  }, [userId]);
+
   const archivedOnly = viewMode === "archived";
 
   const refreshSessions = useCallback(async () => {
     const uid = userIdRef.current;
     if (!uid || !isIdentityReady) return;
     setAwaitingSessions(true);
+    nextCursorRef.current = null;
+    setHasMoreSessions(false);
+    setLoadingMoreSessions(false);
     try {
       const res = await authFetch("/api/sessions", { cache: "no-store" });
       if (!res?.ok) {
@@ -99,14 +143,28 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         return;
       }
       const data = await res.json().catch(() => ({}));
-      const list = sessionsArrayFromApiPayload(data).slice(0, SESSION_LIST_LIMIT);
+      const list = sessionsArrayFromApiPayload(data);
       const next = list.map((s) => {
         const archived = (s.archived ?? s.isArchived) === true;
         return { ...s, archived, isArchived: archived };
       });
+      const payload = data as { data?: { nextCursor?: string | null; hasMore?: boolean } };
+      const envelope = payload?.data ?? {};
+      const hasMore = envelope.hasMore === true && typeof envelope.nextCursor === "string";
+      nextCursorRef.current = hasMore ? envelope.nextCursor ?? null : null;
+      setHasMoreSessions(hasMore);
       sessionsSourceUserRef.current = uid;
       setAllSessions(next);
       writeCachedSessions(uid, next);
+      sessionsBootstrapPromiseByUid.set(
+        uid,
+        Promise.resolve({
+          ok: true,
+          sessions: next,
+          hasMore,
+          nextCursor: hasMore ? envelope.nextCursor ?? null : null,
+        })
+      );
     } catch (e) {
       console.error("[ECHLY] refreshSessions failed", e);
     } finally {
@@ -116,43 +174,110 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
 
   useEffect(() => {
     if (!userId) {
+      sessionsBootstrapPromiseByUid.clear();
+      lastSessionsBootstrapUid = null;
       sessionsSourceUserRef.current = null;
       setAwaitingSessions(false);
+      setHasMoreSessions(false);
+      setLoadingMoreSessions(false);
+      nextCursorRef.current = null;
       return;
     }
+
+    const uid = userId;
+
+    if (lastSessionsBootstrapUid !== uid) {
+      if (lastSessionsBootstrapUid) {
+        sessionsBootstrapPromiseByUid.delete(lastSessionsBootstrapUid);
+      }
+      lastSessionsBootstrapUid = uid;
+    }
+
     if (!isIdentityReady) {
       setAwaitingSessions(true);
       return;
     }
-    sessionsSourceUserRef.current = userId;
-    const cached = readCachedSessions(userId);
+
+    sessionsSourceUserRef.current = uid;
+    const cached = readCachedSessions(uid);
     if (Array.isArray(cached) && cached.length > 0) {
       setAllSessions(cached);
     } else {
       setAllSessions([]);
     }
+
+    if (bootstrapCompletedRef.current) {
+      console.log("\u{1F6AB} BOOTSTRAP BLOCKED (already completed)", { uid });
+      setAwaitingSessions(false);
+      return;
+    }
+
+    if (bootstrapInFlightRef.current) {
+      console.log("\u{1F6AB} BOOTSTRAP BLOCKED (in-flight)", { uid });
+      return;
+    }
+
+    console.log("\u{1F680} BOOTSTRAP START", { uid });
+
+    let bootstrapPromise = sessionsBootstrapPromiseByUid.get(uid);
+    if (!bootstrapPromise) {
+      const promise = (async () => {
+        try {
+          const result = await fetchSessionsBootstrapFromNetwork();
+          return result;
+        } catch (e) {
+          console.error("\u{274C} BOOTSTRAP FAILED", e);
+          throw e;
+        }
+      })();
+      bootstrapPromise = promise.then((r) => {
+        if (!r.ok) sessionsBootstrapPromiseByUid.delete(uid);
+        return r;
+      });
+      sessionsBootstrapPromiseByUid.set(uid, bootstrapPromise);
+    }
+
+    bootstrapInFlightRef.current = bootstrapPromise;
+
+    bootstrapPromise
+      .then((result) => {
+        if (result && result.ok) {
+          bootstrapCompletedRef.current = true;
+          console.log("\u{2705} BOOTSTRAP COMPLETED", { uid });
+        } else {
+          bootstrapInFlightRef.current = null;
+        }
+      })
+      .catch(() => {
+        bootstrapInFlightRef.current = null;
+      });
+
     setAwaitingSessions(true);
+    setHasMoreSessions(false);
+    setLoadingMoreSessions(false);
+    nextCursorRef.current = null;
+
     let cancelled = false;
 
     void (async () => {
       try {
-        const res = await authFetch("/api/sessions", { cache: "no-store" });
+        const result = await bootstrapPromise;
         if (cancelled) return;
-        if (!res?.ok) {
+        if (userIdRef.current !== uid) return;
+        if (!result.ok) {
           setAwaitingSessions(false);
           return;
         }
-        const data = await res.json().catch(() => ({}));
-        const list = sessionsArrayFromApiPayload(data).slice(0, SESSION_LIST_LIMIT);
-        const next = list.map((s) => {
-          const archived = (s.archived ?? s.isArchived) === true;
-          return { ...s, archived, isArchived: archived };
-        });
-        sessionsSourceUserRef.current = userId;
-        setAllSessions(next);
-        writeCachedSessions(userId, next);
+        nextCursorRef.current = result.hasMore ? result.nextCursor : null;
+        setHasMoreSessions(result.hasMore);
+        sessionsSourceUserRef.current = uid;
+        setAllSessions(result.sessions);
+        writeCachedSessions(uid, result.sessions);
       } catch (e) {
-        if (!cancelled) console.error("[ECHLY] GET /api/sessions failed", e);
+        if (cancelled) return;
+        console.error("[ECHLY] GET /api/sessions failed", e);
+        sessionsBootstrapPromiseByUid.delete(uid);
+        bootstrapInFlightRef.current = null;
       } finally {
         if (!cancelled) setAwaitingSessions(false);
       }
@@ -162,6 +287,45 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
       cancelled = true;
     };
   }, [userId, isIdentityReady]);
+
+  const loadMoreSessions = useCallback(async () => {
+    const uid = userIdRef.current;
+    if (!uid || !isIdentityReady) return;
+    if (loadingMoreSessions) return;
+    const cursor = nextCursorRef.current;
+    if (!cursor) return;
+    setLoadingMoreSessions(true);
+    try {
+      const res = await authFetch(`/api/sessions?cursor=${encodeURIComponent(cursor)}`, {
+        cache: "no-store",
+      });
+      if (!res?.ok) return;
+      const data = await res.json().catch(() => ({}));
+      const incoming = sessionsArrayFromApiPayload(data).map((s) => {
+        const archived = (s.archived ?? s.isArchived) === true;
+        return { ...s, archived, isArchived: archived };
+      });
+      const payload = data as { data?: { nextCursor?: string | null; hasMore?: boolean } };
+      const envelope = payload?.data ?? {};
+      const nextHasMore = envelope.hasMore === true && typeof envelope.nextCursor === "string";
+      nextCursorRef.current = nextHasMore ? envelope.nextCursor ?? null : null;
+      setHasMoreSessions(nextHasMore);
+      setAllSessions((prev) => {
+        const merged = [...prev, ...incoming];
+        const dedupedById = new Map<string, Session>();
+        for (const session of merged) {
+          dedupedById.set(session.id, session);
+        }
+        const next = Array.from(dedupedById.values());
+        writeCachedSessions(uid, next);
+        return next;
+      });
+    } catch (e) {
+      console.error("[ECHLY] loadMoreSessions failed", e);
+    } finally {
+      setLoadingMoreSessions(false);
+    }
+  }, [isIdentityReady, loadingMoreSessions]);
 
   const overviewDataAligned =
     Boolean(userId) && sessionsSourceUserRef.current === userId;
@@ -411,6 +575,9 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
     sessions: sessionsWithCounts,
     loading: overviewDataAligned ? awaitingSessions : true,
     isCountsReady: overviewDataAligned ? true : false,
+    hasMoreSessions,
+    loadingMoreSessions,
+    loadMoreSessions,
     handleCreateSession,
     refreshSessions,
     updateSession,

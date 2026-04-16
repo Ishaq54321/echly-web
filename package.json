@@ -2,6 +2,9 @@
   "name": "echly",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "echly-extension"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -18,7 +21,6 @@
     "firebase": "^12.10.0",
     "firebase-admin": "^13.7.0",
     "framer-motion": "^12.35.2",
-    "html2canvas": "^1.4.1",
     "jose": "^6.0.11",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
@@ -27,9 +29,7 @@
     "react": "19.2.3",
     "react-countup": "^6.5.3",
     "react-dom": "19.2.3",
-    "recharts": "^2.15.4",
-    "tesseract.js": "^7.0.0",
-    "wavesurfer.js": "^7.12.1"
+    "recharts": "^2.15.4"
   },
   "devDependencies": {
     "@fontsource/plus-jakarta-sans": "^5.2.8",

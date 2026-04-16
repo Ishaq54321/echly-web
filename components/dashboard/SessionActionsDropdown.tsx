@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import {
   Archive,
   Link2,
@@ -20,7 +21,12 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Session } from "@/lib/domain/session";
-import { RenameSessionModal } from "@/components/dashboard/RenameSessionModal";
+
+const RenameSessionModal = dynamic(
+  () =>
+    import("@/components/dashboard/RenameSessionModal").then((m) => m.RenameSessionModal),
+  { ssr: false }
+);
 import { copySessionLink } from "@/utils/copySessionLink";
 import {
   assertIdentityResolved,
@@ -460,13 +466,15 @@ export function SessionActionsDropdown({
           document.body
         )}
 
-      <RenameSessionModal
-        open={renameOpen}
-        onClose={() => setRenameOpen(false)}
-        sessionId={session.id}
-        currentTitle={session.title}
-        onSave={handleRenameSave}
-      />
+      {renameOpen ? (
+        <RenameSessionModal
+          open
+          onClose={() => setRenameOpen(false)}
+          sessionId={session.id}
+          currentTitle={session.title}
+          onSave={handleRenameSave}
+        />
+      ) : null}
     </>
   );
 }

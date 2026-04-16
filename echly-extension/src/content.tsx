@@ -1579,8 +1579,11 @@ function syncInitialGlobalState(): void {
 }
 
 /** When tab becomes visible, refresh global state from background so we never rely on a missed broadcast. */
+let visibilityStateRefreshAttached = false;
+let visibilityStateRefreshHandler: (() => void) | null = null;
 function ensureVisibilityStateRefresh(): void {
-  document.addEventListener("visibilitychange", () => {
+  if (visibilityStateRefreshAttached) return;
+  visibilityStateRefreshHandler = () => {
     if (document.hidden) return;
     chrome.runtime.sendMessage(
       { type: "ECHLY_GET_GLOBAL_STATE" },
@@ -1595,7 +1598,9 @@ function ensureVisibilityStateRefresh(): void {
         dispatchGlobalState(normalized);
       }
     );
-  });
+  };
+  document.addEventListener("visibilitychange", visibilityStateRefreshHandler);
+  visibilityStateRefreshAttached = true;
 }
 
 /** Listen for global state; single listener. Background is source of truth. */
@@ -1685,14 +1690,16 @@ function ensureScrollDebugListeners(): void {
   const win = window as Window & { __ECHLY_SCROLL_DEBUG__?: boolean };
   if (win.__ECHLY_SCROLL_DEBUG__) return;
   win.__ECHLY_SCROLL_DEBUG__ = true;
+  const wheelHandler = () => ECHLY_DEBUG && console.debug("ECHLY wheel event reached page");
+  const scrollHandler = () => ECHLY_DEBUG && console.debug("ECHLY scroll event detected");
   window.addEventListener(
     "wheel",
-    () => ECHLY_DEBUG && console.debug("ECHLY wheel event reached page"),
+    wheelHandler,
     { passive: true }
   );
   document.addEventListener(
     "scroll",
-    () => ECHLY_DEBUG && console.debug("ECHLY scroll event detected"),
+    scrollHandler,
     { passive: true }
   );
 }
@@ -1776,11 +1783,13 @@ function safeAutoInject() {
   if (document.readyState === "complete") {
     injectWidgetUI();
   } else {
-    window.addEventListener("load", () => {
+    const onLoad = () => {
       setTimeout(() => {
         injectWidgetUI();
       }, 50); // small delay to allow hydration
-    });
+      window.removeEventListener("load", onLoad);
+    };
+    window.addEventListener("load", onLoad);
   }
 }
 

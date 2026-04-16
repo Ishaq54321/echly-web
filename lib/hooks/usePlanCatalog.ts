@@ -21,6 +21,8 @@ export interface UsePlanCatalogResult {
 }
 
 const CATALOG_API = "/api/plans/catalog";
+let cachedPlanCatalog: PlanCatalogItem[] | null = null;
+let cachedPlanCatalogPromise: Promise<PlanCatalogItem[] | null> | null = null;
 
 /**
  * Fetches plan catalog from API (single source of truth). No Firestore listener.
@@ -33,18 +35,36 @@ export function usePlanCatalog(): UsePlanCatalogResult {
 
   useEffect(() => {
     let cancelled = false;
+    if (cachedPlanCatalog) {
+      setPlans(cachedPlanCatalog);
+      setLoading(false);
+      setError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
     setLoading(true);
     setError(null);
 
-    (async () => {
-      const authed = await authFetch(CATALOG_API);
-      return authed ?? fetch(CATALOG_API, { cache: "no-store" });
-    })()
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to load plans"))))
-      .then((envelope: { data?: PlanCatalogItem[] | null }) => {
+    if (!cachedPlanCatalogPromise) {
+      cachedPlanCatalogPromise = (async () => {
+        const authed = await authFetch(CATALOG_API);
+        const res = authed ?? (await fetch(CATALOG_API, { cache: "no-store" }));
+        if (!res.ok) throw new Error("Failed to load plans");
+        const envelope = (await res.json()) as { data?: PlanCatalogItem[] | null };
         const data = Array.isArray(envelope?.data) ? envelope.data : null;
+        cachedPlanCatalog = data && data.length > 0 ? data : null;
+        return cachedPlanCatalog;
+      })().catch((err) => {
+        cachedPlanCatalogPromise = null;
+        throw err;
+      });
+    }
+
+    cachedPlanCatalogPromise
+      .then((data: PlanCatalogItem[] | null) => {
         if (!cancelled) {
-          setPlans(data && data.length > 0 ? data : null);
+          setPlans(data);
           setError(null);
         }
       })

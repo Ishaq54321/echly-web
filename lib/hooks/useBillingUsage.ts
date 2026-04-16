@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { authFetch } from "@/lib/authFetch";
-import { getBillingUsageCached, invalidateBillingUsageCache } from "@/lib/cachedBillingUsage";
+import { getBillingUsageCached } from "@/lib/cachedBillingUsage";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import {
   getWorkspaceRealtimeSnapshot,
@@ -94,7 +94,6 @@ export function useBillingUsage(
       idleHandle = scheduleIdleTask(() => {
         idleHandle = null;
         if (cancelled) return;
-        invalidateBillingUsageCache();
         void refetch();
       });
     };

@@ -11,6 +11,7 @@ import {
   useMemo,
   startTransition,
 } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
@@ -42,10 +43,19 @@ import {
   CommentPanel,
 } from "@/components/layout/operating-system";
 import { TopControlBar } from "@/components/ui/TopControlBar";
-import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
 import { useToast } from "@/components/dashboard/context/ToastContext";
-import { RequestAccessModal } from "@/components/RequestAccessModal";
 import { ImageViewer } from "@/components/ImageViewer";
+
+const DeleteSessionModal = dynamic(
+  () =>
+    import("@/components/dashboard/DeleteSessionModal").then((m) => m.DeleteSessionModal),
+  { ssr: false }
+);
+
+const RequestAccessModal = dynamic(
+  () => import("@/components/RequestAccessModal").then((m) => m.RequestAccessModal),
+  { ssr: false }
+);
 import { Modal } from "@/components/ui/Modal";
 
 /** Broadcast ticket update to extension tray so tray stays in sync. */
@@ -1718,12 +1728,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   return (
     <>
-      <RequestAccessModal
-        open={requestAccessModalOpen}
-        onClose={() => setRequestAccessModalOpen(false)}
-        onConfirm={confirmRequestResolveAccess}
-        submitting={requestAccessSubmitting}
-      />
+      {requestAccessModalOpen ? (
+        <RequestAccessModal
+          open
+          onClose={() => setRequestAccessModalOpen(false)}
+          onConfirm={confirmRequestResolveAccess}
+          submitting={requestAccessSubmitting}
+        />
+      ) : null}
       <div className="flex h-full min-h-0 overflow-hidden">
         <aside className="sidebar hidden lg:flex w-[300px] h-screen overflow-hidden shrink-0 self-start min-h-0 flex-col sticky top-0">
           <TicketList
@@ -1916,12 +1928,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         />
       )}
 
-      <DeleteSessionModal
-        open={deleteSessionModalOpen}
-        onClose={() => setDeleteSessionModalOpen(false)}
-        sessionTitle={session ? (session.title ?? "").trim() : ""}
-        onConfirm={confirmDeleteSessionFromMenu}
-      />
+      {deleteSessionModalOpen ? (
+        <DeleteSessionModal
+          open
+          onClose={() => setDeleteSessionModalOpen(false)}
+          sessionTitle={session ? (session.title ?? "").trim() : ""}
+          onConfirm={confirmDeleteSessionFromMenu}
+        />
+      ) : null}
 
       {showDeleteModal && effectiveSelectedId && (
         <Modal

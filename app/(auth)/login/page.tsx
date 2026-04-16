@@ -173,6 +173,7 @@ function LoginPageContent() {
             alt="Echly"
             width={130}
             height={40}
+            sizes="130px"
             className="h-12 w-auto"
           />
         </Link>

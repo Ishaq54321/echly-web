@@ -64,6 +64,7 @@ export function GlobalNavBar() {
           alt="Echly"
           width={28}
           height={26}
+          sizes="28px"
           className="h-[26px] w-auto"
         />
       </Link>

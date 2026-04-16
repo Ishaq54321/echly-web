@@ -1,9 +1,13 @@
 "use client";
 
 // deep_data_latency_trace_phase3b_v2
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useWorkspaceOverview } from "@/lib/client/workspaceOverviewContext";
+import {
+  WorkspaceOverviewProvider,
+  useWorkspaceOverview,
+} from "@/lib/client/workspaceOverviewContext";
 import type { SessionWithCounts } from "./hooks/useWorkspaceOverview";
 import { SessionsWorkspace } from "@/components/dashboard/SessionsWorkspace";
 import {
@@ -22,8 +26,14 @@ import { useSessionsSearch } from "@/components/dashboard/context/SessionsSearch
 import EmptySessionsCard from "@/components/dashboard/EmptySessionsCard";
 import { ArchiveEmptyState } from "@/components/empty/ArchiveEmptyState";
 import { ToastProvider } from "@/components/dashboard/context/ToastContext";
-import { DeleteSessionModal } from "@/components/dashboard/DeleteSessionModal";
+import { SessionsSearchProvider } from "@/components/dashboard/context/SessionsSearchContext";
 import DashboardCaptureHost from "./components/DashboardCaptureHost";
+
+const DeleteSessionModal = dynamic(
+  () =>
+    import("@/components/dashboard/DeleteSessionModal").then((m) => m.DeleteSessionModal),
+  { ssr: false }
+);
 import type { Session } from "@/lib/domain/session";
 
 function sessionSortKey(session: Session): number {
@@ -43,22 +53,14 @@ import { useWorkspace } from "@/lib/client/workspaceContext";
 import BrandLoader from "@/components/ui/BrandLoader";
 import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 
-function filterAndSortSessions(sessions: SessionWithCounts[], search: string): SessionWithCounts[] {
-  const q = search.trim().toLowerCase();
-  const list = q
-    ? sessions.filter(({ session }) =>
-        session.title.toLowerCase().includes(q)
-      )
-    : [...sessions];
-
-  return [...list].sort((a, b) => sessionSortKey(b.session) - sessionSortKey(a.session));
-}
-
 function DashboardContent() {
   const router = useRouter();
   const {
     sessions,
     loading: sessionsLoading,
+    hasMoreSessions,
+    loadingMoreSessions,
+    loadMoreSessions,
     updateSession,
     setSessionArchived,
     deleteSession,
@@ -66,6 +68,7 @@ function DashboardContent() {
   const { authUid, isIdentityResolved } = useWorkspace();
   const stableSessions = useStableState(sessions, true, authUid);
   const { search } = useSessionsSearch();
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const isLoading =
     !isIdentityResolved || (sessionsLoading && sessions.length === 0);
 
@@ -77,33 +80,48 @@ function DashboardContent() {
   const [sessionsTimeRange, setSessionsTimeRange] =
     useState<SessionsTimeRange>(DEFAULT_FILTER);
 
-  const filteredSessions = useMemo(
-    () => filterAndSortSessions(stableSessions, search),
-    [stableSessions, search]
-  );
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [search]);
 
-  const activeSessions = useMemo(
-    () =>
-      filteredSessions.filter(
-        ({ session }) => (session.isArchived ?? session.archived) !== true
-      ),
-    [filteredSessions]
-  );
-
-  const archivedSessions = useMemo(
-    () =>
-      filteredSessions.filter(
-        ({ session }) => (session.isArchived ?? session.archived) === true
-      ),
-    [filteredSessions]
-  );
-
-  const tabFilteredSessions = useMemo(() => {
-    const pool = listArchiveTab === "sessions" ? activeSessions : archivedSessions;
-    return pool.filter(({ session }) =>
-      sessionPassesTimeRange(session, sessionsTimeRange)
+  const { activeSessions, archivedSessions, tabFilteredSessions } = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    const sortedSessions = [...stableSessions].sort(
+      (a, b) => sessionSortKey(b.session) - sessionSortKey(a.session)
     );
-  }, [listArchiveTab, activeSessions, archivedSessions, sessionsTimeRange]);
+    const nextActiveSessions: SessionWithCounts[] = [];
+    const nextArchivedSessions: SessionWithCounts[] = [];
+    const nextTabFilteredSessions: SessionWithCounts[] = [];
+
+    for (const item of sortedSessions) {
+      const title = item.session.title ?? "";
+      if (q && !title.toLowerCase().includes(q)) {
+        continue;
+      }
+
+      const isArchived = (item.session.isArchived ?? item.session.archived) === true;
+      if (isArchived) {
+        nextArchivedSessions.push(item);
+      } else {
+        nextActiveSessions.push(item);
+      }
+
+      const inSelectedTab =
+        listArchiveTab === "sessions" ? !isArchived : isArchived;
+      if (!inSelectedTab) continue;
+      if (!sessionPassesTimeRange(item.session, sessionsTimeRange)) continue;
+      nextTabFilteredSessions.push(item);
+    }
+
+    return {
+      activeSessions: nextActiveSessions,
+      archivedSessions: nextArchivedSessions,
+      tabFilteredSessions: nextTabFilteredSessions,
+    };
+  }, [debouncedSearch, listArchiveTab, sessionsTimeRange, stableSessions]);
 
   const workspaceSections = useMemo(
     () => [
@@ -174,18 +192,32 @@ function DashboardContent() {
                     <ArchiveEmptyState />
                   </div>
                 ) : (
-                  <SessionsWorkspace
-                    sections={workspaceSections}
-                    onView={handleView}
-                    onRenameSuccess={(session) =>
-                      updateSession(session.id, { title: session.title })
-                    }
-                    onSetArchived={setSessionArchived}
-                    onRequestDelete={(session) => setDeleteTarget(session)}
-                    onDeleteSession={deleteSession}
-                    viewMode={sessionViewMode}
-                    onViewModeChange={setSessionViewMode}
-                  />
+                  <>
+                    <SessionsWorkspace
+                      sections={workspaceSections}
+                      onView={handleView}
+                      onRenameSuccess={(session) =>
+                        updateSession(session.id, { title: session.title })
+                      }
+                      onSetArchived={setSessionArchived}
+                      onRequestDelete={(session) => setDeleteTarget(session)}
+                      onDeleteSession={deleteSession}
+                      viewMode={sessionViewMode}
+                      onViewModeChange={setSessionViewMode}
+                    />
+                    {hasMoreSessions && !debouncedSearch.trim() ? (
+                      <div className="mt-6 flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => void loadMoreSessions()}
+                          disabled={loadingMoreSessions}
+                          className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {loadingMoreSessions ? "Loading..." : "Load more sessions"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </div>
             </div>
@@ -193,15 +225,16 @@ function DashboardContent() {
         </main>
       </div>
 
-      <DeleteSessionModal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        sessionTitle={deleteTarget?.title ?? ""}
-        onConfirm={async () => {
-          if (!deleteTarget) return;
-          await deleteSession(deleteTarget);
-        }}
-      />
+      {deleteTarget ? (
+        <DeleteSessionModal
+          open
+          onClose={() => setDeleteTarget(null)}
+          sessionTitle={deleteTarget.title ?? ""}
+          onConfirm={async () => {
+            await deleteSession(deleteTarget);
+          }}
+        />
+      ) : null}
 
       <DashboardCaptureHost
         open={captureOpen}
@@ -213,8 +246,12 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   return (
-    <ToastProvider>
-      <DashboardContent />
-    </ToastProvider>
+    <WorkspaceOverviewProvider>
+      <SessionsSearchProvider>
+        <ToastProvider>
+          <DashboardContent />
+        </ToastProvider>
+      </SessionsSearchProvider>
+    </WorkspaceOverviewProvider>
   );
 }

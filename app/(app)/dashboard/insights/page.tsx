@@ -1,13 +1,51 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
-import { ActivityTrendChart, type ActivityTrendPoint } from "@/components/insights/ActivityTrendChart";
-import { IssueTypeDonutChart, type IssueSlice } from "@/components/insights/IssueTypeDonutChart";
-import { MostActiveSessionsBarChart, type ActiveSessionBar } from "@/components/insights/MostActiveSessionsBarChart";
+import type { ActivityTrendPoint } from "@/components/insights/ActivityTrendChart";
+import type { IssueSlice } from "@/components/insights/IssueTypeDonutChart";
+import type { ActiveSessionBar } from "@/components/insights/MostActiveSessionsBarChart";
+
+function InsightsChartChunkFallback() {
+  return (
+    <div
+      className="min-h-[260px] animate-pulse rounded-lg bg-neutral-100"
+      aria-hidden
+    />
+  );
+}
+
+const ActivityTrendChart = dynamic(
+  () =>
+    import("@/components/insights/ActivityTrendChart").then((m) => m.ActivityTrendChart),
+  { ssr: false, loading: InsightsChartChunkFallback }
+);
+
+const IssueTypeDonutChart = dynamic(
+  () =>
+    import("@/components/insights/IssueTypeDonutChart").then((m) => m.IssueTypeDonutChart),
+  { ssr: false, loading: InsightsChartChunkFallback }
+);
+
+const MostActiveSessionsBarChart = dynamic(
+  () =>
+    import("@/components/insights/MostActiveSessionsBarChart").then(
+      (m) => m.MostActiveSessionsBarChart
+    ),
+  { ssr: false, loading: InsightsChartChunkFallback }
+);
 import { filterDaily, type DailyInsights } from "@/lib/analytics/filterDaily";
-import { doc, getDoc, onSnapshot, type DocumentData } from "firebase/firestore";
+import {
+  collection,
+  documentId,
+  getDocs,
+  onSnapshot,
+  query,
+  where,
+  type DocumentData,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   emptyWorkspaceInsightsDoc,
@@ -70,10 +108,42 @@ export default function InsightsPage() {
   const workspaceIdLiveRef = useRef<string | null>(workspaceId);
 
   useEffect(() => {
+    if (!isIdentityResolved || !workspaceId) {
+      console.log("\u26D4 BLOCKED: Identity not ready (effect prevented)", {
+        workspaceId,
+        isIdentityResolved,
+        isIdentityReady,
+      });
+      return;
+    }
     workspaceIdLiveRef.current = workspaceId;
-  }, [workspaceId]);
+  }, [workspaceId, isIdentityResolved]);
 
   useEffect(() => {
+    if (!isIdentityResolved || !workspaceId) {
+      console.log("\u26D4 BLOCKED: Identity not ready (effect prevented)", {
+        workspaceId,
+        isIdentityResolved,
+        isIdentityReady,
+      });
+      return;
+    }
+    console.log("\u{1F9E0} IDENTITY STATE", {
+      workspaceId,
+      isIdentityReady,
+      isIdentityResolved,
+    });
+  }, [workspaceId, isIdentityReady, isIdentityResolved]);
+
+  useEffect(() => {
+    if (!isIdentityResolved || !workspaceId) {
+      console.log("\u26D4 BLOCKED: Identity not ready (effect prevented)", {
+        workspaceId,
+        isIdentityResolved,
+        isIdentityReady,
+      });
+      return;
+    }
     if (!isRangeOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setIsRangeOpen(false);
@@ -90,7 +160,7 @@ export default function InsightsPage() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("mousedown", onPointerDown);
     };
-  }, [isRangeOpen]);
+  }, [isRangeOpen, workspaceId, isIdentityResolved]);
 
   const rangeDays = useMemo((): number => {
     return RANGE_OPTIONS.find((o) => o.value === range)?.days ?? 7;
@@ -108,6 +178,36 @@ export default function InsightsPage() {
     const totalFeedback = asNonNegativeNumber(data.totalFeedback);
     const totalResolved = asNonNegativeNumber(data.totalResolved);
 
+    const raw = data;
+
+    const daily: Record<string, Record<string, unknown>> = {};
+    Object.keys(raw).forEach((key) => {
+      if (key.startsWith("daily.")) {
+        const [, date, field] = key.split(".");
+        if (!date || !field) return;
+        if (!daily[date]) daily[date] = {};
+        daily[date][field] = raw[key];
+      }
+    });
+
+    const issueTypes: Record<string, number> = {};
+    Object.keys(raw).forEach((key) => {
+      if (key.startsWith("issueTypes.")) {
+        const [, type] = key.split(".");
+        if (!type) return;
+        issueTypes[type] = Number(raw[key]) || 0;
+      }
+    });
+
+    const sessionCounts: Record<string, number> = {};
+    Object.keys(raw).forEach((key) => {
+      if (key.startsWith("sessionCounts.")) {
+        const [, sessionId] = key.split(".");
+        if (!sessionId) return;
+        sessionCounts[sessionId] = Number(raw[key]) || 0;
+      }
+    });
+
     return {
       lifetime: {
         totalFeedback,
@@ -117,9 +217,9 @@ export default function InsightsPage() {
         resolutionRate: totalFeedback > 0 ? Math.round((totalResolved / totalFeedback) * 100) : 0,
       },
       analytics: {
-        daily: asRecord<DailyInsights>(data.daily),
-        issueTypes: asRecord<Record<string, number>>(data.issueTypes),
-        sessionCounts: asRecord<Record<string, number>>(data.sessionCounts),
+        daily: daily as DailyInsights,
+        issueTypes,
+        sessionCounts,
         response: {
           totalFirstReplyMs: asNonNegativeNumber(
             asRecord<Record<string, unknown>>(data.response).totalFirstReplyMs
@@ -131,16 +231,29 @@ export default function InsightsPage() {
   };
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!authUser) setLoading(false);
-  }, [authUser, authLoading]);
-
-  useEffect(() => {
-    if (!authUser) return;
-    console.log("🔥 WORKSPACE READY:", workspaceId);
-    if (!workspaceId || !isIdentityReady || !isIdentityResolved) {
+    if (!isIdentityResolved || !workspaceId) {
+      console.log("\u26D4 BLOCKED: Identity not ready (effect prevented)", {
+        workspaceId,
+        isIdentityResolved,
+        isIdentityReady,
+      });
       return;
     }
+    if (authLoading) return;
+    if (!authUser) setLoading(false);
+  }, [authUser, authLoading, workspaceId, isIdentityResolved]);
+
+  useEffect(() => {
+    if (!isIdentityResolved || !workspaceId) {
+      console.log("\u26D4 BLOCKED: Identity not ready (effect prevented)", {
+        workspaceId,
+        isIdentityResolved,
+        isIdentityReady,
+      });
+      return;
+    }
+    if (!authUser) return;
+    console.log("🔥 WORKSPACE READY:", workspaceId);
     const wid = workspaceId.trim();
     if (!wid) return;
 
@@ -149,23 +262,27 @@ export default function InsightsPage() {
     // Realtime: keep Insights UI synced to the insights doc (no queries).
     insightsDocWidRef.current = wid;
     const ref = workspaceInsightsRef(wid);
+    console.log("\u{1F4E1} SUBSCRIBING TO INSIGHTS", {
+      workspaceId,
+    });
     const unsubscribe = onSnapshot(
       ref,
       (snap) => {
         if (insightsDocWidRef.current !== wid) return;
-        console.log("🔥 RAW FIRESTORE:", snap.data());
+        console.log("\u{1F525} SNAPSHOT RECEIVED", snap.data());
+        console.log("\u{1F525} SNAP EXISTS", snap.exists());
         if (!snap.exists()) {
           const mapped = mapDocToApi(emptyWorkspaceInsightsDoc());
-          console.log("🔥 MAPPED DATA:", mapped);
+          console.log("\u{1F9E9} MAPPED DATA", mapped);
           setData(mapped);
-          console.log("🔥 STATE SET:", mapped);
+          console.log("\u2705 STATE SET", mapped.lifetime);
           setLoading(false);
           return;
         }
         const mapped = mapDocToApi(snap.data() as WorkspaceInsightsDoc);
-        console.log("🔥 MAPPED DATA:", mapped);
+        console.log("\u{1F9E9} MAPPED DATA", mapped);
         setData(mapped);
-        console.log("🔥 STATE SET:", mapped);
+        console.log("\u2705 STATE SET", mapped.lifetime);
         setLoading(false);
       },
       (err) => {
@@ -181,7 +298,7 @@ export default function InsightsPage() {
       }
       unsubscribe();
     };
-  }, [workspaceId, isIdentityReady, isIdentityResolved, authUser]);
+  }, [workspaceId, isIdentityReady, isIdentityResolved, authUser?.uid]);
 
   const filteredDaily = useMemo(() => {
     return filterDaily(data?.analytics?.daily ?? {}, rangeDays);
@@ -257,11 +374,18 @@ export default function InsightsPage() {
   const topSessionIdsKey = useMemo(() => topSessionIds.join(","), [topSessionIds]);
 
   useEffect(() => {
+    if (!isIdentityResolved || !workspaceId) {
+      console.log("\u26D4 BLOCKED: Identity not ready (effect prevented)", {
+        workspaceId,
+        isIdentityResolved,
+        isIdentityReady,
+      });
+      return;
+    }
     // CRITICAL: Do not run query until workspaceId is resolved
     // Prevents Firestore permission errors
     if (authLoading) return;
     if (!authUser) return;
-    if (!isIdentityReady) return;
     if (workspaceId == null || workspaceId.trim() === "") return;
     const wid = workspaceId.trim();
     if (topSessionIds.length === 0) {
@@ -273,29 +397,27 @@ export default function InsightsPage() {
     let cancelled = false;
     void (async () => {
       try {
-        const pairs = await Promise.all(
-          ids.map(async (sessionId) => {
-            try {
-              const snap = await getDoc(doc(db, "sessions", sessionId));
-              if (!snap.exists()) return null;
-              const sd = snap.data() as DocumentData;
-              if (sd.workspaceId !== wid) return null;
-              const title = (typeof sd.title === "string" ? sd.title : "").trim();
-              return [sessionId, title] as const;
-            } catch (err) {
-              console.error("[ECHLY] insights session title read failed", sessionId, err);
-              return null;
-            }
-          })
+        const sessionsQuery = query(
+          collection(db, "sessions"),
+          where(documentId(), "in", ids)
         );
+        const snapshot = await getDocs(sessionsQuery);
+        const titlePairs = new Map<string, string>();
+        for (const snap of snapshot.docs) {
+          const sessionId = snap.id;
+          const sd = snap.data() as DocumentData;
+          if (sd.workspaceId !== wid) continue;
+          const title = (typeof sd.title === "string" ? sd.title : "").trim();
+          titlePairs.set(sessionId, title);
+        }
         if (cancelled) return;
         const liveWid = workspaceIdLiveRef.current?.trim() ?? "";
         if (liveWid !== wid) return;
         setSessionTitleMap((prev) => {
           const next: Record<string, string> = { ...prev };
           for (const id of ids) delete next[id];
-          for (const p of pairs) {
-            if (p) next[p[0]] = p[1];
+          for (const [sessionId, title] of titlePairs) {
+            next[sessionId] = title;
           }
           return next;
         });
@@ -306,7 +428,31 @@ export default function InsightsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, authUser?.uid, workspaceId, isIdentityReady, topSessionIdsKey]);
+  }, [
+    authLoading,
+    authUser?.uid,
+    workspaceId,
+    isIdentityReady,
+    isIdentityResolved,
+    topSessionIdsKey,
+  ]);
+
+  useEffect(() => {
+    if (!isIdentityResolved || !workspaceId) {
+      console.log("\u26D4 BLOCKED: Identity not ready (effect prevented)", {
+        workspaceId,
+        isIdentityResolved,
+        isIdentityReady,
+      });
+      return;
+    }
+    if (!data) return;
+
+    console.log("\u{1F3AF} UI RENDER WITH DATA", {
+      feedback: data.lifetime.totalFeedback,
+      comments: data.lifetime.totalComments,
+    });
+  }, [data, workspaceId, isIdentityResolved]);
 
   const topSession = useMemo(() => {
     return sessionBars[0] ?? null;
@@ -332,12 +478,9 @@ export default function InsightsPage() {
       : resolutionRate >= 40
         ? "text-secondary"
         : "text-amber-600";
-  console.log("🔥 WORKSPACE ID:", workspaceId);
-  console.log("🔥 RENDER CHECK:", {
-    feedback: data?.lifetime?.totalFeedback,
-    comments: data?.lifetime?.totalComments,
-  });
-
+  if (isIdentityResolved && workspaceId) {
+    console.log("🔥 WORKSPACE ID:", workspaceId);
+  }
   return (
     <div className="flex-1 bg-white flex flex-col w-full min-h-0">
       <div className="pt-10 pb-12 max-w-[1200px] mx-auto px-6 w-full">
@@ -380,6 +523,7 @@ export default function InsightsPage() {
                   alt="Time saved"
                   width={120}
                   height={120}
+                  sizes="120px"
                   className="object-contain"
                   priority
                 />
@@ -404,7 +548,10 @@ export default function InsightsPage() {
           </div>
 
           {(data.lifetime?.totalFeedback ?? 0) === 0 &&
-            (data.lifetime?.totalComments ?? 0) === 0 ? (
+            (data.lifetime?.totalComments ?? 0) === 0 &&
+            Object.keys(data.analytics?.issueTypes ?? {}).length === 0 &&
+            Object.keys(data.analytics?.sessionCounts ?? {}).length === 0 &&
+            Object.keys(data.analytics?.daily ?? {}).length === 0 ? (
             <div className="flex justify-center py-6">
               <PageEmptyState
                 title="No feedback yet"

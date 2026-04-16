@@ -74,6 +74,36 @@ export async function GET(req: Request) {
     const resolutionRate =
       totalFeedback > 0 ? Math.round((totalResolved / totalFeedback) * 100) : 0;
 
+    const raw = docData as unknown as Record<string, unknown>;
+
+    const daily: WorkspaceInsightsDoc["daily"] = {};
+    Object.keys(raw).forEach((key) => {
+      if (key.startsWith("daily.")) {
+        const [, date, field] = key.split(".");
+        if (!date || !field) return;
+        if (!daily[date]) daily[date] = {} as WorkspaceInsightsDoc["daily"][string];
+        (daily[date] as Record<string, unknown>)[field] = raw[key];
+      }
+    });
+
+    const issueTypes: WorkspaceInsightsDoc["issueTypes"] = {};
+    Object.keys(raw).forEach((key) => {
+      if (key.startsWith("issueTypes.")) {
+        const [, type] = key.split(".");
+        if (!type) return;
+        issueTypes[type] = Number(raw[key]) || 0;
+      }
+    });
+
+    const sessionCounts: WorkspaceInsightsDoc["sessionCounts"] = {};
+    Object.keys(raw).forEach((key) => {
+      if (key.startsWith("sessionCounts.")) {
+        const [, sessionId] = key.split(".");
+        if (!sessionId) return;
+        sessionCounts[sessionId] = Number(raw[key]) || 0;
+      }
+    });
+
     const data: InsightsApiResponse = {
       lifetime: {
         totalFeedback,
@@ -83,9 +113,9 @@ export async function GET(req: Request) {
         resolutionRate,
       },
       analytics: {
-        daily: docData.daily ?? {},
-        issueTypes: docData.issueTypes ?? {},
-        sessionCounts: docData.sessionCounts ?? {},
+        daily,
+        issueTypes,
+        sessionCounts,
         response: docData.response ?? { totalFirstReplyMs: 0, count: 0 },
       },
     };

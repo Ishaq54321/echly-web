@@ -35,9 +35,8 @@ export function useCommentsRepoSubscription({
     const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
     if (!sid || !fid) return;
     try {
-      const all = await fetchComments(sid);
-      const filtered = all.filter((c) => c.feedbackId === fid);
-      onCommentsRef.current(filtered);
+      const scoped = await fetchComments(sid, { feedbackId: fid });
+      onCommentsRef.current(scoped);
     } catch (e) {
       console.error("[useCommentsRepoSubscription] fetchComments failed", e);
     }

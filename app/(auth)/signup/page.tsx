@@ -83,7 +83,14 @@ export default function SignupPage() {
     <AuthLayout>
       <div className="flex flex-col items-center w-full max-w-[420px]">
         <Link href="/" className="mb-8" aria-label="Echly home">
-          <Image src="/Echly_logo.svg" alt="Echly" width={120} height={32} className="h-8 w-auto" />
+          <Image
+            src="/Echly_logo.svg"
+            alt="Echly"
+            width={120}
+            height={32}
+            sizes="120px"
+            className="h-8 w-auto"
+          />
         </Link>
         <h1 className="text-5xl font-semibold tracking-tight text-gray-900 text-center mb-3">
         Capture Feedback Exactly Where it Happens

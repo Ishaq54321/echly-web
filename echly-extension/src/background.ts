@@ -14,6 +14,44 @@ import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
 const LOGIN_URL = `${WEB_APP_URL}/login`;
 /** Extension token TTL from backend is 15m; treat as valid for 14 min to avoid edge expiry. */
 const EXTENSION_TOKEN_TTL_MS = 14 * 60 * 1000;
+const MAX_VISIBLE_TEXT_LENGTH = 2000;
+
+type OcrWorkerLike = {
+  recognize: (
+    image: string
+  ) => Promise<{
+    data?: { text?: string };
+  }>;
+  /** tesseract.js returns ConfigResult; callers may ignore it. */
+  terminate: () => Promise<unknown>;
+};
+
+let ocrWorkerPromise: Promise<OcrWorkerLike> | null = null;
+
+async function getOrCreateOcrWorker(): Promise<OcrWorkerLike> {
+  if (ocrWorkerPromise) return ocrWorkerPromise;
+  ocrWorkerPromise = (async () => {
+    const Tesseract = await import("tesseract.js");
+    return Tesseract.createWorker("eng", undefined, {
+      logger: () => {},
+    }) as Promise<OcrWorkerLike>;
+  })();
+  return ocrWorkerPromise;
+}
+
+async function recognizeVisibleTextFromImage(imageDataUrl: string): Promise<string> {
+  if (!imageDataUrl || typeof imageDataUrl !== "string") return "";
+  try {
+    const worker = await getOrCreateOcrWorker();
+    const result = await worker.recognize(imageDataUrl);
+    const text = result?.data?.text;
+    if (!text || typeof text !== "string") return "";
+    return text.replace(/\s+/g, " ").trim().slice(0, MAX_VISIBLE_TEXT_LENGTH);
+  } catch (error) {
+    console.error("[ECHLY] OCR in background failed", error);
+    return "";
+  }
+}
 
 async function openOrFocusLoginTab(): Promise<void> {
   const tabs = await chrome.tabs.query({});
@@ -619,6 +657,20 @@ self.addEventListener("activate", () => {
   if (ECHLY_DEBUG) console.log("[ECHLY] service worker activated");
 });
 
+chrome.runtime.onSuspend.addListener(() => {
+  if (!ocrWorkerPromise) return;
+  void (async () => {
+    try {
+      const worker = await ocrWorkerPromise!;
+      await worker.terminate();
+    } catch {
+      // ignore worker teardown errors on suspend
+    } finally {
+      ocrWorkerPromise = null;
+    }
+  })();
+});
+
 (async () => {
   try {
     const stored = await chrome.storage.local.get([
@@ -742,20 +794,99 @@ async function requireAuthForExplicitOpen(): Promise<boolean> {
   return false;
 }
 
-function broadcastUIState(): void {
-  const state = getCanonicalGlobalState();
-  echlyLog("BACKGROUND", "broadcast global state", state);
-  chrome.tabs.query({}, (tabs) => {
-    tabs.forEach((tab) => {
-      if (tab.id) {
-        chrome.tabs
-          .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state })
-          .catch((error) => {
-            console.error("[ECHLY] broadcast ECHLY_GLOBAL_STATE to tab failed", tab.id, error);
-          });
-      }
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+type JsonObject = { [key: string]: JsonValue };
+
+const STATE_BROADCAST_DEBOUNCE_MS = 120;
+let pendingBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingBroadcastState: CanonicalGlobalState | null = null;
+let lastBroadcastState: CanonicalGlobalState | null = null;
+
+function isPlainObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function jsonEquals(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function buildStatePatch(
+  prev: CanonicalGlobalState | null,
+  next: CanonicalGlobalState
+): Record<string, unknown> {
+  if (!prev) return next as unknown as Record<string, unknown>;
+
+  const diff = (before: JsonValue | undefined, after: JsonValue): JsonValue | undefined => {
+    if (jsonEquals(before, after)) return undefined;
+    if (!isPlainObject(after)) return after;
+    if (!isPlainObject(before)) return after;
+
+    const out: JsonObject = {};
+    for (const key of Object.keys(after)) {
+      const nested = diff(before[key], after[key]);
+      if (nested !== undefined) out[key] = nested;
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
+  };
+
+  const patch: Record<string, unknown> = {};
+  for (const key of Object.keys(next) as Array<keyof CanonicalGlobalState>) {
+    const changed = diff(
+      prev[key] as unknown as JsonValue | undefined,
+      next[key] as unknown as JsonValue
+    );
+    if (changed !== undefined) patch[key] = changed;
+  }
+  return patch;
+}
+
+async function getActiveTabIdForBroadcast(): Promise<number | null> {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTabId = tabs[0]?.id;
+    if (typeof activeTabId === "number") return activeTabId;
+  } catch (error) {
+    console.warn("[ECHLY] active tab query failed for broadcast", error);
+  }
+  if (typeof activeOwnerTabId === "number") return activeOwnerTabId;
+  if (typeof sw.lastUserTabId === "number") return sw.lastUserTabId;
+  return null;
+}
+
+async function flushBroadcastUIState(): Promise<void> {
+  pendingBroadcastTimer = null;
+  const state = pendingBroadcastState ?? getCanonicalGlobalState();
+  pendingBroadcastState = null;
+
+  const patch = buildStatePatch(lastBroadcastState, state);
+  if (Object.keys(patch).length === 0) return;
+
+  const tabId = await getActiveTabIdForBroadcast();
+  if (typeof tabId !== "number") return;
+
+  echlyLog("BACKGROUND", "broadcast global state", { tabId, patch });
+  chrome.tabs
+    .sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state, patch })
+    .catch((error) => {
+      console.error("[ECHLY] broadcast ECHLY_GLOBAL_STATE to tab failed", tabId, error);
     });
-  });
+
+  lastBroadcastState = state;
+}
+
+function broadcastUIState(): void {
+  pendingBroadcastState = getCanonicalGlobalState();
+  if (pendingBroadcastTimer != null) return;
+  pendingBroadcastTimer = setTimeout(() => {
+    void flushBroadcastUIState();
+  }, STATE_BROADCAST_DEBOUNCE_MS);
 }
 
 function getCanonicalGlobalState(): CanonicalGlobalState {
@@ -910,9 +1041,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
-/** Loom-style: when a page finishes loading and Echly is active, inject content script so widget appears. */
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
+/** Loom-style: only sync global state to the active tab after load completes. */
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;
+  if (!tab.active) return;
   const { echlyActive } = await chrome.storage.local.get("echlyActive");
   if (!echlyActive) return;
   try {
@@ -925,8 +1057,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
   }
 });
 
-/** When a new tab is created, push current session state. Fails silently if content script not yet injected. */
+/** New tabs will get state on activation; avoid background-tab state broadcasts. */
 chrome.tabs.onCreated.addListener((tab) => {
+  if (!tab.active) return;
   if (!tab.id) return;
   chrome.tabs
     .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: getCanonicalGlobalState() })
@@ -1557,6 +1690,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true, screenshot: dataUrl });
       } catch (error) {
         sendResponse({ success: false });
+      }
+    })();
+    return true;
+  }
+
+  if (request.type === "ECHLY_OCR_VISIBLE_TEXT") {
+    (async () => {
+      try {
+        const imageDataUrl = (request as { imageDataUrl?: string }).imageDataUrl ?? "";
+        const text = await recognizeVisibleTextFromImage(imageDataUrl);
+        sendResponse({ success: true, text });
+      } catch (error) {
+        console.error("[ECHLY] ECHLY_OCR_VISIBLE_TEXT failed", error);
+        sendResponse({ success: false, text: "" });
       }
     })();
     return true;

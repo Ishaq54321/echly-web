@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Expand, Paperclip, RefreshCw, Send } from "lucide-react";
@@ -16,8 +17,15 @@ import {
 } from "@/lib/comments";
 import type { Comment, CommentAttachment } from "@/lib/domain/comment";
 import { useToast } from "@/components/dashboard/context/ToastContext";
-import { AttachmentUploadModal } from "@/components/discussion/AttachmentUploadModal";
 import { CommentItem } from "@/components/comments/CommentItem";
+
+const AttachmentUploadModal = dynamic(
+  () =>
+    import("@/components/discussion/AttachmentUploadModal").then(
+      (m) => m.AttachmentUploadModal
+    ),
+  { ssr: false }
+);
 import {
   assertIdentityResolved,
   useWorkspace,
@@ -466,11 +474,13 @@ export function DiscussionThread({
         </div>
       </div>
 
-      <AttachmentUploadModal
-        open={attachmentModalOpen}
-        onClose={() => setAttachmentModalOpen(false)}
-        onSend={handleAttachmentSend}
-      />
+      {attachmentModalOpen ? (
+        <AttachmentUploadModal
+          open
+          onClose={() => setAttachmentModalOpen(false)}
+          onSend={handleAttachmentSend}
+        />
+      ) : null}
 
       {/* Screenshot modal overlay */}
       {screenshotModalOpen && resolvedScreenshotSrc && (
@@ -490,6 +500,7 @@ export function DiscussionThread({
               alt="Feedback screenshot"
               width={1200}
               height={800}
+              sizes="85vw"
               className="w-full h-full object-contain max-w-[85vw] max-h-[85vh]"
               unoptimized={resolvedScreenshotSrc.startsWith("data:")}
             />

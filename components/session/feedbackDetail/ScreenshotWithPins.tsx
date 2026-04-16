@@ -391,7 +391,7 @@ const ScreenshotWithPinsInner = ({
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-neutral-100 overflow-hidden shrink-0">
                     {userAvatar ? (
-                      <Image src={userAvatar} alt="" width={36} height={36} className="w-full h-full object-cover" unoptimized />
+                      <Image src={userAvatar} alt="" width={36} height={36} sizes="36px" className="w-full h-full object-cover" unoptimized />
                     ) : (
                       <span className="w-full h-full flex items-center justify-center text-[12px] font-medium text-secondary">{userName.charAt(0)}</span>
                     )}
@@ -450,7 +450,7 @@ const ScreenshotWithPinsInner = ({
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-neutral-100 overflow-hidden shrink-0">
                     {root.userAvatar ? (
-                      <Image src={root.userAvatar} alt="" width={36} height={36} className="w-full h-full object-cover" unoptimized />
+                      <Image src={root.userAvatar} alt="" width={36} height={36} sizes="36px" className="w-full h-full object-cover" unoptimized />
                     ) : (
                       <span className="w-full h-full flex items-center justify-center text-[12px] font-medium text-secondary">{root.userName?.charAt(0) ?? "?"}</span>
                     )}
