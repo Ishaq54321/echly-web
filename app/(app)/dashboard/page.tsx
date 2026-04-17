@@ -4,10 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import {
-  WorkspaceOverviewProvider,
-  useWorkspaceOverview,
-} from "@/lib/client/workspaceOverviewContext";
+import { useWorkspaceStore } from "@/lib/client/workspaceStore";
 import type { SessionWithCounts } from "./hooks/useWorkspaceOverview";
 import { SessionsWorkspace } from "@/components/dashboard/SessionsWorkspace";
 import {
@@ -64,7 +61,7 @@ function DashboardContent() {
     updateSession,
     setSessionArchived,
     deleteSession,
-  } = useWorkspaceOverview();
+  } = useWorkspaceStore();
   const { authUid, isIdentityResolved } = useWorkspace();
   const stableSessions = useStableState(sessions, true, authUid);
   const { search } = useSessionsSearch();
@@ -123,6 +120,9 @@ function DashboardContent() {
     };
   }, [debouncedSearch, listArchiveTab, sessionsTimeRange, stableSessions]);
 
+  // PERF R-013: removed redundant `listArchiveTab` dep — tabFilteredSessions
+  // is already derived from listArchiveTab, so adding it directly was causing
+  // an extra recompute on every tab switch before tabFilteredSessions settled.
   const workspaceSections = useMemo(
     () => [
       {
@@ -131,7 +131,7 @@ function DashboardContent() {
         items: tabFilteredSessions,
       },
     ],
-    [listArchiveTab, tabFilteredSessions]
+    [tabFilteredSessions]
   );
 
   const handleView = (sessionId: string) => {
@@ -246,12 +246,10 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   return (
-    <WorkspaceOverviewProvider>
-      <SessionsSearchProvider>
-        <ToastProvider>
-          <DashboardContent />
-        </ToastProvider>
-      </SessionsSearchProvider>
-    </WorkspaceOverviewProvider>
+    <SessionsSearchProvider>
+      <ToastProvider>
+        <DashboardContent />
+      </ToastProvider>
+    </SessionsSearchProvider>
   );
 }

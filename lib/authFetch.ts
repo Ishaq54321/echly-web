@@ -1,8 +1,11 @@
 import { auth } from "@/lib/firebase";
 import { getShareToken } from "@/lib/client/shareToken";
 
+// PERF R-014: guard behind NODE_ENV so localStorage is never read in production
+// builds — eliminates a synchronous localStorage read on every authFetch call.
 function echlyPerfEnabled(): boolean {
   return (
+    process.env.NODE_ENV === "development" &&
     typeof window !== "undefined" &&
     typeof localStorage !== "undefined" &&
     localStorage.getItem("ECHLY_PERF") === "1"

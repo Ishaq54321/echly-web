@@ -20,11 +20,7 @@ import {
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { useStableState } from "@/lib/client/perception/useStableState";
-import {
-  mergeScreenshotResolveOpts,
-  resolveScreenshotUrl,
-  type ResolveScreenshotUrlOptions,
-} from "@/lib/client/screenshotResolver";
+import { getScreenshotUrl } from "@/lib/client/screenshotResolver";
 import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
@@ -40,6 +36,11 @@ import {
   responseIsPermissionDenied,
 } from "@/lib/client/permissionError";
 import { safeResolveAction } from "@/lib/client/safeResolveAction";
+import {
+  getSessionDetailCache,
+  setSessionDetailCache,
+  invalidateSessionDetailCache,
+} from "@/lib/client/sessionDetailCache";
 import { warn } from "@/lib/utils/logger";
 import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import {
@@ -62,6 +63,9 @@ const RequestAccessModal = dynamic(
   { ssr: false }
 );
 import { Modal } from "@/components/ui/Modal";
+
+/** Session page: single GET for session + first feedback page. Set false to restore legacy `/api/sessions` + `/api/feedback` first page. */
+const USE_BUNDLE = true;
 
 /** Broadcast ticket update to extension tray so tray stays in sync. */
 function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps?: string[] | null; type?: string }) {
@@ -148,6 +152,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [sessionAccess, setSessionAccess] = useState<AccessCapabilities | null>(null);
   /** From GET /api/sessions/:id `data.request.pendingResolve` or successful POST /request-access. */
   const [pendingResolveRequest, setPendingResolveRequest] = useState(false);
+  /** First feedback page from GET /api/session-page-bundle when {@link USE_BUNDLE} is true. */
+  const [bundledFirstFeedbackPage, setBundledFirstFeedbackPage] = useState<{
+    feedback: Record<string, unknown>[];
+    nextCursor?: string | null;
+    hasMore?: boolean;
+  } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
@@ -165,7 +175,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /** Invalidates in-flight load work when the effect re-runs (e.g. React Strict Mode). */
   const sessionLoadEffectNonceRef = useRef(0);
 
-  const { authUid, isIdentityResolved, authReady, workspaceId } = useWorkspace();
+  const { authUid, isIdentityResolved, authReady } = useWorkspace();
   const { showToast } = useToast();
 
   const handleRequestResolveAccess = useCallback(async () => {
@@ -235,26 +245,6 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   shareTokenForApiRef.current = shareTokenForApi;
   const isAnonymousViewer = authReady && !authUid;
 
-  const screenshotUrlResolveOptions = useMemo((): ResolveScreenshotUrlOptions | undefined => {
-    const shareTok = shareTokenForApi.trim();
-    if (shareTok !== "") {
-      return { shareToken: shareTok };
-    }
-    const sessionWs = (session?.workspaceId ?? "").trim();
-    if (!sessionWs) return undefined;
-    const viewerWs = (workspaceId ?? "").trim();
-    const useClientFirebaseUrl = Boolean(
-      authUid?.trim() && viewerWs && sessionWs && viewerWs === sessionWs
-    );
-    if (useClientFirebaseUrl) {
-      return { useClientFirebaseUrl: true };
-    }
-    if (authUid?.trim()) {
-      return { useClientFirebaseUrl: false, useSessionCookieProxy: true };
-    }
-    return { useClientFirebaseUrl: false };
-  }, [shareTokenForApi, session?.workspaceId, authUid, workspaceId]);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -304,6 +294,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     setSearchResults([]);
     setSearchLoading(false);
     setAccessBlocked(false);
+    setBundledFirstFeedbackPage(null);
   }, [sessionId]);
 
   useEffect(() => {
@@ -432,6 +423,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           ? { total: sessionRestTotal, open: sessionRestOpen, resolved: sessionRestResolved }
           : null,
       restFetch: restFeedbackFetch,
+      awaitBundledFirstFeedback: USE_BUNDLE,
+      bundledFirstFeedbackPage: USE_BUNDLE ? bundledFirstFeedbackPage : null,
     }),
     [
       authReady,
@@ -441,6 +434,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       sessionRestTotal,
       sessionRestOpen,
       sessionRestResolved,
+      bundledFirstFeedbackPage,
     ]
   );
 
@@ -659,6 +653,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       setSessionFetchError(null);
       setAccessBlocked(false);
       setPendingResolveRequest(false);
+      setBundledFirstFeedbackPage(null);
       return;
     }
 
@@ -695,93 +690,133 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
       const tok = shareTokenForApiRef.current;
       const qs = tok !== "" ? `?token=${encodeURIComponent(tok)}` : "";
-      const url = `/api/sessions/${encodeURIComponent(sessionId)}${qs}`;
-      const res = await authFetchOrAnonCookie(url);
-      if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
-      const body = await res.json().catch(() => null);
-      if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
-      if (body === null || typeof body !== "object") {
-        setSessionFetchError("error");
-        return;
-      }
-      const accessRoot = body as {
-        access?: { capabilities?: Partial<AccessCapabilities> };
-      };
-      if (res.status === 403) {
-        const cap = accessRoot.access?.capabilities;
-        if (cap && cap.canView === false) {
-          setAccessBlocked(true);
-          setSession(null);
+
+      if (USE_BUNDLE) {
+        // PERF R-006: check in-memory cache before issuing a network request —
+        // avoids 2 Firestore reads on every back-navigation to the same session.
+        const cached = getSessionDetailCache(sessionId.trim());
+        if (cached) {
+          setSession(cached.session);
+          setSessionAccess(cached.sessionAccess);
+          setPendingResolveRequest(cached.pendingResolveRequest);
+          setBundledFirstFeedbackPage(cached.bundledFirstFeedbackPage);
           setSessionFetchError(null);
-          setPendingResolveRequest(false);
-          setSessionAccess({
-            canView: false,
-            canComment: cap.canComment === true,
-            canResolve: cap.canResolve === true,
-            canAssign: cap.canAssign === true,
-            canDeleteOwnComment: cap.canDeleteOwnComment !== false,
-            canDeleteTicket: cap.canDeleteTicket === true,
-          });
+          setAccessBlocked(false);
           return;
         }
-        setAccessBlocked(false);
-        setSession(null);
-        setSessionAccess(null);
-        setPendingResolveRequest(false);
-        setSessionFetchError("forbidden");
-        return;
-      }
-      if (res.status === 404) {
-        setAccessBlocked(false);
-        setSession(null);
-        setSessionAccess(null);
-        setPendingResolveRequest(false);
-        setSessionFetchError("not_found");
-        return;
-      }
-      if (!res.ok) {
-        setAccessBlocked(false);
-        setSession(null);
-        setSessionAccess(null);
-        setPendingResolveRequest(false);
-        setSessionFetchError("error");
-        return;
-      }
-      let sessionPayload: Record<string, unknown>;
-      let requestPayload: { pendingResolve?: boolean } | undefined;
-      try {
-        const inner = requireApiSuccessData<{
-          session: Record<string, unknown>;
-          request?: { pendingResolve?: boolean };
-        }>(body);
-        sessionPayload = inner.session;
-        requestPayload = inner.request;
-      } catch {
-        setAccessBlocked(false);
-        setSession(null);
-        setSessionAccess(null);
-        setPendingResolveRequest(false);
-        setSessionFetchError("error");
-        return;
-      }
-      if (!sessionPayload) {
-        setAccessBlocked(false);
-        setSession(null);
-        setSessionAccess(null);
-        setPendingResolveRequest(false);
-        setSessionFetchError("error");
-        return;
-      }
-      setSessionFetchError(null);
-      const raw = sessionPayload as { accessLevel?: unknown };
-      setSession({
-        id: sessionId,
-        ...(sessionPayload as object),
-        accessLevel: requireAccessLevel(raw.accessLevel),
-      } as Session);
-      const cap = accessRoot.access?.capabilities;
-      setSessionAccess(
-        cap
+
+        const bundleSp = new URLSearchParams({ sessionId: sessionId.trim() });
+        if (tok !== "") bundleSp.set("token", tok);
+        const bundleUrl = `/api/session-page-bundle?${bundleSp.toString()}`;
+        const res = await authFetchOrAnonCookie(bundleUrl);
+        if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
+        const body = await res.json().catch(() => null);
+        if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
+        if (body === null || typeof body !== "object") {
+          setBundledFirstFeedbackPage(null);
+          setSessionFetchError("error");
+          return;
+        }
+        const accessRoot = body as {
+          access?: { capabilities?: Partial<AccessCapabilities> };
+        };
+        if (res.status === 403) {
+          setBundledFirstFeedbackPage(null);
+          const cap = accessRoot.access?.capabilities;
+          if (cap && cap.canView === false) {
+            setAccessBlocked(true);
+            setSession(null);
+            setSessionFetchError(null);
+            setPendingResolveRequest(false);
+            setSessionAccess({
+              canView: false,
+              canComment: cap.canComment === true,
+              canResolve: cap.canResolve === true,
+              canAssign: cap.canAssign === true,
+              canDeleteOwnComment: cap.canDeleteOwnComment !== false,
+              canDeleteTicket: cap.canDeleteTicket === true,
+            });
+            return;
+          }
+          setAccessBlocked(false);
+          setSession(null);
+          setSessionAccess(null);
+          setPendingResolveRequest(false);
+          setSessionFetchError("forbidden");
+          return;
+        }
+        if (res.status === 404) {
+          setBundledFirstFeedbackPage(null);
+          setAccessBlocked(false);
+          setSession(null);
+          setSessionAccess(null);
+          setPendingResolveRequest(false);
+          setSessionFetchError("not_found");
+          return;
+        }
+        if (!res.ok) {
+          setBundledFirstFeedbackPage(null);
+          setAccessBlocked(false);
+          setSession(null);
+          setSessionAccess(null);
+          setPendingResolveRequest(false);
+          setSessionFetchError("error");
+          return;
+        }
+        let sessionPayload: Record<string, unknown>;
+        let requestPayload: { pendingResolve?: boolean } | undefined;
+        let bundleFeedbackRows: Record<string, unknown>[] = [];
+        let bundleNextCursor: string | null = null;
+        let bundleHasMore = false;
+        let bundleCapabilities: Partial<AccessCapabilities> | undefined;
+        try {
+          const inner = requireApiSuccessData<{
+            session: Record<string, unknown>;
+            feedback: unknown[];
+            nextCursor?: string | null;
+            hasMore?: boolean;
+            request?: { pendingResolve?: boolean };
+            access?: { capabilities?: Partial<AccessCapabilities> };
+          }>(body);
+          sessionPayload = inner.session;
+          requestPayload = inner.request;
+          bundleCapabilities = inner.access?.capabilities;
+          bundleFeedbackRows = Array.isArray(inner.feedback)
+            ? (inner.feedback as Record<string, unknown>[])
+            : [];
+          bundleNextCursor =
+            typeof inner.nextCursor === "string" || inner.nextCursor === null
+              ? inner.nextCursor
+              : null;
+          bundleHasMore = inner.hasMore === true;
+        } catch {
+          setBundledFirstFeedbackPage(null);
+          setAccessBlocked(false);
+          setSession(null);
+          setSessionAccess(null);
+          setPendingResolveRequest(false);
+          setSessionFetchError("error");
+          return;
+        }
+        if (!sessionPayload) {
+          setBundledFirstFeedbackPage(null);
+          setAccessBlocked(false);
+          setSession(null);
+          setSessionAccess(null);
+          setPendingResolveRequest(false);
+          setSessionFetchError("error");
+          return;
+        }
+        setSessionFetchError(null);
+        const raw = sessionPayload as { accessLevel?: unknown };
+        const assembledSession = {
+          id: sessionId,
+          ...(sessionPayload as object),
+          accessLevel: requireAccessLevel(raw.accessLevel),
+        } as Session;
+        setSession(assembledSession);
+        const cap = accessRoot.access?.capabilities ?? bundleCapabilities;
+        const assembledAccess: AccessCapabilities | null = cap
           ? {
               canView: cap.canView !== false,
               canComment: cap.canComment === true,
@@ -790,27 +825,143 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               canDeleteOwnComment: cap.canDeleteOwnComment !== false,
               canDeleteTicket: cap.canDeleteTicket === true,
             }
-          : null
-      );
-      setPendingResolveRequest(
-        requestPayload !== undefined && requestPayload.pendingResolve === true
-      );
-      // Authenticated: Loom-style view count via Bearer. Anonymous: share link token (sessionStorage / URL) on the request.
-      if (authUid?.trim()) {
-        const viewerId = getViewerId(authUid);
-        void recordSessionViewIfNew(sessionId, viewerId).catch((err) => {
-          console.warn("[ECHLY] recordSessionViewIfNew failed", err);
+          : null;
+        setSessionAccess(assembledAccess);
+        const assembledPendingResolve =
+          requestPayload !== undefined && requestPayload.pendingResolve === true;
+        setPendingResolveRequest(assembledPendingResolve);
+        const assembledFeedbackPage = {
+          feedback: bundleFeedbackRows,
+          nextCursor: bundleNextCursor,
+          hasMore: bundleHasMore,
+        };
+        setBundledFirstFeedbackPage(assembledFeedbackPage);
+        // PERF R-006: store in cache so back-navigation skips the network round-trip
+        setSessionDetailCache(sessionId.trim(), {
+          session: assembledSession,
+          sessionAccess: assembledAccess,
+          pendingResolveRequest: assembledPendingResolve,
+          bundledFirstFeedbackPage: assembledFeedbackPage,
         });
+        /* View count: recorded server-side in GET /api/session-page-bundle (see recordSessionViewIfNewRepo). */
       } else {
-        const viewUrl = `/api/sessions/${encodeURIComponent(sessionId)}/view`;
-        void authFetchOrAnonCookie(viewUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            shareToken:
-              shareTokenForApiRef.current !== "" ? shareTokenForApiRef.current : undefined,
-          }),
-        }).catch(() => {});
+        const url = `/api/sessions/${encodeURIComponent(sessionId)}${qs}`;
+        const res = await authFetchOrAnonCookie(url);
+        if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
+        const body = await res.json().catch(() => null);
+        if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
+        if (body === null || typeof body !== "object") {
+          setSessionFetchError("error");
+          return;
+        }
+        const accessRoot = body as {
+          access?: { capabilities?: Partial<AccessCapabilities> };
+        };
+        if (res.status === 403) {
+          const cap = accessRoot.access?.capabilities;
+          if (cap && cap.canView === false) {
+            setAccessBlocked(true);
+            setSession(null);
+            setSessionFetchError(null);
+            setPendingResolveRequest(false);
+            setSessionAccess({
+              canView: false,
+              canComment: cap.canComment === true,
+              canResolve: cap.canResolve === true,
+              canAssign: cap.canAssign === true,
+              canDeleteOwnComment: cap.canDeleteOwnComment !== false,
+              canDeleteTicket: cap.canDeleteTicket === true,
+            });
+            return;
+          }
+          setAccessBlocked(false);
+          setSession(null);
+          setSessionAccess(null);
+          setPendingResolveRequest(false);
+          setSessionFetchError("forbidden");
+          return;
+        }
+        if (res.status === 404) {
+          setAccessBlocked(false);
+          setSession(null);
+          setSessionAccess(null);
+          setPendingResolveRequest(false);
+          setSessionFetchError("not_found");
+          return;
+        }
+        if (!res.ok) {
+          setAccessBlocked(false);
+          setSession(null);
+          setSessionAccess(null);
+          setPendingResolveRequest(false);
+          setSessionFetchError("error");
+          return;
+        }
+        let sessionPayload: Record<string, unknown>;
+        let requestPayload: { pendingResolve?: boolean } | undefined;
+        try {
+          const inner = requireApiSuccessData<{
+            session: Record<string, unknown>;
+            request?: { pendingResolve?: boolean };
+          }>(body);
+          sessionPayload = inner.session;
+          requestPayload = inner.request;
+        } catch {
+          setAccessBlocked(false);
+          setSession(null);
+          setSessionAccess(null);
+          setPendingResolveRequest(false);
+          setSessionFetchError("error");
+          return;
+        }
+        if (!sessionPayload) {
+          setAccessBlocked(false);
+          setSession(null);
+          setSessionAccess(null);
+          setPendingResolveRequest(false);
+          setSessionFetchError("error");
+          return;
+        }
+        setSessionFetchError(null);
+        const raw = sessionPayload as { accessLevel?: unknown };
+        setSession({
+          id: sessionId,
+          ...(sessionPayload as object),
+          accessLevel: requireAccessLevel(raw.accessLevel),
+        } as Session);
+        const cap = accessRoot.access?.capabilities;
+        setSessionAccess(
+          cap
+            ? {
+                canView: cap.canView !== false,
+                canComment: cap.canComment === true,
+                canResolve: cap.canResolve === true,
+                canAssign: cap.canAssign === true,
+                canDeleteOwnComment: cap.canDeleteOwnComment !== false,
+                canDeleteTicket: cap.canDeleteTicket === true,
+              }
+            : null
+        );
+        setPendingResolveRequest(
+          requestPayload !== undefined && requestPayload.pendingResolve === true
+        );
+        // Authenticated: Loom-style view count via Bearer. Anonymous: share link token (sessionStorage / URL) on the request.
+        if (authUid?.trim()) {
+          const viewerId = getViewerId(authUid);
+          void recordSessionViewIfNew(sessionId, viewerId).catch((err) => {
+            console.warn("[ECHLY] recordSessionViewIfNew failed", err);
+          });
+        } else {
+          const viewUrl = `/api/sessions/${encodeURIComponent(sessionId)}/view`;
+          void authFetchOrAnonCookie(viewUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              shareToken:
+                shareTokenForApiRef.current !== "" ? shareTokenForApiRef.current : undefined,
+            }),
+          }).catch(() => {});
+        }
       }
     })();
     return () => {
@@ -928,27 +1079,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   useEffect(() => {
     const delayMs = 300;
     const handle = window.setTimeout(() => {
-      void (async () => {
-        const mergedOpts = mergeScreenshotResolveOpts(
-          screenshotUrlResolveOptions,
-          searchParams
-        );
-        if (preloadNextScreenshotId) {
-          const nextUrl = await resolveScreenshotUrl(
-            preloadNextScreenshotId,
-            mergedOpts
-          );
-          if (nextUrl) preloadImage(nextUrl, preloadedScreenshotUrlsRef.current);
-        }
-      })();
+      const sid = sessionId?.trim() ?? "";
+      if (!preloadNextScreenshotId || !sid) return;
+      const nextUrl = getScreenshotUrl(preloadNextScreenshotId, { sessionId: sid });
+      if (nextUrl) preloadImage(nextUrl, preloadedScreenshotUrlsRef.current);
     }, delayMs);
     return () => window.clearTimeout(handle);
-  }, [
-    selectedIndex,
-    preloadNextScreenshotId,
-    screenshotUrlResolveOptions,
-    searchParamsSignature,
-  ]);
+  }, [selectedIndex, preloadNextScreenshotId, sessionId]);
 
   const selectedBaseItem = useMemo(
     () => stableCanonicalFeedback.find((t) => t.id === effectiveSelectedId) ?? null,
@@ -959,7 +1096,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     url: selectedScreenshotUrl,
     loading: selectedScreenshotUrlLoading,
     error: selectedScreenshotUrlError,
-  } = useScreenshotUrl(selectedScreenshotId, screenshotUrlResolveOptions);
+  } = useScreenshotUrl(selectedScreenshotId, {
+    sessionId: sessionId?.trim() ?? "",
+  });
 
   const contextualPosition = useMemo(() => {
     if (!effectiveSelectedId) return { index: 0, total: -1 };
@@ -1396,7 +1535,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             );
           };
 
+          // PERF R-014: guard behind NODE_ENV so localStorage is never read in
+          // production builds — eliminates a synchronous localStorage read per resolve.
           const perf =
+            process.env.NODE_ENV === "development" &&
             typeof window !== "undefined" &&
             typeof localStorage !== "undefined" &&
             localStorage.getItem("ECHLY_PERF") === "1";
@@ -1437,6 +1579,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
                 item.id === ticketId ? { ...item, ...ticketPayload } : item
               )
             );
+            // PERF R-006: session counters changed — stale cache entry must be
+            // evicted so the next navigation re-fetches accurate counts.
+            invalidateSessionDetailCache(sessionId);
             broadcastTicketUpdated(ticketPayload);
           } catch (err) {
             console.error("[ECHLY] saveResolved failed", err);
@@ -1580,38 +1725,24 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             )
           );
           try {
-            const settled = await Promise.allSettled(
-              active.map((item) =>
-                authFetch(`/api/tickets/${item.id}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ isResolved: true }),
-                  timeout: 60000,
-                })
-              )
-            );
-            const failedIds = new Set<string>();
-            let anyPermissionDenied = false;
-            settled.forEach((entry, index) => {
-              const id = active[index]!.id;
-              if (entry.status === "rejected") {
-                failedIds.add(id);
-                return;
-              }
-              const r = entry.value;
-              if (r == null || !r.ok) {
-                failedIds.add(id);
-                if (r != null && responseIsPermissionDenied(r)) anyPermissionDenied = true;
-              }
+            // PERF R-002: single batch request instead of N individual PATCH requests
+            const res = await authFetch(`/api/feedback/batch-resolve`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sessionId,
+                feedbackIds: active.map((item) => item.id),
+                isResolved: true,
+              }),
+              timeout: 60000,
             });
-            if (failedIds.size > 0) {
+            // PERF R-006: invalidate cache after bulk resolve so next navigation re-fetches fresh counters
+            invalidateSessionDetailCache(sessionId);
+            if (!res || !res.ok) {
               setFeedback((prev) =>
-                prev.map((item) => {
-                  if (!failedIds.has(item.id)) return item;
-                  return previousById.get(item.id) ?? item;
-                })
+                prev.map((item) => previousById.get(item.id) ?? item)
               );
-              if (anyPermissionDenied) notifyPermissionDenied(showToast);
+              if (res != null && responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
               else showToast("Could not resolve all tickets");
             }
           } catch (err) {
@@ -1645,38 +1776,24 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             )
           );
           try {
-            const settled = await Promise.allSettled(
-              resolved.map((item) =>
-                authFetch(`/api/tickets/${item.id}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ isResolved: false }),
-                  timeout: 60000,
-                })
-              )
-            );
-            const failedIds = new Set<string>();
-            let anyPermissionDenied = false;
-            settled.forEach((entry, index) => {
-              const id = resolved[index]!.id;
-              if (entry.status === "rejected") {
-                failedIds.add(id);
-                return;
-              }
-              const r = entry.value;
-              if (r == null || !r.ok) {
-                failedIds.add(id);
-                if (r != null && responseIsPermissionDenied(r)) anyPermissionDenied = true;
-              }
+            // PERF R-002: single batch request instead of N individual PATCH requests
+            const res = await authFetch(`/api/feedback/batch-resolve`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sessionId,
+                feedbackIds: resolved.map((item) => item.id),
+                isResolved: false,
+              }),
+              timeout: 60000,
             });
-            if (failedIds.size > 0) {
+            // PERF R-006: invalidate cache after bulk unresolve so next navigation re-fetches fresh counters
+            invalidateSessionDetailCache(sessionId);
+            if (!res || !res.ok) {
               setFeedback((prev) =>
-                prev.map((item) => {
-                  if (!failedIds.has(item.id)) return item;
-                  return previousById.get(item.id) ?? item;
-                })
+                prev.map((item) => previousById.get(item.id) ?? item)
               );
-              if (anyPermissionDenied) notifyPermissionDenied(showToast);
+              if (res != null && responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
               else showToast("Could not reopen all tickets");
             }
           } catch (err) {
@@ -1744,6 +1861,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         showToast("Could not delete ticket");
         return;
       }
+      // PERF R-006: invalidate cache so next navigation doesn't serve deleted feedback
+      invalidateSessionDetailCache(sessionId);
       const currentPath = window.location.pathname;
       router.push(currentPath);
     } catch (err) {

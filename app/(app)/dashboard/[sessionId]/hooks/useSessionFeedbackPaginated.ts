@@ -192,6 +192,16 @@ export type SessionFeedbackMergeOptions = {
   /** From GET /api/sessions/:id (same source as session header). */
   restSessionCounts?: { total: number; open: number; resolved: number } | null;
   restFetch?: (url: string) => Promise<Response>;
+  /**
+   * Session bundle migration: while true, skip the initial GET /api/feedback request until
+   * {@link bundledFirstFeedbackPage} is non-null, then treat that payload like the first REST page.
+   */
+  awaitBundledFirstFeedback?: boolean;
+  bundledFirstFeedbackPage?: {
+    feedback: Record<string, unknown>[];
+    nextCursor?: string | null;
+    hasMore?: boolean;
+  } | null;
 };
 
 export function useSessionFeedbackPaginated(
@@ -236,6 +246,9 @@ export function useSessionFeedbackPaginated(
 
   const restFetchRef = useRef(options?.restFetch);
   restFetchRef.current = options?.restFetch;
+
+  const awaitBundledFirstFeedback = options?.awaitBundledFirstFeedback === true;
+  const bundledFirstFeedbackPage = options?.bundledFirstFeedbackPage ?? null;
 
   const setCanonicalFeedback = useCallback(
     (updater: React.SetStateAction<Feedback[]>) => {
@@ -339,6 +352,20 @@ export function useSessionFeedbackPaginated(
       return;
     }
 
+    if (awaitBundledFirstFeedback && bundledFirstFeedbackPage == null) {
+      setInitialLoading(true);
+      setLoadingMore(false);
+      loadingMoreRef.current = false;
+      setHasMore(false);
+      hasMoreRef.current = false;
+      setHasLoadedResolved(false);
+      setIsLoadingResolved(true);
+      setFeedbackSnapshotReady(false);
+      nextCursorRef.current = "";
+      initialLoadCompleteRef.current = false;
+      return;
+    }
+
     let cancelled = false;
     setInitialLoading(true);
     setLoadingMore(false);
@@ -353,57 +380,69 @@ export function useSessionFeedbackPaginated(
 
     void (async () => {
       try {
-        const q = new URLSearchParams({
-          sessionId,
-          limit: "50",
-        });
-        if (shareTokenRest) q.set("token", shareTokenRest);
-        const fetchPage =
-          restFetchRef.current ?? ((u: string) => fetch(u, { credentials: "include" }));
-        const res = await fetchPage(`/api/feedback?${q.toString()}`);
-        if (!res.ok) {
-          if (res.status === 403 || res.status === 401) {
-            if (cancelled || sessionIdRef.current !== sessionId) return;
-            itemsRef.current = [];
-            setItems([]);
-            nextCursorRef.current = "";
-            hasMoreRef.current = false;
-            setHasMore(false);
-            initialLoadCompleteRef.current = true;
-            return;
-          }
-          throw new Error(`Feedback page 1 fetch failed (${res.status})`);
-        }
-        const page = requireApiSuccessData<{
+        const applyFirstPage = (page: {
           feedback: Record<string, unknown>[];
           nextCursor?: string | null;
           hasMore?: boolean;
-        }>(await res.json());
-        if (!Array.isArray(page.feedback)) {
-          throw new Error("Invalid API response: feedback must be an array");
+        }) => {
+          if (!Array.isArray(page.feedback)) {
+            throw new Error("Invalid API response: feedback must be an array");
+          }
+          const rows = page.feedback;
+          const initialPage: Feedback[] = [];
+          for (const r of rows) {
+            const f = feedbackFromRestApiRow(r, sessionId);
+            if (f) initialPage.push(f);
+          }
+          const next = typeof page.nextCursor === "string" ? page.nextCursor : "";
+          const hasMoreFlag = page.hasMore;
+          const nextHasMore = hasMoreFlag === true && next.trim() !== "";
+
+          if (cancelled || sessionIdRef.current !== sessionId) return;
+
+          nextCursorRef.current = nextHasMore ? next : "";
+          hasMoreRef.current = nextHasMore;
+          setHasMore(nextHasMore);
+          initialLoadCompleteRef.current = true;
+
+          const finalized = finalizeFeedbackListForPagination(initialPage);
+          const mergeFn = mergeRealtimeListOuterRef.current?.current;
+          const list = mergeFn ? mergeFn(finalized) : finalized;
+          itemsRef.current = list;
+          setItems(list);
+        };
+
+        if (awaitBundledFirstFeedback && bundledFirstFeedbackPage != null) {
+          applyFirstPage(bundledFirstFeedbackPage);
+        } else {
+          const q = new URLSearchParams({
+            sessionId,
+            limit: "50",
+          });
+          if (shareTokenRest) q.set("token", shareTokenRest);
+          const fetchPage =
+            restFetchRef.current ?? ((u: string) => fetch(u, { credentials: "include" }));
+          const res = await fetchPage(`/api/feedback?${q.toString()}`);
+          if (!res.ok) {
+            if (res.status === 403 || res.status === 401) {
+              if (cancelled || sessionIdRef.current !== sessionId) return;
+              itemsRef.current = [];
+              setItems([]);
+              nextCursorRef.current = "";
+              hasMoreRef.current = false;
+              setHasMore(false);
+              initialLoadCompleteRef.current = true;
+              return;
+            }
+            throw new Error(`Feedback page 1 fetch failed (${res.status})`);
+          }
+          const page = requireApiSuccessData<{
+            feedback: Record<string, unknown>[];
+            nextCursor?: string | null;
+            hasMore?: boolean;
+          }>(await res.json());
+          applyFirstPage(page);
         }
-        const rows = page.feedback;
-        const initialPage: Feedback[] = [];
-        for (const r of rows) {
-          const f = feedbackFromRestApiRow(r, sessionId);
-          if (f) initialPage.push(f);
-        }
-        const next = typeof page.nextCursor === "string" ? page.nextCursor : "";
-        const hasMoreFlag = page.hasMore;
-        const nextHasMore = hasMoreFlag === true && next.trim() !== "";
-
-        if (cancelled || sessionIdRef.current !== sessionId) return;
-
-        nextCursorRef.current = nextHasMore ? next : "";
-        hasMoreRef.current = nextHasMore;
-        setHasMore(nextHasMore);
-        initialLoadCompleteRef.current = true;
-
-        const finalized = finalizeFeedbackListForPagination(initialPage);
-        const mergeFn = mergeRealtimeListOuterRef.current?.current;
-        const list = mergeFn ? mergeFn(finalized) : finalized;
-        itemsRef.current = list;
-        setItems(list);
       } catch (err) {
         console.error("[ECHLY] REST session feedback load failed", err);
       }
@@ -417,7 +456,13 @@ export function useSessionFeedbackPaginated(
     return () => {
       cancelled = true;
     };
-  }, [sessionId, enabled, shareTokenRest]);
+  }, [
+    sessionId,
+    enabled,
+    shareTokenRest,
+    awaitBundledFirstFeedback,
+    bundledFirstFeedbackPage,
+  ]);
 
   const loadNextPage = useCallback(async () => {
     const sid = sessionIdRef.current;

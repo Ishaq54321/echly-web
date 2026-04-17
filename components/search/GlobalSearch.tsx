@@ -3,7 +3,7 @@
 import { FileText, Search as SearchIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useWorkspaceOverview } from "@/lib/client/workspaceOverviewContext";
+import { useWorkspaceStore } from "@/lib/client/workspaceStore";
 import type { Session } from "@/lib/domain/session";
 import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 
@@ -43,7 +43,7 @@ function formatSessionMeta(s: Session): string {
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const { sessions: sessionsWithCounts, loading } = useWorkspaceOverview();
+  const { sessions: sessionsWithCounts, loading } = useWorkspaceStore();
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();

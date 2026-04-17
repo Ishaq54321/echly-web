@@ -38,7 +38,7 @@ import {
   assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
-import { getActiveShareToken, getShareToken } from "@/lib/client/shareToken";
+import { getShareToken } from "@/lib/client/shareToken";
 import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
@@ -104,7 +104,7 @@ export function DiscussionThread({
   const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
   const { url: resolvedScreenshotSrc, loading: screenshotLoading } =
     useScreenshotUrl(ticket?.screenshotId, {
-      shareToken: getActiveShareToken() ?? undefined,
+      sessionId: ticket?.sessionId?.trim() || "",
     });
 
   const feedbackIdRef = useRef(feedbackId);
@@ -144,48 +144,56 @@ export function DiscussionThread({
       setLoading(false);
       return;
     }
-    let cancelled = false;
+
+    // PERF R-009: AbortController cancels BOTH chained fetches when feedbackId
+    // changes or component unmounts. Previously the session-name fetch could
+    // complete and call setState after navigation because the `cancelled` flag
+    // was only checked after the second .then() resolved, not between the two
+    // chained fetches.
+    const controller = new AbortController();
+    const { signal } = controller;
+
     setLoading(true);
-    authFetch(`/api/tickets/${feedbackId}`)
-      .then((res) => {
-        if (cancelled) return;
-        if (!res || !res.ok) throw new Error("Failed to load");
-        return res.json();
-      })
-      .then((raw: unknown) => {
-        if (cancelled) return;
+
+    const run = async () => {
+      try {
+        const ticketRes = await authFetch(`/api/tickets/${feedbackId}`, { signal });
+        if (!ticketRes || !ticketRes.ok) throw new Error("Failed to load ticket");
+        if (signal.aborted) return;
+        const raw: unknown = await ticketRes.json();
+        if (signal.aborted) return;
         const payload = requireApiSuccessData<{ ticket: TicketData }>(raw);
         const t = payload.ticket;
         setTicket(t);
+
         if (t.sessionId) {
-          authFetch(`/api/sessions/${t.sessionId}`)
-            .then((r) => {
-              if (!r || !r.ok) return null;
-              return r.json();
-            })
-            .then((sessionRaw: unknown) => {
-              if (cancelled || sessionRaw === null) return;
-              const sessionPayload = requireApiSuccessData<{
-                session: { title?: string };
-              }>(sessionRaw);
-              const title = sessionPayload.session.title;
-              if (typeof title === "string" && title.trim())
-                setSessionName(title);
-            })
-            .catch(() => {});
+          // non-critical: session name enrichment — failure is silent
+          const sessionRes = await authFetch(`/api/sessions/${t.sessionId}`, { signal });
+          if (!sessionRes || !sessionRes.ok) return;
+          if (signal.aborted) return;
+          const sessionRaw: unknown = await sessionRes.json();
+          if (signal.aborted) return;
+          const sessionPayload = requireApiSuccessData<{
+            session: { title?: string };
+          }>(sessionRaw);
+          const title = sessionPayload.session.title;
+          if (typeof title === "string" && title.trim()) setSessionName(title);
         } else {
           setSessionName("");
         }
-      })
-      .catch(() => {
-        if (!cancelled) setTicket(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        // PERF R-009: previously silently swallowed all errors; now only aborts
+        // are silently dropped — real errors are logged for debugging
+        console.error("[DiscussionThread] fetch error:", err);
+        setTicket(null);
+      } finally {
+        if (!signal.aborted) setLoading(false);
+      }
     };
+
+    void run();
+    return () => controller.abort();
   }, [feedbackId, authUid]);
 
   useEffect(() => {

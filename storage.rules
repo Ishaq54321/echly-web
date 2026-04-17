@@ -1,6 +1,13 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Public read only for feedback screenshots (uploads use Admin SDK).
+    // MUST appear before the catch-all so this path is not auth-gated.
+    match /sessions/{sessionId}/screenshots/{file} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if false;

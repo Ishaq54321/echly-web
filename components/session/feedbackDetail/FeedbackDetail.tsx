@@ -20,6 +20,7 @@ export interface FeedbackDetailProps {
 }
 
 function FeedbackDetailInner({
+  sessionId,
   selectedItem,
   onSaveTitle,
   onRequestDelete,
@@ -34,7 +35,9 @@ function FeedbackDetailInner({
     url: screenshotUrl,
     loading: screenshotUrlLoading,
     error: screenshotUrlError,
-  } = useScreenshotUrl(selectedItem?.screenshotId, undefined);
+  } = useScreenshotUrl(selectedItem?.screenshotId, {
+    sessionId: sessionId.trim(),
+  });
 
   if (!selectedItem) {
     return (

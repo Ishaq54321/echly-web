@@ -50,7 +50,7 @@ export function AppBootGate({ children }: { children: ReactNode }) {
 }
 
 /**
- * Under WorkspaceOverviewProvider. Dismisses boot overlay when auth has initialized only.
+ * Under WorkspaceStoreProvider. Dismisses boot overlay when auth has initialized only.
  * Claims, workspace id, sessions, and billing load progressively and must not block boot.
  */
 export function AppBootReadinessBridge() {

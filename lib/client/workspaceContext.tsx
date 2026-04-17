@@ -223,22 +223,39 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     console.log("IDENTITY READY:", isIdentityReady);
   }, [isIdentityReady]);
 
+  // PERF R-004: memoize context value so the ~20+ consumers only re-render when
+  // a field they actually use changes, not on every WorkspaceProvider render.
+  const contextValue = useMemo(
+    () => ({
+      workspaceId,
+      workspaceError,
+      workspaceLoading,
+      claimsReady,
+      isIdentityReady,
+      authReady,
+      isIdentityResolved,
+      authUid,
+      authEmail,
+      authDisplayName,
+      authPhotoUrl,
+    }),
+    [
+      workspaceId,
+      workspaceError,
+      workspaceLoading,
+      claimsReady,
+      isIdentityReady,
+      authReady,
+      isIdentityResolved,
+      authUid,
+      authEmail,
+      authDisplayName,
+      authPhotoUrl,
+    ]
+  );
+
   return (
-    <WorkspaceContext.Provider
-      value={{
-        workspaceId,
-        workspaceError,
-        workspaceLoading,
-        claimsReady,
-        isIdentityReady,
-        authReady,
-        isIdentityResolved,
-        authUid,
-        authEmail,
-        authDisplayName,
-        authPhotoUrl,
-      }}
-    >
+    <WorkspaceContext.Provider value={contextValue}>
       {children}
     </WorkspaceContext.Provider>
   );

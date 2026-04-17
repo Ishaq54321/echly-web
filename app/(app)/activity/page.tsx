@@ -28,8 +28,7 @@ import {
   type ActivityEvent,
   type GroupedActivity,
 } from "@/lib/activity/groupEvents";
-import { sessionsListBootstrapFromApiPayload } from "@/lib/domain/session";
-import type { Session } from "@/lib/domain/session";
+import { useWorkspaceStore } from "@/lib/client/workspaceStore";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -201,7 +200,11 @@ function ActivityFeed() {
   const selectedSessionId = searchParams.get("sessionId")?.trim() || null;
   /** At most one type filter; `null` = all activity types (no filter). */
   const [selectedCategory, setSelectedCategory] = useState<ActivityFilterCategoryId | null>(null);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const { sessions: sessionsWithCounts } = useWorkspaceStore();
+  const sessions = useMemo(
+    () => sessionsWithCounts.map(({ session }) => session),
+    [sessionsWithCounts]
+  );
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const sessionMenuRef = useRef<HTMLDivElement>(null);
 
@@ -246,25 +249,18 @@ function ActivityFeed() {
     ].filter((s) => s.items.length > 0);
   }, [grouped]);
 
-  useEffect(() => {
-    if (!user?.uid || authLoading) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await authFetch("/api/sessions", { cache: "no-store" });
-        if (!res?.ok || cancelled) return;
-        const json = await res.json().catch(() => null);
-        if (json === null || cancelled) return;
-        const { sessions: list } = sessionsListBootstrapFromApiPayload(json);
-        if (!cancelled) setSessions(list);
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.uid, authLoading]);
+  // PERF R-018: memoize collapseSystemEvents per section so expand/collapse
+  // state changes (expandedSystemKeys) don't re-run the collapse computation.
+  // collapseSystemEvents is a pure function defined outside the component.
+  const collapsedDayBuckets = useMemo(
+    () =>
+      dayBuckets.map((section) => ({
+        label: section.label,
+        items: section.items,
+        renderRows: collapseSystemEvents(section.items),
+      })),
+    [dayBuckets]
+  );
 
   useEffect(() => {
     if (!sessionMenuOpen) return;
@@ -543,8 +539,8 @@ function ActivityFeed() {
 
           /* Feed */
           <div className="space-y-4">
-            {dayBuckets.map((section) => {
-              const renderRows = collapseSystemEvents(section.items);
+            {collapsedDayBuckets.map((section) => {
+              const renderRows = section.renderRows;
               return (
                 <div key={section.label} className="space-y-2">
 

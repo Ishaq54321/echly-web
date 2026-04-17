@@ -592,6 +592,76 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
   return result;
 }
 
+// PERF R-002: batch resolve/unresolve — replaces N individual transactions with one.
+// Updates all feedback docs and session counters in a single Firestore transaction.
+// Activity events and insights are intentionally skipped for batch operations.
+// Cap: 200 items to stay well within Firestore's 500-operation transaction limit.
+const BATCH_RESOLVE_MAX = 200;
+
+export interface BatchResolveFeedbackResult {
+  applied: number;
+  skipped: number;
+}
+
+export async function batchResolveFeedbackRepo(
+  sessionId: string,
+  feedbackIds: string[],
+  toStatus: FeedbackStatus,
+  _actorId: string
+): Promise<BatchResolveFeedbackResult> {
+  if (feedbackIds.length === 0) return { applied: 0, skipped: 0 };
+  const capped = feedbackIds.slice(0, BATCH_RESOLVE_MAX);
+  const sessionRef = adminDb.doc(`sessions/${sessionId}`);
+  const feedbackRefs = capped.map((id) => adminDb.doc(`feedback/${id}`));
+
+  return adminDb.runTransaction(async (tx) => {
+    // Single round-trip: read session + all feedback docs together
+    const snaps = await tx.getAll(sessionRef, ...feedbackRefs);
+    const sessionSnap = snaps[0]!;
+    const feedbackSnaps = snaps.slice(1);
+
+    const srow = sessionSnap.data() ?? {};
+    let openCount = Math.max(0, num((srow as { openCount?: unknown }).openCount));
+    let resolvedCount = Math.max(0, num((srow as { resolvedCount?: unknown }).resolvedCount));
+
+    let applied = 0;
+    for (const snap of feedbackSnaps) {
+      if (!snap.exists) continue;
+      const fd = (snap.data() ?? {}) as Record<string, unknown>;
+      const wasStatus: FeedbackStatus = fd.status === "resolved" ? "resolved" : "open";
+      if (wasStatus === toStatus) continue;
+      // PERF R-002: write each feedback doc in the same transaction (no per-item round-trips)
+      tx.update(snap.ref, { status: toStatus });
+      if (toStatus === "resolved") {
+        openCount = Math.max(0, openCount - 1);
+        resolvedCount += 1;
+      } else {
+        openCount += 1;
+        resolvedCount = Math.max(0, resolvedCount - 1);
+      }
+      applied++;
+    }
+
+    if (applied > 0) {
+      // PERF R-002: update session counters exactly once instead of N times
+      tx.set(
+        sessionRef,
+        {
+          openCount,
+          resolvedCount,
+          totalCount: openCount + resolvedCount,
+          feedbackCount: openCount + resolvedCount,
+          skippedCount: FieldValue.delete(),
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      );
+    }
+
+    return { applied, skipped: capped.length - applied };
+  });
+}
+
 /** Cursor for server-side pagination. Opaque to callers; only repo uses it. */
 export type FeedbackPageCursor = QueryDocumentSnapshot;
 
