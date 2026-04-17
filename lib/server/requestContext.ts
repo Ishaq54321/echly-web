@@ -150,8 +150,9 @@ export async function buildRequestContext(params: {
         ? "USER"
         : "NONE";
 
+  const extractedShare = extractShareToken(params.req, params.bodyShareToken);
   const shareTokenForContext: string | null =
-    identityRes.type === "SHARE" ? identityRes.shareToken : null;
+    identityRes.type === "SHARE" ? identityRes.shareToken : extractedShare;
 
   const viewerUser: AuthorizedRequestUser | null =
     identityRes.type === "USER" ? identityRes.user : null;

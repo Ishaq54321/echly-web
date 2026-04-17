@@ -6,6 +6,7 @@ import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.serve
 import { corsHeaders } from "@/lib/server/cors";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { parseActivityFeedEventTypesParam } from "@/lib/activity/activityEventTypeFilters";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -73,7 +74,9 @@ export async function OPTIONS(req: NextRequest) {
 }
 
 /**
- * GET /api/activity-feed?sessionId=&cursor=&limit=20
+ * GET /api/activity-feed?sessionId=&eventTypes=&cursor=&limit=20
+ *
+ * `eventTypes`: comma-separated allowlist, e.g. `comment.added,feedback.created`
  *
  * `cursor`: JSON string `{ "createdAt": epoch ms, "id": doc id }` (e.g. encodeURIComponent)
  * or the same object encoded as base64url.
@@ -82,8 +85,11 @@ export async function OPTIONS(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const sessionIdParam = searchParams.get("sessionId")?.trim() ?? "";
+  const eventTypesRaw = searchParams.get("eventTypes");
   const cursorParam = searchParams.get("cursor")?.trim() ?? "";
   const limit = parseLimit(searchParams);
+  const eventTypesForQuery = parseActivityFeedEventTypesParam(eventTypesRaw);
+  const hasEventTypeFilter = eventTypesForQuery.length > 0;
 
   const hasSessionFilter = sessionIdParam !== "";
 
@@ -166,6 +172,10 @@ export async function GET(req: NextRequest) {
     q = q.where("sessionId", "==", sessionIdParam);
   }
 
+  if (hasEventTypeFilter) {
+    q = q.where("eventType", "in", eventTypesForQuery);
+  }
+
   q = q
     .orderBy("createdAt", "desc")
     .orderBy(FieldPath.documentId(), "desc")
@@ -199,6 +209,7 @@ export async function GET(req: NextRequest) {
       console.warn("[FIRESTORE] Missing composite index for activityEvents", {
         workspaceIdForQuery,
         hasSessionFilter,
+        hasEventTypeFilter,
       });
     }
     console.error("GET /api/activity-feed:", err);

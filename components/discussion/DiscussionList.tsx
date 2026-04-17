@@ -29,6 +29,8 @@ export interface ProjectItem {
   name: string;
 }
 
+export type StatusFilter = "all" | "open" | "review" | "resolved";
+
 export interface DiscussionListProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
@@ -40,9 +42,28 @@ export interface DiscussionListProps {
   onEmptyChange?: (isEmpty: boolean) => void;
   /** Called when discussions load with unique sessions (projects) derived from the list */
   onProjectsLoaded?: (projects: ProjectItem[]) => void;
-  /** Optional controlled list state; when provided, fetch updates this instead of internal state (avoids reload on reply). */
+  /** Optional controlled list state; when provided, fetch updates this instead of internal state */
   items?: DiscussionItem[];
   setItems?: React.Dispatch<React.SetStateAction<DiscussionItem[]>>;
+}
+
+// Deterministic avatar palette derived from item id
+const AVATAR_PALETTES = [
+  { bg: "#EEF3FF", text: "#1e40af" },
+  { bg: "#F0FDF4", text: "#166534" },
+  { bg: "#FFF7ED", text: "#9A3412" },
+  { bg: "#FDF4FF", text: "#7E22CE" },
+  { bg: "#F0F9FF", text: "#0C4A6E" },
+  { bg: "#FEFCE8", text: "#854D0E" },
+];
+
+function getAvatarPalette(seed: string) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length];
 }
 
 function parseUpdatedAt(item: DiscussionItem): number {
@@ -61,6 +82,13 @@ function parseUpdatedAt(item: DiscussionItem): number {
   return 0;
 }
 
+const FILTER_PILLS: Array<{ key: StatusFilter; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "open", label: "Open" },
+  { key: "review", label: "In review" },
+  { key: "resolved", label: "Resolved" },
+];
+
 export function DiscussionList({
   selectedId,
   onSelect,
@@ -76,6 +104,7 @@ export function DiscussionList({
   const [internalItems, setInternalItems] = useState<DiscussionItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const onEmptyChangeRef = useRef(onEmptyChange);
   onEmptyChangeRef.current = onEmptyChange;
   const onProjectsLoadedRef = useRef(onProjectsLoaded);
@@ -86,7 +115,6 @@ export function DiscussionList({
 
   useEffect(() => {
     if (!authUid) return;
-
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -106,8 +134,7 @@ export function DiscussionList({
           const item = f as Record<string, unknown>;
           const status = (item.status as string) ?? "open";
           const isResolved = status === "resolved" || item.isResolved === true;
-          const titleStr =
-            typeof item.title === "string" ? item.title.trim() : "";
+          const titleStr = typeof item.title === "string" ? item.title.trim() : "";
           return {
             id: String(item.id ?? ""),
             title: titleStr,
@@ -137,12 +164,11 @@ export function DiscussionList({
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [refreshKey, authUid]);
 
-  const filteredItems = useMemo(() => {
+  // Counts for header (before status filter)
+  const sessionFilteredItems = useMemo(() => {
     let list = items;
     if (filterBySessionId) {
       list = list.filter((i) => i.sessionId === filterBySessionId);
@@ -152,63 +178,88 @@ export function DiscussionList({
     return list.filter(
       (i) =>
         i.title.toLowerCase().includes(q) ||
-        (i.sessionName ?? "").toLowerCase().includes(q)
+        (i.sessionName ?? "").toLowerCase().includes(q) ||
+        (i.lastCommentPreview ?? "").toLowerCase().includes(q)
     );
   }, [items, search, filterBySessionId]);
 
+  const openCount = useMemo(
+    () => sessionFilteredItems.filter((i) => i.status === "open").length,
+    [sessionFilteredItems]
+  );
+
+  const filteredItems = useMemo(() => {
+    if (statusFilter === "all") return sessionFilteredItems;
+    if (statusFilter === "open") return sessionFilteredItems.filter((i) => i.status === "open");
+    if (statusFilter === "resolved") return sessionFilteredItems.filter((i) => i.status === "resolved");
+    // "review" — no such status in API; returns empty
+    return [];
+  }, [sessionFilteredItems, statusFilter]);
+
   const showLoading = !error && (!authUid || loading);
 
-  if (showLoading) {
-    return (
-      <div
-        className="flex h-full min-h-[200px] flex-col items-center justify-center overflow-hidden bg-transparent py-8"
-        aria-busy="true"
-        aria-live="polite"
-      >
-        <MinimalLoader label="Loading discussions…" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-transparent">
-        <p className="text-sm text-secondary">{error}</p>
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="flex flex-col overflow-hidden bg-transparent">
-        <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-          <MessageSquareMore className="w-12 h-12 text-neutral-300 mb-4" />
-          <h2 className="text-lg font-semibold text-neutral-900">
-            No discussions yet
-          </h2>
-          <p className="mt-2 text-sm text-secondary max-w-[240px]">
-            When feedback receives comments, they will appear here.
+  return (
+    <div className="flex flex-col h-full overflow-hidden bg-white">
+      {/* Sticky header */}
+      <div className="shrink-0 px-4 py-4 border-b border-neutral-200 flex items-start justify-between gap-3 bg-white">
+        <div>
+          <h2 className="text-[15px] font-semibold text-neutral-900 leading-tight">Discussions</h2>
+          <p className="text-[12px] text-meta mt-0.5 tabular-nums">
+            {showLoading
+              ? "Loading…"
+              : `${sessionFilteredItems.length} thread${sessionFilteredItems.length !== 1 ? "s" : ""} · ${openCount} open`}
           </p>
-          <Link
-            href="/dashboard"
-            className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#155DFC] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[#0F4ED1] transition"
-          >
-            Open Sessions
-          </Link>
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="flex flex-col overflow-hidden bg-transparent h-full">
-      <div className="discussion-list-scroll flex-1 overflow-y-auto min-h-0 pl-0 pr-3 py-2">
-        {filteredItems.length === 0 ? (
-          <p className="text-sm text-secondary py-4 px-2 text-center">
-            No discussions match your search.
-          </p>
+      {/* Filter pills */}
+      <div className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 border-b border-neutral-100 bg-white overflow-x-auto">
+        {FILTER_PILLS.map((pill) => (
+          <button
+            key={pill.key}
+            type="button"
+            onClick={() => setStatusFilter(pill.key)}
+            className={`text-[12px] px-3 py-[5px] rounded-full border whitespace-nowrap transition-all ${
+              statusFilter === pill.key
+                ? "bg-[#EEF3FF] text-[#155DFC] border-[#bfdbfe] font-medium"
+                : "bg-transparent text-secondary border-neutral-200 hover:border-neutral-300 hover:text-neutral-900"
+            }`}
+          >
+            {pill.label}
+          </button>
+        ))}
+      </div>
+
+      {/* List body */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {showLoading ? (
+          <div className="flex h-full min-h-[200px] flex-col items-center justify-center" aria-busy="true" aria-live="polite">
+            <MinimalLoader label="Loading discussions…" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center">
+            <p className="text-sm text-secondary">{error}</p>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center h-full">
+            <MessageSquareMore className="w-10 h-10 text-neutral-300 mb-3" />
+            <h3 className="text-[15px] font-semibold text-neutral-900">No discussions yet</h3>
+            <p className="mt-1.5 text-[13px] text-secondary max-w-[220px]">
+              When feedback receives comments, they will appear here.
+            </p>
+            <Link
+              href="/dashboard"
+              className="mt-5 inline-flex items-center justify-center rounded-xl bg-[#155DFC] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[#0F4ED1] transition"
+            >
+              Open Sessions
+            </Link>
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center h-full">
+            <p className="text-[13px] text-secondary">No threads match this filter.</p>
+          </div>
         ) : (
-          <div className="flex flex-col gap-0">
+          <div className="flex flex-col">
             {filteredItems.map((item) => {
               const isSelected = selectedId === item.id;
               const ts = parseUpdatedAt(item);
@@ -216,8 +267,8 @@ export function DiscussionList({
               const replyLabel = count === 1 ? "1 reply" : `${count} replies`;
               const timeLabel = ts > 0 ? formatRelativeTime(new Date(ts)) : "Just now";
               const sessionDisplay = item.sessionName ?? "Session";
-
               const initial = (item.title || "?").charAt(0).toUpperCase();
+              const palette = getAvatarPalette(item.id);
 
               return (
                 <div
@@ -231,31 +282,48 @@ export function DiscussionList({
                       onSelect(item.id);
                     }
                   }}
-                  className={`ticket-item flex items-center gap-2.5 pl-3 pr-3 py-3 cursor-pointer transition-colors ${
-                    isSelected ? "selected bg-blue-50" : "hover:bg-neutral-50"
+                  className={`flex items-start gap-2.5 px-4 py-3.5 cursor-pointer border-b border-neutral-100 transition-colors ${
+                    isSelected ? "bg-blue-50" : "hover:bg-neutral-50/80"
                   }`}
                 >
+                  {/* Avatar */}
                   <div
-                    className="w-8 h-8 rounded-full bg-[#EEF3FF] text-[#155DFC] font-semibold text-sm flex items-center justify-center shrink-0"
+                    className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[12px] font-semibold shrink-0 mt-0.5"
+                    style={{ background: palette.bg, color: palette.text }}
                     aria-hidden
                   >
                     {initial}
                   </div>
-                  <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-                    <div className="ticket-header flex items-center justify-between gap-2">
-                      <h3 className="ticket-title font-semibold text-neutral-900 truncate text-[15px] min-w-0">
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    {/* Row 1: Title + timestamp */}
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <h3 className="text-[13px] font-medium text-neutral-900 truncate leading-snug">
                         {item.title}
                       </h3>
-                      <span className="ticket-time text-xs text-meta shrink-0">
-                        {timeLabel}
-                      </span>
+                      <span className="text-[11px] text-meta shrink-0">{timeLabel}</span>
                     </div>
-                    <p className="text-sm text-secondary truncate">
-                      {sessionDisplay}
-                    </p>
-                    <p className="text-xs text-meta">
-                      {replyLabel}
-                    </p>
+
+                    {/* Row 2: Session name */}
+                    <p className="text-[12px] text-secondary truncate mb-1">{sessionDisplay}</p>
+
+                    {/* Row 3: Preview */}
+                    {item.lastCommentPreview && (
+                      <p className="text-[12px] text-meta truncate mb-1.5">
+                        {item.lastCommentPreview}
+                      </p>
+                    )}
+
+                    {/* Footer: status dot + reply count */}
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`w-[6px] h-[6px] rounded-full shrink-0 ${
+                          item.status === "open" ? "bg-green-500" : "bg-neutral-400"
+                        }`}
+                      />
+                      <span className="text-[11px] text-meta">{replyLabel}</span>
+                    </div>
                   </div>
                 </div>
               );

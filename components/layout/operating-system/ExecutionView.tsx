@@ -18,7 +18,8 @@ export interface ExecutionViewProps {
   onOpenComment?: () => void;
   onCloseCommentMode?: () => void;
   isCommentMode?: boolean;
-  onResolveAndNext?: () => void;
+  /** True while PATCH resolve is in flight (dashboard Resolve control). */
+  resolveSubmitting?: boolean;
   impactScore?: number | null;
   comments?: Comment[];
   sendPinComment?: (position: { xPercent: number; yPercent: number }, message: string) => Promise<string | null>;
@@ -43,7 +44,7 @@ export interface ExecutionViewProps {
     permissions: ShareSurfacePermissions;
     onBlocked: (detail: {
       reason: "tier" | "app";
-      action: "resolve" | "resolve_next" | "comment" | "assign" | "defer";
+      action: "resolve" | "comment" | "assign" | "defer";
     }) => void;
     pendingResolve?: boolean;
     onRequestResolveAccess?: () => void;
@@ -54,6 +55,10 @@ export interface ExecutionViewProps {
     onRequestAccess: () => void;
   };
   accessResolveSubmitting?: boolean;
+  /** Parent resolves once via `useScreenshotUrl` for the selected ticket. */
+  screenshotUrl: string | null;
+  screenshotUrlLoading: boolean;
+  screenshotUrlError: string | null;
 }
 
 export function ExecutionView({
@@ -67,7 +72,7 @@ export function ExecutionView({
   onOpenComment,
   onCloseCommentMode,
   isCommentMode = false,
-  onResolveAndNext,
+  resolveSubmitting = false,
   impactScore,
   comments = [],
   sendPinComment,
@@ -88,6 +93,9 @@ export function ExecutionView({
   shareGating,
   accessResolve,
   accessResolveSubmitting,
+  screenshotUrl,
+  screenshotUrlLoading,
+  screenshotUrlError,
 }: ExecutionViewProps) {
   const displayItem = item;
 
@@ -104,8 +112,8 @@ export function ExecutionView({
         onResolvedChange={
           isPublicReadOnly || isShareSurface ? undefined : onResolvedChange
         }
-        onResolveAndNext={
-          isPublicReadOnly || isShareSurface ? undefined : onResolveAndNext
+        resolveSubmitting={
+          isPublicReadOnly || isShareSurface ? false : resolveSubmitting
         }
         onOpenComment={
           isPublicReadOnly || isShareSurface ? undefined : onOpenComment
@@ -142,6 +150,9 @@ export function ExecutionView({
           {displayItem ? (
             <FeedbackContent
               item={displayItem}
+              screenshotUrl={screenshotUrl}
+              screenshotUrlLoading={screenshotUrlLoading}
+              screenshotUrlError={screenshotUrlError}
               readOnlyDescription={readOnlyDescription}
               onSaveActionSteps={
                 isPublicReadOnly || isShareSurface ? undefined : onSaveActionSteps

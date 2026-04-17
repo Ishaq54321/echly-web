@@ -16,6 +16,7 @@ import {
   type FeedbackStatus,
   type FeedbackPriority,
 } from "@/lib/domain/feedback-display";
+import { getTagColor } from "@/lib/tagConfig";
 
 export interface CommandPanelItem {
   id: string;
@@ -381,11 +382,11 @@ export function FeedbackCommandPanel({
                         {item.contextSummary}
                       </div>
                     )}
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                       <div className="flex items-center gap-2 mt-1 flex-wrap min-w-0">
                       {(item.suggestedTags ?? []).slice(0, 2).map((tag) => (
                         <span
                           key={tag}
-                          className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-[var(--layer-2-bg)] text-[hsl(var(--text-tertiary))]"
+                          className={`inline-flex items-center max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-medium ${getTagColor(tag)}`}
                         >
                           {tag}
                         </span>

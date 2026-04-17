@@ -4,6 +4,12 @@ export type { Comment, CommentAttachment, CommentPosition, CommentTextRange, Com
 import type { Comment, CommentAttachment, CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import { authFetch } from "@/lib/authFetch";
 import { HttpError } from "@/lib/client/httpError";
+import { getActiveShareToken } from "@/lib/client/shareToken";
+
+function shareTokenFields(): Record<string, string> {
+  const t = getActiveShareToken()?.trim();
+  return t ? { token: t } : {};
+}
 
 function commentFromApiRow(row: unknown): Comment | null {
   if (!row || typeof row !== "object") return null;
@@ -70,9 +76,12 @@ export async function fetchComments(
   if (!sid) return [];
   const feedbackId =
     typeof opts?.feedbackId === "string" ? opts.feedbackId.trim() : "";
-  const query = feedbackId
-    ? `?feedbackId=${encodeURIComponent(feedbackId)}`
-    : "";
+  const params = new URLSearchParams();
+  if (feedbackId) params.set("feedbackId", feedbackId);
+  const shareTok = getActiveShareToken()?.trim();
+  if (shareTok) params.set("token", shareTok);
+  const qs = params.toString();
+  const query = qs !== "" ? `?${qs}` : "";
 
   const res = await authFetch(`/api/comments/${encodeURIComponent(sid)}${query}`);
   if (!res) throw new Error("Not authenticated");
@@ -225,7 +234,7 @@ export async function addComment(
   const res = await authFetch("/api/comments", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionId, feedbackId, data }),
+    body: JSON.stringify({ sessionId, feedbackId, data, ...shareTokenFields() }),
   });
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {
@@ -254,7 +263,7 @@ export async function updatePinPosition(
   const res = await authFetch("/api/comments", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ commentId, data: { position } }),
+    body: JSON.stringify({ commentId, data: { position }, ...shareTokenFields() }),
   });
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {
@@ -289,7 +298,7 @@ export async function updateComment(
   const res = await authFetch("/api/comments", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ commentId, data }),
+    body: JSON.stringify({ commentId, data, ...shareTokenFields() }),
   });
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {
@@ -302,7 +311,7 @@ export async function deleteComment(commentId: string): Promise<void> {
   const res = await authFetch("/api/comments", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ commentId }),
+    body: JSON.stringify({ commentId, ...shareTokenFields() }),
   });
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {

@@ -2,10 +2,13 @@
 
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { Loader2, ZoomIn } from "lucide-react";
-import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 
 interface ScreenshotBlockProps {
   screenshotId: string | null | undefined;
+  /** Resolved download URL from parent `useScreenshotUrl` (single resolution per ticket). */
+  screenshotUrl: string | null;
+  screenshotUrlLoading: boolean;
+  screenshotUrlError: string | null;
   onExpand: () => void;
   /** Omit outer frame when nested inside a parent attachment card. */
   embeddedInCard?: boolean;
@@ -13,20 +16,21 @@ interface ScreenshotBlockProps {
 
 export function ScreenshotBlock({
   screenshotId,
+  screenshotUrl: url,
+  screenshotUrlLoading: loading,
+  screenshotUrlError: error,
   onExpand,
   embeddedInCard = false,
 }: ScreenshotBlockProps) {
-  const { url, loading, error } = useScreenshotUrl(screenshotId);
-  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [imageDecoded, setImageDecoded] = useState(false);
 
-  // Prevent "ghost" screenshot during ticket switch: reset loading before paint.
   useLayoutEffect(() => {
-    setIsImageLoading(true);
+    setImageDecoded(false);
   }, [url]);
   useEffect(() => {
-    setIsImageLoading(true);
+    if (!url) return;
     const timeout = window.setTimeout(() => {
-      setIsImageLoading(false);
+      setImageDecoded(true);
     }, 5000);
     return () => window.clearTimeout(timeout);
   }, [url]);
@@ -44,25 +48,23 @@ export function ScreenshotBlock({
           key={url} // Hard reset the image element on ticket switch
           src={url}
           alt="Screenshot"
-          className="w-full h-auto max-h-[317px] object-contain"
-          style={{
-            display: isImageLoading ? "none" : "block",
-            opacity: isImageLoading ? 0 : 1,
-            transition: "opacity 0.2s ease",
-          }}
-          loading="lazy"
+          className={`w-full h-auto max-h-[317px] object-contain block transition-[filter,opacity] duration-300 ease-out ${
+            imageDecoded ? "opacity-100 blur-0" : "opacity-[0.88] blur-md"
+          }`}
+          loading="eager"
+          decoding="async"
           onLoad={() => {
-            setIsImageLoading(false);
+            setImageDecoded(true);
           }}
-          onError={() => setIsImageLoading(false)}
+          onError={() => setImageDecoded(true)}
         />
         ) : null}
 
-        {(loading || (isImageLoading && Boolean(url))) && (
-          <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)]">
+        {(loading && !url) || (Boolean(screenshotId) && !url && !error) ? (
+          <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)]/80">
             <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--text-tertiary))]" strokeWidth={1.8} aria-hidden />
           </div>
-        )}
+        ) : null}
         {!loading && screenshotId && !url && (
           <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)] text-[12px] text-[hsl(var(--text-tertiary))]">
             {error ?? "Screenshot unavailable"}

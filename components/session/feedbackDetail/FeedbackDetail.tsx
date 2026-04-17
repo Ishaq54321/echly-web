@@ -4,6 +4,7 @@ import React from "react";
 import { FeedbackHeader } from "./FeedbackHeader";
 import { FeedbackContent } from "./FeedbackContent";
 import type { FeedbackItemShape } from "./types";
+import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 
 export interface FeedbackDetailProps {
   sessionId: string;
@@ -29,6 +30,12 @@ function FeedbackDetailInner({
   isCommentsOpen,
   onToggleActivity,
 }: FeedbackDetailProps) {
+  const {
+    url: screenshotUrl,
+    loading: screenshotUrlLoading,
+    error: screenshotUrlError,
+  } = useScreenshotUrl(selectedItem?.screenshotId, undefined);
+
   if (!selectedItem) {
     return (
       <div className="flex flex-1 min-h-0 items-start py-12 font-sans">
@@ -51,6 +58,9 @@ function FeedbackDetailInner({
       />
       <FeedbackContent
         item={selectedItem}
+        screenshotUrl={screenshotUrl}
+        screenshotUrlLoading={screenshotUrlLoading}
+        screenshotUrlError={screenshotUrlError}
         onSaveActionSteps={onSaveActionSteps}
         onSaveTags={onSaveTags}
         onExpandImage={() => setIsImageExpanded(true)}

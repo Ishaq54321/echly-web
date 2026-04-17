@@ -10,7 +10,11 @@ import {
   getSessionMember,
   getInviteByEmail,
 } from "@/lib/repositories/sessionMembersRepository.server";
-import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
+import {
+  createActivityEvent,
+  resolveActorForActivityEvent,
+  sessionTitleFromSessionRow,
+} from "@/lib/repositories/activityEventsRepository.server";
 
 export const dynamic = "force-dynamic";
 
@@ -201,12 +205,16 @@ export async function POST(
       ? context.session.workspaceId.trim()
       : "";
   if (workspaceId) {
+    const actor = await resolveActorForActivityEvent(invitedByUserId);
+    const sessionTitle = sessionTitleFromSessionRow(context.session);
     await createActivityEvent({
       workspaceId,
       sessionId,
       eventType: "invite.sent",
       actorId: invitedByUserId,
-      metadata: { email, access },
+      actorName: actor.actorName,
+      actorPhotoURL: actor.actorPhotoURL,
+      metadata: { sessionTitle, email, access },
     });
   }
 

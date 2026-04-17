@@ -11,7 +11,11 @@ import {
 
 import type { SessionMember } from "@/lib/domain/sessionMember";
 import type { SessionInvite } from "@/lib/domain/sessionInvite";
-import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
+import {
+  createActivityEvent,
+  resolveActorForActivityEvent,
+  sessionTitleForActivityEvent,
+} from "@/lib/repositories/activityEventsRepository.server";
 
 export async function getSessionMember(
   sessionId: string,
@@ -91,12 +95,19 @@ export async function addSessionMember(params: {
 
   const workspaceId = params.workspaceId.trim();
   if (workspaceId) {
+    const actor = await resolveActorForActivityEvent(actorId);
+    const sessionTitle = await sessionTitleForActivityEvent(params.sessionId);
     await createActivityEvent({
       workspaceId,
       sessionId: params.sessionId,
       eventType: "session.member.added",
       actorId,
-      metadata: { source: params.source },
+      actorName: actor.actorName,
+      actorPhotoURL: actor.actorPhotoURL,
+      metadata: {
+        sessionTitle,
+        source: params.source,
+      },
     });
   }
 }

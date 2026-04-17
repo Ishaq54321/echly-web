@@ -8,6 +8,7 @@ export type UploadScreenshotPayload = {
 
 export type UploadScreenshotResponse = {
   screenshotId: string;
+  /** Public GCS HTTPS URL (anonymous read when Storage rules allow). */
   url?: string;
 };
 

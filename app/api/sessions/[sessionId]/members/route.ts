@@ -2,7 +2,11 @@ import { NextRequest } from "next/server";
 import { apiSuccess, apiError } from "@/lib/server/apiResponse";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { listSessionMembers } from "@/lib/repositories/sessionMembersRepository.server";
-import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
+import {
+  createActivityEvent,
+  resolveActorForActivityEvent,
+  sessionTitleFromSessionRow,
+} from "@/lib/repositories/activityEventsRepository.server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -204,12 +208,16 @@ export async function PATCH(
         : "";
     const actorId = context.userId?.trim() ?? "";
     if (workspaceId && actorId) {
+      const actor = await resolveActorForActivityEvent(actorId);
+      const sessionTitle = sessionTitleFromSessionRow(context.session);
       await createActivityEvent({
         workspaceId,
         sessionId,
         eventType: "session.member.role_changed",
         actorId,
-        metadata: { previousAccess, newAccess: access },
+        actorName: actor.actorName,
+        actorPhotoURL: actor.actorPhotoURL,
+        metadata: { sessionTitle, previousAccess, newAccess: access },
       });
     }
 
@@ -340,11 +348,16 @@ export async function DELETE(
         : "";
     const actorId = context.userId?.trim() ?? "";
     if (workspaceId && actorId) {
+      const actor = await resolveActorForActivityEvent(actorId);
+      const sessionTitle = sessionTitleFromSessionRow(context.session);
       await createActivityEvent({
         workspaceId,
         sessionId,
         eventType: "session.member.removed",
         actorId,
+        actorName: actor.actorName,
+        actorPhotoURL: actor.actorPhotoURL,
+        metadata: { sessionTitle },
       });
     }
 

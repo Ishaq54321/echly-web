@@ -82,6 +82,7 @@ export function CommentItem({
             src={comment.userAvatar}
             alt=""
             className="w-full h-full rounded-full object-cover"
+            loading="lazy"
           />
         ) : (
           comment.userName?.charAt(0) ?? "?"
@@ -223,6 +224,7 @@ export function CommentItem({
                       src={comment.userAvatar}
                       alt=""
                       className="w-full h-full rounded-full object-cover"
+                      loading="lazy"
                     />
                   ) : (
                     comment.userName?.charAt(0) ?? "?"

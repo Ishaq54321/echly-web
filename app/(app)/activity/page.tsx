@@ -1,13 +1,26 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { ArrowUpDown, ChevronDown, Clock, Settings, SlidersHorizontal } from "lucide-react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Check, ChevronDown, Clock, Filter, Settings } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { ActivityItem } from "@/components/activity/ActivityItem";
 import { getTier } from "@/components/activity/eventIcons";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
+import {
+  ACTIVITY_FILTER_CATEGORY_IDS,
+  ACTIVITY_FILTER_CATEGORY_LABELS,
+  categoriesToEventTypesForApi,
+  type ActivityFilterCategoryId,
+} from "@/lib/activity/activityEventTypeFilters";
 import {
   groupEvents,
   groupEventsByDay,
@@ -15,6 +28,8 @@ import {
   type ActivityEvent,
   type GroupedActivity,
 } from "@/lib/activity/groupEvents";
+import { sessionsListBootstrapFromApiPayload } from "@/lib/domain/session";
+import type { Session } from "@/lib/domain/session";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -141,11 +156,13 @@ function collapseSystemEvents(items: GroupedActivity[]): RenderRow[] {
 
 async function fetchActivityFeed(
   sessionIdFilter: string | null,
+  eventTypes: string[],
   cursor: string | null
 ): Promise<ActivityFeedData> {
   const params = new URLSearchParams();
   params.set("limit", "20");
   if (sessionIdFilter) params.set("sessionId", sessionIdFilter);
+  if (eventTypes.length > 0) params.set("eventTypes", eventTypes.join(","));
   if (cursor) params.set("cursor", cursor);
   const res = await authFetch(`/api/activity-feed?${params.toString()}`);
   if (!res) throw new Error("Could not reach activity feed.");
@@ -156,11 +173,37 @@ async function fetchActivityFeed(
   return json.data;
 }
 
+/** Soft color-coded selected state for activity type pills (+ tactile depth). */
+const ACTIVITY_TYPE_PILL_ACTIVE: Record<ActivityFilterCategoryId, string> = {
+  comments: "bg-blue-50 text-blue-600 shadow-sm",
+  created: "bg-purple-50 text-purple-600 shadow-sm",
+  resolved: "bg-green-50 text-green-600 shadow-sm",
+};
+
+/** Shared geometry + motion; default fill/text/hover applied unless overridden by active state. */
+const FILTER_PILL_BASE =
+  "inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border-0 px-3 py-1.5 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]";
+
+const FILTER_PILL_DEFAULT =
+  "bg-transparent text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900";
+
+/** Session narrowed to one workspace: same pill language, light surface only. */
+const FILTER_PILL_SESSION_ACTIVE =
+  "bg-white text-neutral-900 shadow-sm hover:bg-white hover:text-neutral-900";
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 function ActivityFeed() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const sessionIdFilter = searchParams.get("sessionId")?.trim() || null;
+  /** Session filter: `?sessionId=` is canonical so links and router.replace stay in sync. */
+  const selectedSessionId = searchParams.get("sessionId")?.trim() || null;
+  /** At most one type filter; `null` = all activity types (no filter). */
+  const [selectedCategory, setSelectedCategory] = useState<ActivityFilterCategoryId | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
+  const sessionMenuRef = useRef<HTMLDivElement>(null);
 
   const { user, loading: authLoading } = useAuthGuard();
   const [events, setEvents] = useState<ActivityEvent[]>([]);
@@ -170,6 +213,26 @@ function ActivityFeed() {
   const [error, setError] = useState<string | null>(null);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
   const [expandedSystemKeys, setExpandedSystemKeys] = useState<Set<string>>(() => new Set());
+
+  const eventTypesForApi = useMemo(
+    () => categoriesToEventTypesForApi(selectedCategory ? [selectedCategory] : []),
+    [selectedCategory]
+  );
+  const eventTypesParamKey = eventTypesForApi.join(",");
+
+  const sortedSessions = useMemo(
+    () =>
+      [...sessions].sort((a, b) =>
+        a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
+      ),
+    [sessions]
+  );
+
+  const selectedSessionLabel = useMemo(() => {
+    if (!selectedSessionId) return "All sessions";
+    const s = sessions.find((x) => x.id === selectedSessionId);
+    return s?.title ?? "Session";
+  }, [selectedSessionId, sessions]);
 
   const grouped = useMemo(() => groupEvents(events), [events]);
   const dayBuckets = useMemo(() => {
@@ -184,9 +247,40 @@ function ActivityFeed() {
   }, [grouped]);
 
   useEffect(() => {
+    if (!user?.uid || authLoading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch("/api/sessions", { cache: "no-store" });
+        if (!res?.ok || cancelled) return;
+        const json = await res.json().catch(() => null);
+        if (json === null || cancelled) return;
+        const { sessions: list } = sessionsListBootstrapFromApiPayload(json);
+        if (!cancelled) setSessions(list);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, authLoading]);
+
+  useEffect(() => {
+    if (!sessionMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (sessionMenuRef.current && !sessionMenuRef.current.contains(e.target as Node)) {
+        setSessionMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [sessionMenuOpen]);
+
+  useEffect(() => {
     setExpandedGroupIds(new Set());
     setExpandedSystemKeys(new Set());
-  }, [sessionIdFilter]);
+  }, [selectedSessionId, eventTypesParamKey]);
 
   useEffect(() => {
     if (!user?.uid && !authLoading) {
@@ -202,8 +296,10 @@ function ActivityFeed() {
     (async () => {
       setError(null);
       setLoadingInitial(true);
+      setEvents([]);
+      setNextCursor(null);
       try {
-        const data = await fetchActivityFeed(sessionIdFilter, null);
+        const data = await fetchActivityFeed(selectedSessionId, eventTypesForApi, null);
         if (cancelled) return;
         setEvents(data.events.map(normalizeApiEvent));
         setNextCursor(data.nextCursor);
@@ -221,7 +317,23 @@ function ActivityFeed() {
     return () => {
       cancelled = true;
     };
-  }, [user?.uid, authLoading, sessionIdFilter]);
+  }, [user?.uid, authLoading, selectedSessionId, eventTypesForApi]);
+
+  const onSessionFilterChange = useCallback(
+    (value: string) => {
+      const next = value === "" ? null : value;
+      const sp = new URLSearchParams(searchParams.toString());
+      if (next) sp.set("sessionId", next);
+      else sp.delete("sessionId");
+      const qs = sp.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  const selectCategory = useCallback((id: ActivityFilterCategoryId) => {
+    setSelectedCategory((prev) => (prev === id ? null : id));
+  }, []);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore || !user?.uid) return;
@@ -229,7 +341,7 @@ function ActivityFeed() {
     setLoadingMore(true);
     setError(null);
     try {
-      const data = await fetchActivityFeed(sessionIdFilter, cursor);
+      const data = await fetchActivityFeed(selectedSessionId, eventTypesForApi, cursor);
       setEvents((prev) => [...prev, ...data.events.map(normalizeApiEvent)]);
       setNextCursor(data.nextCursor);
     } catch (e) {
@@ -237,7 +349,7 @@ function ActivityFeed() {
     } finally {
       setLoadingMore(false);
     }
-  }, [nextCursor, loadingMore, user?.uid, sessionIdFilter]);
+  }, [nextCursor, loadingMore, user?.uid, selectedSessionId, eventTypesForApi]);
 
   const toggleGroup = useCallback((id: string) => {
     setExpandedGroupIds((prev) => {
@@ -261,8 +373,8 @@ function ActivityFeed() {
 
   if (!user?.uid && !authLoading) {
     return (
-      <div className="w-full px-6 py-8 md:px-16 lg:px-24">
-        <div className="mx-auto max-w-3xl">
+      <div className="w-full px-6 py-8">
+        <div className="mx-auto w-full max-w-6xl">
         <div className="flex items-center gap-2.5 mb-7">
           <Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
           <h1 className="text-[16px] font-medium text-foreground">Activity</h1>
@@ -276,8 +388,8 @@ function ActivityFeed() {
   // ─── Main render ──────────────────────────────────────────────────────────
 
   return (
-    <div className="w-full px-6 py-8 md:px-16 lg:px-24">
-      <div className="mx-auto max-w-3xl">
+    <div className="w-full px-6 py-8">
+      <div className="mx-auto w-full max-w-6xl">
 
         {/* Page header */}
         <div className="flex items-center justify-between mb-7">
@@ -290,21 +402,117 @@ function ActivityFeed() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground border border-border rounded-lg px-[14px] h-8 hover:bg-muted transition-colors cursor-pointer bg-transparent"
+          <div className="flex flex-wrap items-center justify-end">
+            <div
+              className="flex flex-wrap items-center gap-1"
+              role="toolbar"
+              aria-label="Activity filters"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-              Filter
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground border border-border rounded-lg px-[14px] h-8 hover:bg-muted transition-colors cursor-pointer bg-transparent"
-            >
-              <ArrowUpDown className="h-3.5 w-3.5" aria-hidden />
-              Sort
-            </button>
+              <div
+                className={`relative shrink-0 ${sessionMenuOpen ? "z-[200]" : "z-0"}`}
+                ref={sessionMenuRef}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSessionMenuOpen((o) => !o)}
+                  aria-expanded={sessionMenuOpen}
+                  aria-haspopup="listbox"
+                  aria-label={`Filter by session, ${selectedSessionLabel}`}
+                  className={`${FILTER_PILL_BASE} max-w-[min(100vw-8rem,220px)] ${
+                    selectedSessionId ? FILTER_PILL_SESSION_ACTIVE : FILTER_PILL_DEFAULT
+                  }`}
+                >
+                  <Filter
+                    className="h-3.5 w-3.5 shrink-0 text-neutral-600 opacity-60"
+                    strokeWidth={2}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1 truncate">{selectedSessionLabel}</span>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 shrink-0 text-neutral-600 opacity-60 transition-transform duration-150 ${sessionMenuOpen ? "rotate-180" : ""}`}
+                    strokeWidth={2}
+                    aria-hidden
+                  />
+                </button>
+
+                {sessionMenuOpen ? (
+                  <div
+                    className="absolute left-1/2 top-full z-[200] mt-1 w-max min-w-[220px] max-w-[min(100vw-2rem,320px)] -translate-x-1/2 rounded-xl border border-neutral-200/80 bg-neutral-100 p-1.5 text-neutral-900 shadow-[var(--shadow-level-4)] dark:border-neutral-200/80 dark:bg-neutral-100 dark:text-neutral-900"
+                    role="listbox"
+                    aria-label="Sessions"
+                  >
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={!selectedSessionId}
+                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-neutral-900 transition-colors hover:bg-neutral-200/50 ${!selectedSessionId ? "bg-neutral-200/60 font-medium" : "font-normal"}`}
+                    onClick={() => {
+                      onSessionFilterChange("");
+                      setSessionMenuOpen(false);
+                    }}
+                  >
+                    <span className="min-w-0 flex-1 truncate">All sessions</span>
+                    {!selectedSessionId ? (
+                      <Check
+                        className="h-3.5 w-3.5 shrink-0 text-neutral-600 opacity-70"
+                        strokeWidth={2}
+                        aria-hidden
+                      />
+                    ) : null}
+                  </button>
+                  {sortedSessions.map((s) => {
+                    const selected = selectedSessionId === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-neutral-900 transition-colors hover:bg-neutral-200/50 ${selected ? "bg-neutral-200/60 font-medium" : "font-normal"}`}
+                        onClick={() => {
+                          onSessionFilterChange(s.id);
+                          setSessionMenuOpen(false);
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{s.title}</span>
+                        {selected ? (
+                          <Check
+                            className="h-3.5 w-3.5 shrink-0 text-neutral-600 opacity-70"
+                            strokeWidth={2}
+                            aria-hidden
+                          />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                  </div>
+                ) : null}
+              </div>
+
+              <div
+                className="flex flex-wrap items-center gap-1"
+                role="radiogroup"
+                aria-label="Activity type"
+              >
+                {ACTIVITY_FILTER_CATEGORY_IDS.map((id) => {
+                  const selected = selectedCategory === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => selectCategory(id)}
+                      className={`${FILTER_PILL_BASE} ${
+                        selected ? ACTIVITY_TYPE_PILL_ACTIVE[id] : FILTER_PILL_DEFAULT
+                      }`}
+                    >
+                      {ACTIVITY_FILTER_CATEGORY_LABELS[id]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -334,14 +542,14 @@ function ActivityFeed() {
         ) : events.length === 0 ? null : (
 
           /* Feed */
-          <div>
+          <div className="space-y-4">
             {dayBuckets.map((section) => {
               const renderRows = collapseSystemEvents(section.items);
               return (
-                <div key={section.label}>
+                <div key={section.label} className="space-y-2">
 
                   {/* Day section rule */}
-                  <div className="flex items-center gap-4 my-5">
+                  <div className="flex items-center gap-4">
                     <div className="flex-1 h-px bg-border" aria-hidden />
                     <span className="text-[13px] font-semibold text-foreground/60 whitespace-nowrap tracking-wide">
                       {section.label}
@@ -367,24 +575,30 @@ function ActivityFeed() {
                             <button
                               type="button"
                               onClick={() => toggleSystemGroup(row.key)}
-                              className="flex items-center gap-2 py-1.5 w-full text-left cursor-pointer bg-transparent border-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-3 text-left transition-colors hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
-                              {/* Spacer aligns with content column */}
-                              <div className="w-[52px] shrink-0" aria-hidden />
-                              <div className="h-px w-3 bg-border shrink-0" aria-hidden />
-                              <span className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-                                <Settings className="h-3 w-3" aria-hidden />
-                                {row.items.length} system{" "}
-                                {row.items.length === 1 ? "event" : "events"}
+                              <div className="relative z-10 flex w-[52px] shrink-0 justify-center">
+                                <div
+                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/50 text-muted-foreground"
+                                  aria-hidden
+                                >
+                                  <Settings className="h-5 w-5" />
+                                </div>
+                              </div>
+                              <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                                <span className="min-w-0 text-[15px] font-normal leading-snug text-muted-foreground">
+                                  {row.items.length} system{" "}
+                                  {row.items.length === 1 ? "event" : "events"}
+                                </span>
                                 <ChevronDown
-                                  className={`h-3 w-3 transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`}
+                                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`}
                                   aria-hidden
                                 />
-                              </span>
+                              </div>
                             </button>
 
                             {isExpanded && (
-                              <div className="pl-[52px]">
+                              <div className="mt-2 w-full min-w-0 pl-[52px]">
                                 {row.items.map((item) => {
                                   const ev =
                                     item.type === "single"

@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Expand, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { useWorkspace } from "@/lib/client/workspaceContext";
-import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 import type { Comment } from "@/lib/domain/comment";
 import type { CommentPosition } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
@@ -21,6 +20,10 @@ const POPOVER_STYLE =
 
 interface ScreenshotWithPinsProps {
   screenshotId: string | null | undefined;
+  /** Resolved download URL from parent `useScreenshotUrl` (single resolution per ticket). */
+  screenshotUrl: string | null;
+  screenshotUrlLoading: boolean;
+  screenshotUrlError: string | null;
   onExpand: () => void;
   isCommentMode?: boolean;
   pins?: Comment[];
@@ -152,6 +155,9 @@ const PinMarker = memo(function PinMarker({
 
 const ScreenshotWithPinsInner = ({
   screenshotId,
+  screenshotUrl: url,
+  screenshotUrlLoading: screenshotLoading,
+  screenshotUrlError: screenshotError,
   onExpand,
   isCommentMode = false,
   pins = [],
@@ -167,23 +173,21 @@ const ScreenshotWithPinsInner = ({
   onPinPositionChange,
   embeddedInCard = false,
 }: ScreenshotWithPinsProps) => {
-  const { url, loading: screenshotLoading, error: screenshotError } = useScreenshotUrl(screenshotId);
   const { authDisplayName, authEmail, authPhotoUrl } = useWorkspace();
   const containerRef = useRef<HTMLDivElement>(null);
   const threadPopoverRef = useRef<HTMLDivElement>(null);
   const [draftPosition, setDraftPosition] = useState<CommentPosition | null>(null);
   const [draftMessage, setDraftMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [imageDecoded, setImageDecoded] = useState(false);
 
-  // Prevent "ghost" screenshot during ticket switch: reset loading before paint.
   useLayoutEffect(() => {
-    setIsImageLoading(true);
+    setImageDecoded(false);
   }, [url]);
   useEffect(() => {
-    setIsImageLoading(true);
+    if (!url) return;
     const timeout = window.setTimeout(() => {
-      setIsImageLoading(false);
+      setImageDecoded(true);
     }, 5000);
     return () => window.clearTimeout(timeout);
   }, [url]);
@@ -309,26 +313,25 @@ const ScreenshotWithPinsInner = ({
             key={url} // Hard reset the image element on ticket switch
             src={url}
             alt="Screenshot"
-            className="w-full h-full object-contain max-h-[317px] pointer-events-none"
-            style={{
-              display: isImageLoading ? "none" : "block",
-              opacity: isImageLoading ? 0 : 1,
-              transition: "opacity 0.2s ease",
-            }}
-            loading="lazy"
+            className={`w-full h-full object-contain max-h-[317px] pointer-events-none block transition-[filter,opacity] duration-300 ease-out ${
+              imageDecoded ? "opacity-100 blur-0" : "opacity-[0.88] blur-md"
+            }`}
+            loading="eager"
+            decoding="async"
             draggable={false}
             onLoad={() => {
-              setIsImageLoading(false);
+              setImageDecoded(true);
             }}
-            onError={() => setIsImageLoading(false)}
+            onError={() => setImageDecoded(true)}
           />
           ) : null}
 
-          {(screenshotLoading || (isImageLoading && Boolean(url))) && (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none z-10 bg-[var(--layer-2-bg)]">
+          {(screenshotLoading && !url) ||
+          (Boolean(screenshotId) && !url && !screenshotError) ? (
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none z-10 bg-[var(--layer-2-bg)]/80">
               <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--text-tertiary))]" strokeWidth={1.8} aria-hidden />
             </div>
-          )}
+          ) : null}
           {!screenshotLoading && screenshotId && !url && (
             <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)] text-[12px] text-[hsl(var(--text-tertiary))]">
               {screenshotError ?? "Screenshot unavailable"}

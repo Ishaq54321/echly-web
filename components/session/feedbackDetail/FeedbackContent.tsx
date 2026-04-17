@@ -15,6 +15,10 @@ import type { Comment } from "@/lib/domain/comment";
 
 interface FeedbackContentProps {
   item: FeedbackItemShape & { index?: number; total?: number };
+  /** Parent resolves once via `useScreenshotUrl(selectedScreenshotId, …)`. */
+  screenshotUrl: string | null;
+  screenshotUrlLoading: boolean;
+  screenshotUrlError: string | null;
   /** Read-only body text from public share / sanitized description (not editable). */
   readOnlyDescription?: string | null;
   onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
@@ -37,6 +41,9 @@ interface FeedbackContentProps {
 
 export function FeedbackContent({
   item,
+  screenshotUrl,
+  screenshotUrlLoading,
+  screenshotUrlError,
   readOnlyDescription = null,
   onSaveActionSteps,
   onSaveTags,
@@ -118,6 +125,9 @@ export function FeedbackContent({
               sendPinComment != null ? (
                 <ScreenshotWithPins
                   screenshotId={item.screenshotId}
+                  screenshotUrl={screenshotUrl}
+                  screenshotUrlLoading={screenshotUrlLoading}
+                  screenshotUrlError={screenshotUrlError}
                   onExpand={onExpandImage}
                   isCommentMode={isCommentMode}
                   pins={pinComments ?? []}
@@ -136,6 +146,9 @@ export function FeedbackContent({
               ) : (
                 <ScreenshotBlock
                   screenshotId={item.screenshotId}
+                  screenshotUrl={screenshotUrl}
+                  screenshotUrlLoading={screenshotUrlLoading}
+                  screenshotUrlError={screenshotUrlError}
                   onExpand={onExpandImage}
                   embeddedInCard
                 />
@@ -170,7 +183,7 @@ export function FeedbackContent({
       />
       {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (
         <Section title="Tags" titleMuted>
-          <div className="flex flex-wrap gap-2 mt-3 max-w-full">
+          <div className="flex flex-wrap justify-start gap-2 mt-3 max-w-full min-w-0">
             {tags.map((tag, i) => (
               <Tag key={`${tag}-${i}`} name={tag} variant="default">
                 {onSaveTags && (
@@ -196,13 +209,13 @@ export function FeedbackContent({
                 <button
                   type="button"
                   onClick={() => setTagPopoverOpen((o) => !o)}
-                  className="text-[14px] font-medium px-3 py-1 rounded-full border border-dashed border-[var(--layer-2-border)] text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-120 ease-out cursor-pointer"
+                  className="inline-flex items-center px-3 py-1.5 rounded-full border border-dashed text-muted-foreground hover:bg-muted/50 transition-all duration-150 ease-out text-xs font-medium cursor-pointer"
                 >
                   + Add tag
                 </button>
                 {tagPopoverOpen && tagsToOffer.length > 0 && (
                   <div
-                    className={`absolute left-0 top-full mt-1.5 z-20 min-w-[180px] bg-white border border-neutral-200 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] py-2 transition-all duration-[120ms] ease-out ${
+                    className={`absolute left-0 top-full mt-1.5 z-20 min-w-[180px] max-w-[min(280px,calc(100vw-2rem))] bg-white border border-neutral-200 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] py-2 transition-all duration-[120ms] ease-out ${
                       dropdownAnimate ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
                     }`}
                   >
@@ -224,7 +237,7 @@ export function FeedbackContent({
                 )}
                 {tagPopoverOpen && tagsToOffer.length === 0 && (
                   <div
-                    className={`absolute left-0 top-full mt-1.5 z-20 min-w-[180px] bg-white border border-neutral-200 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] py-2 px-3 transition-all duration-[120ms] ease-out ${
+                    className={`absolute left-0 top-full mt-1.5 z-20 min-w-[180px] max-w-[min(280px,calc(100vw-2rem))] bg-white border border-neutral-200 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] py-2 px-3 transition-all duration-[120ms] ease-out ${
                       dropdownAnimate ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
                     }`}
                   >

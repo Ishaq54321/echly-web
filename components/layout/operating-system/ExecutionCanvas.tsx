@@ -43,8 +43,6 @@ export interface ExecutionCanvasProps {
   leftContent: React.ReactNode;
   /** Right column: metadata, activity (inline collapsible). */
   rightContent: React.ReactNode;
-  /** Resolve current and go to next (for Resolve & Next button) */
-  onResolveAndNext?: () => void;
 }
 
 function StatusPill({ status }: { status: FeedbackStatus }) {
@@ -76,7 +74,6 @@ export function ExecutionCanvas({
   systemAnalysis,
   leftContent,
   rightContent,
-  onResolveAndNext,
 }: ExecutionCanvasProps) {
   const status = item ? statusFromResolved(item.isResolved) : null;
   const [editingTitle, setEditingTitle] = useState(false);
@@ -315,7 +312,7 @@ export function ExecutionCanvas({
         </div>
       )}
 
-      {/* Quick actions: Resolve, Assign, Defer, Resolve & Next; Activity (slide-in) */}
+      {/* Quick actions: Resolve, Assign, Defer; Activity (slide-in) */}
       <div className="shrink-0 px-6 py-3 border-b border-[var(--layer-2-border)] flex flex-wrap items-center gap-2">
         {onResolve && (
           <button
@@ -345,15 +342,6 @@ export function ExecutionCanvas({
           <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />
           Defer
         </button>
-        {onResolveAndNext && !item.isResolved && (
-          <button
-            type="button"
-            onClick={onResolveAndNext}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
-          >
-            Resolve & Next
-          </button>
-        )}
       </div>
 
       {/* Body: two columns — content + metadata/activity */}

@@ -7,7 +7,11 @@ import {
   updateAccessRequestStatus,
 } from "@/lib/repositories/accessRequestsRepository.server";
 import { addSessionMember } from "@/lib/repositories/sessionMembersRepository.server";
-import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
+import {
+  createActivityEvent,
+  resolveActorForActivityEvent,
+  sessionTitleFromSessionRow,
+} from "@/lib/repositories/activityEventsRepository.server";
 
 export const dynamic = "force-dynamic";
 
@@ -149,11 +153,16 @@ export async function PATCH(
         ? context.session.workspaceId.trim()
         : "";
     if (workspaceId) {
+      const actor = await resolveActorForActivityEvent(approverId);
+      const sessionTitle = sessionTitleFromSessionRow(context.session);
       await createActivityEvent({
         workspaceId,
         sessionId,
         eventType: "access_request.rejected",
         actorId: approverId,
+        actorName: actor.actorName,
+        actorPhotoURL: actor.actorPhotoURL,
+        metadata: { sessionTitle },
       });
     }
     return apiSuccess({
@@ -187,11 +196,16 @@ export async function PATCH(
       ? context.session.workspaceId.trim()
       : "";
   if (workspaceId) {
+    const actor = await resolveActorForActivityEvent(approverId);
+    const sessionTitle = sessionTitleFromSessionRow(context.session);
     await createActivityEvent({
       workspaceId,
       sessionId,
       eventType: "access_request.approved",
       actorId: approverId,
+      actorName: actor.actorName,
+      actorPhotoURL: actor.actorPhotoURL,
+      metadata: { sessionTitle },
     });
   }
 

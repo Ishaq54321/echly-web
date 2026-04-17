@@ -68,6 +68,29 @@ function fmtTime(ms: number | null): string {
   });
 }
 
+/** Subtle left accent for comment preview only (not titles). */
+function ActivityContextBlock({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative mt-2 pl-4">
+      <div
+        className="absolute bottom-0 left-0 top-0 w-[2px] rounded-full bg-blue-500/60"
+        aria-hidden
+      />
+      <div className="py-1">{children}</div>
+    </div>
+  );
+}
+
+/** Same semantic color as the row body; weight carries hierarchy. */
+const FEEDBACK_TITLE_EMPHASIS = "font-medium text-foreground";
+
+/** Display string for inline feedback title; primary titles include a # prefix when missing. */
+function feedbackTitleDisplay(primaryFromMeta: string | null, fallback: string): string {
+  const p = primaryFromMeta?.trim();
+  if (p) return p.startsWith("#") ? p : `# ${p}`;
+  return fallback.trim();
+}
+
 // ─── Row model ───────────────────────────────────────────────────────────────
 
 type RowModel = {
@@ -329,7 +352,7 @@ const PILL_STYLES: Record<string, { label: string; className: string; icon?: "ch
   },
   "session.archived": {
     label: "Archived",
-    className: "bg-neutral-100 text-neutral-500 border-neutral-200",
+    className: "bg-neutral-100 text-muted-foreground border-neutral-200",
   },
   "access_request.approved": {
     label: "Approved",
@@ -362,10 +385,7 @@ function renderMentions(text: string): ReactNode {
   const parts = text.split(/(@[\w.-]+)/g);
   return parts.map((part, i) =>
     part.startsWith("@") ? (
-      <span
-        key={i}
-        className="bg-blue-50 text-blue-700 rounded px-0.5 font-medium text-[12px] dark:bg-blue-950 dark:text-blue-300"
-      >
+      <span key={i} className="font-medium text-[12px] text-foreground">
         {part}
       </span>
     ) : (
@@ -439,110 +459,108 @@ export function ActivityItem(props: ActivityItemProps) {
         : undefined;
 
   const entityLabel = (row.entityLabel?.trim() || row.entityFallback).trim();
+  const hasPrimaryEntityTitle = Boolean(row.entityLabel?.trim());
   const hasEntityChip = tier !== 3 && Boolean(entityLabel);
+  const hasCommentPreview = Boolean(row.showPreview && row.previewText);
+  const inlineTitleText = hasPrimaryEntityTitle
+    ? feedbackTitleDisplay(row.entityLabel, "")
+    : entityLabel;
   const hasStatePill = tier !== 3 && eventType in PILL_STYLES;
 
   const badgeEntry = eventIconMap[eventType];
   const BadgeIcon = badgeEntry?.icon;
   const badgeColorClass = badgeEntry?.badgeClass ?? "bg-neutral-300";
 
+  /** Rows with preview or group chrome stack below the headline; keep cross-axis alignment sensible. */
+  const isTallRow = hasCommentPreview || props.kind === "group";
+
   return (
-    <div className={`flex items-start ${tier === 3 ? "py-1" : "py-2.5"}`}>
+    <div
+      className={`flex w-full gap-3 py-3 transition-colors hover:bg-muted/20 ${isTallRow ? "items-start" : "items-center"}`}
+    >
       {/* Fixed-width avatar column — w-[52px] keeps the timeline spine centred */}
-      <div className="relative z-10 w-[52px] shrink-0 flex justify-center pt-0.5">
-        {tier === 3 ? (
-          /* Compact icon node for system events */
-          <div className="h-[22px] w-[22px] rounded-full bg-neutral-100 border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700 flex items-center justify-center">
-            {BadgeIcon && <BadgeIcon className="h-3 w-3 text-neutral-400 dark:text-neutral-500" aria-hidden />}
-          </div>
-        ) : (
-          /* Actor avatar with event-type badge overlay */
-          <div className="relative">
-            <UserAvatar
-              photoURL={photoURL}
-              name={actorName}
-              className="h-9 w-9"
-            />
-            {BadgeIcon && (
-              <div
-                className={`absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-background flex items-center justify-center w-[15px] h-[15px] ${badgeColorClass}`}
-                aria-hidden
-              >
-                <BadgeIcon className="h-[7px] w-[7px] text-white" />
-              </div>
-            )}
-          </div>
-        )}
+      <div className="relative z-10 flex w-[52px] shrink-0 justify-center">
+        <div className="relative">
+          <UserAvatar
+            photoURL={photoURL}
+            name={actorName}
+            className="h-9 w-9"
+          />
+          {BadgeIcon && (
+            <div
+              className={`absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-background flex items-center justify-center w-[17px] h-[17px] ${badgeColorClass}`}
+              aria-hidden
+            >
+              <BadgeIcon className="h-2.5 w-2.5 text-white" />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content */}
-      <div className="min-w-0 flex-1 pl-[14px]">
-        {/* Action line */}
-        <div
-          className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 leading-snug ${
-            tier === 3 ? "text-[13px]" : "text-[15px]"
-          }`}
-        >
-          {tier === 3 ? (
-            <span className="text-muted-foreground">
-              <span className="font-medium text-foreground/70">{actorName}</span>
-              {" "}
-              {row.actionPhrase}
-            </span>
-          ) : (
-            <>
-              <span className="font-medium text-foreground">{actorName}</span>
-              <span className="text-muted-foreground">{row.actionPhrase}</span>
-            </>
-          )}
+      <div className="min-w-0 flex-1">
+        {/* Action line — timestamp column fixed right */}
+        <div className="flex w-full min-w-0 items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 leading-snug text-[15px]">
+            <span className="text-muted-foreground">{actorName}</span>
+            <span className="text-foreground">{row.actionPhrase}</span>
 
-          {hasEntityChip && entityLabel ? (
-            handleEntityClick ? (
-              <button
-                type="button"
-                onClick={handleEntityClick}
-                className="inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground bg-muted border border-border rounded-md px-2 py-0.5 hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <span className="text-blue-500 font-semibold text-[11px]">#</span>
-                {entityLabel}
-                <ExternalLink className="h-2.5 w-2.5 opacity-40 shrink-0" aria-hidden />
-              </button>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground bg-muted border border-border rounded-md px-2 py-0.5">
-                <span className="text-blue-500 font-semibold text-[11px]">#</span>
-                {entityLabel}
+            {hasEntityChip && entityLabel ? (
+              handleEntityClick ? (
+                <button
+                  type="button"
+                  onClick={handleEntityClick}
+                  className={`inline-flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 text-left underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    hasPrimaryEntityTitle
+                      ? FEEDBACK_TITLE_EMPHASIS
+                      : "font-medium text-muted-foreground"
+                  }`}
+                >
+                  <span className="min-w-0 break-words">{inlineTitleText}</span>
+                  <ExternalLink
+                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden
+                  />
+                </button>
+              ) : (
+                <span
+                  className={
+                    hasPrimaryEntityTitle
+                      ? FEEDBACK_TITLE_EMPHASIS
+                      : "font-medium text-muted-foreground"
+                  }
+                >
+                  {inlineTitleText}
+                </span>
+              )
+            ) : null}
+
+            {hasStatePill && <StatePill eventType={eventType} />}
+
+            {row.sessionContext ? (
+              <span className="text-[15px] text-muted-foreground">
+                in {row.sessionContext}
               </span>
-            )
-          ) : null}
-
-          {hasStatePill && <StatePill eventType={eventType} />}
-
-          {row.sessionContext ? (
-            <span className="text-[12px] text-muted-foreground">in {row.sessionContext}</span>
-          ) : null}
-
-          <span className="text-muted-foreground/40 text-[12px]" aria-hidden>
-            ·
-          </span>
+            ) : null}
+          </div>
 
           {props.relativeTime ? (
             <time
               dateTime={props.isoTime}
-              className="text-[12px] text-muted-foreground whitespace-nowrap"
+              className="shrink-0 text-right text-sm tabular-nums text-muted-foreground whitespace-nowrap"
             >
               {props.relativeTime}
             </time>
           ) : null}
         </div>
 
-        {/* Preview card — Tier 1 only */}
-        {row.showPreview && row.previewText ? (
-          <div className="mt-2 flex max-w-[600px] overflow-hidden rounded-lg border border-border">
-            <div className="w-[3px] shrink-0 bg-blue-400 rounded-l-lg" aria-hidden />
-            <div className="bg-muted/50 px-3 py-2 text-[14px] text-muted-foreground line-clamp-2 flex-1 min-w-0 leading-[1.55]">
+        {/* Comment preview — blue accent only */}
+        {hasCommentPreview && row.previewText ? (
+          <ActivityContextBlock>
+            <div className="text-sm leading-relaxed text-muted-foreground line-clamp-2">
               {renderMentions(row.previewText)}
             </div>
-          </div>
+          </ActivityContextBlock>
         ) : null}
 
         {/* Group expand toggle */}
@@ -554,10 +572,10 @@ export function ActivityItem(props: ActivityItemProps) {
               e.stopPropagation();
               props.onToggleExpand();
             }}
-            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors mt-1.5 w-fit cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-2 flex w-fit cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ChevronDown
-              className={`h-3 w-3 transition-transform duration-150 ${props.isExpanded ? "rotate-180" : ""}`}
+              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ${props.isExpanded ? "rotate-180" : ""}`}
               aria-hidden
             />
             {props.isExpanded
@@ -568,21 +586,108 @@ export function ActivityItem(props: ActivityItemProps) {
 
         {/* Expanded group sub-items */}
         {props.kind === "group" && props.isExpanded ? (
-          <div className="mt-2 border-l-2 border-border pl-3 space-y-1.5">
+          <div className="mt-3 w-full min-w-0" role="list">
             {props.group.events.map((ev) => {
               const evRow = deriveRowModel(ev);
+              const evTier = getTier(ev.eventType);
+              const timeLabel =
+                ev.createdAt != null ? fmtTime(ev.createdAt) : null;
+              const SubIcon = eventIconMap[ev.eventType]?.icon;
+              const subEntityLabel = (
+                evRow.entityLabel?.trim() || evRow.entityFallback
+              ).trim();
+              const subHasPrimaryTitle = Boolean(evRow.entityLabel?.trim());
+              const subHasEntityChip = evTier !== 3 && Boolean(subEntityLabel);
+              const subHasPreview = Boolean(
+                evRow.showPreview && evRow.previewText
+              );
+              const subInlineTitleText = subHasPrimaryTitle
+                ? feedbackTitleDisplay(evRow.entityLabel, "")
+                : subEntityLabel;
+              const subEntityClick =
+                evRow.feedbackId && evRow.sessionId
+                  ? () => goToFeedback(evRow.sessionId!, evRow.feedbackId!)
+                  : evRow.sessionId
+                    ? () => goToSession(evRow.sessionId!)
+                    : undefined;
+              const subTallRow = subHasPreview;
               return (
-                <div key={ev.id} className="text-xs text-muted-foreground leading-relaxed">
-                  <span className="font-medium text-foreground/80">
-                    {ev.actor?.name?.trim() || "A teammate"}
-                  </span>
-                  {" "}
-                  {evRow.actionPhrase}
-                  {evRow.entityLabel && (
-                    <span className="text-foreground/70"> {evRow.entityLabel}</span>
-                  )}
-                  {ev.createdAt != null ? (
-                    <span className="text-muted-foreground/60"> · {fmtTime(ev.createdAt)}</span>
+                <div
+                  key={ev.id}
+                  role="listitem"
+                  className={`flex w-full min-w-0 justify-between gap-3 py-3 transition-colors hover:bg-muted/20 ${subTallRow ? "items-start" : "items-center"}`}
+                >
+                  <div
+                    className={`flex min-w-0 flex-1 gap-3 ${subTallRow ? "items-start" : "items-center"}`}
+                  >
+                    {SubIcon ? (
+                      <SubIcon
+                        className="h-4 w-4 shrink-0 text-muted-foreground"
+                        aria-hidden
+                      />
+                    ) : (
+                      <span className="h-4 w-4 shrink-0" aria-hidden />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="flex min-w-0 flex-wrap items-center gap-2 text-[15px] leading-relaxed">
+                        <span className="text-muted-foreground">
+                          {ev.actor?.name?.trim() || "A teammate"}
+                        </span>
+                        <span className="text-foreground">
+                          {evRow.actionPhrase}
+                        </span>
+                        {subHasEntityChip && subEntityLabel ? (
+                          subEntityClick ? (
+                            <button
+                              type="button"
+                              onClick={subEntityClick}
+                              className={`inline-flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 text-left underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                                subHasPrimaryTitle
+                                  ? FEEDBACK_TITLE_EMPHASIS
+                                  : "font-medium text-muted-foreground"
+                              }`}
+                            >
+                              <span className="min-w-0 break-words">
+                                {subInlineTitleText}
+                              </span>
+                              <ExternalLink
+                                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                                aria-hidden
+                              />
+                            </button>
+                          ) : (
+                            <span
+                              className={
+                                subHasPrimaryTitle
+                                  ? FEEDBACK_TITLE_EMPHASIS
+                                  : "font-medium text-muted-foreground"
+                              }
+                            >
+                              {subInlineTitleText}
+                            </span>
+                          )
+                        ) : null}
+                      </p>
+                      {subHasPreview && evRow.previewText ? (
+                        <ActivityContextBlock>
+                          <div className="text-sm leading-relaxed text-muted-foreground line-clamp-2">
+                            {renderMentions(evRow.previewText)}
+                          </div>
+                        </ActivityContextBlock>
+                      ) : null}
+                    </div>
+                  </div>
+                  {timeLabel ? (
+                    <time
+                      dateTime={
+                        ev.createdAt != null
+                          ? new Date(ev.createdAt).toISOString()
+                          : undefined
+                      }
+                      className={`shrink-0 text-right text-sm tabular-nums text-muted-foreground whitespace-nowrap ${subTallRow ? "self-start" : ""}`}
+                    >
+                      {timeLabel}
+                    </time>
                   ) : null}
                 </div>
               );

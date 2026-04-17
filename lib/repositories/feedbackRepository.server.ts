@@ -10,7 +10,12 @@ import {
   updateInsightsOnResolveRepo,
   updateInsightsOnTypeChangeRepo,
 } from "@/lib/repositories/insightsRepository.server";
-import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
+import {
+  createActivityEvent,
+  normalizeFeedbackTitleForActivity,
+  resolveActorForActivityEvent,
+  sessionTitleForActivityEvent,
+} from "@/lib/repositories/activityEventsRepository.server";
 import { listAccessibleSessionsForUser } from "@/lib/server/listAccessibleSessionsForUser";
 
 type DocumentReference = FirebaseFirestore.DocumentReference;
@@ -224,12 +229,21 @@ export async function addFeedbackWithSessionCountersRepo(
     } catch (e) {
       console.error("\u274c INSIGHTS SYNC FAILED", e);
     }
+    const actor = await resolveActorForActivityEvent(resolvedUserId);
+    const sessionTitle = await sessionTitleForActivityEvent(sessionId);
+    const feedbackTitle = normalizeFeedbackTitleForActivity(data.title);
     await createActivityEvent({
       workspaceId: resolvedWorkspaceId,
       sessionId,
       eventType: "feedback.created",
       actorId: resolvedUserId,
+      actorName: actor.actorName,
+      actorPhotoURL: actor.actorPhotoURL,
       feedbackId: txResult.ref.id,
+      metadata: {
+        feedbackTitle,
+        sessionTitle,
+      },
     });
   }
 
@@ -553,13 +567,23 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
           ? String((fdSnap.data() as { sessionId: string }).sessionId).trim()
           : "";
       if (sid) {
+        const fdData = (fdSnap.data() ?? {}) as Record<string, unknown>;
+        const actor = await resolveActorForActivityEvent(actorId);
+        const sessionTitle = await sessionTitleForActivityEvent(sid);
+        const feedbackTitle = normalizeFeedbackTitleForActivity(fdData.title);
         await createActivityEvent({
           workspaceId: result.resolveDelta.workspaceId,
           sessionId: sid,
           eventType:
             result.toStatus === "resolved" ? "feedback.resolved" : "feedback.reopened",
           actorId,
+          actorName: actor.actorName,
+          actorPhotoURL: actor.actorPhotoURL,
           feedbackId,
+          metadata: {
+            feedbackTitle,
+            sessionTitle,
+          },
         });
       }
     }

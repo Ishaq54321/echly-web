@@ -1,12 +1,62 @@
 import { doc, getDoc } from "firebase/firestore";
 import { getDownloadURL, ref } from "firebase/storage";
+import { getActiveShareToken } from "@/lib/client/shareToken";
 import { db, storage } from "@/lib/firebase";
 
-// \uD83D\uDEA8 ARCHITECTURE RULE:
-// This is the ONLY place where getDownloadURL is allowed.
-// Do NOT move this logic to components or backend.
-const screenshotResolvedUrlCache = new Map<string, string | null>();
-const screenshotResolvePromiseCache = new Map<string, Promise<string | null>>();
+/**
+ * How to turn a screenshotId into a browser-usable image URL.
+ * - When `shareToken` is set: always same-origin `/api/screenshot/:id?token=...` (images cannot send Bearer headers).
+ * - useClientFirebaseUrl: Firebase Web SDK {@link getDownloadURL} (viewer is signed in and in-bucket rules allow read).
+ * - Otherwise: same-origin `/api/screenshot/:id` (session cookie).
+ */
+export type ResolveScreenshotUrlOptions = {
+  useClientFirebaseUrl?: boolean;
+  shareToken?: string;
+  useSessionCookieProxy?: boolean;
+};
+
+const firebaseResolvedCache = new Map<string, string | null>();
+const firebaseResolveInflight = new Map<string, Promise<string | null>>();
+
+/** In-memory URL cache (proxy + Firebase) so revisiting a ticket skips resolver delay. */
+const resolvedUrlMemoryCache = new Map<string, string>();
+
+function resolveOptionsCacheKey(options?: ResolveScreenshotUrlOptions): string {
+  if (!options) return "";
+  return [
+    options.useClientFirebaseUrl ? "1" : "0",
+    options.useSessionCookieProxy ? "1" : "0",
+    options.shareToken?.trim() ?? "",
+  ].join("|");
+}
+
+function memoryCacheKey(screenshotId: string, options?: ResolveScreenshotUrlOptions): string {
+  return `${screenshotId.trim()}|${resolveOptionsCacheKey(options)}`;
+}
+
+/**
+ * Synchronous URL when no async work is needed, or when a prior resolve populated caches.
+ * Used to paint the &lt;img&gt; src on the same frame as ticket selection.
+ */
+export function getScreenshotUrlSyncIfAvailable(
+  screenshotId: string,
+  options?: ResolveScreenshotUrlOptions
+): string | null {
+  const id = typeof screenshotId === "string" ? screenshotId.trim() : "";
+  if (!id) return null;
+
+  const memHit = resolvedUrlMemoryCache.get(memoryCacheKey(id, options));
+  if (memHit) return memHit;
+
+  if (options?.useClientFirebaseUrl) {
+    const fb = firebaseResolvedCache.get(id);
+    return typeof fb === "string" && fb ? fb : null;
+  }
+
+  const proxyUrl = buildProxyScreenshotPath(id, options);
+  resolvedUrlMemoryCache.set(memoryCacheKey(id, options), proxyUrl);
+  return proxyUrl;
+}
 
 type ScreenshotDoc = {
   storagePath?: unknown;
@@ -40,8 +90,7 @@ async function fetchScreenshotStoragePath(screenshotId: string): Promise<string 
   if (!snap.exists()) return null;
   const data = snap.data() as ScreenshotDoc;
   const workspaceId = data.workspaceId;
-  const hasWorkspaceId =
-    typeof workspaceId === "string" && workspaceId.trim() !== "";
+  const hasWorkspaceId = typeof workspaceId === "string" && workspaceId.trim() !== "";
   if (!hasWorkspaceId) {
     return null;
   }
@@ -58,83 +107,123 @@ async function fetchScreenshotStoragePath(screenshotId: string): Promise<string 
   return storagePath;
 }
 
-export async function resolveScreenshotUrl(
-  screenshotId: string | null | undefined
-): Promise<string | null> {
-  const id = typeof screenshotId === "string" ? screenshotId.trim() : "";
-  if (!id) return null;
+function buildProxyScreenshotPath(
+  screenshotId: string,
+  options?: ResolveScreenshotUrlOptions
+): string {
+  const path = `/api/screenshot/${encodeURIComponent(screenshotId)}`;
+  const token = options?.shareToken?.trim();
+  if (!token) return path;
+  return `${path}?${new URLSearchParams({ token }).toString()}`;
+}
 
-  if (screenshotResolvedUrlCache.has(id)) {
-    return screenshotResolvedUrlCache.get(id) ?? null;
+/**
+ * Merge router query + {@link getActiveShareToken} into resolve options so every
+ * `/api/screenshot` request includes `?token=` when a share link is active.
+ */
+export function mergeScreenshotResolveOpts(
+  options: ResolveScreenshotUrlOptions | undefined,
+  searchParams: Pick<URLSearchParams, "get"> | null
+): ResolveScreenshotUrlOptions | undefined {
+  const qsTok =
+    searchParams?.get("token")?.trim() ||
+    searchParams?.get("shareToken")?.trim() ||
+    "";
+  const active = getActiveShareToken()?.trim() ?? "";
+  const mergedShare =
+    (active || qsTok || options?.shareToken?.trim() || "") || undefined;
+
+  if (!options && !mergedShare) return undefined;
+
+  const out: ResolveScreenshotUrlOptions = { ...(options ?? {}) };
+  if (mergedShare) {
+    out.shareToken = mergedShare;
+  } else {
+    delete out.shareToken;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+async function resolveViaFirebaseClient(screenshotId: string): Promise<string | null> {
+  if (firebaseResolvedCache.has(screenshotId)) {
+    return firebaseResolvedCache.get(screenshotId) ?? null;
   }
 
-  const inFlight = screenshotResolvePromiseCache.get(id);
+  const inFlight = firebaseResolveInflight.get(screenshotId);
   if (inFlight) return inFlight;
 
   const next = (async () => {
     try {
-      const storagePath = await fetchScreenshotStoragePath(id);
+      const storagePath = await fetchScreenshotStoragePath(screenshotId);
       if (!storagePath) {
-        screenshotResolvedUrlCache.set(id, null);
+        firebaseResolvedCache.set(screenshotId, null);
         return null;
       }
 
       try {
-        console.log("\uD83E\uDDE0 [DEBUG] START RESOLVE", {
-          screenshotId: id,
-        });
-
-        console.log("\uD83E\uDDE0 [DEBUG] STORAGE CONFIG", {
-          bucket: storage?.app?.options?.storageBucket,
-          projectId: storage?.app?.options?.projectId,
-        });
-
-        console.log("\uD83E\uDDE0 [DEBUG] STORAGE PATH", storagePath);
-
-        const manualUrl = `https://firebasestorage.googleapis.com/v0/b/${storage.app.options.storageBucket}/o/${encodeURIComponent(storagePath)}?alt=media`;
-
-        console.log("\uD83E\uDDE0 [DEBUG] MANUAL URL", manualUrl);
-
         const fileRef = ref(storage, storagePath);
-
-        console.log("\uD83E\uDDE0 [DEBUG] FILE REF", {
-          fullPath: fileRef.fullPath,
-          bucket: fileRef.bucket,
-        });
-
         const url = await getDownloadURL(fileRef);
-
-        console.log("\uD83E\uDDE0 [DEBUG] SUCCESS URL", url);
-
-        screenshotResolvedUrlCache.set(id, url);
+        firebaseResolvedCache.set(screenshotId, url);
         return url;
       } catch (error: unknown) {
-        logResolverFailure(id, error);
-
-        screenshotResolvedUrlCache.set(id, null);
+        logResolverFailure(screenshotId, error);
+        firebaseResolvedCache.set(screenshotId, null);
         return null;
       }
     } catch (error) {
-      logResolverFailure(id, error);
-      screenshotResolvedUrlCache.set(id, null);
+      logResolverFailure(screenshotId, error);
+      firebaseResolvedCache.set(screenshotId, null);
       return null;
     } finally {
-      screenshotResolvePromiseCache.delete(id);
+      firebaseResolveInflight.delete(screenshotId);
     }
   })();
 
-  screenshotResolvePromiseCache.set(id, next);
+  firebaseResolveInflight.set(screenshotId, next);
   return next;
+}
+
+export async function resolveScreenshotUrl(
+  screenshotId: string | null | undefined,
+  options?: ResolveScreenshotUrlOptions
+): Promise<string | null> {
+  const id = typeof screenshotId === "string" ? screenshotId.trim() : "";
+  if (!id) return null;
+
+  const key = memoryCacheKey(id, options);
+  const cached = resolvedUrlMemoryCache.get(key);
+  if (cached) return cached;
+
+  let resolved: string | null = null;
+  const shareTok = options?.shareToken?.trim();
+  if (shareTok) {
+    resolved = buildProxyScreenshotPath(id, options);
+  } else if (options?.useClientFirebaseUrl) {
+    resolved = await resolveViaFirebaseClient(id);
+  } else {
+    resolved = buildProxyScreenshotPath(id, options);
+  }
+
+  if (resolved) {
+    resolvedUrlMemoryCache.set(key, resolved);
+  }
+  return resolved;
 }
 
 export function clearScreenshotUrlCache(screenshotId?: string): void {
   if (!screenshotId) {
-    screenshotResolvedUrlCache.clear();
-    screenshotResolvePromiseCache.clear();
+    firebaseResolvedCache.clear();
+    firebaseResolveInflight.clear();
+    resolvedUrlMemoryCache.clear();
     return;
   }
-  const id = screenshotId.trim();
-  if (!id) return;
-  screenshotResolvedUrlCache.delete(id);
-  screenshotResolvePromiseCache.delete(id);
+  const trimmed = screenshotId.trim();
+  if (!trimmed) return;
+  firebaseResolvedCache.delete(trimmed);
+  firebaseResolveInflight.delete(trimmed);
+  for (const k of resolvedUrlMemoryCache.keys()) {
+    if (k.startsWith(`${trimmed}|`)) {
+      resolvedUrlMemoryCache.delete(k);
+    }
+  }
 }

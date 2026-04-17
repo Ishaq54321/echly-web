@@ -8,7 +8,13 @@ import {
   updateSessionUpdatedAtRepo,
 } from "@/lib/repositories/sessionsRepository.server";
 import { incrementInsightsOnCommentCreateRepo } from "@/lib/repositories/insightsRepository.server";
-import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
+import {
+  createActivityEvent,
+  normalizeFeedbackTitleForActivity,
+  resolveActorForActivityEvent,
+  sessionTitleFromSessionRow,
+  truncateActivityCommentPreview,
+} from "@/lib/repositories/activityEventsRepository.server";
 import { fireAndForget } from "@/lib/server/fireAndForget";
 
 /** Thrown when the feedback doc is missing (e.g. hard-deleted); map to HTTP 404 in API routes. */
@@ -86,6 +92,7 @@ export async function addCommentRepo(
   if (!feedbackSnap.exists) {
     throw new Error(ADD_COMMENT_FEEDBACK_MISSING);
   }
+  const feedbackData = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
   const payload: Record<string, unknown> = {
     userId: resolvedUserId,
     workspaceId,
@@ -123,13 +130,25 @@ export async function addCommentRepo(
   });
   await batch.commit();
 
+  const actor = await resolveActorForActivityEvent(resolvedUserId);
+  const sessionTitle = sessionTitleFromSessionRow(session);
+  const feedbackTitle = normalizeFeedbackTitleForActivity(feedbackData.title);
+  const commentPreview = truncateActivityCommentPreview(data.message, 80);
+
   await createActivityEvent({
     workspaceId,
     sessionId,
     eventType: "comment.added",
     actorId: resolvedUserId,
+    actorName: actor.actorName,
+    actorPhotoURL: actor.actorPhotoURL,
     feedbackId,
     commentId: commentRef.id,
+    metadata: {
+      feedbackTitle,
+      sessionTitle,
+      commentPreview,
+    },
   });
 
   fireAndForget("addCommentRepo-sessionUpdatedAt", () =>

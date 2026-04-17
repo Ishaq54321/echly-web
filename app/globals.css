@@ -15,6 +15,13 @@
   --color-semantic-success: #059669;
   --color-semantic-attention: #D97706;
   --color-semantic-danger: #DC2626;
+  /* App shell semantic colors (use text-foreground / text-muted-foreground in UI) */
+  --color-foreground: var(--text-primary);
+  --color-muted-foreground: var(--text-meta);
+  --color-muted: hsl(var(--surface-2));
+  --color-border: hsl(var(--border));
+  --color-background: hsl(var(--background));
+  --color-ring: var(--color-primary-ring);
   /* Interaction transitions */
   --transition-duration-120: 120ms;
 }
@@ -90,7 +97,8 @@
   --surface-3: 220 10% 93%;
   --border: 220 13% 91%;
   /* Typography hierarchy: premium contrast, no faded greys */
-  --text-primary: #0F172A;
+  /* Primary body / headline tone — dashboard grey (#364153), single source for text-foreground */
+  --text-primary: #364153;
   --text-secondary: #334155;
   --text-meta: #64748B;
   --text-active: 220 9% 46%;
@@ -147,7 +155,8 @@
 
   --ai-accent: #1a56db;
   --ai-accent-ring: rgba(26, 86, 219, 0.28);
-  --text-primary-strong: 220 14% 7%;
+  /* HSL components for hsl(var(--text-primary-strong)) — matches --text-primary #364153 */
+  --text-primary-strong: 217 21% 27%;
   --text-secondary-soft: 220 10% 36%;
   --text-tertiary: 220 9% 48%;
 

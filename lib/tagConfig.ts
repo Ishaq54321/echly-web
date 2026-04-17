@@ -1,47 +1,88 @@
 /**
- * Central semantic tag color mapping for the enterprise tag system.
- * Use with the shared <Tag /> component for consistent styling.
+ * Central semantic tag colors — deterministic: same label (case-insensitive) → same styles.
+ * Use with <Tag /> and chip UIs for a consistent premium tag system.
  */
 
-export const TAG_COLOR_MAP: Record<
-  string,
-  { pill: string; dot: string }
-> = {
-  Product: { pill: "bg-semantic-system/10 text-semantic-system", dot: "bg-semantic-system" },
-  UX: { pill: "bg-semantic-insight/10 text-semantic-insight", dot: "bg-semantic-insight" },
-  Performance: { pill: "bg-semantic-success/10 text-semantic-success", dot: "bg-semantic-success" },
-  Bug: { pill: "bg-semantic-danger/10 text-semantic-danger", dot: "bg-semantic-danger" },
-  Copy: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
-  Interaction: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
-  Responsive: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
-  Backend: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
-  Data: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
-  Blocking: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
-  Accessibility: { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
-  "Visual Hierarchy": { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" },
+const SEMANTIC = {
+  layout: {
+    pill: "bg-blue-50 text-blue-700 border-blue-200",
+    dot: "bg-blue-500",
+  },
+  ux: {
+    pill: "bg-purple-50 text-purple-700 border-purple-200",
+    dot: "bg-purple-500",
+  },
+  bug: {
+    pill: "bg-red-50 text-red-700 border-red-200",
+    dot: "bg-red-500",
+  },
+  content: {
+    pill: "bg-green-50 text-green-700 border-green-200",
+    dot: "bg-green-500",
+  },
+  performance: {
+    pill: "bg-orange-50 text-orange-700 border-orange-200",
+    dot: "bg-orange-500",
+  },
+  default: {
+    pill: "bg-gray-50 text-gray-700 border-gray-200",
+    dot: "bg-gray-400",
+  },
+} as const;
+
+type SemanticKey = keyof typeof SEMANTIC;
+
+/** Primary semantic palette (export for consumers that need the map object). */
+export const TAG_COLOR_MAP: Record<SemanticKey, string> = {
+  layout: SEMANTIC.layout.pill,
+  ux: SEMANTIC.ux.pill,
+  bug: SEMANTIC.bug.pill,
+  content: SEMANTIC.content.pill,
+  performance: SEMANTIC.performance.pill,
+  default: SEMANTIC.default.pill,
 };
 
-const FALLBACK = { pill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-400" };
+/** Maps normalized (lowercase) labels to a semantic bucket. Extends core keys with app vocabulary. */
+const CANONICAL_TAG: Record<string, SemanticKey> = {
+  layout: "layout",
+  product: "layout",
+  "visual hierarchy": "layout",
+  responsive: "layout",
+  ux: "ux",
+  interaction: "ux",
+  accessibility: "ux",
+  bug: "bug",
+  blocking: "bug",
+  content: "content",
+  copy: "content",
+  data: "content",
+  performance: "performance",
+  backend: "default",
+};
 
-function normalizeKey(name: string): string {
-  const trimmed = name.trim();
-  const exact = TAG_COLOR_MAP[trimmed];
-  if (exact) return trimmed;
-  for (const key of Object.keys(TAG_COLOR_MAP)) {
-    if (key.toLowerCase() === trimmed.toLowerCase()) return key;
-  }
-  return trimmed;
+function resolveSemanticKey(tag: string): SemanticKey {
+  const key = tag.toLowerCase().trim();
+  if (CANONICAL_TAG[key]) return CANONICAL_TAG[key];
+  if (key in SEMANTIC) return key as SemanticKey;
+  return "default";
 }
 
+export function getTagColor(tag: string): string {
+  return SEMANTIC[resolveSemanticKey(tag)].pill;
+}
+
+/** @deprecated Prefer getTagColor — same behavior. */
 export function getTagPillClass(name: string): string {
-  const key = normalizeKey(name);
-  return TAG_COLOR_MAP[key]?.pill ?? FALLBACK.pill;
+  return getTagColor(name);
 }
 
 export function getTagDotClass(name: string): string {
-  const key = normalizeKey(name);
-  return TAG_COLOR_MAP[key]?.dot ?? FALLBACK.dot;
+  return SEMANTIC[resolveSemanticKey(name)].dot;
 }
+
+/** Shared interactive chip shell (premium pills + hover). */
+export const TAG_CHIP_BASE_CLASS =
+  "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border";
 
 /** All available tags for the add-tag dropdown. Order defines display order. */
 export const AVAILABLE_TAGS = [

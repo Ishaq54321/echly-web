@@ -16,6 +16,15 @@ function badRequest(message: string) {
   return apiError({ code: "INVALID_INPUT", message, status: 400 });
 }
 
+function shareTokenFromCommentBody(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as Record<string, unknown>;
+  const token = typeof b.token === "string" ? b.token.trim() : "";
+  const shareToken = typeof b.shareToken === "string" ? b.shareToken.trim() : "";
+  const out = token || shareToken;
+  return out !== "" ? out : null;
+}
+
 type CommentRow = Record<string, unknown> & { feedbackId?: string };
 
 export const POST = withAuthorization(
@@ -39,12 +48,14 @@ export const POST = withAuthorization(
       return badRequest("Missing required fields");
     }
 
+    const bodyShareToken = shareTokenFromCommentBody(body);
     const pre = ctx.preloaded;
     const context = await buildRequestContext({
       req,
       authenticatedUser: user,
       userWorkspaceId,
       feedbackId,
+      bodyShareToken,
       ...(pre && pre.feedback !== undefined
         ? {
             feedback: pre.feedback as Feedback | null,
@@ -78,11 +89,13 @@ export const POST = withAuthorization(
         feedbackId?: string;
       };
       const feedbackId = typeof body.feedbackId === "string" ? body.feedbackId.trim() : "";
+      const bodyShareToken = shareTokenFromCommentBody(body);
       const context = await buildRequestContext({
         req,
         authenticatedUser: user,
         userWorkspaceId: viewerWorkspaceId,
         feedbackId: feedbackId || undefined,
+        bodyShareToken,
       });
       return {
         workspaceId: context.sessionWorkspaceId ?? "",
@@ -121,6 +134,7 @@ export const PATCH = withAuthorization(
     const editsCommentBody =
       data.message !== undefined || data.position !== undefined;
 
+    const bodyShareToken = shareTokenFromCommentBody(body);
     const pre = ctx.preloaded;
     const needsResolve = data.resolved !== undefined;
     const context = await buildRequestContext({
@@ -128,6 +142,7 @@ export const PATCH = withAuthorization(
       authenticatedUser: user,
       userWorkspaceId,
       feedbackId: feedbackId || undefined,
+      bodyShareToken,
       ...(pre && pre.feedback !== undefined
         ? {
             feedback: pre.feedback as Feedback | null,
@@ -165,11 +180,13 @@ export const PATCH = withAuthorization(
       const commentId = typeof body.commentId === "string" ? body.commentId.trim() : "";
       const comment = commentId ? await getCommentByIdRepo(commentId) : null;
       const feedbackId = typeof comment?.feedbackId === "string" ? comment.feedbackId : "";
+      const bodyShareToken = shareTokenFromCommentBody(body);
       const context = await buildRequestContext({
         req,
         authenticatedUser: user,
         userWorkspaceId: viewerWorkspaceId,
         feedbackId: feedbackId || undefined,
+        bodyShareToken,
       });
       return {
         workspaceId: context.sessionWorkspaceId ?? "",
@@ -202,12 +219,14 @@ export const DELETE = withAuthorization(
     const feedbackId =
       comment && typeof comment.feedbackId === "string" ? comment.feedbackId.trim() : "";
 
+    const bodyShareToken = shareTokenFromCommentBody(body);
     const pre = ctx.preloaded;
     const context = await buildRequestContext({
       req,
       authenticatedUser: user,
       userWorkspaceId,
       feedbackId: feedbackId || undefined,
+      bodyShareToken,
       ...(pre && pre.feedback !== undefined
         ? {
             feedback: pre.feedback as Feedback | null,
@@ -250,11 +269,13 @@ export const DELETE = withAuthorization(
       const commentId = typeof body.commentId === "string" ? body.commentId.trim() : "";
       const comment = commentId ? await getCommentByIdRepo(commentId) : null;
       const feedbackId = typeof comment?.feedbackId === "string" ? comment.feedbackId : "";
+      const bodyShareToken = shareTokenFromCommentBody(body);
       const context = await buildRequestContext({
         req,
         authenticatedUser: user,
         userWorkspaceId: viewerWorkspaceId,
         feedbackId: feedbackId || undefined,
+        bodyShareToken,
       });
       return {
         workspaceId: context.sessionWorkspaceId ?? "",

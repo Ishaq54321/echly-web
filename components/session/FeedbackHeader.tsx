@@ -63,7 +63,7 @@ export interface SessionFeedbackHeaderProps {
   resolveAffirmationKey?: number;
   impactScore?: number | null;
   onResolvedChange?: (isResolved: boolean) => void;
-  onResolveAndNext?: () => void;
+  resolveSubmitting?: boolean;
   onOpenComment?: () => void;
   onCloseCommentMode?: () => void;
   isCommentMode?: boolean;
@@ -82,7 +82,7 @@ export interface SessionFeedbackHeaderProps {
     permissions: ShareSurfacePermissions;
     onBlocked: (detail: {
       reason: "tier" | "app";
-      action: "resolve" | "resolve_next" | "comment" | "assign" | "defer";
+      action: "resolve" | "comment" | "assign" | "defer";
     }) => void;
     /** When set with {@link shareGating.onRequestResolveAccess}, resolve affordance follows request/pending UI. */
     pendingResolve?: boolean;
@@ -109,7 +109,7 @@ export function SessionFeedbackHeader({
   resolveAffirmationKey = 0,
   impactScore,
   onResolvedChange,
-  onResolveAndNext,
+  resolveSubmitting = false,
   onOpenComment,
   onCloseCommentMode,
   isCommentMode = false,
@@ -150,13 +150,6 @@ export function SessionFeedbackHeader({
     const { permissions, onBlocked } = shareGating;
     if (!permissions.canResolve) onBlocked({ reason: "tier", action: "resolve" });
     else onBlocked({ reason: "app", action: "resolve" });
-  };
-
-  const gateResolveNext = () => {
-    if (!shareGating || isResolved) return;
-    const { permissions, onBlocked } = shareGating;
-    if (!permissions.canResolve) onBlocked({ reason: "tier", action: "resolve_next" });
-    else onBlocked({ reason: "app", action: "resolve_next" });
   };
 
   const gateComment = () => {
@@ -290,12 +283,6 @@ export function SessionFeedbackHeader({
                   <Clock {...iconBtn} aria-hidden />
                   Defer
                 </button>
-                {!isResolved && shareGating.permissions.canResolve ? (
-                  <button type="button" onClick={gateResolveNext} className={secondaryBtn}>
-                    <CheckCircle {...iconBtn} aria-hidden />
-                    Resolve &amp; Next
-                  </button>
-                ) : null}
                 <button type="button" className={secondaryBtn} onClick={gateComment}>
                   <MessageSquare {...iconBtn} aria-hidden />
                   Comment
@@ -366,7 +353,7 @@ export function SessionFeedbackHeader({
                   <button
                     type="button"
                     onClick={() => onResolvedChange(true)}
-                    disabled={isResolved}
+                    disabled={isResolved || resolveSubmitting}
                     className={
                       isResolved
                         ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
@@ -374,7 +361,13 @@ export function SessionFeedbackHeader({
                     }
                   >
                     <CheckCircle {...iconBtn} aria-hidden />
-                    <span>{isResolved ? "Resolved" : "Resolve"}</span>
+                    <span>
+                      {isResolved
+                        ? "Resolved"
+                        : resolveSubmitting
+                          ? "Resolving…"
+                          : "Resolve"}
+                    </span>
                   </button>
                 )
               ) : null}
@@ -386,14 +379,6 @@ export function SessionFeedbackHeader({
                 <Clock {...iconBtn} aria-hidden />
                 Defer
               </button>
-              {onResolveAndNext &&
-              !isResolved &&
-              (accessResolve == null || accessResolve.canResolve) ? (
-                <button type="button" onClick={onResolveAndNext} className={secondaryBtn}>
-                  <CheckCircle {...iconBtn} aria-hidden />
-                  Resolve &amp; Next
-                </button>
-              ) : null}
               {onOpenComment ? (
                 <button
                   type="button"

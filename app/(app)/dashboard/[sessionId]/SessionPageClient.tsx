@@ -1,7 +1,7 @@
 "use client";
 
 import { authFetch, type AuthFetchInit } from "@/lib/authFetch";
-import { clearShareToken, getShareToken, setShareToken } from "@/lib/client/shareToken";
+import { clearShareToken, getActiveShareToken, setShareToken } from "@/lib/client/shareToken";
 import {
   useEffect,
   useLayoutEffect,
@@ -20,7 +20,11 @@ import {
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { useStableState } from "@/lib/client/perception/useStableState";
-import { resolveScreenshotUrl } from "@/lib/client/screenshotResolver";
+import {
+  mergeScreenshotResolveOpts,
+  resolveScreenshotUrl,
+  type ResolveScreenshotUrlOptions,
+} from "@/lib/client/screenshotResolver";
 import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
@@ -156,7 +160,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const requestResolveAccessInFlightRef = useRef(false);
 
-  const { authUid, isIdentityResolved, authReady } = useWorkspace();
+  /** Per-session latch: invite redemption runs at most once per visit (not on every access refetch). */
+  const inviteActivationLatchRef = useRef<string | null>(null);
+  /** Invalidates in-flight load work when the effect re-runs (e.g. React Strict Mode). */
+  const sessionLoadEffectNonceRef = useRef(0);
+
+  const { authUid, isIdentityResolved, authReady, workspaceId } = useWorkspace();
   const { showToast } = useToast();
 
   const handleRequestResolveAccess = useCallback(async () => {
@@ -213,9 +222,31 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     searchParams.get("token")?.trim() ||
     searchParams.get("shareToken")?.trim() ||
     "";
+  const searchParamsSignature = searchParams.toString();
   const shareTokenQsRef = useRef(shareTokenQs);
   shareTokenQsRef.current = shareTokenQs;
   const isAnonymousViewer = authReady && !authUid;
+
+  const screenshotUrlResolveOptions = useMemo((): ResolveScreenshotUrlOptions | undefined => {
+    const shareTok =
+      (getActiveShareToken()?.trim() ?? "") || shareTokenQs.trim();
+    if (shareTok !== "") {
+      return { shareToken: shareTok };
+    }
+    const sessionWs = (session?.workspaceId ?? "").trim();
+    if (!sessionWs) return undefined;
+    const viewerWs = (workspaceId ?? "").trim();
+    const useClientFirebaseUrl = Boolean(
+      authUid?.trim() && viewerWs && sessionWs && viewerWs === sessionWs
+    );
+    if (useClientFirebaseUrl) {
+      return { useClientFirebaseUrl: true };
+    }
+    if (authUid?.trim()) {
+      return { useClientFirebaseUrl: false, useSessionCookieProxy: true };
+    }
+    return { useClientFirebaseUrl: false };
+  }, [shareTokenQs, session?.workspaceId, authUid, workspaceId]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -265,6 +296,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     setSearchResults([]);
     setSearchLoading(false);
     setAccessBlocked(false);
+  }, [sessionId]);
+
+  useEffect(() => {
+    inviteActivationLatchRef.current = null;
   }, [sessionId]);
 
   useEffect(() => {
@@ -619,15 +654,44 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       return;
     }
 
+    const effectNonce = ++sessionLoadEffectNonceRef.current;
     let cancelled = false;
     void (async () => {
       setAccessBlocked(false);
+      let shouldAttemptInviteRedeem = false;
+      if (authUid?.trim()) {
+        const sid = sessionId.trim();
+        if (inviteActivationLatchRef.current !== sid) {
+          inviteActivationLatchRef.current = sid;
+          shouldAttemptInviteRedeem = true;
+        }
+      }
+      if (shouldAttemptInviteRedeem) {
+        const sid = sessionId.trim();
+        try {
+          const activateRes = await authFetch(`/api/invite/activate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: sid }),
+          });
+          if (
+            activateRes == null ||
+            (!activateRes.ok && activateRes.status !== 404)
+          ) {
+            inviteActivationLatchRef.current = null;
+          }
+        } catch {
+          inviteActivationLatchRef.current = null;
+        }
+      }
+      if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
       const tok = shareTokenQsRef.current;
       const qs = tok !== "" ? `?token=${encodeURIComponent(tok)}` : "";
       const url = `/api/sessions/${encodeURIComponent(sessionId)}${qs}`;
       const res = await authFetchOrAnonCookie(url);
-      if (cancelled) return;
+      if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
       const body = await res.json().catch(() => null);
+      if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
       if (body === null || typeof body !== "object") {
         setSessionFetchError("error");
         return;
@@ -850,29 +914,43 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const preloadNextScreenshotId =
     selectedIndex >= 0 ? stableScopedFeedback[selectedIndex + 1]?.screenshotId ?? "" : "";
-  const preloadNext2ScreenshotId =
-    selectedIndex >= 0 ? stableScopedFeedback[selectedIndex + 2]?.screenshotId ?? "" : "";
 
-  // Preload only the next 1-2 ticket screenshots from the current selection.
+  // Preload only the immediate next ticket screenshot (single lookahead).
   useEffect(() => {
-    void (async () => {
-      if (preloadNextScreenshotId) {
-        const nextUrl = await resolveScreenshotUrl(preloadNextScreenshotId);
-        if (nextUrl) preloadImage(nextUrl, preloadedScreenshotUrlsRef.current);
-      }
-      if (preloadNext2ScreenshotId) {
-        const next2Url = await resolveScreenshotUrl(preloadNext2ScreenshotId);
-        if (next2Url) preloadImage(next2Url, preloadedScreenshotUrlsRef.current);
-      }
-    })();
-  }, [selectedIndex, preloadNextScreenshotId, preloadNext2ScreenshotId]);
+    const delayMs = 300;
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        const mergedOpts = mergeScreenshotResolveOpts(
+          screenshotUrlResolveOptions,
+          searchParams
+        );
+        if (preloadNextScreenshotId) {
+          const nextUrl = await resolveScreenshotUrl(
+            preloadNextScreenshotId,
+            mergedOpts
+          );
+          if (nextUrl) preloadImage(nextUrl, preloadedScreenshotUrlsRef.current);
+        }
+      })();
+    }, delayMs);
+    return () => window.clearTimeout(handle);
+  }, [
+    selectedIndex,
+    preloadNextScreenshotId,
+    screenshotUrlResolveOptions,
+    searchParamsSignature,
+  ]);
 
   const selectedBaseItem = useMemo(
     () => stableCanonicalFeedback.find((t) => t.id === effectiveSelectedId) ?? null,
     [stableCanonicalFeedback, effectiveSelectedId]
   );
   const selectedScreenshotId = selectedBaseItem?.screenshotId ?? null;
-  const { url: selectedScreenshotUrl } = useScreenshotUrl(selectedScreenshotId);
+  const {
+    url: selectedScreenshotUrl,
+    loading: selectedScreenshotUrlLoading,
+    error: selectedScreenshotUrlError,
+  } = useScreenshotUrl(selectedScreenshotId, screenshotUrlResolveOptions);
 
   const contextualPosition = useMemo(() => {
     if (!effectiveSelectedId) return { index: 0, total: -1 };
@@ -1361,18 +1439,36 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     });
   };
 
-  const handleResolveAndNext = () => {
-    if (!effectiveSelectedId || !selectedItem) return;
-    const currentId = effectiveSelectedId;
-    const openIdx = stableOpenFeedback.findIndex((f) => f.id === currentId);
-    const nextOpen =
-      openIdx >= 0
-        ? stableOpenFeedback[openIdx + 1] ?? stableOpenFeedback[0]
-        : stableOpenFeedback[0];
-    if (!saveResolved(true)) return;
-    if (nextOpen && nextOpen.id !== currentId) {
-      queueMicrotask(() => setSelectedId(nextOpen.id));
+  const handleResolvedChange = (isResolved: boolean) => {
+    if (!isResolved) {
+      saveResolved(false);
+      return;
     }
+    const ticketId = effectiveSelectedId;
+    if (!ticketId || !selectedItem) return;
+
+    /** Next navigation target: forward scan in list order for open tickets, then first other open (wrap). */
+    const tickets = stableScopedFeedback;
+    const isOpen = (row: (typeof tickets)[number]) =>
+      normalizeTicketStatus(getTicketStatus(row)) === "open";
+    const currentIndex = tickets.findIndex((t) => t.id === ticketId);
+    const nextOpenAfter =
+      currentIndex >= 0
+        ? tickets.slice(currentIndex + 1).find(isOpen)
+        : undefined;
+    const firstOtherOpen = tickets.find(
+      (t) => t.id !== ticketId && isOpen(t)
+    );
+    const navigateToId = nextOpenAfter?.id ?? firstOtherOpen?.id;
+
+    if (navigateToId) {
+      setSelectedId(navigateToId);
+    } else {
+      showToast("No more feedback");
+    }
+
+    /** Optimistic local updates + PATCH already run inside saveResolved; navigation is immediate (no await). */
+    saveResolved(true);
   };
 
   const handleSessionTitleBlur = useCallback(async () => {
@@ -1728,6 +1824,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             setIsImageExpanded={setIsImageExpanded}
             isCommentMode={false}
             comments={[]}
+            screenshotUrl={null}
+            screenshotUrlLoading={false}
+            screenshotUrlError={null}
           />
         );
       }
@@ -1747,14 +1846,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         item={selectedItem}
         resolveAffirmationKey={resolveAffirmationKey}
         onSaveTitle={saveTitle}
-        onResolvedChange={saveResolved}
+        onResolvedChange={handleResolvedChange}
         onSaveActionSteps={saveActionSteps}
         onSaveTags={saveTags}
         setIsImageExpanded={setIsImageExpanded}
         isCommentMode={isCommentMode}
         onOpenComment={() => setIsCommentMode(true)}
         onCloseCommentMode={() => setIsCommentMode(false)}
-        onResolveAndNext={handleResolveAndNext}
         impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
         comments={comments}
         sendPinComment={sendPinComment}
@@ -1795,6 +1893,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             : undefined
         }
         accessResolveSubmitting={requestAccessSubmitting}
+        screenshotUrl={selectedScreenshotUrl}
+        screenshotUrlLoading={selectedScreenshotUrlLoading}
+        screenshotUrlError={selectedScreenshotUrlError}
       />
     );
   };

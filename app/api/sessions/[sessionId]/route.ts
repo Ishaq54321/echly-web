@@ -18,7 +18,10 @@ import { routeParamId } from "@/lib/server/routeParams";
 import { buildRequestContext } from "@/lib/server/requestContext";
 import type { Session } from "@/lib/domain/session";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
-import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
+import {
+  createActivityEvent,
+  resolveActorForActivityEvent,
+} from "@/lib/repositories/activityEventsRepository.server";
 
 type PatchBody = { title?: string; archived?: boolean; accessLevel?: string };
 
@@ -193,12 +196,18 @@ export const PATCH = withAuthorization(
         typeof sess.workspaceId === "string" ? sess.workspaceId.trim() : "";
       const actorId = user.uid.trim();
       if (workspaceId && actorId) {
+        const actor = await resolveActorForActivityEvent(actorId);
+        const sessionTitleForMeta =
+          (titleChanged ? nextTitle : currentTitle).trim() || "Untitled Session";
         if (archiveChanged && body.archived === true) {
           await createActivityEvent({
             workspaceId,
             sessionId: id,
             eventType: "session.archived",
             actorId,
+            actorName: actor.actorName,
+            actorPhotoURL: actor.actorPhotoURL,
+            metadata: { sessionTitle: sessionTitleForMeta },
           });
         }
         const settingsChangedFields = changedFields.filter(
@@ -210,7 +219,12 @@ export const PATCH = withAuthorization(
             sessionId: id,
             eventType: "session.settings_changed",
             actorId,
-            metadata: { changedFields: settingsChangedFields },
+            actorName: actor.actorName,
+            actorPhotoURL: actor.actorPhotoURL,
+            metadata: {
+              sessionTitle: sessionTitleForMeta,
+              changedFields: settingsChangedFields,
+            },
           });
         }
       }

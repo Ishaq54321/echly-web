@@ -1,34 +1,58 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import Link from "next/link";
-import { Layers, MessageSquareMore } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { ChevronLeft } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
-import { DiscussionList, type ProjectItem, type DiscussionItem } from "@/components/discussion/DiscussionList";
+import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  DiscussionList,
+  type ProjectItem,
+  type DiscussionItem,
+} from "@/components/discussion/DiscussionList";
 import { DiscussionThread } from "@/components/discussion/DiscussionThread";
-import { ResizeHandle } from "@/components/discussion/ResizeHandle";
-import { MinimalLoader } from "@/components/ui/MinimalLoader";
-
-const MIN_SIDEBAR = 200;
-const MAX_SIDEBAR = 360;
-const MIN_LIST = 238; /* ~15% lower than 280 for better narrow-viewport shrink */
-const MAX_LIST = 420;
-const MIN_RIGHT = 520;
-const DEFAULT_LIST_BASIS = 320;
+import {
+  DiscussionSidebar,
+  type SidebarProject,
+} from "@/components/discussion/DiscussionSidebar";
+import { useToast } from "@/components/dashboard/context/ToastContext";
 
 export default function DiscussionPage() {
   const { user, loading } = useAuthGuard();
+  const { authDisplayName } = useWorkspace();
+  const { showToast } = useToast();
+
+  // ── State ──────────────────────────────────────────────────────────────────
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [listItems, setListItems] = useState<DiscussionItem[]>([]);
   const [isEmpty, setIsEmpty] = useState<boolean | null>(null);
-  const [sidebarBasis, setSidebarBasis] = useState(260);
-  const [listBasis, setListBasis] = useState(DEFAULT_LIST_BASIS);
-  const handleEmptyChange = useCallback((empty: boolean) => setIsEmpty(empty), []);
-  const handleProjectsLoaded = useCallback((list: ProjectItem[]) => setProjects(list), []);
 
-  /** Update only the selected ticket's reply count when a comment is added; do NOT trigger ticket list reload. */
+  /** Mobile: 'list' shows the thread list panel; 'detail' shows the selected thread */
+  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+
+  // ── Callbacks ──────────────────────────────────────────────────────────────
+  const handleEmptyChange = useCallback(
+    (empty: boolean) => setIsEmpty(empty),
+    []
+  );
+  const handleProjectsLoaded = useCallback(
+    (list: ProjectItem[]) => setProjects(list),
+    []
+  );
+
+  const handleSelect = useCallback((id: string | null) => {
+    setSelectedId(id);
+    if (id) setMobileView("detail");
+  }, []);
+
+  const handleMobileBack = useCallback(() => {
+    setMobileView("list");
+    setSelectedId(null);
+  }, []);
+
+  /** Increment reply count for the selected ticket without triggering a list reload. */
   const handleCommentAdded = useCallback(() => {
     if (!selectedId) return;
     setListItems((prev) =>
@@ -40,148 +64,205 @@ export default function DiscussionPage() {
     );
   }, [selectedId]);
 
-  const handleSidebarResize = useCallback((delta: number) => {
-    setSidebarBasis((prev) => Math.min(MAX_SIDEBAR, Math.max(MIN_SIDEBAR, prev + delta)));
-  }, []);
-  const handleListResize = useCallback((delta: number) => {
-    setListBasis((prev) => Math.min(MAX_LIST, Math.max(MIN_LIST, prev + delta)));
+  /** Sync reopened status into list (by selection). Resolve uses optimistic update in advance handler. */
+  const handleStatusChanged = useCallback((affectedTicketId?: string) => {
+    const id = affectedTicketId ?? selectedId;
+    if (!id) return;
+    setListItems((prev) =>
+      prev.map((ticket) => {
+        if (ticket.id !== id) return ticket;
+        const next = ticket.status === "resolved" ? "open" : "resolved";
+        return { ...ticket, status: next };
+      })
+    );
+  }, [selectedId]);
+
+  /**
+   * Instant UX: navigate + optimistic resolve from list snapshot (current row still open),
+   * then PATCH runs in DiscussionThread.
+   */
+  const handleResolvedAdvanceQueue = useCallback(
+    (currentId: string) => {
+      const tickets = listItems;
+      const isOpen = (t: (typeof tickets)[number]) => t.status !== "resolved";
+      const currentIndex = tickets.findIndex((t) => t.id === currentId);
+      const nextOpenAfter =
+        currentIndex >= 0
+          ? tickets.slice(currentIndex + 1).find(isOpen)
+          : undefined;
+      const firstOtherOpen = tickets.find(
+        (t) => t.id !== currentId && isOpen(t)
+      );
+      const target = nextOpenAfter ?? firstOtherOpen;
+      if (target) {
+        setSelectedId(target.id);
+      } else {
+        showToast("No more feedback");
+      }
+      setListItems((prev) =>
+        prev.map((t) =>
+          t.id === currentId ? { ...t, status: "resolved" as const } : t
+        )
+      );
+    },
+    [listItems, showToast]
+  );
+
+  const handleResolveFailed = useCallback((ticketId: string) => {
+    setListItems((prev) =>
+      prev.map((t) =>
+        t.id === ticketId ? { ...t, status: "open" as const } : t
+      )
+    );
   }, []);
 
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const sidebarProjects = useMemo<SidebarProject[]>(() => {
+    return projects.map((proj) => ({
+      id: proj.id,
+      name: proj.name,
+      count: listItems.filter((i) => i.sessionId === proj.id).length,
+    }));
+  }, [projects, listItems]);
+
+  const selectedIndex = useMemo(() => {
+    if (!selectedId) return undefined;
+    const idx = listItems.findIndex((i) => i.id === selectedId);
+    return idx >= 0 ? idx + 1 : undefined;
+  }, [selectedId, listItems]);
+
+  const userInitial = authDisplayName?.charAt(0).toUpperCase() ?? undefined;
+
+  // ── Loading / auth guard ───────────────────────────────────────────────────
   if (!user && !loading) {
     return (
-      <div className="flex min-h-0 w-full flex-1 flex-col bg-white pt-6">
-        <div className="w-full px-6 flex flex-1 flex-col min-h-0">
-          <div className="mb-0 shrink-0">
-            <h1 className="text-3xl font-semibold text-neutral-900">Discussion</h1>
-            <p className="text-sm text-secondary mt-1">
-              All feedback conversations across sessions
-            </p>
-          </div>
-          <div className="border-b border-neutral-300 mt-6 shrink-0" />
-          <div className="discussion-layout flex flex-1 min-h-0 w-full pt-0 items-stretch">
-            <div className="shrink-0 bg-white px-3 py-2" style={{ flex: "0 0 260px" }} />
-            <div className="shrink-0 bg-white pl-0 pr-3 py-2 border-l border-neutral-300" style={{ flex: `1 1 ${DEFAULT_LIST_BASIS}px` }} />
-            <div className="discussion-panel-right flex-1 min-w-0 bg-white flex justify-center items-center px-4 py-4">
-              <p className="text-sm text-secondary font-normal">
-                Please sign in to view discussions.
-              </p>
-            </div>
-          </div>
-        </div>
+      <div className="flex h-full items-center justify-center bg-white">
+        <p className="text-[13px] text-secondary">
+          Please sign in to view discussions.
+        </p>
       </div>
     );
   }
 
+  // ── Layout ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col bg-white pt-6">
-      <div className="w-full px-6 flex flex-1 flex-col min-h-0">
-        <div className="mb-0 shrink-0">
-          <h1 className="text-3xl font-semibold text-neutral-900">Discussion</h1>
-          <p className="text-sm text-secondary mt-1">
-            All feedback conversations across sessions
-          </p>
+    <div className="flex h-full overflow-hidden bg-white border-t border-neutral-200">
+      {/* ── Panel 1: Sidebar (≥ lg only) ─────────────────────────────────── */}
+      <div className="hidden lg:flex flex-col w-[220px] shrink-0 border-r border-neutral-200">
+        <DiscussionSidebar
+          projects={sidebarProjects}
+          totalCount={listItems.length}
+          selectedProjectId={selectedProjectId}
+          onProjectChange={setSelectedProjectId}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          userName={authDisplayName ?? undefined}
+          userInitial={userInitial}
+        />
+      </div>
+
+      {/* ── Panel 2: Thread list ──────────────────────────────────────────── */}
+      {/*
+        Mobile: visible when mobileView === 'list'
+        md+: always visible, fixed 340px width
+      */}
+      <div
+        className={`
+          flex flex-col border-r border-neutral-200
+          ${mobileView === "detail" ? "hidden md:flex" : "flex"}
+          w-full md:w-[340px] md:shrink-0
+        `}
+      >
+        {/* Mobile: search bar (sidebar is hidden) */}
+        <div className="lg:hidden shrink-0 px-4 pt-3 pb-0">
+          <input
+            type="search"
+            placeholder="Search discussions…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-3 py-[7px] text-[13px] bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 placeholder:text-meta outline-none focus:border-[#155DFC]/50 focus:bg-white transition-colors"
+          />
         </div>
 
-        <div className="border-b border-neutral-300 mt-6 shrink-0" />
-
-        <div className="discussion-layout flex flex-1 min-h-[420px] w-full pt-0 items-stretch">
-          {/* LEFT: Projects — Navigation (light) */}
-          <div
-            className="discussion-panel-sidebar shrink-0 bg-white px-3 py-2 space-y-0.5 overflow-y-auto min-h-0"
-            style={{ flex: `0 0 ${sidebarBasis}px`, minWidth: MIN_SIDEBAR, maxWidth: MAX_SIDEBAR }}
-          >
-            {projects.length === 0 && isEmpty === false ? (
-              <div className="flex flex-1 flex-col items-center justify-center py-8 px-2" aria-busy="true" aria-live="polite">
-                <MinimalLoader compact label="Loading projects…" />
-              </div>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setSelectedProjectId(null)}
-                  className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors cursor-pointer ${
-                    selectedProjectId === null
-                      ? "bg-blue-50 text-blue-700 font-semibold"
-                      : "text-secondary hover:bg-neutral-50"
-                  }`}
-                >
-                  <Layers className="h-4 w-4 shrink-0 text-[#155DFC]" />
-                  <span className="truncate">All projects</span>
-                </button>
-                {projects.map((proj) => {
-                  const isActive = selectedProjectId === proj.id;
-                  return (
-                    <button
-                      key={proj.id}
-                      type="button"
-                      onClick={() => setSelectedProjectId(proj.id)}
-                      className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors cursor-pointer ${
-                        isActive
-                          ? "bg-blue-50 text-blue-700 font-semibold"
-                          : "text-secondary hover:bg-neutral-50"
-                      }`}
-                    >
-                      <Layers className="h-4 w-4 shrink-0 text-[#155DFC]" />
-                      <span className="truncate">{proj.name}</span>
-                    </button>
-                  );
-                })}
-              </>
-            )}
+        {/* Mobile: session filter (sidebar is hidden on < lg) */}
+        {sidebarProjects.length > 0 && (
+          <div className="lg:hidden shrink-0 flex items-center gap-1.5 px-4 py-2 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setSelectedProjectId(null)}
+              className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-all ${
+                selectedProjectId === null
+                  ? "bg-[#EEF3FF] text-[#155DFC] border-[#bfdbfe] font-medium"
+                  : "bg-transparent text-secondary border-neutral-200 hover:text-neutral-900"
+              }`}
+            >
+              All
+            </button>
+            {sidebarProjects.map((proj) => (
+              <button
+                key={proj.id}
+                type="button"
+                onClick={() => setSelectedProjectId(proj.id)}
+                className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-all ${
+                  selectedProjectId === proj.id
+                    ? "bg-[#EEF3FF] text-[#155DFC] border-[#bfdbfe] font-medium"
+                    : "bg-transparent text-secondary border-neutral-200 hover:text-neutral-900"
+                }`}
+              >
+                {proj.name || "Untitled"}
+              </button>
+            ))}
           </div>
+        )}
 
-          <ResizeHandle onResize={handleSidebarResize} />
+        <DiscussionList
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          search={searchQuery}
+          filterBySessionId={selectedProjectId}
+          onEmptyChange={handleEmptyChange}
+          onProjectsLoaded={handleProjectsLoaded}
+          items={listItems}
+          setItems={setListItems}
 
-          {/* MIDDLE: Discussions — static 1px grey divider; selection rail is per-row */}
-          <div
-            className="discussion-panel-list shrink-0 h-full min-h-0 bg-white overflow-y-auto flex flex-col border-l border-neutral-300"
-            style={{ flex: `1 1 ${listBasis}px`, minWidth: MIN_LIST, maxWidth: MAX_LIST }}
+        />
+      </div>
+
+      {/* ── Panel 3: Detail ───────────────────────────────────────────────── */}
+      {/*
+        Mobile: visible when mobileView === 'detail' (or no thread selected shows placeholder)
+        md+: always visible, fills remaining space
+      */}
+      <div
+        className={`
+          flex-1 min-w-0 flex flex-col overflow-hidden
+          ${mobileView === "list" && !selectedId ? "hidden md:flex" : ""}
+          ${mobileView === "list" && selectedId ? "hidden md:flex" : ""}
+          ${mobileView === "detail" ? "flex" : ""}
+        `}
+      >
+        {/* Mobile back button */}
+        {mobileView === "detail" && (
+          <button
+            type="button"
+            onClick={handleMobileBack}
+            className="md:hidden shrink-0 flex items-center gap-1.5 px-4 py-2.5 border-b border-neutral-200 text-[13px] font-medium text-[#155DFC] bg-white"
           >
-            {isEmpty === true ? (
-              <div className="px-3 py-8 text-center">
-                <MessageSquareMore className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
-                <h2 className="text-lg font-semibold text-neutral-900">
-                  No discussions yet
-                </h2>
-                <p className="mt-2 text-sm text-secondary max-w-[280px] mx-auto">
-                  When feedback receives comments, they will appear here.
-                </p>
-                <Link
-                  href="/dashboard"
-                  className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#155DFC] text-white px-5 py-2.5 text-sm font-semibold transition-colors duration-200 hover:bg-[#0F4ED1] active:scale-[0.99]"
-                >
-                  Open Sessions
-                </Link>
-              </div>
-            ) : (
-              <DiscussionList
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                filterBySessionId={selectedProjectId}
-                onEmptyChange={handleEmptyChange}
-                onProjectsLoaded={handleProjectsLoaded}
-                items={listItems}
-                setItems={setListItems}
-              />
-            )}
-          </div>
+            <ChevronLeft className="h-4 w-4 shrink-0" strokeWidth={2} />
+            All discussions
+          </button>
+        )}
 
-          <ResizeHandle onResize={handleListResize} />
-
-          {/* RIGHT: Ticket workspace (strong) — left-aligned reading column */}
-          <div
-            className="discussion-panel-right flex-1 min-w-0 bg-white flex py-4 min-h-0 overflow-hidden"
-            style={{ flex: "2 1 auto", minWidth: MIN_RIGHT }}
-          >
-            <div className="w-full min-h-0 flex flex-col">
-              <DiscussionThread
-                feedbackId={selectedId}
-                onCommentAdded={handleCommentAdded}
-                listLoaded={isEmpty !== null}
-              />
-            </div>
-          </div>
-        </div>
+        <DiscussionThread
+          feedbackId={selectedId}
+          onCommentAdded={handleCommentAdded}
+          onStatusChanged={handleStatusChanged}
+          onResolvedAdvanceQueue={handleResolvedAdvanceQueue}
+          onResolveFailed={handleResolveFailed}
+          listLoaded={isEmpty !== null}
+          threadIndex={selectedIndex}
+          threadTotal={listItems.length}
+        />
       </div>
     </div>
   );

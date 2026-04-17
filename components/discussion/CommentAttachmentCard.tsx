@@ -31,6 +31,7 @@ export function CommentAttachmentCard({ attachment, onImageClick }: CommentAttac
       src={url}
       alt={name}
       className="max-w-full h-auto max-h-[360px] object-contain rounded-lg"
+      loading="lazy"
     />
   );
 

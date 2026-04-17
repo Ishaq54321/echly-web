@@ -11,15 +11,9 @@ import type { SessionInvite } from "@/lib/domain/sessionInvite";
 import type { SessionMember } from "@/lib/domain/sessionMember";
 import type { Session } from "@/lib/domain/session";
 import { getShareLinkByToken } from "@/lib/repositories/shareLinksRepository";
-import {
-  activateInvite,
-  addSessionMember,
-  getInviteByEmail,
-  getSessionMember,
-} from "@/lib/repositories/sessionMembersRepository.server";
+import { getInviteByEmail, getSessionMember } from "@/lib/repositories/sessionMembersRepository.server";
 import { getRequestByUser } from "@/lib/repositories/accessRequestsRepository.server";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
-import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { AuthorizationError } from "@/lib/server/auth/authorize";
 import { adminDb } from "@/lib/server/firebaseAdmin";
@@ -123,9 +117,13 @@ function accessInputsFromContext(context: SystemContext): {
       };
     }
     const ws = context.workspaceId == null ? "" : context.workspaceId.trim();
+    const shareTok =
+      context.shareToken == null || context.shareToken === ""
+        ? ""
+        : context.shareToken.trim();
     return {
       user: { uid },
-      tokenString: undefined,
+      tokenString: shareTok !== "" ? shareTok : undefined,
       viewerWorkspaceIdOverride: ws !== "" ? ws : undefined,
     };
   }
@@ -166,7 +164,7 @@ export async function getAccessContext(options: {
   const { user, tokenString, viewerWorkspaceIdOverride } =
     accessInputsFromContext(options.context);
 
-  const effectiveToken = user == null ? tokenString : undefined;
+  const effectiveToken = tokenString;
 
   const rawSession =
     options.session !== undefined
@@ -224,60 +222,6 @@ export async function getAccessContext(options: {
     invite = null;
   }
 
-  const isInviteRedemption =
-    !member && invite != null && Boolean(user?.uid) && Boolean(userEmail);
-
-  if (isInviteRedemption) {
-    assert(invite != null, "invite redemption without invite row");
-    assert(user?.uid, "invite redemption without user uid");
-    assert(userEmail, "invite redemption without user email");
-
-    const redeemerId = user.uid.trim();
-    assert(redeemerId, "Missing user uid for invite redemption");
-
-    const existingAfterRace = await getSessionMember(sid, redeemerId);
-    if (existingAfterRace) {
-      member = existingAfterRace;
-    } else {
-      await addSessionMember({
-        sessionId: sid,
-        workspaceId: session.workspaceId.trim(),
-        userId: redeemerId,
-        email: userEmail,
-        access: invite.access,
-        actorId: redeemerId,
-        source: "invite_redemption",
-      });
-      const workspaceId = session.workspaceId.trim();
-      const existingAcceptedEvent = await adminDb
-        .collection("workspaces")
-        .doc(workspaceId)
-        .collection("activityEvents")
-        .where("eventType", "==", "invite.accepted")
-        .where("sessionId", "==", sid)
-        .where("actor.id", "==", redeemerId)
-        .limit(1)
-        .get();
-
-      if (existingAcceptedEvent.empty) {
-        await createActivityEvent({
-          workspaceId,
-          sessionId: sid,
-          eventType: "invite.accepted",
-          actorId: redeemerId,
-        });
-      }
-      member = await getSessionMember(sid, redeemerId);
-    }
-
-    if (invite.status !== "active") {
-      await activateInvite({
-        sessionId: sid,
-        email: userEmail,
-      });
-    }
-  }
-
   let resolveAccessRequest: AccessRequest | null = null;
   if (user?.uid) {
     resolveAccessRequest = await getRequestByUser(sid, user.uid);
@@ -288,13 +232,6 @@ export async function getAccessContext(options: {
   if (effectiveToken) {
     tokenPayload = await loadShareLinkPayloadForSession(effectiveToken, sid);
   }
-
-  console.log("INVITE ACTIVATION", {
-    userId: user?.uid,
-    email: userEmail,
-    invite,
-    member,
-  });
 
   const { role, sessionGranted } = resolveAccess({
     session: {
