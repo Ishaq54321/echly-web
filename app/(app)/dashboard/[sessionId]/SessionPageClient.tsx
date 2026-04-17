@@ -218,18 +218,25 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   const feedbackSessionId = sessionId || undefined;
 
-  const shareTokenQs =
+  const shareTokenFromUrl =
     searchParams.get("token")?.trim() ||
     searchParams.get("shareToken")?.trim() ||
     "";
   const searchParamsSignature = searchParams.toString();
-  const shareTokenQsRef = useRef(shareTokenQs);
-  shareTokenQsRef.current = shareTokenQs;
+  /**
+   * Effective share token for optional-auth APIs. Must match {@link getActiveShareToken}:
+   * signed-in requests only send Firebase Bearer, so restricted share links need `?token=` on the URL.
+   */
+  const shareTokenForApi =
+    typeof window !== "undefined"
+      ? getActiveShareToken()?.trim() ?? ""
+      : shareTokenFromUrl;
+  const shareTokenForApiRef = useRef(shareTokenForApi);
+  shareTokenForApiRef.current = shareTokenForApi;
   const isAnonymousViewer = authReady && !authUid;
 
   const screenshotUrlResolveOptions = useMemo((): ResolveScreenshotUrlOptions | undefined => {
-    const shareTok =
-      (getActiveShareToken()?.trim() ?? "") || shareTokenQs.trim();
+    const shareTok = shareTokenForApi.trim();
     if (shareTok !== "") {
       return { shareToken: shareTok };
     }
@@ -246,9 +253,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       return { useClientFirebaseUrl: false, useSessionCookieProxy: true };
     }
     return { useClientFirebaseUrl: false };
-  }, [shareTokenQs, session?.workspaceId, authUid, workspaceId]);
+  }, [shareTokenForApi, session?.workspaceId, authUid, workspaceId]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token") || params.get("shareToken");
     if (token) {
@@ -256,7 +264,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     } else {
       clearShareToken();
     }
-  }, []);
+  }, [searchParamsSignature]);
 
   const restFeedbackFetch = useCallback((url: string) => authFetchOrAnonCookie(url), []);
 
@@ -335,8 +343,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             sessionId: feedbackSessionId,
             query: q,
           });
-          if (shareTokenQsRef.current !== "") {
-            sp.set("token", shareTokenQsRef.current);
+          if (shareTokenForApiRef.current !== "") {
+            sp.set("token", shareTokenForApiRef.current);
           }
           const url = `/api/feedback/search?${sp.toString()}`;
           const res = await authFetchOrAnonCookie(url);
@@ -365,7 +373,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [searchQuery, feedbackSessionId, shareTokenQs]);
+  }, [searchQuery, feedbackSessionId, shareTokenForApi]);
 
   /** In-flight action steps per ticket — merged onto list updates to avoid flicker. */
   const pendingOptimisticActionStepsRef = useRef(
@@ -418,7 +426,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     () => ({
       mergeRealtimeListRef: mergeRealtimeFeedbackListRef,
       enabled: authReady,
-      shareToken: shareTokenQs || null,
+      shareToken: shareTokenForApi || null,
       restSessionCounts:
         session != null
           ? { total: sessionRestTotal, open: sessionRestOpen, resolved: sessionRestResolved }
@@ -427,7 +435,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     }),
     [
       authReady,
-      shareTokenQs,
+      shareTokenForApi,
       restFeedbackFetch,
       session?.id ?? "",
       sessionRestTotal,
@@ -685,7 +693,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         }
       }
       if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
-      const tok = shareTokenQsRef.current;
+      const tok = shareTokenForApiRef.current;
       const qs = tok !== "" ? `?token=${encodeURIComponent(tok)}` : "";
       const url = `/api/sessions/${encodeURIComponent(sessionId)}${qs}`;
       const res = await authFetchOrAnonCookie(url);
@@ -799,7 +807,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            shareToken: shareTokenQsRef.current !== "" ? shareTokenQsRef.current : undefined,
+            shareToken:
+              shareTokenForApiRef.current !== "" ? shareTokenForApiRef.current : undefined,
           }),
         }).catch(() => {});
       }
@@ -807,7 +816,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return () => {
       cancelled = true;
     };
-  }, [sessionId, authUid, authReady, shareTokenQs]);
+  }, [sessionId, authUid, authReady, shareTokenForApi]);
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
@@ -831,7 +840,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     let cancelled = false;
     void (async () => {
       try {
-        const tok = shareTokenQsRef.current;
+        const tok = shareTokenForApiRef.current;
         const qs = tok !== "" ? `?token=${encodeURIComponent(tok)}` : "";
         const url = `/api/tickets/${encodeURIComponent(ticketIdFromUrl)}${qs}`;
         const res = await authFetchOrAnonCookie(url);
@@ -871,7 +880,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     };
   }, [
     authReady,
-    shareTokenQs,
+    shareTokenForApi,
     ticketIdFromUrl,
     feedbackSessionId,
     sessionId,

@@ -9,7 +9,7 @@ import type { Feedback } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
 import { getFeedbackByIdRepo } from "@/lib/repositories/feedbackRepository.server";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { getUserProfileForRequestContextRepo } from "@/lib/repositories/usersRepository.server";
 import type { AuthorizedRequestUser } from "@/lib/server/auth/authorize";
 import {
   AuthorizationError,
@@ -111,7 +111,7 @@ export async function buildRequestContext(params: {
    * Omit to resolve from the request via {@link tryGetAuthUser}.
    */
   authenticatedUser?: AuthorizedRequestUser | null;
-  /** When provided (e.g. viewer workspace from withAuthorization), skips getUserWorkspaceIdRepo */
+  /** When provided (e.g. viewer workspace from withAuthorization), skips reading workspace from the user doc */
   userWorkspaceId?: string;
   feedbackId?: string;
   sessionId?: string;
@@ -167,12 +167,12 @@ export async function buildRequestContext(params: {
       ? params.userWorkspaceId.trim()
       : "";
 
-  const workspacePromise =
+  const userProfilePromise =
     viewerUser == null
-      ? Promise.resolve("")
+      ? Promise.resolve(null)
       : trimmedPreloaded !== ""
-        ? Promise.resolve(trimmedPreloaded)
-        : getUserWorkspaceIdRepo(viewerUser.uid);
+        ? getUserProfileForRequestContextRepo(viewerUser.uid, trimmedPreloaded)
+        : getUserProfileForRequestContextRepo(viewerUser.uid, undefined);
 
   const hasExplicitSessionId =
     typeof sessionId === "string" && sessionId.trim() !== "";
@@ -181,9 +181,9 @@ export async function buildRequestContext(params: {
   const skipFeedbackRepo = usePreloadedFeedback || !feedbackId;
   const skipSessionExplicitRepo = hasExplicitSessionId && usePreloadedSession;
 
-  const [userWorkspaceIdRaw, feedbackFetched, sessionFromExplicit] =
+  const [userProfile, feedbackFetched, sessionFromExplicit] =
     await Promise.all([
-      workspacePromise,
+      userProfilePromise,
       skipFeedbackRepo
         ? Promise.resolve(null)
         : getFeedbackByIdRepo(feedbackId!),
@@ -191,6 +191,11 @@ export async function buildRequestContext(params: {
         ? getSessionByIdRepo(explicitSessionId)
         : Promise.resolve(null),
     ]);
+
+  const userWorkspaceIdRaw =
+    userProfile != null && typeof userProfile.workspaceId === "string"
+      ? userProfile.workspaceId.trim()
+      : "";
 
   const feedback = usePreloadedFeedback ? params.feedback! : feedbackFetched;
 
@@ -235,6 +240,7 @@ export async function buildRequestContext(params: {
       sessionId: sidForAccess,
       context: accessContextInput,
       session,
+      ...(userProfile != null ? { preloadedUserFields: userProfile } : {}),
     });
     access = resolved.access;
     sessionOut = resolved.session;

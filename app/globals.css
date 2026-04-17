@@ -5710,3 +5710,14 @@ html.dark .echly-mic-item.is-active {
   }
 }
 
+/* Capture session: numbered feedback markers on overlay */
+.echly-marker {
+  background-color: #ffa566;
+  color: #000000;
+  transition: background-color 150ms ease;
+}
+
+.echly-marker:hover {
+  background-color: #ea7038;
+}
+

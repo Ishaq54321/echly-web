@@ -896,7 +896,7 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
 }
 
 /** Max docs loaded into memory for sidebar search (no pagination of results). */
-const SESSION_SEARCH_CORPUS_MAX = 200;
+const SESSION_SEARCH_CORPUS_MAX = 50;
 
 /**
  * Loads up to {@link SESSION_SEARCH_CORPUS_MAX} non-deleted feedback docs for a session

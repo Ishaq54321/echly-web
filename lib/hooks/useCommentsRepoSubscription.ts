@@ -16,7 +16,7 @@ type Args = {
 
 /**
  * Fetches GET /api/comments/:sessionId when active and delivers comments for `feedbackId` via `onComments`.
- * One initial fetch when enabled; use `refetch()` for manual sync.
+ * One automatic fetch per sessionId+feedbackId open; use `refetch()` for manual sync (force refresh).
  */
 export function useCommentsRepoSubscription({
   sessionId,
@@ -25,30 +25,58 @@ export function useCommentsRepoSubscription({
   onComments,
 }: Args): { refetch: () => Promise<void> } {
   const onCommentsRef = useRef(onComments);
+  const initialDoneRef = useRef("");
+  const prevScopeRef = useRef<string | null>(null);
+  const inFlightRef = useRef(false);
+  const queuedRefetchRef = useRef(false);
 
   useEffect(() => {
     onCommentsRef.current = onComments;
   }, [onComments]);
 
-  const executeFetch = useCallback(async () => {
-    const sid = typeof sessionId === "string" ? sessionId.trim() : "";
-    const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
-    if (!sid || !fid) return;
-    try {
-      const scoped = await fetchComments(sid, { feedbackId: fid });
-      onCommentsRef.current(scoped);
-    } catch (e) {
-      console.error("[useCommentsRepoSubscription] fetchComments failed", e);
+  const sid = typeof sessionId === "string" ? sessionId.trim() : "";
+  const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
+  const fetchEnabled = enabled && !!sid && !!fid;
+  const scopeKey = sid && fid ? `${sid}\x1f${fid}` : "";
+
+  useEffect(() => {
+    if (!scopeKey) return;
+    if (prevScopeRef.current !== scopeKey) {
+      prevScopeRef.current = scopeKey;
+      initialDoneRef.current = "";
     }
-  }, [sessionId, feedbackId]);
+  }, [scopeKey]);
 
-  const inFlightRef = useRef(false);
-  const queuedRefetchRef = useRef(false);
+  useEffect(() => {
+    if (!fetchEnabled) {
+      initialDoneRef.current = "";
+    }
+  }, [fetchEnabled]);
 
-  const run = useCallback(
+  useEffect(() => {
+    if (!fetchEnabled || !scopeKey) return;
+    if (initialDoneRef.current === scopeKey) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const scoped = await fetchComments(sid, {
+          feedbackId: fid,
+          force: false,
+        });
+        if (cancelled) return;
+        initialDoneRef.current = scopeKey;
+        onCommentsRef.current(scoped);
+      } catch (e) {
+        console.error("[useCommentsRepoSubscription] fetchComments failed", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchEnabled, scopeKey, sid, fid]);
+
+  const runRefetch = useCallback(
     async (queueIfBusy: boolean) => {
-      const sid = typeof sessionId === "string" ? sessionId.trim() : "";
-      const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
       if (!sid || !fid) return;
 
       if (inFlightRef.current) {
@@ -59,27 +87,25 @@ export function useCommentsRepoSubscription({
       try {
         do {
           queuedRefetchRef.current = false;
-          await executeFetch();
+          const scoped = await fetchComments(sid, {
+            feedbackId: fid,
+            force: true,
+          });
+          initialDoneRef.current = scopeKey;
+          onCommentsRef.current(scoped);
         } while (queuedRefetchRef.current);
+      } catch (e) {
+        console.error("[useCommentsRepoSubscription] refetch failed", e);
       } finally {
         inFlightRef.current = false;
       }
     },
-    [sessionId, feedbackId, executeFetch],
+    [sid, fid, scopeKey],
   );
 
   const refetch = useCallback(async () => {
-    await run(true);
-  }, [run]);
-
-  const sid = typeof sessionId === "string" ? sessionId.trim() : "";
-  const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
-  const fetchEnabled = enabled && !!sid && !!fid;
-
-  useEffect(() => {
-    if (!fetchEnabled) return;
-    void run(true);
-  }, [fetchEnabled, run]);
+    await runRefetch(true);
+  }, [runRefetch]);
 
   return { refetch };
 }

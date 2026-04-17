@@ -165,6 +165,21 @@ function normalizeFeedbackItemStatus(item: Feedback): Feedback {
   };
 }
 
+/** Stable module scope: avoids effect dependency churn from parent re-renders / selection-driven UI updates. */
+function sortFeedbackByCreatedAtDesc(list: Feedback[]): Feedback[] {
+  const deduped = dedupeFeedbackById(list);
+  deduped.sort((a, b) => {
+    const diff = getTimestamp(b) - getTimestamp(a);
+    if (diff !== 0) return diff;
+    return b.id.localeCompare(a.id);
+  });
+  return deduped;
+}
+
+function finalizeFeedbackListForPagination(list: Feedback[]): Feedback[] {
+  return sortFeedbackByCreatedAtDesc(list.map(normalizeFeedbackItemStatus));
+}
+
 export type SessionFeedbackMergeOptions = {
   /**
    * Applied after each REST load before `setState`.
@@ -222,30 +237,15 @@ export function useSessionFeedbackPaginated(
   const restFetchRef = useRef(options?.restFetch);
   restFetchRef.current = options?.restFetch;
 
-  const sortByCreatedAtDesc = useCallback((list: Feedback[]): Feedback[] => {
-    const deduped = dedupeFeedbackById(list);
-    deduped.sort((a, b) => {
-      const diff = getTimestamp(b) - getTimestamp(a);
-      if (diff !== 0) return diff;
-      return b.id.localeCompare(a.id);
-    });
-    return deduped;
-  }, []);
-
-  const finalizeList = useCallback(
-    (list: Feedback[]): Feedback[] => sortByCreatedAtDesc(list.map(normalizeFeedbackItemStatus)),
-    [sortByCreatedAtDesc]
-  );
-
   const setCanonicalFeedback = useCallback(
     (updater: React.SetStateAction<Feedback[]>) => {
       const current = itemsRef.current;
       const next = typeof updater === "function" ? updater(current) : updater;
-      const normalized = finalizeList(next);
+      const normalized = finalizeFeedbackListForPagination(next);
       itemsRef.current = normalized;
       setItems(normalized);
     },
-    [finalizeList]
+    []
   );
 
   useEffect(() => {
@@ -361,7 +361,19 @@ export function useSessionFeedbackPaginated(
         const fetchPage =
           restFetchRef.current ?? ((u: string) => fetch(u, { credentials: "include" }));
         const res = await fetchPage(`/api/feedback?${q.toString()}`);
-        if (!res.ok) throw new Error(`Feedback page 1 fetch failed (${res.status})`);
+        if (!res.ok) {
+          if (res.status === 403 || res.status === 401) {
+            if (cancelled || sessionIdRef.current !== sessionId) return;
+            itemsRef.current = [];
+            setItems([]);
+            nextCursorRef.current = "";
+            hasMoreRef.current = false;
+            setHasMore(false);
+            initialLoadCompleteRef.current = true;
+            return;
+          }
+          throw new Error(`Feedback page 1 fetch failed (${res.status})`);
+        }
         const page = requireApiSuccessData<{
           feedback: Record<string, unknown>[];
           nextCursor?: string | null;
@@ -387,7 +399,7 @@ export function useSessionFeedbackPaginated(
         setHasMore(nextHasMore);
         initialLoadCompleteRef.current = true;
 
-        const finalized = finalizeList(initialPage);
+        const finalized = finalizeFeedbackListForPagination(initialPage);
         const mergeFn = mergeRealtimeListOuterRef.current?.current;
         const list = mergeFn ? mergeFn(finalized) : finalized;
         itemsRef.current = list;
@@ -405,7 +417,7 @@ export function useSessionFeedbackPaginated(
     return () => {
       cancelled = true;
     };
-  }, [sessionId, enabled, shareTokenRest, finalizeList]);
+  }, [sessionId, enabled, shareTokenRest]);
 
   const loadNextPage = useCallback(async () => {
     const sid = sessionIdRef.current;
@@ -429,6 +441,12 @@ export function useSessionFeedbackPaginated(
         restFetchRef.current ?? ((u: string) => fetch(u, { credentials: "include" }));
       const res = await fetchPage(`/api/feedback?${q.toString()}`);
       if (!res.ok) {
+        if (res.status === 403 || res.status === 401) {
+          nextCursorRef.current = "";
+          hasMoreRef.current = false;
+          setHasMore(false);
+          return;
+        }
         throw new Error(`Feedback pagination fetch failed (${res.status})`);
       }
       const page = requireApiSuccessData<{

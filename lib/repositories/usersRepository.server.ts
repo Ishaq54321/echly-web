@@ -210,6 +210,43 @@ export async function getUserWorkspaceIdRepo(uid: string): Promise<string> {
   return workspaceId;
 }
 
+/**
+ * Single `users/{uid}` read for {@link buildRequestContext} + {@link getAccessContext}.
+ * Mirrors {@link loadUserEmailAndWorkspaceForAccess} semantics (override skips workspace field from doc).
+ */
+export async function getUserProfileForRequestContextRepo(
+  uid: string,
+  workspaceIdOverride?: string
+): Promise<{ email: string | null; workspaceId: string }> {
+  const trimmedUid = uid.trim();
+  if (!trimmedUid) {
+    throw new Error("getUserProfileForRequestContextRepo: missing uid");
+  }
+  const snap = await adminDb.doc(`users/${trimmedUid}`).get();
+  const data = (snap.exists ? snap.data() ?? {} : {}) as Record<string, unknown>;
+  const emailRaw = data.email;
+  const userEmail =
+    typeof emailRaw === "string"
+      ? emailRaw.trim() || null
+      : emailRaw == null
+        ? null
+        : String(emailRaw).trim() || null;
+
+  if (workspaceIdOverride !== undefined) {
+    return { email: userEmail, workspaceId: workspaceIdOverride.trim() };
+  }
+  if (!snap.exists) {
+    console.error("CRITICAL: User without workspaceId", { uid: trimmedUid, reason: "missing_user_doc" });
+    throw new Error(MISSING_USER_WORKSPACE_ERROR);
+  }
+  const rawWs = typeof data.workspaceId === "string" ? data.workspaceId.trim() : "";
+  if (!rawWs) {
+    console.error("CRITICAL: User without workspaceId", { uid: trimmedUid, reason: "missing_workspaceId_field" });
+    throw new Error(MISSING_USER_WORKSPACE_ERROR);
+  }
+  return { email: userEmail, workspaceId: rawWs };
+}
+
 export async function ensureUserWorkspaceLinkRepo(
   user: UserLike
 ): Promise<{ workspaceId: string }> {

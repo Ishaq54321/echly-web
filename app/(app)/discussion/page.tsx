@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, Suspense } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { useWorkspace } from "@/lib/client/workspaceContext";
@@ -15,6 +15,7 @@ import {
   type SidebarProject,
 } from "@/components/discussion/DiscussionSidebar";
 import { useToast } from "@/components/dashboard/context/ToastContext";
+import { MinimalLoader } from "@/components/ui/MinimalLoader";
 
 export default function DiscussionPage() {
   const { user, loading } = useAuthGuard();
@@ -253,16 +254,24 @@ export default function DiscussionPage() {
           </button>
         )}
 
-        <DiscussionThread
-          feedbackId={selectedId}
-          onCommentAdded={handleCommentAdded}
-          onStatusChanged={handleStatusChanged}
-          onResolvedAdvanceQueue={handleResolvedAdvanceQueue}
-          onResolveFailed={handleResolveFailed}
-          listLoaded={isEmpty !== null}
-          threadIndex={selectedIndex}
-          threadTotal={listItems.length}
-        />
+        <Suspense
+          fallback={
+            <div className="flex flex-1 items-center justify-center bg-white">
+              <MinimalLoader />
+            </div>
+          }
+        >
+          <DiscussionThread
+            feedbackId={selectedId}
+            onCommentAdded={handleCommentAdded}
+            onStatusChanged={handleStatusChanged}
+            onResolvedAdvanceQueue={handleResolvedAdvanceQueue}
+            onResolveFailed={handleResolveFailed}
+            listLoaded={isEmpty !== null}
+            threadIndex={selectedIndex}
+            threadTotal={listItems.length}
+          />
+        </Suspense>
       </div>
     </div>
   );

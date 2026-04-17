@@ -272,26 +272,70 @@ export async function listRecentCommentsForSessionRepo(
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() ?? {}) }));
 }
 
-/** Hard cap for GET /api/comments/:sessionId (cost protection). */
-const LIST_SESSION_COMMENTS_FOR_API_MAX = 3000;
+/** Default page size for GET /api/comments/:sessionId. */
+export const LIST_SESSION_COMMENTS_PAGE_DEFAULT = 50;
+
+/** Hard cap per request (cost protection). */
+const LIST_SESSION_COMMENTS_PAGE_MAX = 100;
+
+export type ListCommentsForSessionOptions = {
+  /** Max docs to return (clamped). Default {@link LIST_SESSION_COMMENTS_PAGE_DEFAULT}. */
+  limit?: number;
+  /**
+   * Pagination: Firestore comment id — return the next page (older) after this document.
+   * Must belong to the same workspace, session, and feedback scope as the query.
+   */
+  cursorCommentId?: string;
+};
+
+async function getValidatedCommentCursorSnapshot(
+  cursorId: string,
+  wid: string,
+  sid: string,
+  fid: string
+): Promise<FirebaseFirestore.DocumentSnapshot> {
+  const id = cursorId.trim();
+  if (!id) {
+    throw new Error("INVALID_CURSOR");
+  }
+  const snap = await adminDb.doc(`comments/${id}`).get();
+  if (!snap.exists) {
+    throw new Error("INVALID_CURSOR");
+  }
+  const d = snap.data() ?? {};
+  const rowWid = typeof d.workspaceId === "string" ? d.workspaceId.trim() : "";
+  const rowSid = typeof d.sessionId === "string" ? d.sessionId.trim() : "";
+  const rowFid = typeof d.feedbackId === "string" ? d.feedbackId.trim() : "";
+  if (rowWid !== wid || rowSid !== sid || (fid !== "" && rowFid !== fid)) {
+    throw new Error("INVALID_CURSOR");
+  }
+  return snap;
+}
 
 /**
- * All comments in a session, oldest first (matches former client listener ordering).
+ * Comments in a session, oldest first (matches former client listener ordering).
  * Uses workspaceId+sessionId+createdAt DESC index; results reversed in memory.
  */
 export async function listCommentsForSessionChronologicalRepo(
   workspaceId: string,
   sessionId: string,
-  feedbackId?: string
+  feedbackId?: string,
+  options?: ListCommentsForSessionOptions
 ): Promise<Array<Record<string, unknown> & { id: string }>> {
   const wid = workspaceId.trim();
   const sid = sessionId.trim();
   if (!wid || !sid) return [];
   const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
-  assertQueryLimit(
-    LIST_SESSION_COMMENTS_FOR_API_MAX,
-    "listCommentsForSessionChronologicalRepo"
+  const rawLimit =
+    typeof options?.limit === "number" && Number.isFinite(options.limit)
+      ? Math.floor(options.limit)
+      : LIST_SESSION_COMMENTS_PAGE_DEFAULT;
+  const take = Math.min(
+    LIST_SESSION_COMMENTS_PAGE_MAX,
+    Math.max(1, rawLimit)
   );
+  assertQueryLimit(take, "listCommentsForSessionChronologicalRepo");
+
   let query: FirebaseFirestore.Query = adminDb
     .collection("comments")
     .where("workspaceId", "==", wid)
@@ -299,10 +343,24 @@ export async function listCommentsForSessionChronologicalRepo(
   if (fid) {
     query = query.where("feedbackId", "==", fid);
   }
-  const snap = await query
-    .orderBy("createdAt", "desc")
-    .limit(LIST_SESSION_COMMENTS_FOR_API_MAX)
-    .get();
+  query = query.orderBy("createdAt", "desc");
+
+  const cursorRaw =
+    typeof options?.cursorCommentId === "string"
+      ? options.cursorCommentId.trim()
+      : "";
+  if (cursorRaw) {
+    const cursorSnap = await getValidatedCommentCursorSnapshot(
+      cursorRaw,
+      wid,
+      sid,
+      fid
+    );
+    query = query.startAfter(cursorSnap);
+  }
+
+  query = query.limit(take);
+  const snap = await query.get();
   const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() ?? {}) }));
   rows.reverse();
   return rows;

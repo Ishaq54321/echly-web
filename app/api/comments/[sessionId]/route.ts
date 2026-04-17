@@ -2,7 +2,10 @@ import { type HandlerContext } from "@/lib/server/auth/withAuthorization";
 import { routeParamId } from "@/lib/server/routeParams";
 import { buildRequestContext } from "@/lib/server/requestContext";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
-import { listCommentsForSessionChronologicalRepo } from "@/lib/repositories/commentsRepository.server";
+import {
+  LIST_SESSION_COMMENTS_PAGE_DEFAULT,
+  listCommentsForSessionChronologicalRepo,
+} from "@/lib/repositories/commentsRepository.server";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 function serializeCommentRow(row: Record<string, unknown> & { id: string }): Record<string, unknown> {
@@ -66,6 +69,18 @@ export async function GET(req: Request, ctx: HandlerContext) {
   }
   const url = new URL(req.url);
   const feedbackId = url.searchParams.get("feedbackId")?.trim() || "";
+  const cursorParam =
+    url.searchParams.get("cursor")?.trim() ||
+    url.searchParams.get("before")?.trim() ||
+    "";
+  const limitRaw = url.searchParams.get("limit");
+  let limit = LIST_SESSION_COMMENTS_PAGE_DEFAULT;
+  if (limitRaw != null && limitRaw.trim() !== "") {
+    const n = Number.parseInt(limitRaw, 10);
+    if (Number.isFinite(n)) {
+      limit = Math.min(100, Math.max(1, n));
+    }
+  }
 
   const sessionId = id.trim();
   const loaded = await getSessionByIdRepo(sessionId);
@@ -99,11 +114,24 @@ export async function GET(req: Request, ctx: HandlerContext) {
     const rows = await listCommentsForSessionChronologicalRepo(
       workspaceId,
       sessionId,
-      feedbackId || undefined
+      feedbackId || undefined,
+      {
+        limit,
+        ...(cursorParam ? { cursorCommentId: cursorParam } : {}),
+      }
     );
     const comments = rows.map((r) => serializeCommentRow(r));
-    return apiSuccess({ comments }, context.access);
+    const hasMore = rows.length >= limit;
+    return apiSuccess({ comments, hasMore }, context.access);
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg === "INVALID_CURSOR") {
+      return apiError({
+        code: "INVALID_INPUT",
+        message: "Invalid cursor",
+        status: 400,
+      });
+    }
     console.error("GET /api/comments/[sessionId]:", e);
     return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });
   }

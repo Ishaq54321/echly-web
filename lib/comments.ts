@@ -65,39 +65,29 @@ function commentFromApiRow(row: unknown): Comment | null {
   };
 }
 
-/**
- * Loads session comments from the API (server-enforced canView), optionally scoped by feedbackId.
- */
-export async function fetchComments(
-  sessionId: string,
-  opts?: { feedbackId?: string | null | undefined }
-): Promise<Comment[]> {
-  const sid = typeof sessionId === "string" ? sessionId.trim() : "";
-  if (!sid) return [];
-  const feedbackId =
-    typeof opts?.feedbackId === "string" ? opts.feedbackId.trim() : "";
-  const params = new URLSearchParams();
-  if (feedbackId) params.set("feedbackId", feedbackId);
-  const shareTok = getActiveShareToken()?.trim();
-  if (shareTok) params.set("token", shareTok);
-  const qs = params.toString();
-  const query = qs !== "" ? `?${qs}` : "";
+const COMMENTS_FETCH_INFLIGHT = new Map<string, Promise<Comment[]>>();
+const COMMENTS_FETCH_FRESH = new Map<string, { exp: number; comments: Comment[] }>();
+const COMMENTS_FRESH_TTL_MS = 4_000;
 
-  const res = await authFetch(`/api/comments/${encodeURIComponent(sid)}${query}`);
-  if (!res) throw new Error("Not authenticated");
-  if (!res.ok) {
-    const msg = await res.text().catch(() => "");
-    throw new HttpError(msg || "Failed to load comments", res.status);
-  }
-  const json = (await res.json()) as {
+function commentsFetchDedupeKey(
+  sid: string,
+  feedbackId: string,
+  cursor: string,
+  force: boolean
+): string {
+  return [sid, feedbackId, cursor, force ? "1" : "0"].join("\x1f");
+}
+
+function parseCommentsApiPayload(json: unknown): Comment[] {
+  const j = json as {
     success?: boolean;
-    data?: { comments?: unknown[] };
+    data?: { comments?: unknown[]; hasMore?: boolean };
     error?: { message?: string };
   };
-  if (!json.success) {
-    throw new Error(json.error?.message || "Failed to load comments");
+  if (!j.success) {
+    throw new Error(j.error?.message || "Failed to load comments");
   }
-  const rawList = json.data?.comments;
+  const rawList = j.data?.comments;
   if (!Array.isArray(rawList)) return [];
   const out: Comment[] = [];
   for (const row of rawList) {
@@ -105,6 +95,87 @@ export async function fetchComments(
     if (c) out.push(c);
   }
   return out;
+}
+
+export type FetchCommentsOptions = {
+  feedbackId?: string | null | undefined;
+  /** Bypass short-lived client cache (manual refresh / after mutations). */
+  force?: boolean;
+  /** Pagination: pass last page’s oldest comment id (see GET /api/comments `cursor`). */
+  cursor?: string | null | undefined;
+};
+
+/**
+ * Loads session comments from the API (server-enforced canView), optionally scoped by feedbackId.
+ * Deduplicates concurrent and near-duplicate requests (same session + feedback + first page).
+ */
+export async function fetchComments(
+  sessionId: string,
+  opts?: FetchCommentsOptions
+): Promise<Comment[]> {
+  const sid = typeof sessionId === "string" ? sessionId.trim() : "";
+  if (!sid) return [];
+  const feedbackId =
+    typeof opts?.feedbackId === "string" ? opts.feedbackId.trim() : "";
+  const force = opts?.force === true;
+  const cursor =
+    typeof opts?.cursor === "string" && opts.cursor.trim() !== ""
+      ? opts.cursor.trim()
+      : "";
+
+  if (force && cursor === "") {
+    const staleKey = commentsFetchDedupeKey(sid, feedbackId, "", false);
+    COMMENTS_FETCH_FRESH.delete(staleKey);
+  }
+
+  const dedupeKey = commentsFetchDedupeKey(sid, feedbackId, cursor, force);
+
+  if (!force && cursor === "") {
+    const ent = COMMENTS_FETCH_FRESH.get(dedupeKey);
+    if (ent && Date.now() < ent.exp) {
+      return ent.comments;
+    }
+  }
+
+  const inflight = COMMENTS_FETCH_INFLIGHT.get(dedupeKey);
+  if (inflight) {
+    return inflight;
+  }
+
+  const p = (async (): Promise<Comment[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (feedbackId) params.set("feedbackId", feedbackId);
+      if (cursor) params.set("cursor", cursor);
+      const shareTok = getActiveShareToken()?.trim();
+      if (shareTok) params.set("token", shareTok);
+      const qs = params.toString();
+      const query = qs !== "" ? `?${qs}` : "";
+
+      const res = await authFetch(
+        `/api/comments/${encodeURIComponent(sid)}${query}`
+      );
+      if (!res) throw new Error("Not authenticated");
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        throw new HttpError(msg || "Failed to load comments", res.status);
+      }
+      const json = await res.json();
+      const comments = parseCommentsApiPayload(json);
+      if (!force && cursor === "") {
+        COMMENTS_FETCH_FRESH.set(dedupeKey, {
+          exp: Date.now() + COMMENTS_FRESH_TTL_MS,
+          comments,
+        });
+      }
+      return comments;
+    } finally {
+      COMMENTS_FETCH_INFLIGHT.delete(dedupeKey);
+    }
+  })();
+
+  COMMENTS_FETCH_INFLIGHT.set(dedupeKey, p);
+  return p;
 }
 
 export interface AddCommentOptions {

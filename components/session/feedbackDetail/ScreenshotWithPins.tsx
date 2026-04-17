@@ -123,12 +123,14 @@ const PinMarker = memo(function PinMarker({
     <button
       type="button"
       data-pin-marker
-      className={`absolute rounded-full flex items-center justify-center text-[11px] font-semibold tabular-nums transition-all duration-150 cursor-grab active:cursor-grabbing border-0 shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:scale-105 hover:ring-2 hover:ring-neutral-300 hover:ring-offset-1 ${
+      className={`absolute rounded-full flex items-center justify-center text-[11px] font-semibold tabular-nums transition-all duration-150 cursor-grab active:cursor-grabbing border-0 shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:scale-105 hover:ring-2 hover:ring-[#EA7038] hover:ring-offset-1 ${
         isResolved
-          ? "bg-emerald-100 text-emerald-700 opacity-90 hover:bg-emerald-200/90 hover:opacity-100"
-          : "bg-neutral-200 text-neutral-800 hover:bg-neutral-300"
+          ? "bg-emerald-100 text-emerald-900 hover:bg-emerald-200"
+          : "bg-[#FFA566] text-black hover:bg-[#EA7038]"
       } ${
-        isActive && !isResolved ? "bg-neutral-400 text-white shadow-[0_0_0_2px_rgba(255,255,255,0.8),0_2px_8px_rgba(0,0,0,0.12)] scale-105 ring-2 ring-neutral-300" : ""
+        isActive && !isResolved
+          ? "bg-[#FFA566] text-black shadow-[0_0_0_2px_rgba(255,255,255,0.8),0_2px_8px_rgba(0,0,0,0.12)] scale-105 ring-2 ring-[#EA7038]"
+          : ""
       } ${isActive && isResolved ? "ring-2 ring-emerald-300 shadow-[0_1px_4px_rgba(0,0,0,0.08)] scale-105" : ""}`}
       style={{
         width: PIN_SIZE_PX,

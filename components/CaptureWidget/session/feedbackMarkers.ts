@@ -103,8 +103,6 @@ export function createMarker(
     "width:24px",
     "height:24px",
     "border-radius:999px",
-    "background:#FF553D",
-    "color:white",
     "font-size:12px",
     "font-weight:600",
     "display:flex",

@@ -170,11 +170,14 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const built = await tryBuildRequestContext({
-    req,
-    authenticatedUser: { uid: user.uid, email: user.email },
-    sessionId,
-  });
+  const [built, screenshotRecord] = await Promise.all([
+    tryBuildRequestContext({
+      req,
+      authenticatedUser: { uid: user.uid, email: user.email },
+      sessionId,
+    }),
+    getScreenshotByIdRepo(normalizedScreenshotId),
+  ]);
   if (!built.ok) {
     return new Response(built.response.body, {
       status: built.response.status,
@@ -211,7 +214,6 @@ export async function POST(req: NextRequest) {
   const userId = user.uid;
 
   const meta = body.metadata;
-  const screenshotRecord = await getScreenshotByIdRepo(normalizedScreenshotId);
   const hasValidScreenshotReference =
     typeof screenshotRecord?.storagePath === "string" &&
     screenshotRecord.storagePath.trim().length > 0;
