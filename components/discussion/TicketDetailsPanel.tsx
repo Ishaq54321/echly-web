@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { authFetch } from "@/lib/authFetch";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 
@@ -42,10 +43,10 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
         if (!res || !res.ok) throw new Error("Failed to load");
         return res.json();
       })
-      .then((data: { success?: boolean; ticket?: TicketData }) => {
+      .then((raw: unknown) => {
         if (cancelled) return;
-        const t = data.ticket;
-        setTicket(t ?? null);
+        const payload = requireApiSuccessData<{ ticket: TicketData }>(raw);
+        setTicket(payload.ticket);
       })
       .catch(() => {
         if (!cancelled) setTicket(null);

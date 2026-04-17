@@ -18,6 +18,7 @@ import { routeParamId } from "@/lib/server/routeParams";
 import { buildRequestContext } from "@/lib/server/requestContext";
 import type { Session } from "@/lib/domain/session";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
 
 type PatchBody = { title?: string; archived?: boolean; accessLevel?: string };
 
@@ -146,39 +147,91 @@ export const PATCH = withAuthorization(
       });
     }
 
-    if (!hasTitle && !hasArchived && validAccessLevel === null) {
+    const currentTitle = (sess.title ?? "").trim();
+    const nextTitle = hasTitle ? body.title!.trim() : currentTitle;
+    const titleChanged = hasTitle && nextTitle !== currentTitle;
+
+    const currentlyArchived = sess.archived === true || sess.isArchived === true;
+    const archiveChanged =
+      hasArchived && body.archived !== currentlyArchived;
+
+    const accessChanged =
+      validAccessLevel != null && validAccessLevel !== sess.accessLevel;
+
+    if (!titleChanged && !archiveChanged && !accessChanged) {
       return apiSuccess(
-        { session: serializeSession(sess, context.access!) },
+        {
+          session: serializeSession(sess, context.access!),
+          changedFields: [] as ("title" | "archived" | "accessLevel")[],
+        },
         context.access!
       );
     }
 
     try {
+      const changedFields: ("title" | "archived" | "accessLevel")[] = [];
       const tasks: Promise<void>[] = [];
-      if (hasTitle) {
-        tasks.push(updateSessionTitleRepo(id, body.title!.trim()));
+      if (titleChanged) {
+        changedFields.push("title");
+        tasks.push(updateSessionTitleRepo(id, nextTitle));
       }
-      if (hasArchived) {
+      if (archiveChanged) {
+        changedFields.push("archived");
         const wid =
           typeof sess.workspaceId === "string" ? sess.workspaceId.trim() : "";
         tasks.push(updateSessionArchivedRepo(id, body.archived!, wid));
       }
-      if (validAccessLevel != null) {
+      if (accessChanged && validAccessLevel != null) {
+        changedFields.push("accessLevel");
         tasks.push(updateSessionAccessLevelRepo(id, validAccessLevel));
       }
       if (tasks.length > 0) {
         await Promise.all(tasks);
       }
+
+      const workspaceId =
+        typeof sess.workspaceId === "string" ? sess.workspaceId.trim() : "";
+      const actorId = user.uid.trim();
+      if (workspaceId && actorId) {
+        if (archiveChanged && body.archived === true) {
+          await createActivityEvent({
+            workspaceId,
+            sessionId: id,
+            eventType: "session.archived",
+            actorId,
+          });
+        }
+        const settingsChangedFields = changedFields.filter(
+          (f) => !(f === "archived" && body.archived === true)
+        );
+        if (settingsChangedFields.length > 0) {
+          await createActivityEvent({
+            workspaceId,
+            sessionId: id,
+            eventType: "session.settings_changed",
+            actorId,
+            metadata: { changedFields: settingsChangedFields },
+          });
+        }
+      }
+
       const updated: Session = {
         ...sess,
-        ...(hasTitle ? { title: body.title!.trim() } : {}),
-        ...(hasArchived ? { archived: body.archived!, isArchived: body.archived! } : {}),
-        ...(validAccessLevel != null ? { accessLevel: validAccessLevel } : {}),
+        ...(titleChanged ? { title: nextTitle } : {}),
+        ...(archiveChanged
+          ? { archived: body.archived!, isArchived: body.archived! }
+          : {}),
+        ...(accessChanged && validAccessLevel != null
+          ? { accessLevel: validAccessLevel }
+          : {}),
         ...(tasks.length > 0 ? { updatedAt: new Date() } : {}),
       };
       log("[API] PATCH /api/sessions/[sessionId] duration:", Date.now() - start);
       return apiSuccess(
-        { session: serializeSession(updated, context.access!) },
+        {
+          session: serializeSession(updated, context.access!),
+          changedFields,
+        },
         context.access!
       );
     } catch (err) {

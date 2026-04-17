@@ -7,11 +7,11 @@ import {
   sessionMembersPath,
   sessionMemberDocPath,
   sessionInvitesPath,
-  sessionInviteDocPath,
 } from "./sessionPaths";
 
 import type { SessionMember } from "@/lib/domain/sessionMember";
 import type { SessionInvite } from "@/lib/domain/sessionInvite";
+import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
 
 export async function getSessionMember(
   sessionId: string,
@@ -52,13 +52,31 @@ export async function listSessionMembers(
   });
 }
 
+export type AddSessionMemberSource =
+  | "invite_api"
+  | "access_request"
+  | "invite_redemption";
+
 export async function addSessionMember(params: {
   sessionId: string;
+  workspaceId: string;
   userId: string;
   email: string;
   access: "view" | "resolve";
-  addedBy: string;
-}) {
+  /** Authenticated principal responsible for this membership write (inviter, approver, or redeeming user). */
+  actorId: string;
+  source: AddSessionMemberSource;
+}): Promise<void> {
+  const actorId = params.actorId.trim();
+  if (!actorId) {
+    throw new Error("addSessionMember: actorId is required");
+  }
+
+  const existing = await getSessionMember(params.sessionId, params.userId);
+  if (existing) {
+    return;
+  }
+
   const ref = adminDb.doc(
     sessionMemberDocPath(params.sessionId, params.userId)
   );
@@ -67,9 +85,20 @@ export async function addSessionMember(params: {
     userId: params.userId,
     email: params.email,
     access: params.access,
-    addedBy: params.addedBy,
+    addedBy: actorId,
     createdAt: Timestamp.now(),
   });
+
+  const workspaceId = params.workspaceId.trim();
+  if (workspaceId) {
+    await createActivityEvent({
+      workspaceId,
+      sessionId: params.sessionId,
+      eventType: "session.member.added",
+      actorId,
+      metadata: { source: params.source },
+    });
+  }
 }
 
 export async function getInviteByEmail(

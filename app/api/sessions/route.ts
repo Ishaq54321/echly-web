@@ -8,6 +8,7 @@ import {
   createSessionRepo,
   getWorkspaceSessionCountRepo,
 } from "@/lib/repositories/sessionsRepository.server";
+import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { WORKSPACE_SUSPENDED_MESSAGE } from "@/lib/server/assertWorkspaceActive";
 import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
@@ -214,6 +215,13 @@ export async function POST(req: NextRequest) {
     }
 
     const id = await createSessionRepo(workspaceId, user.uid);
+
+    await createActivityEvent({
+      workspaceId,
+      sessionId: id,
+      eventType: "session.created",
+      actorId: user.uid,
+    });
 
     return apiSuccess({ session: { id } }, null, { headers: corsHeaders(req) });
   } catch (err) {

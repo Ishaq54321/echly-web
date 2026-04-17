@@ -29,6 +29,7 @@ import {
 import { echlyLog } from "@/lib/debug/echlyLogger";
 import { logger } from "@/lib/logger";
 import { getOrCreateShareLink } from "@/lib/share/getOrCreateShareLink";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 
 const SAFE_MARGIN = 24;
 const ECHLY_MOTION = "140ms cubic-bezier(0.2, 0.8, 0.2, 1)";
@@ -937,15 +938,13 @@ export function useCaptureWidget({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title || editedTitle, actionSteps }),
       });
-      const data = (await res.json()) as {
-        success?: boolean;
-        data?: { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } };
-        ticket?: { id: string; title: string; actionSteps?: string[]; type?: string };
-      };
-      const ticketPayload = data.data?.ticket ?? data.ticket;
-      if (!res.ok || !data.success || !ticketPayload) {
+      const raw = await res.json();
+      if (!res.ok) {
         throw new Error("Save failed: API_ERROR_" + res.status);
       }
+      const ticketPayload = requireApiSuccessData<{
+        ticket: { id: string; title: string; actionSteps?: string[]; type?: string };
+      }>(raw).ticket;
       setEditingId(null);
     } catch (err) {
       logger.error("error", "save_edit_failed", err);
@@ -974,13 +973,11 @@ export function useCaptureWidget({
             actionSteps: payload.actionSteps,
           }),
         });
-        const data = (await res.json()) as {
-          success?: boolean;
-          data?: { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } };
-          ticket?: { id: string; title: string; actionSteps?: string[]; type?: string };
-        };
-        const ticketPayload = data.data?.ticket ?? data.ticket;
-        if (!res.ok || !data.success || !ticketPayload) throw new Error("Update failed");
+        const raw = await res.json();
+        if (!res.ok) throw new Error("Update failed");
+        requireApiSuccessData<{
+          ticket: { id: string; title: string; actionSteps?: string[]; type?: string };
+        }>(raw);
       } catch (err) {
         logger.error("error", "ticket_update_failed", err);
         throw err;

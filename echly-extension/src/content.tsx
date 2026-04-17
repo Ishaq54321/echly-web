@@ -23,6 +23,7 @@ import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
 import { logger } from "@/lib/logger";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 
 logger.debug("extension", "content_script_loaded", { href: window.location.href });
 
@@ -839,9 +840,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           type?: string;
           actionSteps?: string[];
         };
-        const feedbackJson = feedbackResponse?.data as
-          | { success?: boolean; data?: { ticket?: CreatedTicket }; ticket?: CreatedTicket }
-          | undefined;
+        const feedbackJson = feedbackResponse?.data;
         const text =
           typeof feedbackResponse?.error === "string"
             ? feedbackResponse.error
@@ -849,25 +848,24 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         if (!feedbackResponse?.success && isAuthFailureResponse(text)) {
           throw new Error("Not authenticated.");
         }
-        const tick = feedbackJson?.data?.ticket ?? feedbackJson?.ticket;
-        if (feedbackJson?.success && tick) {
-          const created: StructuredFeedback = {
-            id: tick.id,
-            title: tick.title,
-            actionSteps:
-              tick.actionSteps ??
-              (tick.instruction
-                ? tick.instruction.split(/\n\s*\n/)
-                : tick.description
-                  ? tick.description.split(/\n\s*\n/)
-                  : []),
-            type: tick.type ?? "Feedback",
-          };
-          notifyFeedbackCreated(created, effectiveSessionId);
-          return created;
+        if (feedbackJson === undefined || typeof feedbackJson !== "object" || feedbackJson === null) {
+          throw new Error("Feedback creation returned no ticket.");
         }
-
-        throw new Error("Feedback creation returned no ticket.");
+        const tick = requireApiSuccessData<{ ticket: CreatedTicket }>(feedbackJson).ticket;
+        const created: StructuredFeedback = {
+          id: tick.id,
+          title: tick.title,
+          actionSteps:
+            tick.actionSteps ??
+            (tick.instruction
+              ? tick.instruction.split(/\n\s*\n/)
+              : tick.description
+                ? tick.description.split(/\n\s*\n/)
+                : []),
+          type: tick.type ?? "Feedback",
+        };
+        notifyFeedbackCreated(created, effectiveSessionId);
+        return created;
       } catch (e) {
         logger.error("error", "feedback_create_failed", e);
         throw e;
@@ -1027,27 +1025,22 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           }),
         });
         throwIfHttpError(res, "PATCH ticket");
-        const data = (await res.json()) as {
-          success?: boolean;
-          ticket?: { id: string; title: string; actionSteps?: string[]; type?: string };
-        };
-        if (data.success && data.ticket) {
-          const ticket = data.ticket;
-          editRollbackRef.current.delete(id);
-          chrome.runtime
-            .sendMessage({
-              type: "ECHLY_TICKET_UPDATED",
-              ticket: {
-                id: ticket.id,
-                title: ticket.title,
-                actionSteps: ticket.actionSteps ?? [],
-                type: ticket.type ?? "Feedback",
-              },
-            })
-            .catch((err) => logSendMessageRejection("ECHLY_TICKET_UPDATED", err));
-        } else {
-          throw new Error("PATCH ticket rejected");
-        }
+        const rawPatch = await res.json();
+        const ticket = requireApiSuccessData<{
+          ticket: { id: string; title: string; actionSteps?: string[]; type?: string };
+        }>(rawPatch).ticket;
+        editRollbackRef.current.delete(id);
+        chrome.runtime
+          .sendMessage({
+            type: "ECHLY_TICKET_UPDATED",
+            ticket: {
+              id: ticket.id,
+              title: ticket.title,
+              actionSteps: ticket.actionSteps ?? [],
+              type: ticket.type ?? "Feedback",
+            },
+          })
+          .catch((err) => logSendMessageRejection("ECHLY_TICKET_UPDATED", err));
       } catch (err) {
         logger.error("error", "update_ticket_failed", err);
         const rolled = editRollbackRef.current.get(id);
@@ -1087,18 +1080,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             body: JSON.stringify({ title: trimmed }),
           });
           throwIfHttpError(res, "PATCH session title");
-          const data = (await res.json()) as { success?: boolean };
-          if (data.success) {
-            chrome.runtime
-              .sendMessage({
-                type: "ECHLY_SESSION_UPDATED",
-                sessionId: effectiveSessionId,
-                title: trimmed,
-              })
-              .catch((err) => logSendMessageRejection("ECHLY_SESSION_UPDATED", err));
-          } else {
-            setLocalSessionTitle(null);
-          }
+          const rawTitle = await res.json();
+          requireApiSuccessData<{ session: unknown }>(rawTitle);
+          chrome.runtime
+            .sendMessage({
+              type: "ECHLY_SESSION_UPDATED",
+              sessionId: effectiveSessionId,
+              title: trimmed,
+            })
+            .catch((err) => logSendMessageRejection("ECHLY_SESSION_UPDATED", err));
         } catch (err) {
           logger.error("error", "session_title_update_failed", err);
           setLocalSessionTitle(null);
@@ -1133,21 +1123,20 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     const data = (await res.json()) as {
       success?: boolean;
       data?: { session?: { id: string }; upgradePlan?: unknown };
-      session?: { id: string };
       error?: { code?: string; message?: string };
     };
-    const created = data.data?.session ?? data.session;
     const limitPayload =
       data.data && typeof data.data === "object" && "upgradePlan" in data.data
         ? (data.data as { upgradePlan?: unknown })
         : null;
-    logger.debug("extension", "session_create_response", {
-      status: res.status,
-      ok: res.ok,
-      success: data.success,
-      sessionId: created?.id,
-      error: data.error,
-    });
+    if (ECHLY_DEBUG) {
+      logger.debug("extension", "session_create_response", {
+        status: res.status,
+        ok: res.ok,
+        success: data.success,
+        error: data.error,
+      });
+    }
     if (
       res.status === 403 &&
       data.success === false &&
@@ -1161,11 +1150,16 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         upgradePlan: limitPayload.upgradePlan,
       };
     }
-    if (!res.ok || !data.success || !created?.id) {
+    if (!res.ok) {
+      throw new Error("API_ERROR_" + res.status);
+    }
+    const inner = requireApiSuccessData<{ session: { id: string } }>(data);
+    const newSessionId = inner.session.id;
+    if (!newSessionId) {
       throw new Error("API_ERROR_" + res.status);
     }
     invalidateSessionsCache();
-    return { id: created.id };
+    return { id: newSessionId };
   }
 
   const environment = new ExtensionCaptureEnvironment({
@@ -1192,11 +1186,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         try {
           const sessionRes = await apiFetch(`/api/sessions/${sessionId}`);
           throwIfHttpError(sessionRes, "GET session for resume");
-          const sessionData = (await sessionRes.json()) as { session?: { url?: string } };
-          if (sessionData?.session?.url) {
+          const sessionRaw = await sessionRes.json();
+          const sessionPayload = requireApiSuccessData<{ session: { url?: string } }>(sessionRaw);
+          const openUrl = sessionPayload.session.url;
+          if (typeof openUrl === "string" && openUrl) {
             chrome.runtime.sendMessage({
               type: "ECHLY_OPEN_TAB",
-              url: sessionData.session.url,
+              url: openUrl,
             }).catch((err) => logSendMessageRejection("ECHLY_OPEN_TAB (resume session)", err));
           }
         } catch (e) {

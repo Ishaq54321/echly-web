@@ -1,4 +1,5 @@
 import type { Timestamp } from "firebase/firestore";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { requireAccessLevel } from "@/lib/domain/accessLevel";
 
@@ -75,22 +76,29 @@ export interface SessionFeedbackCounts {
   resolved: number;
 }
 
-/** Narrow `/api/sessions`-shaped JSON into `Session` (no type assertions on callers). */
+/** GET /api/sessions page: `{ success, data: { sessions, hasMore, nextCursor } }`. */
+export function sessionsListBootstrapFromApiPayload(json: unknown): {
+  sessions: Session[];
+  hasMore: boolean;
+  nextCursor: string | null;
+} {
+  const inner = requireApiSuccessData<{
+    sessions: unknown;
+    hasMore?: boolean;
+    nextCursor?: string | null;
+  }>(json);
+  if (!Array.isArray(inner.sessions)) {
+    throw new Error("sessionsListBootstrapFromApiPayload: missing sessions array");
+  }
+  const sessions = inner.sessions.map((item) => sessionFromApiItem(item));
+  const hasMore = inner.hasMore === true && typeof inner.nextCursor === "string";
+  const nextCursor = hasMore ? inner.nextCursor! : null;
+  return { sessions, hasMore, nextCursor };
+}
+
+/** Narrow `/api/sessions` list JSON into `Session[]` (no legacy root shapes). */
 export function sessionsArrayFromApiPayload(data: unknown): Session[] {
-  if (typeof data !== "object" || data === null) {
-    throw new Error("sessionsArrayFromApiPayload: expected object root");
-  }
-  let raw: unknown = Reflect.get(data, "sessions");
-  if (!Array.isArray(raw)) {
-    const inner = Reflect.get(data, "data");
-    if (typeof inner === "object" && inner !== null) {
-      raw = Reflect.get(inner, "sessions");
-    }
-  }
-  if (!Array.isArray(raw)) {
-    throw new Error("sessionsArrayFromApiPayload: missing sessions array");
-  }
-  return raw.map((item) => sessionFromApiItem(item));
+  return sessionsListBootstrapFromApiPayload(data).sessions;
 }
 
 export function sessionFromApiItem(item: unknown): Session {

@@ -37,6 +37,7 @@ import {
 } from "@/lib/client/permissionError";
 import { safeResolveAction } from "@/lib/client/safeResolveAction";
 import { warn } from "@/lib/utils/logger";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import {
   TicketList,
   ExecutionView,
@@ -311,12 +312,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             }
             throw new Error(`search ${res.status}`);
           }
-          const data = (await res.json()) as {
-            data?: { feedback?: Feedback[] };
-            feedback?: Feedback[];
-          };
+          const inner = requireApiSuccessData<{ feedback: Feedback[] }>(await res.json());
           if (cancelled) return;
-          setSearchResults(data.data?.feedback ?? data.feedback ?? []);
+          if (!Array.isArray(inner.feedback)) {
+            throw new Error("Invalid API response: feedback must be an array");
+          }
+          setSearchResults(inner.feedback);
         } catch (err) {
           console.error("[ECHLY] Session search failed", err);
           if (!cancelled) setSearchResults([]);
@@ -626,18 +627,16 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       const url = `/api/sessions/${encodeURIComponent(sessionId)}${qs}`;
       const res = await authFetchOrAnonCookie(url);
       if (cancelled) return;
-      const data = (await res.json().catch(() => ({}))) as {
-        success?: boolean;
-        data?: {
-          session?: Record<string, unknown>;
-          request?: { pendingResolve?: boolean };
-        };
-        session?: Record<string, unknown>;
+      const body = await res.json().catch(() => null);
+      if (body === null || typeof body !== "object") {
+        setSessionFetchError("error");
+        return;
+      }
+      const accessRoot = body as {
         access?: { capabilities?: Partial<AccessCapabilities> };
       };
-      const sessionPayload = data.data?.session ?? data.session;
       if (res.status === 403) {
-        const cap = data.access?.capabilities;
+        const cap = accessRoot.access?.capabilities;
         if (cap && cap.canView === false) {
           setAccessBlocked(true);
           setSession(null);
@@ -660,12 +659,45 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         setSessionFetchError("forbidden");
         return;
       }
-      if (res.status === 404 || !data.success || !sessionPayload) {
+      if (res.status === 404) {
         setAccessBlocked(false);
         setSession(null);
         setSessionAccess(null);
         setPendingResolveRequest(false);
-        setSessionFetchError(res.status === 404 ? "not_found" : "error");
+        setSessionFetchError("not_found");
+        return;
+      }
+      if (!res.ok) {
+        setAccessBlocked(false);
+        setSession(null);
+        setSessionAccess(null);
+        setPendingResolveRequest(false);
+        setSessionFetchError("error");
+        return;
+      }
+      let sessionPayload: Record<string, unknown>;
+      let requestPayload: { pendingResolve?: boolean } | undefined;
+      try {
+        const inner = requireApiSuccessData<{
+          session: Record<string, unknown>;
+          request?: { pendingResolve?: boolean };
+        }>(body);
+        sessionPayload = inner.session;
+        requestPayload = inner.request;
+      } catch {
+        setAccessBlocked(false);
+        setSession(null);
+        setSessionAccess(null);
+        setPendingResolveRequest(false);
+        setSessionFetchError("error");
+        return;
+      }
+      if (!sessionPayload) {
+        setAccessBlocked(false);
+        setSession(null);
+        setSessionAccess(null);
+        setPendingResolveRequest(false);
+        setSessionFetchError("error");
         return;
       }
       setSessionFetchError(null);
@@ -675,7 +707,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         ...(sessionPayload as object),
         accessLevel: requireAccessLevel(raw.accessLevel),
       } as Session);
-      const cap = data.access?.capabilities;
+      const cap = accessRoot.access?.capabilities;
       setSessionAccess(
         cap
           ? {
@@ -688,7 +720,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             }
           : null
       );
-      setPendingResolveRequest(data.data?.request?.pendingResolve === true);
+      setPendingResolveRequest(
+        requestPayload !== undefined && requestPayload.pendingResolve === true
+      );
       // Authenticated: Loom-style view count via Bearer. Anonymous: share link token (sessionStorage / URL) on the request.
       if (authUid?.trim()) {
         const viewerId = getViewerId(authUid);
@@ -737,14 +771,21 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         const qs = tok !== "" ? `?token=${encodeURIComponent(tok)}` : "";
         const url = `/api/tickets/${encodeURIComponent(ticketIdFromUrl)}${qs}`;
         const res = await authFetchOrAnonCookie(url);
-        if (res.status === 403 || res.status === 404) return;
-        const data = (await res.json()) as {
-          success?: boolean;
-          data?: { ticket?: TicketFromApi & { sessionId?: string; status?: string; createdAt?: string | null } };
-          ticket?: TicketFromApi & { sessionId?: string; status?: string; createdAt?: string | null };
+        if (res.status === 403 || res.status === 404 || !res.ok) return;
+        const rawDeep = await res.json();
+        let ticketPayload: TicketFromApi & {
+          sessionId?: string;
+          status?: string;
+          createdAt?: string | null;
         };
-        const ticketPayload = data.data?.ticket ?? data.ticket;
-        if (cancelled || !data.success || !ticketPayload) return;
+        try {
+          ticketPayload = requireApiSuccessData<{
+            ticket: TicketFromApi & { sessionId?: string; status?: string; createdAt?: string | null };
+          }>(rawDeep).ticket;
+        } catch {
+          return;
+        }
+        if (cancelled) return;
         const t = ticketPayload;
         if (t.sessionId && t.sessionId !== sessionId) return;
         const isResolved =
@@ -955,14 +996,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (!res) {
       throw new Error("Delete failed");
     }
-    const data = (await res.json()) as {
-      success?: boolean;
-      error?: { message?: string };
-    };
-    if (!res.ok || !data?.success) {
+    const rawDelete = await res.json();
+    if (!res.ok) {
+      const errBody = rawDelete as { error?: { message?: string } };
       if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
-      throw new Error(data?.error?.message ?? "Delete failed");
+      throw new Error(
+        typeof errBody.error?.message === "string" ? errBody.error.message : "Delete failed"
+      );
     }
+    requireApiSuccessData<Record<string, never>>(rawDelete);
     router.push("/dashboard");
   }, [sessionId, router, isIdentityResolved, showToast]);
 
@@ -1017,13 +1059,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         showToast("Could not save title");
         return;
       }
-      const data = (await res.json()) as {
-        success?: boolean;
-        data?: { ticket?: TicketFromApi };
-        ticket?: TicketFromApi;
-      };
-      const ticketPayload = data.data?.ticket ?? data.ticket;
-      if (!res.ok || !data.success || !ticketPayload) {
+      const raw = await res.json();
+      if (!res.ok) {
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === effectiveSelectedId
@@ -1033,6 +1070,20 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         );
         if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
         else showToast("Could not save title");
+        return;
+      }
+      let ticketPayload: TicketFromApi;
+      try {
+        ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(raw).ticket;
+      } catch {
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === effectiveSelectedId
+              ? { ...item, title: previousTitle ?? trimmed }
+              : item
+          )
+        );
+        showToast("Could not save title");
         return;
       }
       setFeedback((prev) =>
@@ -1101,17 +1152,22 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           }
           return;
         }
-        const data = (await res.json()) as {
-          success?: boolean;
-          data?: { ticket?: TicketFromApi };
-          ticket?: TicketFromApi;
-        };
-        const ticketPayload = data.data?.ticket ?? data.ticket;
-        if (!res.ok || !data.success || !ticketPayload) {
+        const raw = await res.json();
+        if (!res.ok) {
           rollbackIfLatest();
           if (actionStepsSaveLatestGenRef.current.get(ticketId) === myGen) {
             if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
             else showToast("Could not save action items");
+          }
+          return;
+        }
+        let ticketPayload: TicketFromApi;
+        try {
+          ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(raw).ticket;
+        } catch {
+          rollbackIfLatest();
+          if (actionStepsSaveLatestGenRef.current.get(ticketId) === myGen) {
+            showToast("Could not save action items");
           }
           return;
         }
@@ -1160,13 +1216,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         showToast("Could not save tags");
         return;
       }
-      const data = (await res.json()) as {
-        success?: boolean;
-        data?: { ticket?: TicketFromApi };
-        ticket?: TicketFromApi;
-      };
-      const ticketPayload = data.data?.ticket ?? data.ticket;
-      if (!res.ok || !data.success || !ticketPayload) {
+      const rawTags = await res.json();
+      if (!res.ok) {
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
@@ -1174,6 +1225,18 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         );
         if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
         else showToast("Could not save tags");
+        return;
+      }
+      let ticketPayload: TicketFromApi;
+      try {
+        ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(rawTags).ticket;
+      } catch {
+        setFeedback((prev) =>
+          prev.map((item) =>
+            item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
+          )
+        );
+        showToast("Could not save tags");
         return;
       }
       setFeedback((prev) =>
@@ -1265,23 +1328,21 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               else showToast("Failed to update");
               return;
             }
-            const data = (await res.json()) as {
-              success?: boolean;
-              data?: { ticket?: TicketFromApi };
-              ticket?: TicketFromApi;
-            };
-            const ticketPayload = data.data?.ticket ?? data.ticket;
+            const rawResolve = await res.json();
+            let ticketPayload: TicketFromApi;
+            try {
+              ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(rawResolve).ticket;
+            } catch {
+              rollbackResolved();
+              showToast("Failed to update");
+              return;
+            }
             if (perf) {
               const clientTotal = performance.now() - t0;
               console.log("[ECHLY_PERF] CLIENT END (resolve ticket)", clientTotal.toFixed(1), "ms");
               console.log(
                 "[ECHLY_PERF] Full breakdown: compare CLIENT total above with authFetch TOKEN/NETWORK lines and server [Resolve] logs for API vs Firestore."
               );
-            }
-            if (!data.success || !ticketPayload) {
-              rollbackResolved();
-              showToast("Failed to update");
-              return;
             }
             setResolveOptimistic(null);
             setFeedback((prev) =>
@@ -1348,15 +1409,23 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         showToast("Could not save session name");
         return;
       }
-      const data = (await res.json()) as {
-        success?: boolean;
-        data?: { session?: Record<string, unknown> };
-        session?: Record<string, unknown>;
-      };
-      const patchSession = data.data?.session ?? data.session;
-      if (!res.ok || !data.success || !patchSession) {
+      const rawSessionPatch = await res.json();
+      if (!res.ok) {
         if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
         else showToast("Could not save session name");
+        setSession((prev: Session | null) =>
+          prev ? ({ ...prev, title: previousTitle } as Session) : prev
+        );
+        setSessionTitleDraft((previousTitle || "").trim());
+        return;
+      }
+      let patchSession: Record<string, unknown>;
+      try {
+        patchSession = requireApiSuccessData<{ session: Record<string, unknown> }>(
+          rawSessionPatch
+        ).session;
+      } catch {
+        showToast("Could not save session name");
         setSession((prev: Session | null) =>
           prev ? ({ ...prev, title: previousTitle } as Session) : prev
         );
@@ -1556,14 +1625,18 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         showToast("Could not delete ticket");
         return;
       }
-      const data = (await res.json()) as {
-        success?: boolean;
-        error?: { message?: string };
-      };
-      if (!res.ok || !data?.success) {
+      const rawDelTicket = await res.json();
+      if (!res.ok) {
         rollbackDelete();
         if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
         else showToast("Could not delete ticket");
+        return;
+      }
+      try {
+        requireApiSuccessData<Record<string, never>>(rawDelTicket);
+      } catch {
+        rollbackDelete();
+        showToast("Could not delete ticket");
         return;
       }
       const currentPath = window.location.pathname;

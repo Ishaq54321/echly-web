@@ -4,7 +4,10 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/authFetch";
 import type { Session } from "@/lib/domain/session";
-import { sessionsArrayFromApiPayload } from "@/lib/domain/session";
+import {
+  sessionsListBootstrapFromApiPayload,
+} from "@/lib/domain/session";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import type { SessionFeedbackCounts } from "@/lib/domain/session";
 import {
   assertIdentityResolved,
@@ -60,16 +63,13 @@ async function fetchSessionsBootstrapFromNetwork(): Promise<SessionsBootstrapRes
   try {
     const res = await authFetch("/api/sessions", { cache: "no-store" });
     if (!res?.ok) return { ok: false };
-    const data = await res.json().catch(() => ({}));
-    const list = sessionsArrayFromApiPayload(data);
+    const data = await res.json().catch(() => null);
+    if (data === null) return { ok: false };
+    const { sessions: list, hasMore, nextCursor } = sessionsListBootstrapFromApiPayload(data);
     const next = list.map((s) => {
       const archived = (s.archived ?? s.isArchived) === true;
       return { ...s, archived, isArchived: archived };
     });
-    const payload = data as { data?: { nextCursor?: string | null; hasMore?: boolean } };
-    const envelope = payload?.data ?? {};
-    const hasMore = envelope.hasMore === true && typeof envelope.nextCursor === "string";
-    const nextCursor = hasMore ? envelope.nextCursor ?? null : null;
     return { ok: true, sessions: next, hasMore, nextCursor };
   } catch {
     return { ok: false };
@@ -142,16 +142,17 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         setAwaitingSessions(false);
         return;
       }
-      const data = await res.json().catch(() => ({}));
-      const list = sessionsArrayFromApiPayload(data);
+      const data = await res.json().catch(() => null);
+      if (data === null) {
+        setAwaitingSessions(false);
+        return;
+      }
+      const { sessions: list, hasMore, nextCursor } = sessionsListBootstrapFromApiPayload(data);
       const next = list.map((s) => {
         const archived = (s.archived ?? s.isArchived) === true;
         return { ...s, archived, isArchived: archived };
       });
-      const payload = data as { data?: { nextCursor?: string | null; hasMore?: boolean } };
-      const envelope = payload?.data ?? {};
-      const hasMore = envelope.hasMore === true && typeof envelope.nextCursor === "string";
-      nextCursorRef.current = hasMore ? envelope.nextCursor ?? null : null;
+      nextCursorRef.current = nextCursor;
       setHasMoreSessions(hasMore);
       sessionsSourceUserRef.current = uid;
       setAllSessions(next);
@@ -162,7 +163,7 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
           ok: true,
           sessions: next,
           hasMore,
-          nextCursor: hasMore ? envelope.nextCursor ?? null : null,
+          nextCursor,
         })
       );
     } catch (e) {
@@ -300,16 +301,16 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
         cache: "no-store",
       });
       if (!res?.ok) return;
-      const data = await res.json().catch(() => ({}));
-      const incoming = sessionsArrayFromApiPayload(data).map((s) => {
+      const data = await res.json().catch(() => null);
+      if (data === null) return;
+      const { sessions: pageSessions, hasMore: nextHasMoreFlag, nextCursor: nextCursorVal } =
+        sessionsListBootstrapFromApiPayload(data);
+      const incoming = pageSessions.map((s) => {
         const archived = (s.archived ?? s.isArchived) === true;
         return { ...s, archived, isArchived: archived };
       });
-      const payload = data as { data?: { nextCursor?: string | null; hasMore?: boolean } };
-      const envelope = payload?.data ?? {};
-      const nextHasMore = envelope.hasMore === true && typeof envelope.nextCursor === "string";
-      nextCursorRef.current = nextHasMore ? envelope.nextCursor ?? null : null;
-      setHasMoreSessions(nextHasMore);
+      nextCursorRef.current = nextCursorVal;
+      setHasMoreSessions(nextHasMoreFlag);
       setAllSessions((prev) => {
         const merged = [...prev, ...incoming];
         const dedupedById = new Map<string, Session>();
@@ -416,11 +417,14 @@ export function useWorkspaceOverviewState(viewMode: ViewMode = "all") {
           return;
         }
 
-        const payload = data as {
-          data?: { session?: { id?: string } };
-          session?: { id?: string };
-        };
-        const newSessionId = payload.data?.session?.id ?? payload.session?.id;
+        let newSessionId: string;
+        try {
+          const inner = requireApiSuccessData<{ session: { id: string } }>(data);
+          newSessionId = inner.session.id;
+        } catch {
+          setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
+          return;
+        }
         if (!newSessionId) {
           setAllSessions((prev) => prev.filter((s) => s.id !== tempSessionId));
           return;

@@ -7,6 +7,7 @@ import {
   updateAccessRequestStatus,
 } from "@/lib/repositories/accessRequestsRepository.server";
 import { addSessionMember } from "@/lib/repositories/sessionMembersRepository.server";
+import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
 
 export const dynamic = "force-dynamic";
 
@@ -143,9 +144,36 @@ export async function PATCH(
       requestId: accessRequest.id,
       status: "rejected",
     });
+    const workspaceId =
+      typeof context.session.workspaceId === "string"
+        ? context.session.workspaceId.trim()
+        : "";
+    if (workspaceId) {
+      await createActivityEvent({
+        workspaceId,
+        sessionId,
+        eventType: "access_request.rejected",
+        actorId: approverId,
+      });
+    }
     return apiSuccess({
       type: "rejected" as const,
     });
+  }
+
+  try {
+    await addSessionMember({
+      sessionId,
+      workspaceId: context.session.workspaceId.trim(),
+      userId: accessRequest.requesterUserId.trim(),
+      email: accessRequest.requesterEmail.trim(),
+      access: "resolve",
+      actorId: approverId,
+      source: "access_request",
+    });
+  } catch (err) {
+    console.error("[access-requests] addSessionMember failed (request left pending)", err);
+    throw err;
   }
 
   await updateAccessRequestStatus({
@@ -154,13 +182,18 @@ export async function PATCH(
     status: "approved",
   });
 
-  await addSessionMember({
-    sessionId,
-    userId: accessRequest.requesterUserId.trim(),
-    email: accessRequest.requesterEmail.trim(),
-    access: "resolve",
-    addedBy: approverId,
-  });
+  const workspaceId =
+    typeof context.session.workspaceId === "string"
+      ? context.session.workspaceId.trim()
+      : "";
+  if (workspaceId) {
+    await createActivityEvent({
+      workspaceId,
+      sessionId,
+      eventType: "access_request.approved",
+      actorId: approverId,
+    });
+  }
 
   return apiSuccess({
     type: "approved" as const,

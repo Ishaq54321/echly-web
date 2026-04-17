@@ -357,24 +357,6 @@ Color density is a **best-effort estimate** based on file type and obvious styli
   - **description**: Comment input/composer UI block.
   - **color density**: High
 
-### Insights / Charts
-
-- `components/insights/FeedbackHeatmap.tsx`
-  - **description**: Heatmap chart block.
-  - **color density**: High
-- `components/insights/IssueTypeDonutChart.tsx`
-  - **description**: Donut chart block.
-  - **color density**: High
-- `components/insights/ResponseSpeedTrendChart.tsx`
-  - **description**: Trend chart block.
-  - **color density**: High
-- `components/insights/MostActiveSessionsBarChart.tsx`
-  - **description**: Bar chart block.
-  - **color density**: High
-- `components/insights/ActivityTrendChart.tsx`
-  - **description**: Activity trend chart block.
-  - **color density**: High
-
 ### Command Center
 
 - `components/command-center/FocusNowBlock.tsx`
@@ -575,9 +557,6 @@ Color density is a **best-effort estimate** based on file type and obvious styli
 - `app/(app)/dashboard/page.tsx`
   - **description**: Main dashboard page.
   - **color density**: High
-- `app/(app)/dashboard/insights/page.tsx`
-  - **description**: Dashboard insights page.
-  - **color density**: High
 - `app/(app)/dashboard/[sessionId]/page.tsx`
   - **description**: Session dashboard page (dynamic).
   - **color density**: High
@@ -683,7 +662,7 @@ Color density is a **best-effort estimate** based on file type and obvious styli
 - **Most complex areas**:
   - **OS-style multi-panel layout**: `components/layout/operating-system/*` (many panels, high surface area).
   - **Capture/overlay UI**: `components/CaptureWidget/*` + `lib/capture-engine/core/*` (overlay, interactive, modals, panels).
-  - **Charts/insights**: `components/insights/*` (color-heavy visualizations).
+  - **Command Center blocks**: `components/command-center/*` (color-heavy visualizations).
   - **Feedback detail**: `components/session/feedbackDetail/*` (interactive composition + screenshots/pins).
 
 - **Highest migration risk**:

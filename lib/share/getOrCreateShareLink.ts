@@ -1,6 +1,7 @@
 "use client";
 
 import { authFetch } from "@/lib/authFetch";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 
 export type GetOrCreateShareLinkParams = {
   sessionId: string;
@@ -42,12 +43,9 @@ export async function getOrCreateShareLink({
     throw new Error(message);
   }
 
-  const data = (await res.json()) as {
-    success?: boolean;
-    data?: { token?: string };
-  };
-  const token = typeof data.data?.token === "string" ? data.data.token.trim() : "";
-  if (!data.success || !token) {
+  const inner = requireApiSuccessData<{ token: string }>(await res.json());
+  const token = inner.token.trim();
+  if (!token) {
     throw new Error("Invalid share-link response");
   }
 

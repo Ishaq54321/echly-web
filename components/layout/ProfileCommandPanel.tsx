@@ -13,32 +13,15 @@ import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime";
 import { useBillingStore } from "@/lib/store/billingStore";
 import CountUp from "react-countup";
-import { filterDaily, type DailyInsights } from "@/lib/analytics/filterDaily";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 
 const PANEL_WIDTH = 520;
-
-interface AnalyticsWindow {
-  issuesCaptured: number;
-  repliesMade: number;
-  sessionsReviewed: number;
-  timeSavedHours: number;
-}
 
 interface InsightsApiResponse {
   lifetime: {
     totalFeedback: number;
     totalComments: number;
     timeSavedMinutes: number;
-  };
-  analytics: {
-    daily: DailyInsights;
-    issueTypes: Record<string, number>;
-    sessionCounts: Record<string, number>;
-    response: {
-      totalFirstReplyMs: number;
-      count: number;
-    };
   };
 }
 
@@ -177,21 +160,14 @@ export function ProfileCommandPanel({
     ? "— / — sessions used"
     : `${sessionUsed} / ${maxSessions === null ? "Unlimited" : maxSessions} sessions used`;
 
-  const last30Issues = (() => {
-    const filtered = filterDaily(analytics?.analytics?.daily ?? {}, 30);
-    return Object.values(filtered).reduce(
-      (sum, d) => sum + Math.max(0, Number(d?.feedback) || 0),
-      0
-    );
-  })();
-
-  const last30Replies = (() => {
-    const filtered = filterDaily(analytics?.analytics?.daily ?? {}, 30);
-    return Object.values(filtered).reduce(
-      (sum, d) => sum + Math.max(0, Number(d?.comments) || 0),
-      0
-    );
-  })();
+  const lifetimeIssuesCaptured = Math.max(
+    0,
+    Number(analytics?.lifetime?.totalFeedback) || 0
+  );
+  const lifetimeRepliesMade = Math.max(
+    0,
+    Number(analytics?.lifetime?.totalComments) || 0
+  );
 
   const lifetimeTimeSavedHours = Math.round(
     Math.max(0, Number(analytics?.lifetime?.timeSavedMinutes) || 0) / 60
@@ -209,7 +185,7 @@ export function ProfileCommandPanel({
     {
       key: "issuesCaptured" as const,
       label: "Issues captured",
-      context: "last 30 days",
+      context: "lifetime",
       bg: "#EFF6FF",
       textColor: "#1E3A8A",
       Icon: Info,
@@ -217,7 +193,7 @@ export function ProfileCommandPanel({
     {
       key: "repliesMade" as const,
       label: "Replies made",
-      context: "last 30 days",
+      context: "lifetime",
       bg: "#FFF7ED",
       textColor: "#7C2D12",
       Icon: MessageCircle,
@@ -303,14 +279,14 @@ export function ProfileCommandPanel({
                         return (
                           <CountUp
                             start={0}
-                            end={last30Issues}
+                            end={lifetimeIssuesCaptured}
                             duration={1}
                             separator=","
                             onEnd={() => setHasAnimatedMetrics(true)}
                           />
                         );
                       }
-                      return last30Issues.toLocaleString();
+                      return lifetimeIssuesCaptured.toLocaleString();
                     }
 
                     if (stat.key === "repliesMade") {
@@ -318,14 +294,14 @@ export function ProfileCommandPanel({
                         return (
                           <CountUp
                             start={0}
-                            end={last30Replies}
+                            end={lifetimeRepliesMade}
                             duration={1}
                             separator=","
                             onEnd={() => setHasAnimatedMetrics(true)}
                           />
                         );
                       }
-                      return last30Replies.toLocaleString();
+                      return lifetimeRepliesMade.toLocaleString();
                     }
 
                     return null;

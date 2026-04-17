@@ -7,9 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   Command,
   Inbox,
-  Flag,
   LayoutGrid,
-  BarChart2,
   Archive,
   Settings,
 } from "lucide-react";
@@ -28,7 +26,6 @@ const NAV_GROUPS = [
   {
     label: "System",
     items: [
-      { href: "/dashboard/insights", icon: BarChart2, label: "Insights" },
       { href: "/dashboard?view=archived", icon: Archive, label: "Archive" },
       { href: "/dashboard/settings", icon: Settings, label: "Settings" },
     ],
@@ -40,13 +37,10 @@ function isActive(href: string, label: string, pathname: string): boolean {
     if (label === "Sessions")
       return (
         pathname.startsWith("/session/") ||
-        (pathname.startsWith("/dashboard/") &&
-          pathname !== "/dashboard" &&
-          !pathname.startsWith("/dashboard/insights"))
+        (pathname.startsWith("/dashboard/") && pathname !== "/dashboard")
       );
     if (label === "Dashboard") return pathname === "/dashboard";
   }
-  if (href === "/dashboard/insights") return pathname === "/dashboard/insights";
   if (href.startsWith("/dashboard?")) return pathname === "/dashboard";
   if (href === "/dashboard/settings") return pathname.startsWith("/dashboard/settings");
   return pathname.startsWith(href);

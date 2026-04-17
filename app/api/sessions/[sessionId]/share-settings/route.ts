@@ -126,8 +126,18 @@ export const PATCH = withAuthorization(
       return apiError({ code: "INVALID_INPUT", message: "Invalid value", status: 400 });
     }
 
+    if (generalAccess === context.session.generalAccess) {
+      return apiSuccess(
+        { changedFields: [] as ("generalAccess")[] },
+        context.access!
+      );
+    }
+
     await updateSessionGeneralAccessRepo(id, generalAccess);
-    return apiSuccess({}, context.access!);
+    return apiSuccess(
+      { changedFields: ["generalAccess"] as const },
+      context.access!
+    );
   },
   { resolveWorkspace: resolveSessionWorkspaceId }
 );

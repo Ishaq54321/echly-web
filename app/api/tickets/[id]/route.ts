@@ -215,10 +215,22 @@ export const PATCH = withAuthorization(
           Date.now() - start,
           "ms)"
         );
-        const resolveResult = await updateFeedbackResolveAndSessionCountersRepo(id, {
-          ...contentUpdates,
-          status: patchStatus,
-        });
+        const actorId = context.userId?.trim() ?? user.uid.trim();
+        if (!actorId) {
+          return apiError({
+            code: "UNAUTHORIZED",
+            message: "Missing user",
+            status: 401,
+          });
+        }
+        const resolveResult = await updateFeedbackResolveAndSessionCountersRepo(
+          id,
+          actorId,
+          {
+            ...contentUpdates,
+            status: patchStatus,
+          }
+        );
         if (resolveResult.kind === "missing") {
           return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
         }

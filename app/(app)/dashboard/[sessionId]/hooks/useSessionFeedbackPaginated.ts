@@ -13,6 +13,7 @@ import { Timestamp } from "firebase/firestore";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 
 const ZERO_COUNTS = {
   total: 0,
@@ -361,33 +362,22 @@ export function useSessionFeedbackPaginated(
           restFetchRef.current ?? ((u: string) => fetch(u, { credentials: "include" }));
         const res = await fetchPage(`/api/feedback?${q.toString()}`);
         if (!res.ok) throw new Error(`Feedback page 1 fetch failed (${res.status})`);
-        const data = (await res.json()) as {
-          data?: {
-            feedback?: Record<string, unknown>[];
-            nextCursor?: string | null;
-            hasMore?: boolean;
-          };
-          feedback?: Record<string, unknown>[];
+        const page = requireApiSuccessData<{
+          feedback: Record<string, unknown>[];
           nextCursor?: string | null;
           hasMore?: boolean;
-        };
-        const envelope = data.data;
-        const rows = Array.isArray(envelope?.feedback)
-          ? envelope.feedback
-          : Array.isArray(data.feedback)
-            ? data.feedback
-            : [];
+        }>(await res.json());
+        if (!Array.isArray(page.feedback)) {
+          throw new Error("Invalid API response: feedback must be an array");
+        }
+        const rows = page.feedback;
         const initialPage: Feedback[] = [];
         for (const r of rows) {
           const f = feedbackFromRestApiRow(r, sessionId);
           if (f) initialPage.push(f);
         }
-        const next = typeof envelope?.nextCursor === "string"
-          ? envelope.nextCursor
-          : typeof data.nextCursor === "string"
-            ? data.nextCursor
-            : "";
-        const hasMoreFlag = envelope?.hasMore ?? data.hasMore;
+        const next = typeof page.nextCursor === "string" ? page.nextCursor : "";
+        const hasMoreFlag = page.hasMore;
         const nextHasMore = hasMoreFlag === true && next.trim() !== "";
 
         if (cancelled || sessionIdRef.current !== sessionId) return;
@@ -441,34 +431,23 @@ export function useSessionFeedbackPaginated(
       if (!res.ok) {
         throw new Error(`Feedback pagination fetch failed (${res.status})`);
       }
-      const data = (await res.json()) as {
-        data?: {
-          feedback?: Record<string, unknown>[];
-          nextCursor?: string | null;
-          hasMore?: boolean;
-        };
-        feedback?: Record<string, unknown>[];
+      const page = requireApiSuccessData<{
+        feedback: Record<string, unknown>[];
         nextCursor?: string | null;
         hasMore?: boolean;
-      };
-      const envelope = data.data;
-      const rows = Array.isArray(envelope?.feedback)
-        ? envelope.feedback
-        : Array.isArray(data.feedback)
-          ? data.feedback
-          : [];
+      }>(await res.json());
+      if (!Array.isArray(page.feedback)) {
+        throw new Error("Invalid API response: feedback must be an array");
+      }
+      const rows = page.feedback;
       const nextPage: Feedback[] = [];
       for (const r of rows) {
         const f = feedbackFromRestApiRow(r, sid);
         if (f) nextPage.push(f);
       }
 
-      const next = typeof envelope?.nextCursor === "string"
-        ? envelope.nextCursor
-        : typeof data.nextCursor === "string"
-          ? data.nextCursor
-          : "";
-      const hasMoreFlag = envelope?.hasMore ?? data.hasMore;
+      const next = typeof page.nextCursor === "string" ? page.nextCursor : "";
+      const hasMoreFlag = page.hasMore;
       const nextHasMore = hasMoreFlag === true && next.trim() !== "";
       nextCursorRef.current = nextHasMore ? next : "";
       hasMoreRef.current = nextHasMore;

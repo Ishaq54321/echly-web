@@ -8,6 +8,7 @@ import {
   updateSessionUpdatedAtRepo,
 } from "@/lib/repositories/sessionsRepository.server";
 import { incrementInsightsOnCommentCreateRepo } from "@/lib/repositories/insightsRepository.server";
+import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
 import { fireAndForget } from "@/lib/server/fireAndForget";
 
 /** Thrown when the feedback doc is missing (e.g. hard-deleted); map to HTTP 404 in API routes. */
@@ -122,21 +123,23 @@ export async function addCommentRepo(
   });
   await batch.commit();
 
+  await createActivityEvent({
+    workspaceId,
+    sessionId,
+    eventType: "comment.added",
+    actorId: resolvedUserId,
+    feedbackId,
+    commentId: commentRef.id,
+  });
+
   fireAndForget("addCommentRepo-sessionUpdatedAt", () =>
     updateSessionUpdatedAtRepo(sessionId)
   );
-  console.log("🔥 BEFORE insights update", {
-    workspaceId,
-    sessionId,
-    feedbackId,
-    type: "comment",
-  });
   try {
     await incrementInsightsOnCommentCreateRepo({ workspaceId });
-    console.log("✅ AFTER insights update");
-    console.log("✅ INSIGHTS WRITE SUCCESS");
+    console.log("\u2705 INSIGHTS SYNC SUCCESS");
   } catch (e) {
-    console.error("❌ INSIGHTS WRITE FAILED", e);
+    console.error("\u274c INSIGHTS SYNC FAILED", e);
   }
 
   return commentRef.id;

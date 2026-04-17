@@ -7,6 +7,7 @@ import { ECHLY_DEBUG } from "../../lib/utils/logger";
 import { echlyLog } from "../../lib/debug/echlyLogger";
 import { setExtensionToken, apiFetch } from "../utils/apiFetch";
 import { API_BASE, WEB_APP_URL } from "../config";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import { sessionsArrayFromApiPayload } from "@/lib/domain/session";
 import { buildFeedbackPayload } from "@/utils/buildFeedbackPayload";
 import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
@@ -129,21 +130,18 @@ type FeedbackListResponse = {
 };
 
 function parseFeedbackListResponse(raw: unknown): FeedbackListResponse {
-  if (typeof raw !== "object" || raw === null) return {};
-  const o = raw as Record<string, unknown>;
-  const inner = o.data;
-  if (typeof inner === "object" && inner !== null) {
-    const d = inner as Record<string, unknown>;
-    return {
-      feedback: Array.isArray(d.feedback) ? (d.feedback as FeedbackApiItem[]) : [],
-      nextCursor: typeof d.nextCursor === "string" ? d.nextCursor : null,
-      hasMore: d.hasMore === true,
-    };
+  const inner = requireApiSuccessData<{
+    feedback: FeedbackApiItem[];
+    nextCursor?: string | null;
+    hasMore?: boolean;
+  }>(raw);
+  if (!Array.isArray(inner.feedback)) {
+    throw new Error("parseFeedbackListResponse: feedback must be an array");
   }
   return {
-    feedback: Array.isArray(o.feedback) ? (o.feedback as FeedbackApiItem[]) : [],
-    nextCursor: typeof o.nextCursor === "string" ? o.nextCursor : null,
-    hasMore: o.hasMore === true,
+    feedback: inner.feedback,
+    nextCursor: typeof inner.nextCursor === "string" ? inner.nextCursor : null,
+    hasMore: inner.hasMore === true,
   };
 }
 type SessionCounts = {
@@ -418,13 +416,9 @@ async function fetchFeedbackCountFresh(sessionId: string): Promise<SessionCounts
     throw new Error("session_meta_failed_" + res.status);
   }
   const raw = await res.json();
-  const json = raw as {
-    success?: boolean;
-    data?: { session?: Record<string, unknown> };
-    session?: Record<string, unknown>;
-  };
-  const s = json.data?.session ?? json.session;
-  if (!s || json.success === false) {
+  const inner = requireApiSuccessData<{ session: Record<string, unknown> }>(raw);
+  const s = inner.session;
+  if (!s || typeof s !== "object") {
     throw new Error("session_meta_missing");
   }
   const open = typeof s.openCount === "number" ? s.openCount : 0;

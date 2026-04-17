@@ -218,6 +218,23 @@
         { "fieldPath": "sessionId", "order": "ASCENDING" },
         { "fieldPath": "isActive", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "activityEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activityEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sessionId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

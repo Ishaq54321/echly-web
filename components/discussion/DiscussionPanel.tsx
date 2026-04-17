@@ -19,6 +19,7 @@ import {
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { getShareToken } from "@/lib/client/shareToken";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 
 const PANEL_WIDTH = 420;
@@ -84,25 +85,28 @@ export function DiscussionPanel({
         if (!res || !res.ok) throw new Error("Failed to load");
         return res.json();
       })
-      .then((data: { success?: boolean; ticket?: TicketData }) => {
+      .then((raw: unknown) => {
         if (cancelled) return;
-        const t = data.ticket;
-        if (t) {
-          setTicket(t);
-          if (t.sessionId) {
-            authFetch(`/api/sessions/${t.sessionId}`)
-              .then((r) => {
-                if (!r || !r.ok) return null;
-                return r.json();
-              })
-              .then((d: { session?: { title?: string } } | null) => {
-                if (!d) return;
-                if (!cancelled && d.session?.title) {
-                  setSessionName(d.session.title);
-                }
-              })
-              .catch(() => {});
-          }
+        const payload = requireApiSuccessData<{ ticket: TicketData }>(raw);
+        const t = payload.ticket;
+        setTicket(t);
+        if (t.sessionId) {
+          authFetch(`/api/sessions/${t.sessionId}`)
+            .then((r) => {
+              if (!r || !r.ok) return null;
+              return r.json();
+            })
+            .then((sessionRaw: unknown) => {
+              if (sessionRaw === null || cancelled) return;
+              const sessionPayload = requireApiSuccessData<{
+                session: { title?: string };
+              }>(sessionRaw);
+              const title = sessionPayload.session.title;
+              if (typeof title === "string" && title.trim()) {
+                setSessionName(title);
+              }
+            })
+            .catch(() => {});
         }
       })
       .catch(() => {

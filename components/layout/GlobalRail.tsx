@@ -7,7 +7,7 @@ import { useRef, useEffect, useState } from "react";
 import {
   Home,
   MessageSquare,
-  BarChart3,
+  Activity,
   Settings,
   UserPlus,
   PanelLeftClose,
@@ -23,13 +23,14 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
 const NAV_ITEMS = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
   { href: "/discussion", icon: MessageSquare, label: "Discussion" },
-  { href: "/dashboard/insights", icon: BarChart3, label: "Insights" },
+  { href: "/activity", icon: Activity, label: "Activity" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ] as const;
 
 function isActive(href: string, pathname: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
   if (href === "/discussion") return pathname === "/discussion";
+  if (href === "/activity") return pathname === "/activity";
   return pathname === href || (href !== "/dashboard" && pathname.startsWith(href + "/"));
 }
 

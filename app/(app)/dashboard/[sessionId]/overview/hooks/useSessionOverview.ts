@@ -10,6 +10,7 @@ import { requireAccessLevel } from "@/lib/domain/accessLevel";
 import type { Session } from "@/lib/domain/session";
 import { requireGeneralAccess } from "@/lib/domain/session";
 import { Timestamp } from "firebase/firestore";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 
 const RECENT_ACTIVITY_LIMIT = 10;
 
@@ -184,19 +185,9 @@ export function useSessionOverview(sessionId: string | undefined) {
         if (!res?.ok) {
           throw new Error(`Overview failed: ${res?.status ?? "?"}`);
         }
-        const payload = (await res.json().catch(() => ({}))) as {
-          success?: boolean;
-          data?: {
-            session?: Record<string, unknown>;
-            statusPreview?: { open?: unknown[]; resolved?: unknown[] };
-            recentActivity?: Array<{
-              actorName?: string;
-              action?: string;
-              targetTitle?: string;
-              timestamp?: string | null;
-            }>;
-          };
-          session?: Record<string, unknown>;
+        const json = await res.json();
+        const inner = requireApiSuccessData<{
+          session: Record<string, unknown>;
           statusPreview?: { open?: unknown[]; resolved?: unknown[] };
           recentActivity?: Array<{
             actorName?: string;
@@ -204,18 +195,18 @@ export function useSessionOverview(sessionId: string | undefined) {
             targetTitle?: string;
             timestamp?: string | null;
           }>;
-        };
-
-        const inner = payload.data;
-        const sessionRaw = inner?.session ?? payload.session;
-        const statusPreviewRaw = inner?.statusPreview ?? payload.statusPreview;
-        const recentActivityRawTop = inner?.recentActivity ?? payload.recentActivity;
+        }>(json);
 
         if (cancelled || !isCurrent(token)) return;
-        if (!payload.success || !sessionRaw) {
+
+        const sessionRaw = inner.session;
+        if (typeof sessionRaw !== "object" || sessionRaw === null) {
           setData(EMPTY_SESSION_OVERVIEW);
           return;
         }
+
+        const statusPreviewRaw = inner.statusPreview;
+        const recentActivityRawTop = inner.recentActivity;
 
         const session = sessionFromOverviewApi(sessionRaw);
         const openRaw = Array.isArray(statusPreviewRaw?.open) ? statusPreviewRaw.open! : [];

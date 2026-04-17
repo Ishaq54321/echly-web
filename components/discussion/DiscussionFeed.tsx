@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { MessageSquare } from "lucide-react";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { useWorkspace } from "@/lib/client/workspaceContext";
@@ -65,16 +66,12 @@ export function DiscussionFeed({
         const url = "/api/feedback?conversationsOnly=true&limit=100";
         const res = await authFetch(url, { cache: "no-store" });
         if (!res?.ok) throw new Error("Failed to load discussions");
-        const data = (await res.json().catch(() => ({}))) as {
-          data?: { feedback?: unknown[] };
-          feedback?: unknown[];
-        };
+        const inner = requireApiSuccessData<{ feedback: unknown[] }>(await res.json());
         if (cancelled) return;
-        const raw = Array.isArray(data.data?.feedback)
-          ? data.data.feedback
-          : Array.isArray(data.feedback)
-            ? data.feedback
-            : [];
+        if (!Array.isArray(inner.feedback)) {
+          throw new Error("Invalid API response: feedback must be an array");
+        }
+        const raw = inner.feedback;
         const list: DiscussionFeedItem[] = raw.map((row: unknown) => {
           const item = row as Record<string, unknown>;
           const status = (item.status as string) ?? "open";

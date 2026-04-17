@@ -10,6 +10,7 @@ import {
   getSessionMember,
   getInviteByEmail,
 } from "@/lib/repositories/sessionMembersRepository.server";
+import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
 
 export const dynamic = "force-dynamic";
 
@@ -135,12 +136,23 @@ export async function POST(
       });
     }
 
+    const inviterId = context.userId?.trim() ?? "";
+    if (!inviterId) {
+      return apiError({
+        code: "UNAUTHORIZED",
+        message: "Missing user",
+        status: 401,
+      });
+    }
+
     await addSessionMember({
       sessionId,
+      workspaceId: sessionWorkspaceId,
       userId: existingUser.uid,
       email,
       access,
-      addedBy: context.session.createdByUserId,
+      actorId: inviterId,
+      source: "invite_api",
     });
 
     return apiSuccess({
@@ -168,12 +180,35 @@ export async function POST(
     });
   }
 
+  const invitedByUserId = context.userId?.trim() ?? "";
+  if (!invitedByUserId) {
+    return apiError({
+      code: "UNAUTHORIZED",
+      message: "Missing user",
+      status: 401,
+    });
+  }
+
   await createSessionInvite({
     sessionId,
     email,
     access,
-    invitedBy: context.session.createdByUserId,
+    invitedBy: invitedByUserId,
   });
+
+  const workspaceId =
+    typeof context.session.workspaceId === "string"
+      ? context.session.workspaceId.trim()
+      : "";
+  if (workspaceId) {
+    await createActivityEvent({
+      workspaceId,
+      sessionId,
+      eventType: "invite.sent",
+      actorId: invitedByUserId,
+      metadata: { email, access },
+    });
+  }
 
   return apiSuccess({
     type: "invite_created",

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MessageSquareMore } from "lucide-react";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { formatRelativeTime } from "@/lib/utils/time";
 import { getTicketStatus } from "@/lib/domain/feedback";
@@ -94,16 +95,12 @@ export function DiscussionList({
       try {
         const res = await authFetch(url, { cache: "no-store" });
         if (!res || !res.ok) throw new Error("Failed to load feedback");
-        const data = (await res.json()) as {
-          data?: { feedback?: unknown[] };
-          feedback?: unknown[];
-        };
+        const inner = requireApiSuccessData<{ feedback: unknown[] }>(await res.json());
         if (cancelled) return;
-        const raw = Array.isArray(data.data?.feedback)
-          ? data.data.feedback
-          : Array.isArray(data.feedback)
-            ? data.feedback
-            : [];
+        if (!Array.isArray(inner.feedback)) {
+          throw new Error("Invalid API response: feedback must be an array");
+        }
+        const raw = inner.feedback;
         onEmptyChangeRef.current?.(raw.length === 0);
         const list: DiscussionItem[] = raw.map((f: unknown) => {
           const item = f as Record<string, unknown>;

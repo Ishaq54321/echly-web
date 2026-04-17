@@ -1,6 +1,7 @@
 "use client";
 
 import { authFetch } from "@/lib/authFetch";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import {
   Fragment,
   useCallback,
@@ -280,13 +281,11 @@ export function SessionActionsDropdown({
     });
     if (!res) throw new Error("Failed to rename");
     if (!res.ok) throw new Error("Failed to rename");
-    const data = (await res.json()) as {
-      success?: boolean;
-      data?: { session?: { id: string; title: string; updatedAt?: unknown } };
-      session?: { id: string; title: string; updatedAt?: unknown };
-    };
-    const renamed = data.data?.session ?? data.session;
-    if (data.success && renamed && onRenameSuccess) {
+    const inner = requireApiSuccessData<{
+      session: { id: string; title: string; updatedAt?: unknown };
+    }>(await res.json());
+    const renamed = inner.session;
+    if (onRenameSuccess) {
       onRenameSuccess(renamed);
     }
   };

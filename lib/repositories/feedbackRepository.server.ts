@@ -4,9 +4,13 @@ import { FieldPath, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { assertQueryLimit } from "@/lib/querySafety";
 import type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
 import {
+  decrementInsightsOnFeedbackDeleteRepo,
   incrementInsightsOnFeedbackCreateRepo,
-  workspaceInsightsRef,
+  normalizeIssueTypeForInsights,
+  updateInsightsOnResolveRepo,
+  updateInsightsOnTypeChangeRepo,
 } from "@/lib/repositories/insightsRepository.server";
+import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
 import { listAccessibleSessionsForUser } from "@/lib/server/listAccessibleSessionsForUser";
 
 type DocumentReference = FirebaseFirestore.DocumentReference;
@@ -140,7 +144,7 @@ export async function addFeedbackWithSessionCountersRepo(
     throw new Error("Missing workspaceId on session");
   }
 
-  const issueTypeForInsights = (data.type ?? "").trim() || "general";
+  const issueTypeForInsights = normalizeIssueTypeForInsights(data.type);
 
   const workspaceRef = adminDb.doc(`workspaces/${resolvedWorkspaceId}`);
   const txResult = await adminDb.runTransaction(async (tx) => {
@@ -207,23 +211,26 @@ export async function addFeedbackWithSessionCountersRepo(
     return { ref: feedbackRef, inserted: true as const, createdAt };
   });
 
-  if (txResult.inserted) {
-    console.log("🔥 BEFORE insights update", {
-      workspaceId: resolvedWorkspaceId,
-      sessionId,
-      type: issueTypeForInsights,
-    });
+  if (txResult.inserted && txResult.createdAt) {
+    const feedbackDay = txResult.createdAt.toISOString().slice(0, 10);
     try {
       await incrementInsightsOnFeedbackCreateRepo({
         workspaceId: resolvedWorkspaceId,
         sessionId,
         type: issueTypeForInsights,
+        feedbackDay,
       });
-      console.log("✅ AFTER insights update");
-      console.log("✅ INSIGHTS WRITE SUCCESS");
+      console.log("\u2705 INSIGHTS SYNC SUCCESS");
     } catch (e) {
-      console.error("❌ INSIGHTS WRITE FAILED", e);
+      console.error("\u274c INSIGHTS SYNC FAILED", e);
     }
+    await createActivityEvent({
+      workspaceId: resolvedWorkspaceId,
+      sessionId,
+      eventType: "feedback.created",
+      actorId: resolvedUserId,
+      feedbackId: txResult.ref.id,
+    });
   }
 
   return txResult;
@@ -333,14 +340,49 @@ export async function updateFeedbackRepo(
   const feedbackRef = adminDb.doc(`feedback/${feedbackId}`);
   const feedbackSnap = await feedbackRef.get();
   if (!feedbackSnap.exists) return;
+  const prev = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
+  const oldType = normalizeIssueTypeForInsights(prev.type);
+  let workspaceId =
+    typeof prev.workspaceId === "string" ? prev.workspaceId.trim() : "";
+
   await feedbackRef.update(updates);
+
+  if (typeof updates.type === "string") {
+    if (!workspaceId) {
+      const sid = typeof prev.sessionId === "string" ? prev.sessionId.trim() : "";
+      if (sid) {
+        const s = await adminDb.doc(`sessions/${sid}`).get();
+        const w = s.data()?.workspaceId;
+        workspaceId = typeof w === "string" ? w.trim() : "";
+      }
+    }
+    const newType = normalizeIssueTypeForInsights(updates.type);
+    if (workspaceId && newType !== oldType) {
+      try {
+        await updateInsightsOnTypeChangeRepo({
+          workspaceId,
+          oldType,
+          newType,
+        });
+        console.log("\u2705 INSIGHTS SYNC SUCCESS");
+      } catch (e) {
+        console.error("\u274c INSIGHTS SYNC FAILED", e);
+      }
+    }
+  }
 }
 
 /** Outcome of resolve/reopen + session counters (PATCH must map `missing` → 404). */
 export type UpdateFeedbackResolveAndSessionCountersResult =
   | { kind: "missing" }
-  | { kind: "noop" }
-  | { kind: "applied"; insights?: { workspaceId: string; sessionId: string; delta: number } };
+  | { kind: "noop"; wasStatus: FeedbackStatus; toStatus: FeedbackStatus }
+  | {
+      kind: "applied";
+      wasStatus: FeedbackStatus;
+      toStatus: FeedbackStatus;
+      resolveDelta?: { workspaceId: string; delta: 1 | -1 };
+      typeChange?: { workspaceId: string; oldType: string; newType: string };
+    };
 
 /**
  * Updates feedback (resolve / reopen) and session denormalized counters in one transaction.
@@ -348,6 +390,7 @@ export type UpdateFeedbackResolveAndSessionCountersResult =
  */
 export async function updateFeedbackResolveAndSessionCountersRepo(
   feedbackId: string,
+  actorId: string,
   data: Partial<{
     title: string;
     instruction: string;
@@ -359,6 +402,7 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     status: FeedbackStatus;
   }>
 ): Promise<UpdateFeedbackResolveAndSessionCountersResult> {
+  requireUserId(actorId, "updateFeedbackResolveAndSessionCountersRepo.actorId");
   const feedbackRef = adminDb.doc(`feedback/${feedbackId}`);
   if (typeof data.status !== "string") {
     throw new Error("updateFeedbackResolveAndSessionCountersRepo: missing status");
@@ -401,8 +445,22 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
       }
     }
 
+    const oldTypeForInsights = normalizeIssueTypeForInsights(fd.type);
+    const newTypeForInsights =
+      typeof data.type === "string"
+        ? normalizeIssueTypeForInsights(data.type)
+        : oldTypeForInsights;
+    const typeChangeMeta =
+      typeof data.type === "string" && newTypeForInsights !== oldTypeForInsights
+        ? {
+            workspaceId,
+            oldType: oldTypeForInsights,
+            newType: newTypeForInsights,
+          }
+        : undefined;
+
     if (wasStatus === toStatus && !hasNonStatusResolvePayload(data)) {
-      return { kind: "noop" as const };
+      return { kind: "noop" as const, wasStatus, toStatus };
     }
 
     const srow = sessionSnap.data() ?? {};
@@ -435,9 +493,16 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
 
       const deltaResolved =
         (toStatus === "resolved" ? 1 : 0) - (wasStatus === "resolved" ? 1 : 0);
+      const resolveDelta =
+        deltaResolved !== 0
+          ? { workspaceId, delta: deltaResolved as 1 | -1 }
+          : undefined;
       return {
         kind: "applied" as const,
-        insights: { workspaceId, sessionId, delta: deltaResolved },
+        wasStatus,
+        toStatus,
+        resolveDelta,
+        typeChange: typeChangeMeta,
       };
     }
 
@@ -448,31 +513,55 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
         { merge: true }
       );
     }
-    return { kind: "applied" as const };
+    return {
+      kind: "applied" as const,
+      wasStatus,
+      toStatus,
+      typeChange: typeChangeMeta,
+    };
   });
 
-  if (result.kind === "applied" && result.insights) {
-    const { workspaceId, sessionId, delta } = result.insights;
-    console.log("🔥 BEFORE insights update", {
-      workspaceId,
-      sessionId,
-      type: "resolved_delta",
-      feedbackId,
-      delta,
-    });
-    try {
-      const insightsRef = workspaceInsightsRef(workspaceId);
-      const day = new Date().toISOString().slice(0, 10);
-      const patch: Record<string, unknown> = {
-        totalResolved: FieldValue.increment(delta),
-        updatedAt: new Date(),
-      };
-      patch[`daily.${day}.resolved`] = FieldValue.increment(delta);
-      await insightsRef.set(patch, { merge: true });
-      console.log("✅ AFTER insights update");
-      console.log("✅ INSIGHTS WRITE SUCCESS");
-    } catch (e) {
-      console.error("❌ INSIGHTS WRITE FAILED", e);
+  if (result.kind === "applied") {
+    if (result.typeChange) {
+      try {
+        await updateInsightsOnTypeChangeRepo({
+          workspaceId: result.typeChange.workspaceId,
+          oldType: result.typeChange.oldType,
+          newType: result.typeChange.newType,
+        });
+        console.log("\u2705 INSIGHTS SYNC SUCCESS");
+      } catch (e) {
+        console.error("\u274c INSIGHTS SYNC FAILED", e);
+      }
+    }
+    if (result.resolveDelta) {
+      try {
+        await updateInsightsOnResolveRepo({
+          workspaceId: result.resolveDelta.workspaceId,
+          delta: result.resolveDelta.delta,
+        });
+        console.log("\u2705 INSIGHTS SYNC SUCCESS");
+      } catch (e) {
+        console.error("\u274c INSIGHTS SYNC FAILED", e);
+      }
+    }
+    if (result.wasStatus !== result.toStatus && result.resolveDelta) {
+      const fdSnap = await feedbackRef.get();
+      const sid =
+        typeof (fdSnap.data() as { sessionId?: string } | undefined)?.sessionId ===
+        "string"
+          ? String((fdSnap.data() as { sessionId: string }).sessionId).trim()
+          : "";
+      if (sid) {
+        await createActivityEvent({
+          workspaceId: result.resolveDelta.workspaceId,
+          sessionId: sid,
+          eventType:
+            result.toStatus === "resolved" ? "feedback.resolved" : "feedback.reopened",
+          actorId,
+          feedbackId,
+        });
+      }
     }
   }
 
@@ -835,9 +924,9 @@ export async function deleteFeedbackWithSessionCountersRepo(
   }
   const feedbackRef = adminDb.doc(`feedback/${fid}`);
 
-  await adminDb.runTransaction(async (tx) => {
+  const insightsAfterDelete = await adminDb.runTransaction(async (tx) => {
     const feedbackSnap = await tx.get(feedbackRef);
-    if (!feedbackSnap.exists) return;
+    if (!feedbackSnap.exists) return null;
 
     const data = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
     const isTombstone = data.isDeleted === true;
@@ -858,6 +947,15 @@ export async function deleteFeedbackWithSessionCountersRepo(
     if (!resolvedWorkspaceId) {
       throw new Error("Missing workspaceId on feedback/session");
     }
+
+    const rawCreated = data.createdAt;
+    const createdAtForInsights =
+      rawCreated != null && typeof (rawCreated as { toDate?: () => Date }).toDate === "function"
+        ? (rawCreated as FirebaseFirestore.Timestamp)
+        : rawCreated instanceof Date
+          ? rawCreated
+          : new Date();
+
     const workspaceRef = adminDb.doc(`workspaces/${resolvedWorkspaceId}`);
     const workspaceSnap = await tx.get(workspaceRef);
 
@@ -909,7 +1007,12 @@ export async function deleteFeedbackWithSessionCountersRepo(
         "stats.totalComments": nextWorkspaceTotalComments,
         "stats.updatedAt": new Date(),
       });
-      return;
+      return {
+        workspaceId: resolvedWorkspaceId,
+        sessionId,
+        type: normalizeIssueTypeForInsights(data.type),
+        createdAt: createdAtForInsights,
+      };
     }
 
     const rawStatus = typeof data.status === "string" ? data.status : "";
@@ -935,7 +1038,22 @@ export async function deleteFeedbackWithSessionCountersRepo(
       "stats.totalComments": nextWorkspaceTotalComments,
       "stats.updatedAt": new Date(),
     });
+    return {
+      workspaceId: resolvedWorkspaceId,
+      sessionId,
+      type: normalizeIssueTypeForInsights(data.type),
+      createdAt: createdAtForInsights,
+    };
   });
+
+  if (insightsAfterDelete) {
+    try {
+      await decrementInsightsOnFeedbackDeleteRepo(insightsAfterDelete);
+      console.log("\u2705 INSIGHTS SYNC SUCCESS");
+    } catch (e) {
+      console.error("\u274c INSIGHTS SYNC FAILED", e);
+    }
+  }
 }
 
 const DELETE_SESSION_FEEDBACK_LIMIT = 500;
@@ -946,14 +1064,56 @@ const DELETE_SESSION_FEEDBACK_LIMIT = 500;
  * Screenshot files in Storage are not removed here (TODO: optional cleanup).
  */
 export async function deleteAllFeedbackForSessionRepo(sessionId: string): Promise<number> {
+  const sid = sessionId.trim();
+  const sessionSnap = await adminDb.doc(`sessions/${sid}`).get();
+  const fallbackWorkspaceId =
+    typeof sessionSnap.data()?.workspaceId === "string"
+      ? String(sessionSnap.data()!.workspaceId).trim()
+      : "";
+
   const snapshot = await adminDb
     .collection("feedback")
-    .where("sessionId", "==", sessionId.trim())
+    .where("sessionId", "==", sid)
     .limit(DELETE_SESSION_FEEDBACK_LIMIT)
     .get();
-  const count = snapshot.docs.length;
-  await Promise.all(snapshot.docs.map((d) => d.ref.delete()));
-  return count;
+  const docs = snapshot.docs as QueryDocumentSnapshot[];
+
+  const payloads: Parameters<typeof decrementInsightsOnFeedbackDeleteRepo>[0][] = [];
+  for (const d of docs) {
+    const data = (d.data() ?? {}) as Record<string, unknown>;
+    const workspaceId =
+      (typeof data.workspaceId === "string" ? data.workspaceId.trim() : "") ||
+      fallbackWorkspaceId;
+    if (!workspaceId) {
+      throw new Error("Missing workspaceId on feedback/session (bulk delete)");
+    }
+    const rawCreated = data.createdAt;
+    const createdAt =
+      rawCreated != null && typeof (rawCreated as { toDate?: () => Date }).toDate === "function"
+        ? (rawCreated as FirebaseFirestore.Timestamp)
+        : rawCreated instanceof Date
+          ? rawCreated
+          : new Date();
+    payloads.push({
+      workspaceId,
+      sessionId: sid,
+      type: normalizeIssueTypeForInsights(data.type),
+      createdAt,
+    });
+  }
+
+  await Promise.all(docs.map((d) => d.ref.delete()));
+
+  for (const p of payloads) {
+    try {
+      await decrementInsightsOnFeedbackDeleteRepo(p);
+      console.log("\u2705 INSIGHTS SYNC SUCCESS");
+    } catch (e) {
+      console.error("\u274c INSIGHTS SYNC FAILED", e);
+    }
+  }
+
+  return docs.length;
 }
 
 const OVERVIEW_PREVIEW_PER_RESOLVED_LIMIT = 3;

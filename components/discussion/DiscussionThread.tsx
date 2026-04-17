@@ -31,6 +31,7 @@ import {
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { getShareToken } from "@/lib/client/shareToken";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 
@@ -111,19 +112,24 @@ export function DiscussionThread({
         if (!res || !res.ok) throw new Error("Failed to load");
         return res.json();
       })
-      .then((data: { success?: boolean; ticket?: TicketData }) => {
+      .then((raw: unknown) => {
         if (cancelled) return;
-        const t = data.ticket;
-        setTicket(t ?? null);
-        if (t?.sessionId) {
+        const payload = requireApiSuccessData<{ ticket: TicketData }>(raw);
+        const t = payload.ticket;
+        setTicket(t);
+        if (t.sessionId) {
           authFetch(`/api/sessions/${t.sessionId}`)
             .then((r) => {
               if (!r || !r.ok) return null;
               return r.json();
             })
-            .then((d: { session?: { title?: string } } | null) => {
-              if (cancelled || !d) return;
-              if (d.session?.title) setSessionName(d.session.title);
+            .then((sessionRaw: unknown) => {
+              if (cancelled || sessionRaw === null) return;
+              const sessionPayload = requireApiSuccessData<{
+                session: { title?: string };
+              }>(sessionRaw);
+              const title = sessionPayload.session.title;
+              if (typeof title === "string" && title.trim()) setSessionName(title);
             })
             .catch(() => {});
         } else {

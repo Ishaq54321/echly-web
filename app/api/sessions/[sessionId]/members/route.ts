@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { apiSuccess, apiError } from "@/lib/server/apiResponse";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { listSessionMembers } from "@/lib/repositories/sessionMembersRepository.server";
+import { createActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -188,9 +189,29 @@ export async function PATCH(
       });
     }
 
+    const previousAccess =
+      snap.data()?.access === "resolve" || snap.data()?.access === "view"
+        ? snap.data()!.access
+        : "view";
+
     await ref.update({
       access,
     });
+
+    const workspaceId =
+      typeof context.session.workspaceId === "string"
+        ? context.session.workspaceId.trim()
+        : "";
+    const actorId = context.userId?.trim() ?? "";
+    if (workspaceId && actorId) {
+      await createActivityEvent({
+        workspaceId,
+        sessionId,
+        eventType: "session.member.role_changed",
+        actorId,
+        metadata: { previousAccess, newAccess: access },
+      });
+    }
 
     return apiSuccess({
       type: "member_updated",
@@ -312,6 +333,20 @@ export async function DELETE(
     }
 
     await ref.delete();
+
+    const workspaceId =
+      typeof context.session.workspaceId === "string"
+        ? context.session.workspaceId.trim()
+        : "";
+    const actorId = context.userId?.trim() ?? "";
+    if (workspaceId && actorId) {
+      await createActivityEvent({
+        workspaceId,
+        sessionId,
+        eventType: "session.member.removed",
+        actorId,
+      });
+    }
 
     return apiSuccess({
       type: "member_removed",
