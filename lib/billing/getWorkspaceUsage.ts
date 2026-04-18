@@ -14,7 +14,7 @@ export async function getWorkspaceUsage(workspaceId: string): Promise<WorkspaceU
   if (!workspace) return null;
 
   const sessionCount = await getWorkspaceSessionCountRepo(workspaceId, workspace);
-  const memberCount = Array.isArray(workspace.members) ? workspace.members.length : 0;
+  const memberCount = workspace.usage?.members ?? 0;
 
   return {
     sessionCount,

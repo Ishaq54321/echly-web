@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/workspace-invite-reminders",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/workspace-purge",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

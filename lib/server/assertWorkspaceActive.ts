@@ -1,10 +1,18 @@
-type WorkspaceLike = { billing?: { suspended?: boolean } } | null | undefined;
+type WorkspaceLike = {
+  billing?: { suspended?: boolean };
+  deletedAt?: { toMillis?: () => number } | null;
+} | null | undefined;
 
 /**
- * Throws if the workspace is suspended. Use after loading a workspace in API routes
- * so suspended workspaces cannot use any product functionality.
+ * Throws if the workspace is soft-deleted or suspended. Use after loading a workspace
+ * in API routes so deleted/suspended workspaces cannot use any product functionality.
  */
 export function assertWorkspaceActive(workspace: WorkspaceLike): void {
+  if (workspace?.deletedAt != null) {
+    const err = new Error("WORKSPACE_DELETED");
+    (err as Error & { status?: number }).status = 410;
+    throw err;
+  }
   if (workspace?.billing?.suspended === true) {
     const err = new Error("WORKSPACE_SUSPENDED");
     (err as Error & { status?: number }).status = 403;

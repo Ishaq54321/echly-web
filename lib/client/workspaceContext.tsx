@@ -15,11 +15,13 @@ import { authFetch, clearAuthTokenCache } from "@/lib/authFetch";
 import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
+import { listenToWorkspace } from "@/lib/repositories/workspacesRepository";
 import {
   clearWorkspaceHint,
   getWorkspaceHint,
   setWorkspaceHint,
 } from "@/lib/client/workspaceBootstrap";
+import type { Workspace } from "@/lib/domain/workspace";
 
 export type WorkspaceContextValue = {
   workspaceId: string | null;
@@ -45,6 +47,16 @@ export type WorkspaceContextValue = {
   authEmail: string | null;
   authDisplayName: string | null;
   authPhotoUrl: string | null;
+  /** Workspace display name from the workspace document. */
+  workspaceName: string | null;
+  /** Workspace logo URL from the workspace document. */
+  workspaceLogoUrl: string | null;
+  /** Workspace owner UID from the workspace document. */
+  workspaceOwnerId: string | null;
+  /** True when the signed-in user is the workspace owner. */
+  isWorkspaceOwner: boolean;
+  /** True when the workspace has been soft-deleted. */
+  isWorkspaceDeleted: boolean;
 };
 
 /** Throws if identity is not ready; use before destructive or workspace-scoped API calls. */
@@ -78,6 +90,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [authDisplayName, setAuthDisplayName] = useState<string | null>(null);
   const [authPhotoUrl, setAuthPhotoUrl] = useState<string | null>(null);
+  const [workspaceDoc, setWorkspaceDoc] = useState<Workspace | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,6 +219,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Subscribe to the workspace document for live name/logo/owner data
+  useEffect(() => {
+    if (!workspaceId || !claimsReady) {
+      setWorkspaceDoc(null);
+      return;
+    }
+    const unsub = listenToWorkspace(workspaceId, setWorkspaceDoc, claimsReady);
+    return () => unsub();
+  }, [workspaceId, claimsReady]);
+
   const isIdentityResolved = useMemo(
     () =>
       authReady &&
@@ -238,6 +261,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       authEmail,
       authDisplayName,
       authPhotoUrl,
+      // Derived from workspace document — zero additional Firestore reads
+      workspaceName: workspaceDoc?.name ?? null,
+      workspaceLogoUrl: workspaceDoc?.logoUrl ?? null,
+      workspaceOwnerId: workspaceDoc?.ownerId ?? null,
+      isWorkspaceOwner: !!authUid && !!workspaceDoc?.ownerId && authUid === workspaceDoc.ownerId,
+      isWorkspaceDeleted: workspaceDoc?.deletedAt != null,
     }),
     [
       workspaceId,
@@ -251,6 +280,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       authEmail,
       authDisplayName,
       authPhotoUrl,
+      workspaceDoc,
     ]
   );
 

@@ -51,6 +51,8 @@ function LoginPageContent() {
   const [password,setPassword]=useState("");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState<string|null>(null);
+  const [deletionBannerDismissed, setDeletionBannerDismissed] = useState(false);
+  const showDeletionBanner = searchParams.get("deleted") === "true" && !deletionBannerDismissed;
 
   const handleGoogle = async () => {
     setError(null);
@@ -194,6 +196,26 @@ function LoginPageContent() {
 
           {/* ===== Auth Card ===== */}
           <div className="max-w-[420px] mx-auto mt-10">
+
+            {showDeletionBanner && (
+              <div className="mb-4 rounded-xl px-4 py-3 bg-amber-50 border border-amber-200 flex items-start gap-3 text-left">
+                <span className="text-amber-600 mt-0.5 shrink-0">⚠</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-amber-900">
+                    Your workspace has been scheduled for deletion.
+                  </p>
+                  <p className="mt-0.5 text-xs text-amber-700">Contact support to cancel.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDeletionBannerDismissed(true)}
+                  className="shrink-0 text-amber-500 hover:text-amber-700"
+                  aria-label="Dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             <AuthCard>
 

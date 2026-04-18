@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import {
   requireAuth,
   toAuthorizationResponse,
@@ -8,6 +8,7 @@ import { corsHeaders } from "@/lib/server/cors";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { addWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { NextResponse } from "next/server";
@@ -146,6 +147,24 @@ export async function POST(req: NextRequest) {
     }
 
     await setWorkspaceClaim(user.uid, resolvedWid);
+
+    // WORKSPACE-MEMBER: owner added to subcollection on workspace creation
+    try {
+      const userSnap2 = await adminDb.doc(`users/${user.uid}`).get();
+      const userData = (userSnap2.data() ?? {}) as Record<string, unknown>;
+      await addWorkspaceMemberRepo(resolvedWid, {
+        uid: user.uid,
+        email: typeof userData.email === "string" ? userData.email : (user.email ?? ""),
+        displayName: typeof userData.displayName === "string" ? userData.displayName : null,
+        avatarUrl: typeof userData.avatarUrl === "string" ? userData.avatarUrl : null,
+        role: "OWNER",
+        joinedAt: Timestamp.now(),
+        invitedBy: null,
+      });
+    } catch (memberErr) {
+      console.error("POST /api/workspaces: failed to add owner to members subcollection", memberErr);
+    }
+
     return apiSuccess(
       { workspaceId: resolvedWid, userId: user.uid },
       null,

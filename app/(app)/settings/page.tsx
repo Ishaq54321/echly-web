@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState, Fragment } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Monitor,
@@ -10,6 +10,14 @@ import {
   Gem,
   Check,
   Minus,
+  UserPlus,
+  Trash2,
+  X,
+  Mail,
+  Clock,
+  RotateCcw,
+  AlertCircle,
+  Users,
 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { usePlanCatalog } from "@/lib/hooks/usePlanCatalog";
@@ -17,6 +25,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Switch } from "@/components/ui/Switch";
 import { Modal } from "@/components/ui/Modal";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import type { Workspace } from "@/lib/domain/workspace";
 import {
   assertIdentityResolved,
@@ -31,6 +40,7 @@ import {
   updateWorkspaceSettings,
 } from "@/lib/repositories/workspacesRepository";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
+import { authFetch } from "@/lib/authFetch";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
@@ -61,6 +71,7 @@ function SectionHeader({
 
 const TABS = [
   { id: "general", label: "General" },
+  { id: "members", label: "Members" },
   { id: "security", label: "Security" },
   { id: "integrations", label: "Integrations" },
   { id: "billing", label: "Billing" },
@@ -83,8 +94,8 @@ function SettingsPageInner() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab === "billing" && TABS.some((t) => t.id === "billing")) {
-      setActiveTab("billing");
+    if (tab && TABS.some((t) => t.id === tab)) {
+      setActiveTab(tab as TabId);
     }
   }, [searchParams]);
 
@@ -171,6 +182,9 @@ function SettingsPageInner() {
         </nav>
 
         {/* Tab content */}
+        {activeTab === "members" && (
+          <MembersTab workspaceId={workspaceId} loading={sectionLoading} />
+        )}
         <BillingUsageProvider>
           {activeTab === "general" && (
             <GeneralTab
@@ -180,7 +194,7 @@ function SettingsPageInner() {
               onNavigateToBilling={() => setActiveTab("billing")}
             />
           )}
-          {activeTab === "security" && <SecurityTab user={user} />}
+          {activeTab === "security" && <SecurityTab />}
           {activeTab === "integrations" && (
             <IntegrationsTab onNavigateToBilling={() => setActiveTab("billing")} />
           )}
@@ -260,6 +274,15 @@ function WorkspaceCard({
   const { isIdentityResolved } = useWorkspace();
   const [nameDraft, setNameDraft] = useState("");
   const lastWorkspaceIdRef = useRef<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoToast, setLogoToast] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLogoUrl(workspace?.logoUrl ?? null);
+  }, [workspace?.logoUrl]);
 
   useEffect(() => {
     if (workspaceId !== lastWorkspaceIdRef.current) {
@@ -271,12 +294,81 @@ function WorkspaceCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, workspace?.name]);
 
+  function showToast(msg: string) {
+    setLogoToast(msg);
+    setTimeout(() => setLogoToast(null), 3000);
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      showToast("Please use JPEG, PNG, or WebP");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("Image must be under 2MB");
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setLogoPreview(preview);
+    setUploadingLogo(true);
+
+    try {
+      const fd = new FormData();
+      fd.append("logo", file);
+      const res = await authFetch("/api/workspace/logo", { method: "POST", body: fd });
+      if (!res) { showToast("Upload failed. Try again."); return; }
+      const json = await res.json() as { success: boolean; data?: { logoUrl: string }; error?: { message: string } };
+      if (!res.ok || !json.success) {
+        const msg = json.error?.message;
+        if (msg === "FILE_TOO_LARGE") showToast("Image must be under 2MB");
+        else if (msg === "INVALID_FILE_TYPE") showToast("Please use JPEG, PNG, or WebP");
+        else showToast("Upload failed. Try again.");
+        return;
+      }
+      setLogoUrl(json.data?.logoUrl ?? null);
+      setLogoPreview(null);
+      showToast("Logo updated");
+    } catch {
+      showToast("Upload failed. Try again.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  async function handleRemoveLogo() {
+    setUploadingLogo(true);
+    try {
+      const res = await authFetch("/api/workspace/logo", { method: "DELETE" });
+      if (!res?.ok) { showToast("Failed to remove logo."); return; }
+      setLogoUrl(null);
+      setLogoPreview(null);
+      showToast("Logo removed");
+    } catch {
+      showToast("Failed to remove logo.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  const displayLogoUrl = logoPreview ?? logoUrl;
+  const workspaceInitial = (workspace?.name ?? "W").trim().charAt(0).toUpperCase();
+
   return (
     <Card className={SETTINGS_CARD} as="article">
       <SectionHeader
         title="Workspace"
         description="Name and logo for this workspace."
       />
+      {logoToast && (
+        <div className="mt-3 px-3 py-2 rounded-lg bg-neutral-900 text-white text-sm font-medium w-fit">
+          {logoToast}
+        </div>
+      )}
       <div className={`mt-4 pt-4 border-t border-[var(--border-default)] ${ROW_GAP}`}>
         <div className="flex flex-wrap items-start justify-between gap-4 py-1">
           <div className="min-w-0">
@@ -307,12 +399,47 @@ function WorkspaceCard({
             <p className={SETTING_DESC}>Shown in the sidebar and on shared pages.</p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <div className="w-12 h-12 rounded-full bg-neutral-100 border border-[var(--border-default)] flex items-center justify-center text-neutral-500 text-xs shrink-0 overflow-hidden">
-              Logo
+            <div className="relative w-12 h-12 rounded-lg bg-neutral-100 border border-[var(--border-default)] flex items-center justify-center text-neutral-500 text-xs shrink-0 overflow-hidden">
+              {uploadingLogo && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/70 z-10">
+                  <span className="w-4 h-4 rounded-full border-2 border-[#155DFC] border-t-transparent animate-spin" aria-hidden />
+                </div>
+              )}
+              {displayLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={displayLogoUrl} alt="Workspace logo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-lg font-bold text-neutral-400">{workspaceInitial}</span>
+              )}
             </div>
-            <Button variant="secondary" className={BTN_SECONDARY}>
-              Upload
-            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleFileChange}
+              aria-label="Upload workspace logo"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                className={BTN_SECONDARY}
+                disabled={uploadingLogo || loading || !workspaceId}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {displayLogoUrl ? "Change" : "Upload logo"}
+              </Button>
+              {displayLogoUrl && (
+                <Button
+                  variant="secondary"
+                  className={`${BTN_SECONDARY} text-red-600 border-red-200 hover:bg-red-50`}
+                  disabled={uploadingLogo || loading || !workspaceId}
+                  onClick={handleRemoveLogo}
+                >
+                  Remove
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -645,6 +772,546 @@ function AdvancedSettingsCard({
   );
 }
 
+/* ——— Members tab ——— */
+type SerializedTs = { seconds: number; nanoseconds: number };
+
+type SerializedMember = {
+  uid: string;
+  email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  role: "OWNER" | "MEMBER";
+  joinedAt: SerializedTs;
+  invitedBy: string | null;
+};
+
+type SerializedInvitation = {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: "OWNER" | "MEMBER";
+  status: "pending" | "accepted" | "revoked" | "expired";
+  invitedBy: string;
+  invitedByName: string;
+  workspaceName: string;
+  expiresAt: SerializedTs;
+  createdAt: SerializedTs;
+};
+
+function formatTs(ts: SerializedTs): string {
+  return new Date(ts.seconds * 1000).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatJoinedAt(ts: SerializedTs): string {
+  return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(
+    new Date(ts.seconds * 1000)
+  );
+}
+
+function daysUntil(ts: SerializedTs): number {
+  return Math.ceil((ts.seconds * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+const AVATAR_COLORS = [
+  "bg-blue-500",
+  "bg-violet-500",
+  "bg-emerald-500",
+  "bg-amber-500",
+  "bg-rose-500",
+  "bg-cyan-500",
+];
+
+function nameToColorClass(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]!;
+}
+
+function MemberRow({
+  member,
+  isOwnerCaller,
+  removing,
+  onRemove,
+}: {
+  member: SerializedMember;
+  isOwnerCaller: boolean;
+  removing: boolean;
+  onRemove: () => void;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const canRemove = isOwnerCaller && member.role !== "OWNER";
+  const displayName = member.displayName ?? member.email;
+  const colorClass = nameToColorClass(displayName);
+
+  return (
+    <>
+      <div
+        className="flex items-center gap-3 py-4 first:pt-0 last:pb-0 rounded-lg px-2 -mx-2 transition-colors duration-150"
+        style={{ backgroundColor: hovered ? "var(--color-bg-subtle, #f9fafb)" : undefined }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {member.avatarUrl ? (
+          <UserAvatar
+            image={member.avatarUrl}
+            name={displayName}
+            className="h-9 w-9 shrink-0"
+          />
+        ) : (
+          <span
+            className={`h-9 w-9 shrink-0 flex items-center justify-center rounded-full text-white text-sm font-semibold select-none ${colorClass}`}
+          >
+            {displayName.charAt(0).toUpperCase()}
+          </span>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-medium text-neutral-900 truncate">{displayName}</p>
+          <p className="text-[13px] text-neutral-500 truncate">
+            {member.email}
+            {member.joinedAt && (
+              <span className="text-neutral-400"> · Joined {formatJoinedAt(member.joinedAt)}</span>
+            )}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${
+            member.role === "OWNER"
+              ? "bg-violet-50 text-violet-700"
+              : "bg-neutral-100 text-neutral-600"
+          }`}
+        >
+          {member.role === "OWNER" ? "Owner" : "Member"}
+        </span>
+        {canRemove && (
+          <button
+            type="button"
+            onClick={() => setConfirmOpen(true)}
+            disabled={removing}
+            title={`Remove ${displayName}`}
+            className={`shrink-0 ml-1 p-1.5 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 ${
+              hovered ? "opacity-100" : "opacity-0"
+            }`}
+            aria-label={`Remove ${displayName}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)} role="alertdialog" ariaLabelledBy="remove-member-title">
+        <div className="p-6 max-w-sm">
+          <h3 id="remove-member-title" className="text-base font-semibold text-neutral-900">
+            Remove {displayName}?
+          </h3>
+          <p className="mt-2 text-sm text-neutral-600">
+            They will lose access to this workspace immediately.
+          </p>
+          <div className="mt-5 flex gap-3 justify-end">
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(false)}
+              className="px-4 py-2 text-sm font-medium rounded-lg text-neutral-700 hover:bg-neutral-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={removing}
+              onClick={() => { setConfirmOpen(false); onRemove(); }}
+              className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-60"
+            >
+              {removing ? "Removing…" : "Remove"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+function InvitationRow({
+  invitation,
+  revoking,
+  onRevoke,
+  onResend,
+  resending,
+}: {
+  invitation: SerializedInvitation;
+  revoking: boolean;
+  onRevoke: () => void;
+  onResend: () => void;
+  resending: boolean;
+}) {
+  const days = daysUntil(invitation.expiresAt);
+  const expiryClass =
+    days < 2
+      ? "text-red-600"
+      : days < 7
+      ? "text-amber-600"
+      : "text-neutral-400";
+  const expiryLabel =
+    days <= 0
+      ? "Expires today"
+      : days === 1
+      ? "Expires in 1 day"
+      : `Expires in ${days} days`;
+
+  return (
+    <div className="flex items-center gap-3 py-4 first:pt-0 last:pb-0">
+      <span className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-neutral-100">
+        <Mail className="h-4 w-4 text-neutral-500" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[15px] font-medium text-neutral-900 truncate">{invitation.email}</p>
+        <p className="text-[13px] text-neutral-500">
+          Invited by {invitation.invitedByName}
+          <span className={`ml-2 ${expiryClass}`}>{expiryLabel}</span>
+        </p>
+      </div>
+      <span className="shrink-0 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+        <Clock className="h-3 w-3" aria-hidden />
+        Pending
+      </span>
+      <button
+        type="button"
+        onClick={onResend}
+        disabled={resending || revoking}
+        title="Resend invitation"
+        className="shrink-0 p-1.5 rounded-md text-neutral-400 hover:text-blue-500 hover:bg-blue-50 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+        aria-label={`Resend invitation for ${invitation.email}`}
+      >
+        <RotateCcw className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={onRevoke}
+        disabled={revoking || resending}
+        title="Revoke invitation"
+        className="shrink-0 p-1.5 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+        aria-label={`Revoke invitation for ${invitation.email}`}
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function InviteMemberModal({
+  onClose,
+  onInviteSent,
+}: {
+  onClose: () => void;
+  onInviteSent: (inv: SerializedInvitation) => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(trimmed)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await authFetch("/api/workspace/members/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed, role: "MEMBER" }),
+      });
+      if (!res) { setError("Request failed. Try again."); return; }
+      const json = await res.json() as { success: boolean; data?: { invitation: SerializedInvitation }; error?: { message: string } };
+      if (!res.ok || !json.success) {
+        const msg = json.error?.message;
+        if (msg === "ALREADY_MEMBER") setError("This person is already a member.");
+        else if (msg === "INVITE_ALREADY_SENT") setError("An invitation has already been sent to this email.");
+        else setError("Failed to send invitation. Try again.");
+        return;
+      }
+      if (json.data?.invitation) onInviteSent(json.data.invitation);
+    } catch {
+      setError("Failed to send invitation. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="invite-modal-title"
+    >
+      <div
+        className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="invite-modal-title" className="text-[20px] font-semibold text-neutral-900">
+          Invite a team member
+        </h2>
+        <p className="mt-1 text-sm text-neutral-600">
+          They'll receive an email with a link to join your workspace.
+        </p>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <div>
+            <label htmlFor="invite-email-settings" className="sr-only">Email address</label>
+            <input
+              id="invite-email-settings"
+              type="email"
+              placeholder="email@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              autoFocus
+            />
+            {error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-neutral-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60"
+            >
+              {submitting ? "Sending…" : "Send Invite"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function MemberSkeletonRow() {
+  return (
+    <div className="flex items-center gap-3 py-4 animate-pulse">
+      <div className="h-9 w-9 rounded-full bg-neutral-200 shrink-0" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="h-3.5 bg-neutral-200 rounded w-32" />
+        <div className="h-3 bg-neutral-100 rounded w-48" />
+      </div>
+      <div className="h-5 bg-neutral-100 rounded-full w-16 shrink-0" />
+    </div>
+  );
+}
+
+function MembersTab({
+  workspaceId,
+  loading,
+}: {
+  workspaceId: string | null;
+  loading: boolean;
+}) {
+  const { isWorkspaceOwner } = useWorkspace();
+  const [members, setMembers] = useState<SerializedMember[]>([]);
+  const [invitations, setInvitations] = useState<SerializedInvitation[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [membersError, setMembersError] = useState(false);
+  const [invitesLoading, setInvitesLoading] = useState(true);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [removingUid, setRemovingUid] = useState<string | null>(null);
+  const [revokingToken, setRevokingToken] = useState<string | null>(null);
+  const [resendingToken, setResendingToken] = useState<string | null>(null);
+
+  const fetchMembers = useCallback(() => {
+    if (!workspaceId) return;
+    setMembersLoading(true);
+    setMembersError(false);
+    authFetch("/api/workspace/members")
+      .then(async (res) => {
+        if (!res?.ok) { setMembersError(true); return; }
+        const json = await res.json() as { success: boolean; data?: { members: SerializedMember[] } };
+        if (json.success && json.data) setMembers(json.data.members);
+        else setMembersError(true);
+      })
+      .catch(() => setMembersError(true))
+      .finally(() => setMembersLoading(false));
+  }, [workspaceId]);
+
+  useEffect(() => { fetchMembers(); }, [fetchMembers]);
+
+  useEffect(() => {
+    if (!workspaceId || !isWorkspaceOwner) { setInvitesLoading(false); return; }
+    setInvitesLoading(true);
+    authFetch("/api/workspace/members/invitations")
+      .then(async (res) => {
+        if (!res?.ok) return;
+        const json = await res.json() as { success: boolean; data?: { invitations: SerializedInvitation[] } };
+        if (json.success && json.data) setInvitations(json.data.invitations);
+      })
+      .catch(console.error)
+      .finally(() => setInvitesLoading(false));
+  }, [workspaceId, isWorkspaceOwner]);
+
+  async function handleRemoveMember(uid: string) {
+    setRemovingUid(uid);
+    try {
+      const res = await authFetch(`/api/workspace/members/${uid}`, { method: "DELETE" });
+      if (res?.ok) setMembers((prev) => prev.filter((m) => m.uid !== uid));
+    } catch (err) {
+      console.error("Failed to remove member:", err);
+    } finally {
+      setRemovingUid(null);
+    }
+  }
+
+  async function handleRevokeInvitation(token: string) {
+    setRevokingToken(token);
+    try {
+      const res = await authFetch(`/api/workspace/members/invitations/${token}`, { method: "DELETE" });
+      if (res?.ok) setInvitations((prev) => prev.filter((i) => i.id !== token));
+    } catch (err) {
+      console.error("Failed to revoke invitation:", err);
+    } finally {
+      setRevokingToken(null);
+    }
+  }
+
+  async function handleResendInvitation(token: string) {
+    setResendingToken(token);
+    try {
+      await authFetch(`/api/workspace/members/invitations/${token}/resend`, { method: "POST" });
+    } catch (err) {
+      console.error("Failed to resend invitation:", err);
+    } finally {
+      setResendingToken(null);
+    }
+  }
+
+  function handleInviteSent(inv: SerializedInvitation) {
+    setInvitations((prev) => [inv, ...prev]);
+    setInviteModalOpen(false);
+  }
+
+  if (loading || membersLoading) {
+    return (
+      <div className={`${CARD_GAP} pb-16`}>
+        <Card className={SETTINGS_CARD} as="article">
+          <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+            <div className="h-6 bg-neutral-200 rounded w-32 animate-pulse" />
+            <div className="h-9 bg-neutral-100 rounded-lg w-28 animate-pulse" />
+          </div>
+          <div className="pt-4 border-t border-[var(--border-default)] divide-y divide-[var(--border-default)]">
+            {[0, 1, 2].map((i) => <MemberSkeletonRow key={i} />)}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (membersError) {
+    return (
+      <div className={`${CARD_GAP} pb-16`}>
+        <Card className={SETTINGS_CARD} as="article">
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <AlertCircle className="h-8 w-8 text-neutral-400" />
+            <p className="text-sm font-medium text-neutral-700">Couldn&apos;t load members</p>
+            <button
+              type="button"
+              onClick={fetchMembers}
+              className={BTN_SECONDARY}
+            >
+              Try again
+            </button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${CARD_GAP} pb-16 ech-content-enter`}>
+      <Card className={SETTINGS_CARD} as="article">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <SectionHeader
+            title="Team Members"
+            description={`${members.length} member${members.length !== 1 ? "s" : ""} in this workspace.`}
+          />
+          {isWorkspaceOwner && (
+            <button
+              type="button"
+              onClick={() => setInviteModalOpen(true)}
+              className={`${BTN_PRIMARY} flex items-center gap-2 shrink-0`}
+            >
+              <UserPlus className="h-4 w-4" aria-hidden />
+              Invite member
+            </button>
+          )}
+        </div>
+        <div className="mt-4 pt-4 border-t border-[var(--border-default)] divide-y divide-[var(--border-default)]">
+          {members.length === 0 ? (
+            <div className="py-10 flex flex-col items-center gap-2 text-neutral-500">
+              <Users className="h-8 w-8 text-neutral-300" />
+              <p className="text-sm">No members found.</p>
+            </div>
+          ) : (
+            members.map((member) => (
+              <MemberRow
+                key={member.uid}
+                member={member}
+                isOwnerCaller={isWorkspaceOwner}
+                removing={removingUid === member.uid}
+                onRemove={() => handleRemoveMember(member.uid)}
+              />
+            ))
+          )}
+        </div>
+      </Card>
+
+      {isWorkspaceOwner && invitations.length > 0 && (
+        <Card className={SETTINGS_CARD} as="article">
+          <SectionHeader
+            title="Pending Invitations"
+            description="Invitations waiting to be accepted."
+          />
+          <div className="mt-4 pt-4 border-t border-[var(--border-default)] divide-y divide-[var(--border-default)]">
+            {invitesLoading ? (
+              <div className="py-8 flex justify-center">
+                <MinimalLoader label="Loading invitations…" />
+              </div>
+            ) : (
+              invitations.map((inv) => (
+                <InvitationRow
+                  key={inv.id}
+                  invitation={inv}
+                  revoking={revokingToken === inv.id}
+                  onRevoke={() => handleRevokeInvitation(inv.id)}
+                  onResend={() => handleResendInvitation(inv.id)}
+                  resending={resendingToken === inv.id}
+                />
+              ))
+            )}
+          </div>
+        </Card>
+      )}
+
+      {inviteModalOpen && (
+        <InviteMemberModal
+          onClose={() => setInviteModalOpen(false)}
+          onInviteSent={handleInviteSent}
+        />
+      )}
+    </div>
+  );
+}
+
 /* ——— Security tab ——— */
 type SessionRow = {
   id: string;
@@ -655,7 +1322,9 @@ type SessionRow = {
   icon: typeof Laptop;
 };
 
-function SecurityTab({ user }: { user: { email: string | null } | null }) {
+function SecurityTab() {
+  const router = useRouter();
+  const { isWorkspaceOwner, workspaceName } = useWorkspace();
   const sessions = useMemo<SessionRow[]>(
     () => [
       { id: "1", device: "MacBook Pro", browser: "Chrome", location: "San Francisco, US", current: true, icon: Laptop },
@@ -663,11 +1332,118 @@ function SecurityTab({ user }: { user: { email: string | null } | null }) {
     ],
     []
   );
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Transfer ownership state
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferMembers, setTransferMembers] = useState<SerializedMember[]>([]);
+  const [transferMembersLoading, setTransferMembersLoading] = useState(false);
+  const [selectedNewOwnerUid, setSelectedNewOwnerUid] = useState("");
+  const [transferConfirmName, setTransferConfirmName] = useState("");
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferSuccess, setTransferSuccess] = useState(false);
+  const transferConfirmInputRef = useRef<HTMLInputElement>(null);
+
+  // Delete workspace state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteConfirmInputRef = useRef<HTMLInputElement>(null);
+
+  function openTransferModal() {
+    setTransferModalOpen(true);
+    setSelectedNewOwnerUid("");
+    setTransferConfirmName("");
+    setTransferError(null);
+    setTransferMembersLoading(true);
+    authFetch("/api/workspace/members")
+      .then(async (res) => {
+        if (!res?.ok) return;
+        const json = await res.json() as { success: boolean; data?: { members: SerializedMember[] } };
+        if (json.success && json.data) {
+          setTransferMembers(json.data.members.filter((m) => m.role !== "OWNER"));
+        }
+      })
+      .catch(console.error)
+      .finally(() => setTransferMembersLoading(false));
+  }
+
+  async function handleTransferSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedNewOwnerUid) { setTransferError("Select a member to transfer ownership to."); return; }
+    if (transferConfirmName !== workspaceName) { setTransferError("Workspace name does not match."); return; }
+    setTransferError(null);
+    setTransferSubmitting(true);
+    try {
+      const res = await authFetch("/api/workspace/ownership", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newOwnerUid: selectedNewOwnerUid, confirmName: transferConfirmName }),
+      });
+      if (!res) { setTransferError("Request failed. Try again."); return; }
+      const json = await res.json() as { success: boolean; error?: { message: string } };
+      if (!res.ok || !json.success) {
+        setTransferError(json.error?.message ?? "Transfer failed. Try again.");
+        return;
+      }
+      setTransferModalOpen(false);
+      setTransferSuccess(true);
+      setTimeout(() => setTransferSuccess(false), 5000);
+      router.refresh();
+    } catch {
+      setTransferError("Transfer failed. Try again.");
+    } finally {
+      setTransferSubmitting(false);
+    }
+  }
+
+  async function handleDeleteSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (deleteConfirmName !== workspaceName) { setDeleteError("Workspace name does not match."); return; }
+    setDeleteError(null);
+    setDeleteSubmitting(true);
+    try {
+      const res = await authFetch("/api/workspace", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmName: deleteConfirmName }),
+      });
+      if (!res) { setDeleteError("Request failed. Try again."); return; }
+      const json = await res.json() as { success: boolean; error?: { message: string } };
+      if (!res.ok || !json.success) {
+        setDeleteError(json.error?.message ?? "Delete failed. Try again.");
+        return;
+      }
+      // Sign out and redirect
+      const { auth } = await import("@/lib/firebase");
+      const { signOut } = await import("firebase/auth");
+      await signOut(auth).catch(() => void 0);
+      router.push("/login?deleted=true");
+    } catch {
+      setDeleteError("Delete failed. Try again.");
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  }
+
+  // Auto-focus confirm inputs when modals open
+  useEffect(() => {
+    if (transferModalOpen) setTimeout(() => transferConfirmInputRef.current?.focus(), 50);
+  }, [transferModalOpen]);
+
+  useEffect(() => {
+    if (deleteModalOpen) setTimeout(() => deleteConfirmInputRef.current?.focus(), 50);
+  }, [deleteModalOpen]);
 
   return (
     <div className={CARD_GAP}>
+      {transferSuccess && (
+        <div className="rounded-xl px-4 py-3 bg-blue-50 border border-blue-200 text-sm font-medium text-blue-800">
+          You are now a member of this workspace.
+        </div>
+      )}
       <Card className={SETTINGS_CARD} as="article">
         <SectionHeader
           title="Password & Authentication"
@@ -727,68 +1503,200 @@ function SecurityTab({ user }: { user: { email: string | null } | null }) {
         </div>
       </Card>
 
-      {/* Collapsible Advanced Security Settings */}
-      <Card className={SETTINGS_CARD} as="article">
+      {/* Collapsible Danger Zone */}
+      <Card className={`${SETTINGS_CARD} border-red-100`} as="article" style={{ background: "rgba(254,242,242,0.35)" }}>
         <button
           type="button"
           onClick={() => setAdvancedOpen(!advancedOpen)}
           className="w-full flex items-center justify-between gap-3 text-left rounded-lg py-2 -my-2 px-2 -mx-2 hover:bg-neutral-50/80 transition-colors duration-200"
           aria-expanded={advancedOpen}
         >
-          <span className={SECTION_TITLE}>Advanced Security Settings</span>
+          <span className={SECTION_TITLE}>Danger Zone</span>
           <span className="text-neutral-500 shrink-0" aria-hidden>
             {advancedOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </span>
         </button>
         <div
           className="overflow-hidden transition-[max-height] duration-300 ease-out"
-          style={{ maxHeight: advancedOpen ? 400 : 0 }}
+          style={{ maxHeight: advancedOpen ? 500 : 0 }}
         >
-          <div className="mt-4 pt-4 border-t border-[var(--border-default)] space-y-6">
-            <div>
-              <h2 className="text-[18px] font-semibold text-neutral-900">Irreversible Or High Impact Actions</h2>
-              <p className="mt-1 text-[14px] text-neutral-600">Proceed With Caution</p>
-            </div>
-            <div className="space-y-5">
+          <div className="mt-4 pt-4 border-t border-[var(--border-default)] space-y-5">
+            {isWorkspaceOwner && (
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>
                   <p className="text-[15px] font-medium text-neutral-900">Transfer Workspace Ownership</p>
                   <p className={SETTING_DESC}>Assign another member as the workspace owner.</p>
                 </div>
-                <Button variant="secondary" className={`${BTN_SECONDARY} shrink-0`}>
+                <button
+                  type="button"
+                  onClick={openTransferModal}
+                  className="rounded-[8px] px-4 py-2.5 text-sm font-semibold shrink-0 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all duration-200"
+                >
                   Transfer
-                </Button>
+                </button>
               </div>
+            )}
+            {isWorkspaceOwner && (
               <div className="flex items-center justify-between gap-4 flex-wrap pt-5 border-t border-[var(--border-default)]">
                 <div>
                   <p className="text-[15px] font-semibold text-neutral-900">Delete Workspace</p>
                   <p className={SETTING_DESC}>Permanently delete this workspace and all its data. This cannot be undone.</p>
                 </div>
-                <Button
-                  variant="danger"
+                <button
+                  type="button"
                   className="rounded-[8px] px-4 py-2.5 text-sm font-semibold shrink-0 bg-red-600 text-white hover:bg-red-700 hover:shadow-[0_2px_8px_rgba(220,38,38,0.35)] transition-all duration-200"
-                  onClick={() => setDeleteModalOpen(true)}
+                  onClick={() => { setDeleteConfirmName(""); setDeleteError(null); setDeleteModalOpen(true); }}
                 >
                   Delete Workspace
-                </Button>
+                </button>
               </div>
-            </div>
+            )}
+            {!isWorkspaceOwner && (
+              <p className="text-sm text-neutral-500 py-2">Only the workspace owner can perform these actions.</p>
+            )}
           </div>
         </div>
       </Card>
 
-      <Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} role="alertdialog" ariaLabelledBy="delete-workspace-title">
-        <div className="p-6 max-w-md">
-          <h3 id="delete-workspace-title" className="text-lg font-semibold text-neutral-900">Delete workspace?</h3>
-          <p className="mt-2 text-sm text-neutral-600">
-            This will permanently delete the workspace and all associated data. This action cannot be undone.
-          </p>
-          <div className="mt-6 flex gap-3 justify-end">
-            <Button variant="ghost" onClick={() => setDeleteModalOpen(false)}>Cancel</Button>
-            <Button variant="danger" onClick={() => setDeleteModalOpen(false)}>Delete workspace</Button>
+      {/* Transfer ownership modal */}
+      {transferModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          onClick={() => setTransferModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="transfer-modal-title"
+        >
+          <div
+            className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="transfer-modal-title" className="text-[20px] font-semibold text-neutral-900">
+              Transfer Ownership
+            </h3>
+            <p className="mt-1 text-sm text-neutral-600">
+              You will become a regular member after this action.
+            </p>
+            <form onSubmit={handleTransferSubmit} className="mt-4 space-y-4">
+              <div>
+                <label htmlFor="transfer-new-owner" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Transfer to
+                </label>
+                {transferMembersLoading ? (
+                  <p className="text-sm text-neutral-500">Loading members…</p>
+                ) : transferMembers.length === 0 ? (
+                  <p className="text-sm text-neutral-500">No other members to transfer to. Invite a member first.</p>
+                ) : (
+                  <select
+                    id="transfer-new-owner"
+                    value={selectedNewOwnerUid}
+                    onChange={(e) => setSelectedNewOwnerUid(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select a member…</option>
+                    {transferMembers.map((m) => (
+                      <option key={m.uid} value={m.uid}>
+                        {m.displayName ? `${m.displayName} (${m.email})` : m.email}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div>
+                <label htmlFor="transfer-confirm-name" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Type <strong>{workspaceName}</strong> to confirm
+                </label>
+                <input
+                  ref={transferConfirmInputRef}
+                  id="transfer-confirm-name"
+                  type="text"
+                  placeholder={workspaceName ?? ""}
+                  value={transferConfirmName}
+                  onChange={(e) => setTransferConfirmName(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {transferError && <p className="mt-1.5 text-sm text-red-600">{transferError}</p>}
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setTransferModalOpen(false)}
+                  className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-neutral-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={transferSubmitting || transferMembers.length === 0}
+                  className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60"
+                >
+                  {transferSubmitting ? "Transferring…" : "Transfer Ownership"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </Modal>
+      )}
+
+      {/* Delete workspace modal */}
+      {deleteModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          onClick={() => setDeleteModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-workspace-title"
+        >
+          <div
+            className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="delete-workspace-title" className="text-[20px] font-semibold text-neutral-900">
+              Delete workspace?
+            </h3>
+            <p className="mt-2 text-sm text-neutral-600">
+              This will schedule permanent deletion in 30 days. All sessions, feedback, and members will be removed.
+            </p>
+            <form onSubmit={handleDeleteSubmit} className="mt-4 space-y-3">
+              <div>
+                <label htmlFor="delete-confirm-name" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Type <strong>{workspaceName}</strong> to confirm
+                </label>
+                <input
+                  ref={deleteConfirmInputRef}
+                  id="delete-confirm-name"
+                  type="text"
+                  placeholder={workspaceName ?? ""}
+                  value={deleteConfirmName}
+                  onChange={(e) => setDeleteConfirmName(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                />
+                {deleteError && <p className="mt-1.5 text-sm text-red-600">{deleteError}</p>}
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalOpen(false)}
+                  className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-neutral-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={deleteSubmitting || deleteConfirmName !== workspaceName}
+                  className={`px-4 py-2.5 text-sm font-semibold rounded-xl transition disabled:cursor-not-allowed ${
+                    deleteConfirmName === workspaceName
+                      ? "bg-red-600 text-white hover:bg-red-700"
+                      : "bg-neutral-200 text-neutral-400 disabled:opacity-100"
+                  }`}
+                >
+                  {deleteSubmitting ? "Deleting…" : "Schedule Deletion"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

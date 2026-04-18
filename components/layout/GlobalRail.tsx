@@ -13,9 +13,11 @@ import {
   UserPlus,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronDown,
 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
-import { UserAvatar } from "@/components/ui/UserAvatar";
+import { useWorkspace } from "@/lib/client/workspaceContext";
+import { authFetch } from "@/lib/authFetch";
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
   return classes.filter(Boolean).join(" ");
@@ -43,20 +45,33 @@ function isActive(href: string, pathname: string): boolean {
   return pathname === href || (href !== "/dashboard" && pathname.startsWith(href + "/"));
 }
 
-const WORKSPACE_NAME = "My Workspace";
-
 const RAIL_ICON_CLASS = "h-[22px] w-[22px] shrink-0 text-current" as const;
 const RAIL_ICON_STROKE = 2.2 as const;
+
+function WorkspaceInitialsAvatar({ name }: { name: string }) {
+  const initial = name.trim().charAt(0).toUpperCase() || "W";
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-sm font-semibold select-none">
+      {initial}
+    </span>
+  );
+}
 
 export default function GlobalRail() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuthGuard({ router });
+  useAuthGuard({ router });
+  // WORKSPACE-MEMBER: replaced hardcoded string with live data
+  const { workspaceName, workspaceLogoUrl, isWorkspaceOwner } = useWorkspace();
+  const displayName = workspaceName ?? "Workspace";
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [workspacePopoverOpen, setWorkspacePopoverOpen] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSent, setInviteSent] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,8 +89,15 @@ export default function GlobalRail() {
         setWorkspacePopoverOpen(false);
       }
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setWorkspacePopoverOpen(false);
+    };
     document.addEventListener("click", onDocClick);
-    return () => document.removeEventListener("click", onDocClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [workspacePopoverOpen]);
 
   return (
@@ -188,36 +210,52 @@ export default function GlobalRail() {
               onClick={() => setWorkspacePopoverOpen((v) => !v)}
               className={cn(
                 "flex items-center rounded-md transition-colors duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
-                "text-neutral-800 hover:text-neutral-900",
+                "text-neutral-800 hover:text-neutral-900 hover:bg-neutral-100",
                 isCollapsed
                   ? "justify-center w-10 h-10"
-                  : "justify-start gap-3 px-3 py-2 w-full"
+                  : "justify-start gap-2 px-3 py-2 w-full"
               )}
-              aria-label="Invite teammate"
+              aria-label="Workspace menu"
               aria-expanded={workspacePopoverOpen}
             >
-              <UserPlus
-                className={RAIL_ICON_CLASS}
-                strokeWidth={RAIL_ICON_STROKE}
-              />
+              {workspaceLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={workspaceLogoUrl}
+                  alt={displayName}
+                  className="h-7 w-7 rounded-md object-cover border border-neutral-200 shrink-0"
+                />
+              ) : (
+                <WorkspaceInitialsAvatar name={displayName} />
+              )}
               <span
                 className={cn(
-                  "text-[15px] font-semibold text-current whitespace-nowrap",
+                  "flex-1 min-w-0 text-[13px] font-medium text-current truncate",
                   "transition-[opacity,transform] duration-200 ease-out",
                   isCollapsed
                     ? "opacity-0 translate-x-[-6px] w-0 overflow-hidden"
                     : "opacity-100 translate-x-0"
                 )}
+                style={{ maxWidth: "120px" }}
               >
-                Invite
+                {displayName}
               </span>
+              {!isCollapsed && (
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-neutral-500 transition-transform duration-200",
+                    workspacePopoverOpen ? "rotate-180" : ""
+                  )}
+                  aria-hidden
+                />
+              )}
             </button>
             {isCollapsed ? (
               <span
                 className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-neutral-800 rounded-md bg-white border border-neutral-200 shadow-[0_1px_2px_rgba(0,0,0,0.06)] opacity-0 pointer-events-none z-10 transition-opacity duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:opacity-100 group-focus-within:opacity-100"
                 role="tooltip"
               >
-                Invite teammate
+                {displayName}
               </span>
             ) : null}
           </div>
@@ -298,37 +336,50 @@ export default function GlobalRail() {
           aria-label="Workspace"
         >
           <div className="flex items-center gap-3 mb-3">
-            <UserAvatar
-              image={(user as { image?: string | null } | null)?.image}
-              photoURL={user?.photoURL}
-              name={
-                user?.displayName?.trim() ||
-                user?.email?.split("@")[0] ||
-                undefined
-              }
-              className="h-10 w-10 rounded-full border border-neutral-200"
-            />
+            {workspaceLogoUrl ? (
+              <img
+                src={workspaceLogoUrl}
+                alt={displayName}
+                className="h-8 w-8 rounded-full object-cover border border-neutral-200 shrink-0"
+              />
+            ) : (
+              <WorkspaceInitialsAvatar name={displayName} />
+            )}
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-neutral-900 truncate">
-                {WORKSPACE_NAME}
+                {displayName}
               </p>
-              <p className="text-xs text-neutral-800">1 member</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setWorkspacePopoverOpen(false);
-              setInviteModalOpen(true);
-            }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium text-neutral-900 bg-neutral-50 hover:bg-blue-50 hover:text-blue-600 transition"
-          >
-            <UserPlus
-              className={RAIL_ICON_CLASS}
-              strokeWidth={RAIL_ICON_STROKE}
-            />
-            Invite teammates
-          </button>
+          <div className="flex flex-col gap-1">
+            <a
+              href="/settings?tab=general"
+              onClick={() => setWorkspacePopoverOpen(false)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition"
+            >
+              Workspace settings
+            </a>
+            <a
+              href="/settings?tab=members"
+              onClick={() => setWorkspacePopoverOpen(false)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition"
+            >
+              Members
+            </a>
+            {isWorkspaceOwner && (
+              <button
+                type="button"
+                onClick={() => {
+                  setWorkspacePopoverOpen(false);
+                  setInviteModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-neutral-700 hover:bg-blue-50 hover:text-blue-600 transition text-left"
+              >
+                <UserPlus className="h-4 w-4 shrink-0" strokeWidth={2} />
+                Invite teammate
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -364,24 +415,52 @@ export default function GlobalRail() {
               onChange={(e) => setInviteEmail(e.target.value)}
               className="mt-4 w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+            {inviteError && (
+              <p className="mt-2 text-sm text-red-600">{inviteError}</p>
+            )}
+            {inviteSent && (
+              <p className="mt-2 text-sm text-green-600">Invitation sent!</p>
+            )}
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setInviteModalOpen(false)}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl text-secondary hover:bg-neutral-100 transition"
+                onClick={() => { setInviteModalOpen(false); setInviteEmail(""); setInviteError(null); setInviteSent(false); }}
+                className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-neutral-100 transition"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  // Placeholder: send invite
-                  setInviteModalOpen(false);
-                  setInviteEmail("");
+                disabled={inviteSubmitting || !inviteEmail.trim()}
+                onClick={async () => {
+                  const email = inviteEmail.trim().toLowerCase();
+                  if (!email) return;
+                  setInviteError(null);
+                  setInviteSent(false);
+                  setInviteSubmitting(true);
+                  try {
+                    const res = await authFetch("/api/workspace/members/invite", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ email, role: "MEMBER" }),
+                    });
+                    if (!res?.ok) {
+                      const json = await res?.json() as { error?: { message: string } } | undefined;
+                      setInviteError(json?.error?.message ?? "Failed to send invite.");
+                    } else {
+                      setInviteSent(true);
+                      setInviteEmail("");
+                      setTimeout(() => { setInviteModalOpen(false); setInviteSent(false); }, 1500);
+                    }
+                  } catch {
+                    setInviteError("Failed to send invite.");
+                  } finally {
+                    setInviteSubmitting(false);
+                  }
                 }}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
+                className="px-4 py-2.5 text-sm font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60"
               >
-                Send Invites
+                {inviteSubmitting ? "Sending…" : "Send Invite"}
               </button>
             </div>
           </div>

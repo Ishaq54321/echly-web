@@ -15,6 +15,7 @@ import { getShareLinkByToken } from "@/lib/repositories/shareLinksRepository";
 import { getInviteByEmail, getSessionMember } from "@/lib/repositories/sessionMembersRepository.server";
 import { getRequestByUser } from "@/lib/repositories/accessRequestsRepository.server";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import { getWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import { AuthorizationError } from "@/lib/server/auth/authorize";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import type { SessionUser } from "@/lib/server/session";
@@ -359,17 +360,31 @@ export async function getAccessContext(options: {
     return result;
   }
 
-  const isWorkspaceMember =
+  const isWorkspaceMemberByWorkspaceId =
     Boolean(user.uid) &&
     Boolean(userWorkspaceId) &&
     Boolean(session.workspaceId?.trim()) &&
     userWorkspaceId === session.workspaceId.trim();
 
-  const [member, resolveAccessRequest, tokenPayload] = await Promise.all([
-    getSessionMember(sid, user.uid),
-    getRequestByUser(sid, user.uid),
-    effectiveToken ? loadShareLinkPayloadForSession(effectiveToken, sid) : Promise.resolve(null),
-  ]);
+  // WORKSPACE-MEMBER: checking subcollection instead of members[] array
+  const [member, resolveAccessRequest, tokenPayload, workspaceMemberDoc] =
+    await Promise.all([
+      getSessionMember(sid, user.uid),
+      getRequestByUser(sid, user.uid),
+      effectiveToken ? loadShareLinkPayloadForSession(effectiveToken, sid) : Promise.resolve(null),
+      !isWorkspaceMemberByWorkspaceId && user.uid
+        ? getWorkspaceMemberRepo(session.workspaceId.trim(), user.uid)
+        : Promise.resolve(null),
+    ]);
+
+  const isWorkspaceMemberBySubcollection = workspaceMemberDoc !== null;
+  const isWorkspaceMember =
+    isWorkspaceMemberByWorkspaceId || isWorkspaceMemberBySubcollection;
+
+  const effectiveUserWorkspaceId =
+    isWorkspaceMemberBySubcollection && !isWorkspaceMemberByWorkspaceId
+      ? session.workspaceId.trim()
+      : userWorkspaceId;
 
   let invite: SessionInvite | null = null;
   if (userEmail && !isWorkspaceMember) {
@@ -395,7 +410,7 @@ export async function getAccessContext(options: {
     session,
     sid,
     user,
-    userWorkspaceId,
+    userWorkspaceId: effectiveUserWorkspaceId,
     member,
     invite,
     inviteIgnoredReason,

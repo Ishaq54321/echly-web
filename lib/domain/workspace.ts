@@ -19,9 +19,15 @@ export interface Workspace {
   name: string;
   logoUrl: string | null;
   ownerId: string;
-  members: string[];
+  // WORKSPACE-MEMBER: member list moved to workspaces/{id}/members subcollection
+  members?: string[];
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
+
+  // Soft-delete fields
+  deletedAt?: Timestamp | null;
+  deletedBy?: string | null;
+  deleteScheduledPurgeAt?: Timestamp | null;
 
   appearance: {
     logoOnFeedbackScreen: boolean;
@@ -106,9 +112,12 @@ export function defaultWorkspaceDoc(params: {
     name: (params.name ?? "My Workspace").trim() || "My Workspace",
     logoUrl: params.logoUrl ?? null,
     ownerId: params.ownerId,
-    members: [params.ownerId],
+    // WORKSPACE-MEMBER: member list moved to workspaces/{id}/members subcollection
     createdAt: null,
     updatedAt: null,
+    deletedAt: null,
+    deletedBy: null,
+    deleteScheduledPurgeAt: null,
     appearance: {
       logoOnFeedbackScreen: false,
       accentColor: null,
@@ -152,7 +161,7 @@ export function defaultWorkspaceDoc(params: {
     usage: {
       sessionsCreated: 0,
       feedbackCreated: 0,
-      members: 1,
+      members: 0,
     },
     sessionCount: 0,
     archivedCount: 0,
