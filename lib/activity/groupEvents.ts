@@ -18,17 +18,39 @@ export type GroupedActivity =
     }
   | {
       type: "group"
+      /** Stable id from server grouping (`/api/activity-feed`); must match expand fetches. */
+      groupId: string
       eventType: string
       actorId: string
       actorName?: string
       sessionId: string
       primaryEventId: string
       count: number
-      events: ActivityEvent[]
+      /** Newest-first preview slice for summary UI (aligned with server). */
+      previewEvents: ActivityEvent[]
       createdAt: number | null
     }
 
 const GROUP_WINDOW_MS = 300_000
+
+/** Deterministic id for an adjacency group (aligned with `groupEventsServer`). */
+function stableGroupId(params: {
+  eventType: string
+  actorId: string
+  sessionId: string
+  primaryEventId: string
+  createdAt: number | null
+}): string {
+  const bucket = Math.floor((params.createdAt ?? 0) / GROUP_WINDOW_MS)
+  return `${params.eventType}_${params.actorId}_${params.sessionId}_${bucket}_${params.primaryEventId}`
+}
+
+/** Preview events for grouped rows (server summary; required on group rows). */
+export function groupPreviewEvents(
+  g: Extract<GroupedActivity, { type: "group" }>
+): ActivityEvent[] {
+  return g.previewEvents
+}
 
 /**
  * Types that must never merge, even if grouping rules expand later.
@@ -69,15 +91,25 @@ function finalizeBuffer(buffer: ActivityEvent[]): GroupedActivity | null {
   if (buffer.length === 0) return null
   if (buffer.length === 1) return toSingle(buffer[0]!)
   const newest = buffer[0]!
+  const events = buffer.slice()
+  const primaryEventId = newest.id
+  const groupId = stableGroupId({
+    eventType: newest.eventType,
+    actorId: newest.actor.id,
+    sessionId: newest.sessionId,
+    primaryEventId,
+    createdAt: newest.createdAt,
+  })
   return {
     type: "group",
+    groupId,
     eventType: newest.eventType,
     actorId: newest.actor.id,
     actorName: buffer[0]!.actor?.name ?? undefined,
     sessionId: newest.sessionId,
-    primaryEventId: buffer[0]!.id,
-    count: buffer.length,
-    events: buffer.slice(),
+    primaryEventId,
+    count: events.length,
+    previewEvents: events.slice(0, 2),
     createdAt: newest.createdAt,
   }
 }

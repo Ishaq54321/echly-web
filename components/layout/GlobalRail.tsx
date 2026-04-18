@@ -5,9 +5,10 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useRef, useEffect, useState } from "react";
 import {
+  type LucideIcon,
   Home,
   MessageSquare,
-  Activity,
+  SquareChartGantt,
   Settings,
   UserPlus,
   PanelLeftClose,
@@ -20,12 +21,20 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-const NAV_ITEMS = [
+type MainNavItem = {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  /** Slightly lower stroke for glyphs with more internal detail (keeps rail visually even). */
+  iconStroke?: number;
+};
+
+const NAV_ITEMS: MainNavItem[] = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
   { href: "/discussion", icon: MessageSquare, label: "Discussion" },
-  { href: "/activity", icon: Activity, label: "Activity" },
+  { href: "/activity", icon: SquareChartGantt, label: "Activity", iconStroke: 1.9 },
   { href: "/settings", icon: Settings, label: "Settings" },
-] as const;
+];
 
 function isActive(href: string, pathname: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
@@ -228,7 +237,7 @@ export default function GlobalRail() {
           )}
           aria-label="Main"
         >
-          {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+          {NAV_ITEMS.map(({ href, icon: Icon, label, iconStroke }) => {
             const active = isActive(href, pathname);
             return (
               <div
@@ -249,7 +258,7 @@ export default function GlobalRail() {
                 >
                   <Icon
                     className={RAIL_ICON_CLASS}
-                    strokeWidth={RAIL_ICON_STROKE}
+                    strokeWidth={iconStroke ?? RAIL_ICON_STROKE}
                   />
                   <span
                     className={cn(

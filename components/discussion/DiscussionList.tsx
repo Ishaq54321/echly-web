@@ -29,7 +29,7 @@ export interface ProjectItem {
   name: string;
 }
 
-export type StatusFilter = "all" | "open" | "review" | "resolved";
+export type StatusFilter = "all" | "open" | "resolved";
 
 export interface DiscussionListProps {
   selectedId: string | null;
@@ -85,7 +85,6 @@ function parseUpdatedAt(item: DiscussionItem): number {
 const FILTER_PILLS: Array<{ key: StatusFilter; label: string }> = [
   { key: "all", label: "All" },
   { key: "open", label: "Open" },
-  { key: "review", label: "In review" },
   { key: "resolved", label: "Resolved" },
 ];
 
@@ -167,7 +166,6 @@ export function DiscussionList({
     return () => { cancelled = true; };
   }, [refreshKey, authUid]);
 
-  // Counts for header (before status filter)
   const sessionFilteredItems = useMemo(() => {
     let list = items;
     if (filterBySessionId) {
@@ -183,46 +181,29 @@ export function DiscussionList({
     );
   }, [items, search, filterBySessionId]);
 
-  const openCount = useMemo(
-    () => sessionFilteredItems.filter((i) => i.status === "open").length,
-    [sessionFilteredItems]
-  );
-
   const filteredItems = useMemo(() => {
     if (statusFilter === "all") return sessionFilteredItems;
-    if (statusFilter === "open") return sessionFilteredItems.filter((i) => i.status === "open");
-    if (statusFilter === "resolved") return sessionFilteredItems.filter((i) => i.status === "resolved");
-    // "review" — no such status in API; returns empty
-    return [];
+    if (statusFilter === "open") {
+      return sessionFilteredItems.filter((i) => i.status === "open");
+    }
+    return sessionFilteredItems.filter((i) => i.status === "resolved");
   }, [sessionFilteredItems, statusFilter]);
 
   const showLoading = !error && (!authUid || loading);
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
-      {/* Sticky header */}
-      <div className="shrink-0 px-4 py-4 border-b border-neutral-200 flex items-start justify-between gap-3 bg-white">
-        <div>
-          <h2 className="text-[15px] font-semibold text-neutral-900 leading-tight">Discussions</h2>
-          <p className="text-[12px] text-meta mt-0.5 tabular-nums">
-            {showLoading
-              ? "Loading…"
-              : `${sessionFilteredItems.length} thread${sessionFilteredItems.length !== 1 ? "s" : ""} · ${openCount} open`}
-          </p>
-        </div>
-      </div>
-
-      {/* Filter pills */}
-      <div className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 border-b border-neutral-100 bg-white overflow-x-auto">
+      {/* Filter pills — spacing only; no divider line */}
+      <div className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 bg-white overflow-x-auto">
         {FILTER_PILLS.map((pill) => (
           <button
             key={pill.key}
             type="button"
             onClick={() => setStatusFilter(pill.key)}
-            className={`text-[12px] px-3 py-[5px] rounded-full border whitespace-nowrap transition-all ${
+            className={`text-[13px] px-3 py-[5px] rounded-full border whitespace-nowrap transition-all ${
               statusFilter === pill.key
                 ? "bg-[#EEF3FF] text-[#155DFC] border-[#bfdbfe] font-medium"
-                : "bg-transparent text-secondary border-neutral-200 hover:border-neutral-300 hover:text-neutral-900"
+                : "bg-transparent text-discussion-supporting border-neutral-200 hover:border-neutral-300 hover:text-discussion-title"
             }`}
           >
             {pill.label}
@@ -238,13 +219,13 @@ export function DiscussionList({
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">
-            <p className="text-sm text-secondary">{error}</p>
+            <p className="text-[14px] text-discussion-supporting">{error}</p>
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center h-full">
             <MessageSquareMore className="w-10 h-10 text-neutral-300 mb-3" />
-            <h3 className="text-[15px] font-semibold text-neutral-900">No discussions yet</h3>
-            <p className="mt-1.5 text-[13px] text-secondary max-w-[220px]">
+            <h3 className="text-[16px] font-semibold text-discussion-title">No discussions yet</h3>
+            <p className="mt-1.5 text-[14px] text-discussion-supporting max-w-[240px]">
               When feedback receives comments, they will appear here.
             </p>
             <Link
@@ -256,10 +237,10 @@ export function DiscussionList({
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center h-full">
-            <p className="text-[13px] text-secondary">No threads match this filter.</p>
+            <p className="text-[14px] text-discussion-supporting">No threads match this filter.</p>
           </div>
         ) : (
-          <div className="flex flex-col">
+          <div className="flex flex-col space-y-2 px-3 pt-2 pb-4">
             {filteredItems.map((item) => {
               const isSelected = selectedId === item.id;
               const ts = parseUpdatedAt(item);
@@ -282,47 +263,50 @@ export function DiscussionList({
                       onSelect(item.id);
                     }
                   }}
-                  className={`flex items-start gap-2.5 px-4 py-3.5 cursor-pointer border-b border-neutral-100 transition-colors ${
-                    isSelected ? "bg-blue-50" : "hover:bg-neutral-50/80"
-                  }`}
+                  className={[
+                    "flex items-start gap-3 rounded-xl px-3.5 py-3.5 cursor-pointer outline-none",
+                    "transition-colors duration-150 ease-out",
+                    "focus-visible:ring-2 focus-visible:ring-neutral-200/80 focus-visible:ring-offset-1 focus-visible:ring-offset-white",
+                    isSelected
+                      ? "bg-neutral-100"
+                      : "bg-transparent hover:bg-neutral-50",
+                  ].join(" ")}
                 >
-                  {/* Avatar */}
+                  {/* Avatar — compact so text stays primary */}
                   <div
-                    className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[12px] font-semibold shrink-0 mt-0.5"
+                    className="w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 mt-[1px]"
                     style={{ background: palette.bg, color: palette.text }}
                     aria-hidden
                   >
                     {initial}
                   </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    {/* Row 1: Title + timestamp */}
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <h3 className="text-[13px] font-medium text-neutral-900 truncate leading-snug">
+                  {/* Four-line block: title+time · workspace · preview · replies */}
+                  <div className="flex flex-1 min-w-0 flex-col gap-1.5">
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                      <h3 className="min-w-0 flex-1 truncate text-[14px] font-medium leading-snug text-discussion-title">
                         {item.title}
                       </h3>
-                      <span className="text-[11px] text-meta shrink-0">{timeLabel}</span>
+                      <span className="shrink-0 whitespace-nowrap pt-[1px] text-[13px] leading-snug text-discussion-supporting">
+                        {timeLabel}
+                      </span>
                     </div>
-
-                    {/* Row 2: Session name */}
-                    <p className="text-[12px] text-secondary truncate mb-1">{sessionDisplay}</p>
-
-                    {/* Row 3: Preview */}
-                    {item.lastCommentPreview && (
-                      <p className="text-[12px] text-meta truncate mb-1.5">
+                    <p className="truncate text-[13px] leading-snug text-discussion-supporting">
+                      {sessionDisplay}
+                    </p>
+                    {item.lastCommentPreview ? (
+                      <p className="truncate text-[13px] leading-snug text-discussion-supporting">
                         {item.lastCommentPreview}
                       </p>
-                    )}
-
-                    {/* Footer: status dot + reply count */}
+                    ) : null}
                     <div className="flex items-center gap-1.5">
                       <span
-                        className={`w-[6px] h-[6px] rounded-full shrink-0 ${
-                          item.status === "open" ? "bg-green-500" : "bg-neutral-400"
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                          item.status === "open" ? "bg-emerald-500/75" : "bg-neutral-400/60"
                         }`}
+                        aria-hidden
                       />
-                      <span className="text-[11px] text-meta">{replyLabel}</span>
+                      <span className="text-[13px] leading-snug text-meta">{replyLabel}</span>
                     </div>
                   </div>
                 </div>

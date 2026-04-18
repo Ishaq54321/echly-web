@@ -7,6 +7,8 @@ import { corsHeaders } from "@/lib/server/cors";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { parseActivityFeedEventTypesParam } from "@/lib/activity/activityEventTypeFilters";
+import { groupEventsServer } from "@/lib/server/activity/groupEventsServer";
+import { normalizeForGrouping } from "@/lib/server/activity/normalizeForGrouping";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -81,6 +83,11 @@ export async function OPTIONS(req: NextRequest) {
  * `cursor`: JSON string `{ "createdAt": epoch ms, "id": doc id }` (e.g. encodeURIComponent)
  * or the same object encoded as base64url.
  * Raw activity events for the workspace (or one session), newest first.
+ *
+ * Response `data` includes `events` (unchanged) plus `groupedEvents` (server-side
+ * adjacency groups for `comment.added` / `feedback.created` only). Each group item
+ * includes `groupId`, `count`, `previewEvents` (first 1–2 events); full members load via
+ * `/api/activity-group-members` when a group is expanded.
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -188,6 +195,19 @@ export async function GET(req: NextRequest) {
   try {
     const snapshot = await q.get();
     const events = snapshot.docs.map((d) => activityEventFromDoc(d as QueryDocumentSnapshot));
+    const normalizedEvents = events.map(normalizeForGrouping);
+    const groupedEvents = groupEventsServer(normalizedEvents);
+
+    if (process.env.NODE_ENV === "development") {
+      try {
+        const { assertGroupingParity } = await import(
+          "@/lib/server/activity/assertGroupingParity"
+        );
+        assertGroupingParity(normalizedEvents);
+      } catch (e) {
+        console.warn("Parity check failed", e);
+      }
+    }
 
     let nextCursor: ActivityFeedNextCursor = null;
     if (events.length === limit) {
@@ -199,7 +219,7 @@ export async function GET(req: NextRequest) {
     }
 
     return apiSuccess(
-      { events, nextCursor },
+      { events, groupedEvents, nextCursor },
       hasSessionFilter ? ctx.access : null,
       { headers: corsHeaders(req) }
     );

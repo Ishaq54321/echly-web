@@ -188,9 +188,7 @@ function DashboardContent() {
                     <EmptySessionsCard />
                   </div>
                 ) : listArchiveTab === "archived" && archivedSessions.length === 0 ? (
-                  <div className="mt-16">
-                    <ArchiveEmptyState />
-                  </div>
+                  <ArchiveEmptyState />
                 ) : (
                   <>
                     <SessionsWorkspace

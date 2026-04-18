@@ -14,6 +14,12 @@ export type EmptyStateProps = {
   animate?: boolean;
   /** Tighter padding and vertical rhythm (e.g. archive tab empty state). */
   density?: "default" | "compact";
+  /**
+   * `card` — bordered panel (default).
+   * `minimal` — no chrome; sits flush in the page layout.
+   */
+  surface?: "card" | "minimal";
+  className?: string;
   children?: ReactNode;
 };
 
@@ -27,6 +33,8 @@ export function EmptyState({
   emphasis = "prominent",
   animate = false,
   density = "default",
+  surface = "card",
+  className,
   children,
 }: EmptyStateProps) {
   const [animateIn, setAnimateIn] = useState(!animate);
@@ -46,10 +54,19 @@ export function EmptyState({
   const mediaOrIconBottom = isCompact ? "mb-4" : "mb-6";
   const descriptionTop = isCompact ? "mt-2" : "mt-4";
   const descriptionMaxW = isCompact ? "max-w-[340px]" : "max-w-[640px]";
+  const isMinimal = surface === "minimal";
+  const rootClassName = [
+    "mx-auto max-w-xl text-center",
+    isMinimal ? "" : `rounded-2xl border border-neutral-200 bg-white ${cardPadding} shadow-sm`,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const bodyClassName = isMinimal ? "text-center" : "px-6 text-center";
 
   return (
     <div
-      className={`mx-auto max-w-xl rounded-2xl border border-neutral-200 bg-white ${cardPadding} text-center shadow-sm`}
+      className={rootClassName}
       style={{
         opacity: animateIn ? 1 : 0,
         transform: animateIn ? "translateY(0)" : "translateY(6px)",
@@ -64,7 +81,7 @@ export function EmptyState({
         </div>
       ) : null}
 
-      <div className="px-6 text-center">
+      <div className={bodyClassName}>
         <h2 className={titleClassName}>{title}</h2>
         <p
           className={`${descriptionTop} ${descriptionMaxW} mx-auto text-center text-base text-gray-600`}

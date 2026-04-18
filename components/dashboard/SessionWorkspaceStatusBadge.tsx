@@ -1,14 +1,12 @@
-export type SessionWorkspaceStatus = "active" | "in_review" | "done";
+export type SessionWorkspaceStatus = "active" | "done";
 
 const STYLES: Record<SessionWorkspaceStatus, string> = {
   active: "bg-blue-50 text-blue-700",
-  in_review: "bg-neutral-100 text-neutral-700",
   done: "bg-neutral-900 text-white",
 };
 
 const LABELS: Record<SessionWorkspaceStatus, string> = {
   active: "Active",
-  in_review: "In Review",
   done: "Done",
 };
 

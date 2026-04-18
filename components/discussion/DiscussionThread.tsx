@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowUpRight,
-  CheckCircle2,
-  Circle,
   Expand,
   Paperclip,
   RefreshCw,
@@ -46,14 +44,6 @@ import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 export interface DiscussionThreadProps {
   feedbackId: string | null;
   onCommentAdded?: () => void;
-  /** Toggle list row for the affected ticket; omit id to use current selection (reopen). */
-  onStatusChanged?: (affectedTicketId?: string) => void;
-  /**
-   * Before PATCH: parent snapshots list (current still open), navigates to next open, marks row resolved optimistically.
-   */
-  onResolvedAdvanceQueue?: (currentFeedbackId: string) => void;
-  /** PATCH failed after optimistic resolve + navigate — parent should revert list row to open. */
-  onResolveFailed?: (ticketId: string) => void;
   /** When false, do not show empty-state message (e.g. while ticket list is still loading). */
   listLoaded?: boolean;
   /** Index of this thread in the full list (1-based), for the "X of Y" counter */
@@ -76,9 +66,6 @@ interface TicketData {
 export function DiscussionThread({
   feedbackId,
   onCommentAdded,
-  onStatusChanged,
-  onResolvedAdvanceQueue,
-  onResolveFailed,
   listLoaded = true,
   threadIndex,
   threadTotal,
@@ -99,16 +86,12 @@ export function DiscussionThread({
   const [loading, setLoading] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const [resolvePending, setResolvePending] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
   const [screenshotModalOpen, setScreenshotModalOpen] = useState(false);
   const { url: resolvedScreenshotSrc, loading: screenshotLoading } =
     useScreenshotUrl(ticket?.screenshotId, {
       sessionId: ticket?.sessionId?.trim() || "",
     });
-
-  const feedbackIdRef = useRef(feedbackId);
-  feedbackIdRef.current = feedbackId;
 
   const commentsPollEnabled = useMemo(
     () =>
@@ -117,10 +100,6 @@ export function DiscussionThread({
       (Boolean(authUid?.trim()) || sharePresent),
     [authReady, ticket?.sessionId, feedbackId, authUid, sharePresent]
   );
-
-  useEffect(() => {
-    setResolvePending(false);
-  }, [feedbackId]);
 
   useEffect(() => {
     if (!screenshotModalOpen) return;
@@ -212,60 +191,6 @@ export function DiscussionThread({
       setCommentsInitialized(true);
     },
   });
-
-  const handleResolve = useCallback(() => {
-    if (!feedbackId || !ticket) return;
-    assertIdentityResolved(isIdentityResolved);
-    const newStatus: "open" | "resolved" =
-      ticket.status === "resolved" ? "open" : "resolved";
-    const resolvingId = feedbackId;
-
-    if (newStatus === "resolved") {
-      onResolvedAdvanceQueue?.(resolvingId);
-    }
-
-    setResolvePending(true);
-    void (async () => {
-      try {
-        const res = await authFetch(`/api/tickets/${resolvingId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: newStatus }),
-        });
-        if (!res || !res.ok) throw new Error("Failed to update status");
-        if (feedbackIdRef.current === resolvingId) {
-          setTicket((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: newStatus,
-                  isResolved: newStatus === "resolved",
-                }
-              : prev
-          );
-        }
-        if (newStatus === "open") {
-          onStatusChanged?.();
-        }
-      } catch (err) {
-        console.error("[DiscussionThread] resolve:", err);
-        if (newStatus === "resolved") {
-          onResolveFailed?.(resolvingId);
-        }
-        showToast("Could not update status");
-      } finally {
-        setResolvePending(false);
-      }
-    })();
-  }, [
-    feedbackId,
-    ticket,
-    isIdentityResolved,
-    onStatusChanged,
-    onResolvedAdvanceQueue,
-    onResolveFailed,
-    showToast,
-  ]);
 
   const handleAttachmentSend = useCallback(
     async (attachment: CommentAttachment) => {
@@ -375,10 +300,10 @@ export function DiscussionThread({
     return (
       <div className="flex-1 flex h-full items-center justify-center bg-white min-w-0">
         <div className="text-center max-w-xs px-6">
-          <p className="text-[15px] font-medium text-neutral-800">
+          <p className="text-[16px] font-semibold text-discussion-title">
             Select a thread to view conversation
           </p>
-          <p className="text-[13px] text-secondary mt-1.5">
+          <p className="text-[14px] text-discussion-supporting mt-1.5">
             Choose a discussion from the list
           </p>
         </div>
@@ -416,81 +341,51 @@ export function DiscussionThread({
     <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-white">
 
       {/* ── Sticky header ─────────────────────────────────────────────────── */}
-      <div className="shrink-0 border-b border-neutral-200 px-5 py-3.5 bg-white">
-        <div className="flex items-start justify-between gap-4">
-          {/* Title + meta */}
-          <div className="min-w-0">
-            <h2 className="text-[17px] font-semibold text-neutral-900 truncate leading-snug">
+      <div className="shrink-0 px-5 pt-3.5 pb-[18px] bg-white">
+        <div className="flex max-w-[720px] mx-auto w-full min-w-0 items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="mb-1.5 text-[17px] font-semibold leading-snug text-[#0F172A]">
               {ticket.title?.trim() ? ticket.title : "Untitled"}
             </h2>
-            <div className="flex items-center gap-2.5 mt-1 flex-wrap">
-              {/* Status badge */}
+            <div className="flex flex-wrap items-center gap-2 text-[13px]">
               <span
-                className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-normal tracking-wide ${
                   isResolved
-                    ? "bg-neutral-100 text-neutral-500"
-                    : "bg-green-50 text-green-700"
+                    ? "border-slate-200/90 bg-slate-50 text-slate-500"
+                    : "border-emerald-200/50 bg-emerald-50/70 text-emerald-800/75"
                 }`}
               >
                 {isResolved ? "Resolved" : "Open"}
               </span>
-
-              {/* Session link */}
               {sessionName && ticket.sessionId ? (
-                <span className="text-[12px] text-secondary flex items-center gap-1">
-                  {sessionName}
-                </span>
+                <span className="min-w-0 truncate text-[#364153]">{sessionName}</span>
               ) : null}
-
-              {/* X of Y counter */}
-              {threadIndex !== undefined && threadTotal !== undefined && (
-                <span className="text-[12px] text-meta tabular-nums">
+              {threadIndex !== undefined && threadTotal !== undefined ? (
+                <span className="shrink-0 tabular-nums text-[13px] text-[#64748B]/80">
                   {threadIndex} of {threadTotal}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            {ticket.sessionId && feedbackId && (
-              <Link
-                href={`/session/${ticket.sessionId}?ticket=${feedbackId}`}
-                className="hidden sm:inline-flex items-center gap-1 text-[12px] font-medium text-secondary border border-neutral-200 rounded-lg px-3 py-1.5 hover:border-neutral-300 hover:text-neutral-900 transition-colors"
-              >
-                View ticket
-                <ArrowUpRight className="h-3 w-3 shrink-0" strokeWidth={2} />
-              </Link>
-            )}
-            <button
-              type="button"
-              onClick={() => void handleResolve()}
-              disabled={resolvePending}
-              className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                isResolved
-                  ? "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                  : "bg-[#155DFC] text-white hover:bg-[#0F4ED1]"
-              }`}
+          {ticket.sessionId && feedbackId ? (
+            <Link
+              href={`/session/${ticket.sessionId}?ticket=${feedbackId}`}
+              className="group inline-flex shrink-0 items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-[#364153] shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-colors hover:border-neutral-300 hover:bg-slate-50/90 hover:text-[#0F172A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/20"
             >
-              {isResolved ? (
-                <>
-                  <Circle className="h-3.5 w-3.5" strokeWidth={2} />
-                  Reopen
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} />
-                  {resolvePending ? "Resolving…" : "Resolve"}
-                </>
-              )}
-            </button>
-          </div>
+              View Ticket
+              <ArrowUpRight
+                className="h-3 w-3 shrink-0 text-[#64748B] transition-colors group-hover:text-[#0F172A]"
+                strokeWidth={2}
+                aria-hidden
+              />
+            </Link>
+          ) : null}
         </div>
       </div>
 
       {/* ── Scrollable body ───────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="max-w-[720px] w-full mx-auto px-5 py-5 flex flex-col gap-5">
+        <div className="max-w-[720px] w-full mx-auto px-5 pb-5 pt-0 flex flex-col gap-5">
 
           {/* Screenshot */}
           {hasScreenshot && (
@@ -508,11 +403,11 @@ export function DiscussionThread({
                     unoptimized={resolvedScreenshotSrc.startsWith("data:")}
                   />
                 ) : screenshotLoading ? (
-                  <div className="w-full h-[200px] flex items-center justify-center text-[13px] text-secondary">
+                  <div className="w-full h-[200px] flex items-center justify-center text-[14px] text-discussion-supporting">
                     Loading screenshot…
                   </div>
                 ) : (
-                  <div className="w-full h-[200px] flex items-center justify-center text-[13px] text-secondary">
+                  <div className="w-full h-[200px] flex items-center justify-center text-[14px] text-discussion-supporting">
                     Screenshot unavailable
                   </div>
                 )}
@@ -528,11 +423,11 @@ export function DiscussionThread({
                 )}
               </div>
               <div className="px-4 py-2.5 border-t border-neutral-100 flex items-center justify-between">
-                <span className="text-[12px] text-meta">Screenshot</span>
+                <span className="text-[13px] text-meta">Screenshot</span>
                 {ticket.sessionId && feedbackId && (
                   <Link
                     href={`/session/${ticket.sessionId}?ticket=${feedbackId}`}
-                    className="text-[12px] font-medium text-[#155DFC] hover:underline flex items-center gap-0.5"
+                    className="text-[13px] font-medium text-[#155DFC] hover:underline flex items-center gap-0.5"
                   >
                     View full
                     <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
@@ -545,12 +440,12 @@ export function DiscussionThread({
           {/* Action steps */}
           {hasSteps && (
             <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-level-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-meta mb-3">
+              <p className="text-sm font-semibold text-discussion-title mb-3">
                 Action Steps
               </p>
               <ul className="space-y-2">
                 {steps!.map((step, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-[13px] text-neutral-700">
+                  <li key={i} className="flex items-start gap-2.5 text-[14px] text-discussion-body leading-relaxed">
                     <span className="mt-[3px] w-[6px] h-[6px] rounded-full bg-orange-400 shrink-0" />
                     {step}
                   </li>
@@ -563,10 +458,10 @@ export function DiscussionThread({
           <div className="rounded-xl border border-neutral-200 bg-white shadow-level-1">
             {/* Comments header */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-100">
-              <span className="text-[13px] font-medium text-neutral-900">
+              <span className="text-sm font-semibold text-discussion-title">
                 Replies
                 {commentsInitialized && rootComments.length > 0 && (
-                  <span className="ml-1.5 text-[12px] font-normal text-meta tabular-nums">
+                  <span className="ml-1.5 text-[13px] font-normal text-meta tabular-nums">
                     · {rootComments.length}
                   </span>
                 )}
@@ -574,7 +469,7 @@ export function DiscussionThread({
               <button
                 type="button"
                 onClick={() => void refetchComments()}
-                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#155DFC] hover:text-[#0F4EDC] transition-colors"
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#155DFC] hover:text-[#0F4EDC] transition-colors"
               >
                 <RefreshCw className="h-3 w-3 shrink-0" strokeWidth={2} />
                 Refresh
@@ -588,7 +483,7 @@ export function DiscussionThread({
                   <MinimalLoader compact label="Loading replies…" />
                 </div>
               ) : rootComments.length === 0 ? (
-                <p className="text-[13px] text-secondary py-2">No replies yet. Be the first to comment.</p>
+                <p className="text-[14px] text-discussion-supporting py-2">No replies yet. Be the first to comment.</p>
               ) : (
                 <div className="space-y-0">
                   {rootComments.map((root) => {
@@ -625,7 +520,7 @@ export function DiscussionThread({
             {/* Compose — inside the Replies card */}
             <div className="border-t border-neutral-100 px-5 py-3.5">
               <div className="flex items-center gap-2.5">
-                <div className="w-[28px] h-[28px] rounded-full bg-[#EEF3FF] text-[#155DFC] font-semibold text-[13px] flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="w-[28px] h-[28px] rounded-full bg-[#EEF3FF] text-[#155DFC] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden">
                   {userInitial}
                 </div>
                 <input
@@ -639,12 +534,12 @@ export function DiscussionThread({
                       handleSendComment();
                     }
                   }}
-                  className="flex-1 min-w-0 h-[38px] rounded-xl border border-neutral-200 px-4 text-[13px] text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition"
+                  className="flex-1 min-w-0 h-[38px] rounded-xl border border-neutral-200 px-4 text-[14px] text-discussion-body placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition"
                 />
                 <button
                   type="button"
                   onClick={() => setAttachmentModalOpen(true)}
-                  className="p-2 rounded-lg text-secondary hover:bg-neutral-100 hover:text-neutral-700 transition-colors shrink-0"
+                  className="p-2 rounded-lg text-discussion-supporting hover:bg-neutral-100 hover:text-discussion-title transition-colors shrink-0"
                   aria-label="Attach file"
                 >
                   <Paperclip className="h-4 w-4" strokeWidth={1.5} />

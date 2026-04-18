@@ -1,6 +1,6 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { DiscussionSidebarHeading } from "@/components/discussion/DiscussionSidebarHeading";
 
 export interface SidebarProject {
   id: string;
@@ -13,10 +13,10 @@ export interface DiscussionSidebarProps {
   totalCount: number;
   selectedProjectId: string | null;
   onProjectChange: (id: string | null) => void;
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
-  userName?: string;
-  userInitial?: string;
+  /** Threads matching session + search (same basis as list header counts) */
+  filteredThreadCount: number;
+  openThreadCount: number;
+  statsLoading: boolean;
 }
 
 export function DiscussionSidebar({
@@ -24,38 +24,29 @@ export function DiscussionSidebar({
   totalCount,
   selectedProjectId,
   onProjectChange,
-  searchQuery,
-  onSearchChange,
-  userName,
-  userInitial,
+  filteredThreadCount,
+  openThreadCount,
+  statsLoading,
 }: DiscussionSidebarProps) {
   return (
     <aside className="flex flex-col h-full bg-white overflow-hidden">
-      {/* Search */}
-      <div className="px-4 pt-4 pb-3 shrink-0">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-meta pointer-events-none" />
-          <input
-            type="search"
-            placeholder="Search discussions…"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-8 pr-3 py-[7px] text-[13px] bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 placeholder:text-meta outline-none focus:border-[#155DFC]/50 focus:bg-white transition-colors"
-          />
-        </div>
-      </div>
+      <DiscussionSidebarHeading
+        filteredThreadCount={filteredThreadCount}
+        openThreadCount={openThreadCount}
+        statsLoading={statsLoading}
+      />
 
       {/* Workspace section */}
-      <div className="px-4 pb-1 shrink-0">
+      <div className="px-4 pb-1 pt-3 shrink-0">
         <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-meta">Workspace</p>
       </div>
       <button
         type="button"
         onClick={() => onProjectChange(null)}
-        className={`w-full flex items-center gap-2.5 px-4 py-[7px] text-left text-[13px] transition-all ${
+        className={`w-full flex items-center gap-2.5 px-4 py-[7px] text-left text-[14px] transition-all ${
           selectedProjectId === null
-            ? "bg-blue-50/70 text-neutral-900 font-medium"
-            : "text-secondary hover:bg-neutral-50 hover:text-neutral-900"
+            ? "bg-blue-50/70 text-discussion-title font-medium"
+            : "text-discussion-supporting hover:bg-neutral-50 hover:text-discussion-title"
         }`}
       >
         <span
@@ -65,7 +56,7 @@ export function DiscussionSidebar({
         />
         <span className="flex-1 truncate">All projects</span>
         <span
-          className={`ml-auto text-[11px] px-[6px] py-0.5 rounded-full font-medium tabular-nums ${
+          className={`ml-auto text-[12px] px-[6px] py-0.5 rounded-full font-medium tabular-nums ${
             selectedProjectId === null
               ? "bg-[#DBEAFE] text-[#155DFC]"
               : "bg-neutral-100 text-meta"
@@ -89,10 +80,10 @@ export function DiscussionSidebar({
                   key={proj.id}
                   type="button"
                   onClick={() => onProjectChange(proj.id)}
-                  className={`w-full flex items-center gap-2.5 px-4 py-[7px] text-left text-[13px] transition-all ${
+                  className={`w-full flex items-center gap-2.5 px-4 py-[7px] text-left text-[14px] transition-all ${
                     isActive
-                      ? "bg-blue-50/70 text-neutral-900 font-medium"
-                      : "text-secondary hover:bg-neutral-50 hover:text-neutral-900"
+                      ? "bg-blue-50/70 text-discussion-title font-medium"
+                      : "text-discussion-supporting hover:bg-neutral-50 hover:text-discussion-title"
                   }`}
                 >
                   <span
@@ -102,7 +93,7 @@ export function DiscussionSidebar({
                   />
                   <span className="flex-1 truncate">{proj.name || "Untitled"}</span>
                   <span
-                    className={`ml-auto text-[11px] px-[6px] py-0.5 rounded-full font-medium tabular-nums ${
+                    className={`ml-auto text-[12px] px-[6px] py-0.5 rounded-full font-medium tabular-nums ${
                       isActive
                         ? "bg-[#DBEAFE] text-[#155DFC]"
                         : "bg-neutral-100 text-meta"

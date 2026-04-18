@@ -192,6 +192,7 @@ const API_ERROR_CODES = new Set<ApiErrorCode>([
   "UNAUTHORIZED",
   "FORBIDDEN",
   "NOT_FOUND",
+  "GROUP_NOT_FOUND",
   "INVALID_INPUT",
   "INTERNAL_ERROR",
 ]);

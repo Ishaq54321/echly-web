@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useCallback, useMemo, Suspense } from "react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Search } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
-import { useWorkspace } from "@/lib/client/workspaceContext";
 import {
   DiscussionList,
   type ProjectItem,
@@ -14,13 +13,10 @@ import {
   DiscussionSidebar,
   type SidebarProject,
 } from "@/components/discussion/DiscussionSidebar";
-import { useToast } from "@/components/dashboard/context/ToastContext";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 
 export default function DiscussionPage() {
   const { user, loading } = useAuthGuard();
-  const { authDisplayName } = useWorkspace();
-  const { showToast } = useToast();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -65,58 +61,6 @@ export default function DiscussionPage() {
     );
   }, [selectedId]);
 
-  /** Sync reopened status into list (by selection). Resolve uses optimistic update in advance handler. */
-  const handleStatusChanged = useCallback((affectedTicketId?: string) => {
-    const id = affectedTicketId ?? selectedId;
-    if (!id) return;
-    setListItems((prev) =>
-      prev.map((ticket) => {
-        if (ticket.id !== id) return ticket;
-        const next = ticket.status === "resolved" ? "open" : "resolved";
-        return { ...ticket, status: next };
-      })
-    );
-  }, [selectedId]);
-
-  /**
-   * Instant UX: navigate + optimistic resolve from list snapshot (current row still open),
-   * then PATCH runs in DiscussionThread.
-   */
-  const handleResolvedAdvanceQueue = useCallback(
-    (currentId: string) => {
-      const tickets = listItems;
-      const isOpen = (t: (typeof tickets)[number]) => t.status !== "resolved";
-      const currentIndex = tickets.findIndex((t) => t.id === currentId);
-      const nextOpenAfter =
-        currentIndex >= 0
-          ? tickets.slice(currentIndex + 1).find(isOpen)
-          : undefined;
-      const firstOtherOpen = tickets.find(
-        (t) => t.id !== currentId && isOpen(t)
-      );
-      const target = nextOpenAfter ?? firstOtherOpen;
-      if (target) {
-        setSelectedId(target.id);
-      } else {
-        showToast("No more feedback");
-      }
-      setListItems((prev) =>
-        prev.map((t) =>
-          t.id === currentId ? { ...t, status: "resolved" as const } : t
-        )
-      );
-    },
-    [listItems, showToast]
-  );
-
-  const handleResolveFailed = useCallback((ticketId: string) => {
-    setListItems((prev) =>
-      prev.map((t) =>
-        t.id === ticketId ? { ...t, status: "open" as const } : t
-      )
-    );
-  }, []);
-
   // ── Derived ────────────────────────────────────────────────────────────────
   const sidebarProjects = useMemo<SidebarProject[]>(() => {
     return projects.map((proj) => ({
@@ -132,7 +76,27 @@ export default function DiscussionPage() {
     return idx >= 0 ? idx + 1 : undefined;
   }, [selectedId, listItems]);
 
-  const userInitial = authDisplayName?.charAt(0).toUpperCase() ?? undefined;
+  const sessionFilteredForStats = useMemo(() => {
+    let list = listItems;
+    if (selectedProjectId) {
+      list = list.filter((i) => i.sessionId === selectedProjectId);
+    }
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (i) =>
+        i.title.toLowerCase().includes(q) ||
+        (i.sessionName ?? "").toLowerCase().includes(q) ||
+        (i.lastCommentPreview ?? "").toLowerCase().includes(q)
+    );
+  }, [listItems, selectedProjectId, searchQuery]);
+
+  const statsOpenCount = useMemo(
+    () => sessionFilteredForStats.filter((i) => i.status === "open").length,
+    [sessionFilteredForStats]
+  );
+
+  const statsLoading = isEmpty === null;
 
   // ── Loading / auth guard ───────────────────────────────────────────────────
   if (!user && !loading) {
@@ -155,10 +119,9 @@ export default function DiscussionPage() {
           totalCount={listItems.length}
           selectedProjectId={selectedProjectId}
           onProjectChange={setSelectedProjectId}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          userName={authDisplayName ?? undefined}
-          userInitial={userInitial}
+          filteredThreadCount={sessionFilteredForStats.length}
+          openThreadCount={statsOpenCount}
+          statsLoading={statsLoading}
         />
       </div>
 
@@ -174,15 +137,17 @@ export default function DiscussionPage() {
           w-full md:w-[340px] md:shrink-0
         `}
       >
-        {/* Mobile: search bar (sidebar is hidden) */}
-        <div className="lg:hidden shrink-0 px-4 pt-3 pb-0">
-          <input
-            type="search"
-            placeholder="Search discussions…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-[7px] text-[13px] bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 placeholder:text-meta outline-none focus:border-[#155DFC]/50 focus:bg-white transition-colors"
-          />
+        <div className="shrink-0 px-4 pt-3 pb-2 bg-white">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-meta pointer-events-none" />
+            <input
+              type="search"
+              placeholder="Search discussions…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-[7px] text-[14px] bg-neutral-50 border border-neutral-200 rounded-lg text-discussion-body placeholder:text-meta outline-none focus:border-[#155DFC]/50 focus:bg-white transition-colors"
+            />
+          </div>
         </div>
 
         {/* Mobile: session filter (sidebar is hidden on < lg) */}
@@ -264,9 +229,6 @@ export default function DiscussionPage() {
           <DiscussionThread
             feedbackId={selectedId}
             onCommentAdded={handleCommentAdded}
-            onStatusChanged={handleStatusChanged}
-            onResolvedAdvanceQueue={handleResolvedAdvanceQueue}
-            onResolveFailed={handleResolveFailed}
             listLoaded={isEmpty !== null}
             threadIndex={selectedIndex}
             threadTotal={listItems.length}

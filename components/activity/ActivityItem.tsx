@@ -5,7 +5,11 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, ExternalLink, RotateCcw } from "lucide-react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
-import type { ActivityEvent, GroupedActivity } from "@/lib/activity/groupEvents";
+import {
+  groupPreviewEvents,
+  type ActivityEvent,
+  type GroupedActivity,
+} from "@/lib/activity/groupEvents";
 import { getTier, eventIconMap } from "@/components/activity/eventIcons";
 
 // ─── Metadata helpers ────────────────────────────────────────────────────────
@@ -266,8 +270,9 @@ function deriveRowModel(ev: ActivityEvent): RowModel {
 }
 
 function deriveGroupRowModel(g: Extract<GroupedActivity, { type: "group" }>): RowModel {
-  const first = g.events[0]!;
-  const firstWithFeedback = g.events.find((e) => e.feedbackId?.trim());
+  const preview = groupPreviewEvents(g);
+  const first = preview[0]!;
+  const firstWithFeedback = preview.find((e) => e.feedbackId?.trim());
   const sid = (first?.sessionId ?? g.sessionId)?.trim() ?? "";
   const fid = firstWithFeedback?.feedbackId?.trim() ?? "";
   const meta = firstWithFeedback?.metadata ?? first?.metadata;
@@ -276,7 +281,7 @@ function deriveGroupRowModel(g: Extract<GroupedActivity, { type: "group" }>): Ro
 
   let previewText: string | null = null;
   if (g.eventType === "comment.added") {
-    for (const e of g.events) {
+    for (const e of preview) {
       const p = commentPreviewFromMetadata(e.metadata);
       if (p) {
         previewText = p;
@@ -284,7 +289,7 @@ function deriveGroupRowModel(g: Extract<GroupedActivity, { type: "group" }>): Ro
       }
     }
   } else if (g.eventType === "feedback.created") {
-    for (const e of g.events) {
+    for (const e of preview) {
       const p = feedbackTitleFromMeta(e.metadata);
       if (p) {
         previewText = p;
@@ -410,6 +415,8 @@ export type ActivityItemProps =
       isoTime?: string;
       isExpanded: boolean;
       onToggleExpand: () => void;
+      /** Full member list when expanded (preview-only rows use `previewEvents` until lazy load completes). */
+      expandListEvents?: ActivityEvent[];
     };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -430,6 +437,15 @@ export function ActivityItem(props: ActivityItemProps) {
 
   const row =
     props.kind === "single" ? deriveRowModel(props.event) : deriveGroupRowModel(props.group);
+
+  const previewForGroup =
+    props.kind === "group" ? groupPreviewEvents(props.group) : null;
+  const collapsedMoreBeyondPreview =
+    props.kind === "group" && previewForGroup
+      ? Math.max(0, props.group.count - previewForGroup.length)
+      : 0;
+  const showGroupExpandToggle =
+    props.kind === "group" && collapsedMoreBeyondPreview > 0;
 
   const goToFeedback = useCallback(
     (sessionId: string, feedbackId: string) => {
@@ -563,8 +579,8 @@ export function ActivityItem(props: ActivityItemProps) {
           </ActivityContextBlock>
         ) : null}
 
-        {/* Group expand toggle */}
-        {props.kind === "group" && (
+        {/* Group expand toggle — only when more members exist than the preview slice */}
+        {showGroupExpandToggle ? (
           <button
             type="button"
             aria-expanded={props.isExpanded}
@@ -578,16 +594,38 @@ export function ActivityItem(props: ActivityItemProps) {
               className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ${props.isExpanded ? "rotate-180" : ""}`}
               aria-hidden
             />
-            {props.isExpanded
-              ? "Hide"
-              : `${props.group.count - 1} more ${props.group.count === 2 ? "item" : "items"}`}
+            {props.isExpanded ? "Show less" : "Show all"}
           </button>
-        )}
+        ) : null}
 
         {/* Expanded group sub-items */}
         {props.kind === "group" && props.isExpanded ? (
           <div className="mt-3 w-full min-w-0" role="list">
-            {props.group.events.map((ev) => {
+            {(() => {
+              const g = props.group;
+              const needsRemoteMembers = g.count > g.previewEvents.length;
+              const membersReady =
+                !needsRemoteMembers || props.expandListEvents !== undefined;
+              const showMembersLoading =
+                Boolean(g.groupId) && needsRemoteMembers && !membersReady;
+              const list = showMembersLoading ? [] : (props.expandListEvents ?? []);
+              return (
+                <>
+                  {showMembersLoading ? (
+                    <div
+                      className="flex items-center gap-1.5 py-2 text-muted-foreground"
+                      aria-live="polite"
+                      aria-busy="true"
+                    >
+                      <span className="sr-only">Loading group activity</span>
+                      <span className="inline-flex items-center gap-1 px-0.5" aria-hidden>
+                        <span className="activity-expand-dot" style={{ animationDelay: "0ms" }} />
+                        <span className="activity-expand-dot" style={{ animationDelay: "140ms" }} />
+                        <span className="activity-expand-dot" style={{ animationDelay: "280ms" }} />
+                      </span>
+                    </div>
+                  ) : null}
+                  {list.map((ev) => {
               const evRow = deriveRowModel(ev);
               const evTier = getTier(ev.eventType);
               const timeLabel =
@@ -691,7 +729,10 @@ export function ActivityItem(props: ActivityItemProps) {
                   ) : null}
                 </div>
               );
-            })}
+                  })}
+                </>
+              );
+            })()}
           </div>
         ) : null}
       </div>

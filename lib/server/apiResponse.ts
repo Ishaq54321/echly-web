@@ -8,6 +8,7 @@ export type ApiErrorCode =
   | "UNAUTHORIZED"
   | "FORBIDDEN"
   | "NOT_FOUND"
+  | "GROUP_NOT_FOUND"
   | "INVALID_INPUT"
   | "INTERNAL_ERROR";
 

@@ -13,8 +13,8 @@ import { Check, ChevronDown, Clock, Filter, Settings } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { ActivityItem } from "@/components/activity/ActivityItem";
+import { ActivitySkeletonStack } from "@/components/activity/ActivitySkeletonRow";
 import { getTier } from "@/components/activity/eventIcons";
-import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import {
   ACTIVITY_FILTER_CATEGORY_IDS,
   ACTIVITY_FILTER_CATEGORY_LABELS,
@@ -22,7 +22,6 @@ import {
   type ActivityFilterCategoryId,
 } from "@/lib/activity/activityEventTypeFilters";
 import {
-  groupEvents,
   groupEventsByDay,
   partitionEarlierByWeek,
   type ActivityEvent,
@@ -34,6 +33,8 @@ import { useWorkspaceStore } from "@/lib/client/workspaceStore";
 
 type ActivityFeedData = {
   events: unknown[];
+  /** Server-side adjacency groups; required whenever the API returns a feed page. */
+  groupedEvents: unknown[];
   nextCursor: { createdAt: number; id: string } | null;
 };
 
@@ -93,6 +94,61 @@ function normalizeApiEvent(raw: unknown): ActivityEvent {
   };
 }
 
+/** Maps API `groupedEvents` into client {@link GroupedActivity}. */
+function normalizeGroupedRows(raw: unknown): GroupedActivity[] {
+  if (!Array.isArray(raw)) return [];
+  const out: GroupedActivity[] = [];
+  for (const row of raw) {
+    const one = normalizeOneGroupedActivity(row);
+    if (one) out.push(one);
+  }
+  return out;
+}
+
+function normalizeOneGroupedActivity(raw: unknown): GroupedActivity | null {
+  if (typeof raw !== "object" || raw == null) return null;
+  const o = raw as Record<string, unknown>;
+  if (o.type === "single") {
+    return { type: "single", event: normalizeApiEvent(o.event) };
+  }
+  if (o.type !== "group") return null;
+
+  const previewWire = Array.isArray(o.previewEvents) ? o.previewEvents : [];
+  const previewEvents = previewWire.map(normalizeApiEvent);
+  if (previewEvents.length === 0) return null;
+
+  const groupId = typeof o.groupId === "string" ? o.groupId.trim() : "";
+  if (!groupId) return null;
+
+  const countRaw = o.count;
+  if (typeof countRaw !== "number" || !Number.isFinite(countRaw) || countRaw < 1) return null;
+  const count = Math.trunc(countRaw);
+
+  const primaryFromWire = typeof o.primaryEventId === "string" ? o.primaryEventId.trim() : "";
+  const primaryEventId = primaryFromWire || (previewEvents[0]?.id ?? "");
+  if (!primaryEventId) return null;
+
+  const createdAt =
+    typeof o.createdAt === "number" && Number.isFinite(o.createdAt)
+      ? o.createdAt
+      : (previewEvents[0]?.createdAt ?? null);
+
+  const first = previewEvents[0]!;
+  return {
+    type: "group",
+    groupId,
+    eventType: typeof o.eventType === "string" ? o.eventType : first.eventType,
+    actorId: typeof o.actorId === "string" ? o.actorId : first.actor?.id ?? "",
+    actorName:
+      typeof o.actorName === "string" ? o.actorName : (first.actor?.name ?? undefined),
+    sessionId: typeof o.sessionId === "string" ? o.sessionId : first.sessionId ?? "",
+    primaryEventId,
+    count,
+    previewEvents,
+    createdAt,
+  };
+}
+
 function formatRelativeActivityTime(ms: number | null): string {
   if (ms == null || !Number.isFinite(ms)) return "";
   const date = new Date(ms);
@@ -123,6 +179,14 @@ function formatRelativeActivityTime(ms: number | null): string {
 type RenderRow =
   | { kind: "activity"; item: GroupedActivity }
   | { kind: "system-collapse"; items: GroupedActivity[]; key: string };
+
+function groupedActivityStableKey(item: GroupedActivity): string {
+  if (item.type === "single") {
+    const ev = item.event;
+    return ev.id || `${ev.eventType}-${ev.createdAt}`;
+  }
+  return `group-${item.groupId}`;
+}
 
 function collapseSystemEvents(items: GroupedActivity[]): RenderRow[] {
   const result: RenderRow[] = [];
@@ -172,6 +236,24 @@ async function fetchActivityFeed(
   return json.data;
 }
 
+/**
+ * Ensures every feed page includes server `groupedEvents` aligned with `events`.
+ * Empty feed: both may be empty arrays. Throws in development on violation.
+ */
+function enforceGroupedEventsContract(data: ActivityFeedData, label: string): void {
+  const ge = data.groupedEvents;
+  const hasEvents = Array.isArray(data.events) && data.events.length > 0;
+  const okArray = Array.isArray(ge);
+  const violated = !okArray || (hasEvents && ge.length === 0);
+  if (!violated) return;
+  const msg = "groupedEvents missing — API contract violated";
+  if (process.env.NODE_ENV === "development") {
+    throw new Error(`${msg} (${label})`);
+  }
+  console.error(msg, { label, hasEvents, groupedEvents: ge });
+  throw new Error("Activity feed returned an invalid response.");
+}
+
 /** Soft color-coded selected state for activity type pills (+ tactile depth). */
 const ACTIVITY_TYPE_PILL_ACTIVE: Record<ActivityFilterCategoryId, string> = {
   comments: "bg-blue-50 text-blue-600 shadow-sm",
@@ -189,6 +271,17 @@ const FILTER_PILL_DEFAULT =
 /** Session narrowed to one workspace: same pill language, light surface only. */
 const FILTER_PILL_SESSION_ACTIVE =
   "bg-white text-neutral-900 shadow-sm hover:bg-white hover:text-neutral-900";
+
+/** Auto-fill + infinite scroll: stop chaining loads once this many rows exist and the page scrolls. */
+const ACTIVITY_FEED_MIN_VISIBLE_ROWS = 8;
+
+function isActivityViewportFilled(rowCount: number): boolean {
+  if (typeof window === "undefined" || typeof document === "undefined") return true;
+  const scrollH = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+  const shortPage = scrollH <= window.innerHeight + 2;
+  const enoughRows = rowCount >= ACTIVITY_FEED_MIN_VISIBLE_ROWS;
+  return enoughRows && !shortPage;
+}
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -213,9 +306,35 @@ function ActivityFeed() {
   const [nextCursor, setNextCursor] = useState<ActivityFeedData["nextCursor"]>(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const loadingInitialRef = useRef(true);
+  const loadingMoreRef = useRef(false);
+  const nextCursorRef = useRef<ActivityFeedData["nextCursor"]>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
   const [expandedSystemKeys, setExpandedSystemKeys] = useState<Set<string>>(() => new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, ActivityEvent[]>>({});
+  /** Accumulated `/api/activity-feed` `groupedEvents` pages (sole source for feed rows). */
+  const [groupedFromServer, setGroupedFromServer] = useState<GroupedActivity[]>([]);
+  /** Keys of rows that just arrived via pagination (short-lived, for enter animation). */
+  const [enterRowKeys, setEnterRowKeys] = useState<Set<string>>(() => new Set());
+  const prevGroupedLenRef = useRef(0);
+  const expandedGroupsRef = useRef<Record<string, ActivityEvent[]>>({});
+  /** In-flight group-member fetches (dedupe / guard against stale completion). */
+  const loadingGroupsRef = useRef<Record<string, boolean>>({});
+  const groupFetchAbortRef = useRef(new Map<string, AbortController>());
+
+  useEffect(() => {
+    expandedGroupsRef.current = expandedGroups;
+  }, [expandedGroups]);
+
+  useEffect(() => {
+    loadingInitialRef.current = loadingInitial;
+  }, [loadingInitial]);
+
+  useEffect(() => {
+    nextCursorRef.current = nextCursor;
+  }, [nextCursor]);
 
   const eventTypesForApi = useMemo(
     () => categoriesToEventTypesForApi(selectedCategory ? [selectedCategory] : []),
@@ -237,9 +356,8 @@ function ActivityFeed() {
     return s?.title ?? "Session";
   }, [selectedSessionId, sessions]);
 
-  const grouped = useMemo(() => groupEvents(events), [events]);
   const dayBuckets = useMemo(() => {
-    const { today, yesterday, earlier } = groupEventsByDay(grouped);
+    const { today, yesterday, earlier } = groupEventsByDay(groupedFromServer);
     const { thisWeek, rest } = partitionEarlierByWeek(earlier, new Date());
     return [
       { label: "Today" as const, items: today },
@@ -247,7 +365,7 @@ function ActivityFeed() {
       { label: "This week" as const, items: thisWeek },
       { label: "Earlier" as const, items: rest },
     ].filter((s) => s.items.length > 0);
-  }, [grouped]);
+  }, [groupedFromServer]);
 
   // PERF R-018: memoize collapseSystemEvents per section so expand/collapse
   // state changes (expandedSystemKeys) don't re-run the collapse computation.
@@ -274,8 +392,17 @@ function ActivityFeed() {
   }, [sessionMenuOpen]);
 
   useEffect(() => {
+    for (const c of groupFetchAbortRef.current.values()) {
+      c.abort();
+    }
+    groupFetchAbortRef.current.clear();
     setExpandedGroupIds(new Set());
     setExpandedSystemKeys(new Set());
+    setExpandedGroups({});
+    loadingGroupsRef.current = {};
+    setGroupedFromServer([]);
+    prevGroupedLenRef.current = 0;
+    setEnterRowKeys(new Set());
   }, [selectedSessionId, eventTypesParamKey]);
 
   useEffect(() => {
@@ -294,16 +421,20 @@ function ActivityFeed() {
       setLoadingInitial(true);
       setEvents([]);
       setNextCursor(null);
+      setGroupedFromServer([]);
       try {
         const data = await fetchActivityFeed(selectedSessionId, eventTypesForApi, null);
         if (cancelled) return;
+        enforceGroupedEventsContract(data, "initial");
         setEvents(data.events.map(normalizeApiEvent));
         setNextCursor(data.nextCursor);
+        setGroupedFromServer(normalizeGroupedRows(data.groupedEvents));
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Something went wrong.");
           setEvents([]);
           setNextCursor(null);
+          setGroupedFromServer([]);
         }
       } finally {
         if (!cancelled) setLoadingInitial(false);
@@ -332,29 +463,165 @@ function ActivityFeed() {
   }, []);
 
   const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore || !user?.uid) return;
-    const cursor = JSON.stringify(nextCursor);
+    if (!user?.uid) return;
+    if (loadingInitialRef.current) return;
+    if (!nextCursorRef.current) return;
+    if (loadingMoreRef.current) return;
+
+    const cursor = JSON.stringify(nextCursorRef.current);
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     setError(null);
     try {
       const data = await fetchActivityFeed(selectedSessionId, eventTypesForApi, cursor);
+      enforceGroupedEventsContract(data, "loadMore");
       setEvents((prev) => [...prev, ...data.events.map(normalizeApiEvent)]);
       setNextCursor(data.nextCursor);
+      const chunk = normalizeGroupedRows(data.groupedEvents);
+      setGroupedFromServer((prev) => [...prev, ...chunk]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load more.");
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [nextCursor, loadingMore, user?.uid, selectedSessionId, eventTypesForApi]);
+  }, [user?.uid, selectedSessionId, eventTypesForApi]);
 
-  const toggleGroup = useCallback((id: string) => {
-    setExpandedGroupIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+  /** Fill short viewports after data paints; chains via deps when each load finishes. */
+  useEffect(() => {
+    if (authLoading || !user?.uid) return;
+    if (loadingInitial) return;
+    if (groupedFromServer.length === 0) return;
+    if (!nextCursor) return;
+    if (loadingMoreRef.current) return;
+
+    const tick = () => {
+      if (loadingMoreRef.current) return;
+      if (!nextCursorRef.current) return;
+      const rowCount = collapsedDayBuckets.reduce((n, s) => n + s.renderRows.length, 0);
+      if (isActivityViewportFilled(rowCount)) return;
+      void loadMore();
+    };
+
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(tick);
     });
-  }, []);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [
+    authLoading,
+    user?.uid,
+    loadingInitial,
+    loadingMore,
+    nextCursor,
+    groupedFromServer.length,
+    collapsedDayBuckets,
+    loadMore,
+  ]);
+
+  useEffect(() => {
+    if (loadingInitial) return;
+    const prev = prevGroupedLenRef.current;
+    const len = groupedFromServer.length;
+    if (len > prev && prev > 0) {
+      const keys = groupedFromServer.slice(prev).map(groupedActivityStableKey);
+      setEnterRowKeys(new Set(keys));
+      const t = window.setTimeout(() => setEnterRowKeys(new Set()), 200);
+      prevGroupedLenRef.current = len;
+      return () => window.clearTimeout(t);
+    }
+    prevGroupedLenRef.current = len;
+  }, [groupedFromServer, loadingInitial]);
+
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el || !nextCursor) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        void loadMore();
+      },
+      { root: null, rootMargin: "0px 0px 280px 0px", threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [nextCursor, loadMore]);
+
+  const loadGroupMembersIfNeeded = useCallback(
+    async (g: Extract<GroupedActivity, { type: "group" }>, groupKey: string) => {
+      if (!g.groupId || g.createdAt == null) return;
+      if (groupKey in expandedGroupsRef.current) return;
+      if (loadingGroupsRef.current[groupKey]) return;
+
+      const previewLen = g.previewEvents.length;
+      if (g.count <= previewLen) return;
+
+      const prev = groupFetchAbortRef.current.get(groupKey);
+      prev?.abort();
+      const ac = new AbortController();
+      groupFetchAbortRef.current.set(groupKey, ac);
+
+      loadingGroupsRef.current[groupKey] = true;
+      try {
+        const params = new URLSearchParams({
+          groupId: g.groupId,
+          sessionId: g.sessionId,
+          eventType: g.eventType,
+          actorId: g.actorId,
+          createdAt: String(g.createdAt),
+        });
+        const res = await authFetch(`/api/activity-group-members?${params.toString()}`, {
+          signal: ac.signal,
+        });
+        if (ac.signal.aborted) return;
+        if (!res) {
+          console.warn("activity-group-members: authFetch returned null");
+          return;
+        }
+        const json = (await res.json()) as ApiEnvelope<{ events: unknown[] }>;
+        if (!res.ok || !json.success || !json.data) {
+          console.warn("activity-group-members:", json.error?.message ?? res.status);
+          return;
+        }
+        const mapped = json.data.events.map(normalizeApiEvent);
+        if (groupFetchAbortRef.current.get(groupKey) === ac) {
+          setExpandedGroups((prevMap) => ({ ...prevMap, [groupKey]: mapped }));
+        }
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return;
+        console.warn("activity-group-members fetch failed", e);
+      } finally {
+        if (groupFetchAbortRef.current.get(groupKey) === ac) {
+          delete loadingGroupsRef.current[groupKey];
+          groupFetchAbortRef.current.delete(groupKey);
+        }
+      }
+    },
+    []
+  );
+
+  const toggleGroup = useCallback(
+    (g: Extract<GroupedActivity, { type: "group" }>) => {
+      const groupKey = g.groupId;
+      setExpandedGroupIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(groupKey)) {
+          next.delete(groupKey);
+          return next;
+        }
+        next.add(groupKey);
+        queueMicrotask(() => {
+          void loadGroupMembersIfNeeded(g, groupKey);
+        });
+        return next;
+      });
+    },
+    [loadGroupMembersIfNeeded]
+  );
 
   const toggleSystemGroup = useCallback((key: string) => {
     setExpandedSystemKeys((prev) => {
@@ -519,26 +786,32 @@ function ActivityFeed() {
           </p>
         ) : null}
 
-        {/* Loading */}
+        {/* Initial load — partial skeleton reads as “content arriving”, not a full-page wait */}
         {loadingInitial ? (
-          <div className="flex justify-center py-10" aria-busy="true" aria-live="polite">
-            <MinimalLoader compact label="Loading activity…" />
+          <div className="w-full" aria-busy="true" aria-live="polite">
+            <ActivitySkeletonStack count={4} />
           </div>
-        ) : events.length === 0 && !error ? (
+        ) : groupedFromServer.length === 0 && !error ? (
           /* Empty state */
-          <div className="flex flex-col items-center py-14 text-center px-6">
-            <div className="mb-4 text-muted-foreground" aria-hidden>
-              <Clock className="h-8 w-8 opacity-30" strokeWidth={1.5} />
+          <div className="flex flex-col items-center py-16 text-center px-6">
+            <div className="relative mb-6" aria-hidden>
+              <div className="absolute inset-0 rounded-full bg-primary/5 blur-2xl scale-150" />
+              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-border/60 bg-gradient-to-b from-muted/80 to-muted/40 shadow-sm">
+                <Clock className="h-7 w-7 text-muted-foreground/55" strokeWidth={1.25} />
+              </div>
             </div>
-            <p className="text-sm font-medium text-foreground">No activity yet</p>
-            <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Activity from your sessions will show up here
+            <p className="text-[15px] font-medium text-foreground/90 tracking-tight">
+              Nothing here yet
+            </p>
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+              When your team comments, creates feedback, or resolves tickets, it will appear in this
+              timeline.
             </p>
           </div>
-        ) : events.length === 0 ? null : (
+        ) : groupedFromServer.length === 0 ? null : (
 
-          /* Feed */
-          <div className="space-y-4">
+          /* Feed — single calm enter when surface replaces skeleton */
+          <div className="space-y-4 activity-feed-row-enter">
             {collapsedDayBuckets.map((section) => {
               const renderRows = section.renderRows;
               return (
@@ -567,7 +840,12 @@ function ActivityFeed() {
                       if (row.kind === "system-collapse") {
                         const isExpanded = expandedSystemKeys.has(row.key);
                         return (
-                          <div key={row.key}>
+                          <div
+                            key={row.key}
+                            className={
+                              enterRowKeys.has(row.key) ? "activity-feed-row-enter" : undefined
+                            }
+                          >
                             <button
                               type="button"
                               onClick={() => toggleSystemGroup(row.key)}
@@ -599,7 +877,7 @@ function ActivityFeed() {
                                   const ev =
                                     item.type === "single"
                                       ? item.event
-                                      : item.events[0]!;
+                                      : item.previewEvents[0]!;
                                   const time = formatRelativeActivityTime(ev.createdAt);
                                   const rowKey =
                                     ev.id || `sys-${ev.eventType}-${ev.createdAt}`;
@@ -630,40 +908,57 @@ function ActivityFeed() {
                         const ev = item.event;
                         const time = formatRelativeActivityTime(ev.createdAt);
                         const rowKey = ev.id || `${ev.eventType}-${ev.createdAt}`;
+                        const enter = enterRowKeys.has(groupedActivityStableKey(item));
                         return (
-                          <ActivityItem
+                          <div
                             key={rowKey}
-                            kind="single"
-                            event={ev}
-                            relativeTime={time || null}
-                            isoTime={
-                              ev.createdAt != null
-                                ? new Date(ev.createdAt).toISOString()
-                                : undefined
-                            }
-                          />
+                            className={enter ? "activity-feed-row-enter" : undefined}
+                          >
+                            <ActivityItem
+                              kind="single"
+                              event={ev}
+                              relativeTime={time || null}
+                              isoTime={
+                                ev.createdAt != null
+                                  ? new Date(ev.createdAt).toISOString()
+                                  : undefined
+                              }
+                            />
+                          </div>
                         );
                       }
 
                       /* Group row */
                       const g = item;
                       const time = formatRelativeActivityTime(g.createdAt);
-                      const expandId = g.primaryEventId;
-                      const expanded = expandedGroupIds.has(expandId);
+                      const groupKey = g.groupId;
+                      const expanded = expandedGroupIds.has(groupKey);
+                      const expandListEvents =
+                        g.count <= g.previewEvents.length
+                          ? g.previewEvents
+                          : groupKey in expandedGroups
+                            ? expandedGroups[groupKey]
+                            : undefined;
+                      const gEnter = enterRowKeys.has(groupedActivityStableKey(item));
                       return (
-                        <ActivityItem
-                          key={`group-${expandId}`}
-                          kind="group"
-                          group={g}
-                          relativeTime={time || null}
-                          isoTime={
-                            g.createdAt != null
-                              ? new Date(g.createdAt).toISOString()
-                              : undefined
-                          }
-                          isExpanded={expanded}
-                          onToggleExpand={() => toggleGroup(expandId)}
-                        />
+                        <div
+                          key={`group-${groupKey}`}
+                          className={gEnter ? "activity-feed-row-enter" : undefined}
+                        >
+                          <ActivityItem
+                            kind="group"
+                            group={g}
+                            relativeTime={time || null}
+                            isoTime={
+                              g.createdAt != null
+                                ? new Date(g.createdAt).toISOString()
+                                : undefined
+                            }
+                            isExpanded={expanded}
+                            onToggleExpand={() => toggleGroup(g)}
+                            expandListEvents={expandListEvents}
+                          />
+                        </div>
                       );
                     })}
                   </div>
@@ -673,23 +968,21 @@ function ActivityFeed() {
           </div>
         )}
 
-        {/* Load more */}
+        {!loadingInitial && groupedFromServer.length > 0 && nextCursor ? (
+          <>
+            <div ref={loadMoreRef} className="h-4 w-full shrink-0" aria-hidden />
+            {loadingMore ? (
+              <div className="mt-1 w-full" aria-busy="true" aria-live="polite">
+                <ActivitySkeletonStack count={3} />
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        {/* Manual fallback (screen readers / if auto-load misses edge cases) */}
         {!loadingInitial && nextCursor ? (
-          <div className="flex justify-center py-4 border-t border-border">
-            <button
-              type="button"
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer bg-transparent border-0 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {loadingMore ? (
-                <span
-                  className="h-3 w-3 rounded-full border border-current border-t-transparent animate-spin"
-                  aria-hidden
-                />
-              ) : (
-                <ChevronDown className="h-3 w-3" aria-hidden />
-              )}
+          <div className="sr-only">
+            <button type="button" onClick={() => void loadMore()} disabled={loadingMore}>
               Load more events
             </button>
           </div>
@@ -702,7 +995,15 @@ function ActivityFeed() {
 
 export default function ActivityPage() {
   return (
-    <Suspense fallback={<div className="w-full" />}>
+    <Suspense
+      fallback={
+        <div className="w-full px-6 py-8">
+          <div className="mx-auto w-full max-w-6xl">
+            <ActivitySkeletonStack count={4} />
+          </div>
+        </div>
+      }
+    >
       <ActivityFeed />
     </Suspense>
   );

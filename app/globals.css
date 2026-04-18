@@ -99,10 +99,15 @@
   /* Typography hierarchy: premium contrast, no faded greys */
   /* Primary body / headline tone — dashboard grey (#364153), single source for text-foreground */
   --text-primary: #364153;
-  --text-secondary: #334155;
+  /* Supporting UI copy — aligned with discussion “secondary” tone */
+  --text-secondary: #364153;
   --text-meta: #64748B;
   --text-active: 220 9% 46%;
   --text-muted: var(--text-meta);
+  /* Discussion thread list + detail: strong hierarchy without loud contrast */
+  --discussion-title: #0f172a;
+  --discussion-body: #0f172a;
+  --discussion-supporting: #364153;
   --brand: 217 85% 52%;
   --brand-ring: 217 85% 52% / 0.35;
 
@@ -191,12 +196,19 @@ html.dark {
   --button-primary-bg: #155dfc;
   --button-primary-text: #ffffff;
   --color-alert: #ef4444;
+  /* Discussion / comment surfaces on dark backgrounds */
+  --discussion-title: #f8fafc;
+  --discussion-body: #f1f5f9;
+  --discussion-supporting: #cbd5e1;
   color-scheme: dark;
 }
 
 /* Text hierarchy utilities: use vars for secondary/meta only; primary stays default or explicit */
 .text-secondary { color: var(--text-secondary); }
 .text-meta { color: var(--text-meta); }
+.text-discussion-title { color: var(--discussion-title); }
+.text-discussion-body { color: var(--discussion-body); }
+.text-discussion-supporting { color: var(--discussion-supporting); }
 .placeholder\:text-meta::placeholder { color: var(--text-meta); }
 .placeholder\:text-secondary::placeholder { color: var(--text-secondary); }
 
@@ -411,6 +423,62 @@ button[aria-disabled="true"],
 
 .insights-fade-in {
   animation: fadeIn 220ms var(--motion-ease-out) both;
+}
+
+/* ======================================
+   ACTIVITY FEED — SKELETON + PAGINATION (PREMIUM)
+====================================== */
+
+@keyframes activity-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+.activity-skeleton-row {
+  animation: activity-skeleton-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes activity-feed-row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.activity-feed-row-enter {
+  animation: activity-feed-row-enter 160ms ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes activity-expand-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.28;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+}
+
+.activity-expand-dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: activity-expand-dot 1s ease-in-out infinite;
 }
 
 /* ======================================
