@@ -76,6 +76,22 @@ export interface SessionFeedbackCounts {
   resolved: number;
 }
 
+export interface SharedSessionMembership {
+  sessionId: string;
+  sessionName: string;
+  workspaceId: string;
+  workspaceName: string | null;
+  access: "view" | "resolve";
+  addedBy: string | null;
+  addedByName: string | null;
+  addedAt: { seconds: number; nanoseconds: number } | null;
+  feedbackCount: number;
+  openCount: number;
+  resolvedCount: number;
+  generalAccess: string;
+  isArchived: boolean;
+}
+
 /** GET /api/sessions page: `{ success, data: { sessions, hasMore, nextCursor } }`. */
 export function sessionsListBootstrapFromApiPayload(json: unknown): {
   sessions: Session[];

@@ -1,5 +1,5 @@
 import { createShareLink } from "@/lib/repositories/shareLinksRepository";
-import { getActiveShareLinkForSession } from "@/lib/repositories/shareLinkActiveBySession";
+import { getActiveShareLinkByAccessForSession } from "@/lib/repositories/shareLinkActiveBySession";
 import { withAuthorization, type HandlerContext } from "@/lib/server/auth/withAuthorization";
 import { routeParamId } from "@/lib/server/routeParams";
 import { buildRequestContext } from "@/lib/server/requestContext";
@@ -8,7 +8,8 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export const dynamic = "force-dynamic";
 
-/** POST /api/sessions/:id/share-link — return existing active token or create one (comment access). */
+/** POST /api/sessions/:id/share-link — return existing active token or create one.
+ *  Body: { access?: "view" | "resolve" } — defaults to "view". */
 export const POST = withAuthorization(
   "update_session",
   async (req: Request, ctx: HandlerContext, { user, userWorkspaceId }) => {
@@ -31,28 +32,39 @@ export const POST = withAuthorization(
       session,
     });
     if (!accessCtx.access?.capabilities.canView) {
-      return apiError({
-        code: "FORBIDDEN",
-        message: "You do not have access",
-        status: 403,
-      });
+      return apiError({ code: "FORBIDDEN", message: "You do not have access", status: 403 });
     }
     if (!accessCtx.access?.capabilities.canComment) {
-      return apiError({
-        code: "FORBIDDEN",
-        message: "You do not have access",
-        status: 403,
-      });
+      return apiError({ code: "FORBIDDEN", message: "You do not have access", status: 403 });
     }
     if (!accessCtx.session) {
       return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
+
+    let body: { access?: unknown } = {};
     try {
-      const existing = await getActiveShareLinkForSession(sessionId);
+      body = (await req.json()) as { access?: unknown };
+    } catch {
+      // no body is fine — defaults to "view"
+    }
+    const rawAccess = body.access;
+    const access: "view" | "resolve" =
+      rawAccess === "resolve" ? "resolve" : "view";
+
+    if (access === "resolve" && !accessCtx.access.capabilities.canResolve) {
+      return apiError({
+        code: "FORBIDDEN",
+        message: "Only resolvers can create resolve-level links",
+        status: 403,
+      });
+    }
+
+    try {
+      const existing = await getActiveShareLinkByAccessForSession(sessionId, access);
       if (existing) {
         return apiSuccess({ token: existing.token }, accessCtx.access!);
       }
-      const { token } = await createShareLink(user.uid, sessionId, "comment", user.uid);
+      const { token } = await createShareLink(user.uid, sessionId, access, user.uid);
       return apiSuccess({ token }, accessCtx.access!);
     } catch (e) {
       console.error("POST /api/sessions/[sessionId]/share-link:", e);

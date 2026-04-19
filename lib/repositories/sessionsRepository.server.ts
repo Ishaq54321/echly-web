@@ -237,6 +237,22 @@ export async function deleteSessionRepo(sessionId: string): Promise<void> {
 
   const viewsSnap = await adminDb.collection(`sessionViews/${sessionId}/views`).get();
   await Promise.all(viewsSnap.docs.map((d) => d.ref.delete()));
+
+  // Delete all member docs to prevent ghost entries in "Shared with me" lists
+  const membersSnap = await adminDb
+    .collection("sessions")
+    .doc(sessionId)
+    .collection("members")
+    .get();
+  if (!membersSnap.empty) {
+    const BATCH_LIMIT = 500;
+    for (let i = 0; i < membersSnap.docs.length; i += BATCH_LIMIT) {
+      const batch = adminDb.batch();
+      membersSnap.docs.slice(i, i + BATCH_LIMIT).forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    }
+  }
+
   await adminDb.doc(`sessions/${sessionId}`).delete();
 
   const workspaceRef = adminDb.doc(`workspaces/${workspaceId}`);

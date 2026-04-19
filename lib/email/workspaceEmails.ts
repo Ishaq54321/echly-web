@@ -3,6 +3,9 @@ import { sendEmailOrLog } from "./resend";
 import { workspaceInviteEmailHtml } from "./templates/workspaceInvite";
 import { workspaceInviteReminderHtml } from "./templates/workspaceInviteReminder";
 import { workspaceDeletedConfirmationHtml } from "./templates/workspaceDeletedConfirmation";
+import { sessionInviteEmailHtml } from "./templates/sessionInvite";
+import { accessRequestNotificationEmailHtml } from "./templates/accessRequestNotification";
+import { accessRequestResultEmailHtml } from "./templates/accessRequestResult";
 
 // WS-006 FIX: always use verified sender domain
 // regardless of APP_URL (localhost would break Resend)
@@ -52,6 +55,100 @@ export async function sendWorkspaceInviteReminderEmail({
     subject: `Your invitation to ${workspaceName} expires in ${expiresInDays} days`,
     html: workspaceInviteReminderHtml({ workspaceName, acceptUrl, expiresInDays }),
   });
+}
+
+export async function sendSessionInviteEmail({
+  to,
+  invitedByName,
+  sessionName,
+  workspaceName,
+  accessLevel,
+  sessionUrl,
+  requiresAccount = false,
+}: {
+  to: string;
+  invitedByName: string;
+  sessionName: string;
+  workspaceName: string;
+  accessLevel: "view" | "resolve";
+  sessionUrl: string;
+  requiresAccount?: boolean;
+}): Promise<void> {
+  try {
+    await sendEmailOrLog({
+      to,
+      subject: `You've been invited to view ${sessionName}`,
+      html: sessionInviteEmailHtml({
+        invitedByName,
+        sessionName,
+        workspaceName,
+        accessLevel,
+        sessionUrl,
+        requiresAccount,
+      }),
+    });
+  } catch (err) {
+    console.error("[sendSessionInviteEmail] failed", err);
+  }
+}
+
+export async function sendAccessRequestNotificationEmail({
+  to,
+  requesterEmail,
+  sessionName,
+  sessionUrl,
+  workspaceName,
+}: {
+  to: string[];
+  requesterEmail: string;
+  sessionName: string;
+  sessionUrl: string;
+  workspaceName: string;
+}): Promise<void> {
+  try {
+    await Promise.allSettled(
+      to.map((recipient) =>
+        sendEmailOrLog({
+          to: recipient,
+          subject: `${requesterEmail} requested access to ${sessionName}`,
+          html: accessRequestNotificationEmailHtml({
+            requesterEmail,
+            sessionName,
+            sessionUrl,
+            workspaceName,
+          }),
+        })
+      )
+    );
+  } catch (err) {
+    console.error("[sendAccessRequestNotificationEmail] failed", err);
+  }
+}
+
+export async function sendAccessRequestResultEmail({
+  to,
+  approved,
+  sessionName,
+  sessionUrl,
+  workspaceName,
+}: {
+  to: string;
+  approved: boolean;
+  sessionName: string;
+  sessionUrl: string;
+  workspaceName: string;
+}): Promise<void> {
+  try {
+    await sendEmailOrLog({
+      to,
+      subject: approved
+        ? `You now have access to ${sessionName}`
+        : `Access request for ${sessionName}`,
+      html: accessRequestResultEmailHtml({ approved, sessionName, sessionUrl, workspaceName }),
+    });
+  } catch (err) {
+    console.error("[sendAccessRequestResultEmail] failed", err);
+  }
 }
 
 export async function sendWorkspaceDeletionConfirmationEmail({

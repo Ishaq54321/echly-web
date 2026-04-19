@@ -26,9 +26,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /sessions/{id} {
+    match /sessions/{sessionId} {
       allow read: if isWorkspaceMember(resource.data.workspaceId);
       allow write: if false;
+
+      match /members/{memberId} {
+        // Server (Admin SDK) bypasses these rules.
+        // These rules protect against direct client SDK access.
+        allow read: if request.auth != null
+                    && request.auth.uid == memberId;
+        allow write: if false;
+      }
     }
 
     match /feedback/{id} {

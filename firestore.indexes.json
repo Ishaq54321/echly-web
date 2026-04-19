@@ -45,14 +45,6 @@
       "collectionGroup": "comments",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "feedbackId", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "comments",
-      "queryScope": "COLLECTION",
-      "fields": [
         { "fieldPath": "workspaceId", "order": "ASCENDING" },
         { "fieldPath": "feedbackId", "order": "ASCENDING" },
         { "fieldPath": "__name__", "order": "ASCENDING" }
@@ -208,23 +200,8 @@
       "collectionGroup": "share_links",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "token", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "share_links",
-      "queryScope": "COLLECTION",
-      "fields": [
         { "fieldPath": "sessionId", "order": "ASCENDING" },
         { "fieldPath": "isActive", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "activityEvents",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
       ]
     },
     {
@@ -256,5 +233,16 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "members",
+      "fieldPath": "userId",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    }
+  ]
 }

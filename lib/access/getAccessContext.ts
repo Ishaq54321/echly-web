@@ -27,6 +27,8 @@ export type AccessContextUser = SessionUser | { uid: string; email?: string | nu
 /** Resolve access-request state for UI; does not affect {@link resolveAccess} or roles. */
 export type AccessContextRequestAwareness = {
   pendingResolve: boolean;
+  /** Current access request status for the authenticated user, or null if no request exists. */
+  requestStatus: "pending" | "approved" | "rejected" | null;
 };
 
 export type GetAccessContextResult = {
@@ -266,7 +268,15 @@ function finalizeAccessContextResult(params: {
   return {
     session,
     access,
-    request: { pendingResolve: resolveAccessRequest?.status === "pending" },
+    request: {
+      pendingResolve: resolveAccessRequest?.status === "pending",
+      requestStatus:
+        resolveAccessRequest?.status === "pending" ||
+        resolveAccessRequest?.status === "approved" ||
+        resolveAccessRequest?.status === "rejected"
+          ? resolveAccessRequest.status
+          : null,
+    },
     debug: { member, invite, inviteIgnoredReason },
   };
 }

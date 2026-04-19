@@ -15,6 +15,9 @@ import {
   resolveActorForActivityEvent,
   sessionTitleFromSessionRow,
 } from "@/lib/repositories/activityEventsRepository.server";
+import { sendSessionInviteEmail } from "@/lib/email/workspaceEmails";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
 export const dynamic = "force-dynamic";
 
@@ -159,6 +162,22 @@ export async function POST(
       source: "invite_api",
     });
 
+    const inviterSnap = await adminDb.doc(`users/${inviterId}`).get();
+    const inviterName =
+      typeof inviterSnap.data()?.displayName === "string"
+        ? inviterSnap.data()!.displayName
+        : typeof inviterSnap.data()?.email === "string"
+          ? inviterSnap.data()!.email
+          : "Someone";
+    void sendSessionInviteEmail({
+      to: email,
+      invitedByName: inviterName,
+      sessionName: context.session?.title ?? "a session",
+      workspaceName: sessionWorkspaceId,
+      accessLevel: access,
+      sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
+    }).catch(() => {});
+
     return apiSuccess({
       type: "member_added",
     });
@@ -216,6 +235,29 @@ export async function POST(
       actorPhotoURL: actor.actorPhotoURL,
       metadata: { sessionTitle, email, access },
     });
+
+    void (async () => {
+      try {
+        const inviterSnap2 = await adminDb.doc(`users/${invitedByUserId}`).get();
+        const inviterName2 =
+          typeof inviterSnap2.data()?.displayName === "string"
+            ? inviterSnap2.data()!.displayName
+            : typeof inviterSnap2.data()?.email === "string"
+              ? inviterSnap2.data()!.email
+              : "Someone";
+        await sendSessionInviteEmail({
+          to: email,
+          invitedByName: inviterName2,
+          sessionName: sessionTitle,
+          workspaceName: workspaceId,
+          accessLevel: access,
+          sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
+          requiresAccount: true,
+        });
+      } catch {
+        // email failure must not fail the route
+      }
+    })();
   }
 
   return apiSuccess({

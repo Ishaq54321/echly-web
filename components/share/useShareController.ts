@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { authFetch } from "@/lib/authFetch";
 
 export type ShareAccess = "view" | "resolve";
@@ -38,7 +38,12 @@ function itemKey(item: Pick<ShareItem, "type" | "id">): string {
   return `${item.type}:${item.id}`;
 }
 
-export function useShareController(sessionId: string) {
+export function useShareController(
+  sessionId: string,
+  options?: { canResolve?: boolean }
+) {
+  const canResolve = options?.canResolve ?? false;
+
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ShareItem[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -53,9 +58,13 @@ export function useShareController(sessionId: string) {
   const [listError, setListError] = useState("");
   const [inviteError, setInviteError] = useState("");
   const [accessRequests, setAccessRequests] = useState<ShareAccessRequestItem[]>([]);
-  const [patchingAccessRequestId, setPatchingAccessRequestId] = useState<string | null>(
-    null
-  );
+  const [patchingAccessRequestId, setPatchingAccessRequestId] = useState<string | null>(null);
+
+  // Link access level for share link copy
+  const [linkAccessLevel, setLinkAccessLevel] = useState<ShareAccess>("view");
+  const [copyingLink, setCopyingLink] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const linkCopiedTimerRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     const sid = sessionId.trim();
@@ -161,6 +170,8 @@ export function useShareController(sessionId: string) {
     async (value: ShareGeneralAccess) => {
       const sid = sessionId.trim();
       if (!sid) return;
+      const previous = generalAccess;
+      setGeneralAccess(value);
       setUpdatingGeneralAccess(true);
       const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/share-settings`, {
         method: "PATCH",
@@ -168,17 +179,64 @@ export function useShareController(sessionId: string) {
         body: JSON.stringify({ generalAccess: value }),
       });
       if (!res) {
+        setGeneralAccess(previous);
         setUpdatingGeneralAccess(false);
         return;
       }
       const json = (await res.json().catch(() => ({}))) as ApiEnvelope<Record<string, never>>;
-      if (res.ok && json.success) {
-        setGeneralAccess(value);
+      if (!res.ok || !json.success) {
+        setGeneralAccess(previous);
+        setListError("Only the session owner can change general access");
+        console.error("[useShareController] updateGeneralAccess failed", { status: res.status, json });
       }
       setUpdatingGeneralAccess(false);
     },
-    [sessionId]
+    [sessionId, generalAccess]
   );
+
+  const copyShareLink = useCallback(async () => {
+    const sid = sessionId.trim();
+    if (!sid || copyingLink) return;
+    setCopyingLink(true);
+    setListError("");
+    try {
+      const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/share-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access: linkAccessLevel }),
+      });
+      if (!res) {
+        setCopyingLink(false);
+        return;
+      }
+      const json = (await res.json().catch(() => ({}))) as ApiEnvelope<{ token?: string }>;
+      if (!res.ok || !json.success) {
+        setListError(getErrorMessage(json) || "Could not create share link");
+        setCopyingLink(false);
+        return;
+      }
+      const token = json.data?.token;
+      if (token) {
+        const url = `${window.location.origin}/dashboard/${encodeURIComponent(sid)}?token=${encodeURIComponent(token)}`;
+        try {
+          await navigator.clipboard.writeText(url);
+        } catch {
+          // fallback: no-op
+        }
+        if (linkCopiedTimerRef.current != null) window.clearTimeout(linkCopiedTimerRef.current);
+        setLinkCopied(true);
+        linkCopiedTimerRef.current = window.setTimeout(() => setLinkCopied(false), 2000);
+      }
+    } finally {
+      setCopyingLink(false);
+    }
+  }, [sessionId, linkAccessLevel, copyingLink]);
+
+  useEffect(() => {
+    return () => {
+      if (linkCopiedTimerRef.current != null) window.clearTimeout(linkCopiedTimerRef.current);
+    };
+  }, []);
 
   const updateRole = useCallback(
     async (item: Pick<ShareItem, "type" | "id">, access: ShareAccess) => {
@@ -327,5 +385,11 @@ export function useShareController(sessionId: string) {
     invite,
     updateRole,
     removeAccess,
+    canResolve,
+    linkAccessLevel,
+    setLinkAccessLevel,
+    copyingLink,
+    linkCopied,
+    copyShareLink,
   };
 }

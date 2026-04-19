@@ -7,6 +7,10 @@ import {
   getRequestByUser,
 } from "@/lib/repositories/accessRequestsRepository.server";
 import { getSessionMember } from "@/lib/repositories/sessionMembersRepository.server";
+import { getWorkspaceMembersRepo } from "@/lib/repositories/workspaceMembersRepository.server";
+import { sendAccessRequestNotificationEmail } from "@/lib/email/workspaceEmails";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
 export const dynamic = "force-dynamic";
 
@@ -43,15 +47,7 @@ export async function POST(
 
   const userId = context.userId.trim();
 
-  if (!context.access?.capabilities.canView) {
-    return apiError({
-      code: "FORBIDDEN",
-      message: "You do not have access to this session",
-      status: 403,
-    });
-  }
-
-  if (context.access.capabilities.canResolve) {
+  if (context.access?.capabilities.canResolve) {
     return apiError({
       code: "FORBIDDEN",
       message: "You already have resolve access",
@@ -109,6 +105,27 @@ export async function POST(
     }
     throw e;
   }
+
+  void (async () => {
+    try {
+      const sess = context.session;
+      if (!sess) return;
+      const workspaceId = typeof sess.workspaceId === "string" ? sess.workspaceId.trim() : "";
+      if (!workspaceId) return;
+      const members = await getWorkspaceMembersRepo(workspaceId);
+      const emails = members.map((m) => m.email).filter((e) => e && e !== requesterEmail);
+      if (emails.length === 0) return;
+      await sendAccessRequestNotificationEmail({
+        to: emails,
+        requesterEmail,
+        sessionName: sess.title ?? "a session",
+        sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
+        workspaceName: workspaceId,
+      });
+    } catch {
+      // email failure must not fail the route
+    }
+  })();
 
   return apiSuccess({
     type: "request_created" as const,

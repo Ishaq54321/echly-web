@@ -62,6 +62,20 @@ const RequestAccessModal = dynamic(
   () => import("@/components/RequestAccessModal").then((m) => m.RequestAccessModal),
   { ssr: false }
 );
+
+const RequestSessionAccessPage = dynamic(
+  () =>
+    import("@/components/session/RequestSessionAccessPage").then(
+      (m) => m.RequestSessionAccessPage
+    ),
+  { ssr: false }
+);
+
+const PendingAccessBanner = dynamic(
+  () =>
+    import("@/components/session/PendingAccessBanner").then((m) => m.PendingAccessBanner),
+  { ssr: false }
+);
 import { Modal } from "@/components/ui/Modal";
 
 /** Session page: single GET for session + first feedback page. Set false to restore legacy `/api/sessions` + `/api/feedback` first page. */
@@ -152,6 +166,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   const [sessionAccess, setSessionAccess] = useState<AccessCapabilities | null>(null);
   /** From GET /api/sessions/:id `data.request.pendingResolve` or successful POST /request-access. */
   const [pendingResolveRequest, setPendingResolveRequest] = useState(false);
+  /** Status of the current user's access request when accessBlocked is true. */
+  const [requestAccessStatus, setRequestAccessStatus] = useState<
+    "idle" | "pending" | "submitted" | "already_requested" | "rejected"
+  >("idle");
+  /** Pending access request count shown as red dot on Share button. */
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   /** First feedback page from GET /api/session-page-bundle when {@link USE_BUNDLE} is true. */
   const [bundledFirstFeedbackPage, setBundledFirstFeedbackPage] = useState<{
     feedback: Record<string, unknown>[];
@@ -175,7 +195,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   /** Invalidates in-flight load work when the effect re-runs (e.g. React Strict Mode). */
   const sessionLoadEffectNonceRef = useRef(0);
 
-  const { authUid, isIdentityResolved, authReady } = useWorkspace();
+  const { authUid, isIdentityResolved, authReady, workspaceName, authEmail } = useWorkspace();
   const { showToast } = useToast();
 
   const handleRequestResolveAccess = useCallback(async () => {
@@ -208,6 +228,38 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
       requestResolveAccessInFlightRef.current = false;
     }
   }, [sessionId, authUid, pendingResolveRequest, showToast]);
+
+  const handleRequestSessionAccess = useCallback(async () => {
+    const sid = sessionId?.trim();
+    if (!sid || !authUid?.trim()) return;
+    setRequestAccessStatus("pending");
+    try {
+      const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/request-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const raw = (await res?.json().catch(() => ({}))) as {
+        success?: boolean;
+        data?: { type?: string };
+      };
+      if (res?.ok && raw.success) {
+        const t = raw.data?.type;
+        if (t === "request_created") {
+          setRequestAccessStatus("submitted");
+          return;
+        }
+        if (t === "already_requested") {
+          setRequestAccessStatus("already_requested");
+          return;
+        }
+      }
+      setRequestAccessStatus("idle");
+      showToast("Could not submit access request");
+    } catch {
+      setRequestAccessStatus("idle");
+      showToast("Could not submit access request");
+    }
+  }, [sessionId, authUid, showToast]);
 
   const [requestAccessModalOpen, setRequestAccessModalOpen] = useState(false);
   const [requestAccessSubmitting, setRequestAccessSubmitting] = useState(false);
@@ -722,7 +774,15 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         };
         if (res.status === 403) {
           setBundledFirstFeedbackPage(null);
-          const cap = accessRoot.access?.capabilities;
+          const errorBody = body as {
+            data?: {
+              access?: { capabilities?: Partial<AccessCapabilities> };
+              accessRequestStatus?: string | null;
+            };
+          };
+          const cap =
+            errorBody.data?.access?.capabilities ??
+            (accessRoot.access?.capabilities as Partial<AccessCapabilities> | undefined);
           if (cap && cap.canView === false) {
             setAccessBlocked(true);
             setSession(null);
@@ -736,6 +796,14 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
               canDeleteOwnComment: cap.canDeleteOwnComment !== false,
               canDeleteTicket: cap.canDeleteTicket === true,
             });
+            const arStatus = errorBody.data?.accessRequestStatus;
+            if (arStatus === "rejected") {
+              setRequestAccessStatus("rejected");
+            } else if (arStatus === "pending") {
+              setRequestAccessStatus("already_requested");
+            } else {
+              setRequestAccessStatus("idle");
+            }
             return;
           }
           setAccessBlocked(false);
@@ -843,6 +911,29 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           pendingResolveRequest: assembledPendingResolve,
           bundledFirstFeedbackPage: assembledFeedbackPage,
         });
+
+        // Phase 5: load pending request count for Share button dot
+        if (assembledAccess?.canResolve) {
+          void (async () => {
+            try {
+              const arRes = await authFetch(
+                `/api/sessions/${encodeURIComponent(sessionId.trim())}/access-requests`
+              );
+              if (arRes?.ok) {
+                const arJson = (await arRes.json().catch(() => ({}))) as {
+                  success?: boolean;
+                  data?: { requests?: { status?: string }[] };
+                };
+                if (arJson.success && Array.isArray(arJson.data?.requests)) {
+                  const count = arJson.data.requests.filter((r) => r.status === "pending").length;
+                  setPendingRequestsCount(count);
+                }
+              }
+            } catch {
+              // ignore
+            }
+          })();
+        }
         /* View count: recorded server-side in GET /api/session-page-bundle (see recordSessionViewIfNewRepo). */
       } else {
         const url = `/api/sessions/${encodeURIComponent(sessionId)}${qs}`;
@@ -1879,22 +1970,22 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
 
   if (accessBlocked) {
     return (
-      <div className="flex h-full min-h-[50vh] w-full items-center justify-center p-8">
-        <div className="max-w-md text-center">
-          <h2 className="text-[20px] font-semibold text-[hsl(var(--text-primary-strong))]">
-            Access restricted
-          </h2>
-          <p className="mt-3 text-[14px] text-[hsl(var(--text-secondary-soft))]">
-            Sign in or request access to view this session.
-          </p>
-          <button
-            type="button"
-            className="mt-6 rounded-lg border border-[hsl(var(--border-subtle))] bg-[hsl(var(--surface-elevated))] px-4 py-2 text-[14px] font-medium text-[hsl(var(--text-primary-strong))]"
-          >
-            Request access
-          </button>
-        </div>
-      </div>
+      <RequestSessionAccessPage
+        sessionId={sessionId}
+        sessionName={null}
+        workspaceName={workspaceName ?? null}
+        isAuthenticated={!!authUid}
+        userEmail={authEmail ?? null}
+        requestStatus={requestAccessStatus}
+        onRequestAccess={handleRequestSessionAccess}
+        onSignIn={() =>
+          router.push(
+            `/login?returnUrl=${encodeURIComponent(
+              window.location.pathname + window.location.search
+            )}`
+          )
+        }
+      />
     );
   }
 
@@ -2096,6 +2187,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         <div className="content-divider hidden lg:block shrink-0" aria-hidden />
 
         <div className="main-area flex min-h-0 min-w-0 flex-1 flex-col">
+          {pendingResolveRequest && sessionAccess?.canResolve === false ? (
+            <PendingAccessBanner />
+          ) : null}
           <TopControlBar
             sessionId={sessionId}
             sessionTitle={session ? (session.title ?? "").trim() : ""}
@@ -2105,6 +2199,9 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             onRequestDeleteSession={handleRequestDeleteSessionFromMenu}
             publicViewer={isAnonymousViewer}
             canManageShare={sessionAccess?.canResolve === true}
+            canManageAccess={sessionAccess?.canDeleteTicket === true}
+            pendingRequestsCount={pendingRequestsCount}
+            onShareModalOpen={() => setPendingRequestsCount(0)}
           />
           <div className="flex flex-1 min-h-0 min-w-0">
             <main className="surface-main flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">

@@ -199,7 +199,11 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
   }
 
   if (level === "resolve") {
-    return { role: "RESOLVER", sessionGranted: true };
+    // Unauthenticated users with a "resolve" link can view but must sign in to resolve
+    if (user !== null) {
+      return { role: "RESOLVER", sessionGranted: true };
+    }
+    return { role: "VIEWER", sessionGranted: true };
   }
   return { role: "VIEWER", sessionGranted: true };
 }

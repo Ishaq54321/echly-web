@@ -65,6 +65,10 @@ export async function GET(req: NextRequest) {
         code: "FORBIDDEN",
         message: "You do not have access",
         status: 403,
+        data: {
+          access: access ? { capabilities: access.capabilities } : null,
+          accessRequestStatus: ctx.accessRequest?.requestStatus ?? null,
+        },
         init: { headers: corsHeaders(req) },
       });
     }

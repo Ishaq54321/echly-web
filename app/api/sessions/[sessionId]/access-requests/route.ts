@@ -12,6 +12,9 @@ import {
   resolveActorForActivityEvent,
   sessionTitleFromSessionRow,
 } from "@/lib/repositories/activityEventsRepository.server";
+import { sendAccessRequestResultEmail } from "@/lib/email/workspaceEmails";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
 export const dynamic = "force-dynamic";
 
@@ -164,6 +167,13 @@ export async function PATCH(
         actorPhotoURL: actor.actorPhotoURL,
         metadata: { sessionTitle },
       });
+      void sendAccessRequestResultEmail({
+        to: accessRequest.requesterEmail,
+        approved: false,
+        sessionName: sessionTitle,
+        sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
+        workspaceName: workspaceId,
+      }).catch(() => {});
     }
     return apiSuccess({
       type: "rejected" as const,
@@ -207,6 +217,13 @@ export async function PATCH(
       actorPhotoURL: actor.actorPhotoURL,
       metadata: { sessionTitle },
     });
+    void sendAccessRequestResultEmail({
+      to: accessRequest.requesterEmail,
+      approved: true,
+      sessionName: sessionTitle,
+      sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
+      workspaceName: workspaceId,
+    }).catch(() => {});
   }
 
   return apiSuccess({

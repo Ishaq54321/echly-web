@@ -31,6 +31,9 @@ export function TopControlBar({
   onRequestDeleteSession,
   publicViewer = false,
   canManageShare = false,
+  canManageAccess = false,
+  pendingRequestsCount = 0,
+  onShareModalOpen,
 }: {
   sessionId: string;
   sessionTitle?: string;
@@ -48,6 +51,12 @@ export function TopControlBar({
   /** Anonymous `/session/:id` — no share/archive/delete or global chrome. */
   publicViewer?: boolean;
   canManageShare?: boolean;
+  /** True only for OWNER — gates the general access dropdown. */
+  canManageAccess?: boolean;
+  /** Number of pending access requests; shows red dot on Share button when > 0. */
+  pendingRequestsCount?: number;
+  /** Called when share modal is opened (e.g. to clear pending count). */
+  onShareModalOpen?: () => void;
 }) {
   const { authUid, isIdentityResolved } = useWorkspace();
   const copyTimerRef = useRef<number | null>(null);
@@ -56,11 +65,17 @@ export function TopControlBar({
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkCopyBusy, setLinkCopyBusy] = useState(false);
 
-  const share = useShareController(sessionId);
+  const share = useShareController(sessionId, { canResolve: canManageShare });
+
   useEffect(() => {
     if (!share.open) return;
     void share.load().catch(() => {});
   }, [share.open, share.load]);
+
+  const handleShareOpen = useCallback(() => {
+    share.setOpen(true);
+    onShareModalOpen?.();
+  }, [share, onShareModalOpen]);
 
   const copyCurrentLink = useCallback(async () => {
     if (linkCopyBusy) return;
@@ -99,12 +114,33 @@ export function TopControlBar({
     <>
       <div className="page-header sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-end gap-4 bg-[var(--layer-1-bg)] px-6">
         <div className="right flex shrink-0 items-center gap-2.5">
-          <ShareButton onClick={() => share.setOpen(true)} />
+          {/* Share button with notification dot */}
+          <div style={{ position: "relative", display: "inline-flex" }}>
+            <ShareButton onClick={handleShareOpen} />
+            {pendingRequestsCount > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -3,
+                  right: -3,
+                  width: 9,
+                  height: 9,
+                  background: "#EF4444",
+                  borderRadius: "50%",
+                  border: "1.5px solid white",
+                  pointerEvents: "none",
+                }}
+                aria-hidden
+              />
+            )}
+          </div>
+
           {share.open ? (
             <ShareModal
               open
               onClose={() => share.setOpen(false)}
               canManageShare={canManageShare}
+              canManageAccess={canManageAccess}
               inviteEmail={share.inviteEmail}
               setInviteEmail={share.setInviteEmail}
               inviteAccess={share.inviteAccess}
@@ -139,6 +175,12 @@ export function TopControlBar({
               onRejectAccessRequest={(id) => {
                 void share.patchAccessRequest(id, "reject").catch(() => {});
               }}
+              canResolve={canManageShare}
+              linkAccessLevel={share.linkAccessLevel}
+              setLinkAccessLevel={share.setLinkAccessLevel}
+              copyingLink={share.copyingLink}
+              linkCopied={share.linkCopied}
+              onCopyShareLink={() => void share.copyShareLink().catch(() => {})}
             />
           ) : null}
           <button

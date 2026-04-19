@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { Loader2, Trash2, Users, X } from "lucide-react";
+import { Check, ChevronDown, Link, Loader2, Trash2, Users, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import type {
   ShareAccess,
@@ -15,6 +15,8 @@ export interface ShareModalProps {
   open: boolean;
   onClose: () => void;
   canManageShare: boolean;
+  /** True only for OWNER — gates the general access dropdown. */
+  canManageAccess: boolean;
   inviteEmail: string;
   setInviteEmail: (value: string) => void;
   inviteAccess: ShareAccess;
@@ -37,6 +39,13 @@ export interface ShareModalProps {
   patchingAccessRequestId: string | null;
   onApproveAccessRequest: (requestId: string) => void;
   onRejectAccessRequest: (requestId: string) => void;
+  // Link copy section
+  canResolve: boolean;
+  linkAccessLevel: ShareAccess;
+  setLinkAccessLevel: (v: ShareAccess) => void;
+  copyingLink: boolean;
+  linkCopied: boolean;
+  onCopyShareLink: () => void;
 }
 
 const GENERAL_ACCESS_OPTIONS: { value: ShareGeneralAccess; label: string }[] = [
@@ -66,6 +75,7 @@ export function ShareModal({
   open,
   onClose,
   canManageShare,
+  canManageAccess,
   inviteEmail,
   setInviteEmail,
   inviteAccess,
@@ -88,9 +98,14 @@ export function ShareModal({
   patchingAccessRequestId,
   onApproveAccessRequest,
   onRejectAccessRequest,
+  canResolve,
+  linkAccessLevel,
+  setLinkAccessLevel,
+  copyingLink,
+  linkCopied,
+  onCopyShareLink,
 }: ShareModalProps) {
   const titleId = useId();
-  const inviteAccessId = useId();
   const canWrite = canManageShare;
 
   if (!open) return null;
@@ -98,6 +113,7 @@ export function ShareModal({
   return (
     <Modal open={open} onClose={onClose} ariaLabelledBy={titleId}>
       <div className="modal share-modal relative overflow-visible" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
         <div className="share-modal-header">
           <h2 id={titleId} className="share-modal-title">
             Share session
@@ -108,60 +124,78 @@ export function ShareModal({
         </div>
 
         <div className="share-modal-share-stack flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* General access */}
           <section className="share-modal-general-access-stack">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="share-modal-section-heading share-modal-section-heading--general-access">
+              <h3 className="text-xs font-medium text-muted-foreground mb-1.5">
                 General access
+                {loadingGeneralAccess ? (
+                  <Loader2 size={12} className="ml-1.5 inline animate-spin" aria-hidden />
+                ) : null}
               </h3>
-              {loadingGeneralAccess ? (
-                <Loader2 size={16} className="shrink-0 animate-spin text-[#6b7280]" aria-hidden />
-              ) : null}
             </div>
             <p className="share-modal-general-access-hint">Default access for anyone opening the link</p>
             <div className="share-modal-permissions share-modal-permissions--flush">
-              <ShareDropdown
-                variant="general"
-                value={generalAccess}
-                options={GENERAL_ACCESS_OPTIONS}
-                onSelect={(v) => {
-                  if (v === "restricted" || v === "link_view") {
-                    onUpdateGeneralAccess(v);
-                  }
-                }}
-                disabled={!canWrite || updatingGeneralAccess || loadingGeneralAccess}
-                ariaLabel="Default access for the link"
-              />
+              <div
+                title={!canManageAccess ? "Only the session owner can change general access" : undefined}
+              >
+                <ShareDropdown
+                  variant="general"
+                  value={generalAccess}
+                  options={GENERAL_ACCESS_OPTIONS}
+                  onSelect={(v) => {
+                    if (v === "restricted" || v === "link_view") {
+                      onUpdateGeneralAccess(v);
+                    }
+                  }}
+                  disabled={!canManageAccess || updatingGeneralAccess || loadingGeneralAccess}
+                  ariaLabel="Default access for the link"
+                />
+              </div>
             </div>
           </section>
 
           <hr className="share-modal-divider" />
 
-          <div className="share-modal-invite">
-            <div className="share-modal-invite-actions">
+          {/* Invite people */}
+          <section className="py-3">
+            <h3 className="text-xs font-medium text-muted-foreground mb-1.5">Invite people</h3>
+            <div className="flex items-center gap-2">
+              {/* Email input */}
               <input
+                type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="Email address"
-                className="share-input min-w-0 flex-1 basis-[120px] disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 h-[38px] border border-border rounded-lg px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:border-blue-400 bg-background disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={!canWrite || inviting}
                 autoComplete="email"
               />
-              <ShareDropdown
-                id={inviteAccessId}
-                variant="role-pill"
-                value={inviteAccess}
-                options={ROLE_OPTIONS}
-                onSelect={(v) => {
-                  if (v === "view" || v === "resolve") {
-                    setInviteAccess(v);
-                  }
-                }}
-                disabled={!canWrite || inviting}
-                ariaLabel="Invite permission"
-              />
+
+              {/* Can view / Can resolve pill toggle */}
+              <div className="flex items-center bg-muted border border-border rounded-lg p-[3px] gap-[2px] flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setInviteAccess("view")}
+                  disabled={!canWrite || inviting}
+                  className={`text-xs font-medium rounded-md px-2.5 py-1 transition-all whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 ${inviteAccess === "view" ? "bg-background text-foreground border border-border shadow-none" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Can view
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInviteAccess("resolve")}
+                  disabled={!canWrite || inviting}
+                  className={`text-xs font-medium rounded-md px-2.5 py-1 transition-all whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 ${inviteAccess === "resolve" ? "bg-background text-foreground border border-border shadow-none" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Can resolve
+                </button>
+              </div>
+
+              {/* Invite button */}
               <button
                 type="button"
-                className="share-btn share-btn--primary share-modal-invite-share-btn inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+                className="h-[38px] bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 flex-shrink-0 transition-colors inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={onInvite}
                 disabled={!canWrite || inviting}
               >
@@ -169,23 +203,22 @@ export function ShareModal({
                 Invite
               </button>
             </div>
-          </div>
 
-          {inviteError ? <p className="share-modal-list-error">{inviteError}</p> : null}
-          {listError ? <p className="share-modal-list-error">{listError}</p> : null}
-          {!canWrite ? (
-            <p className="share-modal-general-access-hint">
-              You do not have permission to manage access.
-            </p>
-          ) : null}
+            {inviteError ? <p className="share-modal-list-error mt-2">{inviteError}</p> : null}
+            {listError ? <p className="share-modal-list-error mt-1">{listError}</p> : null}
+            {!canWrite ? (
+              <p className="share-modal-general-access-hint mt-2">
+                You do not have permission to manage access.
+              </p>
+            ) : null}
+          </section>
 
+          {/* Requests */}
           {canWrite ? (
             <>
               <hr className="share-modal-divider" />
-              <section className="share-modal-requests shrink-0">
-                <h3 className="share-modal-section-heading share-modal-section-heading--requests">
-                  Requests
-                </h3>
+              <section className="share-modal-requests shrink-0 py-3">
+                <h3 className="text-xs font-medium text-muted-foreground mb-1.5">Requests</h3>
                 {initialLoading ? (
                   <div className="share-modal-list-loading flex items-center justify-center py-6">
                     <Loader2 size={18} className="animate-spin text-[#6b7280]" aria-hidden />
@@ -199,10 +232,10 @@ export function ShareModal({
                       return (
                         <li
                           key={req.id}
-                          className="share-access-request-row flex flex-wrap items-center gap-3 rounded-lg border border-[#E8EBEF] bg-[#FAFBFC] px-3 py-2.5"
+                          className="share-access-request-row flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5"
                         >
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-[14px] font-medium text-[#111827]">
+                            <div className="truncate text-[14px] font-medium text-foreground">
                               {req.requesterEmail}
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -212,6 +245,12 @@ export function ShareModal({
                             </div>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
+                            {/* Role selector */}
+                            <div className="flex items-center gap-1.5 border border-border rounded-lg px-2.5 py-[5px] text-xs font-medium text-muted-foreground bg-background cursor-pointer hover:border-border/80 transition-colors select-none">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                              Can view
+                              <ChevronDown className="h-3 w-3 ml-0.5" />
+                            </div>
                             <button
                               type="button"
                               className="share-btn share-btn--primary inline-flex h-8 min-w-[5.5rem] items-center justify-center gap-1.5 px-3 text-[13px] disabled:cursor-not-allowed disabled:opacity-60"
@@ -242,10 +281,11 @@ export function ShareModal({
             </>
           ) : null}
 
-          <div className="share-modal-shared-with min-h-0 flex-1">
-            <h3 className="share-modal-section-heading share-modal-section-heading--people">
-              People with access
-            </h3>
+          <hr className="share-modal-divider" />
+
+          {/* People with access */}
+          <div className="share-modal-shared-with min-h-0 flex-1 py-3">
+            <h3 className="text-xs font-medium text-muted-foreground mb-1.5">People with access</h3>
             <div className="share-modal-team share-modal-team--members min-h-0 overflow-y-auto pr-1">
               {initialLoading ? (
                 <div className="share-modal-list-loading flex items-center justify-center py-10">
@@ -277,29 +317,37 @@ export function ShareModal({
                             <p>{memberSubtitle(item)}</p>
                           </div>
                         </div>
-                        <ShareDropdown
-                          variant="role-pill"
-                          value={item.access}
-                          options={ROLE_OPTIONS}
-                          onSelect={(v) => {
-                            if (v === "view" || v === "resolve") {
-                              onUpdateRole(item, v);
+
+                        {/* Role dropdown */}
+                        <div
+                          className={`flex items-center gap-1.5 border border-border rounded-lg px-2.5 py-[5px] text-xs font-medium text-muted-foreground bg-background cursor-pointer hover:border-border/80 transition-colors select-none${disabled ? " opacity-60 cursor-not-allowed pointer-events-none" : ""}`}
+                          onClick={() => {
+                            if (!disabled) {
+                              onUpdateRole(item, item.access === "view" ? "resolve" : "view");
                             }
                           }}
-                          disabled={disabled}
-                          ariaLabel={`Access for ${item.email}`}
-                        />
+                        >
+                          {busyUpdate ? (
+                            <Loader2 size={12} className="animate-spin" aria-hidden />
+                          ) : (
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                          )}
+                          {item.access === "resolve" ? "Can resolve" : "Can view"}
+                          <ChevronDown className="h-3 w-3 ml-0.5" />
+                        </div>
+
+                        {/* Remove button */}
                         <button
                           type="button"
-                          className="icon-btn shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
                           aria-label="Remove access"
                           disabled={disabled}
                           onClick={() => onRemove(item)}
                         >
                           {busyRemove ? (
-                            <Loader2 size={16} className="animate-spin" aria-hidden />
+                            <Loader2 size={14} className="animate-spin" aria-hidden />
                           ) : (
-                            <Trash2 size={16} aria-hidden />
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
                           )}
                         </button>
                       </li>
@@ -311,13 +359,46 @@ export function ShareModal({
           </div>
         </div>
 
-        <div className="share-modal-actions share-modal-actions--footer">
-          <button type="button" className="share-btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="share-btn share-btn--primary" onClick={onClose}>
-            Done
-          </button>
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-3.5 border-t border-border">
+          {/* Copy link — bottom left */}
+          {canWrite ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-3.5 py-[7px] hover:bg-blue-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={onCopyShareLink}
+              disabled={copyingLink}
+            >
+              {copyingLink ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              ) : linkCopied ? (
+                <Check className="h-3.5 w-3.5" aria-hidden />
+              ) : (
+                <Link className="h-3.5 w-3.5" aria-hidden />
+              )}
+              {linkCopied ? "Copied" : "Copy link"}
+            </button>
+          ) : (
+            <span />
+          )}
+
+          {/* Cancel + Done — bottom right */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="h-9 px-4 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="h-9 px-5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={onClose}
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
     </Modal>

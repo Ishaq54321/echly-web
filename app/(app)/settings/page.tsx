@@ -11,10 +11,9 @@ import {
   Check,
   Minus,
   UserPlus,
-  Trash2,
+  UserMinus,
   X,
   Mail,
-  Clock,
   RotateCcw,
   AlertCircle,
   Users,
@@ -25,7 +24,6 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Switch } from "@/components/ui/Switch";
 import { Modal } from "@/components/ui/Modal";
-import { UserAvatar } from "@/components/ui/UserAvatar";
 import type { Workspace } from "@/lib/domain/workspace";
 import {
   assertIdentityResolved,
@@ -798,6 +796,18 @@ type SerializedInvitation = {
   createdAt: SerializedTs;
 };
 
+type UnifiedMemberRow = {
+  id: string;
+  type: "member" | "invitation";
+  name: string | null;
+  email: string;
+  role: "OWNER" | "MEMBER";
+  status: "active" | "pending";
+  joinedAt: { seconds: number; nanoseconds: number } | null;
+  avatarUrl: string | null;
+  invitationToken: string | null;
+};
+
 function formatTs(ts: SerializedTs): string {
   return new Date(ts.seconds * 1000).toLocaleDateString("en-US", {
     year: "numeric",
@@ -843,187 +853,342 @@ function daysUntil(ts: SerializedTs): number {
   return Math.ceil((ts.seconds * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-const AVATAR_COLORS = [
-  "bg-blue-500",
-  "bg-violet-500",
-  "bg-emerald-500",
-  "bg-amber-500",
-  "bg-rose-500",
-  "bg-cyan-500",
+const MEMBER_AVATAR_COLORS = [
+  { bg: "#DBEAFE", text: "#1D4ED8" },
+  { bg: "#D1FAE5", text: "#065F46" },
+  { bg: "#FEE2E2", text: "#991B1B" },
+  { bg: "#EDE9FE", text: "#5B21B6" },
+  { bg: "#FEF3C7", text: "#92400E" },
+  { bg: "#FCE7F3", text: "#9D174D" },
+  { bg: "#E0F2FE", text: "#0C4A6E" },
+  { bg: "#F0FDF4", text: "#14532D" },
 ];
 
-function nameToColorClass(name: string): string {
+function getAvatarColor(email: string): { bg: string; text: string } {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]!;
+  for (let i = 0; i < email.length; i++) {
+    hash = email.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return MEMBER_AVATAR_COLORS[Math.abs(hash) % MEMBER_AVATAR_COLORS.length]!;
 }
 
-function MemberRow({
-  member,
-  isOwnerCaller,
-  removing,
-  onRemove,
-}: {
-  member: SerializedMember;
-  isOwnerCaller: boolean;
-  removing: boolean;
-  onRemove: () => void;
-}) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const canRemove = isOwnerCaller && member.role !== "OWNER";
-  const displayName = member.displayName ?? member.email;
-  const colorClass = nameToColorClass(displayName);
+function formatDateAdded(ts: unknown): string {
+  try {
+    if (!ts) return "—";
+    let date: Date;
+    if (
+      typeof ts === "object" &&
+      ts !== null &&
+      "seconds" in ts &&
+      typeof (ts as { seconds: unknown }).seconds === "number"
+    ) {
+      date = new Date((ts as { seconds: number }).seconds * 1000);
+    } else if (typeof ts === "string") {
+      date = new Date(ts);
+    } else if (typeof ts === "number") {
+      date = new Date(ts);
+    } else {
+      return "—";
+    }
+    if (isNaN(date.getTime())) return "—";
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(date);
+  } catch {
+    return "—";
+  }
+}
 
+const TABLE_COLS = "2fr 120px 150px 80px 60px";
+
+function MembersTableSkeleton() {
   return (
     <>
-      <div
-        className="flex items-center gap-3 py-4 first:pt-0 last:pb-0 rounded-lg px-2 -mx-2 transition-colors duration-150"
-        style={{ backgroundColor: hovered ? "var(--color-bg-subtle, #f9fafb)" : undefined }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
-        {member.avatarUrl ? (
-          <UserAvatar
-            image={member.avatarUrl}
-            name={displayName}
-            className="h-9 w-9 shrink-0"
-          />
-        ) : (
-          <span
-            className={`h-9 w-9 shrink-0 flex items-center justify-center rounded-full text-white text-sm font-semibold select-none ${colorClass}`}
-          >
-            {displayName.charAt(0).toUpperCase()}
-          </span>
-        )}
-        <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-medium text-neutral-900 truncate">{displayName}</p>
-          <p className="text-[13px] text-neutral-500 truncate">
-            {member.email}
-            {member.joinedAt && (
-              <span className="text-neutral-400"> · Joined {formatJoinedAt(member.joinedAt)}</span>
-            )}
-          </p>
-        </div>
-        <span
-          className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${
-            member.role === "OWNER"
-              ? "bg-violet-50 text-violet-700"
-              : "bg-neutral-100 text-neutral-600"
-          }`}
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="hidden md:grid items-center border-b border-[#F0F0F0] last:border-b-0 bg-white"
+          style={{ gridTemplateColumns: TABLE_COLS, minHeight: 56, padding: "12px 16px" }}
         >
-          {member.role === "OWNER" ? "Owner" : "Member"}
-        </span>
-        {canRemove && (
-          <button
-            type="button"
-            onClick={() => setConfirmOpen(true)}
-            disabled={removing}
-            title={`Remove ${displayName}`}
-            className={`shrink-0 ml-1 p-1.5 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 ${
-              hovered ? "opacity-100" : "opacity-0"
-            }`}
-            aria-label={`Remove ${displayName}`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-      <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)} role="alertdialog" ariaLabelledBy="remove-member-title">
-        <div className="p-6 max-w-sm">
-          <h3 id="remove-member-title" className="text-base font-semibold text-neutral-900">
-            Remove {displayName}?
-          </h3>
-          <p className="mt-2 text-sm text-neutral-600">
-            They will lose access to this workspace immediately.
-          </p>
-          <div className="mt-5 flex gap-3 justify-end">
-            <button
-              type="button"
-              onClick={() => setConfirmOpen(false)}
-              className="px-4 py-2 text-sm font-medium rounded-lg text-neutral-700 hover:bg-neutral-100 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={removing}
-              onClick={() => { setConfirmOpen(false); onRemove(); }}
-              className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-60"
-            >
-              {removing ? "Removing…" : "Remove"}
-            </button>
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" />
+            <div className="h-[14px] w-48 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="h-[14px] w-16 bg-muted animate-pulse rounded" />
+          <div className="h-[14px] w-24 bg-muted animate-pulse rounded" />
+          <div className="h-[14px] w-14 bg-muted animate-pulse rounded" />
+          <div />
+        </div>
+      ))}
+      {[0, 1, 2].map((i) => (
+        <div
+          key={`m${i}`}
+          className="md:hidden p-4 border-b border-[#F0F0F0] last:border-b-0 animate-pulse"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[#F0F0F0] shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <div className="h-3 bg-[#F0F0F0] rounded w-32" />
+              <div className="h-2.5 bg-[#F0F0F0] rounded w-44" />
+            </div>
+            <div className="h-5 bg-[#F0F0F0] rounded-full w-14" />
           </div>
         </div>
-      </Modal>
+      ))}
     </>
   );
 }
 
-function InvitationRow({
-  invitation,
-  revoking,
+function MembersTableRow({
+  row,
+  isWorkspaceOwner,
+  onRemove,
   onRevoke,
   onResend,
-  resending,
+  confirmingRemoveId,
+  setConfirmingRemoveId,
 }: {
-  invitation: SerializedInvitation;
-  revoking: boolean;
-  onRevoke: () => void;
-  onResend: () => void;
-  resending: boolean;
+  row: UnifiedMemberRow;
+  isWorkspaceOwner: boolean;
+  onRemove: (id: string, label: string) => void;
+  onRevoke: (token: string, email: string) => void;
+  onResend: (token: string, email: string) => void;
+  confirmingRemoveId: string | null;
+  setConfirmingRemoveId: (id: string | null) => void;
 }) {
-  const days = daysUntil(invitation.expiresAt);
-  const expiryClass =
-    days < 2
-      ? "text-red-600"
-      : days < 7
-      ? "text-amber-600"
-      : "text-neutral-400";
-  const expiryLabel =
-    days <= 0
-      ? "Expires today"
-      : days === 1
-      ? "Expires in 1 day"
-      : `Expires in ${days} days`;
+  const [hovered, setHovered] = useState(false);
+  const avatarColor = getAvatarColor(row.email);
+  const initial = (row.name ?? row.email).charAt(0).toUpperCase();
+  const isOwner = row.role === "OWNER";
+  const confirming = confirmingRemoveId === row.id;
 
-  return (
-    <div className="flex items-center gap-3 py-4 first:pt-0 last:pb-0">
-      <span className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-neutral-100">
-        <Mail className="h-4 w-4 text-neutral-500" />
+  const avatarNode =
+    row.status === "active" ? (
+      row.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={row.avatarUrl}
+          alt={row.name ?? row.email}
+          className="w-8 h-8 rounded-full shrink-0 object-cover"
+        />
+      ) : (
+        <span
+          className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-sm font-semibold select-none"
+          style={{ background: avatarColor.bg, color: avatarColor.text }}
+        >
+          {initial}
+        </span>
+      )
+    ) : (
+      <span
+        className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center"
+        style={{ background: "#F0F0F0", border: "1.5px dashed #D0D0D0" }}
+      >
+        <Mail size={14} color="#BBBBBB" />
       </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-[15px] font-medium text-neutral-900 truncate">{invitation.email}</p>
-        <p className="text-[13px] text-neutral-500">
-          Invited by {invitation.invitedByName}
-          <span className={`ml-2 ${expiryClass}`}>{expiryLabel}</span>
+    );
+
+  const nameBlock =
+    row.status === "active" ? (
+      row.name ? (
+        <div className="min-w-0">
+          <p
+            className="text-[14px] font-medium text-[#111111] truncate"
+            style={{ lineHeight: "1.3" }}
+          >
+            {row.name}
+          </p>
+          <p className="text-[13px] text-[#777777] truncate" style={{ marginTop: 1 }}>
+            {row.email}
+          </p>
+        </div>
+      ) : (
+        <p className="text-[14px] font-medium text-[#111111] truncate min-w-0">{row.email}</p>
+      )
+    ) : (
+      <div className="min-w-0">
+        <p className="text-[14px] text-[#AAAAAA] italic" style={{ lineHeight: "1.3" }}>
+          Invited
+        </p>
+        <p className="text-[13px] text-[#777777] truncate" style={{ marginTop: 1 }}>
+          {row.email}
         </p>
       </div>
-      <span className="shrink-0 flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
-        <Clock className="h-3 w-3" aria-hidden />
-        Pending
-      </span>
+    );
+
+  const roleBadge = (
+    <span className={row.status === "pending" ? "text-sm font-semibold text-foreground/50" : "text-sm font-semibold text-foreground"}>
+      {row.role === "OWNER" ? "Owner" : "Member"}
+    </span>
+  );
+
+  const statusBadge =
+    row.status === "active" ? (
+      <span className="text-sm font-semibold text-foreground">Active</span>
+    ) : (
+      <span className="text-sm font-semibold text-foreground/50">Pending</span>
+    );
+
+  const removeConfirm = (
+    <div className="flex items-center gap-1">
       <button
         type="button"
-        onClick={onResend}
-        disabled={resending || revoking}
-        title="Resend invitation"
-        className="shrink-0 p-1.5 rounded-md text-neutral-400 hover:text-blue-500 hover:bg-blue-50 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-        aria-label={`Resend invitation for ${invitation.email}`}
+        onClick={() => setConfirmingRemoveId(null)}
+        className="text-[13px] text-[#777777] hover:text-neutral-900 transition-colors px-1"
       >
-        <RotateCcw className="h-4 w-4" />
+        Cancel
       </button>
       <button
         type="button"
-        onClick={onRevoke}
-        disabled={revoking || resending}
-        title="Revoke invitation"
-        className="shrink-0 p-1.5 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
-        aria-label={`Revoke invitation for ${invitation.email}`}
+        onClick={() => onRemove(row.id, row.name ?? row.email)}
+        className="text-[13px] text-[#DC2626]"
+        style={{
+          background: "#FEF2F2",
+          border: "1px solid #FECACA",
+          borderRadius: 6,
+          padding: "4px 10px",
+        }}
       >
-        <X className="h-4 w-4" />
+        Remove
       </button>
     </div>
+  );
+
+  const actionsDesktop = (
+    <div
+      className="flex items-center justify-end gap-1"
+      style={{ opacity: hovered ? 1 : 0, transition: "opacity 120ms" }}
+    >
+      {row.status === "active" && !isOwner && isWorkspaceOwner && (
+        confirming ? removeConfirm : (
+          <button
+            type="button"
+            onClick={() => setConfirmingRemoveId(row.id)}
+            title="Remove member"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#999999] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
+          >
+            <UserMinus size={15} />
+          </button>
+        )
+      )}
+      {row.status === "pending" && isWorkspaceOwner && (
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onResend(row.invitationToken!, row.email)}
+            title="Resend invite"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#999999] hover:text-[#1775E0] hover:bg-[#EBF4FF] transition-colors"
+          >
+            <RotateCcw size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onRevoke(row.invitationToken!, row.email)}
+            title="Revoke invite"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#999999] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop row */}
+      <div
+        className="hidden md:grid items-center border-b border-[#F0F0F0] last:border-b-0 cursor-pointer transition-colors"
+        style={{
+          gridTemplateColumns: TABLE_COLS,
+          minHeight: 56,
+          padding: "12px 16px",
+          background: row.status === "pending" ? "#FEFEFE" : hovered ? "#FAFAFA" : "white",
+          transition: "background 120ms ease",
+        }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          {avatarNode}
+          {nameBlock}
+        </div>
+        <div>{roleBadge}</div>
+        <div className={row.status === "pending" ? "text-sm font-semibold text-foreground/50" : "text-sm font-semibold text-foreground"}>{formatDateAdded(row.joinedAt)}</div>
+        <div>{statusBadge}</div>
+        {actionsDesktop}
+      </div>
+
+      {/* Mobile card */}
+      <div
+        className="md:hidden p-4 border-b border-[#F0F0F0] last:border-b-0"
+        style={{ background: row.status === "pending" ? "#FEFEFE" : "white" }}
+      >
+        <div className="flex items-center gap-3">
+          {avatarNode}
+          <div className="flex-1 min-w-0">
+            {row.status === "active" ? (
+              row.name ? (
+                <>
+                  <p className="text-sm font-medium text-[#111111] truncate">{row.name}</p>
+                  <p className="text-[13px] text-[#777777] truncate">{row.email}</p>
+                </>
+              ) : (
+                <p className="text-sm font-medium text-[#111111] truncate">{row.email}</p>
+              )
+            ) : (
+              <>
+                <p className="text-[14px] text-[#AAAAAA] italic">Invited</p>
+                <p className="text-[13px] text-[#777777] truncate">{row.email}</p>
+              </>
+            )}
+          </div>
+          {statusBadge}
+        </div>
+        <div className="flex items-center gap-3 mt-2 pl-11">
+          {roleBadge}
+          <span className="text-[12px] text-[#AAAAAA]">{formatDateAdded(row.joinedAt)}</span>
+        </div>
+        {row.status === "active" && !isOwner && isWorkspaceOwner && (
+          <div className="flex items-center gap-2 mt-2 pl-11">
+            {confirming ? (
+              removeConfirm
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingRemoveId(row.id)}
+                className="flex items-center gap-1.5 text-[13px] text-[#999999] hover:text-[#DC2626] transition-colors"
+              >
+                <UserMinus size={13} />
+                Remove
+              </button>
+            )}
+          </div>
+        )}
+        {row.status === "pending" && isWorkspaceOwner && (
+          <div className="flex items-center gap-3 mt-2 pl-11">
+            <button
+              type="button"
+              onClick={() => onResend(row.invitationToken!, row.email)}
+              className="flex items-center gap-1 text-[13px] text-[#777777] hover:text-[#1775E0] transition-colors"
+            >
+              <RotateCcw size={12} />
+              Resend
+            </button>
+            <button
+              type="button"
+              onClick={() => onRevoke(row.invitationToken!, row.email)}
+              className="flex items-center gap-1 text-[13px] text-[#777777] hover:text-[#DC2626] transition-colors"
+            >
+              <X size={12} />
+              Revoke
+            </button>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -1126,19 +1291,6 @@ function InviteMemberModal({
   );
 }
 
-function MemberSkeletonRow() {
-  return (
-    <div className="flex items-center gap-3 py-4 animate-pulse">
-      <div className="h-9 w-9 rounded-full bg-neutral-200 shrink-0" />
-      <div className="flex-1 min-w-0 space-y-2">
-        <div className="h-3.5 bg-neutral-200 rounded w-32" />
-        <div className="h-3 bg-neutral-100 rounded w-48" />
-      </div>
-      <div className="h-5 bg-neutral-100 rounded-full w-16 shrink-0" />
-    </div>
-  );
-}
-
 function MembersTab({
   workspaceId,
   loading,
@@ -1147,187 +1299,293 @@ function MembersTab({
   loading: boolean;
 }) {
   const { isWorkspaceOwner } = useWorkspace();
-  const [members, setMembers] = useState<SerializedMember[]>([]);
-  const [invitations, setInvitations] = useState<SerializedInvitation[]>([]);
-  const [membersLoading, setMembersLoading] = useState(true);
-  const [membersError, setMembersError] = useState(false);
-  const [invitesLoading, setInvitesLoading] = useState(true);
-  const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [removingUid, setRemovingUid] = useState<string | null>(null);
-  const [revokingToken, setRevokingToken] = useState<string | null>(null);
-  const [resendingToken, setResendingToken] = useState<string | null>(null);
 
-  const fetchMembers = useCallback(() => {
+  const [rows, setRows] = useState<UnifiedMemberRow[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "OWNER" | "MEMBER">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "pending">("all");
+  const [totalMembers, setTotalMembers] = useState(0);
+  const [totalPending, setTotalPending] = useState(0);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [confirmingRemoveId, setConfirmingRemoveId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(msg: string) {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
+  }
+
+  const fetchAll = useCallback(() => {
     if (!workspaceId) return;
-    setMembersLoading(true);
-    setMembersError(false);
-    authFetch("/api/workspace/members")
+    setDataLoading(true);
+    setFetchError(null);
+    authFetch("/api/workspace/members/all")
       .then(async (res) => {
-        if (!res?.ok) { setMembersError(true); return; }
-        const json = await res.json() as { success: boolean; data?: { members: SerializedMember[] } };
-        if (json.success && json.data) setMembers(json.data.members);
-        else setMembersError(true);
+        if (!res?.ok) { setFetchError("Failed to load members."); return; }
+        const json = await res.json() as {
+          success: boolean;
+          data?: { rows: UnifiedMemberRow[]; totalMembers: number; totalPending: number };
+        };
+        if (json.success && json.data) {
+          setRows(json.data.rows);
+          setTotalMembers(json.data.totalMembers);
+          setTotalPending(json.data.totalPending);
+        } else {
+          setFetchError("Failed to load members.");
+        }
       })
-      .catch(() => setMembersError(true))
-      .finally(() => setMembersLoading(false));
+      .catch(() => setFetchError("Failed to load members."))
+      .finally(() => setDataLoading(false));
   }, [workspaceId]);
 
-  useEffect(() => { fetchMembers(); }, [fetchMembers]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   useEffect(() => {
-    if (!workspaceId || !isWorkspaceOwner) { setInvitesLoading(false); return; }
-    setInvitesLoading(true);
-    authFetch("/api/workspace/members/invitations")
-      .then(async (res) => {
-        if (!res?.ok) return;
-        const json = await res.json() as { success: boolean; data?: { invitations: SerializedInvitation[] } };
-        if (json.success && json.data) setInvitations(json.data.invitations);
-      })
-      .catch(console.error)
-      .finally(() => setInvitesLoading(false));
-  }, [workspaceId, isWorkspaceOwner]);
+    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
+  }, []);
 
-  async function handleRemoveMember(uid: string) {
-    setRemovingUid(uid);
-    try {
-      const res = await authFetch(`/api/workspace/members/${uid}`, { method: "DELETE" });
-      if (res?.ok) setMembers((prev) => prev.filter((m) => m.uid !== uid));
-    } catch (err) {
-      console.error("Failed to remove member:", err);
-    } finally {
-      setRemovingUid(null);
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matchName = row.name?.toLowerCase().includes(q) ?? false;
+        const matchEmail = row.email.toLowerCase().includes(q);
+        if (!matchName && !matchEmail) return false;
+      }
+      if (roleFilter !== "all" && row.role !== roleFilter) return false;
+      if (statusFilter !== "all" && row.status !== statusFilter) return false;
+      return true;
+    });
+  }, [rows, search, roleFilter, statusFilter]);
+
+  async function handleRemove(uid: string, label: string) {
+    setConfirmingRemoveId(null);
+    const res = await authFetch(`/api/workspace/members/${uid}`, { method: "DELETE" });
+    if (res?.ok) {
+      showToast(`${label} removed from workspace`);
+      fetchAll();
     }
   }
 
-  async function handleRevokeInvitation(token: string) {
-    setRevokingToken(token);
-    try {
-      const res = await authFetch(`/api/workspace/members/invitations/${token}`, { method: "DELETE" });
-      if (res?.ok) setInvitations((prev) => prev.filter((i) => i.id !== token));
-    } catch (err) {
-      console.error("Failed to revoke invitation:", err);
-    } finally {
-      setRevokingToken(null);
+  async function handleRevoke(token: string, _email?: string) {
+    const res = await authFetch(`/api/workspace/members/invitations/${token}`, { method: "DELETE" });
+    if (res?.ok) {
+      showToast("Invitation revoked");
+      fetchAll();
     }
   }
 
-  async function handleResendInvitation(token: string) {
-    setResendingToken(token);
-    try {
-      await authFetch(`/api/workspace/members/invitations/${token}/resend`, { method: "POST" });
-    } catch (err) {
-      console.error("Failed to resend invitation:", err);
-    } finally {
-      setResendingToken(null);
-    }
+  async function handleResend(token: string, email: string) {
+    const res = await authFetch(`/api/workspace/members/invitations/${token}/resend`, { method: "POST" });
+    if (res?.ok) showToast(`Invitation resent to ${email}`);
   }
 
   function handleInviteSent(inv: SerializedInvitation) {
-    setInvitations((prev) => [inv, ...prev]);
     setInviteModalOpen(false);
+    showToast(`Invitation sent to ${inv.email}`);
+    fetchAll();
   }
 
-  if (loading || membersLoading) {
-    return (
-      <div className={`${CARD_GAP} pb-16`}>
-        <Card className={SETTINGS_CARD} as="article">
-          <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
-            <div className="h-6 bg-neutral-200 rounded w-32 animate-pulse" />
-            <div className="h-9 bg-neutral-100 rounded-lg w-28 animate-pulse" />
-          </div>
-          <div className="pt-4 border-t border-[var(--border-default)] divide-y divide-[var(--border-default)]">
-            {[0, 1, 2].map((i) => <MemberSkeletonRow key={i} />)}
-          </div>
-        </Card>
+  const isLoading = loading || dataLoading;
+
+  return (
+    <div className="pb-16 ech-content-enter">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg bg-neutral-900 text-white text-sm font-medium shadow-lg pointer-events-none whitespace-nowrap">
+          {toast}
+        </div>
+      )}
+
+      {/* Header Row 1: Title + CTA */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "#111111", lineHeight: "1.3" }}>
+            Team members
+          </h2>
+          <p className="text-sm font-medium text-foreground/60" style={{ marginTop: 4 }}>
+            {totalMembers} member{totalMembers !== 1 ? "s" : ""}
+            {totalPending > 0 && ` · ${totalPending} pending`}
+          </p>
+        </div>
+        {isWorkspaceOwner && (
+          <button
+            type="button"
+            onClick={() => setInviteModalOpen(true)}
+            className={`${BTN_PRIMARY} flex items-center gap-1.5 shrink-0`}
+            style={{ height: 36 }}
+          >
+            <UserPlus size={15} aria-hidden />
+            Invite member
+          </button>
+        )}
       </div>
-    );
-  }
 
-  if (membersError) {
-    return (
-      <div className={`${CARD_GAP} pb-16`}>
-        <Card className={SETTINGS_CARD} as="article">
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <AlertCircle className="h-8 w-8 text-neutral-400" />
-            <p className="text-sm font-medium text-neutral-700">Couldn&apos;t load members</p>
-            <button
-              type="button"
-              onClick={fetchMembers}
-              className={BTN_SECONDARY}
+      {/* Header Row 2: Search + Filters */}
+      <div className="flex items-center flex-wrap gap-[10px]" style={{ marginTop: 16 }}>
+        <div className="relative" style={{ width: 260 }}>
+          <span className="absolute inset-y-0 left-[11px] flex items-center pointer-events-none text-foreground/50">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or email"
+            className="w-full outline-none placeholder:text-foreground/50"
+            style={{
+              height: 36,
+              background: "#F7F8FA",
+              border: "1.5px solid #E8E8E8",
+              borderRadius: 10,
+              padding: "0 12px 0 34px",
+              fontSize: 14,
+              color: "#111111",
+              transition: "border-color 150ms, box-shadow 150ms",
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = "#1775E0";
+              e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)";
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = "#E8E8E8";
+              e.target.style.boxShadow = "none";
+            }}
+          />
+        </div>
+
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value as "all" | "OWNER" | "MEMBER")}
+          className="outline-none cursor-pointer"
+          style={{
+            height: 36,
+            width: 130,
+            background: "white",
+            border: "1.5px solid #E8E8E8",
+            borderRadius: 10,
+            padding: "0 10px",
+            fontSize: 14,
+            color: "#444444",
+          }}
+        >
+          <option value="all">All roles</option>
+          <option value="OWNER">Owner</option>
+          <option value="MEMBER">Member</option>
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "pending")}
+          className="outline-none cursor-pointer"
+          style={{
+            height: 36,
+            width: 140,
+            background: "white",
+            border: "1.5px solid #E8E8E8",
+            borderRadius: 10,
+            padding: "0 10px",
+            fontSize: 14,
+            color: "#444444",
+          }}
+        >
+          <option value="all">All members</option>
+          <option value="active">Active</option>
+          <option value="pending">Pending</option>
+        </select>
+      </div>
+
+      {/* Table */}
+      <div
+        style={{
+          marginTop: 16,
+          border: "1px solid #EBEBEB",
+          borderRadius: 12,
+          overflow: "hidden",
+        }}
+      >
+        {/* Table header — desktop only */}
+        <div
+          className="hidden md:grid"
+          style={{
+            gridTemplateColumns: TABLE_COLS,
+            height: 38,
+            background: "#F9FAFB",
+            borderBottom: "1px solid #EBEBEB",
+            padding: "0 16px",
+            alignItems: "center",
+          }}
+        >
+          <span className="text-sm font-semibold text-foreground">NAME</span>
+          <span className="text-sm font-semibold text-foreground">ROLE</span>
+          <span className="text-sm font-semibold text-foreground">DATE ADDED</span>
+          <span className="text-sm font-semibold text-foreground">STATUS</span>
+          <span />
+        </div>
+
+        {/* Table body */}
+        {isLoading ? (
+          <MembersTableSkeleton />
+        ) : fetchError ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <AlertCircle className="h-7 w-7 text-neutral-400" />
+            <p className="text-sm text-neutral-600">{fetchError}</p>
+            <button type="button" onClick={fetchAll} className={BTN_SECONDARY}>
               Try again
             </button>
           </div>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`${CARD_GAP} pb-16 ech-content-enter`}>
-      <Card className={SETTINGS_CARD} as="article">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <SectionHeader
-            title="Team Members"
-            description={`${members.length} member${members.length !== 1 ? "s" : ""} in this workspace.`}
-          />
-          {isWorkspaceOwner && (
-            <button
-              type="button"
-              onClick={() => setInviteModalOpen(true)}
-              className={`${BTN_PRIMARY} flex items-center gap-2 shrink-0`}
-            >
-              <UserPlus className="h-4 w-4" aria-hidden />
-              Invite member
-            </button>
-          )}
-        </div>
-        <div className="mt-4 pt-4 border-t border-[var(--border-default)] divide-y divide-[var(--border-default)]">
-          {members.length === 0 ? (
-            <div className="py-10 flex flex-col items-center gap-2 text-neutral-500">
-              <Users className="h-8 w-8 text-neutral-300" />
-              <p className="text-sm">No members found.</p>
+        ) : filteredRows.length === 0 ? (
+          rows.length === 0 ? (
+            <div className="flex items-center justify-center py-10">
+              <p style={{ fontSize: 14, color: "#999999" }}>No team members found</p>
             </div>
           ) : (
-            members.map((member) => (
-              <MemberRow
-                key={member.uid}
-                member={member}
-                isOwnerCaller={isWorkspaceOwner}
-                removing={removingUid === member.uid}
-                onRemove={() => handleRemoveMember(member.uid)}
-              />
-            ))
-          )}
-        </div>
-      </Card>
-
-      {isWorkspaceOwner && invitations.length > 0 && (
-        <Card className={SETTINGS_CARD} as="article">
-          <SectionHeader
-            title="Pending Invitations"
-            description="Invitations waiting to be accepted."
-          />
-          <div className="mt-4 pt-4 border-t border-[var(--border-default)] divide-y divide-[var(--border-default)]">
-            {invitesLoading ? (
-              <div className="py-8 flex justify-center">
-                <MinimalLoader label="Loading invitations…" />
-              </div>
-            ) : (
-              invitations.map((inv) => (
-                <InvitationRow
-                  key={inv.id}
-                  invitation={inv}
-                  revoking={revokingToken === inv.id}
-                  onRevoke={() => handleRevokeInvitation(inv.id)}
-                  onResend={() => handleResendInvitation(inv.id)}
-                  resending={resendingToken === inv.id}
-                />
-              ))
-            )}
-          </div>
-        </Card>
-      )}
+            <div
+              className="flex flex-col items-center justify-center gap-[10px]"
+              style={{ padding: "32px 0" }}
+            >
+              <Users size={32} color="#DDDDDD" />
+              <p style={{ fontSize: 14, color: "#999999" }}>No members match your search</p>
+              <button
+                type="button"
+                onClick={() => { setSearch(""); setRoleFilter("all"); setStatusFilter("all"); }}
+                style={{ color: "#1775E0", cursor: "pointer", fontSize: 14 }}
+              >
+                Clear filters
+              </button>
+            </div>
+          )
+        ) : (
+          filteredRows.map((row) => (
+            <MembersTableRow
+              key={row.id}
+              row={row}
+              isWorkspaceOwner={isWorkspaceOwner}
+              onRemove={handleRemove}
+              onRevoke={handleRevoke}
+              onResend={handleResend}
+              confirmingRemoveId={confirmingRemoveId}
+              setConfirmingRemoveId={setConfirmingRemoveId}
+            />
+          ))
+        )}
+      </div>
 
       {inviteModalOpen && (
         <InviteMemberModal

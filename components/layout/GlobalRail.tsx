@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Check,
   Plus,
+  Inbox,
 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { useWorkspace } from "@/lib/client/workspaceContext";
@@ -37,6 +38,7 @@ const NAV_ITEMS: MainNavItem[] = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
   { href: "/discussion", icon: MessageSquare, label: "Discussion" },
   { href: "/activity", icon: SquareChartGantt, label: "Activity", iconStroke: 1.9 },
+  { href: "/shared", icon: Inbox, label: "Shared" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -44,6 +46,7 @@ function isActive(href: string, pathname: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
   if (href === "/discussion") return pathname === "/discussion";
   if (href === "/activity") return pathname === "/activity";
+  if (href === "/shared") return pathname === "/shared";
   return pathname === href || (href !== "/dashboard" && pathname.startsWith(href + "/"));
 }
 
