@@ -6,6 +6,10 @@ import {
   createWorkspaceRepo,
   getWorkspace,
 } from "@/lib/repositories/workspacesRepository.server";
+export {
+  addWorkspaceMembershipRepo,
+  removeWorkspaceMembershipRepo,
+} from "@/lib/repositories/userMembershipsRepository.server";
 
 export type UserLike = {
   uid: string;
@@ -47,6 +51,18 @@ async function resolveOrAssignWorkspaceIdRepo(
     });
   }
 
+  // INV-002 FIX: also skip workspace creation if the user already has
+  // workspace memberships (e.g. they accepted an invite before this ran)
+  const memberships = Array.isArray(priorData?.workspaceMemberships)
+    ? (priorData.workspaceMemberships as unknown[])
+    : [];
+  if (memberships.length > 0) {
+    const firstMembership = memberships[0];
+    if (typeof firstMembership === "string" && firstMembership.trim()) {
+      return firstMembership.trim();
+    }
+  }
+
   const canonical = await getWorkspace(uid);
   if (canonical) {
     return uid;
@@ -72,6 +88,8 @@ async function resolveOrAssignWorkspaceIdRepo(
     ownerId: uid,
     name,
     logoUrl: user.photoURL ?? null,
+    ownerEmail: user.email ?? null,
+    ownerName: typeof user.displayName === "string" && user.displayName.trim() ? user.displayName.trim() : null,
   });
   return uid;
 }
@@ -185,6 +203,7 @@ export async function ensureUserRepo(user: UserLike): Promise<void> {
   if (!snap.exists) {
     await userRef.set({
       ...profile,
+      workspaceMemberships: [],
       createdAt: FieldValue.serverTimestamp(),
     });
     return;
@@ -260,6 +279,11 @@ export interface UserDoc {
   email?: string | null;
   photoURL?: string | null;
   workspaceId?: string | null;
+  /** Array of all workspaceIds this user is a member of.
+   * workspaceId = currently active workspace (unchanged).
+   * workspaceMemberships includes workspaceId plus any
+   * other workspaces the user has been invited to. */
+  workspaceMemberships?: string[];
   isAdmin?: boolean;
   [key: string]: unknown;
 }
@@ -271,4 +295,5 @@ export async function getUserByIdRepo(uid: string): Promise<UserDoc | null> {
   const data = snap.data() as UserDoc;
   return { ...data, uid: data.uid ?? uid };
 }
+
 

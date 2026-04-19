@@ -22,7 +22,7 @@ import type { SessionsTimeRange } from "@/lib/utils/sessionTimeRange";
 import { useSessionsSearch } from "@/components/dashboard/context/SessionsSearchContext";
 import EmptySessionsCard from "@/components/dashboard/EmptySessionsCard";
 import { ArchiveEmptyState } from "@/components/empty/ArchiveEmptyState";
-import { ToastProvider } from "@/components/dashboard/context/ToastContext";
+import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
 import { SessionsSearchProvider } from "@/components/dashboard/context/SessionsSearchContext";
 import DashboardCaptureHost from "./components/DashboardCaptureHost";
 
@@ -52,6 +52,18 @@ import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 
 function DashboardContent() {
   const router = useRouter();
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem("joined_workspace");
+    if (!raw) return;
+    sessionStorage.removeItem("joined_workspace");
+    try {
+      const { workspaceName } = JSON.parse(raw) as { workspaceName?: string };
+      if (workspaceName) showToast(`You've joined ${workspaceName}`);
+    } catch { /* ignore */ }
+  }, [showToast]);
+
   const {
     sessions,
     loading: sessionsLoading,

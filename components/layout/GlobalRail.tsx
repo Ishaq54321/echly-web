@@ -14,6 +14,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ChevronDown,
+  Check,
+  Plus,
 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { useWorkspace } from "@/lib/client/workspaceContext";
@@ -62,7 +64,7 @@ export default function GlobalRail() {
   const router = useRouter();
   useAuthGuard({ router });
   // WORKSPACE-MEMBER: replaced hardcoded string with live data
-  const { workspaceName, workspaceLogoUrl, isWorkspaceOwner } = useWorkspace();
+  const { workspaceName, workspaceLogoUrl, isWorkspaceOwner, allWorkspaces, activeWorkspaceId, switchWorkspace, isLoadingWorkspaces, workspaceId } = useWorkspace();
   const displayName = workspaceName ?? "Workspace";
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -203,44 +205,119 @@ export default function GlobalRail() {
           )}
         </div>
 
-        <div className={cn("flex w-full", isCollapsed ? "justify-center" : "px-3")}>
-          <div className={cn(isCollapsed ? "relative group shrink-0" : "w-full")}>
-            <button
-              type="button"
-              onClick={() => setWorkspacePopoverOpen((v) => !v)}
-              className={cn(
-                "flex items-center rounded-md transition-colors duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
-                "text-neutral-800 hover:text-neutral-900 hover:bg-neutral-100",
-                isCollapsed
-                  ? "justify-center w-10 h-10"
-                  : "justify-start gap-2 px-3 py-2 w-full"
-              )}
-              aria-label="Workspace menu"
-              aria-expanded={workspacePopoverOpen}
+        {/* Collapsed pill — under logo, above nav */}
+        {isCollapsed && (
+          <>
+            <div
+              style={{
+                width: 44,
+                background: "transparent",
+                border: "1.5px solid #D8D8D8",
+                borderRadius: 12,
+                padding: "8px 0",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 6,
+                margin: "16px auto 0",
+                flexShrink: 0,
+              }}
             >
-              {workspaceLogoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={workspaceLogoUrl}
-                  alt={displayName}
-                  className="h-7 w-7 rounded-md object-cover border border-neutral-200 shrink-0"
-                />
-              ) : (
-                <WorkspaceInitialsAvatar name={displayName} />
-              )}
-              <span
-                className={cn(
-                  "flex-1 min-w-0 text-[13px] font-medium text-current truncate",
-                  "transition-[opacity,transform] duration-200 ease-out",
-                  isCollapsed
-                    ? "opacity-0 translate-x-[-6px] w-0 overflow-hidden"
-                    : "opacity-100 translate-x-0"
-                )}
-                style={{ maxWidth: "120px" }}
+              <button
+                type="button"
+                title="Invite teammate"
+                aria-label="Invite teammate"
+                onClick={() => setInviteModalOpen(true)}
+                className="group hover:[background:#F0F0F0] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  border: "none",
+                  background: "transparent",
+                  transition: "all 160ms",
+                  flexShrink: 0,
+                }}
               >
-                {displayName}
-              </span>
-              {!isCollapsed && (
+                <UserPlus
+                  className="h-[22px] w-[22px] shrink-0 transition-colors duration-[160ms] group-hover:text-[#111111]"
+                  strokeWidth={2.2}
+                  style={{ color: "#262626" }}
+                  aria-hidden
+                />
+              </button>
+              <div
+                style={{ width: 26, height: 1, background: "#D8D8D8", margin: "0 auto", flexShrink: 0 }}
+                aria-hidden
+              />
+              <button
+                type="button"
+                title={displayName}
+                aria-label={displayName}
+                onClick={() => setWorkspacePopoverOpen((v) => !v)}
+                className="hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: "#1775E0",
+                  color: "#FFFFFF",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  border: "none",
+                  transition: "opacity 160ms",
+                  flexShrink: 0,
+                  userSelect: "none",
+                }}
+              >
+                {displayName.trim().charAt(0).toUpperCase() || "W"}
+              </button>
+            </div>
+            <div
+              style={{ height: 1, background: "#D8D8D8", width: "100%", margin: "16px 0 16px" }}
+              aria-hidden
+            />
+          </>
+        )}
+
+        {!isCollapsed && (
+          <div className="flex w-full px-3">
+            <div className="w-full">
+              <button
+                type="button"
+                onClick={() => setWorkspacePopoverOpen((v) => !v)}
+                className={cn(
+                  "flex items-center rounded-md transition-colors duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+                  "text-neutral-800 hover:text-neutral-900 hover:bg-neutral-100",
+                  "justify-start gap-2 px-3 py-2 w-full"
+                )}
+                aria-label="Workspace menu"
+                aria-expanded={workspacePopoverOpen}
+              >
+                {workspaceLogoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={workspaceLogoUrl}
+                    alt={displayName}
+                    className="h-7 w-7 rounded-md object-cover border border-neutral-200 shrink-0"
+                  />
+                ) : (
+                  <WorkspaceInitialsAvatar name={displayName} />
+                )}
+                <span
+                  className="flex-1 min-w-0 text-[13px] font-medium text-current truncate opacity-100 translate-x-0 transition-[opacity,transform] duration-200 ease-out"
+                  style={{ maxWidth: "120px" }}
+                >
+                  {displayName}
+                </span>
                 <ChevronDown
                   className={cn(
                     "h-4 w-4 shrink-0 text-neutral-500 transition-transform duration-200",
@@ -248,30 +325,24 @@ export default function GlobalRail() {
                   )}
                   aria-hidden
                 />
-              )}
-            </button>
-            {isCollapsed ? (
-              <span
-                className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-neutral-800 rounded-md bg-white border border-neutral-200 shadow-[0_1px_2px_rgba(0,0,0,0.06)] opacity-0 pointer-events-none z-10 transition-opacity duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:opacity-100 group-focus-within:opacity-100"
-                role="tooltip"
-              >
-                {displayName}
-              </span>
-            ) : null}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div
-          className={cn("h-px bg-neutral-200 my-1 shrink-0", isCollapsed ? "w-8" : "mx-3")}
-          aria-hidden
-        />
+        {!isCollapsed && (
+          <div
+            className="h-px bg-neutral-200 my-1 shrink-0 mx-3"
+            aria-hidden
+          />
+        )}
 
         <nav
           className={cn(
-            "flex flex-col gap-3 flex-1 min-h-0",
+            "flex flex-col gap-3 min-h-0",
             isCollapsed
-              ? "mt-5 items-stretch overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-              : "mt-4 items-stretch px-2 overflow-y-auto"
+              ? "mt-0 items-stretch overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              : "mt-4 items-stretch px-2 overflow-y-auto flex-1"
           )}
           aria-label="Main"
         >
@@ -322,6 +393,7 @@ export default function GlobalRail() {
             );
           })}
         </nav>
+
         </div>
       </aside>
 
@@ -335,6 +407,50 @@ export default function GlobalRail() {
           role="dialog"
           aria-label="Workspace"
         >
+          {/* Workspace switcher section */}
+          {(allWorkspaces.length > 1 || isLoadingWorkspaces) && (
+            <>
+              <p
+                className="px-1 pb-1"
+                style={{ fontSize: 11, letterSpacing: "0.5px", textTransform: "uppercase", color: "var(--ink-4, #9ca3af)", paddingTop: 2, paddingBottom: 4 }}
+              >
+                Your workspaces
+              </p>
+              {isLoadingWorkspaces ? (
+                <>
+                  <div className="h-[38px] rounded-lg bg-neutral-100 animate-pulse mb-1" />
+                  <div className="h-[38px] rounded-lg bg-neutral-100 animate-pulse mb-1" />
+                </>
+              ) : (
+                allWorkspaces.map((ws) => {
+                  const isActive = (activeWorkspaceId ?? workspaceId) === ws.workspaceId;
+                  const initial = ws.name.trim().charAt(0).toUpperCase() || "W";
+                  return (
+                    <button
+                      key={ws.workspaceId}
+                      type="button"
+                      onClick={() => {
+                        setWorkspacePopoverOpen(false);
+                        if (!isActive) switchWorkspace(ws.workspaceId);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition text-left"
+                      style={{ height: 38 }}
+                    >
+                      <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-semibold select-none">
+                        {initial}
+                      </span>
+                      <span className="flex-1 min-w-0 truncate">{ws.name}</span>
+                      {isActive && (
+                        <Check className="h-4 w-4 shrink-0 text-blue-600" strokeWidth={2.5} aria-hidden />
+                      )}
+                    </button>
+                  );
+                })
+              )}
+              <div className="h-px bg-neutral-200 my-2" aria-hidden />
+            </>
+          )}
+
           <div className="flex items-center gap-3 mb-3">
             {workspaceLogoUrl ? (
               <img
@@ -380,6 +496,21 @@ export default function GlobalRail() {
               </button>
             )}
           </div>
+
+          {/* Create new workspace */}
+          <div className="h-px bg-neutral-200 mt-2 mb-1" aria-hidden />
+          <button
+            type="button"
+            onClick={() => {
+              setWorkspacePopoverOpen(false);
+              window.location.href = "/onboarding";
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition text-left"
+            style={{ color: "var(--brand-text, #466EFF)", fontWeight: 500 }}
+          >
+            <Plus className="h-4 w-4 shrink-0" strokeWidth={2} style={{ color: "var(--brand-text, #466EFF)" }} aria-hidden />
+            Create workspace
+          </button>
         </div>
       )}
 

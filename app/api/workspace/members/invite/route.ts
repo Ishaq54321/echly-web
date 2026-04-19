@@ -3,11 +3,12 @@ import { Timestamp } from "firebase-admin/firestore";
 import { nanoid } from "nanoid";
 import { requireAuth, toAuthorizationResponse } from "@/lib/server/auth/authorize";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
-import { getUserWorkspaceIdRepo, getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
+import { getUserWorkspaceIdRepo, getUserByIdRepo, addWorkspaceMembershipRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
 import {
   getWorkspaceMemberRepo,
+  addWorkspaceMemberRepo,
   createWorkspaceInvitationRepo,
   getWorkspaceInvitationByEmailRepo,
 } from "@/lib/repositories/workspaceMembersRepository.server";
@@ -50,9 +51,36 @@ export async function POST(req: NextRequest) {
       return apiError({ code: "NOT_FOUND", message: "Workspace not found", status: 404 });
     }
 
+    // WS-004 FIX: check ownerId field first (source of truth),
+    // fall back to subcollection role as belt-and-suspenders
+    const isOwnerByField = workspace.ownerId === user.uid;
     const callerMember = await getWorkspaceMemberRepo(workspaceId, user.uid);
-    if (callerMember?.role !== "OWNER") {
-      return apiError({ code: "FORBIDDEN", message: "Only workspace owners can invite members", status: 403 });
+    const isOwnerByRole = callerMember?.role === "OWNER";
+
+    if (!isOwnerByField && !isOwnerByRole) {
+      return apiError({
+        code: "FORBIDDEN",
+        message: "Only workspace owners can invite members",
+        status: 403,
+      });
+    }
+
+    // Auto-heal: if owner by ownerId but no member doc, create it
+    if (isOwnerByField && !callerMember) {
+      try {
+        await addWorkspaceMemberRepo(workspaceId, {
+          uid: user.uid,
+          email: user.email ?? "",
+          displayName: user.displayName ?? null,
+          avatarUrl: null,
+          role: "OWNER",
+          joinedAt: Timestamp.now(),
+          invitedBy: null,
+        });
+        await addWorkspaceMembershipRepo(user.uid, workspaceId);
+      } catch (e) {
+        console.error("[WS-004 heal]", e);
+      }
     }
 
     // Check if user with this email already a member

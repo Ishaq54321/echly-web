@@ -33,7 +33,14 @@ export async function GET(req: NextRequest) {
         ),
     ];
 
-    return apiSuccess({ members: sorted });
+    const serialized = sorted.map((m) => ({
+      ...m,
+      joinedAt: m.joinedAt
+        ? { seconds: m.joinedAt.seconds, nanoseconds: m.joinedAt.nanoseconds }
+        : null,
+    }));
+
+    return apiSuccess({ members: serialized });
   } catch (err) {
     console.error("GET /api/workspace/members:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to load members", status: 500 });

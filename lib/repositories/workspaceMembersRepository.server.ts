@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { WorkspaceMember, WorkspaceMemberRole } from "@/lib/domain/workspaceMember";
 import type { WorkspaceInvitation, WorkspaceInvitationStatus } from "@/lib/domain/workspaceInvitation";
+import { removeWorkspaceMembershipRepo } from "@/lib/repositories/userMembershipsRepository.server";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,7 @@ export async function removeWorkspaceMemberRepo(
     "usage.members": FieldValue.increment(-1),
   });
   await batch.commit();
+  await removeWorkspaceMembershipRepo(uid, workspaceId);
 }
 
 // ── Invitations ────────────────────────────────────────────────────────────

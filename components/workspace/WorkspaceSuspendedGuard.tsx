@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/authFetch";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { StatusOverlay } from "@/components/ui/StatusOverlay";
 
 interface WorkspaceSuspendedGuardProps {
@@ -16,9 +18,29 @@ interface WorkspaceSuspendedGuardProps {
  */
 export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardProps) {
   const router = useRouter();
-  const { authUid, isIdentityReady } = useWorkspace();
+  const { authUid, isIdentityReady, workspaceId } = useWorkspace();
   const [suspended, setSuspended] = useState<boolean | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+
+  // Redirect to /no-workspace if user is authenticated but has no workspace at all
+  useEffect(() => {
+    if (!authUid || !isIdentityReady) return;
+    if (workspaceId) return; // has workspace — no need to check
+    let cancelled = false;
+    void (async () => {
+      try {
+        const snap = await getDoc(doc(db, "users", authUid));
+        if (cancelled) return;
+        const data = (snap.exists() ? snap.data() : {}) as Record<string, unknown>;
+        const wid = typeof data.workspaceId === "string" ? data.workspaceId.trim() : "";
+        const memberships = Array.isArray(data.workspaceMemberships) ? data.workspaceMemberships : [];
+        if (!wid && memberships.length === 0) {
+          router.replace("/no-workspace");
+        }
+      } catch {/* non-fatal */}
+    })();
+    return () => { cancelled = true; };
+  }, [authUid, isIdentityReady, workspaceId, router]);
 
   useEffect(() => {
     let cancelled = false;

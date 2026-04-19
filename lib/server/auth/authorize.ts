@@ -95,7 +95,7 @@ export class UnauthorizedError extends Error {
   }
 }
 
-export type AuthorizedRequestUser = { uid: string; email?: string };
+export type AuthorizedRequestUser = { uid: string; email?: string; displayName?: string | null };
 
 export async function requireAuth(req: Request): Promise<AuthorizedRequestUser> {
   const extensionToken = req.headers.get("x-extension-token")?.trim() ?? "";

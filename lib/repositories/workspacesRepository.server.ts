@@ -1,9 +1,11 @@
 import "server-only";
 import { adminDb } from "@/lib/server/firebaseAdmin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { Workspace, WorkspaceDoc } from "@/lib/domain/workspace";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 import type { PlanId } from "@/lib/billing/plans";
+import { addWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
+import { addWorkspaceMembershipRepo } from "@/lib/repositories/userMembershipsRepository.server";
 
 function requireUserId(userId: string, context: string): string {
   const trimmed = userId.trim();
@@ -35,6 +37,8 @@ export async function createWorkspaceRepo(params: {
   ownerId: string;
   name: string;
   logoUrl?: string | null;
+  ownerEmail?: string | null;
+  ownerName?: string | null;
 }): Promise<void> {
   const resolvedUserId = requireUserId(params.userId, "createWorkspaceRepo");
   const ref = adminDb.doc(`workspaces/${resolvedUserId}`);
@@ -49,6 +53,18 @@ export async function createWorkspaceRepo(params: {
     updatedAt: FieldValue.serverTimestamp(),
   });
   invalidateWorkspaceDocCache(resolvedUserId);
+
+  // WS-001 FIX: ensure owner member doc always exists
+  await addWorkspaceMemberRepo(resolvedUserId, {
+    uid: params.ownerId,
+    email: params.ownerEmail ?? "",
+    displayName: params.ownerName ?? null,
+    avatarUrl: null,
+    role: "OWNER",
+    joinedAt: Timestamp.now(),
+    invitedBy: null,
+  });
+  await addWorkspaceMembershipRepo(params.ownerId, resolvedUserId);
 }
 
 export async function updateWorkspaceName(userId: string, name: string): Promise<void> {

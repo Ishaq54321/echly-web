@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -36,20 +36,31 @@ async function createSessionCookie(user: { getIdToken: () => Promise<string> }) 
   }
 }
 
-export default function SignupPage() {
+function SignupPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnUrl = searchParams.get("returnUrl");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function handlePostSignup(user: { getIdToken: () => Promise<string> }) {
+    await createSessionCookie(user);
+    if (returnUrl && typeof returnUrl === "string" && returnUrl.startsWith("/")) {
+      router.replace(returnUrl);
+      return;
+    }
+    router.replace("/onboarding");
+  }
 
   const handleGoogle = async () => {
     setError(null);
     setLoading(true);
     try {
       const user = await signInWithGoogle();
-      await createSessionCookie(user);
-      router.replace("/app");
+      await handlePostSignup(user);
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
       if (
@@ -70,8 +81,7 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const user = await signUpWithEmailPassword(email, password);
-      await createSessionCookie(user);
-      router.replace("/app");
+      await handlePostSignup(user);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sign up failed");
     } finally {
@@ -158,6 +168,14 @@ export default function SignupPage() {
         </AuthCard>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="w-8 h-8 border-2 border-gray-200 border-t-[#466EFF] rounded-full animate-spin" />}>
+      <SignupPageContent />
+    </Suspense>
   );
 }
 

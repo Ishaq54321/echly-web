@@ -15,6 +15,7 @@ import {
   addWorkspaceMemberRepo,
   updateWorkspaceInvitationRepo,
 } from "@/lib/repositories/workspaceMembersRepository.server";
+import { addWorkspaceMembershipRepo } from "@/lib/repositories/usersRepository.server";
 import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 
@@ -139,17 +140,27 @@ export async function POST(
       acceptedBy: user.uid,
     });
 
-    // Update user's workspaceId if they don't have one yet
+    // WS-005 FIX: always add to workspaceMemberships
+    // Only update active workspaceId if they have none yet
+    await addWorkspaceMembershipRepo(user.uid, invitation.workspaceId);
+
     const userRef = adminDb.doc(`users/${user.uid}`);
     const currentWorkspaceId =
       typeof profile.workspaceId === "string" ? profile.workspaceId.trim() : "";
     if (!currentWorkspaceId) {
+      // First workspace — set as active
+      // workspaceMemberships already handled by addWorkspaceMembershipRepo above
       await userRef.set(
-        { workspaceId: invitation.workspaceId, updatedAt: FieldValue.serverTimestamp() },
+        {
+          workspaceId: invitation.workspaceId,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
         { merge: true }
       );
       await setWorkspaceClaim(user.uid, invitation.workspaceId);
     }
+    // else: already has own workspace — active workspace unchanged, claims unchanged
+    // workspaceMemberships already updated by addWorkspaceMembershipRepo above
 
     return apiSuccess({
       workspaceId: invitation.workspaceId,

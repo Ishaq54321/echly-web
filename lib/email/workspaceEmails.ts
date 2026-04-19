@@ -1,11 +1,12 @@
 import "server-only";
-import { resend } from "./resend";
+import { sendEmailOrLog } from "./resend";
 import { workspaceInviteEmailHtml } from "./templates/workspaceInvite";
 import { workspaceInviteReminderHtml } from "./templates/workspaceInviteReminder";
 import { workspaceDeletedConfirmationHtml } from "./templates/workspaceDeletedConfirmation";
 
+// WS-006 FIX: always use verified sender domain
+// regardless of APP_URL (localhost would break Resend)
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
-const FROM_ADDRESS = `invites@${new URL(APP_URL).hostname}`;
 
 export async function sendWorkspaceInviteEmail({
   to,
@@ -21,8 +22,7 @@ export async function sendWorkspaceInviteEmail({
   token: string;
 }): Promise<void> {
   const acceptUrl = `${APP_URL}/invite/${token}`;
-  await resend.emails.send({
-    from: FROM_ADDRESS,
+  await sendEmailOrLog({
     to,
     subject: `You've been invited to join ${workspaceName}`,
     html: workspaceInviteEmailHtml({
@@ -47,8 +47,7 @@ export async function sendWorkspaceInviteReminderEmail({
   expiresInDays: number;
 }): Promise<void> {
   const acceptUrl = `${APP_URL}/invite/${token}`;
-  await resend.emails.send({
-    from: FROM_ADDRESS,
+  await sendEmailOrLog({
     to,
     subject: `Your invitation to ${workspaceName} expires in ${expiresInDays} days`,
     html: workspaceInviteReminderHtml({ workspaceName, acceptUrl, expiresInDays }),
@@ -69,8 +68,7 @@ export async function sendWorkspaceDeletionConfirmationEmail({
     month: "long",
     day: "numeric",
   });
-  await resend.emails.send({
-    from: FROM_ADDRESS,
+  await sendEmailOrLog({
     to,
     subject: `Your workspace "${workspaceName}" has been scheduled for deletion`,
     html: workspaceDeletedConfirmationHtml({ workspaceName, purgeDate: purgeDateStr }),

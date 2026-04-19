@@ -1,3 +1,20 @@
+/*
+ * CRITICAL PATH TRACE — new user signup (normal path):
+ * 1. Firebase Auth creates account
+ * 2. WorkspaceProvider calls POST /api/users
+ * 3. ensureUserRepo → createWorkspaceRepo
+ *    → addWorkspaceMemberRepo called ✓ (WS-001 fix)
+ *    → addWorkspaceMembershipRepo called ✓ (WS-001 fix)
+ * 4. User goes through onboarding
+ * 5. POST /api/workspaces fires
+ * 6. Early-return guard fires (workspaceId already set)
+ * 7. Heal check runs — member doc already exists → skip ✓ (WS-002 fix)
+ * 8. setWorkspaceClaim called ✓
+ * 9. User lands on dashboard
+ * 10. User opens Members tab, clicks Invite
+ * 11. Invite API: isOwnerByField = true (ownerId === uid) ✓ (WS-004 fix)
+ * 12. No 403 — invite proceeds ✓
+ */
 import type { NextRequest } from "next/server";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import {
@@ -7,8 +24,11 @@ import {
 import { corsHeaders } from "@/lib/server/cors";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
-import { addWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
+import { getUserWorkspaceIdRepo, addWorkspaceMembershipRepo } from "@/lib/repositories/usersRepository.server";
+import {
+  addWorkspaceMemberRepo,
+  getWorkspaceMemberRepo,
+} from "@/lib/repositories/workspaceMembersRepository.server";
 import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { NextResponse } from "next/server";
@@ -75,6 +95,26 @@ export async function POST(req: NextRequest) {
           ? String((preSnap.data() as { workspaceId: string }).workspaceId).trim()
           : "";
       if (preWid) {
+        // WS-002 FIX: ensure owner member doc exists even on early-return path
+        // (handles workspaces created before Phase 2 fix and any race conditions)
+        try {
+          const existingMember = await getWorkspaceMemberRepo(preWid, user.uid);
+          if (!existingMember) {
+            await addWorkspaceMemberRepo(preWid, {
+              uid: user.uid,
+              email: user.email ?? "",
+              displayName: user.displayName ?? null,
+              avatarUrl: null,
+              role: "OWNER",
+              joinedAt: Timestamp.now(),
+              invitedBy: null,
+            });
+            await addWorkspaceMembershipRepo(user.uid, preWid);
+          }
+        } catch (healErr) {
+          // Non-fatal — log but continue. User can still use app.
+          console.error("[WS-002 heal] member doc heal failed:", healErr);
+        }
         await setWorkspaceClaim(user.uid, preWid);
         return apiSuccess(
           { workspaceId: preWid, userId: user.uid },
@@ -148,7 +188,7 @@ export async function POST(req: NextRequest) {
 
     await setWorkspaceClaim(user.uid, resolvedWid);
 
-    // WORKSPACE-MEMBER: owner added to subcollection on workspace creation
+    // WS-003 FIX: member doc write is critical — do not swallow
     try {
       const userSnap2 = await adminDb.doc(`users/${user.uid}`).get();
       const userData = (userSnap2.data() ?? {}) as Record<string, unknown>;
@@ -161,8 +201,17 @@ export async function POST(req: NextRequest) {
         joinedAt: Timestamp.now(),
         invitedBy: null,
       });
+      await addWorkspaceMembershipRepo(user.uid, resolvedWid);
     } catch (memberErr) {
-      console.error("POST /api/workspaces: failed to add owner to members subcollection", memberErr);
+      console.error("[workspace creation] CRITICAL: member doc failed", memberErr);
+      // Return error — client will retry. Workspace doc exists
+      // but we report failure so client doesn't proceed with a broken state.
+      return apiError({
+        code: "INTERNAL_ERROR",
+        message: "Workspace created but membership setup failed. Please refresh and try again.",
+        status: 500,
+        init: { headers: corsHeaders(req) },
+      });
     }
 
     return apiSuccess(

@@ -781,7 +781,7 @@ type SerializedMember = {
   displayName: string | null;
   avatarUrl: string | null;
   role: "OWNER" | "MEMBER";
-  joinedAt: SerializedTs;
+  joinedAt: SerializedTs | null;
   invitedBy: string | null;
 };
 
@@ -806,10 +806,37 @@ function formatTs(ts: SerializedTs): string {
   });
 }
 
-function formatJoinedAt(ts: SerializedTs): string {
-  return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(
-    new Date(ts.seconds * 1000)
-  );
+function formatJoinedAt(ts: unknown): string {
+  try {
+    if (!ts) return "Recently";
+
+    if (
+      typeof ts === "object" &&
+      ts !== null &&
+      "seconds" in ts &&
+      typeof (ts as { seconds: unknown }).seconds === "number"
+    ) {
+      const date = new Date((ts as { seconds: number }).seconds * 1000);
+      if (isNaN(date.getTime())) return "Recently";
+      return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date);
+    }
+
+    if (typeof ts === "string") {
+      const date = new Date(ts);
+      if (isNaN(date.getTime())) return "Recently";
+      return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date);
+    }
+
+    if (typeof ts === "number") {
+      const date = new Date(ts);
+      if (isNaN(date.getTime())) return "Recently";
+      return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date);
+    }
+
+    return "Recently";
+  } catch {
+    return "Recently";
+  }
 }
 
 function daysUntil(ts: SerializedTs): number {

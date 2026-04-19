@@ -29,7 +29,7 @@ export default function AppLayoutClient({
   );
 
   return (
-    <div className="flex flex-1 min-h-0">
+    <div className="flex h-screen overflow-hidden">
       <SystemNavigationRail onOpenCommandPalette={() => setCommandOpen(true)} />
       <main className="relative z-0 flex-1 min-h-0 overflow-auto">
         <ErrorBoundary>{children}</ErrorBoundary>

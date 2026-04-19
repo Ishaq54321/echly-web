@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Command,
   Inbox,
@@ -11,8 +11,9 @@ import {
   Archive,
   Settings,
 } from "lucide-react";
-
-const RAIL_WIDTH = 56;
+import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
+import { UserAvatar } from "@/components/ui/UserAvatar";
+import { ProfileCommandPanel } from "@/components/layout/ProfileCommandPanel";
 
 const NAV_GROUPS = [
   {
@@ -52,122 +53,127 @@ export interface SystemNavigationRailProps {
 
 export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationRailProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user } = useAuthGuard({ router });
+  const [profileOpen, setProfileOpen] = useState(false);
+  const avatarRef = React.useRef<HTMLButtonElement>(null);
 
   return (
     <aside
-      className="shrink-0 flex flex-col items-center bg-[var(--structural-gray-rail)] border-r border-[var(--layer-1-border)] min-h-0"
-      style={{ width: RAIL_WIDTH }}
+      className="w-14 h-screen flex flex-col items-center border-r border-border bg-background py-4 shrink-0"
       aria-label="System navigation"
     >
-      {/* Logo */}
-      <div className="pt-4 pb-6 shrink-0">
+      {/* Section A — Logo */}
+      <div className="flex-shrink-0 mb-3">
         <Link
           href="/dashboard"
-          className="flex items-center justify-center w-10 h-10 rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[120ms] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="w-[34px] h-[34px] rounded-full bg-blue-600 flex items-center justify-center overflow-hidden flex-shrink-0"
           aria-label="Echly home"
         >
           <Image
             src="/Echly_logo.svg"
             alt=""
-            width={24}
-            height={22}
-            sizes="24px"
-            className="h-[22px] w-auto"
+            width={18}
+            height={18}
+            sizes="18px"
+            className="w-[18px] h-[18px]"
           />
         </Link>
       </div>
 
-      <nav className="flex flex-col items-center gap-1 flex-1 min-h-0 overflow-y-auto py-2">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="flex flex-col items-center w-full">
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              const isCommand = item.href === "#";
-              const active =
-                !isCommand && isActive(item.href, item.label, pathname);
+      {/* Section B — Nav icons */}
+      <nav className="flex flex-col items-center gap-1 flex-1" aria-label="Main">
+        {NAV_GROUPS.map((group) =>
+          group.items.map((item) => {
+            const Icon = item.icon;
+            const isCommand = item.href === "#";
+            const active = !isCommand && isActive(item.href, item.label, pathname);
 
-              const content = (
-                <span
-                  className={`relative flex items-center justify-center w-10 h-10 rounded-lg transition-colors duration-[120ms] ${
-                    active
-                      ? "text-[var(--accent-operational)] bg-[var(--accent-operational-muted)]"
-                      : "text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04] hover:text-[hsl(var(--text-primary-strong))]"
-                  }`}
-                >
-                  {active && (
-                    <span
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-[var(--accent-operational)]"
-                      aria-hidden
-                    />
-                  )}
-                  <Icon className="h-5 w-5" strokeWidth={1.5} />
-                </span>
-              );
+            const title =
+              "shortcut" in item && item.shortcut
+                ? `${item.label} (${item.shortcut})`
+                : item.label;
 
-              const title =
-                "shortcut" in item && item.shortcut
-                  ? `${item.label} (${item.shortcut})`
-                  : item.label;
+            const content = (
+              <Icon className="w-[17px] h-[17px]" strokeWidth={1.5} />
+            );
 
-              if (isCommand && onOpenCommandPalette) {
-                return (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={onOpenCommandPalette}
-                    className="group relative mt-1 first:mt-0 flex items-center justify-center w-full py-1 focus:outline-none focus-visible:ring-0"
-                    aria-label={title}
-                    title={title}
-                  >
-                    {content}
-                    <span className="absolute left-full ml-2 px-2 py-1 text-[11px] font-medium rounded-md bg-white border border-[var(--layer-2-border)] shadow-[var(--elevation-1)] opacity-0 pointer-events-none group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-150 whitespace-nowrap z-10">
-                      {item.label}
-                      {"shortcut" in item && item.shortcut && (
-                        <span className="ml-1.5 text-[10px] text-[hsl(var(--text-tertiary))]">
-                          {item.shortcut}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                );
-              }
-
-              if (item.href === "#") {
-                return (
-                  <span
-                    key={item.label}
-                    className="relative mt-1 first:mt-0 flex items-center justify-center w-full py-1"
-                    title={title}
-                  >
-                    {content}
-                  </span>
-                );
-              }
-
+            if (isCommand && onOpenCommandPalette) {
               return (
-                <Link
+                <button
                   key={item.label}
-                  href={item.href}
-                  className="group relative mt-1 first:mt-0 flex items-center justify-center w-full py-1 focus:outline-none focus-visible:ring-0"
-                  aria-label={item.label}
-                  aria-current={active ? "page" : undefined}
+                  type="button"
+                  onClick={onOpenCommandPalette}
+                  className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  aria-label={title}
                   title={title}
                 >
                   {content}
-                  <span className="absolute left-full ml-2 px-2 py-1 text-[11px] font-medium rounded-md bg-white border border-[var(--layer-2-border)] shadow-[var(--elevation-1)] opacity-0 pointer-events-none group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-150 whitespace-nowrap z-10">
-                    {item.label}
-                    {"shortcut" in item && (item as { shortcut?: string }).shortcut && (
-                      <span className="ml-1.5 text-[10px] text-[hsl(var(--text-tertiary))]">
-                        {(item as { shortcut: string }).shortcut}
-                      </span>
-                    )}
-                  </span>
-                </Link>
+                </button>
               );
-            })}
-          </div>
-        ))}
+            }
+
+            if (item.href === "#") {
+              return (
+                <span
+                  key={item.label}
+                  className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground"
+                  title={title}
+                >
+                  {content}
+                </span>
+              );
+            }
+
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={
+                  active
+                    ? "w-9 h-9 rounded-lg flex items-center justify-center bg-muted text-foreground"
+                    : "w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                }
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
+                title={title}
+              >
+                {content}
+              </Link>
+            );
+          })
+        )}
       </nav>
+
+      {/* Section C — Profile */}
+      <div className="flex flex-col items-center gap-0 mt-auto pb-1">
+        <div className="w-6 h-px bg-border mb-2.5" />
+        <button
+          ref={avatarRef}
+          type="button"
+          aria-label="Profile"
+          aria-expanded={profileOpen}
+          className="w-[30px] h-[30px] rounded-full border border-border overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-border transition-all"
+          onClick={() => setProfileOpen((v) => !v)}
+        >
+          <UserAvatar
+            image={(user as { image?: string | null } | null)?.image}
+            photoURL={user?.photoURL}
+            name={
+              user?.displayName?.trim() ||
+              user?.email?.split("@")[0] ||
+              undefined
+            }
+            className="h-full w-full"
+          />
+        </button>
+        <ProfileCommandPanel
+          open={profileOpen}
+          onClose={() => setProfileOpen(false)}
+          user={user}
+          anchorRef={avatarRef}
+        />
+      </div>
     </aside>
   );
 }

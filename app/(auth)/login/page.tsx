@@ -54,19 +54,23 @@ function LoginPageContent() {
   const [deletionBannerDismissed, setDeletionBannerDismissed] = useState(false);
   const showDeletionBanner = searchParams.get("deleted") === "true" && !deletionBannerDismissed;
 
+  async function handlePostLogin(user: { getIdToken: () => Promise<string> }) {
+    await createSessionCookie(user);
+    const returnPath = getReturnPath(searchParams);
+    if (returnPath) {
+      router.replace(returnPath);
+      return;
+    }
+    router.replace("/app");
+  }
+
   const handleGoogle = async () => {
     setError(null);
     setLoading(true);
 
     try{
       const user = await signInWithGoogle();
-      await createSessionCookie(user);
-      const returnPath = getReturnPath(searchParams);
-      if (returnPath) {
-        router.replace(returnPath);
-        return;
-      }
-      router.replace("/app");
+      await handlePostLogin(user);
     }
     catch (e: unknown) {
       const err = e as { code?: string; message?: string };
@@ -90,13 +94,7 @@ function LoginPageContent() {
 
     try{
       const user = await signInWithEmailPassword(email,password);
-      await createSessionCookie(user);
-      const returnPath = getReturnPath(searchParams);
-      if (returnPath) {
-        router.replace(returnPath);
-        return;
-      }
-      router.replace("/app");
+      await handlePostLogin(user);
     }
     catch(e){
       setError(e instanceof Error ? e.message : "Sign in failed");

@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -22,6 +23,14 @@ import {
   setWorkspaceHint,
 } from "@/lib/client/workspaceBootstrap";
 import type { Workspace } from "@/lib/domain/workspace";
+
+export type WorkspaceMembership = {
+  workspaceId: string;
+  name: string;
+  logoUrl: string | null;
+  plan: string;
+  isOwner: boolean;
+};
 
 export type WorkspaceContextValue = {
   workspaceId: string | null;
@@ -57,6 +66,14 @@ export type WorkspaceContextValue = {
   isWorkspaceOwner: boolean;
   /** True when the workspace has been soft-deleted. */
   isWorkspaceDeleted: boolean;
+  /** All workspaces this user is a member of. */
+  allWorkspaces: WorkspaceMembership[];
+  /** The currently active workspace ID (from localStorage or user doc). */
+  activeWorkspaceId: string | null;
+  /** Switch the active workspace and reload. */
+  switchWorkspace: (workspaceId: string) => void;
+  /** True while allWorkspaces is loading. */
+  isLoadingWorkspaces: boolean;
 };
 
 /** Throws if identity is not ready; use before destructive or workspace-scoped API calls. */
@@ -91,6 +108,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [authDisplayName, setAuthDisplayName] = useState<string | null>(null);
   const [authPhotoUrl, setAuthPhotoUrl] = useState<string | null>(null);
   const [workspaceDoc, setWorkspaceDoc] = useState<Workspace | null>(null);
+  const [allWorkspaces, setAllWorkspaces] = useState<WorkspaceMembership[]>([]);
+  const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +141,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setWorkspaceError(null);
           setWorkspaceLoading(false);
           setClaimsReady(false);
+          setAllWorkspaces([]);
+          setActiveWorkspaceId(null);
         }
         return;
       }
@@ -219,15 +241,60 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Resolve active workspace from localStorage when uid + workspaceId are known
+  useEffect(() => {
+    if (!authUid || !workspaceId) {
+      setActiveWorkspaceId(null);
+      return;
+    }
+    const stored = typeof window !== "undefined"
+      ? localStorage.getItem(`echly_active_workspace_${authUid}`)
+      : null;
+    setActiveWorkspaceId(stored && stored.trim() ? stored.trim() : workspaceId);
+  }, [authUid, workspaceId]);
+
+  // Fetch all workspace memberships when identity is ready
+  useEffect(() => {
+    if (!claimsReady || !authUid) {
+      setAllWorkspaces([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingWorkspaces(true);
+    authFetch("/api/workspace/memberships")
+      .then((res) => {
+        if (!res?.ok) return;
+        return res.json() as Promise<{ success: boolean; data?: { memberships: WorkspaceMembership[] } }>;
+      })
+      .then((body) => {
+        if (cancelled) return;
+        if (body?.success && body.data?.memberships) {
+          setAllWorkspaces(body.data.memberships);
+        }
+      })
+      .catch(() => {/* non-fatal */})
+      .finally(() => {
+        if (!cancelled) setIsLoadingWorkspaces(false);
+      });
+    return () => { cancelled = true; };
+  }, [claimsReady, authUid]);
+
   // Subscribe to the workspace document for live name/logo/owner data
   useEffect(() => {
-    if (!workspaceId || !claimsReady) {
+    const targetWid = activeWorkspaceId ?? workspaceId;
+    if (!targetWid || !claimsReady) {
       setWorkspaceDoc(null);
       return;
     }
-    const unsub = listenToWorkspace(workspaceId, setWorkspaceDoc, claimsReady);
+    const unsub = listenToWorkspace(targetWid, setWorkspaceDoc, claimsReady);
     return () => unsub();
-  }, [workspaceId, claimsReady]);
+  }, [activeWorkspaceId, workspaceId, claimsReady]);
+
+  const switchWorkspace = useCallback((wid: string) => {
+    if (!authUid) return;
+    localStorage.setItem(`echly_active_workspace_${authUid}`, wid);
+    window.location.href = "/dashboard";
+  }, [authUid]);
 
   const isIdentityResolved = useMemo(
     () =>
@@ -267,6 +334,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workspaceOwnerId: workspaceDoc?.ownerId ?? null,
       isWorkspaceOwner: !!authUid && !!workspaceDoc?.ownerId && authUid === workspaceDoc.ownerId,
       isWorkspaceDeleted: workspaceDoc?.deletedAt != null,
+      allWorkspaces,
+      activeWorkspaceId,
+      switchWorkspace,
+      isLoadingWorkspaces,
     }),
     [
       workspaceId,
@@ -281,6 +352,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       authDisplayName,
       authPhotoUrl,
       workspaceDoc,
+      allWorkspaces,
+      activeWorkspaceId,
+      switchWorkspace,
+      isLoadingWorkspaces,
     ]
   );
 

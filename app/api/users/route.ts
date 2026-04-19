@@ -8,6 +8,8 @@ import {
   updateUserFieldsRepo,
   getUserWorkspaceIdRepo,
 } from "@/lib/repositories/usersRepository.server";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 import { corsHeaders } from "@/lib/server/cors";
 import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
@@ -25,6 +27,7 @@ export async function OPTIONS(req: NextRequest) {
 type UserPatchBody = {
   role?: string;
   companySize?: string;
+  displayName?: string;
 };
 
 function unauthorizedResponse(req: NextRequest, errRes: Response): NextResponse {
@@ -86,8 +89,9 @@ export async function PATCH(req: NextRequest) {
 
   const role = typeof body.role === "string" ? body.role.trim() : "";
   const companySize = typeof body.companySize === "string" ? body.companySize.trim() : "";
+  const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
 
-  if (!role && !companySize) {
+  if (!role && !companySize && !displayName) {
     return apiError({
       code: "INVALID_INPUT",
       message: "No updates provided",
@@ -97,10 +101,22 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    await updateUserFieldsRepo(user.uid, {
-      role: role || undefined,
-      companySize: companySize || undefined,
-    });
+    if (displayName) {
+      await adminDb.doc(`users/${user.uid}`).set(
+        {
+          displayName,
+          name: displayName,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+    if (role || companySize) {
+      await updateUserFieldsRepo(user.uid, {
+        role: role || undefined,
+        companySize: companySize || undefined,
+      });
+    }
     return apiSuccess({}, null, { headers: corsHeaders(req) });
   } catch (err) {
     console.error("PATCH /api/users:", err);
