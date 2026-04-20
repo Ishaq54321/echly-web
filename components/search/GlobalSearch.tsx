@@ -4,8 +4,10 @@ import { FileText, Search as SearchIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/lib/client/workspaceStore";
-import type { Session } from "@/lib/domain/session";
+import { useWorkspace } from "@/lib/client/workspaceContext";
+import type { Session, SharedSessionMembership } from "@/lib/domain/session";
 import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
+import { authFetch } from "@/lib/authFetch";
 
 export const OPEN_SEARCH_EVENT = "echly:open-search-overlay";
 
@@ -43,7 +45,9 @@ function formatSessionMeta(s: Session): string {
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [sharedSessions, setSharedSessions] = useState<SharedSessionMembership[]>([]);
   const { sessions: sessionsWithCounts, loading } = useWorkspaceStore();
+  const { workspaceName } = useWorkspace();
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
@@ -84,6 +88,22 @@ export function GlobalSearch() {
 
   useEffect(() => {
     if (!open) return;
+    authFetch("/api/sessions/shared")
+      .then((r) => {
+        if (!r || !r.ok) return;
+        return r.json();
+      })
+      .then((data) => {
+        if (!data) return;
+        const list: SharedSessionMembership[] =
+          data?.data?.sessions ?? [];
+        setSharedSessions(list.filter((s) => !s.isArchived));
+      })
+      .catch(() => {});
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
 
     const t = requestAnimationFrame(() => {
       inputRef.current?.focus();
@@ -91,13 +111,6 @@ export function GlobalSearch() {
 
     return () => cancelAnimationFrame(t);
   }, [open]);
-
-  const recentSessions = useMemo(() => {
-    return [...sessionList]
-      .filter((s) => (s.isArchived ?? s.archived) !== true)
-      .sort((a, b) => sessionUpdatedMs(b.updatedAt) - sessionUpdatedMs(a.updatedAt))
-      .slice(0, 8);
-  }, [sessionList]);
 
   const q = query.trim();
   const searchMatches = useMemo(() => {
@@ -107,11 +120,18 @@ export function GlobalSearch() {
       .slice(0, 12);
   }, [filteredSessions, q]);
 
+  const sharedMatches = useMemo(() => {
+    if (!q) return [];
+    return sharedSessions
+      .filter((s) => (s.sessionName ?? "").toLowerCase().includes(q.toLowerCase()))
+      .slice(0, 8);
+  }, [sharedSessions, q]);
+
   if (!open) return null;
 
   const showIdleEmpty = !loading && !q;
   const showNoMatches =
-    !loading && q.length > 0 && searchMatches.length === 0;
+    !loading && q.length > 0 && searchMatches.length === 0 && sharedMatches.length === 0;
   const showSearchResults = searchMatches.length > 0;
 
   const navigateToSession = (id: string) => {
@@ -146,36 +166,12 @@ export function GlobalSearch() {
             <div className="search-loading">Loading sessions…</div>
           </div>
         ) : showIdleEmpty ? (
-          <div className="search-results-wrap search-results-wrap--scroll">
-            {recentSessions.length === 0 ? (
-              <div className="search-empty">
-                <SearchIcon className="search-empty-icon" strokeWidth={2} aria-hidden />
-                <h3>Search sessions</h3>
-                <p>Find sessions by title — start typing to filter.</p>
-              </div>
-            ) : (
-              <>
-                <div className="search-results-section-label">Recent</div>
-                <div className="search-results-list">
-                  {recentSessions.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      className="search-result-item"
-                      onClick={() => navigateToSession(s.id)}
-                    >
-                      <div className="search-result-item-left" aria-hidden>
-                        <FileText className="search-result-file-icon" strokeWidth={2} />
-                      </div>
-                      <div className="search-result-item-content">
-                        <p className="search-result-item-title">{s.title}</p>
-                        <span className="search-result-item-meta">{formatSessionMeta(s)}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+          <div className="search-results-wrap">
+            <div className="search-empty">
+              <SearchIcon className="search-empty-icon" strokeWidth={2} aria-hidden />
+              <h3>Search sessions</h3>
+              <p>Find sessions by title — start typing to filter.</p>
+            </div>
           </div>
         ) : (
           <div className="search-results-wrap search-results-wrap--scroll">
@@ -186,29 +182,56 @@ export function GlobalSearch() {
                 <span>Try another keyword.</span>
               </div>
             ) : (
-              showSearchResults && (
-                <>
-                  <div className="search-results-section-label">Sessions</div>
-                  <div className="search-results-list">
-                    {searchMatches.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        className="search-result-item"
-                        onClick={() => navigateToSession(s.id)}
-                      >
-                        <div className="search-result-item-left" aria-hidden>
-                          <FileText className="search-result-file-icon" strokeWidth={2} />
-                        </div>
-                        <div className="search-result-item-content">
-                          <p className="search-result-item-title">{s.title}</p>
-                          <span className="search-result-item-meta">{formatSessionMeta(s)}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )
+              <>
+                {showSearchResults && (
+                  <>
+                    <div className="search-results-section-label">{workspaceName ?? "Workspace"}</div>
+                    <div className="search-results-list">
+                      {searchMatches.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className="search-result-item"
+                          onClick={() => navigateToSession(s.id)}
+                        >
+                          <div className="search-result-item-left" aria-hidden>
+                            <FileText className="search-result-file-icon" strokeWidth={2} />
+                          </div>
+                          <div className="search-result-item-content">
+                            <p className="search-result-item-title">{s.title}</p>
+                            <span className="search-result-item-meta">{formatSessionMeta(s)}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {sharedMatches.length > 0 && (
+                  <>
+                    <div className="search-results-section-label">Shared with me</div>
+                    <div className="search-results-list">
+                      {sharedMatches.map((s) => (
+                        <button
+                          key={s.sessionId}
+                          type="button"
+                          className="search-result-item"
+                          onClick={() => navigateToSession(s.sessionId)}
+                        >
+                          <div className="search-result-item-left" aria-hidden>
+                            <FileText className="search-result-file-icon" strokeWidth={2} />
+                          </div>
+                          <div className="search-result-item-content">
+                            <p className="search-result-item-title">{s.sessionName}</p>
+                            <span className="search-result-item-meta">
+                              {s.workspaceName ? `Shared · ${s.workspaceName}` : "Shared with me"}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             )}
           </div>
         )}
