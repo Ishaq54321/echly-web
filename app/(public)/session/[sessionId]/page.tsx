@@ -9,13 +9,19 @@ import GlobalRail from "@/components/layout/GlobalRail";
 import PublicViewerBanner from "@/components/session/PublicViewerBanner";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { setShareToken } from "@/lib/client/shareToken";
+import { getUidHint } from "@/lib/client/workspaceBootstrap";
 
 function PublicSessionView({ sessionId }: { sessionId: string }) {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
-  const { authReady, authUid, isIdentityResolved } = useWorkspace();
-  const [accessBlocked, setAccessBlocked] = useState(false);
-  const [isWorkspaceMember] = useState(false);
+
+  const { authReady, authUid } = useWorkspace();
+
+  const [uidHint, setUidHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    setUidHint(getUidHint());
+  }, []);
 
   useEffect(() => {
     if (authReady && authUid && token) {
@@ -23,79 +29,31 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
     }
   }, [authReady, authUid, token]);
 
+  const showAuthShell = !!authUid || !!uidHint;
 
-  const isMember = isWorkspaceMember;
+  const authShell = (content: React.ReactNode) => (
+    <div suppressHydrationWarning className="flex h-screen overflow-hidden">
+      <GlobalRail />
+      <div className="content-divider shrink-0" aria-hidden />
+      <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+          {content}
+        </div>
+      </main>
+    </div>
+  );
 
-  if (!authReady && !authUid) {
-    return (
-      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 24, height: 24, border: "2.5px solid #E0E0E0", borderTopColor: "#1775E0", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
-  if (!!authUid && !isIdentityResolved) {
-    return (
-      <div className="flex h-screen overflow-hidden">
-        <GlobalRail />
-        <div className="content-divider shrink-0" aria-hidden />
-        <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
-          <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto items-center justify-center">
-            <div style={{ width: 24, height: 24, border: "2.5px solid #E0E0E0", borderTopColor: "#1775E0", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (accessBlocked) {
-    return (
+  if (showAuthShell) {
+    return authShell(
       <SessionPageClient
         sessionId={sessionId}
-        isPublicRoute
-        onAccessBlocked={() => setAccessBlocked(true)}
+        onAccessBlocked={() => {}}
       />
     );
   }
 
-  if (authUid && isMember) {
-    return (
-      <div className="flex h-screen overflow-hidden">
-        <GlobalRail />
-        <div className="content-divider shrink-0" aria-hidden />
-        <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
-          <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
-            <SessionPageClient
-              sessionId={sessionId}
-              onAccessBlocked={() => setAccessBlocked(true)}
-            />
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (authUid && !isMember) {
-    return (
-      <div className="flex h-screen overflow-hidden">
-        <GlobalRail />
-        <div className="content-divider shrink-0" aria-hidden />
-        <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
-          <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
-            <SessionPageClient
-              sessionId={sessionId}
-              onAccessBlocked={() => setAccessBlocked(true)}
-            />
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ height: "100dvh", overflow: "hidden", position: "relative" }}>
+    <div suppressHydrationWarning style={{ height: "100dvh", overflow: "hidden", position: "relative" }}>
       <PublicSessionNav />
       <div
         style={{
@@ -109,10 +67,14 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
         <SessionPageClient
           sessionId={sessionId}
           isPublicRoute
-          onAccessBlocked={() => setAccessBlocked(true)}
+          onAccessBlocked={() => {}}
         />
       </div>
-      <PublicViewerBanner sessionId={sessionId} shareToken={token} canRequestAccess={false} />
+      <PublicViewerBanner
+        sessionId={sessionId}
+        shareToken={token}
+        canRequestAccess={false}
+      />
     </div>
   );
 }

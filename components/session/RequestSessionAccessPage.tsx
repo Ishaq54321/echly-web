@@ -8,6 +8,7 @@ export interface RequestSessionAccessPageProps {
   sessionName: string | null;
   workspaceName: string | null;
   isAuthenticated: boolean;
+  isPublicRoute?: boolean;
   userEmail: string | null;
   requestStatus: "idle" | "pending" | "submitted" | "already_requested" | "rejected";
   onRequestAccess: () => Promise<void>;
@@ -18,6 +19,7 @@ export function RequestSessionAccessPage({
   sessionName,
   workspaceName,
   isAuthenticated,
+  isPublicRoute,
   requestStatus,
   onRequestAccess,
   onSignIn,
@@ -74,7 +76,7 @@ export function RequestSessionAccessPage({
         background: "#F7F8FA",
       }}
     >
-      <PublicSessionNav />
+      {isPublicRoute !== false && <PublicSessionNav />}
 
       <div
         style={{

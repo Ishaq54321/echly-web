@@ -206,7 +206,7 @@ export function ActionItemsSection({
           </li>
         )}
       </ul>
-      {!isAdding && (
+      {!isReadOnly && !isAdding && (
         <button
           type="button"
           onClick={startAdd}

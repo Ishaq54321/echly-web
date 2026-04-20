@@ -43,10 +43,9 @@ export default function PublicViewerBanner(_props: PublicViewerBannerProps) {
         background: "#FFFFFF",
         borderTop: "1px solid #EBEBEB",
         boxShadow: "0 -8px 32px rgba(0,0,0,0.08)",
-        height: 80,
         display: "flex",
         alignItems: "center",
-        padding: "0 40px",
+        padding: "21px 40px",
       }}
     >
       {/* Left section */}

@@ -181,7 +181,16 @@ export const PATCH = withAuthorization(
     if (typeof body.title === "string") contentUpdates.title = body.title;
     if (typeof body.instruction === "string") contentUpdates.instruction = body.instruction;
     else if (typeof body.description === "string") contentUpdates.instruction = body.description;
-    if (Array.isArray(body.actionSteps)) contentUpdates.actionSteps = body.actionSteps;
+    if (Array.isArray(body.actionSteps)) {
+      if (!context.access?.isWorkspaceMember) {
+        return apiError({
+          code: "FORBIDDEN",
+          message: "Only workspace members can edit action steps",
+          status: 403,
+        });
+      }
+      contentUpdates.actionSteps = body.actionSteps;
+    }
     if (Array.isArray(body.suggestedTags)) contentUpdates.suggestedTags = body.suggestedTags;
 
     const hasContent = Object.keys(contentUpdates).length > 0;

@@ -1991,6 +1991,7 @@ export default function SessionPageClient({
         sessionName={session?.title ?? null}
         workspaceName={workspaceName ?? null}
         isAuthenticated={!!authUid}
+        isPublicRoute={isPublicRoute}
         userEmail={authEmail ?? null}
         requestStatus={requestAccessStatus}
         onRequestAccess={handleRequestSessionAccess}
@@ -2082,7 +2083,7 @@ export default function SessionPageClient({
         resolveAffirmationKey={resolveAffirmationKey}
         onSaveTitle={saveTitle}
         onResolvedChange={handleResolvedChange}
-        onSaveActionSteps={saveActionSteps}
+        onSaveActionSteps={isWorkspaceMember ? saveActionSteps : undefined}
         onSaveTags={saveTags}
         setIsImageExpanded={setIsImageExpanded}
         isCommentMode={isCommentMode}
