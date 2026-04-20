@@ -55,6 +55,7 @@ export interface ExecutionViewProps {
     onRequestAccess: () => void;
   };
   accessResolveSubmitting?: boolean;
+  isAnonymousViewer?: boolean;
   /** Parent resolves once via `useScreenshotUrl` for the selected ticket. */
   screenshotUrl: string | null;
   screenshotUrlLoading: boolean;
@@ -93,6 +94,7 @@ export function ExecutionView({
   shareGating,
   accessResolve,
   accessResolveSubmitting,
+  isAnonymousViewer,
   screenshotUrl,
   screenshotUrlLoading,
   screenshotUrlError,
@@ -126,6 +128,7 @@ export function ExecutionView({
         shareGating={shareGating}
         accessResolve={accessResolve}
         accessResolveSubmitting={accessResolveSubmitting}
+        isAnonymousViewer={isAnonymousViewer}
       />
 
       {!isPublicReadOnly && !isShareSurface && isCommentMode && (

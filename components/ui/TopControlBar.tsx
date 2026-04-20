@@ -32,8 +32,10 @@ export function TopControlBar({
   publicViewer = false,
   canManageShare = false,
   canManageAccess = false,
+  isWorkspaceMember = false,
   pendingRequestsCount = 0,
   onShareModalOpen,
+  sessionLoaded = false,
 }: {
   sessionId: string;
   sessionTitle?: string;
@@ -53,10 +55,14 @@ export function TopControlBar({
   canManageShare?: boolean;
   /** True only for OWNER — gates the general access dropdown. */
   canManageAccess?: boolean;
+  /** True for OWNER and WS-MEMBER — gates the ⋯ actions menu. */
+  isWorkspaceMember?: boolean;
   /** Number of pending access requests; shows red dot on Share button when > 0. */
   pendingRequestsCount?: number;
   /** Called when share modal is opened (e.g. to clear pending count). */
   onShareModalOpen?: () => void;
+  /** True once the session bundle fetch has resolved (success or error). Gates share/actions buttons. */
+  sessionLoaded?: boolean;
 }) {
   const { authUid, isIdentityResolved } = useWorkspace();
   const copyTimerRef = useRef<number | null>(null);
@@ -100,7 +106,7 @@ export function TopControlBar({
       <div className="page-header sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-end gap-4 bg-[var(--layer-1-bg)] px-6">
         <div className="right flex shrink-0 items-center gap-2.5">
           <Link
-            href={`/login?next=${encodeURIComponent(`/session/${sessionId}`)}`}
+            href={`/login?returnUrl=${encodeURIComponent(`/session/${sessionId}`)}`}
             className="primary-btn inline-flex items-center justify-center no-underline"
           >
             Sign in
@@ -116,7 +122,7 @@ export function TopControlBar({
         <div className="right flex shrink-0 items-center gap-2.5">
           {/* Share button with notification dot */}
           <div style={{ position: "relative", display: "inline-flex" }}>
-            <ShareButton onClick={handleShareOpen} />
+            <ShareButton onClick={handleShareOpen} disabled={!sessionLoaded} />
             {pendingRequestsCount > 0 && (
               <span
                 style={{
@@ -141,6 +147,9 @@ export function TopControlBar({
               onClose={() => share.setOpen(false)}
               canManageShare={canManageShare}
               canManageAccess={canManageAccess}
+              isWorkspaceMember={isWorkspaceMember}
+              sessionId={sessionId}
+              sessionName={sessionTitle ?? null}
               inviteEmail={share.inviteEmail}
               setInviteEmail={share.setInviteEmail}
               inviteAccess={share.inviteAccess}
@@ -202,9 +211,9 @@ export function TopControlBar({
             )}
           </button>
 
-          {session ? (
+          {session !== null && (isWorkspaceMember || canManageAccess) ? (
             <div
-              className="relative shrink-0"
+              className={`relative shrink-0${!sessionLoaded ? " opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >

@@ -7,6 +7,7 @@ import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
 import { getWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import { adminDb, adminBucket } from "@/lib/server/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { getSignedStorageUrl, extractStoragePathFromUrl } from "@/lib/server/storage/getSignedUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,65 @@ function extensionForType(type: string): string {
   if (type === "image/png") return "png";
   if (type === "image/webp") return "webp";
   return "jpg";
+}
+
+function extractStoragePath(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "firebasestorage.googleapis.com") {
+      const match = parsed.pathname.match(/\/v0\/b\/[^/]+\/o\/(.+)/);
+      if (match) return decodeURIComponent(match[1]);
+    }
+    const bucketName = adminBucket.name;
+    const prefix = `/${bucketName}/`;
+    const idx = parsed.pathname.indexOf(prefix);
+    if (idx === -1) return null;
+    return decodeURIComponent(parsed.pathname.slice(idx + prefix.length));
+  } catch {
+    return null;
+  }
+}
+
+/** GET /api/workspace/logo — refresh signed URL for existing logo. */
+export async function GET(req: NextRequest) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (err) {
+    return toAuthorizationResponse(err);
+  }
+
+  try {
+    const workspaceId = await getUserWorkspaceIdRepo(user.uid);
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
+    if (!workspace) {
+      return apiError({ code: "NOT_FOUND", message: "Workspace not found", status: 404 });
+    }
+
+    if (!workspace.logoUrl) {
+      return apiSuccess({ logoUrl: null });
+    }
+
+    const storagePath =
+      extractStoragePathFromUrl(workspace.logoUrl) ?? extractStoragePath(workspace.logoUrl);
+
+    if (!storagePath) {
+      return apiSuccess({ logoUrl: workspace.logoUrl });
+    }
+
+    const signedUrl = await getSignedStorageUrl(storagePath);
+
+    await adminDb.doc(`workspaces/${workspaceId}`).update({
+      logoUrl: signedUrl,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return apiSuccess({ logoUrl: signedUrl });
+  } catch (err) {
+    console.error("GET /api/workspace/logo:", err);
+    return apiError({ code: "INTERNAL_ERROR", message: "Failed to refresh logo URL", status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -67,17 +127,16 @@ export async function POST(req: NextRequest) {
 
     await fileRef.save(buffer, {
       metadata: { contentType: file.type },
-      public: true,
     });
 
-    const publicUrl = fileRef.publicUrl();
+    const signedUrl = await getSignedStorageUrl(filePath);
 
     await adminDb.doc(`workspaces/${workspaceId}`).update({
-      logoUrl: publicUrl,
+      logoUrl: signedUrl,
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    return apiSuccess({ logoUrl: publicUrl });
+    return apiSuccess({ logoUrl: signedUrl });
   } catch (err) {
     console.error("POST /api/workspace/logo:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to upload logo", status: 500 });
@@ -109,18 +168,10 @@ export async function DELETE(req: NextRequest) {
       return apiError({ code: "INVALID_INPUT", message: "NO_LOGO", status: 400 });
     }
 
-    // Extract storage path from the public URL
-    // Public URL format: https://storage.googleapis.com/<bucket>/<path>
     try {
-      const url = new URL(workspace.logoUrl);
-      const bucketName = adminBucket.name;
-      // Path after /<bucket>/
-      const prefix = `/${bucketName}/`;
-      const idx = url.pathname.indexOf(prefix);
-      if (idx !== -1) {
-        const storagePath = decodeURIComponent(url.pathname.slice(idx + prefix.length));
-        await adminBucket.file(storagePath).delete({ ignoreNotFound: true });
-      }
+      const storagePath =
+        extractStoragePathFromUrl(workspace.logoUrl) ?? extractStoragePath(workspace.logoUrl);
+      if (storagePath) await adminBucket.file(storagePath).delete({ ignoreNotFound: true });
     } catch (storageErr) {
       console.error("DELETE /api/workspace/logo: storage delete failed:", storageErr);
     }

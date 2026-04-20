@@ -125,10 +125,12 @@ export async function PATCH(
   }
   const context = built.ctx;
 
-  if (!context.access?.capabilities.canResolve) {
+  const isWorkspaceMemberPatch = context.access?.isWorkspaceMember === true;
+  const isOwnerPatch = context.access?.capabilities.canDeleteTicket === true;
+  if (!context.access?.capabilities.canResolve || (!isWorkspaceMemberPatch && !isOwnerPatch)) {
     return apiError({
       code: "FORBIDDEN",
-      message: "You do not have permission",
+      message: "Only workspace members can manage access",
       status: 403,
     });
   }
@@ -279,10 +281,12 @@ export async function DELETE(
   }
   const context = built.ctx;
 
-  if (!context.access?.capabilities.canResolve) {
+  const isWorkspaceMemberDelete = context.access?.isWorkspaceMember === true;
+  const isOwnerDelete = context.access?.capabilities.canDeleteTicket === true;
+  if (!context.access?.capabilities.canResolve || (!isWorkspaceMemberDelete && !isOwnerDelete)) {
     return apiError({
       code: "FORBIDDEN",
-      message: "You do not have permission",
+      message: "Only workspace members can manage access",
       status: 403,
     });
   }

@@ -79,15 +79,17 @@ export default function CommentThread({ comments }: Props) {
             )}
             <div className="flex gap-4">
               {comment.avatar ? (
-                <Image
-                  src={comment.avatar}
-                  alt={comment.name}
-                  width={36}
-                  height={36}
-                  sizes="36px"
-                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                  unoptimized
-                />
+                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full">
+                  <Image
+                    src={comment.avatar}
+                    alt={comment.name}
+                    width={36}
+                    height={36}
+                    sizes="36px"
+                    className="h-full w-full object-cover"
+                    unoptimized
+                  />
+                </div>
               ) : (
                 <div
                   className="w-9 h-9 rounded-full bg-[hsl(var(--surface-2))] flex flex-shrink-0 items-center justify-center text-xs font-medium text-[hsl(var(--text-secondary))]"

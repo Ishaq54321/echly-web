@@ -56,7 +56,7 @@ export function RequestAccessModal({
             type="button"
             onClick={() => void onConfirm()}
             disabled={submitting}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[14px] font-semibold rounded-xl border border-[var(--border-subtle)] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary-strong))] hover:bg-[hsl(var(--surface-3))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-2 px-[18px] h-[38px] text-[14px] font-semibold rounded-[9px] border-none bg-[#1775E0] text-white shadow-[0_1px_3px_rgba(23,117,224,0.20)] hover:bg-[#1462C4] focus:outline-none focus:ring-2 focus:ring-blue-400/40 transition-all duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <>

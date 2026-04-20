@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import type { User } from "firebase/auth";
-import { usePathname } from "next/navigation";
 import {
   useWorkspace,
   type WorkspaceContextValue,
@@ -39,15 +38,12 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): {
   loading: boolean;
 } {
   const { router, useReplace = false, skipLoginRedirect = false } = options;
-  const pathname = usePathname();
-  const publicSessionSurface =
-    typeof pathname === "string" && pathname.startsWith("/session/");
   const ws = useWorkspace();
   const user = compatUser(ws);
   const loading = !ws.authReady;
 
   useEffect(() => {
-    if (!router || loading || skipLoginRedirect || publicSessionSurface) return;
+    if (!router || loading || skipLoginRedirect) return;
     if (user == null) {
       if (useReplace) {
         router.replace("/login");
@@ -55,7 +51,7 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}): {
         router.push("/login");
       }
     }
-  }, [router, useReplace, loading, user, skipLoginRedirect, publicSessionSurface]);
+  }, [router, useReplace, loading, user, skipLoginRedirect]);
 
   return { user, loading };
 }

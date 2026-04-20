@@ -81,7 +81,7 @@ export function CommentItem({
           <img
             src={comment.userAvatar}
             alt=""
-            className="w-full h-full rounded-full object-cover"
+            className="w-full h-full object-cover"
             loading="lazy"
           />
         ) : (
@@ -227,7 +227,7 @@ export function CommentItem({
                     <img
                       src={comment.userAvatar}
                       alt=""
-                      className="w-full h-full rounded-full object-cover"
+                      className="w-full h-full object-cover"
                       loading="lazy"
                     />
                   ) : (

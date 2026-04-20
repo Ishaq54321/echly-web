@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Avatar } from "@/components/ui/Avatar";
 import {
   Archive,
   Calendar,
@@ -292,13 +293,14 @@ function SessionWorkspaceRow({
               {assigneeLabels.map((label, i) => (
                 <div
                   key={`${session.id}-assignee-${i}-${label}`}
-                  className={[
-                    "w-7 h-7 rounded-full bg-gray-200 text-gray-700 text-xs font-medium flex items-center justify-center border-2 border-white shadow-sm",
-                    label === "?" ? "bg-gray-100 text-gray-400" : "",
-                  ].join(" ")}
+                  style={{ border: "2px solid white", borderRadius: "50%", boxShadow: "0 1px 2px rgba(0,0,0,0.08)" }}
                   aria-label={label === "?" ? "Unassigned" : `Assignee ${label}`}
                 >
-                  {label}
+                  <Avatar
+                    src={null}
+                    name={label === "?" ? null : label}
+                    size={28}
+                  />
                 </div>
               ))}
             </div>

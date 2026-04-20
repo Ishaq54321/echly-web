@@ -50,10 +50,12 @@ export async function POST(
   }
   const context = built.ctx;
 
-  if (!context.access?.capabilities.canResolve) {
+  const isWorkspaceMemberInvite = context.access?.isWorkspaceMember === true;
+  const isOwnerInvite = context.access?.capabilities.canDeleteTicket === true;
+  if (!context.access?.capabilities.canResolve || (!isWorkspaceMemberInvite && !isOwnerInvite)) {
     return apiError({
       code: "FORBIDDEN",
-      message: "You do not have permission to invite users",
+      message: "Only workspace members can invite users",
       status: 403,
     });
   }

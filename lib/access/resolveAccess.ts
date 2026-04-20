@@ -23,6 +23,7 @@ export type AccessContext = {
   isPublicViewer: boolean;
   userId: string | null;
   capabilities: AccessCapabilities;
+  isWorkspaceMember: boolean;
 };
 
 export function buildCapabilities(
@@ -84,6 +85,7 @@ export function accessContextToResponseBody(access: AccessContext): Record<strin
     userId: access.userId,
     isPublicViewer: access.isPublicViewer,
     capabilities: access.capabilities,
+    isWorkspaceMember: access.isWorkspaceMember ?? false,
   };
 }
 
@@ -117,7 +119,7 @@ type ResolveAccessInput = {
   memberAccess?: "view" | "resolve" | null;
 };
 
-export type ResolveAccessResult = { role: Role; sessionGranted: boolean };
+export type ResolveAccessResult = { role: Role; sessionGranted: boolean; isWorkspaceMember: boolean };
 
 /**
  * Single access engine. Grant rule:
@@ -162,7 +164,7 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
     hasShareLinkContext;
 
   if (!accessGranted) {
-    return { role: "VIEWER", sessionGranted: false };
+    return { role: "VIEWER", sessionGranted: false, isWorkspaceMember: false };
   }
 
   const shareTokenIsOnlyGrant =
@@ -172,23 +174,23 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
     !hasMemberAccess &&
     hasShareLinkContext;
   if (shareTokenIsOnlyGrant && tokenExpired) {
-    return { role: "VIEWER", sessionGranted: false };
+    return { role: "VIEWER", sessionGranted: false, isWorkspaceMember: false };
   }
 
   if (isOwner) {
-    return { role: "OWNER", sessionGranted: true };
+    return { role: "OWNER", sessionGranted: true, isWorkspaceMember: true };
   }
 
   if (isWorkspaceMember) {
-    return { role: "RESOLVER", sessionGranted: true };
+    return { role: "RESOLVER", sessionGranted: true, isWorkspaceMember: true };
   }
 
   if (input.memberAccess) {
     if (input.memberAccess === "resolve") {
-      return { role: "RESOLVER", sessionGranted: true };
+      return { role: "RESOLVER", sessionGranted: true, isWorkspaceMember: false };
     }
 
-    return { role: "VIEWER", sessionGranted: true };
+    return { role: "VIEWER", sessionGranted: true, isWorkspaceMember: false };
   }
 
   let level: AccessLevel;
@@ -201,9 +203,9 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
   if (level === "resolve") {
     // Unauthenticated users with a "resolve" link can view but must sign in to resolve
     if (user !== null) {
-      return { role: "RESOLVER", sessionGranted: true };
+      return { role: "RESOLVER", sessionGranted: true, isWorkspaceMember: false };
     }
-    return { role: "VIEWER", sessionGranted: true };
+    return { role: "VIEWER", sessionGranted: true, isWorkspaceMember: false };
   }
-  return { role: "VIEWER", sessionGranted: true };
+  return { role: "VIEWER", sessionGranted: true, isWorkspaceMember: false };
 }

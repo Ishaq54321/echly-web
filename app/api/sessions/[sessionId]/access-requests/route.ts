@@ -87,10 +87,12 @@ export async function PATCH(
   }
   const context = built.ctx;
 
-  if (!context.access?.capabilities.canResolve) {
+  const isWorkspaceMemberAR = context.access?.isWorkspaceMember === true;
+  const isOwnerAR = context.access?.capabilities.canDeleteTicket === true;
+  if (!context.access?.capabilities.canResolve || (!isWorkspaceMemberAR && !isOwnerAR)) {
     return apiError({
       code: "FORBIDDEN",
-      message: "You do not have permission to manage access requests",
+      message: "Only workspace members can manage access requests",
       status: 403,
     });
   }

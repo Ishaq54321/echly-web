@@ -7,7 +7,7 @@ import {
   Laptop,
   ChevronDown,
   ChevronUp,
-  Gem,
+  Camera,
   Check,
   Minus,
   UserPlus,
@@ -17,25 +17,27 @@ import {
   RotateCcw,
   AlertCircle,
   Users,
+  Lock,
+  Info,
+  Eye,
+  EyeOff,
+  CheckCircle,
+  Gem,
 } from "lucide-react";
+import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { usePlanCatalog } from "@/lib/hooks/usePlanCatalog";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Switch } from "@/components/ui/Switch";
-import { Modal } from "@/components/ui/Modal";
 import type { Workspace } from "@/lib/domain/workspace";
 import {
   assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
-import { BillingUsageProvider, useBillingUsageContext } from "@/lib/billing/BillingUsageProvider";
+import { BillingUsageProvider } from "@/lib/billing/BillingUsageProvider";
 import {
   listenToWorkspace,
-  updateWorkspaceAppearance,
   updateWorkspaceName,
-  updateWorkspaceNotifications,
-  updateWorkspaceSettings,
 } from "@/lib/repositories/workspacesRepository";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
@@ -68,10 +70,9 @@ function SectionHeader({
 }
 
 const TABS = [
-  { id: "general", label: "General" },
-  { id: "members", label: "Members" },
+  { id: "profile", label: "My account" },
+  { id: "workspace", label: "Workspace" },
   { id: "security", label: "Security" },
-  { id: "integrations", label: "Integrations" },
   { id: "billing", label: "Billing" },
 ] as const;
 
@@ -87,7 +88,7 @@ function SettingsPageInner() {
     isIdentityReady,
   } = useWorkspace();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<TabId>("general");
+  const [activeTab, setActiveTab] = useState<TabId>("profile");
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
   useEffect(() => {
@@ -139,12 +140,12 @@ function SettingsPageInner() {
   return (
     <div className="flex flex-1 min-h-0 bg-white overflow-auto">
       <div className="flex-1 min-w-0 max-w-[1280px] mx-auto px-12 py-10 w-full">
-        {/* Page header — H1 */}
+        {/* Page header */}
         <header className="mb-8">
-          <h1 className="text-[28px] font-semibold tracking-tight text-neutral-900">
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#111111", letterSpacing: "-0.3px", margin: 0 }}>
             Settings
           </h1>
-          <p className="mt-1.5 text-[15px] text-neutral-600">
+          <p style={{ fontSize: 14, color: "#777777", marginTop: 4, marginBottom: 0 }}>
             Manage your workspace, notifications, and preferences.
           </p>
         </header>
@@ -180,22 +181,16 @@ function SettingsPageInner() {
         </nav>
 
         {/* Tab content */}
-        {activeTab === "members" && (
-          <MembersTab workspaceId={workspaceId} loading={sectionLoading} />
-        )}
         <BillingUsageProvider>
-          {activeTab === "general" && (
-            <GeneralTab
+          {activeTab === "profile" && <MyAccountTab />}
+          {activeTab === "workspace" && (
+            <WorkspaceTab
               workspace={workspace}
               workspaceId={workspaceId}
               loading={sectionLoading}
-              onNavigateToBilling={() => setActiveTab("billing")}
             />
           )}
           {activeTab === "security" && <SecurityTab />}
-          {activeTab === "integrations" && (
-            <IntegrationsTab onNavigateToBilling={() => setActiveTab("billing")} />
-          )}
           {activeTab === "billing" && <BillingTab />}
         </BillingUsageProvider>
       </div>
@@ -221,46 +216,7 @@ export default function SettingsPage() {
   );
 }
 
-/* ——— General tab: Workspace, Appearance, Notifications only ——— */
-function GeneralTab({
-  workspace,
-  workspaceId,
-  loading,
-  onNavigateToBilling,
-}: {
-  workspace: Workspace | null;
-  workspaceId: string | null;
-  loading: boolean;
-  onNavigateToBilling: () => void;
-}) {
-  if (loading) {
-    return (
-      <div
-        className="flex min-h-[920px] items-center justify-center pb-16"
-        aria-busy="true"
-        aria-live="polite"
-      >
-        <MinimalLoader label="Loading settings…" />
-      </div>
-    );
-  }
-
-  return (
-    <div className={`${CARD_GAP} pb-16 ech-content-enter`}>
-      <WorkspaceCard workspace={workspace} workspaceId={workspaceId} loading={loading} />
-      <AppearanceCard
-        workspace={workspace}
-        workspaceId={workspaceId}
-        loading={loading}
-        onNavigateToBilling={onNavigateToBilling}
-      />
-      <NotificationsCard workspace={workspace} workspaceId={workspaceId} loading={loading} />
-      <AdvancedSettingsCard workspace={workspace} workspaceId={workspaceId} loading={loading} />
-    </div>
-  );
-}
-
-function WorkspaceCard({
+function WorkspaceTab({
   workspace,
   workspaceId,
   loading,
@@ -273,14 +229,34 @@ function WorkspaceCard({
   const [nameDraft, setNameDraft] = useState("");
   const lastWorkspaceIdRef = useRef<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [logoToast, setLogoToast] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [logoHovered, setLogoHovered] = useState(false);
+  const [logoCropOpen, setLogoCropOpen] = useState(false);
+  const [logoCropSrc, setLogoCropSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLogoUrl(workspace?.logoUrl ?? null);
   }, [workspace?.logoUrl]);
+
+  // Refresh logo signed URL on mount (Phase 7)
+  useEffect(() => {
+    if (!workspaceId) return;
+    void (async () => {
+      try {
+        const res = await authFetch("/api/workspace/logo");
+        if (res?.ok) {
+          const json = await res.json() as { success: boolean; data?: { logoUrl: string | null } };
+          if (json.success && json.data?.logoUrl) {
+            setLogoUrl(json.data.logoUrl);
+          }
+        }
+      } catch { /* non-fatal */ }
+    })();
+  }, [workspaceId]);
 
   useEffect(() => {
     if (workspaceId !== lastWorkspaceIdRef.current) {
@@ -293,15 +269,14 @@ function WorkspaceCard({
   }, [workspaceId, workspace?.name]);
 
   function showToast(msg: string) {
-    setLogoToast(msg);
-    setTimeout(() => setLogoToast(null), 3000);
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       showToast("Please use JPEG, PNG, or WebP");
       return;
@@ -310,14 +285,17 @@ function WorkspaceCard({
       showToast("Image must be under 2MB");
       return;
     }
+    const objectUrl = URL.createObjectURL(file);
+    setLogoCropSrc(objectUrl);
+    setLogoCropOpen(true);
+  }
 
-    const preview = URL.createObjectURL(file);
-    setLogoPreview(preview);
+  async function handleLogoCropConfirm(blob: Blob) {
+    setLogoCropOpen(false);
     setUploadingLogo(true);
-
     try {
       const fd = new FormData();
-      fd.append("logo", file);
+      fd.append("logo", blob, "logo.jpg");
       const res = await authFetch("/api/workspace/logo", { method: "POST", body: fd });
       if (!res) { showToast("Upload failed. Try again."); return; }
       const json = await res.json() as { success: boolean; data?: { logoUrl: string }; error?: { message: string } };
@@ -329,7 +307,6 @@ function WorkspaceCard({
         return;
       }
       setLogoUrl(json.data?.logoUrl ?? null);
-      setLogoPreview(null);
       showToast("Logo updated");
     } catch {
       showToast("Upload failed. Try again.");
@@ -344,7 +321,6 @@ function WorkspaceCard({
       const res = await authFetch("/api/workspace/logo", { method: "DELETE" });
       if (!res?.ok) { showToast("Failed to remove logo."); return; }
       setLogoUrl(null);
-      setLogoPreview(null);
       showToast("Logo removed");
     } catch {
       showToast("Failed to remove logo.");
@@ -353,165 +329,334 @@ function WorkspaceCard({
     }
   }
 
-  const displayLogoUrl = logoPreview ?? logoUrl;
+  async function handleSave() {
+    assertIdentityResolved(isIdentityResolved);
+    const wid = workspaceId?.trim();
+    if (!wid) return;
+    const trimmed = nameDraft.trim() || "My Workspace";
+    if (workspace?.name === trimmed) {
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 2000);
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await updateWorkspaceName(wid, trimmed);
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 2000);
+    } catch {
+      showToast("Failed to update workspace name.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   const workspaceInitial = (workspace?.name ?? "W").trim().charAt(0).toUpperCase();
 
+  if (loading) {
+    return (
+      <div style={{ maxWidth: 720, padding: "32px 0" }} aria-busy="true" aria-live="polite">
+        <style>{`@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
+        <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
+          <div className="skeleton" style={{ height: 22, width: 180, background: "#F0F0F0", borderRadius: 6, marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 14, width: 280, background: "#F0F0F0", borderRadius: 4 }} />
+        </div>
+        <div style={{ background: "white", border: "1px solid #EBEBEB", borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "20px 24px", borderBottom: "1px solid #F0F0F0" }}>
+            <div className="skeleton" style={{ width: 140, height: 14, background: "#F0F0F0", borderRadius: 4, marginBottom: 16 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              <div className="skeleton" style={{ width: 64, height: 64, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div className="skeleton" style={{ height: 40, background: "#F0F0F0", borderRadius: 9, width: "100%", marginBottom: 10 }} />
+                <div className="skeleton" style={{ height: 38, background: "#F0F0F0", borderRadius: 9, width: 120 }} />
+              </div>
+            </div>
+          </div>
+          {[0, 1, 2].map((i) => (
+            <div key={i} style={{ padding: "16px 24px", borderBottom: "1px solid #F0F0F0", display: "flex", alignItems: "center", gap: 12 }}>
+              <div className="skeleton" style={{ width: 32, height: 32, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div className="skeleton" style={{ height: 13, background: "#F0F0F0", borderRadius: 4, width: "55%", marginBottom: 6 }} />
+                <div className="skeleton" style={{ height: 11, background: "#F0F0F0", borderRadius: 4, width: "70%" }} />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div className="skeleton" style={{ height: 22, width: 52, borderRadius: 999, background: "#F0F0F0" }} />
+                <div className="skeleton" style={{ height: 22, width: 52, borderRadius: 999, background: "#F0F0F0" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Card className={SETTINGS_CARD} as="article">
-      <SectionHeader
-        title="Workspace"
-        description="Name and logo for this workspace."
-      />
-      {logoToast && (
-        <div className="mt-3 px-3 py-2 rounded-lg bg-neutral-900 text-white text-sm font-medium w-fit">
-          {logoToast}
+    <div style={{ maxWidth: 720, padding: "32px 0" }} className="ech-content-enter pb-16">
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 50,
+            padding: "10px 18px",
+            borderRadius: 10,
+            background: "#111",
+            color: "white",
+            fontSize: 14,
+            fontWeight: 500,
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {toast}
         </div>
       )}
-      <div className={`mt-4 pt-4 border-t border-[var(--border-default)] ${ROW_GAP}`}>
-        <div className="flex flex-wrap items-start justify-between gap-4 py-1">
-          <div className="min-w-0">
-            <h3 className={SECTION_SUBTITLE}>Workspace Name</h3>
-            <p className={SETTING_DESC}>Displayed in the app and in shared links.</p>
+
+      {/* Page heading */}
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#111111", letterSpacing: "-0.3px", margin: "0 0 4px 0" }}>
+          Workspace Settings
+        </h1>
+        <p style={{ fontSize: 14, color: "#777777", margin: 0 }}>
+          Manage your workspace identity and members
+        </p>
+      </div>
+
+      {/* Card */}
+      <div style={{ background: "white", border: "1px solid #EBEBEB", borderRadius: 16, overflow: "hidden" }}>
+
+      {/* Workspace identity section */}
+      {/* Workspace identity row */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 24,
+          padding: "20px 24px",
+          borderBottom: "1px solid #F0F0F0",
+        }}
+      >
+        {/* Logo upload */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <div
+            style={{ position: "relative", cursor: "pointer", width: 64, height: 64 }}
+            onClick={() => !uploadingLogo && !loading && workspaceId && fileInputRef.current?.click()}
+            onMouseEnter={() => setLogoHovered(true)}
+            onMouseLeave={() => setLogoHovered(false)}
+          >
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                border: "none",
+                boxShadow: "0 0 0 2px #EBEBEB",
+                overflow: "hidden",
+                background: "#F5F5F5",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+              }}
+            >
+              {uploadingLogo && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "rgba(255,255,255,0.7)",
+                    zIndex: 10,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: "2px solid #1775E0",
+                      borderTopColor: "transparent",
+                      animation: "spin 0.7s linear infinite",
+                      display: "block",
+                    }}
+                  />
+                </div>
+              )}
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="Workspace logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <span style={{ fontSize: 28, fontWeight: 700, color: "#999" }}>{workspaceInitial}</span>
+              )}
+            </div>
+            {/* Camera overlay */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                background: "rgba(0,0,0,0.45)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: logoHovered && !uploadingLogo ? 1 : 0,
+                transition: "opacity 160ms",
+              }}
+            >
+              <Camera size={20} color="white" />
+            </div>
           </div>
+          {logoUrl && (
+            <button
+              type="button"
+              onClick={handleRemoveLogo}
+              disabled={uploadingLogo || loading || !workspaceId}
+              style={{ fontSize: 12, color: "#DC2626", cursor: "pointer", background: "none", border: "none", padding: 0 }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = "underline"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = "none"; }}
+            >
+              Remove
+            </button>
+          )}
+          <span style={{ fontSize: 11, color: "#AAA", textAlign: "center", lineHeight: 1.3 }}>
+            JPG, PNG, WebP · Max 2MB
+          </span>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={handleFileChange}
+          aria-label="Upload workspace logo"
+        />
+
+        {/* Workspace name */}
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 13, fontWeight: 500, color: "#555", display: "block", marginBottom: 6 }}>
+            Workspace name
+          </label>
           <input
             type="text"
             value={nameDraft}
             disabled={loading || !workspaceId}
             onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={() => {
-              assertIdentityResolved(isIdentityResolved);
-              const wid = workspaceId?.trim();
-              if (!wid) throw new Error("Workspace id missing");
-              const next = nameDraft.trim() || "My Workspace";
-              if (workspace?.name === next) return;
-              updateWorkspaceName(wid, next).catch((e) =>
-                console.error("Failed to update workspace name:", e)
-              );
+            onKeyDown={(e) => { if (e.key === "Enter") void handleSave(); }}
+            style={{
+              height: 40,
+              borderRadius: 9,
+              border: "1.5px solid #E5E5E5",
+              background: "#FAFAFA",
+              padding: "0 12px",
+              fontSize: 15,
+              color: "#111111",
+              width: "100%",
+              outline: "none",
+              transition: "border-color 150ms, box-shadow 150ms, background 150ms",
+              boxSizing: "border-box",
             }}
-            className="max-w-[360px] w-full min-w-0 px-3 py-2.5 rounded-lg border border-[var(--border-default)] text-[15px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition-all duration-200 shrink-0"
+            onFocus={(e) => {
+              e.target.style.borderColor = "#1775E0";
+              e.target.style.background = "white";
+              e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)";
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = "#E5E5E5";
+              e.target.style.background = "#FAFAFA";
+              e.target.style.boxShadow = "none";
+            }}
           />
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-5 border-t border-[var(--border-default)]">
-          <div className="min-w-0">
-            <h3 className={SECTION_SUBTITLE}>Workspace Logo</h3>
-            <p className={SETTING_DESC}>Shown in the sidebar and on shared pages.</p>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="relative w-12 h-12 rounded-lg bg-neutral-100 border border-[var(--border-default)] flex items-center justify-center text-neutral-500 text-xs shrink-0 overflow-hidden">
-              {uploadingLogo && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/70 z-10">
-                  <span className="w-4 h-4 rounded-full border-2 border-[#155DFC] border-t-transparent animate-spin" aria-hidden />
-                </div>
-              )}
-              {displayLogoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={displayLogoUrl} alt="Workspace logo" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-lg font-bold text-neutral-400">{workspaceInitial}</span>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={handleFileChange}
-              aria-label="Upload workspace logo"
-            />
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                className={BTN_SECONDARY}
-                disabled={uploadingLogo || loading || !workspaceId}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {displayLogoUrl ? "Change" : "Upload logo"}
-              </Button>
-              {displayLogoUrl && (
-                <Button
-                  variant="secondary"
-                  className={`${BTN_SECONDARY} text-red-600 border-red-200 hover:bg-red-50`}
-                  disabled={uploadingLogo || loading || !workspaceId}
-                  onClick={handleRemoveLogo}
-                >
-                  Remove
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
 
-const NOTIFICATION_OPTIONS = [
-  { key: "feedbackSubmitted", title: "Email Notifications for Feedback", desc: "Get notified when someone submits new feedback on your tickets." },
-  { key: "replyPosted", title: "Email Notifications for Replies", desc: "Get notified when someone responds to feedback on your tickets." },
-  { key: "dailyDigest", title: "Daily Activity Digest", desc: "Receive a daily summary of activity in your workspace." },
-  { key: "commentMentions", title: "Comment Mentions", desc: "Receive alerts when teammates mention you in comments." },
-];
-
-function NotificationsCard({
-  workspace,
-  workspaceId,
-  loading,
-}: {
-  workspace: Workspace | null;
-  workspaceId: string | null;
-  loading: boolean;
-}) {
-  const { isIdentityResolved } = useWorkspace();
-  const email = workspace?.notifications?.email;
-  const state = {
-    feedbackSubmitted: email?.feedbackSubmitted ?? true,
-    replyPosted: email?.replyPosted ?? true,
-    dailyDigest: email?.dailyDigest ?? false,
-    commentMentions: email?.commentMentions ?? true,
-  };
-
-  return (
-    <Card className={SETTINGS_CARD} as="article">
-      <SectionHeader
-        title="Notifications"
-        description="Choose when you want to receive email notifications."
-      />
-      <div className={`mt-4 pt-4 border-t border-[var(--border-default)] divide-y divide-[var(--border-default)] [&>div]:py-5`}>
-        {NOTIFICATION_OPTIONS.map(({ key, title, desc }) => (
-          <div
-            key={key}
-            className="flex items-center justify-between gap-4 first:pt-0 last:pb-0"
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={isSaving || loading || !workspaceId || !nameDraft.trim()}
+            style={{
+              marginTop: 16,
+              height: 38,
+              padding: "0 18px",
+              borderRadius: 9,
+              border: "none",
+              background: savedOk ? "#16A34A" : "#1775E0",
+              color: "white",
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: isSaving || loading || !workspaceId || !nameDraft.trim() ? "not-allowed" : "pointer",
+              opacity: isSaving || loading || !workspaceId || !nameDraft.trim() ? 0.7 : 1,
+              transition: "background 200ms",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
           >
-            <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-medium text-neutral-900">{title}</p>
-              <p className={SETTING_DESC}>{desc}</p>
-            </div>
-            <Switch
-              checked={state[key as keyof typeof state]}
-              disabled={loading || !workspaceId}
-              onChange={(v) => {
-                assertIdentityResolved(isIdentityResolved);
-                const wid = workspaceId?.trim();
-                if (!wid) throw new Error("Workspace id missing");
-                const next = {
-                  ...(workspace?.notifications ?? { email: state }),
-                  email: {
-                    ...(workspace?.notifications?.email ?? state),
-                    [key]: v,
-                  },
-                } as Workspace["notifications"];
-                updateWorkspaceNotifications(wid, next).catch((e) =>
-                  console.error("Failed to update notifications:", e)
-                );
-              }}
-              className="shrink-0 transition-all duration-200 ease-out"
-            />
-          </div>
-        ))}
+            {isSaving ? (
+              <>
+                <span
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    border: "2px solid rgba(255,255,255,0.4)",
+                    borderTopColor: "white",
+                    animation: "spin 0.7s linear infinite",
+                    display: "block",
+                  }}
+                />
+                Saving...
+              </>
+            ) : savedOk ? (
+              <>
+                <Check size={16} />
+                Saved!
+              </>
+            ) : (
+              "Save changes"
+            )}
+          </button>
+        </div>
       </div>
-    </Card>
+
+      {/* Members section inside the card */}
+      <div style={{ padding: "0 24px 24px" }}>
+        <div style={{ margin: "28px 0 0", height: 1, background: "#F0F0F0" }} aria-hidden />
+        <div style={{ marginTop: 24, marginBottom: 20 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#111111", letterSpacing: "-0.2px", margin: "0 0 4px 0" }}>
+            Members
+          </h2>
+          <p style={{ fontSize: 13, color: "#777777", margin: 0 }}>
+            Manage who has access to this workspace
+          </p>
+        </div>
+        <MembersTab workspaceId={workspaceId} loading={loading} />
+      </div>
+
+      </div>{/* end card */}
+
+      {logoCropSrc && (
+        <ImageCropModal
+          isOpen={logoCropOpen}
+          imageSrc={logoCropSrc}
+          onConfirm={(blob) => { void handleLogoCropConfirm(blob); }}
+          onCancel={() => { setLogoCropOpen(false); if (logoCropSrc) URL.revokeObjectURL(logoCropSrc); setLogoCropSrc(null); }}
+          title="Crop workspace logo"
+          shape="circle"
+        />
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
+    </div>
   );
 }
+
+
+
+
 
 const UPGRADE_TOOLTIP = "Upgrade your plan to unlock branding features.";
 
@@ -542,231 +687,632 @@ function UpgradePlanBadge({ onClick, title }: { onClick?: () => void; title?: st
   );
 }
 
-function AppearanceCard({
-  workspace,
-  workspaceId,
-  loading,
-  onNavigateToBilling,
-}: {
-  workspace: Workspace | null;
-  workspaceId: string | null;
-  loading: boolean;
-  onNavigateToBilling: () => void;
-}) {
-  const { isIdentityResolved } = useWorkspace();
-  const { data: billingData } = useBillingUsageContext();
-  const isPro = billingData != null && billingData.plan !== "free";
-  const appearance = workspace?.appearance;
-  const logoOnScreen = appearance?.logoOnFeedbackScreen ?? false;
-  const accentColorEnabled = (appearance?.accentColor ?? null) != null;
-  const removeBranding = appearance?.removeEchlyBranding ?? false;
+/* ——— Change Email Modal ——— */
+function ChangeEmailModal({ onClose }: { onClose: () => void }) {
+  const [newEmail, setNewEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  function AppearanceRow({
-    title,
-    preview,
-    checked,
-    onChange,
-  }: {
-    title: string;
-    preview: string;
-    checked: boolean;
-    onChange: (v: boolean) => void;
-  }) {
-    const locked = !isPro;
-    return (
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await authFetch("/api/users/change-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newEmail: newEmail.trim(), password }),
+      });
+      const json = await res?.json() as { success: boolean; error?: { message: string } } | undefined;
+      if (!res?.ok) {
+        const msg = json?.error?.message ?? "";
+        if (res?.status === 403 || msg.toLowerCase().includes("password")) setError("Incorrect password");
+        else if (res?.status === 409) setError("This email is already in use");
+        else setError(msg || "Failed to send confirmation email");
+        return;
+      }
+      setSuccess(true);
+    } catch {
+      setError("Something went wrong. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
       <div
-        role={locked ? "button" : undefined}
-        tabIndex={locked ? 0 : undefined}
-        onClick={() => locked && onNavigateToBilling()}
-        onKeyDown={(e) => e.key === "Enter" && locked && onNavigateToBilling()}
-        title={locked ? UPGRADE_TOOLTIP : undefined}
-        className={`flex items-center justify-between gap-4 py-4 px-3 -mx-3 rounded-lg transition-colors duration-200 ${locked ? "cursor-pointer hover:bg-neutral-50" : ""}`}
+        style={{ background: "white", borderRadius: 20, maxWidth: 440, width: "100%", margin: 16, boxShadow: "0 24px 64px rgba(0,0,0,0.18)", overflow: "hidden" }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="min-w-0 flex-1 flex items-center gap-3 flex-wrap">
-          <div>
-            <p className="text-[15px] font-semibold text-neutral-900">{title}</p>
-            <p className={SETTING_DESC}>{preview}</p>
-          </div>
-          {locked && (
-            <UpgradePlanBadge onClick={onNavigateToBilling} title={UPGRADE_TOOLTIP} />
+        {/* Header */}
+        <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderBottom: "1px solid #EBEBEB" }}>
+          <span style={{ fontSize: 16, fontWeight: 600, color: "#111" }}>Change email address</span>
+          <button type="button" onClick={onClose} style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 6, cursor: "pointer", color: "#777" }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div style={{ padding: "24px 28px" }}>
+          {success ? (
+            <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
+              <CheckCircle size={32} color="#16A34A" style={{ margin: "0 auto 12px" }} />
+              <p style={{ fontSize: 17, fontWeight: 600, color: "#111", margin: "0 0 8px" }}>Confirmation email sent!</p>
+              <p style={{ fontSize: 14, color: "#777", margin: 0 }}>Check {newEmail} for a confirmation link.</p>
+            </div>
+          ) : (
+            <form onSubmit={(e) => { void handleSubmit(e); }}>
+              {/* Info note */}
+              <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 14px", display: "flex", gap: 10, marginBottom: 20, alignItems: "flex-start" }}>
+                <Mail size={16} color="#1775E0" style={{ flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 13, color: "#1D4ED8", lineHeight: 1.5 }}>
+                  We&apos;ll send a confirmation link to your new email address. Your email won&apos;t change until you click the link.
+                </span>
+              </div>
+
+              <label style={{ fontSize: 13, fontWeight: 500, color: "#555", display: "block", marginBottom: 6 }}>New email address</label>
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                required
+                style={{ height: 42, borderRadius: 9, border: "1.5px solid #E5E5E5", background: "#FAFAFA", padding: "0 12px", fontSize: 15, color: "#111", width: "100%", outline: "none", boxSizing: "border-box", marginBottom: 14 }}
+                onFocus={(e) => { e.target.style.borderColor = "#1775E0"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                onBlur={(e) => { e.target.style.borderColor = "#E5E5E5"; e.target.style.background = "#FAFAFA"; e.target.style.boxShadow = "none"; }}
+              />
+
+              <label style={{ fontSize: 13, fontWeight: 500, color: "#555", display: "block", marginBottom: 6 }}>Current password</label>
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  style={{ height: 42, borderRadius: 9, border: "1.5px solid #E5E5E5", background: "#FAFAFA", padding: "0 40px 0 12px", fontSize: 15, color: "#111", width: "100%", outline: "none", boxSizing: "border-box" }}
+                  onFocus={(e) => { e.target.style.borderColor = "#1775E0"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "#E5E5E5"; e.target.style.background = "#FAFAFA"; e.target.style.boxShadow = "none"; }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#999", display: "flex", alignItems: "center" }}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              {error && (
+                <div style={{ marginTop: 10, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 12px", display: "flex", gap: 8, alignItems: "center" }}>
+                  <AlertCircle size={14} color="#DC2626" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: "#DC2626" }}>{error}</span>
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+                <button type="button" onClick={onClose} style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "1px solid #E5E5E5", background: "white", color: "#555", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || !newEmail.trim() || !password}
+                  style={{ height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: "#1775E0", color: "white", fontSize: 14, fontWeight: 600, cursor: loading || !newEmail.trim() || !password ? "not-allowed" : "pointer", opacity: loading || !newEmail.trim() || !password ? 0.7 : 1, display: "flex", alignItems: "center", gap: 8 }}
+                >
+                  {loading ? <><span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "white", animation: "spin 0.7s linear infinite", display: "block" }} />Sending…</> : "Send confirmation"}
+                </button>
+              </div>
+            </form>
           )}
         </div>
-        <Switch
-          checked={checked}
-          onChange={onChange}
-          disabled={locked || loading || !workspaceId}
-          className="shrink-0 transition-all duration-200 ease-out"
-        />
+      </div>
+    </div>
+  );
+}
+
+/* ——— Delete Account Modal ——— */
+function DeleteAccountModal({ onClose }: { onClose: () => void }) {
+  const [confirmed, setConfirmed] = useState(false);
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: "white", borderRadius: 20, maxWidth: 420, width: "100%", margin: 16, boxShadow: "0 24px 64px rgba(0,0,0,0.18)", overflow: "hidden" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderBottom: "1px solid #EBEBEB" }}>
+          <span style={{ fontSize: 16, fontWeight: 600, color: "#DC2626" }}>Delete account</span>
+          <button type="button" onClick={onClose} style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 6, cursor: "pointer", color: "#777" }}>
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ padding: "24px 28px" }}>
+          <p style={{ fontSize: 14, color: "#444", lineHeight: 1.6, marginBottom: 20 }}>
+            Are you sure? This action <strong>cannot be undone</strong>. All your data will be permanently deleted.
+          </p>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 20 }}>
+            <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} style={{ width: 16, height: 16 }} />
+            <span style={{ fontSize: 14, color: "#555" }}>I understand this is permanent</span>
+          </label>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button type="button" onClick={onClose} style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "1px solid #E5E5E5", background: "white", color: "#555", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!confirmed}
+              onClick={() => { onClose(); alert("Contact support@echly.com to delete your account."); }}
+              style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "none", background: confirmed ? "#DC2626" : "#FECACA", color: "white", fontSize: 14, fontWeight: 600, cursor: confirmed ? "pointer" : "not-allowed", transition: "background 200ms" }}
+            >
+              Delete account
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ——— My Account Tab ——— */
+function MyAccountTab() {
+  const { authPhotoUrl, authDisplayName, authEmail, authReady, updateAvatarUrl } = useWorkspace();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(authPhotoUrl);
+  const [nameDraft, setNameDraft] = useState(authDisplayName ?? "");
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [avatarHovered, setAvatarHovered] = useState(false);
+  const [authProvider, setAuthProvider] = useState<"google" | "password" | "unknown">("unknown");
+  const [changeEmailOpen, setChangeEmailOpen] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [passwordResetSent, setPasswordResetSent] = useState(false);
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Refresh avatar URL + fetch authProvider on mount
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await authFetch("/api/users/avatar");
+        if (res?.ok) {
+          const json = await res.json() as { success: boolean; data?: { avatarUrl: string | null } };
+          if (json.success && json.data?.avatarUrl) {
+            setLocalAvatarUrl(json.data.avatarUrl);
+            updateAvatarUrl(json.data.avatarUrl);
+          }
+        }
+      } catch { /* non-fatal */ }
+      setIsInitialLoad(false);
+    })();
+    void (async () => {
+      try {
+        const res = await authFetch("/api/users");
+        if (res?.ok) {
+          const json = await res.json() as { success: boolean; data?: { authProvider: "google" | "password" | "unknown" } };
+          if (json.success && json.data?.authProvider) {
+            setAuthProvider(json.data.authProvider);
+          }
+        }
+      } catch { /* non-fatal */ }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (authPhotoUrl && !localAvatarUrl) setLocalAvatarUrl(authPhotoUrl);
+  }, [authPhotoUrl, localAvatarUrl]);
+  useEffect(() => { setNameDraft(authDisplayName ?? ""); }, [authDisplayName]);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      showToast("Please use JPEG, PNG, or WebP"); return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Image must be under 5MB"); return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    setCropImageSrc(objectUrl);
+    setCropModalOpen(true);
+  }
+
+  async function handleCropConfirm(blob: Blob) {
+    setCropModalOpen(false);
+    setIsUploadingAvatar(true);
+    try {
+      const fd = new FormData();
+      fd.append("avatar", blob, "avatar.jpg");
+      const res = await authFetch("/api/users/avatar", { method: "POST", body: fd });
+      if (!res?.ok) { showToast("Upload failed. Try again."); return; }
+      const json = await res.json() as { success: boolean; data?: { avatarUrl: string }; error?: { message: string } };
+      if (!json.success) {
+        const msg = json.error?.message;
+        if (msg === "FILE_TOO_LARGE") showToast("Image must be under 5MB");
+        else if (msg === "INVALID_FILE_TYPE") showToast("Please use JPEG, PNG, or WebP");
+        else showToast("Upload failed. Try again.");
+        return;
+      }
+      setLocalAvatarUrl(json.data?.avatarUrl ?? null);
+      updateAvatarUrl(json.data?.avatarUrl ?? null);
+      showToast("Profile photo updated");
+    } catch {
+      showToast("Upload failed. Try again.");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    setIsUploadingAvatar(true);
+    try {
+      const res = await authFetch("/api/users/avatar", { method: "DELETE" });
+      if (!res?.ok) { showToast("Failed to remove photo."); return; }
+      setLocalAvatarUrl(null);
+      updateAvatarUrl(null);
+      showToast("Photo removed");
+    } catch {
+      showToast("Failed to remove photo.");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
+
+  async function handleSaveName() {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) return;
+    if (trimmed === (authDisplayName ?? "")) {
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 2000);
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const res = await authFetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: trimmed }),
+      });
+      if (!res?.ok) { showToast("Failed to update name."); return; }
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 2000);
+    } catch {
+      showToast("Failed to update name.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleSendPasswordReset() {
+    if (!authEmail) return;
+    setPasswordResetLoading(true);
+    try {
+      const res = await authFetch("/api/users/send-password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail }),
+      });
+      if (!res?.ok) { showToast("Failed to send reset email."); return; }
+      setPasswordResetSent(true);
+      setTimeout(() => setPasswordResetSent(false), 3000);
+    } catch {
+      showToast("Failed to send reset email.");
+    } finally {
+      setPasswordResetLoading(false);
+    }
+  }
+
+  const initial = ((authDisplayName ?? authEmail ?? "?").trim().charAt(0) || "?").toUpperCase();
+
+  const inputStyle: React.CSSProperties = {
+    height: 40,
+    borderRadius: 9,
+    border: "1.5px solid #E5E5E5",
+    background: "#FAFAFA",
+    padding: "0 12px",
+    fontSize: 15,
+    color: "#111",
+    width: "100%",
+    outline: "none",
+    transition: "border-color 150ms, box-shadow 150ms, background 150ms",
+    boxSizing: "border-box",
+  };
+
+  const sectionStyle: React.CSSProperties = {
+    padding: "20px 24px",
+    borderBottom: "1px solid #F0F0F0",
+  };
+
+  const sectionTitleStyle: React.CSSProperties = {
+    fontSize: 15,
+    fontWeight: 600,
+    color: "#111",
+    margin: "0 0 4px",
+  };
+
+  const sectionSubtitleStyle: React.CSSProperties = {
+    fontSize: 13,
+    color: "#777",
+    margin: "0 0 20px",
+  };
+
+  const isLoading = !authReady || isInitialLoad;
+
+  if (isLoading) {
+    return (
+      <div style={{ maxWidth: 720, padding: "32px 0" }}>
+        <style>{`@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
+        <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
+          <div className="skeleton" style={{ height: 22, width: 160, background: "#F0F0F0", borderRadius: 6, marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 14, width: 280, background: "#F0F0F0", borderRadius: 4 }} />
+        </div>
+        <div style={{ background: "white", border: "1px solid #EBEBEB", borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "20px 24px", borderBottom: "1px solid #F0F0F0" }}>
+            <div className="skeleton" style={{ width: 110, height: 14, background: "#F0F0F0", borderRadius: 4, marginBottom: 16 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+              <div className="skeleton" style={{ width: 64, height: 64, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div className="skeleton" style={{ height: 40, background: "#F0F0F0", borderRadius: 9, width: "100%", marginBottom: 10 }} />
+                <div className="skeleton" style={{ height: 38, background: "#F0F0F0", borderRadius: 9, width: 120 }} />
+              </div>
+            </div>
+          </div>
+          {[0, 1, 2].map((i) => (
+            <div key={i} style={{ padding: "20px 24px", borderBottom: "1px solid #F0F0F0" }}>
+              <div className="skeleton" style={{ height: 56, background: "#F8F8F8", borderRadius: 9 }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <Card className={SETTINGS_CARD} as="article">
-      <SectionHeader
-        title="Appearance"
-        description="Customize how Echly appears in your feedback experience."
-      />
-      <div className={`mt-4 pt-4 border-t border-[var(--border-default)] ${ROW_GAP}`}>
-        <AppearanceRow
-          title="Logo on Feedback Screen"
-          preview="Add your company logo to feedback sessions."
-          checked={logoOnScreen}
-          onChange={(v) => {
-            assertIdentityResolved(isIdentityResolved);
-            const wid = workspaceId?.trim();
-            if (!wid) throw new Error("Workspace id missing");
-            const next = {
-              ...(workspace?.appearance ?? {
-                logoOnFeedbackScreen: false,
-                accentColor: null,
-                removeEchlyBranding: false,
-              }),
-              logoOnFeedbackScreen: v,
-            };
-            updateWorkspaceAppearance(wid, next).catch((e) =>
-              console.error("Failed to update appearance:", e)
-            );
-          }}
-        />
-        <AppearanceRow
-          title="Custom Accent Color"
-          preview="Match the feedback UI to your brand color."
-          checked={accentColorEnabled}
-          onChange={(v) => {
-            assertIdentityResolved(isIdentityResolved);
-            const wid = workspaceId?.trim();
-            if (!wid) throw new Error("Workspace id missing");
-            const next = {
-              ...(workspace?.appearance ?? {
-                logoOnFeedbackScreen: false,
-                accentColor: null,
-                removeEchlyBranding: false,
-              }),
-              accentColor: v ? (appearance?.accentColor ?? "#155DFC") : null,
-            };
-            updateWorkspaceAppearance(wid, next).catch((e) =>
-              console.error("Failed to update appearance:", e)
-            );
-          }}
-        />
-        <AppearanceRow
-          title="Remove Echly Branding"
-          preview="Hide Echly logo and branding on shared feedback pages."
-          checked={removeBranding}
-          onChange={(v) => {
-            assertIdentityResolved(isIdentityResolved);
-            const wid = workspaceId?.trim();
-            if (!wid) throw new Error("Workspace id missing");
-            const next = {
-              ...(workspace?.appearance ?? {
-                logoOnFeedbackScreen: false,
-                accentColor: null,
-                removeEchlyBranding: false,
-              }),
-              removeEchlyBranding: v,
-            };
-            updateWorkspaceAppearance(wid, next).catch((e) =>
-              console.error("Failed to update appearance:", e)
-            );
-          }}
-        />
+    <div style={{ maxWidth: 720, padding: "32px 0" }} className="ech-content-enter pb-16">
+      {toast && (
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 50, padding: "10px 18px", borderRadius: 10, background: "#111", color: "white", fontSize: 14, fontWeight: 500, pointerEvents: "none", whiteSpace: "nowrap" }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Page heading */}
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#111111", letterSpacing: "-0.3px", margin: "0 0 4px 0" }}>
+          Profile Settings
+        </h1>
+        <p style={{ fontSize: 14, color: "#777777", margin: 0 }}>
+          Manage your personal account and preferences
+        </p>
       </div>
-    </Card>
-  );
-}
 
-const ADVANCED_OPTIONS = [
-  { key: "autoCreateTicket", title: "Auto-Create Ticket When Feedback Added", desc: "Create a ticket automatically when new feedback is submitted." },
-  { key: "guestComments", title: "Allow Guest Comments", desc: "Let people without an account comment on feedback." },
-  { key: "aiActionSteps", title: "AI Action Steps", desc: "Use AI to suggest action steps from feedback content." },
-];
+      {/* Card */}
+      <div style={{ background: "white", border: "1px solid #EBEBEB", borderRadius: 16, overflow: "hidden" }}>
 
-function AdvancedSettingsCard({
-  workspace,
-  workspaceId,
-  loading,
-}: {
-  workspace: Workspace | null;
-  workspaceId: string | null;
-  loading: boolean;
-}) {
-  const { isIdentityResolved } = useWorkspace();
-  const [open, setOpen] = useState(false); /* collapsed by default */
-  const state = {
-    autoCreateTicket: workspace?.automations?.autoCreateTicketOnFeedback ?? false,
-    guestComments: workspace?.permissions?.allowGuestComments ?? false,
-    aiActionSteps: workspace?.ai?.actionStepsEnabled ?? true,
-  };
+        {/* Section: Name and photo */}
+        <div style={{ ...sectionStyle }}>
+          <p style={sectionTitleStyle}>Name and photo</p>
+          <p style={sectionSubtitleStyle}>Update your display name and profile photo</p>
 
-  return (
-    <Card className={SETTINGS_CARD} as="article">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-3 text-left rounded-lg py-2 -my-2 px-2 -mx-2 hover:bg-neutral-50/80 transition-colors duration-200"
-        aria-expanded={open}
-      >
-        <span className={SECTION_TITLE}>Advanced Settings</span>
-        <span className="text-neutral-500 shrink-0" aria-hidden>
-          {open ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-        </span>
-      </button>
-      <div
-        className="overflow-hidden transition-[max-height] duration-300 ease-out"
-        style={{ maxHeight: open ? 400 : 0 }}
-      >
-        <div className={`mt-4 pt-4 border-t border-[var(--border-default)] divide-y divide-[var(--border-default)] [&>div]:py-5`}>
-          {ADVANCED_OPTIONS.map(({ key, title, desc }) => (
-            <div
-              key={key}
-              className="flex items-center justify-between gap-4 first:pt-0 last:pb-0"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-medium text-neutral-900">{title}</p>
-                <p className={SETTING_DESC}>{desc}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            {/* Avatar */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+              <div
+                style={{ position: "relative", cursor: "pointer", width: 64, height: 64, flexShrink: 0 }}
+                onClick={() => !isUploadingAvatar && fileInputRef.current?.click()}
+                onMouseEnter={() => setAvatarHovered(true)}
+                onMouseLeave={() => setAvatarHovered(false)}
+              >
+                <div style={{ width: 64, height: 64, borderRadius: "50%", boxShadow: "0 0 0 3px #FFFFFF, 0 0 0 5px #E0E0E0", overflow: "hidden", background: "#1775E0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {localAvatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={localAvatarUrl} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <span style={{ fontSize: 26, fontWeight: 700, color: "white" }}>{initial}</span>
+                  )}
+                </div>
+                <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", opacity: avatarHovered && !isUploadingAvatar ? 1 : 0, transition: "opacity 160ms" }}>
+                  {isUploadingAvatar ? (
+                    <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid white", borderTopColor: "transparent", animation: "spin 0.7s linear infinite", display: "block" }} />
+                  ) : (
+                    <Camera size={18} color="white" />
+                  )}
+                </div>
               </div>
-              <Switch
-                checked={state[key as keyof typeof state]}
-                disabled={loading || !workspaceId}
-                onChange={(v) => {
-                  assertIdentityResolved(isIdentityResolved);
-                  const wid = workspaceId?.trim();
-                  if (!wid) throw new Error("Workspace id missing");
-                  if (key === "autoCreateTicket") {
-                    updateWorkspaceSettings(wid, {
-                      automations: {
-                        ...(workspace?.automations ?? { autoCreateTicketOnFeedback: false }),
-                        autoCreateTicketOnFeedback: v,
-                      },
-                    }).catch((e) => console.error("Failed to update automations:", e));
-                    return;
-                  }
-                  if (key === "guestComments") {
-                    updateWorkspaceSettings(wid, {
-                      permissions: {
-                        ...(workspace?.permissions ?? { allowGuestComments: false }),
-                        allowGuestComments: v,
-                      },
-                    }).catch((e) => console.error("Failed to update permissions:", e));
-                    return;
-                  }
-                  if (key === "aiActionSteps") {
-                    updateWorkspaceSettings(wid, {
-                      ai: {
-                        ...(workspace?.ai ?? { actionStepsEnabled: true }),
-                        actionStepsEnabled: v,
-                      },
-                    }).catch((e) => console.error("Failed to update ai:", e));
-                  }
-                }}
-                className="shrink-0 transition-all duration-200 ease-out"
-              />
+              {localAvatarUrl && (
+                <button
+                  type="button"
+                  onClick={() => void handleRemoveAvatar()}
+                  disabled={isUploadingAvatar}
+                  style={{ fontSize: 12, color: "#DC2626", cursor: "pointer", background: "none", border: "none", padding: 0 }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = "underline"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = "none"; }}
+                >
+                  Remove
+                </button>
+              )}
             </div>
-          ))}
+
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} aria-label="Upload profile photo" />
+
+            {/* Name field */}
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: "#555", display: "block", marginBottom: 6 }}>Full name</label>
+              <input
+                type="text"
+                value={nameDraft}
+                maxLength={60}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void handleSaveName(); }}
+                style={inputStyle}
+                onFocus={(e) => { e.target.style.borderColor = "#1775E0"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                onBlur={(e) => { e.target.style.borderColor = "#E5E5E5"; e.target.style.background = "#FAFAFA"; e.target.style.boxShadow = "none"; }}
+              />
+              <button
+                type="button"
+                onClick={() => void handleSaveName()}
+                disabled={isSaving || !nameDraft.trim()}
+                style={{ marginTop: 10, height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: savedOk ? "#16A34A" : "#1775E0", color: "white", fontSize: 14, fontWeight: 600, cursor: isSaving || !nameDraft.trim() ? "not-allowed" : "pointer", opacity: isSaving || !nameDraft.trim() ? 0.7 : 1, transition: "background 200ms", display: "flex", alignItems: "center", gap: 8 }}
+              >
+                {isSaving ? (
+                  <><span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "white", animation: "spin 0.7s linear infinite", display: "block" }} />Saving...</>
+                ) : savedOk ? (
+                  <><Check size={14} />Saved</>
+                ) : "Save name"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Section: Connected account (Google users) */}
+        {authProvider === "google" && (
+          <div style={sectionStyle}>
+            <p style={sectionTitleStyle}>Connected account</p>
+            <div style={{ background: "#F8F9FA", border: "1px solid #E8EAED", borderRadius: 12, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden>
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "#111", margin: 0 }}>Signed in with Google</p>
+                <p style={{ fontSize: 13, color: "#777", margin: "2px 0 0" }}>{authEmail ?? ""}</p>
+              </div>
+              <a href="https://myaccount.google.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#1775E0", fontWeight: 500, textDecoration: "none", flexShrink: 0 }}>
+                Manage Google account ↗
+              </a>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "flex-start" }}>
+              <Info size={14} color="#999" style={{ flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 13, color: "#777" }}>Your email and password are managed by Google. To change them, visit your Google account settings.</span>
+            </div>
+          </div>
+        )}
+
+        {/* Section: Contact info */}
+        <div style={sectionStyle}>
+          <p style={{ ...sectionTitleStyle, marginBottom: 16 }}>Contact info</p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0" }}>
+            <div>
+              <p style={{ fontSize: 13, color: "#777", margin: "0 0 2px" }}>Email address</p>
+              <p style={{ fontSize: 15, color: "#111", fontWeight: 500, margin: 0 }}>{authEmail ?? "—"}</p>
+            </div>
+            {authProvider === "google" ? (
+              <Lock size={14} color="#BBB" />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setChangeEmailOpen(true)}
+                style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "1px solid #E5E5E5", background: "white", color: "#555", fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "background 150ms" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#F5F5F5"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "white"; }}
+              >
+                Change email
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Section: Password */}
+        <div style={sectionStyle}>
+          <p style={{ ...sectionTitleStyle, marginBottom: 16 }}>Password</p>
+          {authProvider === "google" ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <Lock size={15} color="#BBB" />
+              <span style={{ fontSize: 14, color: "#777" }}>Password is managed by your Google account</span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <p style={{ fontSize: 14, color: "#111", fontWeight: 500, margin: 0 }}>Password</p>
+                <p style={{ fontSize: 13, color: "#777", margin: "2px 0 0" }}>Last changed: unknown</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleSendPasswordReset()}
+                disabled={passwordResetLoading || passwordResetSent}
+                style={{
+                  height: 34,
+                  padding: "0 14px",
+                  borderRadius: 8,
+                  border: "1px solid #E5E5E5",
+                  background: passwordResetSent ? "#F0FDF4" : "white",
+                  color: passwordResetSent ? "#16A34A" : "#555",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: passwordResetLoading || passwordResetSent ? "default" : "pointer",
+                  transition: "all 200ms",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                {passwordResetSent ? <><Check size={13} />Reset email sent</> : passwordResetLoading ? "Sending…" : "Send reset email"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Section: Delete account */}
+        <div style={{ padding: "20px 24px" }}>
+          <p style={sectionTitleStyle}>Delete account</p>
+          <p style={{ ...sectionSubtitleStyle, marginBottom: 16 }}>Permanently delete your account and all associated data</p>
+          <button
+            type="button"
+            onClick={() => setDeleteAccountOpen(true)}
+            style={{
+              background: "white",
+              border: "1.5px solid #FECACA",
+              color: "#DC2626",
+              borderRadius: 9,
+              height: 38,
+              padding: "0 16px",
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 150ms",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF2F2"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#FCA5A5"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "white"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#FECACA"; }}
+          >
+            Delete account
+          </button>
         </div>
       </div>
-    </Card>
+
+      {cropImageSrc && (
+        <ImageCropModal
+          isOpen={cropModalOpen}
+          imageSrc={cropImageSrc}
+          onConfirm={(blob) => { void handleCropConfirm(blob); }}
+          onCancel={() => { setCropModalOpen(false); if (cropImageSrc) URL.revokeObjectURL(cropImageSrc); setCropImageSrc(null); }}
+          title="Crop profile photo"
+          shape="circle"
+        />
+      )}
+
+      {changeEmailOpen && <ChangeEmailModal onClose={() => setChangeEmailOpen(false)} />}
+      {deleteAccountOpen && <DeleteAccountModal onClose={() => setDeleteAccountOpen(false)} />}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
+    </div>
   );
 }
 
@@ -901,6 +1447,7 @@ function formatDateAdded(ts: unknown): string {
   }
 }
 
+
 const TABLE_COLS = "2fr 120px 150px 80px 60px";
 
 function MembersTableSkeleton() {
@@ -967,12 +1514,16 @@ function MembersTableRow({
   const avatarNode =
     row.status === "active" ? (
       row.avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={row.avatarUrl}
-          alt={row.name ?? row.email}
-          className="w-8 h-8 rounded-full shrink-0 object-cover"
-        />
+        <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full">
+          {
+            // eslint-disable-next-line @next/next/no-img-element -- remote member avatar
+            <img
+              src={row.avatarUrl}
+              alt={row.name ?? row.email}
+              className="h-full w-full object-cover"
+            />
+          }
+        </div>
       ) : (
         <span
           className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-sm font-semibold select-none"

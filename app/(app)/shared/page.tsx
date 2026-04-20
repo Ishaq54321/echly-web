@@ -560,7 +560,7 @@ export default function SharedPage() {
               <SessionRow
                 key={session.sessionId}
                 session={session}
-                onClick={() => router.push(`/dashboard/${session.sessionId}`)}
+                onClick={() => router.push(`/session/${session.sessionId}`)}
               />
             ))
           )}

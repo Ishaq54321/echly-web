@@ -28,6 +28,10 @@ const resolveBtn =
 const requestResolveAccessBtn =
   "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[var(--border-subtle)] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary-strong))] shadow-none hover:bg-[hsl(var(--surface-3))] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
+// Blue variant for AUTH VIEWER on the dashboard surface
+const requestResolveAccessBtnOrange =
+  "inline-flex h-9 items-center gap-1.5 px-[14px] rounded-[10px] text-[14px] font-semibold border-none bg-[#1775E0] text-white shadow-[0_1px_3px_rgba(23,117,224,0.25)] hover:bg-[#1462C4] hover:shadow-[0_2px_8px_rgba(23,117,224,0.30)] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 transition-all duration-[140ms] ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+
 const pendingResolveAccessBtn =
   "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF] cursor-default opacity-95 pointer-events-none select-none";
 
@@ -98,6 +102,8 @@ export interface SessionFeedbackHeaderProps {
   };
   /** True while POST /request-access is in flight (dashboard). */
   accessResolveSubmitting?: boolean;
+  /** True for unauthenticated viewers; shows sign-in affordances instead of disabled buttons. */
+  isAnonymousViewer?: boolean;
 }
 
 /**
@@ -119,6 +125,7 @@ export function SessionFeedbackHeader({
   shareGating,
   accessResolve,
   accessResolveSubmitting = false,
+  isAnonymousViewer = false,
 }: SessionFeedbackHeaderProps) {
   const [resolveFlash, setResolveFlash] = useState(false);
   useEffect(() => {
@@ -306,24 +313,7 @@ export function SessionFeedbackHeader({
                     <CheckCircle {...iconBtn} aria-hidden />
                     <span>{isResolved ? "Resolved" : "Resolve"}</span>
                   </button>
-                ) : null}
-                {readOnlyPermissions?.canComment ? (
-                  <button
-                    type="button"
-                    disabled
-                    title="Not available on shared links yet"
-                    className={`${secondaryBtn} opacity-60 cursor-not-allowed`}
-                  >
-                    <MessageSquare {...iconBtn} aria-hidden />
-                    Comment
-                  </button>
-                ) : null}
-              </>
-            ) : null
-          ) : isActionable ? (
-            <>
-              {onResolvedChange ? (
-                accessResolve != null && !accessResolve.canResolve ? (
+                ) : accessResolve != null ? (
                   isResolved ? (
                     <button
                       type="button"
@@ -343,9 +333,71 @@ export function SessionFeedbackHeader({
                       type="button"
                       onClick={accessResolve.onRequestAccess}
                       disabled={accessResolveSubmitting}
-                      className={requestResolveAccessBtn}
+                      className={requestResolveAccessBtnOrange}
                     >
-                      <Lock {...iconBtn} aria-hidden />
+                      <Lock size={14} color="#FFFFFF" aria-hidden />
+                      <span>Request resolve access</span>
+                    </button>
+                  )
+                ) : null}
+                {readOnlyPermissions?.canComment ? (
+                  <button
+                    type="button"
+                    disabled
+                    title="Not available on shared links yet"
+                    className={`${secondaryBtn} opacity-60 cursor-not-allowed`}
+                  >
+                    <MessageSquare {...iconBtn} aria-hidden />
+                    Comment
+                  </button>
+                ) : isAnonymousViewer ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.href = `/login?returnUrl=${encodeURIComponent(
+                        window.location.pathname + window.location.search
+                      )}`;
+                    }}
+                    className={secondaryBtn}
+                  >
+                    <MessageSquare {...iconBtn} aria-hidden />
+                    Sign in to comment
+                  </button>
+                ) : null}
+              </>
+            ) : null
+          ) : isActionable ? (
+            // Permission table (dashboard surface):
+            // OWNER     canDeleteTicket=true  canResolve=true  → accessResolve=undefined → Resolve ✅ Assign ✅ Defer ✅ Comment ✅ Delete ✅
+            // RESOLVER  canResolve=true       canDeleteTicket=false → accessResolve=undefined → Resolve ✅ Assign ✅ Defer ✅ Comment ✅ Delete ❌
+            // AUTH VIEWER canResolve=false    canComment=true  → accessResolve set       → 🔒Request ✅ Assign ❌ Defer ❌ Comment ✅ Delete ❌
+            // ANON VIEWER canResolve=false    canComment=false → readOnly=true (ro branch above)
+            <>
+              {onResolvedChange ? (
+                accessResolve != null && !accessResolve.canResolve ? (
+                  isResolved ? (
+                    <button
+                      type="button"
+                      disabled
+                      className={`${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <CheckCircle {...iconBtn} aria-hidden />
+                      <span>Resolved</span>
+                    </button>
+                  ) : accessResolve.pendingResolve ? (
+                    <button type="button" disabled className={pendingResolveAccessBtn}>
+                      <Clock {...iconBtn} aria-hidden />
+                      <span>Pending approval</span>
+                    </button>
+                  ) : (
+                    // AUTH VIEWER: orange "Request resolve access" button
+                    <button
+                      type="button"
+                      onClick={accessResolve.onRequestAccess}
+                      disabled={accessResolveSubmitting}
+                      className={requestResolveAccessBtnOrange}
+                    >
+                      <Lock size={14} color="#FFFFFF" aria-hidden />
                       <span>Request resolve access</span>
                     </button>
                   )
@@ -371,14 +423,19 @@ export function SessionFeedbackHeader({
                   </button>
                 )
               ) : null}
-              <button type="button" className={secondaryBtn}>
-                <UserPlus {...iconBtn} aria-hidden />
-                Assign
-              </button>
-              <button type="button" className={secondaryBtn}>
-                <Clock {...iconBtn} aria-hidden />
-                Defer
-              </button>
+              {/* Assign/Defer only for users who can resolve (OWNER, RESOLVER) */}
+              {accessResolve == null && (
+                <button type="button" className={secondaryBtn}>
+                  <UserPlus {...iconBtn} aria-hidden />
+                  Assign
+                </button>
+              )}
+              {accessResolve == null && (
+                <button type="button" className={secondaryBtn}>
+                  <Clock {...iconBtn} aria-hidden />
+                  Defer
+                </button>
+              )}
               {onOpenComment ? (
                 <button
                   type="button"

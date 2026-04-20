@@ -66,7 +66,7 @@ export function ProfileCommandPanel({
   const [analytics, setAnalytics] = useState<InsightsApiResponse | null>(null);
   const [, setAnalyticsLoading] = useState(false);
   const [hasAnimatedMetrics, setHasAnimatedMetrics] = useState(false);
-  const { authUid, workspaceId } = useWorkspace();
+  const { authUid, workspaceId, avatarUrl } = useWorkspace();
   const { data: workspaceUsage } = useWorkspaceUsageRealtime({
     enabled:
       open &&
@@ -409,8 +409,9 @@ export function ProfileCommandPanel({
             <div className="flex flex-col min-w-0">
               {/* Profile header */}
               <div className="flex items-start gap-3 mb-4">
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[#E7E7E7] bg-[#F5F5F5]">
+                <div className="h-10 w-10 shrink-0 rounded-full bg-[#F5F5F5]">
                   <UserAvatar
+                    avatarUrl={avatarUrl}
                     image={(user as { image?: string | null } | null)?.image}
                     photoURL={user?.photoURL}
                     name={displayName}

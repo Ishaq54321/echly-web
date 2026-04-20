@@ -217,7 +217,7 @@ export function useShareController(
       }
       const token = json.data?.token;
       if (token) {
-        const url = `${window.location.origin}/dashboard/${encodeURIComponent(sid)}?token=${encodeURIComponent(token)}`;
+        const url = `${window.location.origin}/session/${encodeURIComponent(sid)}?token=${encodeURIComponent(token)}`;
         try {
           await navigator.clipboard.writeText(url);
         } catch {

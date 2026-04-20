@@ -14,6 +14,7 @@ import {
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { ProfileCommandPanel } from "@/components/layout/ProfileCommandPanel";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 const NAV_GROUPS = [
   {
@@ -55,6 +56,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuthGuard({ router });
+  const { avatarUrl } = useWorkspace();
   const [profileOpen, setProfileOpen] = useState(false);
   const avatarRef = React.useRef<HTMLButtonElement>(null);
 
@@ -153,10 +155,11 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
           type="button"
           aria-label="Profile"
           aria-expanded={profileOpen}
-          className="w-[30px] h-[30px] rounded-full border border-border overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-border transition-all"
+          className="w-[30px] h-[30px] rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer"
           onClick={() => setProfileOpen((v) => !v)}
         >
           <UserAvatar
+            avatarUrl={avatarUrl}
             image={(user as { image?: string | null } | null)?.image}
             photoURL={user?.photoURL}
             name={

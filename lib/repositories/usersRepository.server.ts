@@ -187,14 +187,33 @@ export async function ensureUserRepo(user: UserLike): Promise<void> {
 
   const workspaceId = await resolveOrAssignWorkspaceIdRepo(user, priorData);
 
+  const existingPhotoURL =
+    priorData != null && typeof priorData.photoURL === "string"
+      ? priorData.photoURL
+      : null;
+  const existingAvatarUrl =
+    priorData != null && typeof priorData.avatarUrl === "string"
+      ? priorData.avatarUrl
+      : null;
+  const hasCustomAvatar =
+    typeof existingAvatarUrl === "string" &&
+    existingAvatarUrl.includes("firebasestorage");
+
+  const shouldRefreshGooglePhoto =
+    user.photoURL != null &&
+    user.photoURL !== existingPhotoURL &&
+    !hasCustomAvatar;
+
   const profile = {
     uid: user.uid,
     email,
     ...(displayName != null && displayName !== ""
       ? { displayName, name: displayName }
       : {}),
-    ...(user.photoURL != null
-      ? { photoURL: user.photoURL, avatarUrl: user.photoURL }
+    ...(!snap.exists || shouldRefreshGooglePhoto
+      ? user.photoURL != null
+        ? { photoURL: user.photoURL, avatarUrl: user.photoURL }
+        : {}
       : {}),
     workspaceId,
     updatedAt: FieldValue.serverTimestamp(),

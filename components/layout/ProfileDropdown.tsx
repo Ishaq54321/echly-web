@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { ProfileCommandPanel } from "@/components/layout/ProfileCommandPanel";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 export function ProfileDropdown() {
   const router = useRouter();
   const { user } = useAuthGuard({ router });
+  const { avatarUrl } = useWorkspace();
   const [open, setOpen] = useState(false);
   const avatarRef = useRef<HTMLButtonElement>(null);
 
@@ -19,10 +21,12 @@ export function ProfileDropdown() {
         type="button"
         aria-label="Profile"
         aria-expanded={open}
-        className="shrink-0 cursor-pointer"
+        className="shrink-0 cursor-pointer rounded-full"
+        style={{ boxShadow: "none" }}
         onClick={() => setOpen((v) => !v)}
       >
         <UserAvatar
+          avatarUrl={avatarUrl}
           image={(user as { image?: string | null } | null)?.image}
           photoURL={user?.photoURL}
           name={

@@ -160,8 +160,9 @@ function toAccessContext(params: {
   user: AccessContextUser | null;
   role: AccessContext["role"];
   sessionGranted: boolean;
+  isWorkspaceMember: boolean;
 }): AccessContext {
-  const { sessionId, workspaceId, user, role, sessionGranted } = params;
+  const { sessionId, workspaceId, user, role, sessionGranted, isWorkspaceMember } = params;
   const userId = user == null ? null : user.uid.trim();
   if (user != null) {
     assert(userId, "Missing user uid for access context");
@@ -173,6 +174,7 @@ function toAccessContext(params: {
     userId,
     isPublicViewer: user === null,
     capabilities: buildCapabilities(role, userId, sessionGranted),
+    isWorkspaceMember,
   };
 }
 
@@ -244,7 +246,7 @@ function finalizeAccessContextResult(params: {
     tokenPayload,
   } = params;
 
-  const { role, sessionGranted } = resolveAccess({
+  const { role, sessionGranted, isWorkspaceMember } = resolveAccess({
     session: {
       id: session.id,
       workspaceId: session.workspaceId.trim(),
@@ -263,6 +265,7 @@ function finalizeAccessContextResult(params: {
     user,
     role,
     sessionGranted,
+    isWorkspaceMember,
   });
 
   return {

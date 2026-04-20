@@ -5,9 +5,11 @@ import { User } from "lucide-react";
 import { getInitials } from "@/lib/utils/getInitials";
 
 export interface UserAvatarProps {
-  /** Future: uploaded or API-provided profile image URL */
+  /** Highest priority: uploaded avatar URL stored in Firestore. */
+  avatarUrl?: string | null;
+  /** Legacy/alias: same as avatarUrl, checked second. */
   image?: string | null;
-  /** e.g. Firebase Auth `photoURL` */
+  /** e.g. Firebase Auth `photoURL`, checked third. */
   photoURL?: string | null;
   /** Used for initials fallback (display name or email local part) */
   name?: string | null;
@@ -17,16 +19,22 @@ export interface UserAvatarProps {
   initialsClassName?: string;
 }
 
-function resolveImageSrc(image?: string | null, photoURL?: string | null): string {
-  const a = image?.trim();
-  const b = photoURL?.trim();
-  return a || b || "";
+function resolveImageSrc(
+  avatarUrl?: string | null,
+  image?: string | null,
+  photoURL?: string | null
+): string {
+  const a = avatarUrl?.trim();
+  const b = image?.trim();
+  const c = photoURL?.trim();
+  return a || b || c || "";
 }
 
 /**
  * Safe profile avatar: shows `image` or `photoURL` when loadable, otherwise initials or user icon.
  */
 export function UserAvatar({
+  avatarUrl,
   image,
   photoURL,
   name,
@@ -34,7 +42,7 @@ export function UserAvatar({
   alt = "User avatar",
   initialsClassName,
 }: UserAvatarProps) {
-  const src = resolveImageSrc(image, photoURL);
+  const src = resolveImageSrc(avatarUrl, image, photoURL);
   const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
@@ -55,7 +63,7 @@ export function UserAvatar({
           src={src}
           alt={alt}
           onError={() => setImgError(true)}
-          className="h-full w-full rounded-full object-cover"
+          className="h-full w-full object-cover"
         />
       ) : label ? (
         <span

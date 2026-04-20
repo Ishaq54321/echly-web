@@ -5,6 +5,14 @@ import { corsHeaders } from "@/lib/server/cors";
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  // Redirect all /dashboard/[id] URLs → /session/[id] (preserve any query params including token)
+  if (pathname.startsWith("/dashboard/") && pathname !== "/dashboard") {
+    const sessionId = pathname.slice("/dashboard/".length);
+    const redirectUrl = new URL(request.nextUrl);
+    redirectUrl.pathname = `/session/${sessionId}`;
+    return NextResponse.redirect(redirectUrl);
+  }
+
   // Admin routes: access control is enforced in app/admin/layout.tsx via /api/admin/me (user.isAdmin).
   // Middleware cannot read Firestore, so we only pass through here.
   if (pathname.startsWith("/admin")) {
@@ -43,5 +51,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/:path*", "/admin", "/admin/:path*"],
+  matcher: ["/api/:path*", "/admin", "/admin/:path*", "/dashboard/:path*"],
 };

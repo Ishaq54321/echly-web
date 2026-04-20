@@ -267,7 +267,7 @@ export default function GlobalRail() {
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
-                  background: "#1775E0",
+                  background: workspaceLogoUrl ? "transparent" : "#1775E0",
                   color: "#FFFFFF",
                   fontSize: 14,
                   fontWeight: 700,
@@ -279,9 +279,20 @@ export default function GlobalRail() {
                   transition: "opacity 160ms",
                   flexShrink: 0,
                   userSelect: "none",
+                  overflow: "hidden",
+                  padding: 0,
                 }}
               >
-                {displayName.trim().charAt(0).toUpperCase() || "W"}
+                {workspaceLogoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={workspaceLogoUrl}
+                    alt={displayName}
+                    style={{ width: 32, height: 32, objectFit: "cover" }}
+                  />
+                ) : (
+                  displayName.trim().charAt(0).toUpperCase() || "W"
+                )}
               </button>
             </div>
             <div
@@ -306,12 +317,16 @@ export default function GlobalRail() {
                 aria-expanded={workspacePopoverOpen}
               >
                 {workspaceLogoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={workspaceLogoUrl}
-                    alt={displayName}
-                    className="h-7 w-7 rounded-md object-cover border border-neutral-200 shrink-0"
-                  />
+                  <span className="inline-flex h-7 w-7 shrink-0 overflow-hidden rounded-full">
+                    {
+                      // eslint-disable-next-line @next/next/no-img-element -- remote workspace logo
+                      <img
+                        src={workspaceLogoUrl}
+                        alt={displayName}
+                        className="h-full w-full object-cover"
+                      />
+                    }
+                  </span>
                 ) : (
                   <WorkspaceInitialsAvatar name={displayName} />
                 )}
@@ -439,9 +454,22 @@ export default function GlobalRail() {
                       className="w-full flex items-center gap-2 px-2.5 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition text-left"
                       style={{ height: 38 }}
                     >
-                      <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-semibold select-none">
-                        {initial}
-                      </span>
+                      {ws.logoUrl ? (
+                        <span className="inline-flex h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full">
+                          {
+                            // eslint-disable-next-line @next/next/no-img-element -- workspace list logo
+                            <img
+                              src={ws.logoUrl}
+                              alt={ws.name}
+                              className="h-full w-full object-cover"
+                            />
+                          }
+                        </span>
+                      ) : (
+                        <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center bg-blue-600 text-white text-xs font-semibold select-none" style={{ borderRadius: "50%" }}>
+                          {initial}
+                        </span>
+                      )}
                       <span className="flex-1 min-w-0 truncate">{ws.name}</span>
                       {isActive && (
                         <Check className="h-4 w-4 shrink-0 text-blue-600" strokeWidth={2.5} aria-hidden />
@@ -456,11 +484,16 @@ export default function GlobalRail() {
 
           <div className="flex items-center gap-3 mb-3">
             {workspaceLogoUrl ? (
-              <img
-                src={workspaceLogoUrl}
-                alt={displayName}
-                className="h-8 w-8 rounded-full object-cover border border-neutral-200 shrink-0"
-              />
+              <span className="inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-full">
+                {
+                  // eslint-disable-next-line @next/next/no-img-element -- remote workspace logo
+                  <img
+                    src={workspaceLogoUrl}
+                    alt={displayName}
+                    className="h-full w-full object-cover"
+                  />
+                }
+              </span>
             ) : (
               <WorkspaceInitialsAvatar name={displayName} />
             )}

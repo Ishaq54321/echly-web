@@ -37,6 +37,11 @@ export const POST = withAuthorization(
     if (!accessCtx.access?.capabilities.canComment) {
       return apiError({ code: "FORBIDDEN", message: "You do not have access", status: 403 });
     }
+    const isWorkspaceMemberSL = accessCtx.access?.isWorkspaceMember === true;
+    const isOwnerSL = accessCtx.access?.capabilities.canDeleteTicket === true;
+    if (!isWorkspaceMemberSL && !isOwnerSL) {
+      return apiError({ code: "FORBIDDEN", message: "Only workspace members can generate share links", status: 403 });
+    }
     if (!accessCtx.session) {
       return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }

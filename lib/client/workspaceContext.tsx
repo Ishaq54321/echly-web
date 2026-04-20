@@ -74,6 +74,10 @@ export type WorkspaceContextValue = {
   switchWorkspace: (workspaceId: string) => void;
   /** True while allWorkspaces is loading. */
   isLoadingWorkspaces: boolean;
+  /** User's uploaded avatar URL (updated immediately after upload without page reload). */
+  avatarUrl: string | null;
+  /** Update the local avatar URL in context (call after upload/remove in Settings). */
+  updateAvatarUrl: (url: string | null) => void;
 };
 
 /** Throws if identity is not ready; use before destructive or workspace-scoped API calls. */
@@ -111,6 +115,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [allWorkspaces, setAllWorkspaces] = useState<WorkspaceMembership[]>([]);
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +148,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setClaimsReady(false);
           setAllWorkspaces([]);
           setActiveWorkspaceId(null);
+          setAvatarUrl(null);
         }
         return;
       }
@@ -190,6 +196,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             );
             return;
           }
+
+          if (cancelled) return;
+          if (currentGen !== authSyncGenerationRef.current) return;
+
+          try {
+            const body = await res.json() as { success?: boolean; data?: { avatarUrl?: string | null } };
+            if (body?.data?.avatarUrl) {
+              setAvatarUrl(body.data.avatarUrl);
+            }
+          } catch { /* non-fatal */ }
 
           if (cancelled) return;
           if (currentGen !== authSyncGenerationRef.current) return;
@@ -296,6 +312,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     window.location.href = "/dashboard";
   }, [authUid]);
 
+  const updateAvatarUrl = useCallback((url: string | null) => {
+    setAvatarUrl(url);
+  }, []);
+
   const isIdentityResolved = useMemo(
     () =>
       authReady &&
@@ -338,6 +358,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activeWorkspaceId,
       switchWorkspace,
       isLoadingWorkspaces,
+      avatarUrl: avatarUrl ?? authPhotoUrl,
+      updateAvatarUrl,
     }),
     [
       workspaceId,
@@ -356,6 +378,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activeWorkspaceId,
       switchWorkspace,
       isLoadingWorkspaces,
+      avatarUrl,
+      updateAvatarUrl,
     ]
   );
 

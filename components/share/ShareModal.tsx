@@ -10,6 +10,7 @@ import type {
   ShareItem,
 } from "@/components/share/useShareController";
 import { ShareDropdown, type ShareDropdownOption } from "@/components/share/ShareDropdown";
+import { ExternalShareModal } from "@/components/share/ExternalShareModal";
 
 export interface ShareModalProps {
   open: boolean;
@@ -17,6 +18,11 @@ export interface ShareModalProps {
   canManageShare: boolean;
   /** True only for OWNER — gates the general access dropdown. */
   canManageAccess: boolean;
+  /** True for OWNER and WS-MEMBER — shows full modal vs simplified external view. */
+  isWorkspaceMember?: boolean;
+  /** Forwarded to ExternalShareModal for display; optional. */
+  sessionId?: string;
+  sessionName?: string | null;
   inviteEmail: string;
   setInviteEmail: (value: string) => void;
   inviteAccess: ShareAccess;
@@ -76,6 +82,9 @@ export function ShareModal({
   onClose,
   canManageShare,
   canManageAccess,
+  isWorkspaceMember = false,
+  sessionId = "",
+  sessionName = null,
   inviteEmail,
   setInviteEmail,
   inviteAccess,
@@ -109,6 +118,17 @@ export function ShareModal({
   const canWrite = canManageShare;
 
   if (!open) return null;
+
+  if (!isWorkspaceMember) {
+    return (
+      <ExternalShareModal
+        isOpen={open}
+        onClose={onClose}
+        sessionId={sessionId}
+        sessionName={sessionName}
+      />
+    );
+  }
 
   return (
     <Modal open={open} onClose={onClose} ariaLabelledBy={titleId}>

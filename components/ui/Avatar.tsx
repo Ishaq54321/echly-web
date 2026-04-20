@@ -1,75 +1,101 @@
 "use client";
 
-import Image from "next/image";
-
-/**
- * Deterministic background color from a string (e.g. user id).
- * Same input always yields the same hue. Returns HSL string for background.
- */
-function backgroundColorFromId(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    const char = id.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash;
-  }
-  const hue = Math.abs(hash % 360);
-  return `hsl(${hue}, 55%, 42%)`;
-}
+import { useState, useEffect } from "react";
+import { User } from "lucide-react";
 
 export interface AvatarProps {
-  /** If set, show image. Otherwise show initials on colored background. */
-  avatarUrl?: string | null;
-  firstName: string;
-  lastName: string;
-  /** Used for deterministic background when no avatarUrl (e.g. user id). */
-  id: string;
-  size?: "sm" | "md" | "lg";
+  src?: string | null;
+  name?: string | null;
+  size?: number;
+  borderRadius?: string;
   className?: string;
 }
 
-const sizeClasses = {
-  sm: "w-6 h-6 text-xs",
-  md: "w-8 h-8 text-sm",
-  lg: "w-10 h-10 text-base",
-};
-
 export function Avatar({
-  avatarUrl,
-  firstName,
-  lastName,
-  id,
-  size = "md",
+  src,
+  name,
+  size = 32,
+  borderRadius = "50%",
   className = "",
 }: AvatarProps) {
-  const initials =
-    `${(firstName || " ").trim().charAt(0)}${(lastName || " ").trim().charAt(0)}`.toUpperCase() ||
-    "?";
-  const sizeClass = sizeClasses[size];
+  const [imgError, setImgError] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  if (avatarUrl?.trim()) {
-    const w = size === "sm" ? 24 : size === "md" ? 32 : 40;
-    return (
-      <Image
-        src={avatarUrl}
-        alt=""
-        width={w}
-        height={w}
-        sizes={`${w}px`}
-        className={`rounded-full object-cover ${sizeClass} ${className}`}
-        unoptimized
-      />
-    );
-  }
+  useEffect(() => {
+    setImgError(false);
+    if (src?.trim()) setLoading(true);
+  }, [src]);
 
-  const bg = backgroundColorFromId(id);
+  const showImage = Boolean(src?.trim()) && !imgError;
+  const initial = name?.trim().charAt(0).toUpperCase() ?? null;
+
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-full font-medium text-white ${sizeClass} ${className}`}
-      style={{ backgroundColor: bg }}
-      aria-hidden
+      className={className}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: size,
+        height: size,
+        borderRadius,
+        flexShrink: 0,
+        overflow: "hidden",
+        position: "relative",
+      }}
     >
-      {initials}
+      {showImage ? (
+        <img
+          src={src!}
+          alt=""
+          onLoad={() => setLoading(false)}
+          onError={() => { setImgError(true); setLoading(false); }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: loading ? 0.6 : 1,
+            animation: loading ? "pulse 1.5s ease-in-out infinite" : undefined,
+            transition: "opacity 200ms",
+          }}
+        />
+      ) : initial ? (
+        <span
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#e5e7eb",
+            color: "#374151",
+            fontSize: Math.max(size * 0.38, 10),
+            fontWeight: 600,
+            borderRadius,
+            userSelect: "none",
+          }}
+          aria-hidden
+        >
+          {initial}
+        </span>
+      ) : (
+        <span
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#e5e7eb",
+            borderRadius,
+          }}
+        >
+          <User
+            style={{ width: size * 0.55, height: size * 0.55, color: "#9ca3af" }}
+            aria-hidden
+          />
+        </span>
+      )}
     </span>
   );
 }

@@ -6,6 +6,8 @@ import { workspaceDeletedConfirmationHtml } from "./templates/workspaceDeletedCo
 import { sessionInviteEmailHtml } from "./templates/sessionInvite";
 import { accessRequestNotificationEmailHtml } from "./templates/accessRequestNotification";
 import { accessRequestResultEmailHtml } from "./templates/accessRequestResult";
+import { emailChangeEmailHtml } from "./templates/emailChange";
+import { passwordResetEmailHtml } from "./templates/passwordReset";
 
 // WS-006 FIX: always use verified sender domain
 // regardless of APP_URL (localhost would break Resend)
@@ -149,6 +151,40 @@ export async function sendAccessRequestResultEmail({
   } catch (err) {
     console.error("[sendAccessRequestResultEmail] failed", err);
   }
+}
+
+export async function sendEmailChangeConfirmation({
+  to,
+  newEmail,
+  confirmUrl,
+  userName,
+}: {
+  to: string;
+  newEmail: string;
+  confirmUrl: string;
+  userName: string;
+}): Promise<void> {
+  await sendEmailOrLog({
+    to,
+    subject: "Confirm your new email address",
+    html: emailChangeEmailHtml({ newEmail, confirmUrl, userName }),
+  });
+}
+
+export async function sendPasswordResetEmail({
+  to,
+  resetUrl,
+  userName,
+}: {
+  to: string;
+  resetUrl: string;
+  userName: string;
+}): Promise<void> {
+  await sendEmailOrLog({
+    to,
+    subject: "Reset your Echly password",
+    html: passwordResetEmailHtml({ resetUrl, userName }),
+  });
 }
 
 export async function sendWorkspaceDeletionConfirmationEmail({

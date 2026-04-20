@@ -150,7 +150,23 @@ function sameStringArrayContent(
   return true;
 }
 
-export default function SessionPageClient({ sessionId }: { sessionId: string }) {
+type SessionLoadedInfo = {
+  sessionName: string | null;
+  workspaceName: string | null;
+  createdAt: string | null;
+};
+
+export default function SessionPageClient({
+  sessionId,
+  isPublicRoute = false,
+  onSessionLoaded,
+  onAccessBlocked,
+}: {
+  sessionId: string;
+  isPublicRoute?: boolean;
+  onSessionLoaded?: (info: SessionLoadedInfo) => void;
+  onAccessBlocked?: () => void;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const ticketIdFromUrl = searchParams.get("ticket");
@@ -164,6 +180,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   >(null);
   /** Capability flags from GET /api/sessions/:id (getAccessContext); never inferred in the UI. */
   const [sessionAccess, setSessionAccess] = useState<AccessCapabilities | null>(null);
+  const sessionLoaded = sessionAccess !== null || sessionFetchError !== null;
   /** From GET /api/sessions/:id `data.request.pendingResolve` or successful POST /request-access. */
   const [pendingResolveRequest, setPendingResolveRequest] = useState(false);
   /** Status of the current user's access request when accessBlocked is true. */
@@ -172,6 +189,8 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
   >("idle");
   /** Pending access request count shown as red dot on Share button. */
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  /** True when the current user belongs to the session's workspace (OWNER or WS-MEMBER). */
+  const [isWorkspaceMember, setIsWorkspaceMember] = useState(false);
   /** First feedback page from GET /api/session-page-bundle when {@link USE_BUNDLE} is true. */
   const [bundledFirstFeedbackPage, setBundledFirstFeedbackPage] = useState<{
     feedback: Record<string, unknown>[];
@@ -600,7 +619,10 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (url && stableScopedFeedback.some((f) => f.id === url)) {
       setSelectedId(url);
     } else {
-      setSelectedId(stableScopedFeedback[0]!.id);
+      const firstOpen = stableScopedFeedback.find(
+        (f) => f.status !== "resolved" && f.status !== "processing"
+      );
+      setSelectedId((firstOpen ?? stableScopedFeedback[0]!).id);
     }
   }
 
@@ -702,6 +724,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     if (!sessionId) {
       setSession(null);
       setSessionAccess(null);
+      setIsWorkspaceMember(false);
       setSessionFetchError(null);
       setAccessBlocked(false);
       setPendingResolveRequest(false);
@@ -770,7 +793,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           return;
         }
         const accessRoot = body as {
-          access?: { capabilities?: Partial<AccessCapabilities> };
+          access?: { capabilities?: Partial<AccessCapabilities>; isWorkspaceMember?: boolean };
         };
         if (res.status === 403) {
           setBundledFirstFeedbackPage(null);
@@ -785,6 +808,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             (accessRoot.access?.capabilities as Partial<AccessCapabilities> | undefined);
           if (cap && cap.canView === false) {
             setAccessBlocked(true);
+            onAccessBlocked?.();
             setSession(null);
             setSessionFetchError(null);
             setPendingResolveRequest(false);
@@ -837,6 +861,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
         let bundleNextCursor: string | null = null;
         let bundleHasMore = false;
         let bundleCapabilities: Partial<AccessCapabilities> | undefined;
+        let bundleIsWorkspaceMember = false;
         try {
           const inner = requireApiSuccessData<{
             session: Record<string, unknown>;
@@ -844,11 +869,12 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             nextCursor?: string | null;
             hasMore?: boolean;
             request?: { pendingResolve?: boolean };
-            access?: { capabilities?: Partial<AccessCapabilities> };
+            access?: { capabilities?: Partial<AccessCapabilities>; isWorkspaceMember?: boolean };
           }>(body);
           sessionPayload = inner.session;
           requestPayload = inner.request;
           bundleCapabilities = inner.access?.capabilities;
+          bundleIsWorkspaceMember = inner.access?.isWorkspaceMember === true;
           bundleFeedbackRows = Array.isArray(inner.feedback)
             ? (inner.feedback as Record<string, unknown>[])
             : [];
@@ -883,6 +909,13 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           accessLevel: requireAccessLevel(raw.accessLevel),
         } as Session;
         setSession(assembledSession);
+        onSessionLoaded?.({
+          sessionName: typeof assembledSession.title === "string" ? assembledSession.title : null,
+          workspaceName: workspaceName ?? null,
+          createdAt: typeof (assembledSession as { createdAt?: unknown }).createdAt === "string"
+            ? (assembledSession as { createdAt: string }).createdAt
+            : null,
+        });
         const cap = accessRoot.access?.capabilities ?? bundleCapabilities;
         const assembledAccess: AccessCapabilities | null = cap
           ? {
@@ -895,6 +928,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             }
           : null;
         setSessionAccess(assembledAccess);
+        setIsWorkspaceMember(accessRoot.access?.isWorkspaceMember === true || bundleIsWorkspaceMember);
         const assembledPendingResolve =
           requestPayload !== undefined && requestPayload.pendingResolve === true;
         setPendingResolveRequest(assembledPendingResolve);
@@ -952,6 +986,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           const cap = accessRoot.access?.capabilities;
           if (cap && cap.canView === false) {
             setAccessBlocked(true);
+            onAccessBlocked?.();
             setSession(null);
             setSessionFetchError(null);
             setPendingResolveRequest(false);
@@ -1972,7 +2007,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
     return (
       <RequestSessionAccessPage
         sessionId={sessionId}
-        sessionName={null}
+        sessionName={session?.title ?? null}
         workspaceName={workspaceName ?? null}
         isAuthenticated={!!authUid}
         userEmail={authEmail ?? null}
@@ -2101,16 +2136,22 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           canResolve: sessionAccess?.canResolve === true,
         }}
         accessResolve={
-          authUid &&
           sessionAccess?.canView &&
-          sessionAccess.canResolve === false
+          sessionAccess?.canResolve === false
             ? {
                 canResolve: false,
                 pendingResolve: pendingResolveRequest,
-                onRequestAccess: openRequestAccessModal,
+                onRequestAccess: authUid
+                  ? openRequestAccessModal
+                  : () => {
+                      window.location.href = `/login?returnUrl=${encodeURIComponent(
+                        window.location.pathname + window.location.search
+                      )}`;
+                    },
               }
             : undefined
         }
+        isAnonymousViewer={isAnonymousViewer}
         accessResolveSubmitting={requestAccessSubmitting}
         screenshotUrl={selectedScreenshotUrl}
         screenshotUrlLoading={selectedScreenshotUrlLoading}
@@ -2170,7 +2211,7 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
             hasReachedLimit={feedbackReachedLimit}
             loadMoreRef={feedbackLoadMoreRef}
             scrollContainerRef={listScrollRef}
-            scrollToId={ticketIdFromUrl}
+            scrollToId={effectiveSelectedId}
             openExpanded={openExpanded}
             onOpenExpandedChange={onOpenExpandedChange}
             resolvedExpanded={resolvedExpanded}
@@ -2190,19 +2231,23 @@ export default function SessionPageClient({ sessionId }: { sessionId: string }) 
           {pendingResolveRequest && sessionAccess?.canResolve === false ? (
             <PendingAccessBanner />
           ) : null}
-          <TopControlBar
-            sessionId={sessionId}
-            sessionTitle={session ? (session.title ?? "").trim() : ""}
-            session={session}
-            onSessionRenameSuccess={handleSessionRenameFromMenu}
-            onSetSessionArchived={handleSetSessionArchivedFromMenu}
-            onRequestDeleteSession={handleRequestDeleteSessionFromMenu}
-            publicViewer={isAnonymousViewer}
-            canManageShare={sessionAccess?.canResolve === true}
-            canManageAccess={sessionAccess?.canDeleteTicket === true}
-            pendingRequestsCount={pendingRequestsCount}
-            onShareModalOpen={() => setPendingRequestsCount(0)}
-          />
+          {!isPublicRoute && (
+            <TopControlBar
+              sessionId={sessionId}
+              sessionTitle={session ? (session.title ?? "").trim() : ""}
+              session={session}
+              onSessionRenameSuccess={handleSessionRenameFromMenu}
+              onSetSessionArchived={handleSetSessionArchivedFromMenu}
+              onRequestDeleteSession={handleRequestDeleteSessionFromMenu}
+              publicViewer={isAnonymousViewer}
+              canManageShare={sessionAccess?.canResolve === true}
+              canManageAccess={sessionAccess?.canDeleteTicket === true}
+              isWorkspaceMember={isWorkspaceMember}
+              pendingRequestsCount={pendingRequestsCount}
+              onShareModalOpen={() => setPendingRequestsCount(0)}
+              sessionLoaded={sessionLoaded}
+            />
+          )}
           <div className="flex flex-1 min-h-0 min-w-0">
             <main className="surface-main flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
               <div className="h-full flex flex-col min-w-0">
