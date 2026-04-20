@@ -53,8 +53,11 @@ export function ShareDropdown({
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const dropdownHeight = 120;
+    const viewportHeight = window.innerHeight;
+    const fitsBelow = rect.bottom + 4 + dropdownHeight <= viewportHeight;
     setMenuRect({
-      top: rect.bottom + 4,
+      top: fitsBelow ? rect.bottom + 4 : rect.top - 4 - dropdownHeight,
       left: rect.left,
       width: rect.width,
     });

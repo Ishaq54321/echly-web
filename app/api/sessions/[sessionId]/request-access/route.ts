@@ -86,12 +86,17 @@ export async function POST(
     });
   }
 
+  let body: { access?: unknown } | null = null;
+  try { body = (await req.json()) as { access?: unknown }; } catch { /* no body */ }
+  const rawAccess = body?.access;
+  const requestedAccess: "view" | "resolve" = rawAccess === "view" ? "view" : "resolve";
+
   try {
     await createAccessRequest({
       sessionId,
       requesterUserId: userId,
       requesterEmail,
-      requestedAccess: "resolve",
+      requestedAccess,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

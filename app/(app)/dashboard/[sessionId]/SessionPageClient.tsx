@@ -233,6 +233,7 @@ export default function SessionPageClient({
       const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/request-access`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access: "resolve" }),
       });
       const raw = (await res?.json().catch(() => ({}))) as {
         success?: boolean;
@@ -261,6 +262,7 @@ export default function SessionPageClient({
       const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/request-access`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access: "view" }),
       });
       const raw = (await res?.json().catch(() => ({}))) as {
         success?: boolean;

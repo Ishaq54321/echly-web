@@ -10,7 +10,7 @@ const ShareModal = dynamic(
   () => import("@/components/share/ShareModal").then((m) => m.ShareModal),
   { ssr: false }
 );
-import { useShareController } from "@/components/share/useShareController";
+import { useShareController, type ShareGeneralAccess } from "@/components/share/useShareController";
 import { GlobalSearchButton } from "@/components/layout/GlobalSearchButton";
 import { GlobalNotificationButton } from "@/components/layout/GlobalNotificationButton";
 import { ProfileDropdown } from "@/components/layout/ProfileDropdown";
@@ -71,7 +71,11 @@ export function TopControlBar({
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkCopyBusy, setLinkCopyBusy] = useState(false);
 
-  const share = useShareController(sessionId, { canResolve: canManageShare });
+  const share = useShareController(sessionId, {
+    canResolve: canManageShare,
+    pendingRequestsCount,
+    initialGeneralAccess: session?.generalAccess as ShareGeneralAccess | undefined,
+  });
 
   useEffect(() => {
     if (!share.open) return;
@@ -155,7 +159,6 @@ export function TopControlBar({
               inviteAccess={share.inviteAccess}
               setInviteAccess={share.setInviteAccess}
               generalAccess={share.generalAccess}
-              loadingGeneralAccess={share.loadingGeneralAccess}
               updatingGeneralAccess={share.updatingGeneralAccess}
               items={share.items}
               initialLoading={share.initialLoading}
@@ -177,9 +180,10 @@ export function TopControlBar({
                 void share.removeAccess(item).catch(() => {});
               }}
               accessRequests={share.accessRequests}
+              pendingRequestsCount={pendingRequestsCount}
               patchingAccessRequestId={share.patchingAccessRequestId}
-              onApproveAccessRequest={(id) => {
-                void share.patchAccessRequest(id, "approve").catch(() => {});
+              onApproveAccessRequest={(id, access) => {
+                void share.patchAccessRequest(id, "approve", access).catch(() => {});
               }}
               onRejectAccessRequest={(id) => {
                 void share.patchAccessRequest(id, "reject").catch(() => {});
@@ -190,6 +194,10 @@ export function TopControlBar({
               copyingLink={share.copyingLink}
               linkCopied={share.linkCopied}
               onCopyShareLink={() => void share.copyShareLink().catch(() => {})}
+              refetchingAfterApproval={share.refetchingAfterApproval}
+              workspaceMembers={share.workspaceMembers}
+              loadingWorkspaceMembers={share.loadingWorkspaceMembers}
+              currentUserUid={authUid ?? undefined}
             />
           ) : null}
           <button

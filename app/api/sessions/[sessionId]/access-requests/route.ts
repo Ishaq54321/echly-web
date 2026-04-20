@@ -105,9 +105,9 @@ export async function PATCH(
     });
   }
 
-  let body: { requestId?: unknown; action?: unknown };
+  let body: { requestId?: unknown; action?: unknown; access?: unknown };
   try {
-    body = (await req.json()) as { requestId?: unknown; action?: unknown };
+    body = (await req.json()) as { requestId?: unknown; action?: unknown; access?: unknown };
   } catch {
     return apiError({
       code: "INVALID_INPUT",
@@ -119,6 +119,10 @@ export async function PATCH(
   const requestId =
     typeof body.requestId === "string" ? body.requestId.trim() : "";
   const action = typeof body.action === "string" ? body.action.trim() : "";
+  const accessLevel =
+    body.access === "view" || body.access === "resolve"
+      ? body.access
+      : null;
 
   if (!requestId || (action !== "approve" && action !== "reject")) {
     return apiError({
@@ -188,7 +192,7 @@ export async function PATCH(
       workspaceId: context.session.workspaceId.trim(),
       userId: accessRequest.requesterUserId.trim(),
       email: accessRequest.requesterEmail.trim(),
-      access: "resolve",
+      access: accessLevel ?? accessRequest.requestedAccess ?? "resolve",
       actorId: approverId,
       source: "access_request",
     });

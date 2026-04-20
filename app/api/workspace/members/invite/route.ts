@@ -68,11 +68,16 @@ export async function POST(req: NextRequest) {
     // Auto-heal: if owner by ownerId but no member doc, create it
     if (isOwnerByField && !callerMember) {
       try {
+        const healSnap = await adminDb.doc(`users/${user.uid}`).get();
+        const healData = (healSnap.data() ?? {}) as Record<string, unknown>;
+        const healAvatarUrl =
+          typeof healData.avatarUrl === "string" ? healData.avatarUrl :
+          typeof healData.photoURL === "string" ? healData.photoURL : null;
         await addWorkspaceMemberRepo(workspaceId, {
           uid: user.uid,
           email: user.email ?? "",
           displayName: user.displayName ?? null,
-          avatarUrl: null,
+          avatarUrl: healAvatarUrl,
           role: "OWNER",
           joinedAt: Timestamp.now(),
           invitedBy: null,

@@ -90,15 +90,32 @@ export async function GET(
   ];
 
   items.sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type === "member" ? -1 : 1;
-    }
-
     return (b.createdAt?.getTime?.() ?? 0) - (a.createdAt?.getTime?.() ?? 0);
   });
 
+  const memberUserIds = items
+    .filter(item => item.type === "member" && item.id)
+    .map(item => item.id);
+
+  let userAvatarMap: Record<string, string | null> = {};
+
+  if (memberUserIds.length > 0) {
+    const userRefs = memberUserIds.map(uid => adminDb.doc(`users/${uid}`));
+    const userSnaps = await adminDb.getAll(...userRefs);
+    userSnaps.forEach((snap, i) => {
+      const uid = memberUserIds[i]!;
+      const data = snap.exists ? snap.data() : null;
+      userAvatarMap[uid] = data?.avatarUrl ?? data?.photoURL ?? null;
+    });
+  }
+
+  const itemsWithPhotos = items.map(item => ({
+    ...item,
+    avatarUrl: item.type === "member" ? (userAvatarMap[item.id] ?? null) : null,
+  }));
+
   return apiSuccess({
-    items,
+    items: itemsWithPhotos,
   });
 }
 

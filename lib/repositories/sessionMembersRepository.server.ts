@@ -1,7 +1,7 @@
 import "server-only";
 
 import { adminDb } from "@/lib/server/firebaseAdmin";
-import { Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { SharedSessionMembership } from "@/lib/domain/session";
 
 import {
@@ -77,14 +77,20 @@ export async function addSessionMember(params: {
     throw new Error("addSessionMember: actorId is required");
   }
 
-  const existing = await getSessionMember(params.sessionId, params.userId);
-  if (existing) {
-    return;
-  }
-
   const ref = adminDb.doc(
     sessionMemberDocPath(params.sessionId, params.userId)
   );
+
+  const existing = await getSessionMember(params.sessionId, params.userId);
+  if (existing) {
+    if (existing.access !== params.access) {
+      await ref.update({
+        access: params.access,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    return;
+  }
 
   await ref.set({
     userId: params.userId,

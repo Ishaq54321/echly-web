@@ -20,7 +20,7 @@ export type AccessRequest = {
   requesterUserId: string;
   requesterEmail: string;
 
-  requestedAccess: "resolve";
+  requestedAccess: "view" | "resolve";
 
   status: AccessRequestStatus;
 

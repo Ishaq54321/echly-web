@@ -6,6 +6,7 @@ import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
 import { getWorkspaceMembersRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import type { WorkspaceMember } from "@/lib/domain/workspaceMember";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,29 @@ export async function GET(req: NextRequest) {
         ),
     ];
 
-    const serialized = sorted.map((m) => ({
+    const membersNeedingAvatar = sorted.filter((m) => !m.avatarUrl);
+    let membersWithAvatars: WorkspaceMember[] = sorted;
+
+    if (membersNeedingAvatar.length > 0) {
+      const userRefs = membersNeedingAvatar.map((m) => adminDb.doc(`users/${m.uid}`));
+      const userSnaps = await adminDb.getAll(...userRefs);
+
+      const avatarByUid: Record<string, string | null> = {};
+      userSnaps.forEach((snap, i) => {
+        const uid = membersNeedingAvatar[i]!.uid;
+        const data = snap.exists ? (snap.data() as Record<string, unknown>) : null;
+        avatarByUid[uid] =
+          typeof data?.avatarUrl === "string" ? data.avatarUrl :
+          typeof data?.photoURL === "string" ? data.photoURL : null;
+      });
+
+      membersWithAvatars = sorted.map((m) => ({
+        ...m,
+        avatarUrl: m.avatarUrl ?? avatarByUid[m.uid] ?? null,
+      }));
+    }
+
+    const serialized = membersWithAvatars.map((m) => ({
       ...m,
       joinedAt: m.joinedAt
         ? { seconds: m.joinedAt.seconds, nanoseconds: m.joinedAt.nanoseconds }

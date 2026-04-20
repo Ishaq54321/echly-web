@@ -155,13 +155,14 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
     Date.now() > token.expiresAt;
 
   const isLinkView = session.generalAccess === "link_view";
+  const isRestricted = session.generalAccess === "restricted";
 
   const accessGranted =
     isLinkView ||
     isOwner ||
     isWorkspaceMember ||
     hasMemberAccess ||
-    hasShareLinkContext;
+    (hasShareLinkContext && !isRestricted);
 
   if (!accessGranted) {
     return { role: "VIEWER", sessionGranted: false, isWorkspaceMember: false };

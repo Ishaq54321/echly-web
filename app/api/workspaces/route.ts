@@ -100,11 +100,15 @@ export async function POST(req: NextRequest) {
         try {
           const existingMember = await getWorkspaceMemberRepo(preWid, user.uid);
           if (!existingMember) {
+            const preData = (preSnap.data() ?? {}) as Record<string, unknown>;
+            const healAvatarUrl =
+              typeof preData.avatarUrl === "string" ? preData.avatarUrl :
+              typeof preData.photoURL === "string" ? preData.photoURL : null;
             await addWorkspaceMemberRepo(preWid, {
               uid: user.uid,
               email: user.email ?? "",
               displayName: user.displayName ?? null,
-              avatarUrl: null,
+              avatarUrl: healAvatarUrl,
               role: "OWNER",
               joinedAt: Timestamp.now(),
               invitedBy: null,

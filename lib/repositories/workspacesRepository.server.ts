@@ -55,11 +55,15 @@ export async function createWorkspaceRepo(params: {
   invalidateWorkspaceDocCache(resolvedUserId);
 
   // WS-001 FIX: ensure owner member doc always exists
+  const ownerSnap = await adminDb.doc(`users/${params.ownerId}`).get();
+  const ownerAvatarUrl = ownerSnap.exists
+    ? ((ownerSnap.data()?.avatarUrl ?? ownerSnap.data()?.photoURL) as string | null | undefined) ?? null
+    : null;
   await addWorkspaceMemberRepo(resolvedUserId, {
     uid: params.ownerId,
     email: params.ownerEmail ?? "",
     displayName: params.ownerName ?? null,
-    avatarUrl: null,
+    avatarUrl: ownerAvatarUrl,
     role: "OWNER",
     joinedAt: Timestamp.now(),
     invitedBy: null,

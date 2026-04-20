@@ -7,11 +7,10 @@ import { requireAccessLevel } from "@/lib/domain/accessLevel";
 export type SessionGeneralAccess = "restricted" | "link_view";
 
 export function requireGeneralAccess(value: unknown): SessionGeneralAccess {
-  if (value === "link_view") return "link_view";
-  if (value === "restricted") return "restricted";
-  throw new Error(
-    `Invalid generalAccess: expected restricted|link_view, got ${JSON.stringify(value)}`,
-  );
+  if (value === "restricted" || value === "link_view") {
+    return value;
+  }
+  return "restricted";
 }
 
 export interface Session {

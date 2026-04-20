@@ -4964,13 +4964,30 @@ html.dark .echly-mic-item.is-active {
   padding-top: 0;
 }
 
+.share-access-request-row {
+  padding-left: 14px;
+  padding-right: 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.045);
+}
+
+.share-access-request-row:last-child {
+  border-bottom: none;
+}
+
+.share-request-subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
 .share-member {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 44px;
-  padding: 0 14px;
+  padding: 10px 14px;
   box-sizing: border-box;
   border: none;
   border-radius: 6px;

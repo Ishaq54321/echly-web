@@ -69,7 +69,7 @@ export async function createAccessRequest(params: {
   sessionId: string;
   requesterUserId: string;
   requesterEmail: string;
-  requestedAccess: "resolve";
+  requestedAccess: "view" | "resolve";
 }): Promise<AccessRequest> {
   const requesterUserId = params.requesterUserId.trim();
   const requesterEmail = params.requesterEmail.trim();
