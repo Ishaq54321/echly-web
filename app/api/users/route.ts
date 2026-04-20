@@ -6,7 +6,6 @@ import {
 import {
   ensureUserRepo,
   updateUserFieldsRepo,
-  getUserWorkspaceIdRepo,
 } from "@/lib/repositories/usersRepository.server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getAuth } from "firebase-admin/auth";
@@ -93,14 +92,25 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await ensureUserRepo({
+    const existingSnap = await adminDb.doc(`users/${user.uid}`).get();
+    if (existingSnap.exists) {
+      const data = existingSnap.data() as Record<string, unknown>;
+      const storedWorkspaceId = typeof data.workspaceId === "string" ? data.workspaceId.trim() : "";
+      if (storedWorkspaceId) {
+        await setWorkspaceClaim(user.uid, storedWorkspaceId);
+        return apiSuccess(
+          { workspaceId: storedWorkspaceId, avatarUrl: (data.avatarUrl as string | undefined) ?? null },
+          null,
+          { headers: corsHeaders(req) }
+        );
+      }
+    }
+
+    const { workspaceId, avatarUrl } = await ensureUserRepo({
       uid: user.uid,
       email: user.email ?? null,
     });
-    const workspaceId = await getUserWorkspaceIdRepo(user.uid);
     await setWorkspaceClaim(user.uid, workspaceId);
-    const userSnap = await adminDb.doc(`users/${user.uid}`).get();
-    const avatarUrl = (userSnap.data()?.avatarUrl as string | undefined) ?? null;
     return apiSuccess({ workspaceId, avatarUrl }, null, { headers: corsHeaders(req) });
   } catch (err) {
     console.error("POST /api/users:", err);

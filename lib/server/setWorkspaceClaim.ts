@@ -2,18 +2,26 @@ import "server-only";
 
 import { adminAuth } from "@/lib/firebase/admin";
 
-export async function setWorkspaceClaim(uid: string, workspaceId: string) {
-  const user = await adminAuth.getUser(uid);
-  const currentWorkspaceId = user.customClaims?.workspaceId;
+const claimCache = new Map<string, { workspaceId: string; cachedAt: number }>();
+const CLAIM_TTL_MS = 5 * 60 * 1000;
 
-  if (currentWorkspaceId === workspaceId) {
+export async function setWorkspaceClaim(uid: string, workspaceId: string): Promise<void> {
+  const cached = claimCache.get(uid);
+  const now = Date.now();
+  if (cached && cached.workspaceId === workspaceId && now - cached.cachedAt < CLAIM_TTL_MS) {
     return;
   }
 
-  console.log("Setting claim for", uid, workspaceId);
+  const existingUser = await adminAuth.getUser(uid);
+  const existingClaim = existingUser.customClaims?.workspaceId;
 
-  await adminAuth.setCustomUserClaims(uid, {
-    ...user.customClaims,
-    workspaceId,
-  });
+  if (existingClaim !== workspaceId) {
+    console.log("Setting claim for", uid, workspaceId);
+    await adminAuth.setCustomUserClaims(uid, {
+      ...existingUser.customClaims,
+      workspaceId,
+    });
+  }
+
+  claimCache.set(uid, { workspaceId, cachedAt: now });
 }

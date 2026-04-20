@@ -176,7 +176,7 @@ export async function updateUserFieldsRepo(
  * Ensure users/{uid} exists and always has a valid workspaceId (create or link workspace as needed).
  * Used by POST /api/users before claims sync.
  */
-export async function ensureUserRepo(user: UserLike): Promise<void> {
+export async function ensureUserRepo(user: UserLike): Promise<{ workspaceId: string; avatarUrl: string | null }> {
   const userRef = adminDb.doc(`users/${user.uid}`);
   const snap = await userRef.get();
   const email = user.email ?? null;
@@ -204,6 +204,11 @@ export async function ensureUserRepo(user: UserLike): Promise<void> {
     user.photoURL !== existingPhotoURL &&
     !hasCustomAvatar;
 
+  const resolvedAvatarUrl =
+    (!snap.exists || shouldRefreshGooglePhoto) && user.photoURL != null
+      ? user.photoURL
+      : (existingAvatarUrl ?? null);
+
   const profile = {
     uid: user.uid,
     email,
@@ -225,10 +230,11 @@ export async function ensureUserRepo(user: UserLike): Promise<void> {
       workspaceMemberships: [],
       createdAt: FieldValue.serverTimestamp(),
     });
-    return;
+    return { workspaceId, avatarUrl: resolvedAvatarUrl };
   }
 
   await userRef.set(profile, { merge: true });
+  return { workspaceId, avatarUrl: resolvedAvatarUrl };
 }
 
 /** Returns the user's workspace id or throws — never a null/empty success path. */

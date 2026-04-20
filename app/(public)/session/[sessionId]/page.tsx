@@ -15,8 +15,7 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
   const token = searchParams.get("token") ?? "";
   const { authReady, authUid, isIdentityResolved } = useWorkspace();
   const [accessBlocked, setAccessBlocked] = useState(false);
-  const [sessionLoading, setSessionLoading] = useState(false);
-  const [isWorkspaceMember, setIsWorkspaceMember] = useState(false);
+  const [isWorkspaceMember] = useState(false);
 
   useEffect(() => {
     if (authReady && authUid && token) {
@@ -24,55 +23,31 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
     }
   }, [authReady, authUid, token]);
 
-  useEffect(() => {
-    if (!authUid || !isIdentityResolved) return;
-    let cancelled = false;
-    setSessionLoading(true);
-    fetch(`/api/sessions/${sessionId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) {
-          setIsWorkspaceMember(data?.access?.isWorkspaceMember === true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setIsWorkspaceMember(false);
-      })
-      .finally(() => {
-        if (!cancelled) setSessionLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId, authUid, isIdentityResolved]);
 
   const isMember = isWorkspaceMember;
 
-  const spinner = (
-    <div
-      style={{
-        minHeight: "100dvh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <div
-        style={{
-          width: 24,
-          height: 24,
-          border: "2.5px solid #E0E0E0",
-          borderTopColor: "#1775E0",
-          borderRadius: "50%",
-          animation: "spin 0.7s linear infinite",
-        }}
-      />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
+  if (!authReady && !authUid) {
+    return (
+      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 24, height: 24, border: "2.5px solid #E0E0E0", borderTopColor: "#1775E0", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
-  if (!authReady || (!!authUid && (sessionLoading || !isIdentityResolved))) {
-    return spinner;
+  if (!!authUid && !isIdentityResolved) {
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <GlobalRail />
+        <div className="content-divider shrink-0" aria-hidden />
+        <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
+          <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto items-center justify-center">
+            <div style={{ width: 24, height: 24, border: "2.5px solid #E0E0E0", borderTopColor: "#1775E0", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   if (accessBlocked) {

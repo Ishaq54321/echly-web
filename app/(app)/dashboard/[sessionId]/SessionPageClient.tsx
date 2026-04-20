@@ -181,6 +181,7 @@ export default function SessionPageClient({
   /** Capability flags from GET /api/sessions/:id (getAccessContext); never inferred in the UI. */
   const [sessionAccess, setSessionAccess] = useState<AccessCapabilities | null>(null);
   const sessionLoaded = sessionAccess !== null || sessionFetchError !== null;
+  const hasSessionCounts = session !== null;
   /** From GET /api/sessions/:id `data.request.pendingResolve` or successful POST /request-access. */
   const [pendingResolveRequest, setPendingResolveRequest] = useState(false);
   /** Status of the current user's access request when accessBlocked is true. */
@@ -215,6 +216,10 @@ export default function SessionPageClient({
   const sessionLoadEffectNonceRef = useRef(0);
 
   const { authUid, isIdentityResolved, authReady, workspaceName, authEmail } = useWorkspace();
+  const authUidRef = useRef<string | null>(null);
+  useEffect(() => {
+    authUidRef.current = authUid;
+  }, [authUid]);
   const { showToast } = useToast();
 
   const handleRequestResolveAccess = useCallback(async () => {
@@ -736,30 +741,15 @@ export default function SessionPageClient({
     let cancelled = false;
     void (async () => {
       setAccessBlocked(false);
-      let shouldAttemptInviteRedeem = false;
-      if (authUid?.trim()) {
+      if (authUidRef.current?.trim()) {
         const sid = sessionId.trim();
         if (inviteActivationLatchRef.current !== sid) {
           inviteActivationLatchRef.current = sid;
-          shouldAttemptInviteRedeem = true;
-        }
-      }
-      if (shouldAttemptInviteRedeem) {
-        const sid = sessionId.trim();
-        try {
-          const activateRes = await authFetch(`/api/invite/activate`, {
+          void authFetch(`/api/invite/activate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sessionId: sid }),
-          });
-          if (
-            activateRes == null ||
-            (!activateRes.ok && activateRes.status !== 404)
-          ) {
-            inviteActivationLatchRef.current = null;
-          }
-        } catch {
-          inviteActivationLatchRef.current = null;
+          }).catch(() => {});
         }
       }
       if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
@@ -862,6 +852,7 @@ export default function SessionPageClient({
         let bundleHasMore = false;
         let bundleCapabilities: Partial<AccessCapabilities> | undefined;
         let bundleIsWorkspaceMember = false;
+        let bundlePendingAccessRequestsCount = 0;
         try {
           const inner = requireApiSuccessData<{
             session: Record<string, unknown>;
@@ -870,6 +861,7 @@ export default function SessionPageClient({
             hasMore?: boolean;
             request?: { pendingResolve?: boolean };
             access?: { capabilities?: Partial<AccessCapabilities>; isWorkspaceMember?: boolean };
+            pendingAccessRequestsCount?: number;
           }>(body);
           sessionPayload = inner.session;
           requestPayload = inner.request;
@@ -883,6 +875,7 @@ export default function SessionPageClient({
               ? inner.nextCursor
               : null;
           bundleHasMore = inner.hasMore === true;
+          bundlePendingAccessRequestsCount = typeof inner.pendingAccessRequestsCount === "number" ? inner.pendingAccessRequestsCount : 0;
         } catch {
           setBundledFirstFeedbackPage(null);
           setAccessBlocked(false);
@@ -946,28 +939,8 @@ export default function SessionPageClient({
           bundledFirstFeedbackPage: assembledFeedbackPage,
         });
 
-        // Phase 5: load pending request count for Share button dot
-        if (assembledAccess?.canResolve) {
-          void (async () => {
-            try {
-              const arRes = await authFetch(
-                `/api/sessions/${encodeURIComponent(sessionId.trim())}/access-requests`
-              );
-              if (arRes?.ok) {
-                const arJson = (await arRes.json().catch(() => ({}))) as {
-                  success?: boolean;
-                  data?: { requests?: { status?: string }[] };
-                };
-                if (arJson.success && Array.isArray(arJson.data?.requests)) {
-                  const count = arJson.data.requests.filter((r) => r.status === "pending").length;
-                  setPendingRequestsCount(count);
-                }
-              }
-            } catch {
-              // ignore
-            }
-          })();
-        }
+        // Phase 5: pending request count is included in the bundle response
+        setPendingRequestsCount(bundlePendingAccessRequestsCount);
         /* View count: recorded server-side in GET /api/session-page-bundle (see recordSessionViewIfNewRepo). */
       } else {
         const url = `/api/sessions/${encodeURIComponent(sessionId)}${qs}`;
@@ -1072,8 +1045,8 @@ export default function SessionPageClient({
           requestPayload !== undefined && requestPayload.pendingResolve === true
         );
         // Authenticated: Loom-style view count via Bearer. Anonymous: share link token (sessionStorage / URL) on the request.
-        if (authUid?.trim()) {
-          const viewerId = getViewerId(authUid);
+        if (authUidRef.current?.trim()) {
+          const viewerId = getViewerId(authUidRef.current);
           void recordSessionViewIfNew(sessionId, viewerId).catch((err) => {
             console.warn("[ECHLY] recordSessionViewIfNew failed", err);
           });
@@ -1093,7 +1066,7 @@ export default function SessionPageClient({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, authUid, authReady, shareTokenForApi]);
+  }, [sessionId, authReady, shareTokenForApi]);
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
@@ -1278,6 +1251,14 @@ export default function SessionPageClient({
       total: contextualPosition.total >= 0 ? Math.max(0, contextualPosition.total) : -1,
     };
   }, [selectedBaseItem, contextualPosition.index, contextualPosition.total]);
+
+  const bootstrapFirstTicket = useMemo((): (Feedback & { index: number; total: number }) | null => {
+    if (stableScopedFeedback.length > 0) return null;
+    if (!bundledFirstFeedbackPage?.feedback?.length) return null;
+    const raw = bundledFirstFeedbackPage.feedback[0];
+    if (!raw) return null;
+    return { ...(raw as unknown as Feedback), index: 1, total: -1 };
+  }, [stableScopedFeedback.length, bundledFirstFeedbackPage]);
 
   const handleSessionRenameFromMenu = useCallback(
     (updated: { id: string; title: string; updatedAt?: unknown }) => {
@@ -2074,12 +2055,12 @@ export default function SessionPageClient({
       if (feedbackLoading) {
         return (
           <ExecutionView
-            item={null}
+            item={bootstrapFirstTicket}
             setIsImageExpanded={setIsImageExpanded}
             isCommentMode={false}
             comments={[]}
             screenshotUrl={null}
-            screenshotUrlLoading={false}
+            screenshotUrlLoading={bootstrapFirstTicket?.screenshotId != null}
             screenshotUrlError={null}
           />
         );
@@ -2175,11 +2156,11 @@ export default function SessionPageClient({
           <TicketList
             sessionTitle={session ? (session.title ?? "").trim() : ""}
             counts={{
-              total: feedbackTotal,
-              open: feedbackActiveCount,
-              resolved: feedbackResolvedCount,
+              total: isCountsSynced ? feedbackTotal : Math.max(0, sessionRestTotal),
+              open: isCountsSynced ? feedbackActiveCount : Math.max(0, sessionRestOpen),
+              resolved: isCountsSynced ? feedbackResolvedCount : Math.max(0, sessionRestResolved),
             }}
-            countsLoading={!isCountsSynced || feedbackCountsLoading}
+            countsLoading={!hasSessionCounts}
             {...(isAnonymousViewer
               ? {
                   showTicketSearch: sessionAccess?.canView === true,
@@ -2309,11 +2290,11 @@ export default function SessionPageClient({
             <TicketList
               sessionTitle={session ? (session.title ?? "").trim() : ""}
               counts={{
-                total: feedbackTotal,
-                open: feedbackActiveCount,
-                resolved: feedbackResolvedCount,
+                total: isCountsSynced ? feedbackTotal : Math.max(0, sessionRestTotal),
+                open: isCountsSynced ? feedbackActiveCount : Math.max(0, sessionRestOpen),
+                resolved: isCountsSynced ? feedbackResolvedCount : Math.max(0, sessionRestResolved),
               }}
-              countsLoading={!isCountsSynced || feedbackCountsLoading}
+              countsLoading={!hasSessionCounts}
               {...(isAnonymousViewer
                 ? {
                     showTicketSearch: sessionAccess?.canView === true,

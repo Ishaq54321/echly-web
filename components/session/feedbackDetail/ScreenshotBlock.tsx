@@ -42,7 +42,7 @@ export function ScreenshotBlock({
 
   return (
     <div className={outerFrame}>
-      <div className={`relative overflow-hidden ${innerRadius} max-h-[317px] bg-[var(--layer-2-bg)]`}>
+      <div className={`relative overflow-hidden ${innerRadius} max-h-[317px] bg-[var(--layer-2-bg)]`} style={{ aspectRatio: "16/9" }}>
         {!screenshotId ? null : url ? (
         <img
           key={url} // Hard reset the image element on ticket switch

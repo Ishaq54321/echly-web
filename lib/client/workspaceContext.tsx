@@ -21,6 +21,9 @@ import {
   clearWorkspaceHint,
   getWorkspaceHint,
   setWorkspaceHint,
+  getUidHint,
+  setUidHint,
+  clearUidHint,
 } from "@/lib/client/workspaceBootstrap";
 import type { Workspace } from "@/lib/domain/workspace";
 
@@ -101,6 +104,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const authSyncGenerationRef = useRef(0);
   const syncLockUidRef = useRef<string | null>(null);
   const workspaceIdRef = useRef<string | null>(null);
+  const membershipsLastFetchedRef = useRef<number | null>(null);
 
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
@@ -116,6 +120,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const hint = getUidHint();
+    if (hint) {
+      setAuthUid(hint);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,6 +147,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         clearAuthTokenCache();
         clearWorkspaceSubscription();
         clearWorkspaceHint();
+        clearUidHint();
         if (!cancelled) {
           workspaceIdRef.current = null;
           setAuthUid(null);
@@ -155,6 +167,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
       const uid = user.uid;
       setAuthUid(uid);
+      setUidHint(uid);
       setAuthEmail(user.email ?? null);
       setAuthDisplayName(user.displayName ?? null);
       setAuthPhotoUrl(user.photoURL ?? null);
@@ -275,6 +288,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setAllWorkspaces([]);
       return;
     }
+    const MEMBERSHIPS_TTL_MS = 5 * 60 * 1000;
+    const lastFetched = membershipsLastFetchedRef.current;
+    if (lastFetched && Date.now() - lastFetched < MEMBERSHIPS_TTL_MS) {
+      return;
+    }
+    membershipsLastFetchedRef.current = Date.now();
     let cancelled = false;
     setIsLoadingWorkspaces(true);
     authFetch("/api/workspace/memberships")
@@ -297,14 +316,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // Subscribe to the workspace document for live name/logo/owner data
   useEffect(() => {
-    const targetWid = activeWorkspaceId ?? workspaceId;
-    if (!targetWid || !claimsReady) {
+    const targetId = activeWorkspaceId ?? workspaceId;
+    if (!claimsReady || !targetId) {
       setWorkspaceDoc(null);
       return;
     }
-    const unsub = listenToWorkspace(targetWid, setWorkspaceDoc, claimsReady);
+    const unsub = listenToWorkspace(targetId, setWorkspaceDoc, claimsReady);
     return () => unsub();
-  }, [activeWorkspaceId, workspaceId, claimsReady]);
+  }, [claimsReady, activeWorkspaceId]);
 
   const switchWorkspace = useCallback((wid: string) => {
     if (!authUid) return;
@@ -330,7 +349,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    console.log("IDENTITY READY:", isIdentityReady);
+    if (process.env.NODE_ENV === "development") {
+      console.log("IDENTITY READY:", isIdentityReady);
+    }
   }, [isIdentityReady]);
 
   // PERF R-004: memoize context value so the ~20+ consumers only re-render when

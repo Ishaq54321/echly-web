@@ -1,9 +1,13 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import type { NextRequest } from "next/server";
 import { getSessionFeedbackPageForUserWithStringCursorRepo } from "@/lib/repositories/feedbackRepository.server";
 import {
   getSessionByIdRepo,
   recordSessionViewIfNewRepo,
 } from "@/lib/repositories/sessionsRepository.server";
+import { listPendingAccessRequests } from "@/lib/repositories/accessRequestsRepository.server";
 import { serializeFeedback } from "@/lib/server/serializeFeedback";
 import { serializeSession } from "@/lib/server/serializeSession";
 import { corsHeaders } from "@/lib/server/cors";
@@ -44,12 +48,20 @@ export async function GET(req: NextRequest) {
   try {
     const sessionRow = await getSessionByIdRepo(trimmedSid);
 
-    const built = await tryBuildRequestContext({
-      req,
-      sessionId: trimmedSid,
-      optionalAuth: true,
-      session: sessionRow,
-    });
+    const [built, pageResult] = await Promise.all([
+      tryBuildRequestContext({
+        req,
+        sessionId: trimmedSid,
+        optionalAuth: true,
+        session: sessionRow,
+      }),
+      getSessionFeedbackPageForUserWithStringCursorRepo({
+        sessionId: trimmedSid,
+        limit: BUNDLE_FEEDBACK_LIMIT,
+        cursor: undefined,
+      }),
+    ]);
+
     if (!built.ok) {
       return new Response(built.response.body, {
         status: built.response.status,
@@ -94,17 +106,17 @@ export async function GET(req: NextRequest) {
         );
       }
     }
-
-    const pageResult = await getSessionFeedbackPageForUserWithStringCursorRepo({
-      sessionId: trimmedSid,
-      limit: BUNDLE_FEEDBACK_LIMIT,
-      cursor: undefined,
-    });
     const { feedback, nextCursor, hasMore } = pageResult;
 
     const sessionJson = serializeSession(session, access);
     const feedbackPayload = feedback.map((f) => serializeFeedback(f, access));
     const requestPayload = ctx.accessRequest ?? ({ pendingResolve: false } as const);
+
+    let pendingAccessRequestsCount = 0;
+    if (access?.capabilities.canResolve) {
+      const pending = await listPendingAccessRequests(trimmedSid);
+      pendingAccessRequestsCount = pending.length;
+    }
 
     return apiSuccess(
       {
@@ -114,6 +126,7 @@ export async function GET(req: NextRequest) {
         hasMore,
         request: requestPayload,
         access: ctx.access,
+        pendingAccessRequestsCount,
         user:
           ctx.userId != null
             ? { uid: ctx.userId, workspaceId: ctx.workspaceId }
