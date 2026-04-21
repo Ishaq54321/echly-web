@@ -12,7 +12,7 @@ import {
 import { normalizeForGrouping } from "@/lib/server/activity/normalizeForGrouping";
 
 /** Cap for one group expansion (scalable default; avoids unbounded reads). */
-const MAX_EVENTS_IN_WINDOW = 400;
+const MAX_EVENTS_IN_WINDOW = 100;
 
 function activityEventFromDoc(doc: QueryDocumentSnapshot) {
   const d = doc.data();

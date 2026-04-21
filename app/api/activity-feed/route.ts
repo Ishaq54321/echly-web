@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
   const sessionIdParam = searchParams.get("sessionId")?.trim() ?? "";
   const eventTypesRaw = searchParams.get("eventTypes");
   const cursorParam = searchParams.get("cursor")?.trim() ?? "";
+  const actorIdParam = searchParams.get("actorId")?.trim() || null;
   const limit = parseLimit(searchParams);
   const eventTypesForQuery = parseActivityFeedEventTypesParam(eventTypesRaw);
   const hasEventTypeFilter = eventTypesForQuery.length > 0;
@@ -181,6 +182,10 @@ export async function GET(req: NextRequest) {
 
   if (hasEventTypeFilter) {
     q = q.where("eventType", "in", eventTypesForQuery);
+  }
+
+  if (actorIdParam) {
+    q = q.where("actor.id", "==", actorIdParam);
   }
 
   q = q

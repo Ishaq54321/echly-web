@@ -2,29 +2,57 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { X } from "lucide-react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
+import { MODAL_LAYER_Z_INDEX } from "@/lib/ui/zIndex";
 
 export interface ImageCropModalProps {
   isOpen: boolean;
   imageSrc: string;
   onConfirm: (blob: Blob) => void;
   onCancel: () => void;
+  onError?: (message: string) => void;
   title?: string;
   shape?: "circle" | "square";
+  confirmLabel?: string;
 }
 
 const OUTPUT_SIZE = 400;
+const MAX_ZOOM = 3;
+
+function clampPosition(
+  x: number,
+  y: number,
+  currentScale: number,
+  imgW: number,
+  imgH: number,
+  canvasSize: number,
+  circleR: number
+): { x: number; y: number } {
+  const scaledW = imgW * currentScale;
+  const scaledH = imgH * currentScale;
+  const cropLeft = canvasSize / 2 - circleR;
+  const cropRight = canvasSize / 2 + circleR;
+  const cropTop = canvasSize / 2 - circleR;
+  const cropBottom = canvasSize / 2 + circleR;
+  const clampedX = Math.min(cropLeft, Math.max(cropRight - scaledW, x));
+  const clampedY = Math.min(cropTop, Math.max(cropBottom - scaledH, y));
+  return { x: clampedX, y: clampedY };
+}
 
 export function ImageCropModal({
   isOpen,
   imageSrc,
   onConfirm,
   onCancel,
+  onError,
   title = "Crop profile photo",
   shape = "circle",
+  confirmLabel,
 }: ImageCropModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cropAreaRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const minScaleRef = useRef<number>(0.1);
 
   const [scale, setScale] = useState(1);
   const [imgX, setImgX] = useState(0);
@@ -32,8 +60,9 @@ export function ImageCropModal({
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, imgX: 0, imgY: 0 });
   const [canvasSize, setCanvasSize] = useState(400);
+  const [minScale, setMinScale] = useState(0.1);
 
-  // Load image and center it
+  // Load image and set initial scale/position
   useEffect(() => {
     if (!isOpen || !imageSrc) return;
     const img = new Image();
@@ -42,11 +71,22 @@ export function ImageCropModal({
       const area = cropAreaRef.current;
       const size = area ? area.clientWidth : 400;
       setCanvasSize(size);
-      const fitScale = Math.max(size / img.width, size / img.height) * 1.0;
-      const s = Math.max(fitScale, 1);
-      setScale(s);
-      setImgX((size - img.width * s) / 2);
-      setImgY((size - img.height * s) / 2);
+
+      const localCircleR = (size * 0.72) / 2;
+      const cropDiameter = localCircleR * 2;
+      const minFitScale = Math.max(cropDiameter / img.width, cropDiameter / img.height);
+      const fitWholeImage = Math.min(size / img.width, size / img.height);
+      const initialScale = Math.max(fitWholeImage, minFitScale);
+
+      minScaleRef.current = minFitScale;
+      setMinScale(minFitScale);
+      setScale(initialScale);
+
+      const initX = (size - img.width * initialScale) / 2;
+      const initY = (size - img.height * initialScale) / 2;
+      const clamped = clampPosition(initX, initY, initialScale, img.width, img.height, size, localCircleR);
+      setImgX(clamped.x);
+      setImgY(clamped.y);
     };
     img.src = imageSrc;
   }, [isOpen, imageSrc]);
@@ -73,22 +113,33 @@ export function ImageCropModal({
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragging) return;
-    setImgX(dragStart.imgX + (e.clientX - dragStart.x));
-    setImgY(dragStart.imgY + (e.clientY - dragStart.y));
-  }, [dragging, dragStart]);
+    const img = imgRef.current;
+    if (!img) return;
+    const newX = dragStart.imgX + (e.clientX - dragStart.x);
+    const newY = dragStart.imgY + (e.clientY - dragStart.y);
+    const circleR = (canvasSize * 0.72) / 2;
+    const clamped = clampPosition(newX, newY, scale, img.width, img.height, canvasSize, circleR);
+    setImgX(clamped.x);
+    setImgY(clamped.y);
+  }, [dragging, dragStart, scale, canvasSize]);
 
   const onMouseUp = useCallback(() => setDragging(false), []);
 
   // Wheel zoom
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    setScale((prev) => {
-      const next = prev - e.deltaY * 0.002;
-      return Math.max(0.5, Math.min(5, next));
-    });
-  }, []);
+    const img = imgRef.current;
+    if (!img) return;
+    const rawNewScale = scale - e.deltaY * 0.002;
+    const newScale = Math.min(MAX_ZOOM, Math.max(minScaleRef.current, rawNewScale));
+    setScale(newScale);
+    const circleR = (canvasSize * 0.72) / 2;
+    const clamped = clampPosition(imgX, imgY, newScale, img.width, img.height, canvasSize, circleR);
+    setImgX(clamped.x);
+    setImgY(clamped.y);
+  }, [scale, imgX, imgY, canvasSize]);
 
-  // Touch drag
+  // Touch drag & pinch
   const touchRef = useRef<{ x: number; y: number; imgX: number; imgY: number } | null>(null);
   const lastPinchRef = useRef<number | null>(null);
 
@@ -105,9 +156,15 @@ export function ImageCropModal({
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
+    const img = imgRef.current;
+    if (!img) return;
+    const circleR = (canvasSize * 0.72) / 2;
     if (e.touches.length === 1 && touchRef.current) {
-      setImgX(touchRef.current.imgX + (e.touches[0].clientX - touchRef.current.x));
-      setImgY(touchRef.current.imgY + (e.touches[0].clientY - touchRef.current.y));
+      const newX = touchRef.current.imgX + (e.touches[0].clientX - touchRef.current.x);
+      const newY = touchRef.current.imgY + (e.touches[0].clientY - touchRef.current.y);
+      const clamped = clampPosition(newX, newY, scale, img.width, img.height, canvasSize, circleR);
+      setImgX(clamped.x);
+      setImgY(clamped.y);
     }
     if (e.touches.length === 2 && lastPinchRef.current != null) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -115,9 +172,14 @@ export function ImageCropModal({
       const newDist = Math.hypot(dx, dy);
       const ratio = newDist / lastPinchRef.current;
       lastPinchRef.current = newDist;
-      setScale((prev) => Math.max(0.5, Math.min(5, prev * ratio)));
+      const rawNewScale = scale * ratio;
+      const newScale = Math.min(MAX_ZOOM, Math.max(minScaleRef.current, rawNewScale));
+      setScale(newScale);
+      const clamped = clampPosition(imgX, imgY, newScale, img.width, img.height, canvasSize, circleR);
+      setImgX(clamped.x);
+      setImgY(clamped.y);
     }
-  }, []);
+  }, [scale, imgX, imgY, canvasSize]);
 
   const onTouchEnd = useCallback(() => {
     touchRef.current = null;
@@ -126,13 +188,13 @@ export function ImageCropModal({
 
   const handleConfirm = useCallback(() => {
     const img = imgRef.current;
-    if (!img) return;
+    if (!img) { onError?.("Could not process image. Please try again."); return; }
 
     const out = document.createElement("canvas");
     out.width = OUTPUT_SIZE;
     out.height = OUTPUT_SIZE;
     const ctx = out.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) { onError?.("Could not process image. Please try again."); return; }
 
     const circleR = (canvasSize * 0.72) / 2;
     const circleCx = canvasSize / 2;
@@ -167,23 +229,28 @@ export function ImageCropModal({
 
     out.toBlob(
       (blob) => {
-        if (blob) onConfirm(blob);
+        if (!blob) {
+          onError?.("Could not save crop. Please try again.");
+          return;
+        }
+        onConfirm(blob);
       },
       "image/jpeg",
       0.92
     );
-  }, [canvasSize, imgX, imgY, scale, shape, onConfirm]);
+  }, [canvasSize, imgX, imgY, scale, shape, onConfirm, onError]);
 
   if (!isOpen) return null;
 
   const circleSize = canvasSize * 0.72;
 
   return (
+    <ModalPortal>
     <div
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 9999,
+        zIndex: MODAL_LAYER_Z_INDEX,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -294,11 +361,21 @@ export function ImageCropModal({
           <span style={{ fontSize: 13, color: "#777", flexShrink: 0 }}>Zoom</span>
           <input
             type="range"
-            min={0.5}
-            max={3}
+            min={minScale}
+            max={MAX_ZOOM}
             step={0.01}
             value={scale}
-            onChange={(e) => setScale(Number(e.target.value))}
+            onChange={(e) => {
+              const newScale = Number(e.target.value);
+              setScale(newScale);
+              const img = imgRef.current;
+              if (img) {
+                const circleR = (canvasSize * 0.72) / 2;
+                const clamped = clampPosition(imgX, imgY, newScale, img.width, img.height, canvasSize, circleR);
+                setImgX(clamped.x);
+                setImgY(clamped.y);
+              }
+            }}
             style={{ flex: 1, accentColor: "#1775E0" }}
           />
         </div>
@@ -345,7 +422,7 @@ export function ImageCropModal({
               cursor: "pointer",
             }}
           >
-            Save photo
+            {confirmLabel ?? "Save photo"}
           </button>
         </div>
       </div>
@@ -357,5 +434,6 @@ export function ImageCropModal({
         }
       `}</style>
     </div>
+    </ModalPortal>
   );
 }

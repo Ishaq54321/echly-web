@@ -17,6 +17,7 @@ import {
   Check,
   Plus,
   Inbox,
+  Loader2,
 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { useWorkspace } from "@/lib/client/workspaceContext";
@@ -67,11 +68,15 @@ export default function GlobalRail() {
   const router = useRouter();
   useAuthGuard({ router });
   // WORKSPACE-MEMBER: replaced hardcoded string with live data
-  const { workspaceName, workspaceLogoUrl, isWorkspaceOwner, allWorkspaces, activeWorkspaceId, switchWorkspace, isLoadingWorkspaces, workspaceId } = useWorkspace();
-  const displayName = workspaceName ?? "Workspace";
+  const { workspaceName, workspaceLogoUrl, isWorkspaceOwner, allWorkspaces, activeWorkspaceId, switchWorkspace, isLoadingWorkspaces, workspaceId, workspaceDocLoading, hintWorkspaceName, hintWorkspaceLogoUrl } = useWorkspace();
+  const effectiveLogoUrl = workspaceDocLoading ? hintWorkspaceLogoUrl : workspaceLogoUrl;
+  const effectiveName = workspaceDocLoading ? (hintWorkspaceName ?? workspaceName) : workspaceName;
+  const displayName = effectiveName ?? "Workspace";
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [workspacePopoverOpen, setWorkspacePopoverOpen] = useState(false);
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
@@ -82,6 +87,10 @@ export default function GlobalRail() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [effectiveLogoUrl]);
 
   useEffect(() => {
     localStorage.setItem("echly_sidebar_collapsed", String(isCollapsed));
@@ -267,7 +276,7 @@ export default function GlobalRail() {
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
-                  background: workspaceLogoUrl ? "transparent" : "#1775E0",
+                  background: (effectiveLogoUrl && !logoError) ? "transparent" : (workspaceDocLoading && !effectiveName) ? "transparent" : "#1775E0",
                   color: "#FFFFFF",
                   fontSize: 14,
                   fontWeight: 700,
@@ -283,13 +292,16 @@ export default function GlobalRail() {
                   padding: 0,
                 }}
               >
-                {workspaceLogoUrl ? (
+                {effectiveLogoUrl && !logoError ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={workspaceLogoUrl}
+                    src={effectiveLogoUrl}
                     alt={displayName}
                     style={{ width: 32, height: 32, objectFit: "cover" }}
+                    onError={() => setLogoError(true)}
                   />
+                ) : workspaceDocLoading && !effectiveName ? (
+                  <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
                 ) : (
                   displayName.trim().charAt(0).toUpperCase() || "W"
                 )}
@@ -316,17 +328,20 @@ export default function GlobalRail() {
                 aria-label="Workspace menu"
                 aria-expanded={workspacePopoverOpen}
               >
-                {workspaceLogoUrl ? (
+                {effectiveLogoUrl && !logoError ? (
                   <span className="inline-flex h-7 w-7 shrink-0 overflow-hidden rounded-full">
                     {
                       // eslint-disable-next-line @next/next/no-img-element -- remote workspace logo
                       <img
-                        src={workspaceLogoUrl}
+                        src={effectiveLogoUrl}
                         alt={displayName}
                         className="h-full w-full object-cover"
+                        onError={() => setLogoError(true)}
                       />
                     }
                   </span>
+                ) : workspaceDocLoading && !effectiveName ? (
+                  <div className="h-7 w-7 rounded-full bg-muted animate-pulse shrink-0" />
                 ) : (
                   <WorkspaceInitialsAvatar name={displayName} />
                 )}
@@ -447,9 +462,13 @@ export default function GlobalRail() {
                     <button
                       key={ws.workspaceId}
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setWorkspacePopoverOpen(false);
-                        if (!isActive) switchWorkspace(ws.workspaceId);
+                        if (!isActive) {
+                          setSwitchingTo(ws.workspaceId);
+                          await switchWorkspace(ws.workspaceId);
+                          setSwitchingTo(null);
+                        }
                       }}
                       className="w-full flex items-center gap-2 px-2.5 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition text-left"
                       style={{ height: 38 }}
@@ -471,9 +490,11 @@ export default function GlobalRail() {
                         </span>
                       )}
                       <span className="flex-1 min-w-0 truncate">{ws.name}</span>
-                      {isActive && (
+                      {switchingTo === ws.workspaceId ? (
+                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" aria-hidden />
+                      ) : isActive ? (
                         <Check className="h-4 w-4 shrink-0 text-blue-600" strokeWidth={2.5} aria-hidden />
-                      )}
+                      ) : null}
                     </button>
                   );
                 })
@@ -483,17 +504,20 @@ export default function GlobalRail() {
           )}
 
           <div className="flex items-center gap-3 mb-3">
-            {workspaceLogoUrl ? (
+            {effectiveLogoUrl && !logoError ? (
               <span className="inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-full">
                 {
                   // eslint-disable-next-line @next/next/no-img-element -- remote workspace logo
                   <img
-                    src={workspaceLogoUrl}
+                    src={effectiveLogoUrl}
                     alt={displayName}
                     className="h-full w-full object-cover"
+                    onError={() => setLogoError(true)}
                   />
                 }
               </span>
+            ) : workspaceDocLoading && !effectiveName ? (
+              <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" />
             ) : (
               <WorkspaceInitialsAvatar name={displayName} />
             )}

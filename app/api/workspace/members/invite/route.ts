@@ -76,7 +76,11 @@ export async function POST(req: NextRequest) {
         await addWorkspaceMemberRepo(workspaceId, {
           uid: user.uid,
           email: user.email ?? "",
-          displayName: user.displayName ?? null,
+          displayName:
+            typeof healData.displayName === "string" && healData.displayName.trim()
+              ? healData.displayName.trim() :
+            typeof healData.name === "string" && healData.name.trim()
+              ? healData.name.trim() : null,
           avatarUrl: healAvatarUrl,
           role: "OWNER",
           joinedAt: Timestamp.now(),

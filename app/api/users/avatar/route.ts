@@ -5,10 +5,12 @@ import { adminDb, adminBucket } from "@/lib/server/firebaseAdmin";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue } from "firebase-admin/firestore";
 import { getSignedStorageUrl, extractStoragePathFromUrl } from "@/lib/server/storage/getSignedUrl";
+// @ts-ignore
+import heicConvert from "heic-convert";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 function extensionForType(type: string): string {
@@ -114,13 +116,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const ext = extensionForType(file.type);
+    let fileBuffer = Buffer.from(await file.arrayBuffer());
+    let mimeType = file.type;
+
+    if (mimeType === "image/heic" || mimeType === "image/heif") {
+      fileBuffer = await heicConvert({ buffer: fileBuffer, format: "JPEG", quality: 0.92 });
+      mimeType = "image/jpeg";
+    }
+
+    const ext = extensionForType(mimeType);
     const filePath = `users/${user.uid}/avatar/${Date.now()}.${ext}`;
     const fileRef = adminBucket.file(filePath);
 
-    await fileRef.save(buffer, {
-      metadata: { contentType: file.type },
+    await fileRef.save(fileBuffer, {
+      metadata: { contentType: mimeType },
     });
 
     const signedUrl = await getSignedStorageUrl(filePath);

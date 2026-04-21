@@ -1,7 +1,7 @@
 "use client";
 
+import { memo, useCallback } from "react";
 import type { ReactNode } from "react";
-import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, ExternalLink, RotateCcw } from "lucide-react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
@@ -169,9 +169,9 @@ function deriveRowModel(ev: ActivityEvent): RowModel {
       };
     case "session.created":
       return {
-        actionPhrase: "created a session",
-        entityLabel: st,
-        entityFallback: "a new session",
+        actionPhrase: "created a new session",
+        entityLabel: null,
+        entityFallback: "",
         sessionContext: null,
         feedbackId: null,
         sessionId: sid || null,
@@ -189,61 +189,139 @@ function deriveRowModel(ev: ActivityEvent): RowModel {
         previewText: null,
         showPreview: false,
       };
-    case "session.member.added":
+    case "invite.sent": {
+      const email = (ev.metadata?.email as string | undefined) ?? "";
+      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
       return {
-        actionPhrase: "added a member",
+        actionPhrase: `invited ${email} to`,
         entityLabel: null,
         entityFallback: "",
-        sessionContext: st ?? null,
+        sessionContext: sessionTitle || null,
         feedbackId: null,
         sessionId: sid || null,
         previewText: null,
         showPreview: false,
       };
-    case "session.member.removed":
+    }
+    case "invite.accepted": {
+      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
       return {
-        actionPhrase: "removed a member",
+        actionPhrase: "joined",
         entityLabel: null,
         entityFallback: "",
-        sessionContext: st ?? null,
+        sessionContext: sessionTitle || null,
         feedbackId: null,
         sessionId: sid || null,
         previewText: null,
         showPreview: false,
       };
-    case "session.member.role_changed":
+    }
+    case "session.member.added": {
+      const source = (ev.metadata?.source as string | undefined) ?? "";
+      const targetName =
+        (ev.metadata?.targetName as string | undefined) ||
+        (ev.metadata?.targetEmail as string | undefined) ||
+        "a user";
+      const accessLevel = (ev.metadata?.accessLevel as string | undefined) ?? "";
+      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
+      const accessLabel = accessLevel === "resolve" ? "resolve" : "view";
+
+      if (source === "invite_redemption") {
+        return {
+          actionPhrase: "joined",
+          entityLabel: null,
+          entityFallback: "",
+          sessionContext: sessionTitle || null,
+          feedbackId: null,
+          sessionId: sid || null,
+          previewText: null,
+          showPreview: false,
+        };
+      }
+
       return {
-        actionPhrase: "changed a member's role",
+        actionPhrase: `granted ${targetName} ${accessLabel} access to`,
         entityLabel: null,
         entityFallback: "",
-        sessionContext: st ?? null,
+        sessionContext: sessionTitle || null,
         feedbackId: null,
         sessionId: sid || null,
         previewText: null,
         showPreview: false,
       };
-    case "access_request.approved":
+    }
+    case "session.member.removed": {
+      const targetName =
+        (ev.metadata?.targetName as string | undefined) ||
+        (ev.metadata?.targetEmail as string | undefined) ||
+        "a user";
+      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
       return {
-        actionPhrase: "approved an access request",
+        actionPhrase: `removed ${targetName} from`,
         entityLabel: null,
         entityFallback: "",
-        sessionContext: st ?? null,
+        sessionContext: sessionTitle || null,
         feedbackId: null,
         sessionId: sid || null,
         previewText: null,
         showPreview: false,
       };
-    case "access_request.rejected":
+    }
+    case "session.member.role_changed": {
+      const targetName =
+        (ev.metadata?.targetName as string | undefined) ||
+        (ev.metadata?.targetEmail as string | undefined) ||
+        "a user";
+      const prev = (ev.metadata?.previousAccess as string | undefined) ?? "";
+      const next = (ev.metadata?.newAccess as string | undefined) ?? "";
+      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
+      const prevLabel = prev === "resolve" ? "resolve" : "view";
+      const nextLabel = next === "resolve" ? "resolve" : "view";
       return {
-        actionPhrase: "rejected an access request",
+        actionPhrase: `changed ${targetName}'s access from ${prevLabel} to ${nextLabel} in`,
         entityLabel: null,
         entityFallback: "",
-        sessionContext: st ?? null,
+        sessionContext: sessionTitle || null,
         feedbackId: null,
         sessionId: sid || null,
         previewText: null,
         showPreview: false,
       };
+    }
+    case "access_request.approved": {
+      const requesterName =
+        (ev.metadata?.requesterName as string | undefined) ||
+        (ev.metadata?.requesterEmail as string | undefined) ||
+        "someone";
+      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
+      return {
+        actionPhrase: `approved ${requesterName}'s access request for`,
+        entityLabel: null,
+        entityFallback: "",
+        sessionContext: sessionTitle || null,
+        feedbackId: null,
+        sessionId: sid || null,
+        previewText: null,
+        showPreview: false,
+      };
+    }
+    case "access_request.rejected": {
+      const requesterName =
+        (ev.metadata?.requesterName as string | undefined) ||
+        (ev.metadata?.requesterEmail as string | undefined) ||
+        "someone";
+      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
+      return {
+        actionPhrase: `rejected ${requesterName}'s access request for`,
+        entityLabel: null,
+        entityFallback: "",
+        sessionContext: sessionTitle || null,
+        feedbackId: null,
+        sessionId: sid || null,
+        previewText: null,
+        showPreview: false,
+      };
+    }
     case "session.settings_changed":
       return {
         actionPhrase: "updated session settings",
@@ -255,6 +333,33 @@ function deriveRowModel(ev: ActivityEvent): RowModel {
         previewText: null,
         showPreview: false,
       };
+    case "session.deleted": {
+      const sessionTitle = ev.metadata?.sessionTitle as string ?? "a session";
+      return {
+        actionPhrase: "deleted a session",
+        entityLabel: sessionTitle,
+        entityFallback: "a session",
+        sessionContext: null,
+        feedbackId: null,
+        sessionId: sid || null,
+        previewText: null,
+        showPreview: false,
+      };
+    }
+    case "feedback.deleted": {
+      const feedbackTitle = ev.metadata?.feedbackTitle as string ?? "a feedback item";
+      const sessionTitle = ev.metadata?.sessionTitle as string ?? "";
+      return {
+        actionPhrase: "deleted feedback",
+        entityLabel: feedbackTitle,
+        entityFallback: "a feedback item",
+        sessionContext: sessionTitle || null,
+        feedbackId: null,
+        sessionId: sid || null,
+        previewText: null,
+        showPreview: false,
+      };
+    }
     default:
       return {
         actionPhrase: "recorded activity",
@@ -414,14 +519,14 @@ export type ActivityItemProps =
       relativeTime: string | null;
       isoTime?: string;
       isExpanded: boolean;
-      onToggleExpand: () => void;
+      onToggleExpand: (g: Extract<GroupedActivity, { type: "group" }>) => void;
       /** Full member list when expanded (preview-only rows use `previewEvents` until lazy load completes). */
       expandListEvents?: ActivityEvent[];
     };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function ActivityItem(props: ActivityItemProps) {
+function ActivityItemBase(props: ActivityItemProps) {
   const router = useRouter();
 
   const eventType = props.kind === "single" ? props.event.eventType : props.group.eventType;
@@ -432,8 +537,14 @@ export function ActivityItem(props: ActivityItemProps) {
       ? props.event.actor
       : { id: props.group.actorId, name: props.group.actorName, photoURL: undefined as string | undefined };
 
-  const actorName = actor.name?.trim() || "A teammate";
-  const photoURL = props.kind === "single" ? (props.event.actor.photoURL ?? undefined) : undefined;
+  const actorName =
+    actor.name?.trim() ||
+    actor.id?.split("@")[0]?.trim() ||
+    "A teammate";
+  const photoURL =
+    props.kind === "single"
+      ? (props.event.actor.photoURL ?? undefined)
+      : (props.group.previewEvents?.[0]?.actor?.photoURL ?? undefined);
 
   const row =
     props.kind === "single" ? deriveRowModel(props.event) : deriveGroupRowModel(props.group);
@@ -586,7 +697,7 @@ export function ActivityItem(props: ActivityItemProps) {
             aria-expanded={props.isExpanded}
             onClick={(e) => {
               e.stopPropagation();
-              props.onToggleExpand();
+              props.onToggleExpand(props.group);
             }}
             className="mt-2 flex w-fit cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
@@ -739,3 +850,5 @@ export function ActivityItem(props: ActivityItemProps) {
     </div>
   );
 }
+
+export const ActivityItem = memo(ActivityItemBase);

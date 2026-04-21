@@ -25,6 +25,8 @@ import {
   Gem,
 } from "lucide-react";
 import { ImageCropModal } from "@/components/ui/ImageCropModal";
+import { ModalPortal } from "@/components/ui/ModalPortal";
+import { MODAL_LAYER_Z_INDEX } from "@/lib/ui/zIndex";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { usePlanCatalog } from "@/lib/hooks/usePlanCatalog";
 import { Button } from "@/components/ui/Button";
@@ -268,21 +270,30 @@ function WorkspaceTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, workspace?.name]);
 
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   function showToast(msg: string) {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      showToast("Please use JPEG, PNG, or WebP");
+    const isHeic =
+      file.type === "image/heic" ||
+      file.type === "image/heif" ||
+      file.name.toLowerCase().endsWith(".heic") ||
+      file.name.toLowerCase().endsWith(".heif");
+    const isValidType = ["image/jpeg", "image/png", "image/webp"].includes(file.type) || isHeic;
+    if (!isValidType) {
+      showToast("Please use JPEG, PNG, WebP, or HEIC");
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      showToast("Image must be under 2MB");
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Image must be under 5MB");
       return;
     }
     const objectUrl = URL.createObjectURL(file);
@@ -292,16 +303,18 @@ function WorkspaceTab({
 
   async function handleLogoCropConfirm(blob: Blob) {
     setLogoCropOpen(false);
+    if (logoCropSrc) { URL.revokeObjectURL(logoCropSrc); setLogoCropSrc(null); }
     setUploadingLogo(true);
     try {
       const fd = new FormData();
       fd.append("logo", blob, "logo.jpg");
       const res = await authFetch("/api/workspace/logo", { method: "POST", body: fd });
       if (!res) { showToast("Upload failed. Try again."); return; }
+      if (res.status === 403) { showToast("Only the workspace owner can update the logo."); return; }
       const json = await res.json() as { success: boolean; data?: { logoUrl: string }; error?: { message: string } };
       if (!res.ok || !json.success) {
         const msg = json.error?.message;
-        if (msg === "FILE_TOO_LARGE") showToast("Image must be under 2MB");
+        if (msg === "FILE_TOO_LARGE") showToast("Image must be under 5MB");
         else if (msg === "INVALID_FILE_TYPE") showToast("Please use JPEG, PNG, or WebP");
         else showToast("Upload failed. Try again.");
         return;
@@ -355,25 +368,25 @@ function WorkspaceTab({
 
   if (loading) {
     return (
-      <div style={{ maxWidth: 720, padding: "32px 0" }} aria-busy="true" aria-live="polite">
+      <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }} aria-busy="true" aria-live="polite">
         <style>{`@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
         <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
           <div className="skeleton" style={{ height: 22, width: 180, background: "#F0F0F0", borderRadius: 6, marginBottom: 8 }} />
           <div className="skeleton" style={{ height: 14, width: 280, background: "#F0F0F0", borderRadius: 4 }} />
         </div>
         <div style={{ background: "white", border: "1px solid #EBEBEB", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "20px 24px", borderBottom: "1px solid #F0F0F0" }}>
+          <div style={{ padding: "28px 32px", borderBottom: "1px solid #F0F0F0" }}>
             <div className="skeleton" style={{ width: 140, height: 14, background: "#F0F0F0", borderRadius: 4, marginBottom: 16 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-              <div className="skeleton" style={{ width: 64, height: 64, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+              <div className="skeleton" style={{ width: 88, height: 88, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
-                <div className="skeleton" style={{ height: 40, background: "#F0F0F0", borderRadius: 9, width: "100%", marginBottom: 10 }} />
+                <div className="skeleton" style={{ height: 42, background: "#F0F0F0", borderRadius: 9, width: "100%", marginBottom: 10 }} />
                 <div className="skeleton" style={{ height: 38, background: "#F0F0F0", borderRadius: 9, width: 120 }} />
               </div>
             </div>
           </div>
           {[0, 1, 2].map((i) => (
-            <div key={i} style={{ padding: "16px 24px", borderBottom: "1px solid #F0F0F0", display: "flex", alignItems: "center", gap: 12 }}>
+            <div key={i} style={{ padding: "16px 32px", borderBottom: "1px solid #F0F0F0", display: "flex", alignItems: "center", gap: 12 }}>
               <div className="skeleton" style={{ width: 32, height: 32, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
                 <div className="skeleton" style={{ height: 13, background: "#F0F0F0", borderRadius: 4, width: "55%", marginBottom: 6 }} />
@@ -391,7 +404,7 @@ function WorkspaceTab({
   }
 
   return (
-    <div style={{ maxWidth: 720, padding: "32px 0" }} className="ech-content-enter pb-16">
+    <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }} className="ech-content-enter pb-16">
       {toast && (
         <div
           style={{
@@ -434,22 +447,22 @@ function WorkspaceTab({
           display: "flex",
           alignItems: "flex-start",
           gap: 24,
-          padding: "20px 24px",
+          padding: "28px 32px",
           borderBottom: "1px solid #F0F0F0",
         }}
       >
         {/* Logo upload */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
           <div
-            style={{ position: "relative", cursor: "pointer", width: 64, height: 64 }}
+            style={{ position: "relative", cursor: "pointer", width: 88, height: 88 }}
             onClick={() => !uploadingLogo && !loading && workspaceId && fileInputRef.current?.click()}
             onMouseEnter={() => setLogoHovered(true)}
             onMouseLeave={() => setLogoHovered(false)}
           >
             <div
               style={{
-                width: 64,
-                height: 64,
+                width: 88,
+                height: 88,
                 borderRadius: "50%",
                 border: "none",
                 boxShadow: "0 0 0 2px #EBEBEB",
@@ -522,15 +535,12 @@ function WorkspaceTab({
               Remove
             </button>
           )}
-          <span style={{ fontSize: 11, color: "#AAA", textAlign: "center", lineHeight: 1.3 }}>
-            JPG, PNG, WebP · Max 2MB
-          </span>
         </div>
 
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,image/heic,.heic,.HEIC"
           className="hidden"
           onChange={handleFileChange}
           aria-label="Upload workspace logo"
@@ -548,7 +558,7 @@ function WorkspaceTab({
             onChange={(e) => setNameDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") void handleSave(); }}
             style={{
-              height: 40,
+              height: 42,
               borderRadius: 9,
               border: "1.5px solid #E5E5E5",
               background: "#FAFAFA",
@@ -623,16 +633,8 @@ function WorkspaceTab({
       </div>
 
       {/* Members section inside the card */}
-      <div style={{ padding: "0 24px 24px" }}>
+      <div style={{ padding: "0 32px 32px" }}>
         <div style={{ margin: "28px 0 0", height: 1, background: "#F0F0F0" }} aria-hidden />
-        <div style={{ marginTop: 24, marginBottom: 20 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#111111", letterSpacing: "-0.2px", margin: "0 0 4px 0" }}>
-            Members
-          </h2>
-          <p style={{ fontSize: 13, color: "#777777", margin: 0 }}>
-            Manage who has access to this workspace
-          </p>
-        </div>
         <MembersTab workspaceId={workspaceId} loading={loading} />
       </div>
 
@@ -644,8 +646,10 @@ function WorkspaceTab({
           imageSrc={logoCropSrc}
           onConfirm={(blob) => { void handleLogoCropConfirm(blob); }}
           onCancel={() => { setLogoCropOpen(false); if (logoCropSrc) URL.revokeObjectURL(logoCropSrc); setLogoCropSrc(null); }}
+          onError={(msg) => showToast(msg)}
           title="Crop workspace logo"
           shape="circle"
+          confirmLabel="Save logo"
         />
       )}
 
@@ -723,8 +727,9 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
+    <ModalPortal>
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+      style={{ position: "fixed", inset: 0, zIndex: MODAL_LAYER_Z_INDEX, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
       <div
@@ -811,6 +816,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
@@ -819,8 +825,9 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
   const [confirmed, setConfirmed] = useState(false);
 
   return (
+    <ModalPortal>
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+      style={{ position: "fixed", inset: 0, zIndex: MODAL_LAYER_Z_INDEX, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
       <div
@@ -857,6 +864,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
@@ -914,17 +922,26 @@ function MyAccountTab() {
   }, [authPhotoUrl, localAvatarUrl]);
   useEffect(() => { setNameDraft(authDisplayName ?? ""); }, [authDisplayName]);
 
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   function showToast(msg: string) {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      showToast("Please use JPEG, PNG, or WebP"); return;
+    const isHeic =
+      file.type === "image/heic" ||
+      file.type === "image/heif" ||
+      file.name.toLowerCase().endsWith(".heic") ||
+      file.name.toLowerCase().endsWith(".heif");
+    const isValidType = ["image/jpeg", "image/png", "image/webp"].includes(file.type) || isHeic;
+    if (!isValidType) {
+      showToast("Please use JPEG, PNG, WebP, or HEIC"); return;
     }
     if (file.size > 5 * 1024 * 1024) {
       showToast("Image must be under 5MB"); return;
@@ -936,6 +953,7 @@ function MyAccountTab() {
 
   async function handleCropConfirm(blob: Blob) {
     setCropModalOpen(false);
+    if (cropImageSrc) { URL.revokeObjectURL(cropImageSrc); setCropImageSrc(null); }
     setIsUploadingAvatar(true);
     try {
       const fd = new FormData();
@@ -1022,7 +1040,7 @@ function MyAccountTab() {
   const initial = ((authDisplayName ?? authEmail ?? "?").trim().charAt(0) || "?").toUpperCase();
 
   const inputStyle: React.CSSProperties = {
-    height: 40,
+    height: 42,
     borderRadius: 9,
     border: "1.5px solid #E5E5E5",
     background: "#FAFAFA",
@@ -1036,19 +1054,19 @@ function MyAccountTab() {
   };
 
   const sectionStyle: React.CSSProperties = {
-    padding: "20px 24px",
+    padding: "28px 32px",
     borderBottom: "1px solid #F0F0F0",
   };
 
   const sectionTitleStyle: React.CSSProperties = {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 600,
     color: "#111",
     margin: "0 0 4px",
   };
 
   const sectionSubtitleStyle: React.CSSProperties = {
-    fontSize: 13,
+    fontSize: 14,
     color: "#777",
     margin: "0 0 20px",
   };
@@ -1057,25 +1075,25 @@ function MyAccountTab() {
 
   if (isLoading) {
     return (
-      <div style={{ maxWidth: 720, padding: "32px 0" }}>
+      <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }}>
         <style>{`@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
         <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
           <div className="skeleton" style={{ height: 22, width: 160, background: "#F0F0F0", borderRadius: 6, marginBottom: 8 }} />
           <div className="skeleton" style={{ height: 14, width: 280, background: "#F0F0F0", borderRadius: 4 }} />
         </div>
         <div style={{ background: "white", border: "1px solid #EBEBEB", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "20px 24px", borderBottom: "1px solid #F0F0F0" }}>
+          <div style={{ padding: "28px 32px", borderBottom: "1px solid #F0F0F0" }}>
             <div className="skeleton" style={{ width: 110, height: 14, background: "#F0F0F0", borderRadius: 4, marginBottom: 16 }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-              <div className="skeleton" style={{ width: 64, height: 64, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              <div className="skeleton" style={{ width: 88, height: 88, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
-                <div className="skeleton" style={{ height: 40, background: "#F0F0F0", borderRadius: 9, width: "100%", marginBottom: 10 }} />
+                <div className="skeleton" style={{ height: 42, background: "#F0F0F0", borderRadius: 9, width: "100%", marginBottom: 10 }} />
                 <div className="skeleton" style={{ height: 38, background: "#F0F0F0", borderRadius: 9, width: 120 }} />
               </div>
             </div>
           </div>
           {[0, 1, 2].map((i) => (
-            <div key={i} style={{ padding: "20px 24px", borderBottom: "1px solid #F0F0F0" }}>
+            <div key={i} style={{ padding: "28px 32px", borderBottom: "1px solid #F0F0F0" }}>
               <div className="skeleton" style={{ height: 56, background: "#F8F8F8", borderRadius: 9 }} />
             </div>
           ))}
@@ -1085,7 +1103,7 @@ function MyAccountTab() {
   }
 
   return (
-    <div style={{ maxWidth: 720, padding: "32px 0" }} className="ech-content-enter pb-16">
+    <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }} className="ech-content-enter pb-16">
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 50, padding: "10px 18px", borderRadius: 10, background: "#111", color: "white", fontSize: 14, fontWeight: 500, pointerEvents: "none", whiteSpace: "nowrap" }}>
           {toast}
@@ -1110,21 +1128,21 @@ function MyAccountTab() {
           <p style={sectionTitleStyle}>Name and photo</p>
           <p style={sectionSubtitleStyle}>Update your display name and profile photo</p>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             {/* Avatar */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
               <div
-                style={{ position: "relative", cursor: "pointer", width: 64, height: 64, flexShrink: 0 }}
+                style={{ position: "relative", cursor: "pointer", width: 88, height: 88, flexShrink: 0 }}
                 onClick={() => !isUploadingAvatar && fileInputRef.current?.click()}
                 onMouseEnter={() => setAvatarHovered(true)}
                 onMouseLeave={() => setAvatarHovered(false)}
               >
-                <div style={{ width: 64, height: 64, borderRadius: "50%", boxShadow: "0 0 0 3px #FFFFFF, 0 0 0 5px #E0E0E0", overflow: "hidden", background: "#1775E0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 88, height: 88, borderRadius: "50%", boxShadow: "0 0 0 3px #FFFFFF, 0 0 0 5px #E0E0E0", overflow: "hidden", background: "#1775E0", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {localAvatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={localAvatarUrl} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (
-                    <span style={{ fontSize: 26, fontWeight: 700, color: "white" }}>{initial}</span>
+                    <span style={{ fontSize: 34, fontWeight: 700, color: "white" }}>{initial}</span>
                   )}
                 </div>
                 <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", opacity: avatarHovered && !isUploadingAvatar ? 1 : 0, transition: "opacity 160ms" }}>
@@ -1149,7 +1167,7 @@ function MyAccountTab() {
               )}
             </div>
 
-            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} aria-label="Upload profile photo" />
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,.heic,.HEIC" className="hidden" onChange={handleFileChange} aria-label="Upload profile photo" />
 
             {/* Name field */}
             <div style={{ flex: 1 }}>
@@ -1209,7 +1227,7 @@ function MyAccountTab() {
         {/* Section: Contact info */}
         <div style={sectionStyle}>
           <p style={{ ...sectionTitleStyle, marginBottom: 16 }}>Contact info</p>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", minHeight: 60 }}>
             <div>
               <p style={{ fontSize: 13, color: "#777", margin: "0 0 2px" }}>Email address</p>
               <p style={{ fontSize: 15, color: "#111", fontWeight: 500, margin: 0 }}>{authEmail ?? "—"}</p>
@@ -1239,7 +1257,7 @@ function MyAccountTab() {
               <span style={{ fontSize: 14, color: "#777" }}>Password is managed by your Google account</span>
             </div>
           ) : (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", minHeight: 60 }}>
               <div>
                 <p style={{ fontSize: 14, color: "#111", fontWeight: 500, margin: 0 }}>Password</p>
                 <p style={{ fontSize: 13, color: "#777", margin: "2px 0 0" }}>Last changed: unknown</p>
@@ -1271,7 +1289,7 @@ function MyAccountTab() {
         </div>
 
         {/* Section: Delete account */}
-        <div style={{ padding: "20px 24px" }}>
+        <div style={{ padding: "28px 32px" }}>
           <p style={sectionTitleStyle}>Delete account</p>
           <p style={{ ...sectionSubtitleStyle, marginBottom: 16 }}>Permanently delete your account and all associated data</p>
           <button
@@ -1303,8 +1321,10 @@ function MyAccountTab() {
           imageSrc={cropImageSrc}
           onConfirm={(blob) => { void handleCropConfirm(blob); }}
           onCancel={() => { setCropModalOpen(false); if (cropImageSrc) URL.revokeObjectURL(cropImageSrc); setCropImageSrc(null); }}
+          onError={(msg) => showToast(msg)}
           title="Crop profile photo"
           shape="circle"
+          confirmLabel="Save photo"
         />
       )}
 
@@ -1448,7 +1468,7 @@ function formatDateAdded(ts: unknown): string {
 }
 
 
-const TABLE_COLS = "2fr 120px 150px 80px 60px";
+const TABLE_COLS = "2fr 1fr 1fr 1fr 80px";
 
 function MembersTableSkeleton() {
   return (
@@ -1459,9 +1479,12 @@ function MembersTableSkeleton() {
           className="hidden md:grid items-center border-b border-[#F0F0F0] last:border-b-0 bg-white"
           style={{ gridTemplateColumns: TABLE_COLS, minHeight: 56, padding: "12px 16px" }}
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" />
-            <div className="h-[14px] w-48 bg-muted animate-pulse rounded" />
+            <div className="flex flex-col gap-1 flex-1 min-w-0">
+              <div className="h-[14px] bg-muted animate-pulse rounded" style={{ width: "75%" }} />
+              <div className="h-[12px] bg-muted animate-pulse rounded" style={{ width: "50%" }} />
+            </div>
           </div>
           <div className="h-[14px] w-16 bg-muted animate-pulse rounded" />
           <div className="h-[14px] w-24 bg-muted animate-pulse rounded" />
@@ -1789,8 +1812,10 @@ function InviteMemberModal({
   }
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+      className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+      style={{ zIndex: MODAL_LAYER_Z_INDEX }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -1839,6 +1864,7 @@ function InviteMemberModal({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
@@ -1956,9 +1982,9 @@ function MembersTab({
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: "#111111", lineHeight: "1.3" }}>
-            Team members
+            Members
           </h2>
-          <p className="text-sm font-medium text-foreground/60" style={{ marginTop: 4 }}>
+          <p className="text-sm font-medium text-foreground/60" style={{ marginTop: 4, fontSize: 15, fontWeight: 500 }}>
             {totalMembers} member{totalMembers !== 1 ? "s" : ""}
             {totalPending > 0 && ` · ${totalPending} pending`}
           </p>
@@ -1978,7 +2004,7 @@ function MembersTab({
 
       {/* Header Row 2: Search + Filters */}
       <div className="flex items-center flex-wrap gap-[10px]" style={{ marginTop: 16 }}>
-        <div className="relative" style={{ width: 260 }}>
+        <div className="relative" style={{ flex: 1, minWidth: 180 }}>
           <span className="absolute inset-y-0 left-[11px] flex items-center pointer-events-none text-foreground/50">
             <svg
               width="14"
@@ -2047,7 +2073,7 @@ function MembersTab({
           className="outline-none cursor-pointer"
           style={{
             height: 36,
-            width: 140,
+            width: 150,
             background: "white",
             border: "1.5px solid #E8E8E8",
             borderRadius: 10,
@@ -2396,8 +2422,10 @@ function SecurityTab() {
 
       {/* Transfer ownership modal */}
       {transferModalOpen && (
+        <ModalPortal>
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          style={{ zIndex: MODAL_LAYER_Z_INDEX }}
           onClick={() => setTransferModalOpen(false)}
           role="dialog"
           aria-modal="true"
@@ -2472,12 +2500,15 @@ function SecurityTab() {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Delete workspace modal */}
       {deleteModalOpen && (
+        <ModalPortal>
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          style={{ zIndex: MODAL_LAYER_Z_INDEX }}
           onClick={() => setDeleteModalOpen(false)}
           role="dialog"
           aria-modal="true"
@@ -2532,6 +2563,7 @@ function SecurityTab() {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

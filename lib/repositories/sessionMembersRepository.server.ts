@@ -17,6 +17,7 @@ import {
   resolveActorForActivityEvent,
   sessionTitleForActivityEvent,
 } from "@/lib/repositories/activityEventsRepository.server";
+import { getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
 
 export async function getSessionMember(
   sessionId: string,
@@ -102,6 +103,19 @@ export async function addSessionMember(params: {
 
   const workspaceId = params.workspaceId.trim();
   if (workspaceId) {
+    let targetName: string | null = null;
+    if (params.userId) {
+      try {
+        const targetUser = await getUserByIdRepo(params.userId);
+        targetName =
+          targetUser?.name?.trim() ||
+          targetUser?.email?.split("@")[0]?.trim() ||
+          null;
+      } catch {
+        targetName = params.email?.split("@")[0] ?? null;
+      }
+    }
+
     const actor = await resolveActorForActivityEvent(actorId);
     const sessionTitle = await sessionTitleForActivityEvent(params.sessionId);
     await createActivityEvent({
@@ -114,6 +128,10 @@ export async function addSessionMember(params: {
       metadata: {
         sessionTitle,
         source: params.source,
+        targetEmail: params.email ?? null,
+        targetUserId: params.userId ?? null,
+        targetName,
+        accessLevel: params.access ?? null,
       },
     });
   }

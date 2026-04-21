@@ -74,13 +74,19 @@ export type WorkspaceContextValue = {
   /** The currently active workspace ID (from localStorage or user doc). */
   activeWorkspaceId: string | null;
   /** Switch the active workspace and reload. */
-  switchWorkspace: (workspaceId: string) => void;
+  switchWorkspace: (workspaceId: string) => Promise<void>;
   /** True while allWorkspaces is loading. */
   isLoadingWorkspaces: boolean;
   /** User's uploaded avatar URL (updated immediately after upload without page reload). */
   avatarUrl: string | null;
   /** Update the local avatar URL in context (call after upload/remove in Settings). */
   updateAvatarUrl: (url: string | null) => void;
+  /** True while Firestore workspace doc hasn't fired yet (initial load or workspace switch). */
+  workspaceDocLoading: boolean;
+  /** Workspace name from local hint (available before Firestore fires). */
+  hintWorkspaceName: string | null;
+  /** Workspace logo URL from local hint (available before Firestore fires). */
+  hintWorkspaceLogoUrl: string | null;
 };
 
 /** Throws if identity is not ready; use before destructive or workspace-scoped API calls. */
@@ -120,6 +126,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [workspaceDocLoading, setWorkspaceDocLoading] = useState(true);
+  const [hintWorkspaceName, setHintWorkspaceName] = useState<string | null>(null);
+  const [hintWorkspaceLogoUrl, setHintWorkspaceLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const hint = getUidHint();
@@ -135,7 +144,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (workspaceIdRef.current === next) return;
       workspaceIdRef.current = next;
       setWorkspaceId(next);
-      setWorkspaceHint(next);
+      if (next) {
+        setWorkspaceHint({ workspaceId: next, workspaceName: null, workspaceLogoUrl: null });
+      } else {
+        clearWorkspaceHint();
+      }
     };
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -184,9 +197,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setWorkspaceLoading(true);
 
       setClaimsReady(false);
-      const cachedWorkspaceId = getWorkspaceHint();
-      if (cachedWorkspaceId) {
-        commitWorkspaceId(cachedWorkspaceId);
+      const hint = getWorkspaceHint();
+      if (hint) {
+        commitWorkspaceId(hint.workspaceId);
+        setHintWorkspaceName(hint.workspaceName);
+        setHintWorkspaceLogoUrl(hint.workspaceLogoUrl);
       }
 
       void (async () => {
@@ -270,16 +285,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Resolve active workspace from localStorage when uid + workspaceId are known
+  // Sync localStorage to server state — workspaceId from Firestore IS the active workspace after Prompt 1
   useEffect(() => {
     if (!authUid || !workspaceId) {
       setActiveWorkspaceId(null);
       return;
     }
-    const stored = typeof window !== "undefined"
-      ? localStorage.getItem(`echly_active_workspace_${authUid}`)
-      : null;
-    setActiveWorkspaceId(stored && stored.trim() ? stored.trim() : workspaceId);
+    localStorage.setItem(`echly_active_workspace_${authUid}`, workspaceId);
+    setActiveWorkspaceId(workspaceId);
   }, [authUid, workspaceId]);
 
   // Fetch all workspace memberships when identity is ready
@@ -316,19 +329,91 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // Subscribe to the workspace document for live name/logo/owner data
   useEffect(() => {
+    setWorkspaceDocLoading(true);
+    setHintWorkspaceName(null);
+    setHintWorkspaceLogoUrl(null);
     const targetId = activeWorkspaceId ?? workspaceId;
     if (!claimsReady || !targetId) {
       setWorkspaceDoc(null);
+      setWorkspaceDocLoading(false);
       return;
     }
-    const unsub = listenToWorkspace(targetId, setWorkspaceDoc, claimsReady);
+    let firstCall = true;
+    const unsub = listenToWorkspace(
+      targetId,
+      (doc) => {
+        setWorkspaceDoc(doc);
+        if (firstCall) {
+          firstCall = false;
+          setWorkspaceDocLoading(false);
+        }
+      },
+      claimsReady
+    );
     return () => unsub();
-  }, [claimsReady, activeWorkspaceId]);
+  }, [claimsReady, workspaceId, activeWorkspaceId]);
 
-  const switchWorkspace = useCallback((wid: string) => {
+  useEffect(() => {
+    if (!workspaceId || !workspaceDoc) return;
+    setWorkspaceHint({
+      workspaceId,
+      workspaceName: workspaceDoc.name ?? null,
+      workspaceLogoUrl: workspaceDoc.logoUrl ?? null,
+    });
+  }, [workspaceId, workspaceDoc]);
+
+  const switchWorkspace = useCallback(async (wid: string) => {
     if (!authUid) return;
-    localStorage.setItem(`echly_active_workspace_${authUid}`, wid);
-    window.location.href = "/dashboard";
+
+    try {
+      // 1. Update the server-side active workspace
+      const res = await authFetch("/api/users/workspace", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: wid }),
+      });
+
+      if (!res?.ok) {
+        console.error("[switchWorkspace] Server update failed");
+        return;
+      }
+
+      // 2. Update localStorage preference
+      localStorage.setItem(`echly_active_workspace_${authUid}`, wid);
+
+      // 3. Clear memberships TTL so new workspace appears immediately after switch
+      membershipsLastFetchedRef.current = null;
+
+      // Clear workspace-unaware session cache entries for this user
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key?.startsWith(`echly_sessions:${authUid}`)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => sessionStorage.removeItem(k));
+
+      // Clear activity feed caches
+      const activityKeysToRemove: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key?.startsWith("echly_activity:")) {
+          activityKeysToRemove.push(key);
+        }
+      }
+      activityKeysToRemove.forEach((k) => sessionStorage.removeItem(k));
+
+      // 4. Force Firebase token refresh to pick up new workspaceId claim
+      if (auth.currentUser) {
+        await auth.currentUser.getIdToken(true);
+      }
+
+      // 5. Reload to re-bootstrap with new workspace
+      window.location.href = "/dashboard";
+    } catch (err) {
+      console.error("[switchWorkspace] Error:", err);
+    }
   }, [authUid]);
 
   const updateAvatarUrl = useCallback((url: string | null) => {
@@ -381,6 +466,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       isLoadingWorkspaces,
       avatarUrl: avatarUrl ?? authPhotoUrl,
       updateAvatarUrl,
+      workspaceDocLoading,
+      hintWorkspaceName,
+      hintWorkspaceLogoUrl,
     }),
     [
       workspaceId,
@@ -401,6 +489,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       isLoadingWorkspaces,
       avatarUrl,
       updateAvatarUrl,
+      workspaceDocLoading,
+      hintWorkspaceName,
+      hintWorkspaceLogoUrl,
     ]
   );
 

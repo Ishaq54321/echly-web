@@ -16,7 +16,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { recordSessionViewIfNew } from "@/lib/sessions";
 import { getViewerId } from "@/lib/viewerId";
 import {
-  assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { useStableState } from "@/lib/client/perception/useStableState";
@@ -1282,7 +1281,7 @@ export default function SessionPageClient({
   const handleSetSessionArchivedFromMenu = useCallback(
     async (id: string, archived: boolean) => {
       if (id !== sessionId) return;
-      assertIdentityResolved(isIdentityResolved);
+      if (!isIdentityResolved) return;
       const snapshot = sessionRef.current;
       if (snapshot) {
         setSession({ ...snapshot, archived, isArchived: archived });
@@ -1326,7 +1325,7 @@ export default function SessionPageClient({
 
   const confirmDeleteSessionFromMenu = useCallback(async () => {
     if (!sessionId) return;
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return;
     const res = await authFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
     if (!res) {
       throw new Error("Delete failed");
@@ -1369,7 +1368,7 @@ export default function SessionPageClient({
 
   const saveTitle = async (newTitle: string): Promise<void> => {
     if (!effectiveSelectedId || newTitle.trim() === "") return;
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return;
     const trimmed = newTitle.trim();
     const previousTitle = selectedItem?.title;
     setFeedback((prev) =>
@@ -1444,7 +1443,7 @@ export default function SessionPageClient({
 
   const saveActionSteps = async (actionSteps: string[]) => {
     if (!effectiveSelectedId) return;
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return;
     const ticketId = effectiveSelectedId;
     const currentSteps = selectedItem?.actionSteps ?? null;
     if (sameStringArrayContent(currentSteps, actionSteps)) return;
@@ -1528,7 +1527,7 @@ export default function SessionPageClient({
 
   const saveTags = async (suggestedTags: string[]) => {
     if (!effectiveSelectedId) return;
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return;
     const nextTags = Array.isArray(suggestedTags) ? suggestedTags : null;
     const previous = selectedItem?.suggestedTags ?? null;
     setFeedback((prev) =>
@@ -1599,6 +1598,7 @@ export default function SessionPageClient({
       canResolve: sessionAccessRef.current?.canResolve === true,
       triggerRequestAccessFlow: openRequestAccessModal,
       run: () => {
+        if (!isIdentityResolved) return;
         const previousResolved = Boolean(
           feedback.find((i) => i.id === ticketId)?.isResolved
         );
@@ -1654,7 +1654,6 @@ export default function SessionPageClient({
           const t0 = performance.now();
           if (perf) console.log("[ECHLY_PERF] CLIENT START (resolve ticket)", t0);
           try {
-            assertIdentityResolved(isIdentityResolved);
             const res = await authFetch(`/api/tickets/${ticketId}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
@@ -1745,6 +1744,7 @@ export default function SessionPageClient({
       setSessionTitleDraft(prevDisplay);
       return;
     }
+    if (!isIdentityResolved) return;
     const previousTitle = s.title ?? "";
     setSession((prev: Session | null) =>
       prev ? ({ ...prev, title: safeTitle } as Session) : prev
@@ -1754,7 +1754,6 @@ export default function SessionPageClient({
     setSaveSessionTitleSuccess(true);
     setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
     try {
-      assertIdentityResolved(isIdentityResolved);
       const res = await authFetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1822,8 +1821,8 @@ export default function SessionPageClient({
       canResolve: sessionAccessRef.current?.canResolve === true,
       triggerRequestAccessFlow: openRequestAccessModal,
       run: () => {
+        if (!isIdentityResolved) return;
         void (async () => {
-          assertIdentityResolved(isIdentityResolved);
           const feedbackList = feedbackRef.current;
           const active = feedbackList.filter((item) => getTicketStatus(item) === "open");
           if (active.length === 0) return;
@@ -1871,8 +1870,8 @@ export default function SessionPageClient({
       canResolve: sessionAccessRef.current?.canResolve === true,
       triggerRequestAccessFlow: openRequestAccessModal,
       run: () => {
+        if (!isIdentityResolved) return;
         void (async () => {
-          assertIdentityResolved(isIdentityResolved);
           const feedbackList = feedbackRef.current;
           const resolved = feedbackList.filter((item) => getTicketStatus(item) === "resolved");
           if (resolved.length === 0) return;
@@ -1918,7 +1917,7 @@ export default function SessionPageClient({
   }, [setFeedback, isIdentityResolved, showToast, openRequestAccessModal]);
 
   const handleDeleteFeedback = async (id: string) => {
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return;
     const ticket = feedback.find((i) => i.id === id);
     if (!ticket) return;
 
@@ -2154,7 +2153,20 @@ export default function SessionPageClient({
           submitting={requestAccessSubmitting}
         />
       ) : null}
-      <div className="flex h-full min-h-0 overflow-hidden">
+      <div className="flex h-full min-h-0 overflow-hidden relative">
+        {!isIdentityResolved && (
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 9999,
+              pointerEvents: "all",
+              cursor: "default",
+              background: "transparent",
+            }}
+          />
+        )}
         <aside className="sidebar hidden lg:flex w-[300px] h-screen overflow-hidden shrink-0 self-start min-h-0 flex-col sticky top-0">
           <TicketList
             sessionTitle={session ? (session.title ?? "").trim() : ""}

@@ -8,11 +8,13 @@ import { getWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepos
 import { adminDb, adminBucket } from "@/lib/server/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { getSignedStorageUrl, extractStoragePathFromUrl } from "@/lib/server/storage/getSignedUrl";
+// @ts-ignore
+import heicConvert from "heic-convert";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 function extensionForType(type: string): string {
   if (type === "image/png") return "png";
@@ -120,13 +122,32 @@ export async function POST(req: NextRequest) {
       return apiError({ code: "INVALID_INPUT", message: "FILE_TOO_LARGE", status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const ext = extensionForType(file.type);
+    let fileBuffer = Buffer.from(await file.arrayBuffer());
+    let mimeType = file.type;
+
+    if (mimeType === "image/heic" || mimeType === "image/heif") {
+      fileBuffer = await heicConvert({ buffer: fileBuffer, format: "JPEG", quality: 0.92 });
+      mimeType = "image/jpeg";
+    }
+
+    const ext = extensionForType(mimeType);
+
+    // Delete all possible existing logo extensions
+    const extensions = ["jpg", "jpeg", "png", "webp"];
+    await Promise.allSettled(
+      extensions.map(e =>
+        adminBucket
+          .file(`workspaces/${workspaceId}/logo.${e}`)
+          .delete()
+          .catch(() => {})
+      )
+    );
+
     const filePath = `workspaces/${workspaceId}/logo.${ext}`;
     const fileRef = adminBucket.file(filePath);
 
-    await fileRef.save(buffer, {
-      metadata: { contentType: file.type },
+    await fileRef.save(fileBuffer, {
+      metadata: { contentType: mimeType },
     });
 
     const signedUrl = await getSignedStorageUrl(filePath);

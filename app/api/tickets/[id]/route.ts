@@ -325,7 +325,10 @@ export const DELETE = withAuthorization(
       if (!context.feedback) {
         return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
       }
-      await deleteFeedbackWithSessionCountersRepo(id);
+      await deleteFeedbackWithSessionCountersRepo(id, {
+        actorId: user.uid,
+        sessionTitle: context.session?.title ?? null,
+      });
       log("[API] DELETE /api/tickets/[id] duration:", Date.now() - start);
       return apiSuccess({}, context.access!);
     } catch (err) {

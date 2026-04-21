@@ -299,8 +299,26 @@ export const DELETE = withAuthorization(
     if (!context.session) {
       return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
     }
+    const sessionTitle = context.session.title ?? "Untitled Session";
     try {
       await deleteSessionRepo(id);
+      const actorId = user.uid.trim();
+      const workspaceId =
+        typeof context.session.workspaceId === "string"
+          ? context.session.workspaceId.trim()
+          : "";
+      if (actorId && workspaceId) {
+        const resolvedActor = await resolveActorForActivityEvent(actorId);
+        await createActivityEvent({
+          workspaceId,
+          sessionId: id,
+          eventType: "session.deleted",
+          actorId,
+          actorName: resolvedActor.actorName,
+          actorPhotoURL: resolvedActor.actorPhotoURL,
+          metadata: { sessionTitle },
+        });
+      }
       log("[API] DELETE /api/sessions/[sessionId] duration:", Date.now() - start);
       return apiSuccess({}, context.access!);
     } catch (err) {

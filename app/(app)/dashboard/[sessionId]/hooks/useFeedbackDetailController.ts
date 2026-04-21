@@ -17,7 +17,6 @@ import {
 import type { CommentPosition, CommentTextRange } from "@/lib/domain/comment";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import {
-  assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { getShareToken } from "@/lib/client/shareToken";
@@ -196,7 +195,7 @@ export function useFeedbackDetailController(args: {
 
   const sendComment = async (message: string): Promise<void> => {
     if (!authUid || !feedbackId) return;
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return;
     const trimmed = message.trim();
     if (!trimmed) return;
     const payload: AddCommentOptions = {
@@ -225,7 +224,7 @@ export function useFeedbackDetailController(args: {
 
   const sendReply = async (threadId: string, message: string): Promise<void> => {
     if (!authUid || !feedbackId) return;
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return;
     const trimmed = message.trim();
     if (!trimmed) return;
     const payload: AddCommentOptions = {
@@ -258,7 +257,7 @@ export function useFeedbackDetailController(args: {
     message: string
   ): Promise<string | null> => {
     if (!authUid || !feedbackId) return null;
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return null;
     const trimmed = message.trim();
     if (!trimmed) return null;
     const payload: AddCommentOptions = {
@@ -305,7 +304,7 @@ export function useFeedbackDetailController(args: {
     message: string
   ): Promise<string | null> => {
     if (!authUid || !feedbackId) return null;
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return null;
     const trimmed = message.trim();
     if (!trimmed) return null;
     const payload: AddCommentOptions = {
@@ -351,7 +350,7 @@ export function useFeedbackDetailController(args: {
     commentId: string,
     position: { xPercent: number; yPercent: number }
   ) => {
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return;
     try {
       await updatePinPosition(commentId, position);
     } catch (err) {
@@ -364,7 +363,7 @@ export function useFeedbackDetailController(args: {
     commentId: string,
     data: { message?: string; resolved?: boolean }
   ) => {
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return;
     const trimmedMessage =
       typeof data.message === "string" ? data.message.trim() : undefined;
     const payload: { message?: string; resolved?: boolean } = {
@@ -468,7 +467,7 @@ export function useFeedbackDetailController(args: {
   };
 
   const deleteCommentHandler = async (commentId: string) => {
-    assertIdentityResolved(isIdentityResolved);
+    if (!isIdentityResolved) return;
 
     pendingDeletedCommentIdsRef.current.add(commentId);
     deleteRevertSnapshotRef.current = null;

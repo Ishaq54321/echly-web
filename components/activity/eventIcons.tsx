@@ -8,6 +8,8 @@ import {
   RotateCcw,
   Settings,
   Shield,
+  Trash2,
+  UserCheck,
   UserMinus,
   UserPlus,
 } from "lucide-react";
@@ -30,6 +32,10 @@ export const eventIconMap: Record<string, EventIconEntry> = {
   "session.settings_changed": { icon: Settings,      badgeClass: "bg-neutral-300" },
   "access_request.approved":  { icon: Shield,        badgeClass: "bg-green-400" },
   "access_request.rejected":  { icon: Shield,        badgeClass: "bg-red-400" },
+  "invite.sent":              { icon: UserPlus,      badgeClass: "bg-blue-400" },
+  "invite.accepted":          { icon: UserCheck,     badgeClass: "bg-green-400" },
+  "session.deleted":          { icon: Trash2,        badgeClass: "bg-red-400" },
+  "feedback.deleted":         { icon: Trash2,        badgeClass: "bg-red-400" },
 };
 
 export const TIER_MAP: Record<string, 1 | 2 | 3> = {
@@ -45,6 +51,10 @@ export const TIER_MAP: Record<string, 1 | 2 | 3> = {
   "session.settings_changed": 3,
   "access_request.approved": 3,
   "access_request.rejected": 3,
+  "invite.sent": 2,
+  "invite.accepted": 2,
+  "session.deleted": 2,
+  "feedback.deleted": 2,
 };
 
 export function getTier(eventType: string): 1 | 2 | 3 {

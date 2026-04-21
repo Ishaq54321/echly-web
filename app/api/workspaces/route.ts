@@ -107,7 +107,11 @@ export async function POST(req: NextRequest) {
             await addWorkspaceMemberRepo(preWid, {
               uid: user.uid,
               email: user.email ?? "",
-              displayName: user.displayName ?? null,
+              displayName:
+                typeof preData.displayName === "string" && preData.displayName.trim()
+                  ? preData.displayName.trim() :
+                typeof preData.name === "string" && preData.name.trim()
+                  ? preData.name.trim() : null,
               avatarUrl: healAvatarUrl,
               role: "OWNER",
               joinedAt: Timestamp.now(),
@@ -199,7 +203,11 @@ export async function POST(req: NextRequest) {
       await addWorkspaceMemberRepo(resolvedWid, {
         uid: user.uid,
         email: typeof userData.email === "string" ? userData.email : (user.email ?? ""),
-        displayName: typeof userData.displayName === "string" ? userData.displayName : null,
+        displayName:
+          typeof userData.displayName === "string" && userData.displayName.trim()
+            ? userData.displayName.trim() :
+          typeof userData.name === "string" && userData.name.trim()
+            ? userData.name.trim() : null,
         avatarUrl: typeof userData.avatarUrl === "string" ? userData.avatarUrl : null,
         role: "OWNER",
         joinedAt: Timestamp.now(),

@@ -13,6 +13,7 @@ import {
   sessionTitleFromSessionRow,
 } from "@/lib/repositories/activityEventsRepository.server";
 import { sendAccessRequestResultEmail } from "@/lib/email/workspaceEmails";
+import { getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
@@ -162,6 +163,19 @@ export async function PATCH(
         ? context.session.workspaceId.trim()
         : "";
     if (workspaceId) {
+      let rejectedRequesterName: string | null = null;
+      if (accessRequest.requesterUserId) {
+        try {
+          const requesterUser = await getUserByIdRepo(accessRequest.requesterUserId);
+          rejectedRequesterName =
+            requesterUser?.name?.trim() ||
+            accessRequest.requesterEmail?.split("@")[0]?.trim() ||
+            null;
+        } catch {
+          rejectedRequesterName = accessRequest.requesterEmail?.split("@")[0] ?? null;
+        }
+      }
+
       const actor = await resolveActorForActivityEvent(approverId);
       const sessionTitle = sessionTitleFromSessionRow(context.session);
       await createActivityEvent({
@@ -171,7 +185,12 @@ export async function PATCH(
         actorId: approverId,
         actorName: actor.actorName,
         actorPhotoURL: actor.actorPhotoURL,
-        metadata: { sessionTitle },
+        metadata: {
+          sessionTitle,
+          requesterEmail: accessRequest.requesterEmail ?? null,
+          requesterUserId: accessRequest.requesterUserId ?? null,
+          requesterName: rejectedRequesterName ?? null,
+        },
       });
       void sendAccessRequestResultEmail({
         to: accessRequest.requesterEmail,
@@ -212,6 +231,19 @@ export async function PATCH(
       ? context.session.workspaceId.trim()
       : "";
   if (workspaceId) {
+    let approvedRequesterName: string | null = null;
+    if (accessRequest.requesterUserId) {
+      try {
+        const requesterUser = await getUserByIdRepo(accessRequest.requesterUserId);
+        approvedRequesterName =
+          requesterUser?.name?.trim() ||
+          accessRequest.requesterEmail?.split("@")[0]?.trim() ||
+          null;
+      } catch {
+        approvedRequesterName = accessRequest.requesterEmail?.split("@")[0] ?? null;
+      }
+    }
+
     const actor = await resolveActorForActivityEvent(approverId);
     const sessionTitle = sessionTitleFromSessionRow(context.session);
     await createActivityEvent({
@@ -221,7 +253,13 @@ export async function PATCH(
       actorId: approverId,
       actorName: actor.actorName,
       actorPhotoURL: actor.actorPhotoURL,
-      metadata: { sessionTitle },
+      metadata: {
+        sessionTitle,
+        requesterEmail: accessRequest.requesterEmail ?? null,
+        requesterUserId: accessRequest.requesterUserId ?? null,
+        requesterName: approvedRequesterName ?? null,
+        accessLevel: accessLevel ?? null,
+      },
     });
     void sendAccessRequestResultEmail({
       to: accessRequest.requesterEmail,

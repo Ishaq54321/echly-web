@@ -6,6 +6,9 @@ const claimCache = new Map<string, { workspaceId: string; cachedAt: number }>();
 const CLAIM_TTL_MS = 5 * 60 * 1000;
 
 export async function setWorkspaceClaim(uid: string, workspaceId: string): Promise<void> {
+  // Invalidate existing cache entry to force refresh on workspace switch
+  claimCache.delete(uid);
+
   const cached = claimCache.get(uid);
   const now = Date.now();
   if (cached && cached.workspaceId === workspaceId && now - cached.cachedAt < CLAIM_TTL_MS) {

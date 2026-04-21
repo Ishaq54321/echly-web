@@ -27,8 +27,8 @@ const SESSIONS_CACHE_PREFIX = "echly_sessions";
 /** Skip GET /api/sessions (first page) when a fresh snapshot exists for this uid. */
 const WORKSPACE_SESSIONS_TTL_MS = 45_000;
 
-function sessionsCacheKey(uid: string): string {
-  return `${SESSIONS_CACHE_PREFIX}:${uid}`;
+function sessionsCacheKey(uid: string, workspaceId: string): string {
+  return `${SESSIONS_CACHE_PREFIX}:${uid}:${workspaceId}`;
 }
 
 function filterSessionsByView(sessions: Session[], archivedOnly: boolean): Session[] {
@@ -36,10 +36,10 @@ function filterSessionsByView(sessions: Session[], archivedOnly: boolean): Sessi
   return sessions.filter((s) => (s.isArchived ?? s.archived) === true);
 }
 
-function readCachedSessions(uid: string): Session[] | null {
-  if (!uid) return null;
+function readCachedSessions(uid: string, workspaceId: string): Session[] | null {
+  if (!uid || !workspaceId) return null;
   try {
-    const cached = sessionStorage.getItem(sessionsCacheKey(uid));
+    const cached = sessionStorage.getItem(sessionsCacheKey(uid, workspaceId));
     if (!cached) return null;
     const parsed = JSON.parse(cached);
     return Array.isArray(parsed) ? (parsed as Session[]) : null;
@@ -48,10 +48,10 @@ function readCachedSessions(uid: string): Session[] | null {
   }
 }
 
-function writeCachedSessions(uid: string, sessions: Session[]) {
-  if (!uid) return;
+function writeCachedSessions(uid: string, workspaceId: string, sessions: Session[]) {
+  if (!uid || !workspaceId) return;
   try {
-    sessionStorage.setItem(sessionsCacheKey(uid), JSON.stringify(sessions));
+    sessionStorage.setItem(sessionsCacheKey(uid, workspaceId), JSON.stringify(sessions));
   } catch {
     // Ignore cache write errors (private mode/quota).
   }
@@ -73,7 +73,8 @@ const listSnapshotByUid = new Map<string, ListSnapshot>();
 
 const sessionsBootstrapPromiseByUid = new Map<string, Promise<SessionsBootstrapResult>>();
 
-let lastSessionsBootstrapUid: string | null = null;
+// Key format: "{uid}:{workspaceId}"
+let lastSessionsBootstrapKey: string | null = null;
 
 function normalizeSessionList(list: Session[]): Session[] {
   return list.map((s) => {
@@ -98,10 +99,12 @@ async function fetchSessionsBootstrapFromNetwork(): Promise<SessionsBootstrapRes
 
 async function resolveSessionsBootstrap(
   uid: string,
+  workspaceId: string,
   force: boolean
 ): Promise<SessionsBootstrapResult> {
+  const cacheKey = `${uid}:${workspaceId}`;
   if (!force) {
-    const snap = listSnapshotByUid.get(uid);
+    const snap = listSnapshotByUid.get(cacheKey);
     if (
       snap &&
       Date.now() - snap.lastBootstrapFetchAt < WORKSPACE_SESSIONS_TTL_MS &&
@@ -118,7 +121,7 @@ async function resolveSessionsBootstrap(
 
   const net = await fetchSessionsBootstrapFromNetwork();
   if (net.ok) {
-    listSnapshotByUid.set(uid, {
+    listSnapshotByUid.set(cacheKey, {
       sessions: net.sessions,
       hasMore: net.hasMore,
       nextCursor: net.nextCursor,
@@ -130,11 +133,13 @@ async function resolveSessionsBootstrap(
 
 function patchListSnapshot(
   uid: string,
+  workspaceId: string,
   patch: Partial<Pick<ListSnapshot, "sessions" | "hasMore" | "nextCursor">>
 ) {
-  const prev = listSnapshotByUid.get(uid);
+  const cacheKey = `${uid}:${workspaceId}`;
+  const prev = listSnapshotByUid.get(cacheKey);
   if (!prev) return;
-  listSnapshotByUid.set(uid, {
+  listSnapshotByUid.set(cacheKey, {
     ...prev,
     ...patch,
   });
@@ -161,9 +166,10 @@ export interface SessionWithCounts {
 export type ViewMode = "all" | "archived";
 
 function useWorkspaceStoreState(viewMode: ViewMode = "all") {
-  const { claimsReady, authUid, isIdentityResolved, isIdentityReady } = useWorkspace();
+  const { claimsReady, authUid, workspaceId, isIdentityResolved, isIdentityReady } = useWorkspace();
   const router = useRouter();
   const userIdRef = useRef<string | null>(null);
+  const workspaceIdRef = useRef<string | null>(null);
   const allSessionsRef = useRef<Session[]>([]);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [awaitingSessions, setAwaitingSessions] = useState(false);
@@ -182,6 +188,10 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
   }, [userId]);
 
   useEffect(() => {
+    workspaceIdRef.current = workspaceId;
+  }, [workspaceId]);
+
+  useEffect(() => {
     allSessionsRef.current = allSessions;
   }, [allSessions]);
 
@@ -189,6 +199,11 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
     bootstrapCompletedRef.current = false;
     bootstrapInFlightRef.current = null;
   }, [userId]);
+
+  useEffect(() => {
+    bootstrapCompletedRef.current = false;
+    bootstrapInFlightRef.current = null;
+  }, [workspaceId]);
 
   const archivedOnly = viewMode === "archived";
 
@@ -201,7 +216,7 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
     setHasMoreSessions(false);
     setLoadingMoreSessions(false);
     try {
-      const result = await resolveSessionsBootstrap(uid, true);
+      const result = await resolveSessionsBootstrap(uid, workspaceIdRef.current ?? "", true);
       if (!result.ok) {
         setFetchError("Could not load sessions.");
         setAwaitingSessions(false);
@@ -212,9 +227,9 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
       sessionsSourceUserRef.current = uid;
       setAllSessions(result.sessions);
       setLastFetchedAt(Date.now());
-      writeCachedSessions(uid, result.sessions);
+      writeCachedSessions(uid, workspaceIdRef.current ?? "", result.sessions);
       sessionsBootstrapPromiseByUid.set(
-        uid,
+        `${uid}:${workspaceIdRef.current ?? ""}`,
         Promise.resolve({
           ok: true,
           sessions: result.sessions,
@@ -242,7 +257,7 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
       setFetchError(null);
       setAwaitingSessions(true);
       try {
-        const result = await resolveSessionsBootstrap(uid, force);
+        const result = await resolveSessionsBootstrap(uid, workspaceIdRef.current ?? "", force);
         if (!result.ok) {
           setFetchError("Could not load sessions.");
           return;
@@ -252,7 +267,7 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
         sessionsSourceUserRef.current = uid;
         setAllSessions(result.sessions);
         setLastFetchedAt(Date.now());
-        writeCachedSessions(uid, result.sessions);
+        writeCachedSessions(uid, workspaceIdRef.current ?? "", result.sessions);
       } catch (e) {
         console.error("[ECHLY] fetchSessions failed", e);
         setFetchError("Could not load sessions.");
@@ -266,7 +281,7 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
   useEffect(() => {
     if (!userId) {
       sessionsBootstrapPromiseByUid.clear();
-      lastSessionsBootstrapUid = null;
+      lastSessionsBootstrapKey = null;
       sessionsSourceUserRef.current = null;
       setAwaitingSessions(false);
       setHasMoreSessions(false);
@@ -279,11 +294,12 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
 
     const uid = userId;
 
-    if (lastSessionsBootstrapUid !== uid) {
-      if (lastSessionsBootstrapUid) {
-        sessionsBootstrapPromiseByUid.delete(lastSessionsBootstrapUid);
+    const currentBootstrapKey = `${uid}:${workspaceIdRef.current ?? ""}`;
+    if (lastSessionsBootstrapKey !== currentBootstrapKey) {
+      if (lastSessionsBootstrapKey) {
+        sessionsBootstrapPromiseByUid.delete(lastSessionsBootstrapKey);
       }
-      lastSessionsBootstrapUid = uid;
+      lastSessionsBootstrapKey = currentBootstrapKey;
     }
 
     if (!isIdentityReady) {
@@ -292,7 +308,7 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
     }
 
     sessionsSourceUserRef.current = uid;
-    const cached = readCachedSessions(uid);
+    const cached = readCachedSessions(uid, workspaceIdRef.current ?? "");
     if (Array.isArray(cached) && cached.length > 0) {
       setAllSessions(cached);
     } else {
@@ -308,21 +324,22 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
       return;
     }
 
-    let bootstrapPromise = sessionsBootstrapPromiseByUid.get(uid);
+    const wsIdForBootstrap = workspaceIdRef.current ?? "";
+    let bootstrapPromise = sessionsBootstrapPromiseByUid.get(currentBootstrapKey);
     if (!bootstrapPromise) {
       const promise = (async () => {
         try {
-          return await resolveSessionsBootstrap(uid, false);
+          return await resolveSessionsBootstrap(uid, wsIdForBootstrap, false);
         } catch (e) {
           console.error("[ECHLY] workspace sessions bootstrap failed", e);
           throw e;
         }
       })();
       bootstrapPromise = promise.then((r) => {
-        if (!r.ok) sessionsBootstrapPromiseByUid.delete(uid);
+        if (!r.ok) sessionsBootstrapPromiseByUid.delete(currentBootstrapKey);
         return r;
       });
-      sessionsBootstrapPromiseByUid.set(uid, bootstrapPromise);
+      sessionsBootstrapPromiseByUid.set(currentBootstrapKey, bootstrapPromise);
     }
 
     bootstrapInFlightRef.current = bootstrapPromise;
@@ -362,12 +379,12 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
         sessionsSourceUserRef.current = uid;
         setAllSessions(result.sessions);
         setLastFetchedAt(Date.now());
-        writeCachedSessions(uid, result.sessions);
+        writeCachedSessions(uid, workspaceIdRef.current ?? "", result.sessions);
       } catch (e) {
         if (cancelled) return;
         console.error("[ECHLY] GET /api/sessions failed", e);
         setFetchError("Could not load sessions.");
-        sessionsBootstrapPromiseByUid.delete(uid);
+        sessionsBootstrapPromiseByUid.delete(currentBootstrapKey);
         bootstrapInFlightRef.current = null;
       } finally {
         if (!cancelled) setAwaitingSessions(false);
@@ -377,7 +394,7 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
     return () => {
       cancelled = true;
     };
-  }, [userId, isIdentityReady]);
+  }, [userId, workspaceId, isIdentityReady]);
 
   const loadMoreSessions = useCallback(async () => {
     const uid = userIdRef.current;
@@ -405,8 +422,8 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
           dedupedById.set(session.id, session);
         }
         const next = Array.from(dedupedById.values());
-        writeCachedSessions(uid, next);
-        patchListSnapshot(uid, {
+        writeCachedSessions(uid, workspaceIdForCache(), next);
+        patchListSnapshot(uid, workspaceIdForCache(), {
           sessions: next,
           hasMore: nextHasMoreFlag,
           nextCursor: nextCursorVal,
@@ -457,8 +474,8 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
       setAllSessions((prev) => {
         const next = [tempSession, ...prev];
         if (uid) {
-          writeCachedSessions(uid, next);
-          patchListSnapshot(uid, { sessions: next });
+          writeCachedSessions(uid, workspaceIdForCache(), next);
+          patchListSnapshot(uid, workspaceIdForCache(), { sessions: next });
         }
         return next;
       });
@@ -538,8 +555,8 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
               : s
           );
           if (uid) {
-            writeCachedSessions(uid, next);
-            patchListSnapshot(uid, { sessions: next });
+            writeCachedSessions(uid, workspaceIdForCache(), next);
+            patchListSnapshot(uid, workspaceIdForCache(), { sessions: next });
           }
           return next;
         });
@@ -558,14 +575,15 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
     setAllSessions((prev) => {
       const next = prev.map((s) => (s.id === sessionId ? { ...s, ...patch } : s));
       if (uid) {
-        writeCachedSessions(uid, next);
-        patchListSnapshot(uid, { sessions: next });
+        writeCachedSessions(uid, workspaceIdForCache(), next);
+        patchListSnapshot(uid, workspaceIdForCache(), { sessions: next });
       }
       return next;
     });
   }, []);
 
   const uidForCache = () => userIdRef.current;
+  const workspaceIdForCache = () => workspaceIdRef.current ?? "";
 
   const setSessionArchived = useCallback(
     async (sessionId: string, archived: boolean) => {
@@ -585,8 +603,8 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
           s.id === sessionId ? { ...s, archived, isArchived: archived } : s
         );
         if (uid) {
-          writeCachedSessions(uid, next);
-          patchListSnapshot(uid, { sessions: next });
+          writeCachedSessions(uid, workspaceIdForCache(), next);
+          patchListSnapshot(uid, workspaceIdForCache(), { sessions: next });
         }
         return next;
       });
@@ -604,8 +622,8 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
                 s.id === sessionId ? { ...s, archived: rollbackArchived, isArchived: rollbackArchived } : s
               );
               if (uid) {
-                writeCachedSessions(uid, next);
-                patchListSnapshot(uid, { sessions: next });
+                writeCachedSessions(uid, workspaceIdForCache(), next);
+                patchListSnapshot(uid, workspaceIdForCache(), { sessions: next });
               }
               return next;
             });
@@ -630,8 +648,8 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
               s.id === sessionId ? { ...s, archived: rollbackArchived, isArchived: rollbackArchived } : s
             );
             if (uid) {
-              writeCachedSessions(uid, next);
-              patchListSnapshot(uid, { sessions: next });
+              writeCachedSessions(uid, workspaceIdForCache(), next);
+              patchListSnapshot(uid, workspaceIdForCache(), { sessions: next });
             }
             return next;
           });
@@ -648,8 +666,8 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
     setAllSessions((prev) => {
       const next = prev.filter((s) => s.id !== sessionId);
       if (uid) {
-        writeCachedSessions(uid, next);
-        patchListSnapshot(uid, { sessions: next });
+        writeCachedSessions(uid, workspaceIdForCache(), next);
+        patchListSnapshot(uid, workspaceIdForCache(), { sessions: next });
       }
       return next;
     });
@@ -663,8 +681,8 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
       setAllSessions((prev) => {
         const next = prev.filter((s) => s.id !== sessionId);
         if (uid) {
-          writeCachedSessions(uid, next);
-          patchListSnapshot(uid, { sessions: next });
+          writeCachedSessions(uid, workspaceIdForCache(), next);
+          patchListSnapshot(uid, workspaceIdForCache(), { sessions: next });
         }
         return next;
       });
@@ -674,18 +692,15 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
           setAllSessions((prev) => {
             const next = [session, ...prev];
             if (uid) {
-              writeCachedSessions(uid, next);
-              patchListSnapshot(uid, { sessions: next });
+              writeCachedSessions(uid, workspaceIdForCache(), next);
+              patchListSnapshot(uid, workspaceIdForCache(), { sessions: next });
             }
             return next;
           });
           return;
         }
         if (!res.ok) {
-          const data = await res.json().catch((err: unknown) => {
-            console.error("[ECHLY] JSON parse failed", err);
-            return {};
-          });
+          const data = await res.json().catch(() => ({}));
           const delMsg =
             data &&
             typeof data === "object" &&
@@ -699,12 +714,11 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
         setAllSessions((prev) => {
           const next = [session, ...prev];
           if (uid) {
-            writeCachedSessions(uid, next);
-            patchListSnapshot(uid, { sessions: next });
+            writeCachedSessions(uid, workspaceIdForCache(), next);
+            patchListSnapshot(uid, workspaceIdForCache(), { sessions: next });
           }
           return next;
         });
-        console.error("[ECHLY] Delete session failed", err);
         throw err;
       }
     },

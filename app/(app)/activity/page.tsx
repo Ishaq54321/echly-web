@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Check, ChevronDown, Clock, Filter, Settings } from "lucide-react";
+import { Check, ChevronDown, Clock, Filter, Settings, Users2 } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { ActivityItem } from "@/components/activity/ActivityItem";
@@ -28,6 +28,8 @@ import {
   type GroupedActivity,
 } from "@/lib/activity/groupEvents";
 import { useWorkspaceStore } from "@/lib/client/workspaceStore";
+import { useWorkspace } from "@/lib/client/workspaceContext";
+import type { WorkspaceMember } from "@/lib/domain/workspaceMember";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -220,12 +222,14 @@ function collapseSystemEvents(items: GroupedActivity[]): RenderRow[] {
 async function fetchActivityFeed(
   sessionIdFilter: string | null,
   eventTypes: string[],
+  actorId: string | null,
   cursor: string | null
 ): Promise<ActivityFeedData> {
   const params = new URLSearchParams();
-  params.set("limit", "20");
+  params.set("limit", "50");
   if (sessionIdFilter) params.set("sessionId", sessionIdFilter);
   if (eventTypes.length > 0) params.set("eventTypes", eventTypes.join(","));
+  if (actorId) params.set("actorId", actorId);
   if (cursor) params.set("cursor", cursor);
   const res = await authFetch(`/api/activity-feed?${params.toString()}`);
   if (!res) throw new Error("Could not reach activity feed.");
@@ -254,23 +258,61 @@ function enforceGroupedEventsContract(data: ActivityFeedData, label: string): vo
   throw new Error("Activity feed returned an invalid response.");
 }
 
-/** Soft color-coded selected state for activity type pills (+ tactile depth). */
-const ACTIVITY_TYPE_PILL_ACTIVE: Record<ActivityFilterCategoryId, string> = {
-  comments: "bg-blue-50 text-blue-600 shadow-sm",
-  created: "bg-purple-50 text-purple-600 shadow-sm",
-  resolved: "bg-green-50 text-green-600 shadow-sm",
+// ─── Activity feed sessionStorage cache ──────────────────────────────────────
+
+const ACTIVITY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface ActivityCache {
+  groupedEvents: GroupedActivity[];
+  nextCursor: { createdAt: number; id: string } | null;
+  cachedAt: number;
+}
+
+function readActivityCache(key: string): ActivityCache | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ActivityCache;
+    if (Date.now() - parsed.cachedAt > ACTIVITY_CACHE_TTL_MS) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeActivityCache(
+  key: string,
+  groupedEvents: GroupedActivity[],
+  nextCursor: ActivityCache["nextCursor"]
+): void {
+  try {
+    const cache: ActivityCache = { groupedEvents, nextCursor, cachedAt: Date.now() };
+    sessionStorage.setItem(key, JSON.stringify(cache));
+  } catch {
+    // sessionStorage full or unavailable — silent fail
+  }
+}
+
+/** Semantic active state per category — inline styles to guarantee colors render (sourced from eventIconMap badgeClass). */
+const ACTIVITY_TYPE_PILL_ACTIVE_STYLES: Record<ActivityFilterCategoryId, React.CSSProperties> = {
+  comments: { background: '#3B82F6', borderColor: '#3B82F6', color: '#FFFFFF' },
+  created:  { background: '#A855F7', borderColor: '#A855F7', color: '#FFFFFF' },
+  resolved: { background: '#22C55E', borderColor: '#22C55E', color: '#FFFFFF' },
 };
 
-/** Shared geometry + motion; default fill/text/hover applied unless overridden by active state. */
+/** Shared pill geometry + motion; hover applied via FILTER_PILL_DEFAULT when not active. */
 const FILTER_PILL_BASE =
-  "inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border-0 px-3 py-1.5 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]";
+  "inline-flex shrink-0 cursor-pointer items-center gap-[5px] rounded-full border border-[#E0E0E0] bg-transparent px-[10px] py-[3px] text-[13px] font-medium text-[#777777] whitespace-nowrap transition-all duration-[140ms] ease focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 const FILTER_PILL_DEFAULT =
-  "bg-transparent text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900";
+  "hover:border-[#BBBBBB] hover:text-[#444444] hover:bg-[#F7F8FA]";
 
-/** Session narrowed to one workspace: same pill language, light surface only. */
+/** Session / Members active pill — neutral light fill. */
 const FILTER_PILL_SESSION_ACTIVE =
-  "bg-white text-neutral-900 shadow-sm hover:bg-white hover:text-neutral-900";
+  "bg-[#F0F0F0] border-[#F0F0F0] text-[#444444]";
 
 /** Auto-fill + infinite scroll: stop chaining loads once this many rows exist and the page scrolls. */
 const ACTIVITY_FEED_MIN_VISIBLE_ROWS = 8;
@@ -292,20 +334,27 @@ function ActivityFeed() {
   /** Session filter: `?sessionId=` is canonical so links and router.replace stay in sync. */
   const selectedSessionId = searchParams.get("sessionId")?.trim() || null;
   /** At most one type filter; `null` = all activity types (no filter). */
-  const [selectedCategory, setSelectedCategory] = useState<ActivityFilterCategoryId | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<ActivityFilterCategoryId | "member" | null>(null);
   const { sessions: sessionsWithCounts } = useWorkspaceStore();
+  const { workspaceId } = useWorkspace();
   const sessions = useMemo(
     () => sessionsWithCounts.map(({ session }) => session),
     [sessionsWithCounts]
   );
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const sessionMenuRef = useRef<HTMLDivElement>(null);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
+  const memberDropdownRef = useRef<HTMLDivElement>(null);
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   const { user, loading: authLoading } = useAuthGuard();
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [nextCursor, setNextCursor] = useState<ActivityFeedData["nextCursor"]>(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [autoFillCapped, setAutoFillCapped] = useState(false);
   const loadingInitialRef = useRef(true);
   const loadingMoreRef = useRef(false);
   const nextCursorRef = useRef<ActivityFeedData["nextCursor"]>(null);
@@ -323,6 +372,7 @@ function ActivityFeed() {
   /** In-flight group-member fetches (dedupe / guard against stale completion). */
   const loadingGroupsRef = useRef<Record<string, boolean>>({});
   const groupFetchAbortRef = useRef(new Map<string, AbortController>());
+  const autoFillAttemptsRef = useRef(0);
 
   useEffect(() => {
     expandedGroupsRef.current = expandedGroups;
@@ -337,10 +387,25 @@ function ActivityFeed() {
   }, [nextCursor]);
 
   const eventTypesForApi = useMemo(
-    () => categoriesToEventTypesForApi(selectedCategory ? [selectedCategory] : []),
+    () => {
+      if (!selectedCategory || selectedCategory === "member") return [];
+      return categoriesToEventTypesForApi([selectedCategory]);
+    },
     [selectedCategory]
   );
+  const actorIdForApi = selectedCategory === "member" ? selectedMemberId : null;
   const eventTypesParamKey = eventTypesForApi.join(",");
+
+  const activityCacheKey = useMemo(() => {
+    const parts = [
+      "echly_activity",
+      workspaceId ?? "no-ws",
+      selectedSessionId ?? "all",
+      eventTypesParamKey || "all-types",
+      actorIdForApi ?? "all-actors",
+    ];
+    return parts.join(":");
+  }, [workspaceId, selectedSessionId, eventTypesParamKey, actorIdForApi]);
 
   const sortedSessions = useMemo(
     () =>
@@ -392,6 +457,35 @@ function ActivityFeed() {
   }, [sessionMenuOpen]);
 
   useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (memberDropdownRef.current && !memberDropdownRef.current.contains(e.target as Node)) {
+        setMemberDropdownOpen(false);
+        if (!selectedMemberId) {
+          setSelectedCategory(null);
+        }
+      }
+    }
+    if (memberDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [memberDropdownOpen, selectedMemberId]);
+
+  useEffect(() => {
+    if (!user?.uid || authLoading) return;
+    setLoadingMembers(true);
+    authFetch("/api/workspace/members")
+      .then((r) => (r?.ok ? r.json() : null))
+      .then((data: { data?: { members?: WorkspaceMember[] } } | null) => {
+        setWorkspaceMembers(data?.data?.members ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMembers(false));
+  }, [user?.uid, authLoading]);
+
+  useEffect(() => {
     for (const c of groupFetchAbortRef.current.values()) {
       c.abort();
     }
@@ -403,7 +497,7 @@ function ActivityFeed() {
     setGroupedFromServer([]);
     prevGroupedLenRef.current = 0;
     setEnterRowKeys(new Set());
-  }, [selectedSessionId, eventTypesParamKey]);
+  }, [selectedSessionId, eventTypesParamKey, actorIdForApi]);
 
   useEffect(() => {
     if (!user?.uid && !authLoading) {
@@ -418,17 +512,31 @@ function ActivityFeed() {
     let cancelled = false;
     (async () => {
       setError(null);
+
+      // Check cache first
+      const cached = readActivityCache(activityCacheKey);
+      if (cached) {
+        setGroupedFromServer(normalizeGroupedRows(cached.groupedEvents));
+        setNextCursor(cached.nextCursor);
+        setLoadingInitial(false);
+        return;
+      }
+
+      // Cache miss — fetch from API
+      setAutoFillCapped(false);
+      autoFillAttemptsRef.current = 0;
       setLoadingInitial(true);
       setEvents([]);
       setNextCursor(null);
       setGroupedFromServer([]);
       try {
-        const data = await fetchActivityFeed(selectedSessionId, eventTypesForApi, null);
+        const data = await fetchActivityFeed(selectedSessionId, eventTypesForApi, actorIdForApi, null);
         if (cancelled) return;
         enforceGroupedEventsContract(data, "initial");
         setEvents(data.events.map(normalizeApiEvent));
         setNextCursor(data.nextCursor);
         setGroupedFromServer(normalizeGroupedRows(data.groupedEvents));
+        writeActivityCache(activityCacheKey, data.groupedEvents as GroupedActivity[], data.nextCursor);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -444,7 +552,7 @@ function ActivityFeed() {
     return () => {
       cancelled = true;
     };
-  }, [user?.uid, authLoading, selectedSessionId, eventTypesForApi]);
+  }, [user?.uid, authLoading, selectedSessionId, eventTypesParamKey, actorIdForApi, activityCacheKey]);
 
   const onSessionFilterChange = useCallback(
     (value: string) => {
@@ -473,7 +581,7 @@ function ActivityFeed() {
     setLoadingMore(true);
     setError(null);
     try {
-      const data = await fetchActivityFeed(selectedSessionId, eventTypesForApi, cursor);
+      const data = await fetchActivityFeed(selectedSessionId, eventTypesForApi, actorIdForApi, cursor);
       enforceGroupedEventsContract(data, "loadMore");
       setEvents((prev) => [...prev, ...data.events.map(normalizeApiEvent)]);
       setNextCursor(data.nextCursor);
@@ -485,7 +593,7 @@ function ActivityFeed() {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [user?.uid, selectedSessionId, eventTypesForApi]);
+  }, [user?.uid, selectedSessionId, eventTypesParamKey, actorIdForApi]);
 
   /** Fill short viewports after data paints; chains via deps when each load finishes. */
   useEffect(() => {
@@ -498,8 +606,19 @@ function ActivityFeed() {
     const tick = () => {
       if (loadingMoreRef.current) return;
       if (!nextCursorRef.current) return;
+
+      // Hard cap: max 2 auto-fill attempts per fresh fetch
+      if (autoFillAttemptsRef.current >= 2) {
+        if (nextCursorRef.current) {
+          setAutoFillCapped(true);
+        }
+        return;
+      }
+
       const rowCount = collapsedDayBuckets.reduce((n, s) => n + s.renderRows.length, 0);
       if (isActivityViewportFilled(rowCount)) return;
+
+      autoFillAttemptsRef.current += 1;
       void loadMore();
     };
 
@@ -656,14 +775,24 @@ function ActivityFeed() {
 
         {/* Page header */}
         <div className="flex items-center justify-between mb-7">
-          <div className="flex items-center gap-2.5">
-            <Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
-            <h1 className="text-[16px] font-medium text-foreground">Activity</h1>
-            {events.length > 0 && (
-              <span className="text-[12px] text-muted-foreground bg-muted border border-border rounded-full px-2.5 py-0.5 tabular-nums">
-                {events.length}{nextCursor ? "+" : ""}
-              </span>
-            )}
+          <div>
+            <h1 style={{
+              fontSize: '28px',
+              fontWeight: 700,
+              color: '#111111',
+              letterSpacing: '-0.4px',
+              marginBottom: '4px',
+            }}>
+              Activity
+            </h1>
+            <p style={{
+              fontSize: '15px',
+              color: '#777777',
+              fontWeight: 400,
+              margin: '4px 0 0 0',
+            }}>
+              All activity across your workspace
+            </p>
           </div>
           <div className="flex flex-wrap items-center justify-end">
             <div
@@ -752,6 +881,105 @@ function ActivityFeed() {
                 ) : null}
               </div>
 
+              <div className="relative" ref={memberDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedCategory === "member") {
+                      if (selectedMemberId !== null) {
+                        setMemberDropdownOpen((prev) => !prev);
+                      } else {
+                        setSelectedCategory(null);
+                        setMemberDropdownOpen(false);
+                      }
+                    } else {
+                      setSelectedCategory("member");
+                      setMemberDropdownOpen(true);
+                    }
+                  }}
+                  className={`${FILTER_PILL_BASE} ${
+                    selectedCategory === "member" ? "bg-[#F0F0F0] border-[#F0F0F0] text-[#444444]" : FILTER_PILL_DEFAULT
+                  }`}
+                >
+                  {selectedMemberId
+                    ? (() => {
+                        const selected = workspaceMembers.find(
+                          (m) => m.uid === selectedMemberId
+                        );
+                        return selected?.displayName ?? selected?.email.split("@")[0] ?? "Members";
+                      })()
+                    : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          <Users2 size={14} />
+                          Members
+                        </span>
+                      )}
+                  <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                </button>
+
+                {(selectedCategory === "member" && selectedMemberId === null) ||
+                memberDropdownOpen ? (
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-background border border-border rounded-lg shadow-md z-50 py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedMemberId(null);
+                        setSelectedCategory(null);
+                        setMemberDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] hover:bg-muted/40${selectedMemberId === null ? " font-medium text-foreground" : ""}`}
+                    >
+                      <span className="flex-1 text-left">All</span>
+                      {selectedMemberId === null && (
+                        <Check className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
+                      )}
+                    </button>
+
+                    {loadingMembers ? (
+                      <div className="px-3 py-2 text-[13px] text-muted-foreground">
+                        Loading…
+                      </div>
+                    ) : (
+                      workspaceMembers.map((member) => (
+                        <button
+                          key={member.uid}
+                          type="button"
+                          onClick={() => {
+                            if (selectedMemberId === member.uid) {
+                              setSelectedMemberId(null);
+                              setSelectedCategory(null);
+                              setMemberDropdownOpen(false);
+                            } else {
+                              setSelectedMemberId(member.uid);
+                              setMemberDropdownOpen(false);
+                            }
+                          }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] hover:bg-muted/40 text-left${selectedMemberId === member.uid ? " font-medium text-foreground" : ""}`}
+                        >
+                          <div className="w-5 h-5 rounded-full bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-medium text-muted-foreground">
+                            {member.avatarUrl ? (
+                              <img
+                                src={member.avatarUrl}
+                                className="w-full h-full object-cover"
+                                alt=""
+                              />
+                            ) : (
+                              (member.displayName ?? member.email)[0]?.toUpperCase()
+                            )}
+                          </div>
+                          <span className="truncate">
+                            {member.displayName ?? member.email.split("@")[0]}
+                          </span>
+                          {selectedMemberId === member.uid && (
+                            <Check className="h-3.5 w-3.5 text-blue-600 ml-auto flex-shrink-0" />
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                ) : null}
+              </div>
+
               <div
                 className="flex flex-wrap items-center gap-1"
                 role="radiogroup"
@@ -766,9 +994,8 @@ function ActivityFeed() {
                       role="radio"
                       aria-checked={selected}
                       onClick={() => selectCategory(id)}
-                      className={`${FILTER_PILL_BASE} ${
-                        selected ? ACTIVITY_TYPE_PILL_ACTIVE[id] : FILTER_PILL_DEFAULT
-                      }`}
+                      className={`${FILTER_PILL_BASE} ${selected ? "" : FILTER_PILL_DEFAULT}`}
+                      style={selected ? ACTIVITY_TYPE_PILL_ACTIVE_STYLES[id] : undefined}
                     >
                       {ACTIVITY_FILTER_CATEGORY_LABELS[id]}
                     </button>
@@ -786,7 +1013,7 @@ function ActivityFeed() {
           </p>
         ) : null}
 
-        {/* Initial load — partial skeleton reads as “content arriving”, not a full-page wait */}
+        {/* Initial load — partial skeleton reads as "content arriving", not a full-page wait */}
         {loadingInitial ? (
           <div className="w-full" aria-busy="true" aria-live="polite">
             <ActivitySkeletonStack count={4} />
@@ -812,7 +1039,7 @@ function ActivityFeed() {
 
           /* Feed — single calm enter when surface replaces skeleton */
           <div className="space-y-4 activity-feed-row-enter">
-            {collapsedDayBuckets.map((section) => {
+            {collapsedDayBuckets.map((section, sectionIndex) => {
               const renderRows = section.renderRows;
               return (
                 <div key={section.label} className="space-y-2">
@@ -835,13 +1062,13 @@ function ActivityFeed() {
                       aria-hidden
                     />
 
-                    {renderRows.map((row) => {
+                    {renderRows.map((row, rowIndex) => {
                       /* System-event collapse chip */
                       if (row.kind === "system-collapse") {
                         const isExpanded = expandedSystemKeys.has(row.key);
                         return (
                           <div
-                            key={row.key}
+                            key={`${sectionIndex}-${rowIndex}-${row.key}`}
                             className={
                               enterRowKeys.has(row.key) ? "activity-feed-row-enter" : undefined
                             }
@@ -873,7 +1100,7 @@ function ActivityFeed() {
 
                             {isExpanded && (
                               <div className="mt-2 w-full min-w-0 pl-[52px]">
-                                {row.items.map((item) => {
+                                {row.items.map((item, itemIndex) => {
                                   const ev =
                                     item.type === "single"
                                       ? item.event
@@ -883,7 +1110,7 @@ function ActivityFeed() {
                                     ev.id || `sys-${ev.eventType}-${ev.createdAt}`;
                                   return (
                                     <ActivityItem
-                                      key={rowKey}
+                                      key={`${sectionIndex}-${rowIndex}-${itemIndex}-${rowKey}`}
                                       kind="single"
                                       event={ev}
                                       relativeTime={time || null}
@@ -911,7 +1138,7 @@ function ActivityFeed() {
                         const enter = enterRowKeys.has(groupedActivityStableKey(item));
                         return (
                           <div
-                            key={rowKey}
+                            key={`${sectionIndex}-${rowIndex}-${rowKey}`}
                             className={enter ? "activity-feed-row-enter" : undefined}
                           >
                             <ActivityItem
@@ -942,7 +1169,7 @@ function ActivityFeed() {
                       const gEnter = enterRowKeys.has(groupedActivityStableKey(item));
                       return (
                         <div
-                          key={`group-${groupKey}`}
+                          key={`${sectionIndex}-${rowIndex}-group-${groupKey}`}
                           className={gEnter ? "activity-feed-row-enter" : undefined}
                         >
                           <ActivityItem
@@ -979,11 +1206,19 @@ function ActivityFeed() {
           </>
         ) : null}
 
-        {/* Manual fallback (screen readers / if auto-load misses edge cases) */}
-        {!loadingInitial && nextCursor ? (
-          <div className="sr-only">
-            <button type="button" onClick={() => void loadMore()} disabled={loadingMore}>
-              Load more events
+        {/* Visible fallback for heavy-grouping edge case: auto-fill capped but more data exists */}
+        {autoFillCapped && nextCursor && !loadingMore ? (
+          <div className="flex justify-center py-6">
+            <button
+              type="button"
+              onClick={() => {
+                setAutoFillCapped(false);
+                autoFillAttemptsRef.current = 0;
+                void loadMore();
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium border border-border rounded-lg bg-background hover:bg-muted/40 text-foreground transition-colors"
+            >
+              Load more activity
             </button>
           </div>
         ) : null}

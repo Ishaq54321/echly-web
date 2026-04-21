@@ -127,7 +127,11 @@ export async function POST(
     await addWorkspaceMemberRepo(invitation.workspaceId, {
       uid: user.uid,
       email: callerEmail,
-      displayName: typeof profile.displayName === "string" ? profile.displayName : null,
+      displayName:
+        typeof profile.displayName === "string" && profile.displayName.trim()
+          ? profile.displayName.trim() :
+        typeof profile.name === "string" && profile.name.trim()
+          ? profile.name.trim() : null,
       avatarUrl: typeof profile.avatarUrl === "string" ? profile.avatarUrl : null,
       role: invitation.role,
       joinedAt: Timestamp.now(),
@@ -145,27 +149,22 @@ export async function POST(
     await addWorkspaceMembershipRepo(user.uid, invitation.workspaceId);
 
     const userRef = adminDb.doc(`users/${user.uid}`);
-    const currentWorkspaceId =
-      typeof profile.workspaceId === "string" ? profile.workspaceId.trim() : "";
-    if (!currentWorkspaceId) {
-      // First workspace — set as active
-      // workspaceMemberships already handled by addWorkspaceMembershipRepo above
-      await userRef.set(
-        {
-          workspaceId: invitation.workspaceId,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-      await setWorkspaceClaim(user.uid, invitation.workspaceId);
-    }
-    // else: already has own workspace — active workspace unchanged, claims unchanged
-    // workspaceMemberships already updated by addWorkspaceMembershipRepo above
+
+    // Always switch user to the newly joined workspace
+    await userRef.set(
+      {
+        workspaceId: invitation.workspaceId,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    await setWorkspaceClaim(user.uid, invitation.workspaceId);
 
     return apiSuccess({
       workspaceId: invitation.workspaceId,
       workspaceName: invitation.workspaceName,
       role: invitation.role,
+      switchedToWorkspaceId: invitation.workspaceId,
     });
   } catch (err) {
     console.error("POST /api/workspace/invitations/accept/[token]:", err);

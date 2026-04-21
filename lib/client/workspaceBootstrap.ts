@@ -1,33 +1,39 @@
-const KEY = "echly_workspace_hint_v1";
+const WORKSPACE_HINT_KEY = "echly_workspace_hint_v1";
 
-export function getWorkspaceHint(): string | null {
+export interface WorkspaceHint {
+  workspaceId: string;
+  workspaceName: string | null;
+  workspaceLogoUrl: string | null;
+}
+
+export function getWorkspaceHint(): WorkspaceHint | null {
   try {
-    const value = localStorage.getItem(KEY);
-    if (!value) return null;
-
-    const trimmed = value.trim();
-    return trimmed.length ? trimmed : null;
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(WORKSPACE_HINT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Support old format (plain string) gracefully
+    if (typeof parsed === "string") {
+      return { workspaceId: parsed, workspaceName: null, workspaceLogoUrl: null };
+    }
+    if (parsed?.workspaceId) return parsed as WorkspaceHint;
+    return null;
   } catch {
     return null;
   }
 }
 
-export function setWorkspaceHint(workspaceId: string | null) {
+export function setWorkspaceHint(hint: WorkspaceHint): void {
   try {
-    if (!workspaceId) {
-      localStorage.removeItem(KEY);
-      return;
-    }
-
-    localStorage.setItem(KEY, workspaceId.trim());
-  } catch {
-    // silent
-  }
+    if (typeof window === "undefined") return;
+    localStorage.setItem(WORKSPACE_HINT_KEY, JSON.stringify(hint));
+  } catch {}
 }
 
-export function clearWorkspaceHint() {
+export function clearWorkspaceHint(): void {
   try {
-    localStorage.removeItem(KEY);
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(WORKSPACE_HINT_KEY);
   } catch {}
 }
 

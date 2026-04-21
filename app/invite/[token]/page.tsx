@@ -13,6 +13,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { Toast } from "@/components/ui/Toast";
 import {
   ChevronLeft,
   Lock,
@@ -347,6 +348,18 @@ export default function InviteAcceptPage() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({
+    message: "",
+    visible: false,
+  });
+
+  function showToast(msg: string) {
+    setToast({ message: msg, visible: true });
+  }
+
+  function dismissToast() {
+    setToast((prev) => ({ ...prev, visible: false }));
+  }
 
   // ── Load invite + resolve auth state ──────────────────────────────────────
 
@@ -402,16 +415,10 @@ export default function InviteAcceptPage() {
       });
     }, 1000);
 
-    const t = setTimeout(() => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-      router.replace("/dashboard");
-    }, 3100);
-
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
-      clearTimeout(t);
     };
-  }, [state.phase, router]);
+  }, [state.phase]);
 
   useEffect(() => {
     return () => {
@@ -423,7 +430,7 @@ export default function InviteAcceptPage() {
 
   async function postAccept(
     idToken: string
-  ): Promise<{ ok: boolean; workspaceId?: string; errorCode?: string }> {
+  ): Promise<{ ok: boolean; workspaceId?: string; switchedToWorkspaceId?: string; workspaceName?: string; errorCode?: string }> {
     try {
       const res = await fetch(`/api/workspace/invitations/accept/${token}`, {
         method: "POST",
@@ -435,19 +442,24 @@ export default function InviteAcceptPage() {
       });
       const json = (await res.json()) as {
         success: boolean;
-        data?: { workspaceId: string };
+        data?: { workspaceId: string; switchedToWorkspaceId?: string; workspaceName?: string };
         error?: { message: string };
       };
       if (!res.ok || !json.success) {
         return { ok: false, errorCode: json.error?.message };
       }
-      return { ok: true, workspaceId: json.data?.workspaceId };
+      return {
+        ok: true,
+        workspaceId: json.data?.workspaceId,
+        switchedToWorkspaceId: json.data?.switchedToWorkspaceId,
+        workspaceName: json.data?.workspaceName,
+      };
     } catch {
       return { ok: false };
     }
   }
 
-  function enterSuccess(workspaceId: string, uid: string) {
+  async function enterSuccess(workspaceId: string, uid: string) {
     const workspaceName = state.preview?.workspaceName ?? "";
     sessionStorage.setItem(
       "joined_workspace",
@@ -456,12 +468,34 @@ export default function InviteAcceptPage() {
     if (workspaceId && uid) {
       localStorage.setItem(`echly_active_workspace_${uid}`, workspaceId);
     }
+
+    // Clear session cache
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith("echly_sessions:")) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => sessionStorage.removeItem(k));
+
+    // Force token refresh
+    if (auth.currentUser) {
+      await auth.currentUser.getIdToken(true);
+    }
+
+    showToast(`You've joined ${workspaceName} — switching now`);
+
     setState((s) => ({
       ...s,
       phase: "success",
       countdown: 3,
       formError: null,
     }));
+
+    setTimeout(() => {
+      window.location.href = "/dashboard";
+    }, 1500);
   }
 
   function handleAcceptResult(
@@ -505,7 +539,7 @@ export default function InviteAcceptPage() {
         const idToken = await user.getIdToken();
         const result = await postAccept(idToken);
         if (result.ok) {
-          enterSuccess(result.workspaceId ?? "", authedUser.uid);
+          await enterSuccess(result.workspaceId ?? "", authedUser.uid);
         } else {
           setState((s) => ({ ...s, phase: "landing" }));
           handleAcceptResult(result, "landing");
@@ -562,7 +596,7 @@ export default function InviteAcceptPage() {
       const idToken = await cred.user.getIdToken();
       const result = await postAccept(idToken);
       if (result.ok) {
-        enterSuccess(result.workspaceId ?? "", cred.user.uid);
+        await enterSuccess(result.workspaceId ?? "", cred.user.uid);
       } else {
         setState((s) => ({ ...s, phase: "login" }));
         handleAcceptResult(result, "login");
@@ -604,7 +638,7 @@ export default function InviteAcceptPage() {
       }));
       const result = await postAccept(idToken);
       if (result.ok) {
-        enterSuccess(result.workspaceId ?? "", cred.user.uid);
+        await enterSuccess(result.workspaceId ?? "", cred.user.uid);
       } else {
         setState((s) => ({ ...s, phase: "signup" }));
         handleAcceptResult(result, "signup");
@@ -1346,6 +1380,7 @@ export default function InviteAcceptPage() {
           </div>
         </div>
       </div>
+      <Toast message={toast.message} visible={toast.visible} onDismiss={dismissToast} />
     </>
   );
 }

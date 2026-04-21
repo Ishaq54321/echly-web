@@ -116,7 +116,8 @@ export async function setUserWorkspaceIdRepo(
   if (!snap.exists) {
     await userRef.set({
       uid: user.uid,
-      name: user.displayName,
+      name: user.displayName ?? null,
+      displayName: user.displayName ?? null,
       email: user.email,
       photoURL: user.photoURL,
       workspaceId: resolvedWorkspaceId,

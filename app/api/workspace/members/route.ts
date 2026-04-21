@@ -34,25 +34,35 @@ export async function GET(req: NextRequest) {
         ),
     ];
 
-    const membersNeedingAvatar = sorted.filter((m) => !m.avatarUrl);
+    const membersNeedingEnrichment = sorted.filter((m) => !m.avatarUrl || !m.displayName);
     let membersWithAvatars: WorkspaceMember[] = sorted;
 
-    if (membersNeedingAvatar.length > 0) {
-      const userRefs = membersNeedingAvatar.map((m) => adminDb.doc(`users/${m.uid}`));
+    if (membersNeedingEnrichment.length > 0) {
+      const userRefs = membersNeedingEnrichment.map((m) => adminDb.doc(`users/${m.uid}`));
       const userSnaps = await adminDb.getAll(...userRefs);
 
       const avatarByUid: Record<string, string | null> = {};
+      const displayNameByUid: Record<string, string | null> = {};
+
       userSnaps.forEach((snap, i) => {
-        const uid = membersNeedingAvatar[i]!.uid;
+        const uid = membersNeedingEnrichment[i]!.uid;
         const data = snap.exists ? (snap.data() as Record<string, unknown>) : null;
+
         avatarByUid[uid] =
           typeof data?.avatarUrl === "string" ? data.avatarUrl :
           typeof data?.photoURL === "string" ? data.photoURL : null;
+
+        displayNameByUid[uid] =
+          typeof data?.displayName === "string" && data.displayName.trim()
+            ? data.displayName.trim() :
+          typeof data?.name === "string" && data.name.trim()
+            ? data.name.trim() : null;
       });
 
       membersWithAvatars = sorted.map((m) => ({
         ...m,
         avatarUrl: m.avatarUrl ?? avatarByUid[m.uid] ?? null,
+        displayName: m.displayName ?? (displayNameByUid[m.uid] ?? null),
       }));
     }
 

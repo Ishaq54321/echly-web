@@ -756,10 +756,14 @@ export async function getDiscussionInboxFeedbackForUserRepo(args: {
   const sidList = accessible.map((s) => s.id).slice(0, DISCUSSION_INBOX_MAX_SESSIONS);
   if (sidList.length === 0) return [];
 
+  const sidToWorkspaceId = new Map(accessible.map((s) => [s.id, s.workspaceId ?? ""]));
+
+  // TODO: Ensure composite index exists for workspaceId + sessionId + commentCount (DESC)
   const batches = await Promise.all(
     sidList.map((sid) =>
       adminDb
         .collection("feedback")
+        .where("workspaceId", "==", sidToWorkspaceId.get(sid) ?? "")
         .where("sessionId", "==", sid)
         .where("commentCount", ">", 0)
         .orderBy("commentCount", "desc")
@@ -797,8 +801,14 @@ export async function getSessionFeedbackPageRepo(
   const pageSize = opts.limit ?? FEEDBACK_PAGE_SIZE_DEFAULT;
   assertQueryLimit(pageSize, "getSessionFeedbackPageRepo");
 
+  const sessionSnap = await adminDb.doc(`sessions/${sessionId}`).get();
+  const sessionData = sessionSnap.data() as { workspaceId?: string } | undefined;
+  const workspaceId = typeof sessionData?.workspaceId === "string" ? sessionData.workspaceId.trim() : "";
+
+  // TODO: Ensure composite index exists for workspaceId + sessionId + status + createdAt
   let q: FirebaseFirestore.Query = adminDb
     .collection("feedback")
+    .where("workspaceId", "==", workspaceId)
     .where("sessionId", "==", sessionId);
   if (status !== "all") q = q.where("status", "==", status);
   q = q.orderBy("status", "asc").orderBy("createdAt", "desc");
@@ -886,14 +896,20 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
   const collected: QueryDocumentSnapshot[] = [];
   let hasMore = false;
 
+  const sessionDocSnap = await adminDb.doc(`sessions/${sessionId}`).get();
+  const sessionDocData = sessionDocSnap.data() as { workspaceId?: string } | undefined;
+  const workspaceId = typeof sessionDocData?.workspaceId === "string" ? sessionDocData.workspaceId.trim() : "";
+
   const indexHint =
     statusFilter != null
-      ? "feedback(sessionId ASC, status ASC, createdAt DESC)"
-      : "feedback(sessionId ASC, createdAt DESC)";
+      ? "feedback(workspaceId ASC, sessionId ASC, status ASC, createdAt DESC)"
+      : "feedback(workspaceId ASC, sessionId ASC, createdAt DESC)";
 
+  // TODO: Ensure composite index exists for workspaceId + sessionId (+ status) + createdAt
   const runQuery = () => {
     let q: FirebaseFirestore.Query = adminDb
       .collection("feedback")
+      .where("workspaceId", "==", workspaceId)
       .where("sessionId", "==", sessionId);
     if (statusFilter) q = q.where("status", "==", statusFilter);
     q = q.orderBy("createdAt", "desc").limit(pageSize);
@@ -998,8 +1014,11 @@ export async function getSessionFeedbackSearchCorpusForUserRepo(args: {
   return out;
 }
 
-export async function deleteFeedbackRepo(feedbackId: string): Promise<void> {
-  await deleteFeedbackWithSessionCountersRepo(feedbackId);
+export async function deleteFeedbackRepo(
+  feedbackId: string,
+  opts?: { actorId?: string; sessionTitle?: string | null }
+): Promise<void> {
+  await deleteFeedbackWithSessionCountersRepo(feedbackId, opts);
 }
 
 /** Max comment docs read/deleted per feedback in one transaction (Firestore op budget). */
@@ -1010,7 +1029,8 @@ const DELETE_FEEDBACK_COMMENT_TX_CHUNK = 400;
  * Migration-safe: floors session and workspace comment totals at 0.
  */
 export async function deleteFeedbackWithSessionCountersRepo(
-  feedbackId: string
+  feedbackId: string,
+  opts?: { actorId?: string; sessionTitle?: string | null }
 ): Promise<void> {
   const fid = feedbackId.trim();
   if (!fid) {
@@ -1106,6 +1126,7 @@ export async function deleteFeedbackWithSessionCountersRepo(
         sessionId,
         type: normalizeIssueTypeForInsights(data.type),
         createdAt: createdAtForInsights,
+        feedbackTitle: typeof data.title === "string" ? data.title : undefined,
       };
     }
 
@@ -1137,6 +1158,7 @@ export async function deleteFeedbackWithSessionCountersRepo(
       sessionId,
       type: normalizeIssueTypeForInsights(data.type),
       createdAt: createdAtForInsights,
+      feedbackTitle: typeof data.title === "string" ? data.title : undefined,
     };
   });
 
@@ -1146,6 +1168,21 @@ export async function deleteFeedbackWithSessionCountersRepo(
       console.log("\u2705 INSIGHTS SYNC SUCCESS");
     } catch (e) {
       console.error("\u274c INSIGHTS SYNC FAILED", e);
+    }
+    if (opts?.actorId) {
+      const actor = await resolveActorForActivityEvent(opts.actorId);
+      await createActivityEvent({
+        workspaceId: insightsAfterDelete.workspaceId,
+        sessionId: insightsAfterDelete.sessionId,
+        eventType: "feedback.deleted",
+        actorId: opts.actorId,
+        actorName: actor.actorName,
+        actorPhotoURL: actor.actorPhotoURL,
+        metadata: {
+          sessionTitle: opts.sessionTitle ?? undefined,
+          feedbackTitle: insightsAfterDelete.feedbackTitle ?? "Untitled feedback",
+        },
+      });
     }
   }
 }
@@ -1223,9 +1260,17 @@ export async function getSessionFeedbackByResolvedRepo(
 ): Promise<Feedback[]> {
   assertQueryLimit(max, "getSessionFeedbackByResolvedRepo");
   const status = isResolved ? "resolved" : "open";
+  const sid = sessionId.trim();
+
+  const sessionDocSnap = await adminDb.doc(`sessions/${sid}`).get();
+  const sessionDocData = sessionDocSnap.data() as { workspaceId?: string } | undefined;
+  const workspaceId = typeof sessionDocData?.workspaceId === "string" ? sessionDocData.workspaceId.trim() : "";
+
+  // TODO: Ensure composite index exists for workspaceId + sessionId + status + createdAt
   const snapshot = await adminDb
     .collection("feedback")
-    .where("sessionId", "==", sessionId.trim())
+    .where("workspaceId", "==", workspaceId)
+    .where("sessionId", "==", sid)
     .where("status", "==", status)
     .orderBy("createdAt", "desc")
     .limit(max)

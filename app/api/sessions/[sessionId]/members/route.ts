@@ -8,6 +8,7 @@ import {
   sessionTitleFromSessionRow,
 } from "@/lib/repositories/activityEventsRepository.server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
 
 export const dynamic = "force-dynamic";
 
@@ -227,6 +228,18 @@ export async function PATCH(
         : "";
     const actorId = context.userId?.trim() ?? "";
     if (workspaceId && actorId) {
+      const targetEmail = typeof snap.data()?.email === "string" ? snap.data()!.email : null;
+      let targetName: string | null = null;
+      try {
+        const targetUser = await getUserByIdRepo(id);
+        targetName =
+          targetUser?.name?.trim() ||
+          (targetEmail as string | null | undefined)?.split("@")[0]?.trim() ||
+          null;
+      } catch {
+        targetName = (targetEmail as string | null | undefined)?.split("@")[0] ?? null;
+      }
+
       const actor = await resolveActorForActivityEvent(actorId);
       const sessionTitle = sessionTitleFromSessionRow(context.session);
       await createActivityEvent({
@@ -236,7 +249,14 @@ export async function PATCH(
         actorId,
         actorName: actor.actorName,
         actorPhotoURL: actor.actorPhotoURL,
-        metadata: { sessionTitle, previousAccess, newAccess: access },
+        metadata: {
+          sessionTitle,
+          previousAccess,
+          newAccess: access,
+          targetUserId: id ?? null,
+          targetEmail: targetEmail ?? null,
+          targetName,
+        },
       });
     }
 
@@ -361,6 +381,8 @@ export async function DELETE(
       });
     }
 
+    const removedEmail = typeof snap.data()?.email === "string" ? snap.data()!.email as string : null;
+
     await ref.delete();
 
     const workspaceId =
@@ -369,6 +391,17 @@ export async function DELETE(
         : "";
     const actorId = context.userId?.trim() ?? "";
     if (workspaceId && actorId) {
+      let removedTargetName: string | null = null;
+      try {
+        const targetUser = await getUserByIdRepo(id);
+        removedTargetName =
+          targetUser?.name?.trim() ||
+          removedEmail?.split("@")[0]?.trim() ||
+          null;
+      } catch {
+        removedTargetName = removedEmail?.split("@")[0] ?? null;
+      }
+
       const actor = await resolveActorForActivityEvent(actorId);
       const sessionTitle = sessionTitleFromSessionRow(context.session);
       await createActivityEvent({
@@ -378,7 +411,12 @@ export async function DELETE(
         actorId,
         actorName: actor.actorName,
         actorPhotoURL: actor.actorPhotoURL,
-        metadata: { sessionTitle },
+        metadata: {
+          sessionTitle,
+          targetUserId: id ?? null,
+          targetEmail: removedEmail ?? null,
+          targetName: removedTargetName ?? null,
+        },
       });
     }
 

@@ -117,6 +117,8 @@ type ResolveAccessInput = {
   } | null;
   /** Direct session membership (`sessions/{id}/members/{userId}`); runs after workspace, before link. */
   memberAccess?: "view" | "resolve" | null;
+  /** Workspace-level role; used to grant OWNER capability to workspace owners. */
+  workspaceRole?: "OWNER" | "MEMBER" | null;
 };
 
 export type ResolveAccessResult = { role: Role; sessionGranted: boolean; isWorkspaceMember: boolean };
@@ -179,6 +181,11 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
   }
 
   if (isOwner) {
+    return { role: "OWNER", sessionGranted: true, isWorkspaceMember: true };
+  }
+
+  const isWorkspaceOwner = isWorkspaceMember && input.workspaceRole === "OWNER";
+  if (isWorkspaceOwner) {
     return { role: "OWNER", sessionGranted: true, isWorkspaceMember: true };
   }
 

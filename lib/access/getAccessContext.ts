@@ -233,6 +233,7 @@ function finalizeAccessContextResult(params: {
   inviteIgnoredReason: "WORKSPACE_MEMBER" | null;
   resolveAccessRequest: AccessRequest | null;
   tokenPayload: TokenPayload | null;
+  workspaceRole?: "OWNER" | "MEMBER" | null;
 }): GetAccessContextResult {
   const {
     session,
@@ -244,6 +245,7 @@ function finalizeAccessContextResult(params: {
     inviteIgnoredReason,
     resolveAccessRequest,
     tokenPayload,
+    workspaceRole,
   } = params;
 
   const { role, sessionGranted, isWorkspaceMember } = resolveAccess({
@@ -257,6 +259,7 @@ function finalizeAccessContextResult(params: {
     user: user ? { uid: user.uid, workspaceId: userWorkspaceId } : null,
     token: tokenPayloadForResolve(tokenPayload),
     memberAccess: member?.access ?? null,
+    workspaceRole: workspaceRole ?? null,
   });
 
   const access = toAccessContext({
@@ -385,7 +388,7 @@ export async function getAccessContext(options: {
       getSessionMember(sid, user.uid),
       getRequestByUser(sid, user.uid),
       effectiveToken ? loadShareLinkPayloadForSession(effectiveToken, sid) : Promise.resolve(null),
-      !isWorkspaceMemberByWorkspaceId && user.uid
+      user.uid
         ? getWorkspaceMemberRepo(session.workspaceId.trim(), user.uid)
         : Promise.resolve(null),
     ]);
@@ -429,6 +432,7 @@ export async function getAccessContext(options: {
     inviteIgnoredReason,
     resolveAccessRequest,
     tokenPayload,
+    workspaceRole: (workspaceMemberDoc?.role as "OWNER" | "MEMBER" | null | undefined) ?? null,
   });
   accessCtxCacheSet(cacheKey, result);
   return result;

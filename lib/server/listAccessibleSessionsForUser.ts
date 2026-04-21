@@ -49,15 +49,9 @@ export async function listAccessibleSessionsForUser(args: {
 
   const ids = new Set<string>();
 
-  const createdSnap = await adminDb
-    .collection("sessions")
-    .where("createdByUserId", "==", uid)
-    .orderBy("updatedAt", "desc")
-    .limit(ownerSessionsQueryLimit)
-    .get();
-  for (const d of createdSnap.docs) ids.add(d.id);
-
   const workspaceId = await getUserWorkspaceIdRepo(uid);
+  // TODO: remove before production
+  console.log("[listAccessibleSessions] workspaceId:", workspaceId, "uid:", uid);
   const workspaceSnap = await adminDb
     .collection("sessions")
     .where("workspaceId", "==", workspaceId)
