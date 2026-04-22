@@ -21,6 +21,7 @@ import type { Feedback } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
 import { getFeedbackByIdRepo } from "@/lib/repositories/feedbackRepository.server";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 
 async function resolveTicketWorkspaceId(
   req: Request,
@@ -34,6 +35,7 @@ async function resolveTicketWorkspaceId(
     authenticatedUser: user,
     userWorkspaceId: viewerWorkspaceId,
     feedbackId: id?.trim() || undefined,
+    preloadedUserProfile: ctx.viewerUserProfile,
   });
   return {
     workspaceId: context.sessionWorkspaceId ?? "",
@@ -110,6 +112,11 @@ export const PATCH = withAuthorization(
       suggestedTags?: string[];
       isResolved?: boolean;
       status?: "open" | "resolved";
+      screenshotId?: string;
+      assigneeId?: string | null;
+      assigneeName?: string | null;
+      assigneeAvatarUrl?: string | null;
+      priority?: "high" | "medium" | "low" | null;
     };
     let id: string;
     try {
@@ -138,6 +145,7 @@ export const PATCH = withAuthorization(
       authenticatedUser: user,
       userWorkspaceId,
       feedbackId: id,
+      preloadedUserProfile: ctx.viewerUserProfile,
       ...(pre && pre.feedback !== undefined
         ? {
             feedback: pre.feedback as Feedback | null,
@@ -181,6 +189,12 @@ export const PATCH = withAuthorization(
     if (typeof body.title === "string") contentUpdates.title = body.title;
     if (typeof body.instruction === "string") contentUpdates.instruction = body.instruction;
     else if (typeof body.description === "string") contentUpdates.instruction = body.description;
+    if (typeof body.screenshotId === "string" && body.screenshotId.trim()) {
+      if (!context.access?.isWorkspaceMember) {
+        return apiError({ code: "FORBIDDEN", message: "Only workspace members can update the screenshot", status: 403 });
+      }
+      contentUpdates.screenshotId = body.screenshotId.trim();
+    }
     if (Array.isArray(body.actionSteps)) {
       if (!context.access?.isWorkspaceMember) {
         return apiError({
@@ -192,6 +206,55 @@ export const PATCH = withAuthorization(
       contentUpdates.actionSteps = body.actionSteps;
     }
     if (Array.isArray(body.suggestedTags)) contentUpdates.suggestedTags = body.suggestedTags;
+
+    // Assign support
+    if ("assigneeId" in body) {
+      if (!context.access?.capabilities.canResolve || !context.access?.isWorkspaceMember) {
+        return apiError({ code: "FORBIDDEN", message: "Only workspace members with resolve access can assign tickets", status: 403 });
+      }
+      if (body.assigneeId === null) {
+        contentUpdates.assigneeId = null;
+        contentUpdates.assigneeName = null;
+        contentUpdates.assigneeAvatarUrl = null;
+      } else if (typeof body.assigneeId === "string") {
+        let resolvedName: string | null = null;
+        let resolvedAvatar: string | null = null;
+        if (body.assigneeName !== undefined) {
+          resolvedName = body.assigneeName;
+          resolvedAvatar = body.assigneeAvatarUrl ?? null;
+        } else {
+          const userSnap = await adminDb.doc(`users/${body.assigneeId}`).get();
+          if (!userSnap.exists) {
+            return apiError({ code: "NOT_FOUND", message: "Assignee not found", status: 404 });
+          }
+          const userData = (userSnap.data() ?? {}) as Record<string, unknown>;
+          resolvedName =
+            typeof userData.displayName === "string" && userData.displayName.trim()
+              ? userData.displayName.trim()
+              : typeof userData.name === "string" && userData.name.trim()
+                ? userData.name.trim()
+                : null;
+          resolvedAvatar =
+            typeof userData.avatarUrl === "string" ? userData.avatarUrl :
+            typeof userData.photoURL === "string" ? userData.photoURL : null;
+        }
+        contentUpdates.assigneeId = body.assigneeId;
+        contentUpdates.assigneeName = resolvedName;
+        contentUpdates.assigneeAvatarUrl = resolvedAvatar;
+      }
+    }
+
+    // Priority support
+    if ("priority" in body) {
+      if (!context.access?.isWorkspaceMember) {
+        return apiError({ code: "FORBIDDEN", message: "Only workspace members can set priority", status: 403 });
+      }
+      const p = body.priority;
+      if (p !== null && p !== "high" && p !== "medium" && p !== "low") {
+        return apiError({ code: "INVALID_INPUT", message: "Invalid priority; allowed: high, medium, low, null", status: 400 });
+      }
+      contentUpdates.priority = p ?? null;
+    }
 
     const hasContent = Object.keys(contentUpdates).length > 0;
 
@@ -232,6 +295,12 @@ export const PATCH = withAuthorization(
             status: 401,
           });
         }
+        const { status: _s, ...nonStatusUpdates } = contentUpdates;
+        const hasNonStatusUpdates = Object.keys(nonStatusUpdates).length > 0;
+        const typeIsChanging = "type" in contentUpdates;
+        if (hasNonStatusUpdates) {
+          await updateFeedbackRepo(id, nonStatusUpdates, { skipPreRead: !typeIsChanging });
+        }
         const resolveResult = await updateFeedbackResolveAndSessionCountersRepo(
           id,
           actorId,
@@ -245,7 +314,8 @@ export const PATCH = withAuthorization(
         }
         console.log("[Resolve] Repo done:", Date.now() - start, "ms");
       } else {
-        await updateFeedbackRepo(id, contentUpdates);
+        const typeIsChanging = "type" in contentUpdates;
+        await updateFeedbackRepo(id, contentUpdates, { skipPreRead: !typeIsChanging });
         fireAndForget("PATCH-tickets-sessionUpdatedAt", () =>
           updateSessionUpdatedAtRepo(existingForOwnership.sessionId)
         );
@@ -254,6 +324,12 @@ export const PATCH = withAuthorization(
         ...existingForOwnership,
         ...contentUpdates,
         ...(patchStatus !== undefined ? { status: patchStatus } : {}),
+        ...("assigneeId" in contentUpdates ? {
+          assigneeId: contentUpdates.assigneeId ?? null,
+          assigneeName: contentUpdates.assigneeName ?? null,
+          assigneeAvatarUrl: contentUpdates.assigneeAvatarUrl ?? null,
+        } : {}),
+        ...("priority" in contentUpdates ? { priority: contentUpdates.priority ?? null } : {}),
       };
       if (traceResolveFlow) {
         console.log(
@@ -301,6 +377,7 @@ export const DELETE = withAuthorization(
         authenticatedUser: user,
         userWorkspaceId,
         feedbackId: id,
+        preloadedUserProfile: ctx.viewerUserProfile,
         ...(pre && pre.feedback !== undefined
           ? {
               feedback: pre.feedback as Feedback | null,

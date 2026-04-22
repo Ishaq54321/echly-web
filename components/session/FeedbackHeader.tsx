@@ -7,6 +7,7 @@ import {
 } from "@/lib/domain/feedback-display";
 import type { FeedbackItemShape } from "@/components/session/feedbackDetail/types";
 import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
+import type { Priority } from "@/lib/domain/feedback";
 import {
   CheckCircle,
   UserPlus,
@@ -14,7 +15,10 @@ import {
   MessageSquare,
   Trash2,
   Lock,
+  Minus,
 } from "lucide-react";
+import { AssignDropdown } from "@/components/feedback/AssignDropdown";
+import { PriorityDropdown } from "@/components/feedback/PriorityDropdown";
 
 const iconBtn = {
   size: 16,
@@ -23,7 +27,7 @@ const iconBtn = {
 } as const;
 
 const resolveBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-transparent bg-[#2563EB] text-white shadow-[0_1px_2px_rgba(0,0,0,0.08)] hover:bg-[#1D4ED8] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[13px] font-medium border border-transparent bg-[#2563EB] text-white shadow-[0_1px_2px_rgba(0,0,0,0.08)] hover:bg-[#1D4ED8] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
 const requestResolveAccessBtn =
   "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[var(--border-subtle)] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary-strong))] shadow-none hover:bg-[hsl(var(--surface-3))] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
@@ -36,10 +40,10 @@ const pendingResolveAccessBtn =
   "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF] cursor-default opacity-95 pointer-events-none select-none";
 
 const secondaryBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[#E7ECF2] bg-[#FAFBFC] text-[#374151] hover:bg-[#F1F4F8] hover:border-[#DCE4EE] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[13px] font-medium border border-[#E7ECF2] bg-[#FAFBFC] text-[#374151] hover:bg-[#F1F4F8] hover:border-[#DCE4EE] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
 
 const btnDelete =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[#E7ECF2] bg-[#FAFBFC] text-[#374151] hover:bg-[#FEF2F2] hover:text-[#DC2626] hover:border-[#FECACA] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[13px] font-medium border border-[#E7ECF2] bg-[#FAFBFC] text-[#374151] hover:bg-[#FEF2F2] hover:text-[#DC2626] hover:border-[#FECACA] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
 
 function StatusBadge({ status }: { status: FeedbackStatus }) {
   const base =
@@ -104,6 +108,17 @@ export interface SessionFeedbackHeaderProps {
   accessResolveSubmitting?: boolean;
   /** True for unauthenticated viewers; shows sign-in affordances instead of disabled buttons. */
   isAnonymousViewer?: boolean;
+  /** Assign dropdown data */
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+  assigneeAvatarUrl?: string | null;
+  onAssigned?: (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => void;
+  /** Priority dropdown data */
+  priority?: Priority | null;
+  onPriorityChanged?: (priority: Priority | null) => void;
+  /** Permission gates for new controls */
+  canAssignTicket?: boolean;
+  isWorkspaceMember?: boolean;
 }
 
 /**
@@ -126,6 +141,14 @@ export function SessionFeedbackHeader({
   accessResolve,
   accessResolveSubmitting = false,
   isAnonymousViewer = false,
+  assigneeId,
+  assigneeName,
+  assigneeAvatarUrl,
+  onAssigned,
+  priority,
+  onPriorityChanged,
+  canAssignTicket = false,
+  isWorkspaceMember = false,
 }: SessionFeedbackHeaderProps) {
   const [resolveFlash, setResolveFlash] = useState(false);
   useEffect(() => {
@@ -287,8 +310,8 @@ export function SessionFeedbackHeader({
                   Assign
                 </button>
                 <button type="button" className={secondaryBtn} onClick={gateDefer}>
-                  <Clock {...iconBtn} aria-hidden />
-                  Defer
+                  <Minus {...iconBtn} aria-hidden />
+                  Priority
                 </button>
                 <button type="button" className={secondaryBtn} onClick={gateComment}>
                   <MessageSquare {...iconBtn} aria-hidden />
@@ -413,29 +436,50 @@ export function SessionFeedbackHeader({
                     }
                   >
                     <CheckCircle {...iconBtn} aria-hidden />
-                    <span>
-                      {isResolved
-                        ? "Resolved"
-                        : resolveSubmitting
-                          ? "Resolving…"
-                          : "Resolve"}
-                    </span>
+                    <span>{isResolved ? "Resolved" : "Resolve"}</span>
                   </button>
                 )
               ) : null}
-              {/* Assign/Defer only for users who can resolve (OWNER, RESOLVER) */}
-              {accessResolve == null && (
-                <button type="button" className={secondaryBtn}>
-                  <UserPlus {...iconBtn} aria-hidden />
-                  Assign
-                </button>
-              )}
-              {accessResolve == null && (
-                <button type="button" className={secondaryBtn}>
-                  <Clock {...iconBtn} aria-hidden />
-                  Defer
-                </button>
-              )}
+              {/* Assign: full dropdown for workspace members, read-only chip for others */}
+              {item && (() => {
+                const canManage = !!(canAssignTicket &&
+                                     isWorkspaceMember &&
+                                     onAssigned);
+                const isAnon = isAnonymousViewer === true;
+
+                if (isAnon) return null;
+
+                return (
+                  <AssignDropdown
+                    feedbackId={item.id}
+                    sessionId={""}
+                    currentAssigneeId={assigneeId ?? null}
+                    currentAssigneeName={assigneeName ?? null}
+                    currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
+                    onAssigned={onAssigned ?? (() => {})}
+                    disabled={!canManage}
+                    readOnly={!canManage}
+                  />
+                );
+              })()}
+              {/* Priority: full dropdown for workspace members, read-only pill for others */}
+              {item && (() => {
+                const canManage = !!(isWorkspaceMember &&
+                                     onPriorityChanged);
+                const isAnon = isAnonymousViewer === true;
+
+                if (isAnon) return null;
+
+                return (
+                  <PriorityDropdown
+                    feedbackId={item.id}
+                    currentPriority={priority ?? null}
+                    onPriorityChanged={onPriorityChanged ?? (() => {})}
+                    disabled={!canManage}
+                    readOnly={!canManage}
+                  />
+                );
+              })()}
               {onOpenComment ? (
                 <button
                   type="button"

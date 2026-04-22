@@ -259,6 +259,10 @@ type FeedbackUpdate = Partial<{
   screenshotStatus: "attached" | "pending" | "none" | "failed" | null;
   actionSteps: string[] | null;
   suggestedTags: string[] | null;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  assigneeAvatarUrl: string | null;
+  priority: "high" | "medium" | "low" | null;
 }>;
 
 type FeedbackStatus = "open" | "resolved";
@@ -335,7 +339,12 @@ export async function updateFeedbackRepo(
     screenshotStatus: "attached" | "pending" | "none" | "failed" | null;
     actionSteps: string[] | null;
     suggestedTags: string[] | null;
-  }>
+    assigneeId: string | null;
+    assigneeName: string | null;
+    assigneeAvatarUrl: string | null;
+    priority: "high" | "medium" | "low" | null;
+  }>,
+  opts?: { skipPreRead?: boolean }
 ): Promise<void> {
   const updates: FeedbackUpdate = {};
   if (typeof data.title === "string") updates.title = data.title;
@@ -350,8 +359,18 @@ export async function updateFeedbackRepo(
   if (data.screenshotStatus !== undefined) updates.screenshotStatus = data.screenshotStatus;
   if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
+  if ("assigneeId" in data) updates.assigneeId = data.assigneeId ?? null;
+  if ("assigneeName" in data) updates.assigneeName = data.assigneeName ?? null;
+  if ("assigneeAvatarUrl" in data) updates.assigneeAvatarUrl = data.assigneeAvatarUrl ?? null;
+  if ("priority" in data) updates.priority = data.priority ?? null;
   if (Object.keys(updates).length === 0) return;
   const feedbackRef = adminDb.doc(`feedback/${feedbackId}`);
+
+  if (opts?.skipPreRead) {
+    await feedbackRef.update(updates);
+    return;
+  }
+
   const feedbackSnap = await feedbackRef.get();
   if (!feedbackSnap.exists) return;
   const prev = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
@@ -434,7 +453,21 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
   if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
   updates.status = toStatus;
 
-  const result = await adminDb.runTransaction(async (tx) => {
+  type TxApplied = {
+    kind: "applied";
+    wasStatus: FeedbackStatus;
+    toStatus: FeedbackStatus;
+    resolveDelta?: { workspaceId: string; delta: 1 | -1 };
+    typeChange?: { workspaceId: string; oldType: string; newType: string };
+    sessionId: string;
+    feedbackTitle: string | undefined;
+  };
+  type TxResult =
+    | { kind: "missing" }
+    | { kind: "noop"; wasStatus: FeedbackStatus; toStatus: FeedbackStatus }
+    | TxApplied;
+
+  const result: TxResult = await adminDb.runTransaction(async (tx) => {
     const feedbackSnap = await tx.get(feedbackRef);
     if (!feedbackSnap.exists) return { kind: "missing" as const };
     const fd = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
@@ -442,22 +475,12 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
     const raw = typeof fd.status === "string" ? fd.status : "";
     const wasStatus: FeedbackStatus = raw === "resolved" ? "resolved" : "open";
 
-    let workspaceId =
-      typeof fd.workspaceId === "string" ? fd.workspaceId.trim() : "";
-    const sessionRef = adminDb.doc(`sessions/${sessionId}`);
-    // All transaction reads must complete before any writes.
-    const sessionSnap = await tx.get(sessionRef);
-
+    const workspaceId = typeof fd.workspaceId === "string" ? fd.workspaceId.trim() : "";
     if (!workspaceId) {
-      const s = sessionSnap.data() || {};
-      workspaceId =
-        typeof (s as { workspaceId?: unknown }).workspaceId === "string"
-          ? (s as { workspaceId: string }).workspaceId.trim()
-          : "";
-      if (!workspaceId) {
-        throw new Error("Missing workspaceId on session");
-      }
+      throw new Error("Missing workspaceId on feedback");
     }
+
+    const sessionRef = adminDb.doc(`sessions/${sessionId}`);
 
     const oldTypeForInsights = normalizeIssueTypeForInsights(fd.type);
     const newTypeForInsights =
@@ -477,28 +500,16 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
       return { kind: "noop" as const, wasStatus, toStatus };
     }
 
-    const srow = sessionSnap.data() ?? {};
-    const counterTransition =
-      wasStatus !== toStatus
-        ? sessionTicketCountsAfterStatusChange({
-            openCount: num((srow as { openCount?: unknown }).openCount),
-            resolvedCount: num((srow as { resolvedCount?: unknown }).resolvedCount),
-            wasStatus,
-            toStatus,
-          })
-        : null;
-
     tx.update(feedbackRef, updates);
 
-    if (counterTransition) {
-      const { openCount, resolvedCount, totalCount } = counterTransition;
+    // PERF-006: FieldValue.increment replaces session counter read-modify-write.
+    if (wasStatus !== toStatus) {
+      const isResolving = toStatus === "resolved";
       tx.set(
         sessionRef,
         {
-          openCount,
-          resolvedCount,
-          totalCount,
-          feedbackCount: totalCount,
+          openCount: FieldValue.increment(isResolving ? -1 : 1),
+          resolvedCount: FieldValue.increment(isResolving ? 1 : -1),
           skippedCount: FieldValue.delete(),
           updatedAt: new Date(),
         },
@@ -517,6 +528,8 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
         toStatus,
         resolveDelta,
         typeChange: typeChangeMeta,
+        sessionId,
+        feedbackTitle: typeof fd.title === "string" ? fd.title : undefined,
       };
     }
 
@@ -532,6 +545,8 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
       wasStatus,
       toStatus,
       typeChange: typeChangeMeta,
+      sessionId,
+      feedbackTitle: typeof fd.title === "string" ? fd.title : undefined,
     };
   });
 
@@ -720,6 +735,10 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     lastCommentAt: (data.lastCommentAt ?? null) as any,
     isDeleted: data.isDeleted ?? false,
     status,
+    assigneeId: data.assigneeId ?? null,
+    assigneeName: data.assigneeName ?? null,
+    assigneeAvatarUrl: data.assigneeAvatarUrl ?? null,
+    priority: (data.priority as Feedback["priority"]) ?? null,
   };
 }
 

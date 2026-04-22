@@ -9,7 +9,7 @@ import {
 } from "@/lib/server/auth/authorize";
 import { apiError } from "@/lib/server/apiResponse";
 import { isAdminUser } from "@/lib/server/adminAuth";
-import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { getUserProfileForRequestContextRepo } from "@/lib/repositories/usersRepository.server";
 
 /** Data already loaded while resolving workspace (e.g. ticket + session); handlers must not re-fetch the same docs. */
 export type PreloadedTicketContext = {
@@ -21,6 +21,8 @@ export type PreloadedTicketContext = {
 export type HandlerContext = {
   params?: Promise<Record<string, string>> | Record<string, string>;
   preloaded?: PreloadedTicketContext;
+  /** Cached user profile from the single users/{uid} read in withAuthorization; passed to buildRequestContext to skip re-reads. */
+  viewerUserProfile?: { email: string | null; workspaceId: string } | null;
 };
 
 /** `resolveWorkspace` may return a plain workspace id or an object that includes preloaded entities. */
@@ -83,17 +85,17 @@ export function withAuthorization(
         return apiError({ code: "FORBIDDEN", message: "Forbidden", status: 403 });
       }
 
-      const viewerWorkspaceIdRaw = await getUserWorkspaceIdRepo(user.uid);
-      const viewerWorkspaceId =
-        typeof viewerWorkspaceIdRaw === "string" ? viewerWorkspaceIdRaw.trim() : "";
+      const viewerProfile = await getUserProfileForRequestContextRepo(user.uid);
+      const viewerWorkspaceId = viewerProfile.workspaceId;
 
+      const ctxWithProfile: HandlerContext = { ...ctx, viewerUserProfile: viewerProfile };
       const resolvedWorkspace = await options.resolveWorkspace(
         req,
         user,
-        ctx,
+        ctxWithProfile,
         viewerWorkspaceId
       );
-      const handlerCtx: HandlerContext = { ...ctx };
+      const handlerCtx: HandlerContext = { ...ctxWithProfile };
       let normalizedWorkspaceId: string;
       if (typeof resolvedWorkspace === "string") {
         normalizedWorkspaceId = resolvedWorkspace.trim();

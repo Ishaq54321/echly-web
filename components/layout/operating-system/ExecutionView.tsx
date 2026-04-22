@@ -5,6 +5,7 @@ import { FeedbackContent } from "@/components/session/feedbackDetail/FeedbackCon
 import { SessionFeedbackHeader } from "@/components/session/FeedbackHeader";
 import type { Comment } from "@/lib/domain/comment";
 import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
+import type { Priority } from "@/lib/domain/feedback";
 
 export interface ExecutionViewProps {
   item: (FeedbackItemShape & { index: number; total: number }) | null;
@@ -15,6 +16,8 @@ export interface ExecutionViewProps {
   onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
   onSaveTags?: (suggestedTags: string[]) => Promise<void>;
   setIsImageExpanded: (v: boolean) => void;
+  onEdit?: () => void;
+  canEdit?: boolean;
   onOpenComment?: () => void;
   onCloseCommentMode?: () => void;
   isCommentMode?: boolean;
@@ -60,6 +63,10 @@ export interface ExecutionViewProps {
   screenshotUrl: string | null;
   screenshotUrlLoading: boolean;
   screenshotUrlError: string | null;
+  onAssigned?: (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => void;
+  onPriorityChanged?: (priority: Priority | null) => void;
+  canAssignTicket?: boolean;
+  isWorkspaceMember?: boolean;
 }
 
 export function ExecutionView({
@@ -70,6 +77,8 @@ export function ExecutionView({
   onSaveActionSteps,
   onSaveTags,
   setIsImageExpanded,
+  onEdit,
+  canEdit,
   onOpenComment,
   onCloseCommentMode,
   isCommentMode = false,
@@ -98,6 +107,10 @@ export function ExecutionView({
   screenshotUrl,
   screenshotUrlLoading,
   screenshotUrlError,
+  onAssigned,
+  onPriorityChanged,
+  canAssignTicket = false,
+  isWorkspaceMember = false,
 }: ExecutionViewProps) {
   const displayItem = item;
 
@@ -129,6 +142,14 @@ export function ExecutionView({
         accessResolve={accessResolve}
         accessResolveSubmitting={accessResolveSubmitting}
         isAnonymousViewer={isAnonymousViewer}
+        assigneeId={(!isPublicReadOnly && !isShareSurface) ? (displayItem as { assigneeId?: string | null } | null)?.assigneeId ?? null : undefined}
+        assigneeName={(!isPublicReadOnly && !isShareSurface) ? (displayItem as { assigneeName?: string | null } | null)?.assigneeName ?? null : undefined}
+        assigneeAvatarUrl={(!isPublicReadOnly && !isShareSurface) ? (displayItem as { assigneeAvatarUrl?: string | null } | null)?.assigneeAvatarUrl ?? null : undefined}
+        onAssigned={(!isPublicReadOnly && !isShareSurface) ? onAssigned : undefined}
+        priority={(!isPublicReadOnly && !isShareSurface) ? (displayItem as { priority?: string | null } | null)?.priority as ("high" | "medium" | "low" | null) ?? null : undefined}
+        onPriorityChanged={(!isPublicReadOnly && !isShareSurface) ? onPriorityChanged : undefined}
+        canAssignTicket={canAssignTicket}
+        isWorkspaceMember={isWorkspaceMember}
       />
 
       {!isPublicReadOnly && !isShareSurface && isCommentMode && (
@@ -164,6 +185,8 @@ export function ExecutionView({
                 isPublicReadOnly || isShareSurface ? undefined : onSaveTags
               }
               onExpandImage={() => setIsImageExpanded(true)}
+              onEdit={isPublicReadOnly || isShareSurface ? undefined : onEdit}
+              canEdit={!isPublicReadOnly && !isShareSurface ? canEdit : undefined}
               isCommentMode={
                 !isPublicReadOnly && !isShareSurface && isCommentMode
               }

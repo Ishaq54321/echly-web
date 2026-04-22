@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect, useState } from "react";
-import { Loader2, ZoomIn } from "lucide-react";
+import { Loader2, Pencil, ZoomIn } from "lucide-react";
 
 interface ScreenshotBlockProps {
   screenshotId: string | null | undefined;
@@ -10,6 +10,8 @@ interface ScreenshotBlockProps {
   screenshotUrlLoading: boolean;
   screenshotUrlError: string | null;
   onExpand: () => void;
+  onEdit?: () => void;
+  canEdit?: boolean;
   /** Omit outer frame when nested inside a parent attachment card. */
   embeddedInCard?: boolean;
 }
@@ -20,6 +22,8 @@ export function ScreenshotBlock({
   screenshotUrlLoading: loading,
   screenshotUrlError: error,
   onExpand,
+  onEdit,
+  canEdit,
   embeddedInCard = false,
 }: ScreenshotBlockProps) {
   const [imageDecoded, setImageDecoded] = useState(false);
@@ -72,14 +76,29 @@ export function ScreenshotBlock({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/8 via-transparent to-transparent pointer-events-none" />
         {url ? (
-          <button
-            type="button"
-            onClick={onExpand}
-            className="absolute top-3 right-3 p-2.5 rounded-xl bg-white/95 text-[hsl(var(--text-primary-strong))] shadow-[var(--shadow-level-2)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
-            aria-label="Expand screenshot"
-          >
-            <ZoomIn className="h-5 w-5" strokeWidth={1.5} />
-          </button>
+          <>
+            {canEdit && onEdit && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="absolute top-3 right-[3.75rem] p-3 rounded-xl bg-white/95 text-[hsl(var(--text-primary-strong))] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
+                aria-label="Edit screenshot"
+              >
+                <Pencil className="h-[1.375rem] w-[1.375rem]" strokeWidth={1.5} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onExpand}
+              className="absolute top-3 right-3 p-3 rounded-xl bg-white/95 text-[hsl(var(--text-primary-strong))] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
+              aria-label="Expand screenshot"
+            >
+              <ZoomIn className="h-[1.375rem] w-[1.375rem]" strokeWidth={1.5} />
+            </button>
+          </>
         ) : null}
       </div>
     </div>

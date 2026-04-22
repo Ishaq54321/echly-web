@@ -421,6 +421,11 @@ button[aria-disabled="true"],
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes resolveToastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .insights-fade-in {
   animation: fadeIn 220ms var(--motion-ease-out) both;
 }
@@ -5683,7 +5688,7 @@ html.dark .echly-mic-item.is-active {
   position: sticky;
   top: 0;
   z-index: 5;
-  padding: 0 16px;
+  padding: 0 16px 6px;
   margin: 0 0 12px;
   background: #fafbfc;
 }
@@ -5710,9 +5715,9 @@ html.dark .echly-mic-item.is-active {
 }
 
 .search-container:focus-within {
-  border-color: #E5E7EB;
   background: #fafafa;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
+  border-color: #3B82F6;
+  box-shadow: inset 0 0 0 1px #3B82F6;
 }
 
 .search-icon {

@@ -123,6 +123,8 @@ export async function buildRequestContext(params: {
   bodyShareToken?: string | null;
   /** Same as {@link resolveAccessIdentity} `pathShareToken`. */
   pathShareToken?: string | null;
+  /** Pre-fetched user profile from withAuthorization; when present, skips the users/{uid} Firestore read. */
+  preloadedUserProfile?: { email: string | null; workspaceId: string } | null;
   /**
    * When true, anonymous requests without a share token are allowed; `identityType` is `NONE`
    * and access is resolved with `user: null` (e.g. GET session overview).
@@ -170,9 +172,11 @@ export async function buildRequestContext(params: {
   const userProfilePromise =
     viewerUser == null
       ? Promise.resolve(null)
-      : trimmedPreloaded !== ""
-        ? getUserProfileForRequestContextRepo(viewerUser.uid, trimmedPreloaded)
-        : getUserProfileForRequestContextRepo(viewerUser.uid, undefined);
+      : params.preloadedUserProfile != null
+        ? Promise.resolve(params.preloadedUserProfile)
+        : trimmedPreloaded !== ""
+          ? getUserProfileForRequestContextRepo(viewerUser.uid, trimmedPreloaded)
+          : getUserProfileForRequestContextRepo(viewerUser.uid, undefined);
 
   const hasExplicitSessionId =
     typeof sessionId === "string" && sessionId.trim() !== "";

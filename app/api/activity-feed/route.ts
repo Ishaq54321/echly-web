@@ -200,7 +200,48 @@ export async function GET(req: NextRequest) {
   try {
     const snapshot = await q.get();
     const events = snapshot.docs.map((d) => activityEventFromDoc(d as QueryDocumentSnapshot));
-    const normalizedEvents = events.map(normalizeForGrouping);
+
+    const actorIdsNeedingPhoto = [
+      ...new Set(
+        events
+          .filter(e => e.actor && !e.actor.photoURL)
+          .map(e => e.actor.id)
+          .filter(Boolean)
+      )
+    ];
+
+    let photoByActorId: Record<string, string | null> = {};
+
+    if (actorIdsNeedingPhoto.length > 0) {
+      const userRefs = actorIdsNeedingPhoto.map(uid => adminDb.doc(`users/${uid}`));
+      const userSnaps = await adminDb.getAll(...userRefs);
+
+      userSnaps.forEach((snap, i) => {
+        const uid = actorIdsNeedingPhoto[i]!;
+        const data = snap.exists ? snap.data() : null;
+        photoByActorId[uid] =
+          typeof data?.avatarUrl === "string" && data.avatarUrl.trim()
+            ? data.avatarUrl.trim()
+            : typeof data?.photoURL === "string" && data.photoURL.trim()
+            ? data.photoURL.trim()
+            : null;
+      });
+    }
+
+    const enrichedEvents = events.map(event => {
+      if (event.actor && !event.actor.photoURL && photoByActorId[event.actor.id]) {
+        return {
+          ...event,
+          actor: {
+            ...event.actor,
+            photoURL: photoByActorId[event.actor.id],
+          },
+        };
+      }
+      return event;
+    });
+
+    const normalizedEvents = enrichedEvents.map(normalizeForGrouping);
     const groupedEvents = groupEventsServer(normalizedEvents);
 
     if (process.env.NODE_ENV === "development") {
@@ -224,7 +265,7 @@ export async function GET(req: NextRequest) {
     }
 
     return apiSuccess(
-      { events, groupedEvents, nextCursor },
+      { events: enrichedEvents, groupedEvents, nextCursor },
       hasSessionFilter ? ctx.access : null,
       { headers: corsHeaders(req) }
     );

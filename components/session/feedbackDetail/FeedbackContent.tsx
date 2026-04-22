@@ -24,6 +24,8 @@ interface FeedbackContentProps {
   onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
   onSaveTags?: (suggestedTags: string[]) => Promise<void>;
   onExpandImage: () => void;
+  onEdit?: () => void;
+  canEdit?: boolean;
   isCommentMode?: boolean;
   comments?: Comment[];
   pinComments?: (Comment & { position: { xPercent: number; yPercent: number } })[];
@@ -48,6 +50,8 @@ export function FeedbackContent({
   onSaveActionSteps,
   onSaveTags,
   onExpandImage,
+  onEdit,
+  canEdit,
   isCommentMode,
   comments = [],
   pinComments,
@@ -141,6 +145,8 @@ export function FeedbackContent({
                   updateComment={updateComment}
                   onCommentPlaced={onCommentPlaced}
                   onPinPositionChange={updatePinPosition}
+                  onEdit={onEdit}
+                  canEdit={canEdit}
                   embeddedInCard
                 />
               ) : (
@@ -150,6 +156,8 @@ export function FeedbackContent({
                   screenshotUrlLoading={screenshotUrlLoading}
                   screenshotUrlError={screenshotUrlError}
                   onExpand={onExpandImage}
+                  onEdit={onEdit}
+                  canEdit={canEdit}
                   embeddedInCard
                 />
               )

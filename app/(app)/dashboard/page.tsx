@@ -173,7 +173,7 @@ function DashboardContent() {
                       onClick={triggerCta}
                       disabled={startingRecorder || !isIdentityResolved}
                       aria-busy={startingRecorder}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-blue-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
+                      className="rounded-[9px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-blue-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
                     >
                       New Session
                     </button>

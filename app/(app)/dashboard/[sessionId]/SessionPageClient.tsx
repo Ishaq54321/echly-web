@@ -50,6 +50,7 @@ import {
 import { TopControlBar } from "@/components/ui/TopControlBar";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import { ImageViewer } from "@/components/ImageViewer";
+import { ResolveToast, type ResolveToastState } from "@/components/ui/ResolveToast";
 
 const DeleteSessionModal = dynamic(
   () =>
@@ -556,6 +557,10 @@ export default function SessionPageClient({
     isResolved: boolean;
   } | null>(null);
   const [resolveAffirmationKey, setResolveAffirmationKey] = useState(0);
+  const [resolveSubmitting, setResolveSubmitting] = useState(false);
+  const [resolveToastState, setResolveToastState] = useState<ResolveToastState>("hidden");
+  /** Tracks which ticket was being resolved so we can navigate back on PATCH failure. */
+  const resolvingTicketIdRef = useRef<string | null>(null);
 
   const feedbackScopedVisual = useMemo(() => {
     if (!resolveOptimistic) return feedbackScoped;
@@ -635,6 +640,7 @@ export default function SessionPageClient({
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [isCommentMode, setIsCommentMode] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
+  const [openImageInEditMode, setOpenImageInEditMode] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteSessionModalOpen, setDeleteSessionModalOpen] = useState(false);
   const [isEditingSessionTitle, setIsEditingSessionTitle] = useState(false);
@@ -1590,7 +1596,11 @@ export default function SessionPageClient({
     }
   };
 
-  const saveResolved = (isResolved: boolean): boolean => {
+  const saveResolved = (
+    isResolved: boolean,
+    onSuccess?: () => void,
+    onError?: () => void
+  ): boolean => {
     const ticketId = effectiveSelectedId;
     if (!ticketId) return false;
 
@@ -1603,6 +1613,7 @@ export default function SessionPageClient({
           feedback.find((i) => i.id === ticketId)?.isResolved
         );
 
+        setResolveSubmitting(true);
         setResolveOptimistic({ ticketId, isResolved });
         if (isResolved) {
           setResolveAffirmationKey((k) => k + 1);
@@ -1628,6 +1639,7 @@ export default function SessionPageClient({
         void (async () => {
           const rollbackResolved = () => {
             setResolveOptimistic(null);
+            setResolveSubmitting(false);
             if (countsTransition) {
               setSessionCountsDelta((prev) => ({
                 open: prev.open + (isResolved ? 1 : -1),
@@ -1661,8 +1673,8 @@ export default function SessionPageClient({
             });
             if (!res || !res.ok) {
               rollbackResolved();
+              onError?.();
               if (res && responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
-              else showToast("Failed to update");
               return;
             }
             const rawResolve = await res.json();
@@ -1671,7 +1683,7 @@ export default function SessionPageClient({
               ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(rawResolve).ticket;
             } catch {
               rollbackResolved();
-              showToast("Failed to update");
+              onError?.();
               return;
             }
             if (perf) {
@@ -1682,6 +1694,7 @@ export default function SessionPageClient({
               );
             }
             setResolveOptimistic(null);
+            setResolveSubmitting(false);
             setFeedback((prev) =>
               prev.map((item) =>
                 item.id === ticketId ? { ...item, ...ticketPayload } : item
@@ -1691,10 +1704,12 @@ export default function SessionPageClient({
             // evicted so the next navigation re-fetches accurate counts.
             invalidateSessionDetailCache(sessionId);
             broadcastTicketUpdated(ticketPayload);
+            onSuccess?.();
           } catch (err) {
             console.error("[ECHLY] saveResolved failed", err);
             rollbackResolved();
-            showToast("Failed to update");
+            setResolveSubmitting(false);
+            onError?.();
           }
         })();
       },
@@ -1723,15 +1738,66 @@ export default function SessionPageClient({
     );
     const navigateToId = nextOpenAfter?.id ?? firstOtherOpen?.id;
 
+    // Store for potential rollback on PATCH failure
+    resolvingTicketIdRef.current = ticketId;
+
+    // Navigate immediately (optimistic) before PATCH completes
     if (navigateToId) {
       setSelectedId(navigateToId);
     } else {
       showToast("No more feedback");
     }
 
-    /** Optimistic local updates + PATCH already run inside saveResolved; navigation is immediate (no await). */
-    saveResolved(true);
+    // Show saving toast immediately
+    setResolveToastState("saving");
+
+    saveResolved(
+      true,
+      () => {
+        // PATCH succeeded — toast moves to 'saved'
+        setResolveToastState("saved");
+      },
+      () => {
+        // PATCH failed — show error toast and navigate back to original ticket
+        setResolveToastState("error");
+        const originalId = resolvingTicketIdRef.current;
+        if (originalId) {
+          setSelectedId(originalId);
+          resolvingTicketIdRef.current = null;
+        }
+      }
+    );
   };
+
+  const handleAssigned = useCallback(
+    (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => {
+      const ticketId = effectiveSelectedId;
+      if (!ticketId) return;
+      setFeedback((prev) =>
+        prev.map((item) =>
+          item.id === ticketId
+            ? { ...item, assigneeId, assigneeName, assigneeAvatarUrl }
+            : item
+        )
+      );
+      invalidateSessionDetailCache(sessionId);
+    },
+    [effectiveSelectedId, sessionId, setFeedback]
+  );
+
+  const handlePriorityChanged = useCallback(
+    (priority: "high" | "medium" | "low" | null) => {
+      const ticketId = effectiveSelectedId;
+      if (!ticketId) return;
+      setFeedback((prev) =>
+        prev.map((item) =>
+          item.id === ticketId ? { ...item, priority } : item
+        )
+      );
+      invalidateSessionDetailCache(sessionId);
+    },
+    [effectiveSelectedId, sessionId, setFeedback]
+  );
 
   const handleSessionTitleBlur = useCallback(async () => {
     const s = sessionRef.current;
@@ -1982,6 +2048,28 @@ export default function SessionPageClient({
     }
   };
 
+  const handleScreenshotUpdate = useCallback(
+    async (newId: string) => {
+      const ticketId = effectiveSelectedId;
+      if (!ticketId) return;
+      // Optimistic local update so useScreenshotUrl re-resolves the new image
+      setFeedback((prev) =>
+        prev.map((f) => (f.id === ticketId ? { ...f, screenshotId: newId } : f))
+      );
+      try {
+        await authFetch(`/api/tickets/${ticketId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ screenshotId: newId }),
+        });
+      } catch {
+        // Non-critical — local state is already updated; the screenshotId is persisted
+        // in Storage by the upload API regardless. A full reload will sync DB state.
+      }
+    },
+    [effectiveSelectedId, setFeedback]
+  );
+
   const canDeleteSelectedTicket =
     Boolean(authUid) && selectedItem != null && sessionAccess?.canDeleteTicket === true;
 
@@ -2084,9 +2172,15 @@ export default function SessionPageClient({
         resolveAffirmationKey={resolveAffirmationKey}
         onSaveTitle={saveTitle}
         onResolvedChange={handleResolvedChange}
+        resolveSubmitting={resolveSubmitting}
         onSaveActionSteps={isWorkspaceMember ? saveActionSteps : undefined}
-        onSaveTags={saveTags}
+        onSaveTags={isWorkspaceMember ? saveTags : undefined}
         setIsImageExpanded={setIsImageExpanded}
+        onEdit={() => {
+          setOpenImageInEditMode(true);
+          setIsImageExpanded(true);
+        }}
+        canEdit={isWorkspaceMember && Boolean(selectedItem?.screenshotId)}
         isCommentMode={isCommentMode}
         onOpenComment={() => setIsCommentMode(true)}
         onCloseCommentMode={() => setIsCommentMode(false)}
@@ -2139,6 +2233,10 @@ export default function SessionPageClient({
         screenshotUrl={selectedScreenshotUrl}
         screenshotUrlLoading={selectedScreenshotUrlLoading}
         screenshotUrlError={selectedScreenshotUrlError}
+        onAssigned={isWorkspaceMember && sessionAccess?.canResolve === true ? handleAssigned : undefined}
+        onPriorityChanged={isWorkspaceMember ? handlePriorityChanged : undefined}
+        canAssignTicket={sessionAccess?.canResolve === true}
+        isWorkspaceMember={isWorkspaceMember}
       />
     );
   };
@@ -2153,8 +2251,12 @@ export default function SessionPageClient({
           submitting={requestAccessSubmitting}
         />
       ) : null}
+      <ResolveToast
+        state={resolveToastState}
+        onDismiss={() => setResolveToastState("hidden")}
+      />
       <div className="flex h-full min-h-0 overflow-hidden relative">
-        {!isIdentityResolved && (
+        {!isIdentityResolved && !isAnonymousViewer && (
           <div
             aria-hidden
             style={{
@@ -2176,7 +2278,7 @@ export default function SessionPageClient({
               resolved: isCountsSynced ? feedbackResolvedCount : Math.max(0, sessionRestResolved),
             }}
             countsLoading={!hasSessionCounts}
-            {...(isAnonymousViewer
+            {...(!isWorkspaceMember
               ? {
                   showTicketSearch: sessionAccess?.canView === true,
                   showSessionOverflowMenu: false,
@@ -2310,7 +2412,7 @@ export default function SessionPageClient({
                 resolved: isCountsSynced ? feedbackResolvedCount : Math.max(0, sessionRestResolved),
               }}
               countsLoading={!hasSessionCounts}
-              {...(isAnonymousViewer
+              {...(!isWorkspaceMember
                 ? {
                     showTicketSearch: sessionAccess?.canView === true,
                     showSessionOverflowMenu: false,
@@ -2364,7 +2466,16 @@ export default function SessionPageClient({
         <ImageViewer
           imageUrl={selectedScreenshotUrl}
           fileName={`ticket-${selectedItem.id}-screenshot`}
-          onClose={() => setIsImageExpanded(false)}
+          onClose={() => {
+            setIsImageExpanded(false);
+            setOpenImageInEditMode(false);
+          }}
+          screenshotId={selectedItem.screenshotId}
+          sessionId={sessionId}
+          isWorkspaceMember={isWorkspaceMember}
+          hasPins={comments.some((c) => c.type === "pin" || Boolean(c.position))}
+          onScreenshotUpdate={handleScreenshotUpdate}
+          openInEditMode={openImageInEditMode}
         />
       )}
 

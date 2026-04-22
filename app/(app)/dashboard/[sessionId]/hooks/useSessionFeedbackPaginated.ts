@@ -109,6 +109,13 @@ function feedbackFromRestApiRow(
       typeof row.lastCommentPreview === "string" ? row.lastCommentPreview : undefined,
     lastCommentAt,
     isDeleted: row.isDeleted === true,
+    assigneeId: typeof row.assigneeId === "string" ? row.assigneeId : null,
+    assigneeName: typeof row.assigneeName === "string" ? row.assigneeName : null,
+    assigneeAvatarUrl: typeof row.assigneeAvatarUrl === "string" ? row.assigneeAvatarUrl : null,
+    priority:
+      row.priority === "high" || row.priority === "medium" || row.priority === "low"
+        ? (row.priority as "high" | "medium" | "low")
+        : null,
   };
 }
 

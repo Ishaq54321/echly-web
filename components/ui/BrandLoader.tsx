@@ -3,17 +3,20 @@ export default function BrandLoader() {
     <div className="flex items-center justify-center w-full h-full">
       <svg className="loader" width="48" height="48" viewBox="0 0 48 48">
 
-        {/* Base hexagon */}
-        <polygon
-          points="24,6 40,15 40,33 24,42 8,33 8,15"
+        {/* Base circle */}
+        <circle
+          cx="24"
+          cy="24"
+          r="18"
           className="loader-track"
         />
 
-        {/* Animated arc (same shape) */}
-        <polygon
-          points="24,6 40,15 40,33 24,42 8,33 8,15"
+        {/* Animated arc */}
+        <circle
+          cx="24"
+          cy="24"
+          r="18"
           className="loader-arc"
-
         />
 
         <defs>

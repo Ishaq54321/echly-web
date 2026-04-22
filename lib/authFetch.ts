@@ -13,11 +13,9 @@ function echlyPerfEnabled(): boolean {
 }
 
 async function getIdTokenFresh(
-  user: { getIdToken(): Promise<string>; getIdTokenResult(): Promise<{ expirationTime?: string }> }
+  user: { getIdToken(): Promise<string> }
 ): Promise<string> {
-  const token = await user.getIdToken();
-  await user.getIdTokenResult();
-  return token;
+  return user.getIdToken();
 }
 
 export function clearAuthTokenCache(): void {

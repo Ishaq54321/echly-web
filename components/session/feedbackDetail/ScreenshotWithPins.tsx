@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useRef, memo, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { Expand, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
+import { Expand, CheckCircle2, ExternalLink, Loader2, Pencil } from "lucide-react";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import type { Comment } from "@/lib/domain/comment";
 import type { CommentPosition } from "@/lib/domain/comment";
@@ -42,6 +42,8 @@ interface ScreenshotWithPinsProps {
   onPinPositionChange?: (commentId: string, position: CommentPosition) => Promise<void>;
   /** Omit outer card chrome when nested inside a parent attachment card. */
   embeddedInCard?: boolean;
+  onEdit?: () => void;
+  canEdit?: boolean;
 }
 
 const PinMarker = memo(function PinMarker({
@@ -174,6 +176,8 @@ const ScreenshotWithPinsInner = ({
   onCommentPlaced,
   onPinPositionChange,
   embeddedInCard = false,
+  onEdit,
+  canEdit,
 }: ScreenshotWithPinsProps) => {
   const { authDisplayName, authEmail, authPhotoUrl } = useWorkspace();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -304,7 +308,7 @@ const ScreenshotWithPinsInner = ({
     <div className={outerCard}>
       <div
         ref={containerRef}
-        className={`relative overflow-visible rounded-lg max-h-[317px] bg-white ${innerBorder} shadow-none ${isCommentMode ? "cursor-crosshair" : ""}`}
+        className={`group relative overflow-visible rounded-lg max-h-[317px] bg-white ${innerBorder} shadow-none ${isCommentMode ? "cursor-crosshair" : ""}`}
         onClick={handleImageClick}
         role={isCommentMode ? "button" : undefined}
         aria-label={isCommentMode ? "Click to add comment pin" : undefined}
@@ -501,17 +505,32 @@ const ScreenshotWithPinsInner = ({
           )}
 
         {!isCommentMode && url && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onExpand();
-            }}
-            className="absolute top-2 right-2 p-1.5 rounded-md bg-black/70 text-white opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity duration-120 cursor-pointer z-10"
-            aria-label="Expand screenshot"
-          >
-            <Expand size={14} />
-          </button>
+          <>
+            {canEdit && onEdit && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="absolute top-2.5 right-[50px] flex items-center justify-center h-9 w-9 rounded-md bg-neutral-800 text-white hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
+                aria-label="Edit screenshot"
+              >
+                <Pencil className="h-4 w-4" strokeWidth={2} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onExpand();
+              }}
+              className="absolute top-2.5 right-2.5 flex items-center justify-center h-9 w-9 rounded-md bg-neutral-800 text-white hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
+              aria-label="Expand screenshot"
+            >
+              <Expand className="h-4 w-4" strokeWidth={2} />
+            </button>
+          </>
         )}
       </div>
     </div>

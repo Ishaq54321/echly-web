@@ -264,20 +264,20 @@ function SessionWorkspaceRow({
         <div className="flex min-h-[36px] items-center shrink-0 gap-3.5">
           <>
             {open != null && open > 0 && (
-              <div className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+              <div className="rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
                 <CircleDashed className="h-4 w-4 shrink-0 text-blue-500" aria-hidden />
                 <span className="whitespace-nowrap font-medium tracking-tight">{open} open</span>
               </div>
             )}
             {resolved != null && resolved > 0 && (
-              <div className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+              <div className="rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
                 <Check className="h-4 w-4 shrink-0 text-green-500" strokeWidth={2.5} aria-hidden />
                 <span className="whitespace-nowrap font-medium tracking-tight">{resolved} resolved</span>
               </div>
             )}
           </>
           {updatedShort ? (
-            <div className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm">
+            <div className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 text-sm">
               <Calendar className="h-4 w-4 shrink-0 text-orange-500" strokeWidth={2.5} aria-hidden />
               <span className="whitespace-nowrap font-medium tracking-tight text-gray-700">
                 {updatedShort}

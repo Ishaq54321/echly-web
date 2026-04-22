@@ -31,6 +31,8 @@ export interface StructuredFeedback {
 /** Derived status for a ticket. Prefer explicit checks over !isResolved. */
 export type TicketStatus = "open" | "resolved";
 
+export type Priority = "high" | "medium" | "low";
+
 /**
  * Anchor used to scroll to a specific feedback location in the UI.
  * - `selector`: preferred when present (DOM lookup)
@@ -85,6 +87,11 @@ export interface Feedback {
 
   /** Soft delete: when true, row stays in Firestore but is hidden from list/query semantics. */
   isDeleted?: boolean;
+
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+  assigneeAvatarUrl?: string | null;
+  priority?: "high" | "medium" | "low" | null;
 }
 
 /** Returns explicit status for a feedback item. Use instead of !isResolved. */

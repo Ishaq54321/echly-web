@@ -69,6 +69,10 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     screenshotId: ticket.screenshotId ?? null,
     screenshotStatus: ticket.screenshotStatus ?? null,
     isDeleted: ticket.isDeleted ?? false,
+    assigneeId: ticket.assigneeId ?? null,
+    assigneeName: ticket.assigneeName ?? null,
+    assigneeAvatarUrl: ticket.assigneeAvatarUrl ?? null,
+    priority: ticket.priority ?? null,
   };
 }
 

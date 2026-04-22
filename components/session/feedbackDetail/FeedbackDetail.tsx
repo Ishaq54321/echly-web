@@ -15,6 +15,8 @@ export interface FeedbackDetailProps {
   onSaveTags?: (suggestedTags: string[]) => Promise<void>;
   onResolvedChange?: (isResolved: boolean) => void;
   setIsImageExpanded: (v: boolean) => void;
+  onEdit?: () => void;
+  canEdit?: boolean;
   isCommentsOpen: boolean;
   onToggleActivity: () => void;
 }
@@ -28,6 +30,8 @@ function FeedbackDetailInner({
   onSaveTags,
   onResolvedChange,
   setIsImageExpanded,
+  onEdit,
+  canEdit,
   isCommentsOpen,
   onToggleActivity,
 }: FeedbackDetailProps) {
@@ -67,6 +71,8 @@ function FeedbackDetailInner({
         onSaveActionSteps={onSaveActionSteps}
         onSaveTags={onSaveTags}
         onExpandImage={() => setIsImageExpanded(true)}
+        onEdit={onEdit}
+        canEdit={canEdit}
       />
     </div>
   );

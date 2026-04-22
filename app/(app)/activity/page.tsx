@@ -393,7 +393,7 @@ function ActivityFeed() {
     },
     [selectedCategory]
   );
-  const actorIdForApi = selectedCategory === "member" ? selectedMemberId : null;
+  const actorIdForApi = selectedMemberId;
   const eventTypesParamKey = eventTypesForApi.join(",");
 
   const activityCacheKey = useMemo(() => {

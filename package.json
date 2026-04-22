@@ -22,6 +22,7 @@
     "framer-motion": "^12.35.2",
     "heic-convert": "^2.1.0",
     "jose": "^6.0.11",
+    "konva": "^10.2.5",
     "lucide-react": "^0.575.0",
     "nanoid": "^5.1.9",
     "next": "16.1.6",
@@ -30,9 +31,11 @@
     "react": "19.2.3",
     "react-countup": "^6.5.3",
     "react-dom": "19.2.3",
+    "react-konva": "^19.2.3",
     "recharts": "^2.15.4",
     "resend": "^6.12.0",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "use-image": "^1.1.4"
   },
   "devDependencies": {
     "@fontsource/plus-jakarta-sans": "^5.2.8",

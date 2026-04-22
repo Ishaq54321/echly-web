@@ -24,4 +24,9 @@ export interface FeedbackItemShape {
   createdAt?: string | Timestamp | null;
   /** ISO date string from API or Firestore Timestamp when available. */
   updatedAt?: string | Timestamp | null;
+
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+  assigneeAvatarUrl?: string | null;
+  priority?: "high" | "medium" | "low" | null;
 }
