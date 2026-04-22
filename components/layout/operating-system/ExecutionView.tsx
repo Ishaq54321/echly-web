@@ -65,6 +65,7 @@ export interface ExecutionViewProps {
   screenshotUrlError: string | null;
   onAssigned?: (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => void;
   onPriorityChanged?: (priority: Priority | null) => void;
+  onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
   canAssignTicket?: boolean;
   isWorkspaceMember?: boolean;
 }
@@ -109,6 +110,7 @@ export function ExecutionView({
   screenshotUrlError,
   onAssigned,
   onPriorityChanged,
+  onSaveStateChange,
   canAssignTicket = false,
   isWorkspaceMember = false,
 }: ExecutionViewProps) {
@@ -148,6 +150,7 @@ export function ExecutionView({
         onAssigned={(!isPublicReadOnly && !isShareSurface) ? onAssigned : undefined}
         priority={(!isPublicReadOnly && !isShareSurface) ? (displayItem as { priority?: string | null } | null)?.priority as ("high" | "medium" | "low" | null) ?? null : undefined}
         onPriorityChanged={(!isPublicReadOnly && !isShareSurface) ? onPriorityChanged : undefined}
+        onSaveStateChange={(!isPublicReadOnly && !isShareSurface) ? onSaveStateChange : undefined}
         canAssignTicket={canAssignTicket}
         isWorkspaceMember={isWorkspaceMember}
       />

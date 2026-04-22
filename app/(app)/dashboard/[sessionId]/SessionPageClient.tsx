@@ -472,7 +472,7 @@ export default function SessionPageClient({
   }, [sessionId]);
 
   useLayoutEffect(() => {
-    setResolveOptimistic(null);
+    setResolveOptimisticMap(new Map());
   }, [sessionId]);
 
   const sessionRestTotal =
@@ -552,24 +552,55 @@ export default function SessionPageClient({
   );
 
   /** Instant resolve UI: overlays `isResolved` until list state catches up (see `saveResolved`). */
-  const [resolveOptimistic, setResolveOptimistic] = useState<{
-    ticketId: string;
-    isResolved: boolean;
-  } | null>(null);
+  const [resolveOptimisticMap, setResolveOptimisticMap] = useState<Map<string, boolean>>(() => new Map());
   const [resolveAffirmationKey, setResolveAffirmationKey] = useState(0);
-  const [resolveSubmitting, setResolveSubmitting] = useState(false);
+  const [resolvingSet, setResolvingSet] = useState<Set<string>>(() => new Set());
   const [resolveToastState, setResolveToastState] = useState<ResolveToastState>("hidden");
+  const [actionToastState, setActionToastState] = useState<ResolveToastState>("hidden");
   /** Tracks which ticket was being resolved so we can navigate back on PATCH failure. */
   const resolvingTicketIdRef = useRef<string | null>(null);
 
+  const addResolving = useCallback(
+    (id: string) =>
+      setResolvingSet(prev => new Set([...prev, id])),
+    []
+  );
+  const removeResolving = useCallback(
+    (id: string) =>
+      setResolvingSet(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      }),
+    []
+  );
+  const setOptimistic = useCallback(
+    (id: string, val: boolean) =>
+      setResolveOptimisticMap(prev =>
+        new Map([...prev, [id, val]])
+      ),
+    []
+  );
+  const clearOptimistic = useCallback(
+    (id: string) =>
+      setResolveOptimisticMap(prev => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      }),
+    []
+  );
+
   const feedbackScopedVisual = useMemo(() => {
-    if (!resolveOptimistic) return feedbackScoped;
-    return feedbackScoped.map((item) =>
-      item.id === resolveOptimistic.ticketId
-        ? { ...item, isResolved: resolveOptimistic.isResolved }
-        : item
-    );
-  }, [feedbackScoped, resolveOptimistic]);
+    if (resolveOptimisticMap.size === 0)
+      return feedbackScoped;
+    return feedbackScoped.map((item) => {
+      const override = resolveOptimisticMap.get(item.id);
+      return override !== undefined
+        ? { ...item, isResolved: override }
+        : item;
+    });
+  }, [feedbackScoped, resolveOptimisticMap]);
 
   const stableScopedFeedback = useStableState(feedbackScopedVisual, !feedbackLoading, sessionId);
   const stableOpenFeedback = useMemo(
@@ -1613,8 +1644,8 @@ export default function SessionPageClient({
           feedback.find((i) => i.id === ticketId)?.isResolved
         );
 
-        setResolveSubmitting(true);
-        setResolveOptimistic({ ticketId, isResolved });
+        addResolving(ticketId);
+        setOptimistic(ticketId, isResolved);
         if (isResolved) {
           setResolveAffirmationKey((k) => k + 1);
         }
@@ -1638,8 +1669,8 @@ export default function SessionPageClient({
 
         void (async () => {
           const rollbackResolved = () => {
-            setResolveOptimistic(null);
-            setResolveSubmitting(false);
+            clearOptimistic(ticketId);
+            removeResolving(ticketId);
             if (countsTransition) {
               setSessionCountsDelta((prev) => ({
                 open: prev.open + (isResolved ? 1 : -1),
@@ -1693,8 +1724,8 @@ export default function SessionPageClient({
                 "[ECHLY_PERF] Full breakdown: compare CLIENT total above with authFetch TOKEN/NETWORK lines and server [Resolve] logs for API vs Firestore."
               );
             }
-            setResolveOptimistic(null);
-            setResolveSubmitting(false);
+            clearOptimistic(ticketId);
+            removeResolving(ticketId);
             setFeedback((prev) =>
               prev.map((item) =>
                 item.id === ticketId ? { ...item, ...ticketPayload } : item
@@ -1708,7 +1739,7 @@ export default function SessionPageClient({
           } catch (err) {
             console.error("[ECHLY] saveResolved failed", err);
             rollbackResolved();
-            setResolveSubmitting(false);
+            removeResolving(ticketId);
             onError?.();
           }
         })();
@@ -1761,7 +1792,7 @@ export default function SessionPageClient({
         // PATCH failed — show error toast and navigate back to original ticket
         setResolveToastState("error");
         const originalId = resolvingTicketIdRef.current;
-        if (originalId) {
+        if (originalId && originalId === ticketId) {
           setSelectedId(originalId);
           resolvingTicketIdRef.current = null;
         }
@@ -2172,7 +2203,7 @@ export default function SessionPageClient({
         resolveAffirmationKey={resolveAffirmationKey}
         onSaveTitle={saveTitle}
         onResolvedChange={handleResolvedChange}
-        resolveSubmitting={resolveSubmitting}
+        resolveSubmitting={resolvingSet.has(effectiveSelectedId ?? "")}
         onSaveActionSteps={isWorkspaceMember ? saveActionSteps : undefined}
         onSaveTags={isWorkspaceMember ? saveTags : undefined}
         setIsImageExpanded={setIsImageExpanded}
@@ -2235,6 +2266,7 @@ export default function SessionPageClient({
         screenshotUrlError={selectedScreenshotUrlError}
         onAssigned={isWorkspaceMember && sessionAccess?.canResolve === true ? handleAssigned : undefined}
         onPriorityChanged={isWorkspaceMember ? handlePriorityChanged : undefined}
+        onSaveStateChange={setActionToastState}
         canAssignTicket={sessionAccess?.canResolve === true}
         isWorkspaceMember={isWorkspaceMember}
       />
@@ -2254,6 +2286,11 @@ export default function SessionPageClient({
       <ResolveToast
         state={resolveToastState}
         onDismiss={() => setResolveToastState("hidden")}
+      />
+      <ResolveToast
+        state={resolveToastState !== "hidden" ? "hidden" : actionToastState}
+        onDismiss={() => setActionToastState("hidden")}
+        errorText="Failed to save"
       />
       <div className="flex h-full min-h-0 overflow-hidden relative">
         {!isIdentityResolved && !isAnonymousViewer && (

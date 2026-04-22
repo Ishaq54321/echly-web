@@ -8,9 +8,11 @@ export type ResolveToastState = "saving" | "saved" | "error" | "hidden";
 export function ResolveToast({
   state,
   onDismiss,
+  errorText,
 }: {
   state: ResolveToastState;
   onDismiss: () => void;
+  errorText?: string;
 }) {
   const [rendered, setRendered] = useState(state !== "hidden");
   const [exiting, setExiting] = useState(false);
@@ -28,7 +30,7 @@ export function ResolveToast({
 
   useEffect(() => {
     if (state === "saved" || state === "error") {
-      const delay = state === "saved" ? 1800 : 3000;
+      const delay = state === "saved" ? 1000 : 3000;
       dismissTimerRef.current = setTimeout(() => {
         setExiting(true);
         exitTimerRef.current = setTimeout(() => {
@@ -73,12 +75,12 @@ export function ResolveToast({
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 7,
-            padding: "10px 18px",
-            background: "#111111",
+            gap: 6,
+            padding: "9px 16px",
+            background: "#2C2C2C",
             color: state === "saving" ? "rgba(255,255,255,0.85)" : "#FFFFFF",
             borderRadius: 9,
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 500,
             whiteSpace: "nowrap",
             boxShadow:
@@ -87,19 +89,19 @@ export function ResolveToast({
         >
           {state === "saving" && (
             <Loader2
-              size={14}
+              size={13}
               className="animate-spin"
               color="rgba(255,255,255,0.7)"
             />
           )}
-          {state === "saved" && <Check size={14} color="#4ADE80" />}
-          {state === "error" && <AlertCircle size={14} color="#F87171" />}
+          {state === "saved" && <Check size={13} color="#4ADE80" />}
+          {state === "error" && <AlertCircle size={13} color="#F87171" />}
           <span>
             {state === "saving"
               ? "Saving..."
               : state === "saved"
-                ? "Resolved"
-                : "Failed to resolve"}
+                ? "Saved"
+                : (errorText ?? "Failed to resolve")}
           </span>
         </div>
       </div>

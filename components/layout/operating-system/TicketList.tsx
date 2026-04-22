@@ -400,12 +400,12 @@ function TicketListInner({
                     <button
                       type="button"
                       onClick={() => onSessionTitleEdit?.()}
-                      className="min-w-0 flex-1 min-h-[1.35rem] text-left truncate bg-transparent border-0 p-0 shadow-none cursor-text text-[15px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFBFC] rounded-sm"
+                      className="min-w-0 flex-1 min-h-[1.35rem] text-left truncate bg-transparent border-0 p-0 shadow-none cursor-text text-[17px] font-bold leading-[1.3] tracking-[-0.02em] text-[#111827] outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFBFC] rounded-sm"
                     >
                       {sessionTitle}
                     </button>
                   ) : (
-                    <h1 className="text-[15px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] truncate">
+                    <h1 className="text-[17px] font-bold leading-[1.3] tracking-[-0.02em] text-[#111827] truncate">
                       {sessionTitle}
                     </h1>
                   )}
@@ -431,11 +431,11 @@ function TicketListInner({
                         }
                         setSidebarMenuOpen(true);
                       }}
-                      className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
+                      className="p-2.5 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
                       aria-label="Session options"
                       aria-expanded={sidebarMenuOpen}
                     >
-                      <MoreVertical className="h-4 w-4" aria-hidden />
+                      <MoreVertical className="h-[18px] w-[18px]" aria-hidden />
                     </button>
                     {typeof document !== "undefined" &&
                       sidebarMenuOpen &&
@@ -485,7 +485,7 @@ function TicketListInner({
             )}
           </div>
           {meta ? (
-            <p className="mt-1.5 text-[12px] text-[hsl(var(--text-tertiary))] leading-relaxed">
+            <p className="mt-2 text-[13px] font-medium text-[#6B7280] leading-normal tracking-[-0.01em]">
               {meta}
             </p>
           ) : null}
@@ -549,20 +549,20 @@ function TicketListInner({
                     if (openExpandedControlled) onOpenExpandedChange?.();
                     else setOpenExpandedInternal((x) => !x);
                   }}
-                  className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left border-none shadow-none hover:bg-white transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
+                  className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-3 rounded-xl text-left border-none shadow-none hover:bg-[#F3F4F6] transition-colors duration-150 cursor-pointer"
                   aria-expanded={openExpanded}
                 >
-                  <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-primary-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-primary)]">
+                  <span className="flex items-center justify-center min-w-[24px] h-[24px] rounded-full bg-[var(--color-primary-soft)] text-[12px] font-bold tabular-nums text-[var(--color-primary)]">
                     <span>{open}</span>
                   </span>
-                  <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
+                  <span className="text-[13px] font-semibold text-[#374151] tracking-[-0.01em]">
                     Open
                   </span>
                   <span className="ml-auto shrink-0 text-[hsl(var(--text-tertiary))]">
                     {openExpanded ? (
-                      <ChevronDown className="h-4 w-4" aria-hidden />
+                      <ChevronDown className="h-[18px] w-[18px]" aria-hidden />
                     ) : (
-                      <ChevronRight className="h-4 w-4" aria-hidden />
+                      <ChevronRight className="h-[18px] w-[18px]" aria-hidden />
                     )}
                   </span>
                 </button>
@@ -608,20 +608,20 @@ function TicketListInner({
                   if (resolvedExpandedControlled) onResolvedExpandedChange?.();
                   else setResolvedExpandedInternalOnly(!resolvedExpanded);
                 }}
-                  className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-left border-none shadow-none hover:bg-white transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
+                  className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-3 rounded-xl text-left border-none shadow-none hover:bg-[#F3F4F6] transition-colors duration-150 cursor-pointer"
                   aria-expanded={resolvedExpanded}
                 >
-                  <span className="flex items-center justify-center min-w-[22px] h-[22px] rounded-full bg-[var(--color-success-soft)] text-[12px] font-semibold tabular-nums text-[var(--color-success)]">
+                  <span className="flex items-center justify-center min-w-[24px] h-[24px] rounded-full bg-[var(--color-success-soft)] text-[12px] font-bold tabular-nums text-[var(--color-success)]">
                     <span>{resolved}</span>
                   </span>
-                  <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))] tracking-[-0.01em]">
+                  <span className="text-[13px] font-semibold text-[#374151] tracking-[-0.01em]">
                     Resolved
                   </span>
                   <span className="ml-auto shrink-0 text-[hsl(var(--text-tertiary))]">
                     {resolvedExpanded ? (
-                      <ChevronDown className="h-4 w-4" aria-hidden />
+                      <ChevronDown className="h-[18px] w-[18px]" aria-hidden />
                     ) : (
-                      <ChevronRight className="h-4 w-4" aria-hidden />
+                      <ChevronRight className="h-[18px] w-[18px]" aria-hidden />
                     )}
                   </span>
                 </button>

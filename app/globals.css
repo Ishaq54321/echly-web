@@ -823,17 +823,17 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
   transform: translateY(-50%);
   width: 3px;
   height: 0;
-  border-radius: 0;
+  border-radius: 2px;
   background: var(--color-primary);
   opacity: 0;
   transition: height 150ms ease-in-out, opacity 150ms ease-in-out;
 }
 .sidebar-row-interactive:hover::before {
-  height: 20px;
+  height: 18px;
   opacity: 0.5;
 }
 .sidebar-row-interactive[aria-current="true"]::before {
-  height: 22px;
+  height: 20px;
   opacity: 1;
   background: var(--color-primary);
 }
@@ -5681,32 +5681,32 @@ html.dark .echly-mic-item.is-active {
 }
 
 .sidebar-inner {
-  padding-top: 16px;
+  padding-top: 20px;
 }
 
 .sidebar-header {
   position: sticky;
   top: 0;
   z-index: 5;
-  padding: 0 16px 6px;
-  margin: 0 0 12px;
+  padding: 0 16px 10px;
+  margin: 0 0 6px;
   background: #fafbfc;
 }
 
 .sidebar-list {
-  padding: 0 8px;
+  padding: 0 10px;
 }
 
 .sidebar-item {
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: 9px 12px;
+  border-radius: 8px;
 }
 
 /* TicketList (sidebar) search */
 .search-container {
   position: relative;
   width: 100%;
-  height: 40px;
+  height: 42px;
   border: 1px solid #E5E7EB;
   border-radius: 10px;
   background: var(--layer-2-bg);
@@ -5725,9 +5725,10 @@ html.dark .echly-mic-item.is-active {
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   color: #9ca3af;
+  opacity: 0.5;
   pointer-events: none;
 }
 
@@ -5754,11 +5755,11 @@ html.dark .echly-mic-item.is-active {
 
 .search-input {
   width: 100%;
-  height: 40px;
+  height: 42px;
   padding-left: 36px;
   padding-right: 12px;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13.5px;
   background: transparent;
   outline: none;
   box-shadow: none;

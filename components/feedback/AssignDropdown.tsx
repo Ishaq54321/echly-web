@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { UserPlus, UserMinus, Check, ChevronDown, Loader2 } from "lucide-react";
+import { UserPlus, UserMinus, Check, ChevronDown } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 
@@ -24,6 +24,7 @@ interface AssignDropdownProps {
     assigneeName: string | null,
     assigneeAvatarUrl: string | null
   ) => void;
+  onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
   disabled?: boolean;
   readOnly?: boolean;
 }
@@ -91,6 +92,7 @@ export function AssignDropdown({
   currentAssigneeName,
   currentAssigneeAvatarUrl,
   onAssigned,
+  onSaveStateChange,
   disabled = false,
   readOnly = false,
 }: AssignDropdownProps) {
@@ -156,6 +158,7 @@ export function AssignDropdown({
     setOpen(false);
     onAssigned(member.uid, member.displayName ?? null, member.avatarUrl ?? null);
     setIsSaving(true);
+    onSaveStateChange?.('saving');
     try {
       const res = await authFetch(`/api/tickets/${feedbackId}`, {
         method: "PATCH",
@@ -168,7 +171,7 @@ export function AssignDropdown({
       });
       if (!res?.ok) {
         onAssigned(prevId, prevName, prevAvatar);
-        showToast("Failed to assign");
+        onSaveStateChange?.('error');
       } else {
         const body = await res.json() as {
           data?: {
@@ -183,10 +186,11 @@ export function AssignDropdown({
         if (ticket && ticket.assigneeName !== undefined) {
           onAssigned(ticket.assigneeId ?? null, ticket.assigneeName ?? null, ticket.assigneeAvatarUrl ?? null);
         }
+        onSaveStateChange?.('saved');
       }
     } catch {
       onAssigned(prevId, prevName, prevAvatar);
-      showToast("Failed to assign");
+      onSaveStateChange?.('error');
     } finally {
       setIsSaving(false);
     }
@@ -198,6 +202,8 @@ export function AssignDropdown({
     const prevAvatar = currentAssigneeAvatarUrl;
     setOpen(false);
     onAssigned(null, null, null);
+    setIsSaving(true);
+    onSaveStateChange?.('saving');
     try {
       const res = await authFetch(`/api/tickets/${feedbackId}`, {
         method: "PATCH",
@@ -206,9 +212,15 @@ export function AssignDropdown({
       });
       if (!res?.ok) {
         onAssigned(prevId, prevName, prevAvatar);
+        onSaveStateChange?.('error');
+      } else {
+        onSaveStateChange?.('saved');
       }
     } catch {
       onAssigned(prevId, prevName, prevAvatar);
+      onSaveStateChange?.('error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -281,10 +293,7 @@ export function AssignDropdown({
       >
         {hasAssignee ? (
           <>
-            {isSaving
-              ? <Loader2 size={16} className="animate-spin" aria-hidden style={{ flexShrink: 0 }} />
-              : <Avatar name={currentAssigneeName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
-            }
+            <Avatar name={currentAssigneeName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
             <span style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {currentAssigneeName ?? "Assigned"}
             </span>
@@ -292,10 +301,7 @@ export function AssignDropdown({
           </>
         ) : (
           <>
-            {isSaving
-              ? <Loader2 size={16} className="animate-spin" aria-hidden />
-              : <UserPlus size={16} style={{ flexShrink: 0 }} aria-hidden />
-            }
+            <UserPlus size={16} style={{ flexShrink: 0 }} aria-hidden />
             Assign
           </>
         )}

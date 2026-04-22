@@ -31,20 +31,20 @@ function TicketItemInner({
       type="button"
       onClick={handleClick}
       data-ticket-id={id}
-      className={`sidebar-item sidebar-row-interactive group relative flex w-full items-center gap-2 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] hover:bg-[#F1F5F9] ${
+      className={`sidebar-item sidebar-row-interactive group relative flex w-full items-center gap-2 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] hover:bg-[#F1F4F8] ${
         active
-          ? "bg-[#E8F0FF]"
+          ? "bg-[#EBF2FF]"
           : ""
       } ${isNewTicket ? "echly-new-ticket-highlight" : ""}`}
       aria-current={active ? "true" : undefined}
     >
-      <span className="relative min-w-0 flex-1 truncate text-[13px] leading-[1.4] py-0.5">
+      <span className="relative min-w-0 flex-1 truncate text-[14px] leading-[1.4] py-0.5">
         {title?.trim() ? (
           <span
             className={`truncate block ${
               active
-                ? "text-[#1D4ED8] font-medium"
-                : "text-[hsl(var(--text-secondary-soft))]"
+                ? "text-[#1D4ED8] font-semibold"
+                : "text-[#4B5563] font-normal"
             }`}
           >
             {title}

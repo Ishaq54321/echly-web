@@ -116,6 +116,7 @@ export interface SessionFeedbackHeaderProps {
   /** Priority dropdown data */
   priority?: Priority | null;
   onPriorityChanged?: (priority: Priority | null) => void;
+  onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
   /** Permission gates for new controls */
   canAssignTicket?: boolean;
   isWorkspaceMember?: boolean;
@@ -147,6 +148,7 @@ export function SessionFeedbackHeader({
   onAssigned,
   priority,
   onPriorityChanged,
+  onSaveStateChange,
   canAssignTicket = false,
   isWorkspaceMember = false,
 }: SessionFeedbackHeaderProps) {
@@ -451,12 +453,14 @@ export function SessionFeedbackHeader({
 
                 return (
                   <AssignDropdown
+                    key={`assign-${item.id}`}
                     feedbackId={item.id}
                     sessionId={""}
                     currentAssigneeId={assigneeId ?? null}
                     currentAssigneeName={assigneeName ?? null}
                     currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
                     onAssigned={onAssigned ?? (() => {})}
+                    onSaveStateChange={canManage ? onSaveStateChange : undefined}
                     disabled={!canManage}
                     readOnly={!canManage}
                   />
@@ -472,9 +476,11 @@ export function SessionFeedbackHeader({
 
                 return (
                   <PriorityDropdown
+                    key={`priority-${item.id}`}
                     feedbackId={item.id}
                     currentPriority={priority ?? null}
                     onPriorityChanged={onPriorityChanged ?? (() => {})}
+                    onSaveStateChange={canManage ? onSaveStateChange : undefined}
                     disabled={!canManage}
                     readOnly={!canManage}
                   />

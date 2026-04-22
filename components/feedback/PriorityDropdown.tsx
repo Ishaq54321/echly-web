@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Flag, ArrowUp, ArrowDown, Minus, X, Loader2 } from "lucide-react";
+import { Flag, ArrowUp, ArrowDown, Minus, X } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import type { Priority } from "@/lib/domain/feedback";
 import { useToast } from "@/components/dashboard/context/ToastContext";
@@ -46,6 +46,7 @@ interface PriorityDropdownProps {
   feedbackId: string;
   currentPriority: Priority | null;
   onPriorityChanged: (priority: Priority | null) => void;
+  onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
   disabled?: boolean;
   readOnly?: boolean;
 }
@@ -54,6 +55,7 @@ export function PriorityDropdown({
   feedbackId,
   currentPriority,
   onPriorityChanged,
+  onSaveStateChange,
   disabled = false,
   readOnly = false,
 }: PriorityDropdownProps) {
@@ -99,6 +101,7 @@ export function PriorityDropdown({
     setOpen(false);
     onPriorityChanged(priority);
     setIsSaving(true);
+    onSaveStateChange?.('saving');
     try {
       const res = await authFetch(`/api/tickets/${feedbackId}`, {
         method: "PATCH",
@@ -107,17 +110,18 @@ export function PriorityDropdown({
       });
       if (!res?.ok) {
         onPriorityChanged(prev);
-        showToast("Failed to set priority");
+        onSaveStateChange?.('error');
       } else {
         const body = await res.json() as { data?: { ticket?: { priority?: Priority | null } } };
         const serverPriority = body.data?.ticket?.priority ?? null;
         if (serverPriority !== priority) {
           onPriorityChanged(serverPriority);
         }
+        onSaveStateChange?.('saved');
       }
     } catch {
       onPriorityChanged(prev);
-      showToast("Failed to set priority");
+      onSaveStateChange?.('error');
     } finally {
       setIsSaving(false);
     }
@@ -184,19 +188,13 @@ export function PriorityDropdown({
         {activePriority ? (
           <>
             <span style={{ color: activePriority.color, display: "flex", alignItems: "center", flexShrink: 0 }}>
-              {isSaving
-                ? <Loader2 size={14} className="animate-spin" aria-hidden />
-                : activePriority.icon
-              }
+              {activePriority.icon}
             </span>
             {activePriority.label} Priority
           </>
         ) : (
           <>
-            {isSaving
-              ? <Loader2 size={16} className="animate-spin" aria-hidden />
-              : <Flag size={16} style={{ flexShrink: 0 }} />
-            }
+            <Flag size={16} style={{ flexShrink: 0 }} aria-hidden />
             Priority
           </>
         )}
