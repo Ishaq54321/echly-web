@@ -118,9 +118,9 @@ export function WorkspaceCard({
           overflow-hidden
           shadow-sm
           hover:bg-neutral-50
-          hover:!border-[#155DFC80]
+          hover:!border-[#1775E080]
           hover:ring-1
-          hover:ring-[#155DFC40]
+          hover:ring-[#1775E040]
           hover:shadow-md
           hover:-translate-y-[1px]
           transition-all
@@ -132,10 +132,10 @@ export function WorkspaceCard({
       style={{ animationDelay: `${index * 50}ms` } as React.CSSProperties}
       data-session-id={session.id}
     >
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-blue-500/70 rounded-t-xl" aria-hidden />
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#1775E0]/70 rounded-t-xl" aria-hidden />
       {(isOptimistic || isOpening) && (
         <div
-          className="absolute inset-0 rounded-xl ring-2 ring-[#155DFC]/35 pointer-events-none"
+          className="absolute inset-0 rounded-xl ring-2 ring-[#1775E0]/35 pointer-events-none"
           aria-hidden
         />
       )}
@@ -205,7 +205,7 @@ export function WorkspaceCard({
                   w-10 h-10
                   rounded-xl
                   bg-gradient-to-br from-blue-100 to-blue-50
-                  text-blue-600
+                  text-[var(--brand)]
                   ring-1 ring-blue-200
                   shadow-inner
                   shrink-0
@@ -236,7 +236,7 @@ export function WorkspaceCard({
               </span>
             ) : null}
             {counts != null && counts.open > 0 ? (
-              <span className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-600 tabular-nums">
+              <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--brand-subtle)] text-[var(--brand)] tabular-nums">
                 {counts.open} open
               </span>
             ) : null}

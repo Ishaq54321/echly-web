@@ -293,7 +293,7 @@ export function SessionActionsDropdown({
   const menuItemClass =
     variant === "card"
       ? "dropdown-item transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
-      : "dropdown-item text-neutral-900 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30";
+      : "dropdown-item text-neutral-900 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30";
 
   const menuShellClass =
     variant === "card"
@@ -303,7 +303,7 @@ export function SessionActionsDropdown({
   const deleteItemClass =
     variant === "card"
       ? "dropdown-item delete transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
-      : "dropdown-item delete flex cursor-pointer items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30";
+      : "dropdown-item delete flex cursor-pointer items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30";
 
   const separatorClass =
     variant === "card"

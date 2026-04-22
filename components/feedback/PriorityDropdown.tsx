@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Flag, ArrowUp, ArrowDown, Minus, X } from "lucide-react";
+import { Flag, Ban } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import type { Priority } from "@/lib/domain/feedback";
 import { useToast } from "@/components/dashboard/context/ToastContext";
@@ -22,7 +22,7 @@ const PRIORITIES: PriorityConfig[] = [
     color: "#DC2626",
     bg: "#FEF2F2",
     border: "#FECACA",
-    icon: <ArrowUp size={14} />,
+    icon: <Flag size={14} style={{ fill: "#DC2626", color: "#DC2626" }} />,
   },
   {
     value: "medium",
@@ -30,7 +30,7 @@ const PRIORITIES: PriorityConfig[] = [
     color: "#C2410C",
     bg: "#FFF7ED",
     border: "#FED7AA",
-    icon: <Minus size={14} />,
+    icon: <Flag size={14} style={{ fill: "#C2410C", color: "#C2410C" }} />,
   },
   {
     value: "low",
@@ -38,7 +38,7 @@ const PRIORITIES: PriorityConfig[] = [
     color: "#6B7280",
     bg: "#F9FAFB",
     border: "#E5E7EB",
-    icon: <ArrowDown size={14} />,
+    icon: <Flag size={14} style={{ fill: "#6B7280", color: "#6B7280" }} />,
   },
 ];
 
@@ -142,7 +142,7 @@ export function PriorityDropdown({
           background: activePriorityRO.bg,
           border: `1.5px solid ${activePriorityRO.border}`,
           borderRadius: '9px',
-          fontSize: '13px',
+          fontSize: '14px',
           fontWeight: '500',
           color: activePriorityRO.color,
           cursor: 'default',
@@ -168,13 +168,13 @@ export function PriorityDropdown({
         borderRadius: 9,
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
-        fontSize: 13,
-        fontWeight: 500,
+        fontSize: 14,
+        fontWeight: '500',
         color: activePriority.color,
       }
     : {};
 
-  const noPriorityCls = `inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[13px] font-medium border border-[#E7ECF2] bg-[#FAFBFC] text-[#374151] hover:bg-[#F1F4F8] hover:border-[#DCE4EE] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
+  const noPriorityCls = `inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-white text-[#44403C] hover:bg-[#F4F5F7] hover:border-[#D5D5D5] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
 
   return (
     <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
@@ -207,10 +207,10 @@ export function PriorityDropdown({
             top: "calc(100% + 6px)",
             left: 0,
             zIndex: 50,
-            background: "white",
-            border: "1px solid #E8E8E8",
-            borderRadius: 14,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
+            background: "var(--surface-card)",
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            boxShadow: "var(--shadow-lg)",
             width: 180,
             overflow: "hidden",
             opacity: animate ? 1 : 0,
@@ -221,14 +221,14 @@ export function PriorityDropdown({
           <div
             style={{
               padding: "10px 12px 6px",
-              fontSize: 11,
-              fontWeight: 600,
-              color: "#AAAAAA",
+              fontSize: 12,
+              fontWeight: '600',
+              color: "var(--text-tertiary)",
               letterSpacing: "0.6px",
               textTransform: "uppercase",
             }}
           >
-            Set Priority
+            Priority
           </div>
 
           {PRIORITIES.map((p) => {
@@ -249,13 +249,13 @@ export function PriorityDropdown({
                   background: isSelected ? p.bg : "transparent",
                   borderRadius: 8,
                   margin: "0 4px",
-                  fontSize: 13,
-                  fontWeight: 500,
+                  fontSize: 14,
+                  fontWeight: '500',
                   color: p.color,
                   textAlign: "left",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = "#F7F8FA";
+                  if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-hover)";
                 }}
                 onMouseLeave={(e) => {
                   if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
@@ -269,7 +269,7 @@ export function PriorityDropdown({
 
           {currentPriority !== null && (
             <>
-              <div style={{ height: 1, background: "#F0F0F0", margin: "4px 8px" }} />
+              <div style={{ height: 1, background: "var(--border)", margin: "4px 8px" }} />
               <button
                 type="button"
                 onClick={() => void handleSelect(null)}
@@ -282,15 +282,15 @@ export function PriorityDropdown({
                   cursor: "pointer",
                   border: "none",
                   background: "transparent",
-                  fontSize: 13,
-                  color: "#888888",
+                  fontSize: 14,
+                  color: "var(--text-tertiary)",
                   textAlign: "left",
                   marginBottom: 4,
                 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#F7F8FA"; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-hover)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
               >
-                <X size={13} color="#888888" style={{ flexShrink: 0 }} />
+                <Ban size={13} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
                 Clear priority
               </button>
             </>

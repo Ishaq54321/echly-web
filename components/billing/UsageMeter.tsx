@@ -47,7 +47,7 @@ function MeterRow({
             className="h-full rounded-full transition-all"
             style={{
               width: `${Math.min(100, (used / limit) * 100)}%`,
-              backgroundColor: atLimit ? "#dc2626" : nearLimit ? "#d97706" : "#155DFC",
+              backgroundColor: atLimit ? "#dc2626" : nearLimit ? "#d97706" : "#1775E0",
             }}
           />
         </div>

@@ -1,7 +1,7 @@
 export type SessionWorkspaceStatus = "active" | "done";
 
 const STYLES: Record<SessionWorkspaceStatus, string> = {
-  active: "bg-blue-50 text-blue-700",
+  active: "bg-[var(--brand-subtle)] text-[var(--brand-text)]",
   done: "bg-neutral-900 text-white",
 };
 

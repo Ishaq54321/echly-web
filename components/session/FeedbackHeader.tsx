@@ -27,23 +27,23 @@ const iconBtn = {
 } as const;
 
 const resolveBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[13px] font-medium border border-transparent bg-[#2563EB] text-white shadow-[0_1px_2px_rgba(0,0,0,0.08)] hover:bg-[#1D4ED8] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex h-9 items-center gap-1.5 px-4 rounded-[9px] text-[14px] font-semibold border border-transparent bg-[#1775E0] text-white shadow-[0_1px_3px_rgba(23,117,224,0.25)] hover:bg-[#1462C4] hover:shadow-[0_2px_8px_rgba(23,117,224,0.30)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
 const requestResolveAccessBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[var(--border-subtle)] bg-[hsl(var(--surface-2))] text-[hsl(var(--text-primary-strong))] shadow-none hover:bg-[hsl(var(--surface-3))] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#C3DFFE] bg-[#EBF4FF] text-[#1775E0] shadow-none hover:bg-[#EBF4FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
 // Blue variant for AUTH VIEWER on the dashboard surface
 const requestResolveAccessBtnOrange =
-  "inline-flex h-9 items-center gap-1.5 px-[14px] rounded-[10px] text-[14px] font-semibold border-none bg-[#1775E0] text-white shadow-[0_1px_3px_rgba(23,117,224,0.25)] hover:bg-[#1462C4] hover:shadow-[0_2px_8px_rgba(23,117,224,0.30)] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 transition-all duration-[140ms] ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex h-9 items-center gap-1.5 px-[14px] rounded-[9px] text-[14px] font-semibold border-none bg-[#1775E0] text-white shadow-[0_1px_3px_rgba(23,117,224,0.25)] hover:bg-[#1462C4] hover:shadow-[0_2px_8px_rgba(23,117,224,0.30)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/40 transition-all duration-[140ms] ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
 const pendingResolveAccessBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg text-[13px] font-medium border border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF] cursor-default opacity-95 pointer-events-none select-none";
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-[#F1F2F4] text-[#A8A29E] cursor-default opacity-95 pointer-events-none select-none";
 
 const secondaryBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[13px] font-medium border border-[#E7ECF2] bg-[#FAFBFC] text-[#374151] hover:bg-[#F1F4F8] hover:border-[#DCE4EE] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-white text-[#44403C] hover:bg-[#F4F5F7] hover:border-[#D5D5D5] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
 
 const btnDelete =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[13px] font-medium border border-[#E7ECF2] bg-[#FAFBFC] text-[#374151] hover:bg-[#FEF2F2] hover:text-[#DC2626] hover:border-[#FECACA] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-white text-[#44403C] hover:bg-[#FEF2F2] hover:text-[#B91C1C] hover:border-[#FECACA] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
 
 function StatusBadge({ status }: { status: FeedbackStatus }) {
   const base =
@@ -55,11 +55,11 @@ function StatusBadge({ status }: { status: FeedbackStatus }) {
   }
   if (status === "Open") {
     return (
-      <span className={`${base} bg-[#EFF6FF] text-[#2563EB]`}>Open</span>
+      <span className={`${base} bg-[#EBF4FF] text-[#0F5BB5]`}>Open</span>
     );
   }
   const styles: Record<Exclude<FeedbackStatus, "Open" | "Resolved">, string> = {
-    "In Progress": "bg-[#F3F4F6] text-[#374151]",
+    "In Progress": "bg-[#F1F2F4] text-[#78716C]",
     Blocked: "bg-[#FEF2F2] text-[#B91C1C]",
   };
   return <span className={`${base} ${styles[status]}`}>{status}</span>;
@@ -207,19 +207,19 @@ export function SessionFeedbackHeader({
 
   return (
     <header className="sticky top-0 z-20 shrink-0 bg-white/95 backdrop-blur-[2px] pt-4 px-6 -mx-6 pb-0">
-      <div className="flex items-start justify-between gap-3 min-w-0 mb-3">
+      <div className="flex items-start justify-between gap-3 min-w-0 mb-5">
         <div className="min-w-0 flex-1">
           {titleTrim ? (
             <h1
-              className="text-[29px] font-semibold tracking-[-0.35px] text-[#0A0A0A] truncate leading-tight"
+              className="text-[24px] font-bold tracking-[-0.4px] text-[#1C1B1F] truncate leading-tight"
               title={titleTrim}
             >
               {titleTrim}
             </h1>
           ) : null}
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
             {positionLabel != null ? (
-              <span className="ticket-pill inline-flex items-center bg-[#F4F6F8] px-2.5 py-1 rounded-full text-[11px] font-medium text-[#4B5563]">
+              <span className="ticket-pill inline-flex items-center bg-[#F1F2F4] px-2.5 py-1 rounded-full text-xs font-medium text-[#A8A29E]">
                 {positionLabel}
               </span>
             ) : null}
@@ -235,7 +235,7 @@ export function SessionFeedbackHeader({
               </span>
             ) : null}
             {item != null && impactScore != null ? (
-              <span className="text-[11px] tabular-nums text-[#94A3B8] font-medium">
+              <span className="text-xs tabular-nums text-[#A8A29E] font-medium">
                 Impact {impactScore}
               </span>
             ) : null}
@@ -493,7 +493,7 @@ export function SessionFeedbackHeader({
                     isCommentMode ? onCloseCommentMode?.() : onOpenComment()
                   }
                   className={`${secondaryBtn} ${
-                    isCommentMode ? "bg-[#F3F4F6] border-[#D1D5DB] text-[#111827]" : ""
+                    isCommentMode ? "bg-[#F1F2F4] border-[#D5D5D5] text-[#1C1B1F]" : ""
                   }`}
                 >
                   <MessageSquare {...iconBtn} aria-hidden />

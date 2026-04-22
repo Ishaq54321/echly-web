@@ -41,7 +41,7 @@ export default function PublicViewerBanner(_props: PublicViewerBannerProps) {
         right: 0,
         zIndex: 40,
         background: "#FFFFFF",
-        borderTop: "1px solid #EBEBEB",
+        borderTop: "1px solid var(--border)",
         boxShadow: "0 -8px 32px rgba(0,0,0,0.08)",
         display: "flex",
         alignItems: "center",
@@ -54,7 +54,7 @@ export default function PublicViewerBanner(_props: PublicViewerBannerProps) {
           style={{
             width: 38,
             height: 38,
-            background: "linear-gradient(135deg, #EBF4FF 0%, #DBEAFE 100%)",
+            background: "linear-gradient(135deg, var(--brand-subtle) 0%, var(--brand-muted) 100%)",
             borderRadius: 10,
             display: "flex",
             alignItems: "center",
@@ -62,13 +62,13 @@ export default function PublicViewerBanner(_props: PublicViewerBannerProps) {
             flexShrink: 0,
           }}
         >
-          <Lock size={18} color="#1775E0" aria-hidden />
+          <Lock size={18} color="var(--brand)" aria-hidden />
         </div>
         <p
           style={{
             fontSize: 15,
             fontWeight: 600,
-            color: "#111111",
+            color: "var(--text-heading)",
             letterSpacing: "-0.1px",
             margin: 0,
           }}
@@ -91,7 +91,7 @@ export default function PublicViewerBanner(_props: PublicViewerBannerProps) {
           style={{
             height: 42,
             padding: "0 22px",
-            background: "#1775E0",
+            background: "var(--brand)",
             border: "none",
             borderRadius: 10,
             fontSize: 14,
@@ -108,12 +108,12 @@ export default function PublicViewerBanner(_props: PublicViewerBannerProps) {
           onClick={handleSignIn}
           onMouseEnter={(e) => {
             const btn = e.currentTarget;
-            btn.style.background = "#1462C4";
+            btn.style.background = "var(--brand-hover)";
             btn.style.boxShadow = "0 2px 10px rgba(23,117,224,0.30)";
           }}
           onMouseLeave={(e) => {
             const btn = e.currentTarget;
-            btn.style.background = "#1775E0";
+            btn.style.background = "var(--brand)";
             btn.style.boxShadow = "0 1px 3px rgba(23,117,224,0.25)";
           }}
         >
@@ -132,23 +132,23 @@ export default function PublicViewerBanner(_props: PublicViewerBannerProps) {
             alignItems: "center",
             justifyContent: "center",
             background: "none",
-            border: "1.5px solid #E0E0E0",
+            border: "1.5px solid var(--border)",
             borderRadius: 8,
             cursor: "pointer",
-            color: "#888888",
+            color: "var(--text-tertiary)",
             marginLeft: 4,
             transition: "all 120ms ease",
           }}
           onMouseEnter={(e) => {
             const btn = e.currentTarget;
-            btn.style.borderColor = "#BBBBBB";
-            btn.style.color = "#444444";
-            btn.style.background = "#F7F8FA";
+            btn.style.borderColor = "var(--border-strong)";
+            btn.style.color = "var(--text-body)";
+            btn.style.background = "var(--surface-hover)";
           }}
           onMouseLeave={(e) => {
             const btn = e.currentTarget;
-            btn.style.borderColor = "#E0E0E0";
-            btn.style.color = "#888888";
+            btn.style.borderColor = "var(--border)";
+            btn.style.color = "var(--text-tertiary)";
             btn.style.background = "none";
           }}
         >

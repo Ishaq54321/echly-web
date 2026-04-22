@@ -49,7 +49,7 @@ function ErrorState() {
         style={{
           fontSize: "18px",
           fontWeight: "600",
-          color: "#111111",
+          color: "var(--text-heading)",
           letterSpacing: "-0.2px",
           margin: "0 0 8px 0",
         }}
@@ -60,7 +60,7 @@ function ErrorState() {
       <p
         style={{
           fontSize: "14px",
-          color: "#777777",
+          color: "var(--text-secondary)",
           lineHeight: "1.6",
           maxWidth: "280px",
           margin: "0 0 24px 0",
@@ -140,7 +140,7 @@ function EmptyState() {
         style={{
           fontSize: "18px",
           fontWeight: "600",
-          color: "#111111",
+          color: "var(--text-heading)",
           letterSpacing: "-0.2px",
           margin: "0 0 8px 0",
         }}
@@ -151,7 +151,7 @@ function EmptyState() {
       <p
         style={{
           fontSize: "14px",
-          color: "#777777",
+          color: "var(--text-secondary)",
           lineHeight: "1.6",
           maxWidth: "300px",
           margin: "0",
@@ -188,12 +188,12 @@ function SessionRow({
     justifyContent: "center",
     gap: "6px",
     borderRadius: "9999px",
-    border: "1px solid #E5E5E5",
+    border: "1px solid var(--border)",
     background: "#FFFFFF",
     padding: "6px 12px",
     fontSize: "14px",
     fontWeight: "500",
-    color: "#374151",
+    color: "var(--text-body)",
     whiteSpace: "nowrap",
     minHeight: "36px",
   };
@@ -208,7 +208,7 @@ function SessionRow({
       }}
       onMouseEnter={(e) => {
         const el = e.currentTarget as HTMLDivElement;
-        el.style.background = "#F7F8FA";
+        el.style.background = "var(--surface-hover)";
         el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
         el.style.transform = "translateY(-1px)";
         el.style.borderRadius = "12px";
@@ -243,7 +243,7 @@ function SessionRow({
             style={{
               fontSize: "15px",
               fontWeight: "500",
-              color: "#111827",
+              color: "var(--text-heading)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -259,7 +259,7 @@ function SessionRow({
               marginTop: "3px",
             }}
           >
-            <span style={{ fontSize: "13px", color: "#555555", fontWeight: "400" }}>
+            <span style={{ fontSize: "14px", color: "var(--text-secondary)", fontWeight: "400" }}>
               {session.addedByName
                 ? `Shared by ${session.addedByName}`
                 : "Added to session"}
@@ -278,13 +278,13 @@ function SessionRow({
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "5px",
-                background: "#F4F5F7",
-                border: "1px solid #E0E0E0",
+                background: "var(--surface-hover)",
+                border: "1px solid var(--border)",
                 borderRadius: "9999px",
                 padding: "3px 10px",
-                fontSize: "13px",
+                fontSize: "14px",
                 fontWeight: "500",
-                color: "#444444",
+                color: "var(--text-body)",
                 flexShrink: 0,
                 whiteSpace: "nowrap",
               }}
@@ -307,7 +307,7 @@ function SessionRow({
       >
         {open > 0 && (
           <div style={chipStyle}>
-            <CircleDashed size={16} style={{ color: "#3B82F6", flexShrink: 0 }} />
+            <CircleDashed size={16} style={{ color: "#1775E0", flexShrink: 0 }} />
             <span style={{ letterSpacing: "-0.01em" }}>{open} open</span>
           </div>
         )}
@@ -404,21 +404,13 @@ export default function SharedPage() {
           style={{
             margin: "0 auto",
             width: "100%",
-            maxWidth: "1400px",
+            maxWidth: "1280px",
             padding: "12px 24px 40px 24px",
           }}
         >
         {/* Header */}
         <div style={{ paddingBottom: 0 }}>
-          <span
-            style={{
-              fontSize: "15px",
-              color: "#000000",
-              display: "block",
-              marginBottom: "4px",
-              fontWeight: "600",
-            }}
-          >
+          <span className="text-xs font-medium text-[var(--text-tertiary)] block mb-1 tracking-wide">
             Library
           </span>
 
@@ -430,29 +422,14 @@ export default function SharedPage() {
               marginBottom: sessions.length > 0 ? "4px" : "0",
             }}
           >
-            <h1
-              style={{
-                fontSize: "28px",
-                fontWeight: "700",
-                color: "#111111",
-                letterSpacing: "-0.4px",
-                margin: "0",
-                lineHeight: "1.1",
-              }}
-            >
+            <h1 className="text-xl font-bold text-[var(--text-heading)] tracking-[-0.4px] mt-1 mb-0">
               Shared with me
             </h1>
 
           </div>
 
           {sessions.length > 0 && !isLoading && (
-            <p
-              style={{
-                fontSize: "14px",
-                color: "#6B7280",
-                margin: "4px 0 0 0",
-              }}
-            >
+            <p className="text-sm font-normal text-[var(--text-secondary)] mt-1">
               Sessions shared with you from other workspaces
             </p>
           )}

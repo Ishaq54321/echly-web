@@ -112,7 +112,7 @@ export default function DemoGuide({
       >
         {text}
         <span
-          className="absolute w-2 h-2 rotate-45 bg-white border border-gray-200"
+          className="absolute w-2 h-2 rotate-45 bg-white border border-[#EBEBEB]"
           style={{
             ...arrowStyle,
             width: TOOLTIP_ARROW_SIZE,

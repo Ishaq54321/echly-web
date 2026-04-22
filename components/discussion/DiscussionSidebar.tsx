@@ -45,20 +45,20 @@ export function DiscussionSidebar({
         onClick={() => onProjectChange(null)}
         className={`w-full flex items-center gap-2.5 px-4 py-[7px] text-left text-[14px] transition-all ${
           selectedProjectId === null
-            ? "bg-blue-50/70 text-discussion-title font-medium"
+            ? "bg-[#EBF4FF]/70 text-discussion-title font-medium"
             : "text-discussion-supporting hover:bg-neutral-50 hover:text-discussion-title"
         }`}
       >
         <span
           className={`w-[6px] h-[6px] rounded-full shrink-0 ${
-            selectedProjectId === null ? "bg-[#155DFC]" : "bg-neutral-300"
+            selectedProjectId === null ? "bg-[#1775E0]" : "bg-neutral-300"
           }`}
         />
         <span className="flex-1 truncate">All projects</span>
         <span
           className={`ml-auto text-[12px] px-[6px] py-0.5 rounded-full font-medium tabular-nums ${
             selectedProjectId === null
-              ? "bg-[#DBEAFE] text-[#155DFC]"
+              ? "bg-[#EBF4FF] text-[#1775E0]"
               : "bg-neutral-100 text-meta"
           }`}
         >
@@ -82,20 +82,20 @@ export function DiscussionSidebar({
                   onClick={() => onProjectChange(proj.id)}
                   className={`w-full flex items-center gap-2.5 px-4 py-[7px] text-left text-[14px] transition-all ${
                     isActive
-                      ? "bg-blue-50/70 text-discussion-title font-medium"
+                      ? "bg-[#EBF4FF]/70 text-discussion-title font-medium"
                       : "text-discussion-supporting hover:bg-neutral-50 hover:text-discussion-title"
                   }`}
                 >
                   <span
                     className={`w-[6px] h-[6px] rounded-full shrink-0 ${
-                      isActive ? "bg-[#155DFC]" : "bg-neutral-300"
+                      isActive ? "bg-[#1775E0]" : "bg-neutral-300"
                     }`}
                   />
                   <span className="flex-1 truncate">{proj.name || "Untitled"}</span>
                   <span
                     className={`ml-auto text-[12px] px-[6px] py-0.5 rounded-full font-medium tabular-nums ${
                       isActive
-                        ? "bg-[#DBEAFE] text-[#155DFC]"
+                        ? "bg-[#EBF4FF] text-[#1775E0]"
                         : "bg-neutral-100 text-meta"
                     }`}
                   >

@@ -120,20 +120,20 @@ export function ActionItemsSection({
     );
   }
 
-  const numberClass = "font-sans font-medium text-[#64748B] text-[14px]";
+  const numberClass = "font-sans font-semibold text-[#0F172A] text-base";
   return (
     <div className={cardClass}>
       <h2 className={titleClass}>Action steps</h2>
-      <ul className="list-none space-y-2 p-0 m-0 text-[14px] leading-relaxed text-[#0F172A]">
+      <ul className="list-none space-y-2 p-0 m-0 text-base leading-relaxed text-[#0F172A]">
         {items.map((text, i) => (
           <li key={i} className="group flex items-start gap-2">
             <span className={numberClass}>{i + 1}.</span>
             {isReadOnly ? (
               <span
-                className={`flex-1 min-w-0 text-[14px] leading-relaxed ${
+                className={`flex-1 min-w-0 text-base leading-relaxed ${
                   isResolved
                     ? "line-through text-[#64748B]"
-                    : "text-[#0F172A] font-normal"
+                    : "text-[#0F172A] font-medium"
                 }`}
               >
                 {formatActionStep(text)}
@@ -166,10 +166,10 @@ export function ActionItemsSection({
                 <button
                   type="button"
                   onClick={() => startEdit(i)}
-                  className={`flex-1 text-left px-0 py-0 min-w-0 cursor-pointer text-[14px] leading-relaxed ${
+                  className={`flex-1 text-left px-0 py-0 min-w-0 cursor-pointer text-base leading-relaxed ${
                     isResolved
                       ? "line-through text-[#64748B]"
-                      : "text-[#0F172A] font-normal"
+                      : "text-[#0F172A] font-medium"
                   }`}
                 >
                   {formatActionStep(text)}

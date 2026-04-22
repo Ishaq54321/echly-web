@@ -19,7 +19,7 @@ export function SessionsViewModeToggle({
       type="button"
       aria-label={label}
       onClick={() => onChange(nextMode)}
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] border border-gray-200 bg-white p-2 transition-colors hover:bg-gray-50"
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] border border-[#EBEBEB] bg-white p-2 transition-colors hover:bg-gray-50"
     >
       <Icon
         size={20}

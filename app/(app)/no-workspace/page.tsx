@@ -48,7 +48,7 @@ export default function NoWorkspacePage() {
           <button
             type="button"
             onClick={handleSignOut}
-            className="w-full flex items-center justify-center text-gray-700 font-medium rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition"
+            className="w-full flex items-center justify-center text-gray-700 font-medium rounded-xl border border-[#EBEBEB] bg-white hover:bg-gray-50 transition"
             style={{ height: 40, fontSize: 15 }}
           >
             Sign out

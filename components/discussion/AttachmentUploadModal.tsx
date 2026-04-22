@@ -217,7 +217,7 @@ export function AttachmentUploadModal({
                 className={`
                   flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10
                   cursor-pointer transition-colors duration-150
-                  ${dragOver ? "border-blue-500 bg-blue-50" : "border-neutral-300 hover:border-blue-500 hover:bg-blue-50"}
+                  ${dragOver ? "border-[var(--brand)] bg-[var(--brand-subtle)]" : "border-[#EBEBEB] hover:border-[var(--brand)] hover:bg-[var(--brand-subtle)]"}
                 `}
               >
                 <input
@@ -298,7 +298,7 @@ export function AttachmentUploadModal({
                   <div className="mt-4">
                     <div className="h-[6px] rounded-full bg-neutral-200 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                        className="h-full rounded-full bg-[#1775E0] transition-all duration-300"
                         style={{
                           width: `${uploadProgress ?? 0}%`,
                         }}
@@ -334,7 +334,7 @@ export function AttachmentUploadModal({
                 type="button"
                 onClick={handleSend}
                 disabled={uploading || !uploadedAttachment}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-[#155DFC] hover:bg-[#0F4EDC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-[#1775E0] hover:bg-[#1462C4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Send
               </button>

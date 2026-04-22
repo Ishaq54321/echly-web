@@ -1,28 +1,22 @@
 /* Plus Jakarta Sans: app uses next/font in layout.tsx; extension loads via echly-extension/extension-fonts.css (prepended at build) */
 
+@import "../styles/tokens.css";
 @import "tailwindcss";
 
-/* Tailwind theme extension: brand + semantic colors */
+/* Tailwind theme extension */
 @theme {
-  --color-primary: #2A2A2A;
-  --color-active: #6E6E6E;
-  --color-brand-primary: #111827;
-  --color-brand-accent: #2563EB;
-  --color-brand-soft: #F3F4F6;
-  /* Semantic color system (must be in @theme for Tailwind v4) */
-  --color-semantic-system: #2563EB;
-  --color-semantic-insight: #7C3AED;
-  --color-semantic-success: #059669;
-  --color-semantic-attention: #D97706;
-  --color-semantic-danger: #DC2626;
   /* App shell semantic colors (use text-foreground / text-muted-foreground in UI) */
-  --color-foreground: var(--text-primary);
-  --color-muted-foreground: var(--text-meta);
-  --color-muted: hsl(var(--surface-2));
-  --color-border: hsl(var(--border));
-  --color-background: hsl(var(--background));
-  --color-ring: var(--color-primary-ring);
-  /* Interaction transitions */
+  --color-foreground: var(--text-body);
+  --color-muted-foreground: var(--text-tertiary);
+  --color-muted: var(--surface-subtle);
+  --color-border: var(--border);
+  --color-background: var(--surface-page);
+  --color-ring: var(--brand);
+  --color-semantic-insight: #7C3AED;
+  --color-semantic-system: var(--brand);
+  --color-semantic-success: var(--color-success);
+  --color-semantic-attention: var(--color-warning);
+  --color-semantic-danger: var(--color-danger);
   --transition-duration-120: 120ms;
 }
 
@@ -33,139 +27,25 @@
 ====================================== */
 
 :root {
-  /* ---- DESIGN TOKENS: centralized, system-driven ---- */
-
-  /* Motion: premium, no bounce. Apple + Linear standard. */
-  --motion-duration: 200ms;
-  --motion-duration-fast: 150ms;
-  --motion-fast: 150ms;
-  --motion-standard: 200ms;
-  --motion-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-premium: cubic-bezier(0.4, 0, 0.2, 1);
-
-  /* Spacing: consistent scale */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-
-  /* Radius: soft but precise */
-  --radius: 14px;
-  --radius-md: 14px;
-  --radius-lg: 16px;
-  --radius-card: 22px;
-  --radius-xl: 24px;
-  --radius-pill: 9999px;
-
-  /* ---- COLOR SYSTEM: alive but controlled. No full-saturation. ---- */
-  /* Primary: AI Blue — deep, intelligent, slightly electric, mature */
-  --color-primary: #1a56db;
-  --color-primary-hover: #1648b8;
-  --color-primary-soft: rgba(26, 86, 219, 0.08);
-  --color-primary-ring: rgba(26, 86, 219, 0.35);
-  /* Brand blue for discussion selection and links */
-  --brand-blue: #155DFC;
-
-  /* Legacy/alias for existing usage */
-  --accent: var(--color-primary);
-  --accent-operational: #1a56db;
-  --accent-operational-border: rgba(26, 86, 219, 0.25);
-  --accent-operational-muted: rgba(26, 86, 219, 0.08);
-
-  /* Success: intelligent green — calm, not neon */
-  --color-success: #0d9488;
-  --color-success-soft: rgba(13, 148, 136, 0.1);
-
-  /* Danger: refined red — desaturated, controlled */
-  --color-danger: #b91c1c;
-  --color-danger-soft: rgba(185, 28, 28, 0.08);
-
-  /* Brand / text */
-  --brand-primary: #111827;
-  --brand-primary-rgb: 17, 24, 39;
-  --brand-subtle: var(--color-primary-soft);
-
-  /* Base Surfaces (HSL for Tailwind) */
-  --background: 220 12% 97%;
-  --surface-1: 0 0% 100%;
-  --surface-2: 220 12% 96%;
-  --surface-3: 220 10% 93%;
-  --border: 220 13% 91%;
-  /* Typography hierarchy: premium contrast, no faded greys */
-  /* Primary body / headline tone — dashboard grey (#364153), single source for text-foreground */
-  --text-primary: #364153;
-  /* Supporting UI copy — aligned with discussion “secondary” tone */
-  --text-secondary: #364153;
-  --text-meta: #64748B;
-  --text-active: 220 9% 46%;
-  --text-muted: var(--text-meta);
-  /* Discussion thread list + detail: strong hierarchy without loud contrast */
-  --discussion-title: #0f172a;
-  --discussion-body: #0f172a;
-  --discussion-supporting: #364153;
-  --brand: 217 85% 52%;
-  --brand-ring: 217 85% 52% / 0.35;
-
-  /* ---- GLOBAL BACKGROUND: atmospheric surface (LEVEL 0) ---- */
-  --env-base: #F6F7F9;
+  /* ── Atmospheric surface gradients ────────────────────── */
+  --env-base: var(--surface-page);
   --env-gradient-top: rgba(226, 232, 240, 0.045);
   --env-gradient-bottom: rgba(209, 250, 229, 0.04);
-  --canvas-base: #FFFFFF;
-  --canvas-base-top: #FFFFFF;
-  --canvas-base-bottom: #FFFFFF;
-  /* Structural: elevated panels */
-  --structural-gray: #F2F3F5;
-  --structural-gray-rail: #EEF0F2;
-  --structural-gray-ticket: #F8F9FA;
+  --canvas-base: var(--surface-card);
+  --canvas-base-top: var(--surface-card);
+  --canvas-base-bottom: var(--surface-card);
+
+  /* ── Glass surfaces ───────────────────────────────────── */
   --glass-1-bg: rgba(255, 255, 255, 0.7);
   --glass-1-border: rgba(0, 0, 0, 0.04);
   --glass-1-edge: 0 1px 0 rgba(255, 255, 255, 0.85);
-  --layer-1-bg: #FFFFFF;
-  --layer-1-border: rgba(0, 0, 0, 0.045);
-  --layer-2-bg: #FAFBFC;
-  --layer-2-border: rgba(0, 0, 0, 0.045);
-  --layer-2-hover-bg: #F4F5F7;
 
-  /* Settings / premium surfaces */
-  --border-default: rgba(0, 0, 0, 0.08);
-  --settings-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-
-  /* ---- SPATIAL ARCHITECTURE: 6 elevation layers ---- */
-  /* Layer 0 — Ambient: .env-canvas (gradients + noise) */
-  /* Layer 1 — Structural: sidebar, topbar (--shadow-level-1) */
-  /* Layer 2 — Content container: main surface (--shadow-level-2) */
-  /* Layer 3 — Cards: .card-depth (--shadow-level-3) */
-  /* Layer 4 — Hover: interactive lift (--shadow-level-4) */
-  /* Layer 5 — Focus: active emphasis (--shadow-level-5) */
-  --shadow-level-1: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-level-2: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --shadow-level-3: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
-  --shadow-level-3-lift: 0 2px 4px rgba(0, 0, 0, 0.04);
-  --shadow-level-4: 0 8px 24px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
-  --shadow-level-5: 0 12px 32px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05);
-  /* Elevated menus / popovers (alias) */
-  --shadow-lg: var(--shadow-level-4);
-  /* Card-specific: dual stack + inner highlight */
-  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --elevation-2: 0 4px 12px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.03);
-  --layer-2-shadow: var(--elevation-1);
-  --layer-2-shadow-hover: var(--elevation-2);
+  /* ── Card decorative ──────────────────────────────────── */
   --card-border: 1px solid rgba(255, 255, 255, 0.4);
   --card-inner-highlight: linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 12px);
+  --ai-accent-ring: rgba(23, 117, 224, 0.28);
 
-  --ai-accent: #1a56db;
-  --ai-accent-ring: rgba(26, 86, 219, 0.28);
-  /* HSL components for hsl(var(--text-primary-strong)) — matches --text-primary #364153 */
-  --text-primary-strong: 217 21% 27%;
-  --text-secondary-soft: 220 10% 36%;
-  --text-tertiary: 220 9% 48%;
-
-  /* Voice capture (portaled to body): glass + dim + waveform — align with widget via same var names */
+  /* ── Voice capture ────────────────────────────────────── */
   --glass-voice-capture-bg: rgba(255, 255, 255, 0.98);
   --voice-capture-dim-bg: rgba(0, 0, 0, 0.52);
   --voice-capture-card-shadow: 0 14px 38px rgba(0, 0, 0, 0.18);
@@ -174,11 +54,18 @@
     rgba(255, 255, 255, 0) 0%,
     rgba(255, 255, 255, 0.9) 100%
   );
-  --echly-waveform-fill: rgba(26, 86, 219, 0.85);
-  --border-subtle: rgba(0, 0, 0, 0.08);
-  --button-primary-bg: #155dfc;
-  --button-primary-text: #ffffff;
-  --color-alert: #ef4444;
+  --echly-waveform-fill: rgba(23, 117, 224, 0.85);
+
+  /* ── Tailwind compat (HSL) ────────────────────────────── */
+  --background: 240 4% 97%;
+  --surface-1: 0 0% 100%;
+  --surface-2: 240 4% 94%;
+  --surface-3: 240 4% 91%;
+
+  /* ── Brand compat (HSL for Tailwind ring) ─────────────── */
+  --brand-ring: 228 67% 55% / 0.35;
+  --brand-primary: var(--text-heading);
+  --brand-primary-rgb: 28, 27, 31;
 }
 
 /* App dark mode (next-themes: class "dark" on <html>) — same tokens as #echly-root[data-theme="dark"] */
@@ -193,9 +80,6 @@ html.dark {
   );
   --echly-waveform-fill: rgba(96, 165, 250, 0.75);
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --button-primary-bg: #155dfc;
-  --button-primary-text: #ffffff;
-  --color-alert: #ef4444;
   /* Discussion / comment surfaces on dark backgrounds */
   --discussion-title: #f8fafc;
   --discussion-body: #f1f5f9;
@@ -203,14 +87,8 @@ html.dark {
   color-scheme: dark;
 }
 
-/* Text hierarchy utilities: use vars for secondary/meta only; primary stays default or explicit */
-.text-secondary { color: var(--text-secondary); }
-.text-meta { color: var(--text-meta); }
-.text-discussion-title { color: var(--discussion-title); }
-.text-discussion-body { color: var(--discussion-body); }
-.text-discussion-supporting { color: var(--discussion-supporting); }
-.placeholder\:text-meta::placeholder { color: var(--text-meta); }
-.placeholder\:text-secondary::placeholder { color: var(--text-secondary); }
+/* Text hierarchy utilities */
+.text-discussion-body { color: var(--text-heading); }
 
 /* ======================================
    BASE STYLES
@@ -221,11 +99,11 @@ body {
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
-  background-color: var(--env-base);
-  color: var(--text-primary);
+  background-color: var(--surface-page);
+  color: var(--text-body);
   font-size: 15px;
-  line-height: 1.65;
-  font-family: "Plus Jakarta Sans", sans-serif;
+  line-height: 1.6;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -238,7 +116,7 @@ body {
 .env-canvas {
   position: relative;
   min-height: 100%;
-  background-color: var(--env-base);
+  background-color: var(--surface-page);
   background-image:
     radial-gradient(ellipse 120% 80% at 10% 0%, var(--env-gradient-top) 0%, transparent 50%),
     radial-gradient(ellipse 100% 60% at 90% 100%, var(--env-gradient-bottom) 0%, transparent 45%);
@@ -309,7 +187,7 @@ button[aria-disabled="true"],
 *,
 *::before,
 *::after {
-  border-color: hsl(var(--border));
+  border-color: var(--border);
 }
 
 /* Prevent accidental Tailwind ring colors (no blue default) */
@@ -384,19 +262,19 @@ button[aria-disabled="true"],
 .echly-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2147480000;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.48);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  font-family: "Plus Jakarta Sans", sans-serif;
+  background: var(--surface-overlay);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  font-family: var(--font-sans);
   padding: 16px;
 }
 
 .echly-modal-panel {
-  background: #fff;
+  background: var(--surface-card);
   border-radius: 16px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
   font-family: "Plus Jakarta Sans", sans-serif;
@@ -786,7 +664,7 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
   border-radius: inherit;
   background: radial-gradient(
     circle at center,
-    rgba(26, 86, 219, 0.2),
+    rgba(23, 117, 224, 0.2),
     transparent 70%
   );
   opacity: 0;
@@ -798,11 +676,11 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
 }
 .btn-primary-glow:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(26, 86, 219, 0.35);
+  box-shadow: 0 6px 20px rgba(23, 117, 224, 0.35);
 }
 .btn-primary-glow:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 2px 10px rgba(26, 86, 219, 0.28);
+  box-shadow: 0 2px 10px rgba(23, 117, 224, 0.28);
 }
 
 /* ======================================
@@ -824,7 +702,7 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
   width: 3px;
   height: 0;
   border-radius: 2px;
-  background: var(--color-primary);
+  background: var(--brand);
   opacity: 0;
   transition: height 150ms ease-in-out, opacity 150ms ease-in-out;
 }
@@ -835,7 +713,7 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
 .sidebar-row-interactive[aria-current="true"]::before {
   height: 20px;
   opacity: 1;
-  background: var(--color-primary);
+  background: var(--brand);
 }
 .sidebar-row-interactive[aria-current="true"] {
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
@@ -855,8 +733,8 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
 .focus-ring-brand:focus-visible {
   outline: none;
   box-shadow:
-    0 0 0 2px var(--env-base),
-    0 0 0 4px var(--color-primary);
+    0 0 0 2px var(--surface-page),
+    0 0 0 4px var(--brand);
 }
 
 button:focus-visible,
@@ -866,7 +744,13 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px var(--color-primary);
+  box-shadow: 0 0 0 1px var(--brand);
+}
+
+.no-focus-ring:focus,
+.no-focus-ring:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* ======================================

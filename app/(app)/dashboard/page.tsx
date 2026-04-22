@@ -139,7 +139,7 @@ function DashboardContent() {
     () => [
       {
         title: "",
-        markerClassName: "bg-blue-500",
+        markerClassName: "bg-[#1775E0]",
         items: tabFilteredSessions,
       },
     ],
@@ -152,7 +152,7 @@ function DashboardContent() {
 
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col bg-white">
-      <div className="mx-auto w-full max-w-[1400px] px-6 pb-10 pt-3">
+      <div className="mx-auto w-full max-w-[1280px] px-6 pb-10 pt-3">
         <SessionsHeader />
 
         <main className="flex-1">
@@ -173,7 +173,7 @@ function DashboardContent() {
                       onClick={triggerCta}
                       disabled={startingRecorder || !isIdentityResolved}
                       aria-busy={startingRecorder}
-                      className="rounded-[9px] bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-blue-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
+                      className="rounded-[9px] bg-[#1775E0] px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#1462C4] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
                     >
                       New Session
                     </button>
@@ -221,7 +221,7 @@ function DashboardContent() {
                           type="button"
                           onClick={() => void loadMoreSessions()}
                           disabled={loadingMoreSessions}
-                          className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="rounded-lg border border-[#EBEBEB] bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {loadingMoreSessions ? "Loading..." : "Load more sessions"}
                         </button>

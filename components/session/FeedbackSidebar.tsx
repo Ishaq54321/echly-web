@@ -181,7 +181,7 @@ function FeedbackSidebarInner({
               placeholder="Search feedback…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-full text-[15px] px-3 rounded-md bg-white border border-neutral-200 placeholder:text-meta focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:border-neutral-300 transition-all duration-150"
+              className="h-9 w-full text-[15px] px-3 rounded-md bg-white border border-[#EBEBEB] placeholder:text-meta focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)]/20 focus:border-[var(--border-focus)] transition-all duration-150"
               aria-label="Search feedback"
             />
           </div>

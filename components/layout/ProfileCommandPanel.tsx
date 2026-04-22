@@ -367,13 +367,13 @@ export function ProfileCommandPanel({
                 className="transition-[transform,box-shadow] duration-[120ms] ease-out hover:translate-y-[-1px] hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)]"
                 style={{
                   background: "#EFF6FF",
-                  border: "1px solid #DBEAFE",
+                  border: "1px solid #EBF4FF",
                   borderRadius: 10,
                   padding: 10,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Sparkles size={20} style={{ color: "#2563EB", flexShrink: 0 }} aria-hidden />
+                  <Sparkles size={20} style={{ color: "#1775E0", flexShrink: 0 }} aria-hidden />
                   <p style={{ fontSize: 13, fontWeight: 500, color: "#1E3A8A", margin: 0 }}>
                     Unlock advanced feedback tools
                   </p>
@@ -384,7 +384,7 @@ export function ProfileCommandPanel({
                 <button
                   type="button"
                   style={{
-                    background: "#2563EB",
+                    background: "#1775E0",
                     color: "white",
                     borderRadius: 8,
                     padding: "8px 14px",
@@ -394,10 +394,10 @@ export function ProfileCommandPanel({
                   }}
                   className="transition hover:opacity-90"
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#1D4ED8";
+                    e.currentTarget.style.background = "#1462C4";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#2563EB";
+                    e.currentTarget.style.background = "#1775E0";
                   }}
                 >
                   Upgrade your workspace
@@ -428,7 +428,7 @@ export function ProfileCommandPanel({
                   <button
                     type="button"
                     style={{ fontSize: 12, fontWeight: 500 }}
-                    className="mt-2 text-[#155DFC] hover:underline"
+                    className="mt-2 text-[#1775E0] hover:underline"
                   >
                     Edit profile
                   </button>
@@ -437,7 +437,7 @@ export function ProfileCommandPanel({
 
               {/* Upgrade plan — usage and CTA */}
               <div className="mb-4 pb-4 border-b border-[#EAEAEA] font-medium">
-                <span className="text-blue-600 font-semibold text-[15px] block mb-1.5">
+                <span className="text-[var(--brand)] font-semibold text-[15px] block mb-1.5">
                   Upgrade plan
                 </span>
                 <p className="font-semibold text-[14px] text-neutral-700 mt-0 mb-0.5">
@@ -451,7 +451,7 @@ export function ProfileCommandPanel({
                   href="/settings?tab=billing"
                   onClick={onClose}
                   style={{ fontSize: 12, fontWeight: 500, marginTop: 4 }}
-                  className="block text-[#155DFC] hover:underline"
+                  className="block text-[#1775E0] hover:underline"
                 >
                   View plans →
                 </Link>

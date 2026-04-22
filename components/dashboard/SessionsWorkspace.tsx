@@ -198,7 +198,7 @@ function SessionWorkspaceRow({
         className={[
           "group flex w-full items-center justify-between rounded-lg px-4 py-4 transition-all duration-150 hover:bg-gray-50",
           isSelectionMode ? "hover:bg-gray-100 cursor-pointer" : "",
-          isSelected ? "bg-blue-50 hover:bg-blue-50" : "",
+          isSelected ? "bg-[var(--brand-subtle)] hover:bg-[var(--brand-subtle)]" : "",
           openingId === session.id ? "bg-gray-50" : "",
         ]
           .filter(Boolean)
@@ -232,7 +232,7 @@ function SessionWorkspaceRow({
                   "cursor-pointer",
                   "hover:scale-[1.06] active:scale-[0.97]",
                   isSelected
-                    ? "bg-blue-600 border-blue-600"
+                    ? "bg-[#1775E0] border-[var(--brand)]"
                     : "bg-white border-gray-400 hover:border-gray-600 hover:bg-gray-50",
                 ].join(" ")}
               >
@@ -264,20 +264,20 @@ function SessionWorkspaceRow({
         <div className="flex min-h-[36px] items-center shrink-0 gap-3.5">
           <>
             {open != null && open > 0 && (
-              <div className="rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
-                <CircleDashed className="h-4 w-4 shrink-0 text-blue-500" aria-hidden />
+              <div className="rounded-[9px] border border-[#EBEBEB] bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+                <CircleDashed className="h-4 w-4 shrink-0 text-[var(--brand)]" aria-hidden />
                 <span className="whitespace-nowrap font-medium tracking-tight">{open} open</span>
               </div>
             )}
             {resolved != null && resolved > 0 && (
-              <div className="rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+              <div className="rounded-[9px] border border-[#EBEBEB] bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
                 <Check className="h-4 w-4 shrink-0 text-green-500" strokeWidth={2.5} aria-hidden />
                 <span className="whitespace-nowrap font-medium tracking-tight">{resolved} resolved</span>
               </div>
             )}
           </>
           {updatedShort ? (
-            <div className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 text-sm">
+            <div className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-[9px] border border-[#EBEBEB] bg-white px-3 py-1.5 text-sm">
               <Calendar className="h-4 w-4 shrink-0 text-orange-500" strokeWidth={2.5} aria-hidden />
               <span className="whitespace-nowrap font-medium tracking-tight text-gray-700">
                 {updatedShort}
@@ -314,7 +314,7 @@ function SessionWorkspaceRow({
                 type="button"
                 disabled={isOptimistic || copyLinkBusy}
                 onClick={handleCopyLinkClick}
-                className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30 disabled:opacity-50 disabled:pointer-events-none"
+                className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 disabled:opacity-50 disabled:pointer-events-none"
                 aria-label={
                   copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"
                 }
@@ -341,7 +341,7 @@ function SessionWorkspaceRow({
                   variant="list"
                   flipPlacement
                   disabled={isOptimistic}
-                  triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/30"
+                  triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30"
                   triggerIconClassName="h-5 w-5"
                   triggerAriaLabel="Session actions"
                 />
@@ -473,7 +473,7 @@ export function SessionsWorkspace({
 
       {flatItemCount === 0 ? (
         <section
-          className="w-full rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-6 py-14 text-center"
+          className="w-full rounded-xl border border-dashed border-[#EBEBEB] bg-gray-50/60 px-6 py-14 text-center"
           aria-live="polite"
         >
           <p className="text-sm font-medium text-gray-800">No sessions match the current filters</p>
@@ -494,7 +494,7 @@ export function SessionsWorkspace({
             <div className="mb-2 flex items-center justify-between px-0">
               <div className="flex items-center gap-2">
                 <div
-                  className={`h-2 w-2 shrink-0 rounded-full ${section.markerClassName ?? "bg-blue-500"}`}
+                  className={`h-2 w-2 shrink-0 rounded-full ${section.markerClassName ?? "bg-[#1775E0]"}`}
                   aria-hidden
                 />
                 <span

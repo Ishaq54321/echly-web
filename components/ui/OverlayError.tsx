@@ -20,7 +20,7 @@ export function OverlayError({ title, message, showOnboardingLink }: OverlayErro
       aria-modal="true"
       aria-labelledby="echly-overlay-error-title"
     >
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 text-center shadow-xl">
+      <div className="w-full max-w-md rounded-xl border border-[#EBEBEB] bg-white p-6 text-center shadow-xl">
         <p id="echly-overlay-error-title" className="text-lg font-medium text-gray-900">
           {title}
         </p>
@@ -36,7 +36,7 @@ export function OverlayError({ title, message, showOnboardingLink }: OverlayErro
           ) : null}
           <button
             type="button"
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+            className="rounded-lg border border-[#EBEBEB] bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
             onClick={() => window.location.reload()}
           >
             Reload

@@ -19,8 +19,8 @@ export default function ModeSelector({ selectedMode, onSelect, disabled }: ModeS
         disabled={disabled}
         className={`rounded-xl px-3 py-2.5 flex items-center gap-2 transition-colors ${
           selectedMode === "voice"
-            ? "bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)]"
-            : "bg-white border border-gray-200 text-gray-800 hover:border-gray-300 hover:bg-gray-50"
+            ? "bg-[#1775E0] text-white shadow-[0_10px_24px_rgba(23,117,224,0.22)]"
+            : "bg-white border border-[#EBEBEB] text-gray-800 hover:border-[#D5D5D5] hover:bg-gray-50"
         }`}
       >
         <Mic className="h-4 w-4" />
@@ -37,8 +37,8 @@ export default function ModeSelector({ selectedMode, onSelect, disabled }: ModeS
         disabled={disabled}
         className={`rounded-xl px-3 py-2.5 flex items-center gap-2 transition-colors ${
           selectedMode === "write"
-            ? "bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)]"
-            : "bg-white border border-gray-200 text-gray-800 hover:border-gray-300 hover:bg-gray-50"
+            ? "bg-[#1775E0] text-white shadow-[0_10px_24px_rgba(23,117,224,0.22)]"
+            : "bg-white border border-[#EBEBEB] text-gray-800 hover:border-[#D5D5D5] hover:bg-gray-50"
         }`}
       >
         <Pencil className="h-4 w-4" />

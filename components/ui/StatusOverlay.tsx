@@ -16,7 +16,7 @@ export function StatusOverlay({ title, message }: StatusOverlayProps) {
       aria-modal="true"
       aria-labelledby="echly-status-overlay-title"
     >
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 text-center shadow-xl">
+      <div className="w-full max-w-md rounded-xl border border-[#EBEBEB] bg-white p-6 text-center shadow-xl">
         <p id="echly-status-overlay-title" className="text-lg font-medium text-gray-900">
           {title}
         </p>

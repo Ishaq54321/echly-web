@@ -28,7 +28,7 @@ function cn(...classes: (string | false | undefined | null)[]): string {
 const PALETTE_COLORS = [
   "#000000", "#FFFFFF", "#9CA3AF", "#6B7280", "#4B5563", "#374151",
   "#EC4899", "#EF4444", "#F97316", "#F59E0B", "#EAB308", "#84CC16",
-  "#22C55E", "#10B981", "#14B8A6", "#06B6D4", "#3B82F6", "#6366F1",
+  "#22C55E", "#10B981", "#14B8A6", "#06B6D4", "#1775E0", "#6366F1",
   "#8B5CF6", "#A855F7", "#D946EF", "#F43F5E", "#FB7185", "#FCA5A5",
   "#FED7AA", "#FEF08A", "#BBF7D0", "#BAE6FD", "#C7D2FE", "#DDD6FE",
 ];
@@ -79,7 +79,7 @@ function OpacitySlider({ color, value, onChange }: { color: string; value: numbe
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         />
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-blue-500 shadow pointer-events-none"
+          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-[var(--brand)] shadow pointer-events-none"
           style={{ left: `clamp(8px, calc(${value * 100}% - 8px), calc(100% - 8px))` }}
         />
       </div>
@@ -587,7 +587,7 @@ export function EditorToolbar({
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="h-10 px-5 bg-blue-500 hover:bg-blue-400 text-white text-[15px] font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          className="h-10 px-5 bg-[#1775E0] hover:bg-[#1462C4] text-white text-[15px] font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5"
         >
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />

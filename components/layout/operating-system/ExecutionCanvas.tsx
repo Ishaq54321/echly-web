@@ -48,7 +48,7 @@ export interface ExecutionCanvasProps {
 function StatusPill({ status }: { status: FeedbackStatus }) {
   const styles: Record<FeedbackStatus, string> = {
     Open: "bg-amber-50 text-amber-800 border-amber-200",
-    "In Progress": "bg-blue-50 text-[var(--accent-operational)] border-[var(--accent-operational-border)]",
+    "In Progress": "bg-[var(--brand-subtle)] text-[var(--accent-operational)] border-[var(--accent-operational-border)]",
     Blocked: "bg-red-50 text-red-700 border-red-200",
     Resolved: "bg-emerald-50 text-emerald-700 border-emerald-200",
   };

@@ -121,7 +121,7 @@ export default function AdminPlansPage() {
                       onChange={(e) => updateField(plan.id, "name", e.target.value)}
                       placeholder={formatPlanName(plan.id, plan.id)}
                       disabled={isSaving}
-                      className="w-full max-w-[120px] rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 disabled:opacity-60 disabled:bg-neutral-50"
+                      className="w-full max-w-[120px] rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 disabled:opacity-60 disabled:bg-neutral-50"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -131,7 +131,7 @@ export default function AdminPlansPage() {
                       value={plan.priceMonthly}
                       onChange={(e) => updateField(plan.id, "priceMonthly", Number(e.target.value) || 0)}
                       disabled={isSaving}
-                      className="w-20 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 disabled:opacity-60 disabled:bg-neutral-50"
+                      className="w-20 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 disabled:opacity-60 disabled:bg-neutral-50"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -141,7 +141,7 @@ export default function AdminPlansPage() {
                       value={plan.priceYearly}
                       onChange={(e) => updateField(plan.id, "priceYearly", Number(e.target.value) || 0)}
                       disabled={isSaving}
-                      className="w-20 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 disabled:opacity-60 disabled:bg-neutral-50"
+                      className="w-20 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 disabled:opacity-60 disabled:bg-neutral-50"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -157,7 +157,7 @@ export default function AdminPlansPage() {
                         )
                       }
                       disabled={isSaving}
-                      className="w-16 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 disabled:opacity-60 disabled:bg-neutral-50"
+                      className="w-16 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 disabled:opacity-60 disabled:bg-neutral-50"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -173,7 +173,7 @@ export default function AdminPlansPage() {
                         )
                       }
                       disabled={isSaving}
-                      className="w-16 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 disabled:opacity-60 disabled:bg-neutral-50"
+                      className="w-16 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 disabled:opacity-60 disabled:bg-neutral-50"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -183,7 +183,7 @@ export default function AdminPlansPage() {
                         checked={plan.insightsEnabled}
                         onChange={(e) => updateField(plan.id, "insightsEnabled", e.target.checked)}
                         disabled={isSaving}
-                        className="rounded border-neutral-300 text-[#155DFC] focus:ring-[#155DFC] disabled:opacity-60"
+                        className="rounded border-[#EBEBEB] text-[#1775E0] focus:ring-[#1775E0] disabled:opacity-60"
                       />
                       <span className="text-neutral-600">On</span>
                     </label>
@@ -193,7 +193,7 @@ export default function AdminPlansPage() {
                       type="button"
                       onClick={() => handleSaveClick(plan)}
                       disabled={isSaving}
-                      className="rounded-lg px-3 py-1.5 text-sm font-medium bg-[#155DFC] text-white hover:bg-[#155DFC]/90 disabled:opacity-60"
+                      className="rounded-lg px-3 py-1.5 text-sm font-medium bg-[#1775E0] text-white hover:bg-[#1775E0]/90 disabled:opacity-60"
                     >
                       {isSaving ? "Saving…" : "Save"}
                     </button>
@@ -229,7 +229,7 @@ export default function AdminPlansPage() {
             <button
               type="button"
               onClick={() => confirmPlan && save(confirmPlan)}
-              className="rounded-lg px-3 py-2 text-sm font-medium bg-[#155DFC] text-white hover:bg-[#155DFC]/90"
+              className="rounded-lg px-3 py-2 text-sm font-medium bg-[#1775E0] text-white hover:bg-[#1775E0]/90"
             >
               Confirm Update
             </button>

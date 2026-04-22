@@ -299,7 +299,7 @@ export function ResumeSessionModal({
                   padding: "10px 20px",
                   borderRadius: 10,
                   border: "none",
-                  background: "#3B82F6",
+                  background: "#1775E0",
                   color: "white",
                   fontSize: 14,
                   fontWeight: 600,

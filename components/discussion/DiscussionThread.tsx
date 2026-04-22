@@ -370,7 +370,7 @@ export function DiscussionThread({
           {ticket.sessionId && feedbackId ? (
             <Link
               href={`/session/${ticket.sessionId}?ticket=${feedbackId}`}
-              className="group inline-flex shrink-0 items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-[#364153] shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-colors hover:border-neutral-300 hover:bg-slate-50/90 hover:text-[#0F172A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]/20"
+              className="group inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#EBEBEB] bg-white px-2.5 py-1.5 text-[12px] font-medium text-[#364153] shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-colors hover:border-[#D5D5D5] hover:bg-slate-50/90 hover:text-[#0F172A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/20"
             >
               View Ticket
               <ArrowUpRight
@@ -427,7 +427,7 @@ export function DiscussionThread({
                 {ticket.sessionId && feedbackId && (
                   <Link
                     href={`/session/${ticket.sessionId}?ticket=${feedbackId}`}
-                    className="text-[13px] font-medium text-[#155DFC] hover:underline flex items-center gap-0.5"
+                    className="text-[13px] font-medium text-[#1775E0] hover:underline flex items-center gap-0.5"
                   >
                     View full
                     <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
@@ -469,7 +469,7 @@ export function DiscussionThread({
               <button
                 type="button"
                 onClick={() => void refetchComments()}
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#155DFC] hover:text-[#0F4EDC] transition-colors"
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#1775E0] hover:text-[#1462C4] transition-colors"
               >
                 <RefreshCw className="h-3 w-3 shrink-0" strokeWidth={2} />
                 Refresh
@@ -520,7 +520,7 @@ export function DiscussionThread({
             {/* Compose — inside the Replies card */}
             <div className="border-t border-neutral-100 px-5 py-3.5">
               <div className="flex items-center gap-2.5">
-                <div className="w-[28px] h-[28px] rounded-full bg-[#EEF3FF] text-[#155DFC] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="w-[28px] h-[28px] rounded-full bg-[#EBF4FF] text-[#1775E0] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden">
                   {userInitial}
                 </div>
                 <input
@@ -534,7 +534,7 @@ export function DiscussionThread({
                       handleSendComment();
                     }
                   }}
-                  className="flex-1 min-w-0 h-[38px] rounded-xl border border-neutral-200 px-4 text-[14px] text-discussion-body placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition"
+                  className="flex-1 min-w-0 h-[38px] rounded-xl border border-neutral-200 px-4 text-[14px] text-discussion-body placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 focus:border-[#1775E0] transition"
                 />
                 <button
                   type="button"
@@ -548,7 +548,7 @@ export function DiscussionThread({
                   type="button"
                   onClick={handleSendComment}
                   disabled={sending || !commentDraft.trim()}
-                  className="h-[38px] w-[38px] rounded-xl bg-[#155DFC] text-white flex items-center justify-center shadow-level-1 hover:bg-[#0F4EDC] disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
+                  className="h-[38px] w-[38px] rounded-xl bg-[#1775E0] text-white flex items-center justify-center shadow-level-1 hover:bg-[#1462C4] disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
                   aria-label="Send reply"
                 >
                   <Send className="h-3.5 w-3.5" strokeWidth={1.5} />

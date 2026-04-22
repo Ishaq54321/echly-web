@@ -8,21 +8,22 @@ export function PendingAccessBanner() {
       style={{
         width: "100%",
         height: "48px",
-        background: "#F7F8FA",
+        background: "var(--surface-subtle)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 24px",
         flexShrink: 0,
+        borderBottom: "1px solid var(--border)",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <Clock size={15} color="#1775E0" aria-hidden />
+        <Clock size={15} color="var(--brand)" aria-hidden />
         <span
+          className="font-medium"
           style={{
             fontSize: "14px",
-            fontWeight: 500,
-            color: "#555555",
+            color: "var(--text-secondary)",
             letterSpacing: "-0.1px",
           }}
         >
@@ -30,12 +31,12 @@ export function PendingAccessBanner() {
         </span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        <Mail size={15} color="#555555" aria-hidden />
+        <Mail size={15} color="var(--text-secondary)" aria-hidden />
         <span
+          className="font-medium"
           style={{
             fontSize: "14px",
-            fontWeight: 500,
-            color: "#555555",
+            color: "var(--text-secondary)",
           }}
         >
           You&apos;ll be notified by email

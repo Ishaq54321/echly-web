@@ -20,7 +20,7 @@ export default function SessionControlBar({ onPause, onResume, onEnd, highlightE
       transition={{ duration: 0.25, ease: "easeOut" }}
       className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto"
     >
-      <div className="rounded-xl border border-gray-200 bg-white/95 backdrop-blur-md shadow-[0_18px_48px_rgba(0,0,0,0.12)] px-4 py-3 flex items-center gap-3">
+      <div className="rounded-xl border border-[#EBEBEB] bg-white/95 backdrop-blur-md shadow-[0_18px_48px_rgba(0,0,0,0.12)] px-4 py-3 flex items-center gap-3">
         <span className="text-[12px] font-semibold text-gray-700 whitespace-nowrap">
           Recording Session
         </span>

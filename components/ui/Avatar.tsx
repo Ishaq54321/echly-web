@@ -67,8 +67,8 @@ export function Avatar({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#e5e7eb",
-            color: "#374151",
+            background: "var(--border)",
+            color: "var(--text-body)",
             fontSize: Math.max(size * 0.38, 10),
             fontWeight: 600,
             borderRadius,
@@ -86,12 +86,12 @@ export function Avatar({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#e5e7eb",
+            background: "var(--border)",
             borderRadius,
           }}
         >
           <User
-            style={{ width: size * 0.55, height: size * 0.55, color: "#9ca3af" }}
+            style={{ width: size * 0.55, height: size * 0.55, color: "var(--text-tertiary)" }}
             aria-hidden
           />
         </span>

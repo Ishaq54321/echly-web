@@ -5,8 +5,8 @@
 
 const SEMANTIC = {
   layout: {
-    pill: "bg-blue-50 text-blue-700 border-blue-200",
-    dot: "bg-blue-500",
+    pill: "bg-[var(--brand-subtle)] text-[var(--brand-text)] border-[var(--brand-muted)]",
+    dot: "bg-[#1775E0]",
   },
   ux: {
     pill: "bg-purple-50 text-purple-700 border-purple-200",
@@ -25,7 +25,7 @@ const SEMANTIC = {
     dot: "bg-orange-500",
   },
   default: {
-    pill: "bg-gray-50 text-gray-700 border-gray-200",
+    pill: "bg-gray-50 text-gray-700 border-[#EBEBEB]",
     dot: "bg-gray-400",
   },
 } as const;

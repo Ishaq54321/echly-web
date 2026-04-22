@@ -38,7 +38,7 @@ export function SessionsTimeRangeFilter({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="flex max-w-[220px] items-center gap-2 rounded-[9px] border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-gray-50"
+        className="flex max-w-[220px] items-center gap-2 rounded-[9px] border border-[#EBEBEB] bg-white px-3.5 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-gray-50"
       >
         <span className="truncate">{label}</span>
         <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" strokeWidth={2} aria-hidden />

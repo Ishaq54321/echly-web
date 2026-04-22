@@ -145,7 +145,7 @@ export default function DiscussionPage() {
               placeholder="Search discussions…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-[7px] text-[14px] bg-neutral-50 border border-neutral-200 rounded-lg text-discussion-body placeholder:text-meta outline-none focus:border-[#155DFC]/50 focus:bg-white transition-colors"
+              className="w-full pl-8 pr-3 py-[7px] text-[14px] bg-neutral-50 border border-neutral-200 rounded-lg text-discussion-body placeholder:text-meta outline-none focus:border-[#1775E0]/50 focus:bg-white transition-colors"
             />
           </div>
         </div>
@@ -158,7 +158,7 @@ export default function DiscussionPage() {
               onClick={() => setSelectedProjectId(null)}
               className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-all ${
                 selectedProjectId === null
-                  ? "bg-[#EEF3FF] text-[#155DFC] border-[#bfdbfe] font-medium"
+                  ? "bg-[#EBF4FF] text-[#1775E0] border-[#C3DFFE] font-medium"
                   : "bg-transparent text-secondary border-neutral-200 hover:text-neutral-900"
               }`}
             >
@@ -171,7 +171,7 @@ export default function DiscussionPage() {
                 onClick={() => setSelectedProjectId(proj.id)}
                 className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-all ${
                   selectedProjectId === proj.id
-                    ? "bg-[#EEF3FF] text-[#155DFC] border-[#bfdbfe] font-medium"
+                    ? "bg-[#EBF4FF] text-[#1775E0] border-[#C3DFFE] font-medium"
                     : "bg-transparent text-secondary border-neutral-200 hover:text-neutral-900"
                 }`}
               >
@@ -212,7 +212,7 @@ export default function DiscussionPage() {
           <button
             type="button"
             onClick={handleMobileBack}
-            className="md:hidden shrink-0 flex items-center gap-1.5 px-4 py-2.5 border-b border-neutral-200 text-[13px] font-medium text-[#155DFC] bg-white"
+            className="md:hidden shrink-0 flex items-center gap-1.5 px-4 py-2.5 border-b border-neutral-200 text-[13px] font-medium text-[#1775E0] bg-white"
           >
             <ChevronLeft className="h-4 w-4 shrink-0" strokeWidth={2} />
             All discussions

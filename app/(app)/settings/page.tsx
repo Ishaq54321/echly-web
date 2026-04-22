@@ -25,6 +25,7 @@ import {
   Gem,
 } from "lucide-react";
 import { ImageCropModal } from "@/components/ui/ImageCropModal";
+import { InviteMemberModal } from "@/components/workspace/InviteMemberModal";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { MODAL_LAYER_Z_INDEX } from "@/lib/ui/zIndex";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
@@ -46,15 +47,15 @@ import { authFetch } from "@/lib/authFetch";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
-  "rounded-[12px] border border-[var(--border-default)] bg-white p-[28px] transition-[border-color,box-shadow] duration-200 ease-out hover:border-neutral-300 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]";
+  "rounded-[12px] border border-[var(--border-default)] bg-white p-[28px] transition-[border-color,box-shadow] duration-200 ease-out hover:border-[#D5D5D5] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]";
 const CARD_GAP = "space-y-8"; /* 32px between section cards */
 const ROW_GAP = "space-y-5"; /* 20px between setting rows */
-const SECTION_TITLE = "text-[22px] font-semibold text-neutral-900"; /* H2: +2px, 600 */
+const SECTION_TITLE = "text-lg font-semibold text-[var(--text-heading)]"; /* H2: section heading */
 const SECTION_SUBTITLE = "text-[16px] font-semibold text-neutral-900"; /* H3 setting labels: 600 for hierarchy */
 const SECTION_DESC = "text-[14px] text-neutral-600 mt-1"; /* body, darker grey */
 const SETTING_DESC = "text-[14px] text-neutral-600 mt-0.5";
-const BTN_PRIMARY = "rounded-[8px] px-4 py-2.5 text-sm font-semibold bg-[#155DFC] text-white hover:brightness-110 hover:shadow-[0_2px_8px_rgba(21,93,252,0.35)] transition-all duration-200";
-const BTN_SECONDARY = "rounded-[8px] px-4 py-2.5 text-sm font-semibold bg-neutral-100 border border-neutral-300 text-neutral-900 hover:bg-neutral-200 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-all duration-200";
+const BTN_PRIMARY = "rounded-[8px] px-4 py-2.5 text-sm font-semibold bg-[#1775E0] text-white hover:bg-[#1462C4] hover:shadow-[0_2px_8px_rgba(23,117,224,0.35)] transition-all duration-200";
+const BTN_SECONDARY = "rounded-[8px] px-4 py-2.5 text-sm font-semibold bg-neutral-100 border border-[#EBEBEB] text-neutral-900 hover:bg-neutral-200 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-all duration-200";
 
 function SectionHeader({
   title,
@@ -128,7 +129,7 @@ function SettingsPageInner() {
   ) {
     return (
       <div className="flex flex-1 min-h-0 bg-white overflow-auto">
-        <div className="flex flex-1 flex-col items-center justify-center px-12 py-16 max-w-lg mx-auto text-center">
+        <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 max-w-lg mx-auto text-center">
           <p className="text-lg font-medium text-neutral-900">Workspace unavailable</p>
           <p className="mt-2 text-sm text-neutral-600">
             {workspaceError ||
@@ -141,13 +142,13 @@ function SettingsPageInner() {
 
   return (
     <div className="flex flex-1 min-h-0 bg-white overflow-auto">
-      <div className="flex-1 min-w-0 max-w-[1280px] mx-auto px-12 py-10 w-full">
+      <div className="flex-1 min-w-0 max-w-[1280px] mx-auto px-6 py-10 w-full">
         {/* Page header */}
         <header className="mb-8">
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#111111", letterSpacing: "-0.3px", margin: 0 }}>
+          <h1 className="text-xl font-bold text-[var(--text-heading)] tracking-[-0.4px] mt-1 mb-0">
             Settings
           </h1>
-          <p style={{ fontSize: 14, color: "#777777", marginTop: 4, marginBottom: 0 }}>
+          <p className="text-sm font-normal text-[var(--text-secondary)] mt-1">
             Manage your workspace, notifications, and preferences.
           </p>
         </header>
@@ -166,14 +167,14 @@ function SettingsPageInner() {
                 onClick={() => setActiveTab(id)}
                 className={`
                   relative pb-3 text-sm transition-colors duration-200
-                  ${isActive ? "text-[#155DFC] font-bold" : "font-medium text-[var(--text-meta)] hover:text-neutral-700"}
+                  ${isActive ? "text-[#1775E0] font-bold" : "font-medium text-[var(--text-meta)] hover:text-neutral-700"}
                 `}
                 aria-current={isActive ? "true" : undefined}
               >
                 {label}
                 {isActive && (
                   <span
-                    className="absolute left-0 right-0 bottom-0 h-[3px] bg-[#155DFC] rounded-full"
+                    className="absolute left-0 right-0 bottom-0 h-[3px] bg-[#1775E0] rounded-full"
                     aria-hidden
                   />
                 )}
@@ -203,7 +204,7 @@ function SettingsPageInner() {
 function SettingsSuspenseFallback() {
   return (
     <div className="flex flex-1 min-h-0 bg-white overflow-auto" aria-busy="true" aria-live="polite">
-      <div className="flex flex-1 min-h-[520px] min-w-0 max-w-[1280px] mx-auto w-full items-center justify-center px-12 py-10">
+      <div className="flex flex-1 min-h-[520px] min-w-0 max-w-[1280px] mx-auto w-full items-center justify-center px-6 py-10">
         <MinimalLoader label="Loading settings…" />
       </div>
     </div>
@@ -374,7 +375,7 @@ function WorkspaceTab({
           <div className="skeleton" style={{ height: 22, width: 180, background: "#F0F0F0", borderRadius: 6, marginBottom: 8 }} />
           <div className="skeleton" style={{ height: 14, width: 280, background: "#F0F0F0", borderRadius: 4 }} />
         </div>
-        <div style={{ background: "white", border: "1px solid #EBEBEB", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
           <div style={{ padding: "28px 32px", borderBottom: "1px solid #F0F0F0" }}>
             <div className="skeleton" style={{ width: 140, height: 14, background: "#F0F0F0", borderRadius: 4, marginBottom: 16 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
@@ -428,17 +429,17 @@ function WorkspaceTab({
       )}
 
       {/* Page heading */}
-      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#111111", letterSpacing: "-0.3px", margin: "0 0 4px 0" }}>
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--border)" }}>
+        <h1 className="text-lg font-semibold text-[var(--text-heading)] mb-1">
           Workspace Settings
         </h1>
-        <p style={{ fontSize: 14, color: "#777777", margin: 0 }}>
+        <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0 }}>
           Manage your workspace identity and members
         </p>
       </div>
 
       {/* Card */}
-      <div style={{ background: "white", border: "1px solid #EBEBEB", borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
 
       {/* Workspace identity section */}
       {/* Workspace identity row */}
@@ -491,7 +492,7 @@ function WorkspaceTab({
                       width: 20,
                       height: 20,
                       borderRadius: "50%",
-                      border: "2px solid #1775E0",
+                      border: "2px solid var(--brand)",
                       borderTopColor: "transparent",
                       animation: "spin 0.7s linear infinite",
                       display: "block",
@@ -564,14 +565,14 @@ function WorkspaceTab({
               background: "#FAFAFA",
               padding: "0 12px",
               fontSize: 15,
-              color: "#111111",
+              color: "var(--text-heading)",
               width: "100%",
               outline: "none",
               transition: "border-color 150ms, box-shadow 150ms, background 150ms",
               boxSizing: "border-box",
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = "#1775E0";
+              e.target.style.borderColor = "var(--brand)";
               e.target.style.background = "white";
               e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)";
             }}
@@ -592,7 +593,7 @@ function WorkspaceTab({
               padding: "0 18px",
               borderRadius: 9,
               border: "none",
-              background: savedOk ? "#16A34A" : "#1775E0",
+              background: savedOk ? "var(--color-success)" : "var(--brand)",
               color: "white",
               fontSize: 15,
               fontWeight: 600,
@@ -755,8 +756,8 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
             <form onSubmit={(e) => { void handleSubmit(e); }}>
               {/* Info note */}
               <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 14px", display: "flex", gap: 10, marginBottom: 20, alignItems: "flex-start" }}>
-                <Mail size={16} color="#1775E0" style={{ flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 13, color: "#1D4ED8", lineHeight: 1.5 }}>
+                <Mail size={16} color="var(--brand)" style={{ flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 13, color: "#1462C4", lineHeight: 1.5 }}>
                   We&apos;ll send a confirmation link to your new email address. Your email won&apos;t change until you click the link.
                 </span>
               </div>
@@ -768,7 +769,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setNewEmail(e.target.value)}
                 required
                 style={{ height: 42, borderRadius: 9, border: "1.5px solid #E5E5E5", background: "#FAFAFA", padding: "0 12px", fontSize: 15, color: "#111", width: "100%", outline: "none", boxSizing: "border-box", marginBottom: 14 }}
-                onFocus={(e) => { e.target.style.borderColor = "#1775E0"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
                 onBlur={(e) => { e.target.style.borderColor = "#E5E5E5"; e.target.style.background = "#FAFAFA"; e.target.style.boxShadow = "none"; }}
               />
 
@@ -780,7 +781,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   style={{ height: 42, borderRadius: 9, border: "1.5px solid #E5E5E5", background: "#FAFAFA", padding: "0 40px 0 12px", fontSize: 15, color: "#111", width: "100%", outline: "none", boxSizing: "border-box" }}
-                  onFocus={(e) => { e.target.style.borderColor = "#1775E0"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                  onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
                   onBlur={(e) => { e.target.style.borderColor = "#E5E5E5"; e.target.style.background = "#FAFAFA"; e.target.style.boxShadow = "none"; }}
                 />
                 <button
@@ -806,7 +807,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
                 <button
                   type="submit"
                   disabled={loading || !newEmail.trim() || !password}
-                  style={{ height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: "#1775E0", color: "white", fontSize: 14, fontWeight: 600, cursor: loading || !newEmail.trim() || !password ? "not-allowed" : "pointer", opacity: loading || !newEmail.trim() || !password ? 0.7 : 1, display: "flex", alignItems: "center", gap: 8 }}
+                  style={{ height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--brand)", color: "white", fontSize: 14, fontWeight: 600, cursor: loading || !newEmail.trim() || !password ? "not-allowed" : "pointer", opacity: loading || !newEmail.trim() || !password ? 0.7 : 1, display: "flex", alignItems: "center", gap: 8 }}
                 >
                   {loading ? <><span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "white", animation: "spin 0.7s linear infinite", display: "block" }} />Sending…</> : "Send confirmation"}
                 </button>
@@ -1081,7 +1082,7 @@ function MyAccountTab() {
           <div className="skeleton" style={{ height: 22, width: 160, background: "#F0F0F0", borderRadius: 6, marginBottom: 8 }} />
           <div className="skeleton" style={{ height: 14, width: 280, background: "#F0F0F0", borderRadius: 4 }} />
         </div>
-        <div style={{ background: "white", border: "1px solid #EBEBEB", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
           <div style={{ padding: "28px 32px", borderBottom: "1px solid #F0F0F0" }}>
             <div className="skeleton" style={{ width: 110, height: 14, background: "#F0F0F0", borderRadius: 4, marginBottom: 16 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
@@ -1112,16 +1113,16 @@ function MyAccountTab() {
 
       {/* Page heading */}
       <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#111111", letterSpacing: "-0.3px", margin: "0 0 4px 0" }}>
+        <h1 className="text-lg font-semibold text-[var(--text-heading)] mb-1">
           Profile Settings
         </h1>
-        <p style={{ fontSize: 14, color: "#777777", margin: 0 }}>
+        <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0 }}>
           Manage your personal account and preferences
         </p>
       </div>
 
       {/* Card */}
-      <div style={{ background: "white", border: "1px solid #EBEBEB", borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
 
         {/* Section: Name and photo */}
         <div style={{ ...sectionStyle }}>
@@ -1137,7 +1138,7 @@ function MyAccountTab() {
                 onMouseEnter={() => setAvatarHovered(true)}
                 onMouseLeave={() => setAvatarHovered(false)}
               >
-                <div style={{ width: 88, height: 88, borderRadius: "50%", boxShadow: "0 0 0 3px #FFFFFF, 0 0 0 5px #E0E0E0", overflow: "hidden", background: "#1775E0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 88, height: 88, borderRadius: "50%", boxShadow: "0 0 0 3px #FFFFFF, 0 0 0 5px #E0E0E0", overflow: "hidden", background: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {localAvatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={localAvatarUrl} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -1179,14 +1180,14 @@ function MyAccountTab() {
                 onChange={(e) => setNameDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") void handleSaveName(); }}
                 style={inputStyle}
-                onFocus={(e) => { e.target.style.borderColor = "#1775E0"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
                 onBlur={(e) => { e.target.style.borderColor = "#E5E5E5"; e.target.style.background = "#FAFAFA"; e.target.style.boxShadow = "none"; }}
               />
               <button
                 type="button"
                 onClick={() => void handleSaveName()}
                 disabled={isSaving || !nameDraft.trim()}
-                style={{ marginTop: 10, height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: savedOk ? "#16A34A" : "#1775E0", color: "white", fontSize: 14, fontWeight: 600, cursor: isSaving || !nameDraft.trim() ? "not-allowed" : "pointer", opacity: isSaving || !nameDraft.trim() ? 0.7 : 1, transition: "background 200ms", display: "flex", alignItems: "center", gap: 8 }}
+                style={{ marginTop: 10, height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: savedOk ? "var(--color-success)" : "var(--brand)", color: "white", fontSize: 14, fontWeight: 600, cursor: isSaving || !nameDraft.trim() ? "not-allowed" : "pointer", opacity: isSaving || !nameDraft.trim() ? 0.7 : 1, transition: "background 200ms", display: "flex", alignItems: "center", gap: 8 }}
               >
                 {isSaving ? (
                   <><span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "white", animation: "spin 0.7s linear infinite", display: "block" }} />Saving...</>
@@ -1213,7 +1214,7 @@ function MyAccountTab() {
                 <p style={{ fontSize: 15, fontWeight: 600, color: "#111", margin: 0 }}>Signed in with Google</p>
                 <p style={{ fontSize: 13, color: "#777", margin: "2px 0 0" }}>{authEmail ?? ""}</p>
               </div>
-              <a href="https://myaccount.google.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#1775E0", fontWeight: 500, textDecoration: "none", flexShrink: 0 }}>
+              <a href="https://myaccount.google.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--brand)", fontWeight: 500, textDecoration: "none", flexShrink: 0 }}>
                 Manage Google account ↗
               </a>
             </div>
@@ -1420,7 +1421,7 @@ function daysUntil(ts: SerializedTs): number {
 }
 
 const MEMBER_AVATAR_COLORS = [
-  { bg: "#DBEAFE", text: "#1D4ED8" },
+  { bg: "#EBF4FF", text: "#1462C4" },
   { bg: "#D1FAE5", text: "#065F46" },
   { bg: "#FEE2E2", text: "#991B1B" },
   { bg: "#EDE9FE", text: "#5B21B6" },
@@ -1569,24 +1570,24 @@ function MembersTableRow({
       row.name ? (
         <div className="min-w-0">
           <p
-            className="text-[14px] font-medium text-[#111111] truncate"
+            className="text-[14px] font-medium text-[#1C1B1F] truncate"
             style={{ lineHeight: "1.3" }}
           >
             {row.name}
           </p>
-          <p className="text-[13px] text-[#777777] truncate" style={{ marginTop: 1 }}>
+          <p className="text-[13px] text-[#78716C] truncate" style={{ marginTop: 1 }}>
             {row.email}
           </p>
         </div>
       ) : (
-        <p className="text-[14px] font-medium text-[#111111] truncate min-w-0">{row.email}</p>
+        <p className="text-[14px] font-medium text-[#1C1B1F] truncate min-w-0">{row.email}</p>
       )
     ) : (
       <div className="min-w-0">
         <p className="text-[14px] text-[#AAAAAA] italic" style={{ lineHeight: "1.3" }}>
           Invited
         </p>
-        <p className="text-[13px] text-[#777777] truncate" style={{ marginTop: 1 }}>
+        <p className="text-[13px] text-[#78716C] truncate" style={{ marginTop: 1 }}>
           {row.email}
         </p>
       </div>
@@ -1610,7 +1611,7 @@ function MembersTableRow({
       <button
         type="button"
         onClick={() => setConfirmingRemoveId(null)}
-        className="text-[13px] text-[#777777] hover:text-neutral-900 transition-colors px-1"
+        className="text-[13px] text-[#78716C] hover:text-neutral-900 transition-colors px-1"
       >
         Cancel
       </button>
@@ -1641,7 +1642,7 @@ function MembersTableRow({
             type="button"
             onClick={() => setConfirmingRemoveId(row.id)}
             title="Remove member"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#999999] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#A8A29E] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
           >
             <UserMinus size={15} />
           </button>
@@ -1653,7 +1654,7 @@ function MembersTableRow({
             type="button"
             onClick={() => onResend(row.invitationToken!, row.email)}
             title="Resend invite"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#999999] hover:text-[#1775E0] hover:bg-[#EBF4FF] transition-colors"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#A8A29E] hover:text-[#1775E0] hover:bg-[#EBF4FF] transition-colors"
           >
             <RotateCcw size={14} />
           </button>
@@ -1661,7 +1662,7 @@ function MembersTableRow({
             type="button"
             onClick={() => onRevoke(row.invitationToken!, row.email)}
             title="Revoke invite"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#999999] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#A8A29E] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
           >
             <X size={14} />
           </button>
@@ -1706,16 +1707,16 @@ function MembersTableRow({
             {row.status === "active" ? (
               row.name ? (
                 <>
-                  <p className="text-sm font-medium text-[#111111] truncate">{row.name}</p>
-                  <p className="text-[13px] text-[#777777] truncate">{row.email}</p>
+                  <p className="text-sm font-medium text-[#1C1B1F] truncate">{row.name}</p>
+                  <p className="text-[13px] text-[#78716C] truncate">{row.email}</p>
                 </>
               ) : (
-                <p className="text-sm font-medium text-[#111111] truncate">{row.email}</p>
+                <p className="text-sm font-medium text-[#1C1B1F] truncate">{row.email}</p>
               )
             ) : (
               <>
                 <p className="text-[14px] text-[#AAAAAA] italic">Invited</p>
-                <p className="text-[13px] text-[#777777] truncate">{row.email}</p>
+                <p className="text-[13px] text-[#78716C] truncate">{row.email}</p>
               </>
             )}
           </div>
@@ -1733,7 +1734,7 @@ function MembersTableRow({
               <button
                 type="button"
                 onClick={() => setConfirmingRemoveId(row.id)}
-                className="flex items-center gap-1.5 text-[13px] text-[#999999] hover:text-[#DC2626] transition-colors"
+                className="flex items-center gap-1.5 text-[13px] text-[#A8A29E] hover:text-[#DC2626] transition-colors"
               >
                 <UserMinus size={13} />
                 Remove
@@ -1746,7 +1747,7 @@ function MembersTableRow({
             <button
               type="button"
               onClick={() => onResend(row.invitationToken!, row.email)}
-              className="flex items-center gap-1 text-[13px] text-[#777777] hover:text-[#1775E0] transition-colors"
+              className="flex items-center gap-1 text-[13px] text-[#78716C] hover:text-[#1775E0] transition-colors"
             >
               <RotateCcw size={12} />
               Resend
@@ -1754,7 +1755,7 @@ function MembersTableRow({
             <button
               type="button"
               onClick={() => onRevoke(row.invitationToken!, row.email)}
-              className="flex items-center gap-1 text-[13px] text-[#777777] hover:text-[#DC2626] transition-colors"
+              className="flex items-center gap-1 text-[13px] text-[#78716C] hover:text-[#DC2626] transition-colors"
             >
               <X size={12} />
               Revoke
@@ -1763,108 +1764,6 @@ function MembersTableRow({
         )}
       </div>
     </>
-  );
-}
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function InviteMemberModal({
-  onClose,
-  onInviteSent,
-}: {
-  onClose: () => void;
-  onInviteSent: (inv: SerializedInvitation) => void;
-}) {
-  const [email, setEmail] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = email.trim().toLowerCase();
-    if (!EMAIL_RE.test(trimmed)) {
-      setError("Enter a valid email address.");
-      return;
-    }
-    setError(null);
-    setSubmitting(true);
-    try {
-      const res = await authFetch("/api/workspace/members/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmed, role: "MEMBER" }),
-      });
-      if (!res) { setError("Request failed. Try again."); return; }
-      const json = await res.json() as { success: boolean; data?: { invitation: SerializedInvitation }; error?: { message: string } };
-      if (!res.ok || !json.success) {
-        const msg = json.error?.message;
-        if (msg === "ALREADY_MEMBER") setError("This person is already a member.");
-        else if (msg === "INVITE_ALREADY_SENT") setError("An invitation has already been sent to this email.");
-        else setError("Failed to send invitation. Try again.");
-        return;
-      }
-      if (json.data?.invitation) onInviteSent(json.data.invitation);
-    } catch {
-      setError("Failed to send invitation. Try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
-      style={{ zIndex: MODAL_LAYER_Z_INDEX }}
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="invite-modal-title"
-    >
-      <div
-        className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="invite-modal-title" className="text-[20px] font-semibold text-neutral-900">
-          Invite a team member
-        </h2>
-        <p className="mt-1 text-sm text-neutral-600">
-          They'll receive an email with a link to join your workspace.
-        </p>
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-          <div>
-            <label htmlFor="invite-email-settings" className="sr-only">Email address</label>
-            <input
-              id="invite-email-settings"
-              type="email"
-              placeholder="email@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              autoFocus
-            />
-            {error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-neutral-100 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60"
-            >
-              {submitting ? "Sending…" : "Send Invite"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-    </ModalPortal>
   );
 }
 
@@ -1981,7 +1880,7 @@ function MembersTab({
       {/* Header Row 1: Title + CTA */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: "#111111", lineHeight: "1.3" }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-heading)", lineHeight: "1.3" }}>
             Members
           </h2>
           <p className="text-sm font-medium text-foreground/60" style={{ marginTop: 4, fontSize: 15, fontWeight: 500 }}>
@@ -2033,11 +1932,11 @@ function MembersTab({
               borderRadius: 10,
               padding: "0 12px 0 34px",
               fontSize: 14,
-              color: "#111111",
+              color: "var(--text-heading)",
               transition: "border-color 150ms, box-shadow 150ms",
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = "#1775E0";
+              e.target.style.borderColor = "var(--brand)";
               e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)";
             }}
             onBlur={(e) => {
@@ -2142,7 +2041,7 @@ function MembersTab({
               <button
                 type="button"
                 onClick={() => { setSearch(""); setRoleFilter("all"); setStatusFilter("all"); }}
-                style={{ color: "#1775E0", cursor: "pointer", fontSize: 14 }}
+                style={{ color: "var(--brand)", cursor: "pointer", fontSize: 14 }}
               >
                 Clear filters
               </button>
@@ -2164,12 +2063,11 @@ function MembersTab({
         )}
       </div>
 
-      {inviteModalOpen && (
-        <InviteMemberModal
-          onClose={() => setInviteModalOpen(false)}
-          onInviteSent={handleInviteSent}
-        />
-      )}
+      <InviteMemberModal
+        isOpen={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+        onInviteSent={(inv) => handleInviteSent(inv as SerializedInvitation)}
+      />
     </div>
   );
 }
@@ -2302,7 +2200,7 @@ function SecurityTab() {
   return (
     <div className={CARD_GAP}>
       {transferSuccess && (
-        <div className="rounded-xl px-4 py-3 bg-blue-50 border border-blue-200 text-sm font-medium text-blue-800">
+        <div className="rounded-xl px-4 py-3 bg-[var(--brand-subtle)] border border-[var(--brand-muted)] text-sm font-medium text-[var(--brand-text)]">
           You are now a member of this workspace.
         </div>
       )}
@@ -2339,7 +2237,7 @@ function SecurityTab() {
             title="Active Sessions"
             description="Devices where you're currently signed in."
           />
-          <Button variant="ghost" className="text-sm font-semibold text-[#155DFC] hover:underline shrink-0 rounded-lg px-4 py-2.5">
+          <Button variant="ghost" className="text-sm font-semibold text-[#1775E0] hover:underline shrink-0 rounded-lg px-4 py-2.5">
             Log out of all other sessions
           </Button>
         </div>
@@ -2357,7 +2255,7 @@ function SecurityTab() {
                   <p className={SETTING_DESC}>{s.browser} · {s.location}</p>
                 </div>
                 {s.current && (
-                  <span className="text-xs font-semibold text-[#155DFC] shrink-0">Current</span>
+                  <span className="text-xs font-semibold text-[#1775E0] shrink-0">Current</span>
                 )}
               </div>
             );
@@ -2455,7 +2353,7 @@ function SecurityTab() {
                     id="transfer-new-owner"
                     value={selectedNewOwnerUid}
                     onChange={(e) => setSelectedNewOwnerUid(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:border-transparent"
                   >
                     <option value="">Select a member…</option>
                     {transferMembers.map((m) => (
@@ -2477,7 +2375,7 @@ function SecurityTab() {
                   placeholder={workspaceName ?? ""}
                   value={transferConfirmName}
                   onChange={(e) => setTransferConfirmName(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:border-transparent"
                 />
                 {transferError && <p className="mt-1.5 text-sm text-red-600">{transferError}</p>}
               </div>
@@ -2492,7 +2390,7 @@ function SecurityTab() {
                 <button
                   type="submit"
                   disabled={transferSubmitting || transferMembers.length === 0}
-                  className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60"
+                  className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-[#1775E0] text-white hover:bg-[#1462C4] transition disabled:opacity-60"
                 >
                   {transferSubmitting ? "Transferring…" : "Transfer Ownership"}
                 </button>
@@ -2625,7 +2523,7 @@ function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => v
 
 /* ——— Billing tab: full SaaS pricing, backed by /api/plans/catalog ——— */
 const BILLING_CONTAINER = "w-full";
-const BRAND_BLUE = "#155DFC";
+const BRAND_BLUE = "#1775E0";
 
 type CatalogPlan = {
   id: "free" | "starter" | "business" | "enterprise";
@@ -2889,7 +2787,7 @@ function BillingTab() {
             type="text"
             value={teamSize}
             onChange={(e) => setTeamSize(e.target.value)}
-            className="w-[60px] px-2.5 py-1.5 text-center rounded-[8px] border border-[rgba(0,0,0,0.08)] text-[15px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20"
+            className="w-[60px] px-2.5 py-1.5 text-center rounded-[8px] border border-[rgba(0,0,0,0.08)] text-[15px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20"
           />
         </div>
         <div className="flex items-center gap-4">
@@ -2901,7 +2799,7 @@ function BillingTab() {
                 name="billing"
                 checked={billingPeriod === "monthly"}
                 onChange={() => setBillingPeriod("monthly")}
-                className="w-4 h-4 text-[#155DFC] focus:ring-[#155DFC]"
+                className="w-4 h-4 text-[#1775E0] focus:ring-[#1775E0]"
               />
               <span className="text-[15px] font-medium text-neutral-900">Monthly</span>
             </label>
@@ -2911,7 +2809,7 @@ function BillingTab() {
                 name="billing"
                 checked={billingPeriod === "annual"}
                 onChange={() => setBillingPeriod("annual")}
-                className="w-4 h-4 text-[#155DFC] focus:ring-[#155DFC]"
+                className="w-4 h-4 text-[#1775E0] focus:ring-[#1775E0]"
               />
               <span className="text-[15px] font-medium text-neutral-900">Annually</span>
             </label>
@@ -2959,7 +2857,7 @@ function BillingTab() {
                   variant={plan.highlight ? "primary" : "secondary"}
                   className={
                     plan.highlight
-                      ? "w-full rounded-[10px] px-4 py-2.5 text-sm font-semibold bg-[#155DFC] text-white hover:brightness-110 border border-transparent"
+                      ? "w-full rounded-[10px] px-4 py-2.5 text-sm font-semibold bg-[#1775E0] text-white hover:brightness-110 border border-transparent"
                       : "secondary-cta w-full text-sm"
                   }
                   onClick={() => {

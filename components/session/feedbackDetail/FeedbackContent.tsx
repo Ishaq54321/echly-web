@@ -170,7 +170,7 @@ export function FeedbackContent({
                       href={f.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[14px] font-medium text-[#2563EB] hover:underline break-all"
+                      className="text-[14px] font-medium text-[#1775E0] hover:underline break-all"
                     >
                       {f.name?.trim() ? f.name : f.url}
                     </a>

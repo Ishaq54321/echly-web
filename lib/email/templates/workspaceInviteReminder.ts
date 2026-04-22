@@ -20,7 +20,7 @@ export function workspaceInviteReminderHtml({
       <td align="center">
         <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:560px;width:100%;">
           <tr>
-            <td style="background:#155DFC;padding:28px 40px;">
+            <td style="background:#1775E0;padding:28px 40px;">
               <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.02em;">Echly</span>
             </td>
           </tr>
@@ -36,7 +36,7 @@ export function workspaceInviteReminderHtml({
                 <tr>
                   <td>
                     <a href="${acceptUrl}"
-                       style="display:inline-block;padding:14px 28px;background:#155DFC;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">
+                       style="display:inline-block;padding:14px 28px;background:#1775E0;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">
                       Accept invitation
                     </a>
                   </td>

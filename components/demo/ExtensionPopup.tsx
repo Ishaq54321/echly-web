@@ -31,7 +31,7 @@ export default function ExtensionPopup({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ type: "spring", stiffness: 520, damping: 34 }}
-      className="absolute right-6 top-6 w-[320px] bg-white border border-gray-200 shadow-[0_18px_60px_rgba(0,0,0,0.18)] rounded-2xl overflow-hidden cursor-default pointer-events-auto"
+      className="absolute right-6 top-6 w-[320px] bg-white border border-[#EBEBEB] shadow-[0_18px_60px_rgba(0,0,0,0.18)] rounded-2xl overflow-hidden cursor-default pointer-events-auto"
     >
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2 text-gray-700">

@@ -21,7 +21,7 @@ export default function PublicSessionNav() {
           borderBottom: "1px solid rgba(0,0,0,0.08)",
           display: "flex",
           alignItems: "center",
-          padding: "0 40px",
+          padding: "0 24px",
         }}
       >
         {/* Left: Logo + wordmark */}
@@ -42,7 +42,7 @@ export default function PublicSessionNav() {
               position: "relative",
               width: 32,
               height: 32,
-              background: "#155DFC",
+              background: "var(--brand)",
               borderRadius: 8,
               overflow: "hidden",
               flexShrink: 0,
@@ -51,10 +51,10 @@ export default function PublicSessionNav() {
             <Image src="/Echly_logo.svg" alt="" fill sizes="32px" style={{ objectFit: "cover" }} />
           </div>
           <span
+            className="font-bold"
             style={{
-              fontSize: 18,
-              fontWeight: 700,
-              color: "#111111",
+              fontSize: 20,
+              color: "var(--text-heading)",
               letterSpacing: "-0.4px",
             }}
           >
@@ -92,10 +92,10 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   return (
     <a
       href={href}
+      className="font-medium"
       style={{
         fontSize: 15,
-        fontWeight: 500,
-        color: "#444444",
+        color: "var(--text-body)",
         padding: "6px 12px",
         textDecoration: "none",
         borderRadius: 7,
@@ -104,12 +104,12 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
       }}
       onMouseEnter={(e) => {
         const el = e.currentTarget as HTMLAnchorElement;
-        el.style.color = "#111111";
-        el.style.background = "#F4F5F7";
+        el.style.color = "var(--text-heading)";
+        el.style.background = "var(--surface-hover)";
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget as HTMLAnchorElement;
-        el.style.color = "#444444";
+        el.style.color = "var(--text-body)";
         el.style.background = "transparent";
       }}
     >
@@ -122,15 +122,15 @@ function SignInButton() {
   return (
     <button
       type="button"
+      className="font-medium"
       style={{
         background: "white",
-        border: "1.5px solid #D8D8D8",
+        border: "1.5px solid var(--border-strong)",
         borderRadius: 9,
         height: 38,
         padding: "0 20px",
         fontSize: 14,
-        fontWeight: 500,
-        color: "#333333",
+        color: "var(--text-body)",
         cursor: "pointer",
         transition: "all 140ms ease",
       }}
@@ -141,12 +141,12 @@ function SignInButton() {
       }}
       onMouseEnter={(e) => {
         const btn = e.currentTarget;
-        btn.style.borderColor = "#AAAAAA";
-        btn.style.background = "#F8F8F8";
+        btn.style.borderColor = "var(--text-tertiary)";
+        btn.style.background = "var(--surface-subtle)";
       }}
       onMouseLeave={(e) => {
         const btn = e.currentTarget;
-        btn.style.borderColor = "#D8D8D8";
+        btn.style.borderColor = "var(--border-strong)";
         btn.style.background = "white";
       }}
     >
@@ -159,14 +159,14 @@ function GetStartedButton() {
   return (
     <button
       type="button"
+      className="font-semibold"
       style={{
-        background: "#1775E0",
+        background: "var(--brand)",
         border: "none",
         borderRadius: 9,
         height: 38,
         padding: "0 20px",
         fontSize: 14,
-        fontWeight: 600,
         color: "#FFFFFF",
         cursor: "pointer",
         boxShadow: "0 1px 3px rgba(23,117,224,0.25)",
@@ -177,12 +177,12 @@ function GetStartedButton() {
       }}
       onMouseEnter={(e) => {
         const btn = e.currentTarget;
-        btn.style.background = "#1462C4";
+        btn.style.background = "var(--brand-hover)";
         btn.style.boxShadow = "0 2px 10px rgba(23,117,224,0.30)";
       }}
       onMouseLeave={(e) => {
         const btn = e.currentTarget;
-        btn.style.background = "#1775E0";
+        btn.style.background = "var(--brand)";
         btn.style.boxShadow = "0 1px 3px rgba(23,117,224,0.25)";
       }}
     >

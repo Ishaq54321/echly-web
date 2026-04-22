@@ -239,7 +239,7 @@ export function DiscussionPanel({
                   {sessionName ? (
                     <Link
                       href={`/session/${ticket.sessionId}`}
-                      className="text-[#155DFC] hover:underline"
+                      className="text-[#1775E0] hover:underline"
                     >
                       {sessionName}
                     </Link>
@@ -259,7 +259,7 @@ export function DiscussionPanel({
                   <button
                     type="button"
                     onClick={() => void refetchComments()}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-[#155DFC] hover:text-[#0F4EDC] shrink-0 transition-colors"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[#1775E0] hover:text-[#1462C4] shrink-0 transition-colors"
                   >
                     <RefreshCw className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
                     Refresh
@@ -333,13 +333,13 @@ export function DiscussionPanel({
                     handleSendComment();
                   }
                 }}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 focus:border-[#1775E0] transition"
               />
               <button
                 type="button"
                 onClick={handleSendComment}
                 disabled={sending || !commentDraft.trim()}
-                className="px-4 py-2.5 rounded-xl bg-[#155DFC] text-white text-sm font-medium hover:bg-[#0F4ED1] disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="px-4 py-2.5 rounded-xl bg-[#1775E0] text-white text-sm font-medium hover:bg-[#1462C4] disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                 {sending ? "Sending…" : "Send"}
               </button>

@@ -37,7 +37,7 @@ export default function AdminLayout({
             className="flex items-center gap-2 rounded-md py-1 pr-2"
             aria-label="Echly Admin"
           >
-            <span className="relative block w-8 h-8 bg-[#155DFC] rounded-md overflow-hidden">
+            <span className="relative block w-8 h-8 bg-[#1775E0] rounded-md overflow-hidden">
               <Image
                 src="/Echly_logo.svg"
                 alt=""
@@ -60,7 +60,7 @@ export default function AdminLayout({
                 href={href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
                   active
-                    ? "bg-[#EAF1FF] text-[#155DFC]"
+                    ? "bg-[#EBF4FF] text-[#1775E0]"
                     : "text-neutral-700 hover:bg-neutral-100"
                 }`}
                 aria-current={active ? "page" : undefined}

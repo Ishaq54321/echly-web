@@ -92,7 +92,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
           "Voice & AI-powered feedback",
         ].map((item) => (
           <li key={item} className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#155DFC] shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#1775E0] shrink-0" />
             {item}
           </li>
         ))}
@@ -102,7 +102,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
       <button
         type="button"
         onClick={handleInstall}
-        className="w-full h-11 rounded-[10px] font-medium text-white bg-gradient-to-r from-[#155DFC] to-[#0d47d1] hover:from-[#1a6aff] hover:to-[#155DFC] active:scale-[0.98] transition-all duration-150 shadow-sm"
+        className="w-full h-11 rounded-[10px] font-medium text-white bg-gradient-to-r from-[#1775E0] to-[#1462C4] hover:from-[#1775E0] hover:to-[#1775E0] active:scale-[0.98] transition-all duration-150 shadow-sm"
       >
         Install Chrome Extension
       </button>

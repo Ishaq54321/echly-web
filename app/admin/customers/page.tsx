@@ -184,7 +184,7 @@ export default function AdminCustomersPage() {
                 key={row.id}
                 onClick={() => setSelected(row)}
                 className={`border-b border-neutral-100 cursor-pointer transition ${
-                  selected?.id === row.id ? "bg-[#EAF1FF]" : "hover:bg-neutral-50"
+                  selected?.id === row.id ? "bg-[#EBF4FF]" : "hover:bg-neutral-50"
                 }`}
               >
                 <td className="px-4 py-2.5 font-medium text-neutral-900">{row.name}</td>
@@ -299,7 +299,7 @@ export default function AdminCustomersPage() {
                     actionLoading ||
                     (newPlan || selected.plan) === (selected.billing?.plan ?? selected.plan)
                   }
-                  className="rounded-lg px-3 py-2 text-sm font-medium bg-[#155DFC] text-white hover:bg-[#155DFC]/90 disabled:opacity-60 w-full"
+                  className="rounded-lg px-3 py-2 text-sm font-medium bg-[#1775E0] text-white hover:bg-[#1775E0]/90 disabled:opacity-60 w-full"
                 >
                   {actionLoading ? "Updating…" : "Change Plan"}
                 </button>
@@ -448,7 +448,7 @@ export default function AdminCustomersPage() {
               <button
                 type="button"
                 onClick={confirm.onConfirm}
-                className="rounded-lg px-3 py-2 text-sm font-medium bg-[#155DFC] text-white hover:bg-[#155DFC]/90"
+                className="rounded-lg px-3 py-2 text-sm font-medium bg-[#1775E0] text-white hover:bg-[#1775E0]/90"
               >
                 {confirm.confirmLabel ?? "Confirm"}
               </button>

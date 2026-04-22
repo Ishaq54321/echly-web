@@ -54,7 +54,7 @@ export function ResolveToast({
         bottom: 24,
         left: "50%",
         transform: "translateX(-50%)",
-        zIndex: 9999,
+        zIndex: 400,
         pointerEvents: "none",
       }}
     >
@@ -77,7 +77,7 @@ export function ResolveToast({
             alignItems: "center",
             gap: 6,
             padding: "9px 16px",
-            background: "#2C2C2C",
+            background: "var(--text-heading)",
             color: state === "saving" ? "rgba(255,255,255,0.85)" : "#FFFFFF",
             borderRadius: 9,
             fontSize: 13,
@@ -94,8 +94,8 @@ export function ResolveToast({
               color="rgba(255,255,255,0.7)"
             />
           )}
-          {state === "saved" && <Check size={13} color="#4ADE80" />}
-          {state === "error" && <AlertCircle size={13} color="#F87171" />}
+          {state === "saved" && <Check size={13} color="var(--color-success)" />}
+          {state === "error" && <AlertCircle size={13} color="var(--color-danger)" />}
           <span>
             {state === "saving"
               ? "Saving..."

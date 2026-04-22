@@ -30,7 +30,7 @@ export function PageEmptyState({
     action != null ? (
       <Link
         href={action.href}
-        className="inline-flex items-center justify-center rounded-xl bg-[#155DFC] px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#0F4ED1] active:scale-[0.99]"
+        className="inline-flex items-center justify-center rounded-xl bg-[#1775E0] px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#1462C4] active:scale-[0.99]"
       >
         {action.label}
       </Link>
@@ -38,7 +38,7 @@ export function PageEmptyState({
       <button
         type="button"
         onClick={actionButton.onClick}
-        className="inline-flex items-center justify-center rounded-xl bg-[#155DFC] px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#0F4ED1] active:scale-[0.99]"
+        className="inline-flex items-center justify-center rounded-xl bg-[#1775E0] px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#1462C4] active:scale-[0.99]"
       >
         {actionButton.label}
       </button>

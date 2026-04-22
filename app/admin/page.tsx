@@ -89,7 +89,7 @@ export default function AdminPage() {
             </>
           );
           const className =
-            "rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-neutral-300 " +
+            "rounded-xl border border-[#EBEBEB] bg-white p-5 shadow-sm transition hover:border-[#D5D5D5] " +
             (card.href ? "cursor-pointer hover:bg-neutral-50/50" : "");
           if (card.href) {
             return (

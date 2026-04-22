@@ -151,10 +151,10 @@ export function DiscussionFeed({
               w-full text-left rounded-xl border p-4 transition-all duration-200
               bg-white
               border-neutral-200
-              hover:border-[#155DFC80]
+              hover:border-[#1775E080]
               hover:shadow-md
               hover:-translate-y-[1px]
-              ${isSelected ? "border-[#155DFC] ring-1 ring-[#155DFC40] shadow-md" : ""}
+              ${isSelected ? "border-[#1775E0] ring-1 ring-[#1775E040] shadow-md" : ""}
             `}
           >
             {item.title ? (

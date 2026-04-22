@@ -43,7 +43,7 @@ function TicketItemInner({
           <span
             className={`truncate block ${
               active
-                ? "text-[#1D4ED8] font-semibold"
+                ? "text-[#1462C4] font-semibold"
                 : "text-[#4B5563] font-normal"
             }`}
           >

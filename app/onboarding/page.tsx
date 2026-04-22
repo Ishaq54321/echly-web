@@ -103,7 +103,7 @@ export default function OnboardingPage() {
 
   if (loading || !authReady) {
     return (
-      <div className="w-8 h-8 border-2 border-gray-200 border-t-[#466EFF] rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-[#EBEBEB] border-t-[#466EFF] rounded-full animate-spin" />
     );
   }
 

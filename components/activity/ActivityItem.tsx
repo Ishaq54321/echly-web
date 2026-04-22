@@ -77,7 +77,7 @@ function ActivityContextBlock({ children }: { children: ReactNode }) {
   return (
     <div className="relative mt-2 pl-4">
       <div
-        className="absolute bottom-0 left-0 top-0 w-[2px] rounded-full bg-blue-500/60"
+        className="absolute bottom-0 left-0 top-0 w-[2px] rounded-full bg-[#1775E0]/60"
         aria-hidden
       />
       <div className="py-1">{children}</div>

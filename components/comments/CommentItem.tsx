@@ -148,7 +148,7 @@ export function CommentItem({
             <textarea
               value={editDraft}
               onChange={(e) => setEditDraft(e.target.value)}
-              className="w-full min-h-[80px] rounded-xl border border-neutral-200 px-4 py-3 text-[14px] font-normal text-discussion-body placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#155DFC]/20 focus:border-[#155DFC] transition resize-none"
+              className="w-full min-h-[80px] rounded-xl border border-neutral-200 px-4 py-3 text-[14px] font-normal text-discussion-body placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 focus:border-[#1775E0] transition resize-none"
               autoFocus
             />
             <div className="flex gap-2">
@@ -166,7 +166,7 @@ export function CommentItem({
                 type="button"
                 onClick={handleSaveEdit}
                 disabled={editDraft.trim() === comment.message}
-                className="px-3 py-2 text-sm font-medium rounded-xl bg-[#155DFC] text-white hover:bg-[#0F4EDC] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-2 text-sm font-medium rounded-xl bg-[#1775E0] text-white hover:bg-[#1462C4] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Save
               </button>
@@ -253,7 +253,7 @@ export function CommentItem({
               <button
                 type="button"
                 onClick={() => setDeleteModalOpen(false)}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl border border-neutral-300 text-neutral-700 hover:bg-neutral-50"
+                className="px-4 py-2.5 text-sm font-medium rounded-xl border border-[#EBEBEB] text-neutral-700 hover:bg-neutral-50"
               >
                 Cancel
               </button>

@@ -65,20 +65,20 @@ export function ExternalShareModal({
         <div
           style={{
             padding: "20px 24px 16px",
-            borderBottom: "1px solid #F0F0F0",
+            borderBottom: "1px solid var(--border)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Link2 size={15} color="#777" aria-hidden />
+            <Link2 size={15} color="var(--text-tertiary)" aria-hidden />
             <span
               id={titleId}
               style={{
                 fontSize: 15,
                 fontWeight: 600,
-                color: "#111111",
+                color: "var(--text-heading)",
                 letterSpacing: "-0.1px",
                 maxWidth: 200,
                 overflow: "hidden",
@@ -103,7 +103,7 @@ export function ExternalShareModal({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#777",
+              color: "var(--text-tertiary)",
             }}
           >
             <X size={14} aria-hidden />
@@ -120,9 +120,9 @@ export function ExternalShareModal({
               marginBottom: 10,
             }}
           >
-            <Globe size={14} color="#777777" aria-hidden />
+            <Globe size={14} color="var(--text-tertiary)" aria-hidden />
             <div className="flex items-center gap-1">
-              <span style={{ fontSize: 13, fontWeight: 500, color: "#777777" }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-tertiary)" }}>
                 Share link
               </span>
               <div className="relative group">
@@ -142,12 +142,12 @@ export function ExternalShareModal({
               style={{
                 flex: 1,
                 height: 40,
-                background: "#F7F8FA",
-                border: "1px solid #EBEBEB",
+                background: "var(--surface-subtle)",
+                border: "1px solid var(--border)",
                 borderRadius: 10,
                 padding: "0 12px",
                 fontSize: 13,
-                color: "#555555",
+                color: "var(--text-secondary)",
                 fontFamily: "monospace",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -164,7 +164,7 @@ export function ExternalShareModal({
               style={{
                 height: 40,
                 padding: "0 16px",
-                background: copied ? "#16A34A" : "#1775E0",
+                background: copied ? "var(--color-success)" : "var(--brand)",
                 color: "white",
                 border: "none",
                 borderRadius: 10,
@@ -176,7 +176,7 @@ export function ExternalShareModal({
                 alignItems: "center",
                 gap: 6,
                 boxShadow: copied
-                  ? "0 1px 3px rgba(22,163,74,0.20)"
+                  ? "0 1px 3px rgba(5,150,105,0.20)"
                   : "0 1px 3px rgba(23,117,224,0.20)",
                 transition: "background 0.15s",
               }}
@@ -195,14 +195,14 @@ export function ExternalShareModal({
         <div
           style={{
             padding: "16px 24px",
-            borderTop: "1px solid #F0F0F0",
+            borderTop: "1px solid var(--border)",
             width: "100%",
           }}
         >
           <div
             style={{
               background: "white",
-              border: "1px solid #EBEBEB",
+              border: "1px solid var(--border)",
               borderRadius: 12,
               padding: "12px 14px",
               width: "100%",
@@ -215,13 +215,13 @@ export function ExternalShareModal({
                   style={{
                     fontSize: 14,
                     fontWeight: 600,
-                    color: "#111111",
+                    color: "var(--text-heading)",
                     marginBottom: 2,
                   }}
                 >
                   You have shared access to this session
                 </div>
-                <div style={{ fontSize: 13, color: "#777777", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
                   Only workspace members can control who views or resolves
                   feedback. Reach out to a workspace member to update your
                   permissions.
@@ -233,13 +233,13 @@ export function ExternalShareModal({
                   style={{
                     fontSize: 14,
                     fontWeight: 600,
-                    color: "#111111",
+                    color: "var(--text-heading)",
                     marginBottom: 2,
                   }}
                 >
                   Managed by workspace
                 </div>
-                <div style={{ fontSize: 13, color: "#777777", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
                   Share settings and access controls are managed by the workspace
                   owner. Contact them to change who can access this session.
                 </div>

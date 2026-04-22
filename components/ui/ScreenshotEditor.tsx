@@ -690,7 +690,7 @@ export function ScreenshotEditor({
                   y={cropRect.y}
                   width={cropRect.w}
                   height={cropRect.h}
-                  stroke="#3B82F6"
+                  stroke="#1775E0"
                   strokeWidth={2}
                   dash={[6, 3]}
                   fill="rgba(59,130,246,0.08)"
@@ -724,7 +724,7 @@ export function ScreenshotEditor({
                     width={10}
                     height={10}
                     fill="white"
-                    stroke="#3B82F6"
+                    stroke="#1775E0"
                     strokeWidth={1}
                     draggable={true}
                     dragBoundFunc={(pos) => ({

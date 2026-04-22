@@ -18,7 +18,7 @@ export function workspaceDeletedConfirmationHtml({
       <td align="center">
         <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:560px;width:100%;">
           <tr>
-            <td style="background:#155DFC;padding:28px 40px;">
+            <td style="background:#1775E0;padding:28px 40px;">
               <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.02em;">Echly</span>
             </td>
           </tr>

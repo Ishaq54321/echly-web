@@ -49,7 +49,7 @@ export interface DiscussionListProps {
 
 // Deterministic avatar palette derived from item id
 const AVATAR_PALETTES = [
-  { bg: "#EEF3FF", text: "#1e40af" },
+  { bg: "#EBF4FF", text: "#1e40af" },
   { bg: "#F0FDF4", text: "#166534" },
   { bg: "#FFF7ED", text: "#9A3412" },
   { bg: "#FDF4FF", text: "#7E22CE" },
@@ -202,8 +202,8 @@ export function DiscussionList({
             onClick={() => setStatusFilter(pill.key)}
             className={`text-[13px] px-3 py-[5px] rounded-full border whitespace-nowrap transition-all ${
               statusFilter === pill.key
-                ? "bg-[#EEF3FF] text-[#155DFC] border-[#bfdbfe] font-medium"
-                : "bg-transparent text-discussion-supporting border-neutral-200 hover:border-neutral-300 hover:text-discussion-title"
+                ? "bg-[#EBF4FF] text-[#1775E0] border-[#C3DFFE] font-medium"
+                : "bg-transparent text-discussion-supporting border-[#EBEBEB] hover:border-[#D5D5D5] hover:text-discussion-title"
             }`}
           >
             {pill.label}
@@ -230,7 +230,7 @@ export function DiscussionList({
             </p>
             <Link
               href="/dashboard"
-              className="mt-5 inline-flex items-center justify-center rounded-xl bg-[#155DFC] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[#0F4ED1] transition"
+              className="mt-5 inline-flex items-center justify-center rounded-xl bg-[#1775E0] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[#1462C4] transition"
             >
               Open Sessions
             </Link>

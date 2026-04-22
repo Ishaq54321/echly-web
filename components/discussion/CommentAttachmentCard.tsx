@@ -66,7 +66,7 @@ export function CommentAttachmentCard({ attachment, onImageClick }: CommentAttac
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-[#155DFC] hover:underline shrink-0 inline-flex items-center gap-1"
+              className="text-sm text-[#1775E0] hover:underline shrink-0 inline-flex items-center gap-1"
             >
               <Download className="h-3.5 w-3.5" strokeWidth={1.5} />
               Download
@@ -83,7 +83,7 @@ export function CommentAttachmentCard({ attachment, onImageClick }: CommentAttac
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-[#155DFC] hover:underline shrink-0 inline-flex items-center gap-1"
+            className="text-sm text-[#1775E0] hover:underline shrink-0 inline-flex items-center gap-1"
           >
             <Download className="h-3.5 w-3.5" strokeWidth={1.5} />
             Download

@@ -6,7 +6,7 @@
 import { isSessionCaptureTarget, logSession } from "./sessionMode";
 
 const HIGHLIGHT_STYLE = {
-  outline: "2px solid #2563eb",
+  outline: "2px solid #1775E0",
   background: "rgba(37,99,235,0.1)",
 };
 

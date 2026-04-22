@@ -29,8 +29,8 @@ export function MinimalLoader({
       <span
         className={
           compact
-            ? "h-4 w-4 shrink-0 rounded-full border-2 border-neutral-200 border-t-[#155DFC] animate-spin"
-            : "h-5 w-5 shrink-0 rounded-full border-2 border-neutral-200 border-t-[#155DFC] animate-spin"
+            ? "h-4 w-4 shrink-0 rounded-full border-2 border-neutral-200 border-t-[#1775E0] animate-spin"
+            : "h-5 w-5 shrink-0 rounded-full border-2 border-neutral-200 border-t-[#1775E0] animate-spin"
         }
         aria-hidden
       />

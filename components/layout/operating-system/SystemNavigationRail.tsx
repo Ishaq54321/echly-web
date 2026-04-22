@@ -69,7 +69,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
       <div className="flex-shrink-0 mb-3">
         <Link
           href="/dashboard"
-          className="w-[34px] h-[34px] rounded-full bg-blue-600 flex items-center justify-center overflow-hidden flex-shrink-0"
+          className="w-[34px] h-[34px] rounded-full bg-[#1775E0] flex items-center justify-center overflow-hidden flex-shrink-0"
           aria-label="Echly home"
         >
           <Image

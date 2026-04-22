@@ -298,21 +298,21 @@ function writeActivityCache(
 
 /** Semantic active state per category — inline styles to guarantee colors render (sourced from eventIconMap badgeClass). */
 const ACTIVITY_TYPE_PILL_ACTIVE_STYLES: Record<ActivityFilterCategoryId, React.CSSProperties> = {
-  comments: { background: '#3B82F6', borderColor: '#3B82F6', color: '#FFFFFF' },
+  comments: { background: '#1775E0', borderColor: '#1775E0', color: '#FFFFFF' },
   created:  { background: '#A855F7', borderColor: '#A855F7', color: '#FFFFFF' },
   resolved: { background: '#22C55E', borderColor: '#22C55E', color: '#FFFFFF' },
 };
 
 /** Shared pill geometry + motion; hover applied via FILTER_PILL_DEFAULT when not active. */
 const FILTER_PILL_BASE =
-  "inline-flex shrink-0 cursor-pointer items-center gap-[5px] rounded-full border border-[#E0E0E0] bg-transparent px-[10px] py-[3px] text-[13px] font-medium text-[#777777] whitespace-nowrap transition-all duration-[140ms] ease focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "inline-flex shrink-0 cursor-pointer items-center gap-[5px] rounded-full border border-[#EBEBEB] bg-transparent px-[10px] py-[3px] text-sm font-medium text-[#78716C] whitespace-nowrap transition-all duration-[140ms] ease focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 const FILTER_PILL_DEFAULT =
-  "hover:border-[#BBBBBB] hover:text-[#444444] hover:bg-[#F7F8FA]";
+  "hover:border-[#D5D5D5] hover:text-[#44403C] hover:bg-[#F4F5F7]";
 
 /** Session / Members active pill — neutral light fill. */
 const FILTER_PILL_SESSION_ACTIVE =
-  "bg-[#F0F0F0] border-[#F0F0F0] text-[#444444]";
+  "bg-[#F1F2F4] border-[#F1F2F4] text-[#44403C]";
 
 /** Auto-fill + infinite scroll: stop chaining loads once this many rows exist and the page scrolls. */
 const ACTIVITY_FEED_MIN_VISIBLE_ROWS = 8;
@@ -756,7 +756,7 @@ function ActivityFeed() {
   if (!user?.uid && !authLoading) {
     return (
       <div className="w-full px-6 py-8">
-        <div className="mx-auto w-full max-w-6xl">
+        <div className="mx-auto w-full max-w-[1280px]">
         <div className="flex items-center gap-2.5 mb-7">
           <Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
           <h1 className="text-[16px] font-medium text-foreground">Activity</h1>
@@ -771,26 +771,15 @@ function ActivityFeed() {
 
   return (
     <div className="w-full px-6 py-8">
-      <div className="mx-auto w-full max-w-6xl">
+      <div className="mx-auto w-full max-w-[1280px]">
 
         {/* Page header */}
         <div className="flex items-center justify-between mb-7">
           <div>
-            <h1 style={{
-              fontSize: '28px',
-              fontWeight: 700,
-              color: '#111111',
-              letterSpacing: '-0.4px',
-              marginBottom: '4px',
-            }}>
+            <h1 className="text-xl font-bold text-[var(--text-heading)] tracking-[-0.4px] mt-1 mb-0">
               Activity
             </h1>
-            <p style={{
-              fontSize: '15px',
-              color: '#777777',
-              fontWeight: 400,
-              margin: '4px 0 0 0',
-            }}>
+            <p className="text-sm font-normal text-[var(--text-secondary)] mt-1">
               All activity across your workspace
             </p>
           </div>
@@ -927,16 +916,16 @@ function ActivityFeed() {
                         setSelectedCategory(null);
                         setMemberDropdownOpen(false);
                       }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] hover:bg-muted/40${selectedMemberId === null ? " font-medium text-foreground" : ""}`}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/40${selectedMemberId === null ? " font-medium text-foreground" : ""}`}
                     >
                       <span className="flex-1 text-left">All</span>
                       {selectedMemberId === null && (
-                        <Check className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
+                        <Check className="h-3.5 w-3.5 text-[#1775E0] flex-shrink-0" />
                       )}
                     </button>
 
                     {loadingMembers ? (
-                      <div className="px-3 py-2 text-[13px] text-muted-foreground">
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
                         Loading…
                       </div>
                     ) : (
@@ -954,7 +943,7 @@ function ActivityFeed() {
                               setMemberDropdownOpen(false);
                             }
                           }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] hover:bg-muted/40 text-left${selectedMemberId === member.uid ? " font-medium text-foreground" : ""}`}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/40 text-left${selectedMemberId === member.uid ? " font-medium text-foreground" : ""}`}
                         >
                           <div className="w-5 h-5 rounded-full bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-medium text-muted-foreground">
                             {member.avatarUrl ? (
@@ -971,7 +960,7 @@ function ActivityFeed() {
                             {member.displayName ?? member.email.split("@")[0]}
                           </span>
                           {selectedMemberId === member.uid && (
-                            <Check className="h-3.5 w-3.5 text-blue-600 ml-auto flex-shrink-0" />
+                            <Check className="h-3.5 w-3.5 text-[var(--brand)] ml-auto flex-shrink-0" />
                           )}
                         </button>
                       ))
@@ -1047,7 +1036,7 @@ function ActivityFeed() {
                   {/* Day section rule */}
                   <div className="flex items-center gap-4">
                     <div className="flex-1 h-px bg-border" aria-hidden />
-                    <span className="text-[13px] font-semibold text-foreground/60 whitespace-nowrap tracking-wide">
+                    <span className="text-sm font-semibold text-foreground/60 whitespace-nowrap tracking-wide">
                       {section.label}
                     </span>
                     <div className="flex-1 h-px bg-border" aria-hidden />
@@ -1216,7 +1205,7 @@ function ActivityFeed() {
                 autoFillAttemptsRef.current = 0;
                 void loadMore();
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium border border-border rounded-lg bg-background hover:bg-muted/40 text-foreground transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-border rounded-lg bg-background hover:bg-muted/40 text-foreground transition-colors"
             >
               Load more activity
             </button>
@@ -1233,7 +1222,7 @@ export default function ActivityPage() {
     <Suspense
       fallback={
         <div className="w-full px-6 py-8">
-          <div className="mx-auto w-full max-w-6xl">
+          <div className="mx-auto w-full max-w-[1280px]">
             <ActivitySkeletonStack count={4} />
           </div>
         </div>

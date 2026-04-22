@@ -153,7 +153,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
                     className="h-full rounded-full"
                     style={{
                       background: isFull
-                        ? "#155DFC"
+                        ? "#1775E0"
                         : "rgba(21, 93, 252, 0.5)",
                     }}
                     initial={{ width: 0 }}
@@ -173,7 +173,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
                     key={bullet}
                     className="flex items-center gap-2.5 text-sm text-neutral-700"
                   >
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#155DFC]/10 text-[#155DFC]">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1775E0]/10 text-[#1775E0]">
                       <Check
                         className="h-3 w-3"
                         strokeWidth={2.5}
@@ -201,7 +201,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
               <button
                 type="button"
                 onClick={handlePrimary}
-                className="rounded-xl bg-[#155DFC] px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0F4ED1] focus:outline-none focus:ring-2 focus:ring-[#155DFC] focus:ring-offset-2 transition"
+                className="rounded-xl bg-[#1775E0] px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#1462C4] focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:ring-offset-2 transition"
               >
                 {ctaLabel}
               </button>

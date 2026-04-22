@@ -135,7 +135,7 @@ export function TopControlBar({
                   right: -3,
                   width: 9,
                   height: 9,
-                  background: "#EF4444",
+                  background: "var(--color-danger)",
                   borderRadius: "50%",
                   border: "1.5px solid white",
                   pointerEvents: "none",
@@ -241,7 +241,7 @@ export function TopControlBar({
           ) : null}
 
           <span
-            className="divider mx-1.5 h-5 w-px shrink-0 bg-[#E5E7EB]"
+            className="divider mx-1.5 h-5 w-px shrink-0 bg-[#E8E8E8]"
             aria-hidden
           />
 

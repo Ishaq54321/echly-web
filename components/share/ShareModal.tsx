@@ -209,7 +209,7 @@ export function ShareModal({
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="Email address"
-                className="flex-1 h-[38px] border border-border rounded-lg px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:border-blue-400 bg-background disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 h-[38px] border border-border rounded-lg px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:border-[#1775E0] bg-background disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={!canWrite || inviting}
                 autoComplete="email"
               />
@@ -235,7 +235,7 @@ export function ShareModal({
               {/* Invite button */}
               <button
                 type="button"
-                className="h-[38px] bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 flex-shrink-0 transition-colors inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-[38px] bg-[#1775E0] hover:bg-[#1462C4] text-white text-sm font-medium rounded-lg px-4 flex-shrink-0 transition-colors inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={onInvite}
                 disabled={!canWrite || inviting}
               >
@@ -312,7 +312,7 @@ export function ShareModal({
                                   className="flex items-center gap-2"
                                 >
                                   <Check
-                                    className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${getRequestAccess(req) === "view" ? "text-blue-600" : "text-transparent"}`}
+                                    className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${getRequestAccess(req) === "view" ? "text-[#1775E0]" : "text-transparent"}`}
                                   />
                                   <span>Can view</span>
                                 </DropdownMenuItem>
@@ -324,7 +324,7 @@ export function ShareModal({
                                   className="flex items-center gap-2"
                                 >
                                   <Check
-                                    className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${getRequestAccess(req) === "resolve" ? "text-blue-600" : "text-transparent"}`}
+                                    className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${getRequestAccess(req) === "resolve" ? "text-[#1775E0]" : "text-transparent"}`}
                                   />
                                   <span>Can resolve</span>
                                 </DropdownMenuItem>
@@ -332,7 +332,7 @@ export function ShareModal({
                             </DropdownMenu>
                             <button
                               type="button"
-                              className="h-7 px-3 text-[12px] font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
+                              className="h-7 px-3 text-[12px] font-medium bg-[#1775E0] hover:bg-[#1462C4] text-white rounded-lg transition-colors whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
                               disabled={busy}
                               onClick={() => onApproveAccessRequest(req.id, getRequestAccess(req))}
                             >
@@ -440,7 +440,7 @@ export function ShareModal({
                               className="flex items-center gap-2"
                             >
                               <Check
-                                className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${item.access === "view" ? "text-blue-600" : "text-transparent"}`}
+                                className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${item.access === "view" ? "text-[#1775E0]" : "text-transparent"}`}
                               />
                               <span>Can view</span>
                             </DropdownMenuItem>
@@ -449,7 +449,7 @@ export function ShareModal({
                               className="flex items-center gap-2"
                             >
                               <Check
-                                className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${item.access === "resolve" ? "text-blue-600" : "text-transparent"}`}
+                                className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${item.access === "resolve" ? "text-[#1775E0]" : "text-transparent"}`}
                               />
                               <span>Can resolve</span>
                             </DropdownMenuItem>
@@ -575,7 +575,7 @@ export function ShareModal({
           {canWrite ? (
             <button
               type="button"
-              className="inline-flex items-center gap-2 text-[13px] font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 hover:bg-blue-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 text-[13px] font-medium text-[#1775E0] bg-[#EBF4FF] border border-[#C3DFFE] rounded-lg px-4 py-2 hover:bg-[#E0EAFF] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               onClick={onCopyShareLink}
               disabled={copyingLink}
             >
@@ -604,7 +604,7 @@ export function ShareModal({
             </button>
             <button
               type="button"
-              className="h-9 px-6 text-[13px] font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-9 px-6 text-[13px] font-medium bg-[#1775E0] hover:bg-[#1462C4] text-white rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onClose}
               disabled={
                 inviting ||
