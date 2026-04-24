@@ -178,8 +178,8 @@ export function ProfileCommandPanel({
       key: "timeSaved" as const,
       label: "Time saved reviewing feedback",
       context: "lifetime",
-      bg: "#ECFDF5",
-      textColor: "#065F46",
+      bg: "var(--color-success-bg)",
+      textColor: "var(--color-success-solid)",
       Icon: Clock,
     },
     {
@@ -194,8 +194,8 @@ export function ProfileCommandPanel({
       key: "repliesMade" as const,
       label: "Replies made",
       context: "lifetime",
-      bg: "#FFF7ED",
-      textColor: "#7C2D12",
+      bg: "var(--color-warning-bg)",
+      textColor: "var(--color-warning-text)",
       Icon: MessageCircle,
     },
   ];
@@ -487,8 +487,8 @@ export function ProfileCommandPanel({
               <button
                 type="button"
                 onClick={handleSignOut}
-                style={{ fontSize: 14, fontWeight: 500, color: "#E54848", marginTop: "auto", paddingTop: 12, paddingBottom: 4, paddingLeft: 10, paddingRight: 10 }}
-                className="w-full rounded text-left transition hover:opacity-80 hover:bg-[#FEF2F2]"
+                style={{ fontSize: 14, fontWeight: 500, color: "var(--color-danger)", marginTop: "auto", paddingTop: 12, paddingBottom: 4, paddingLeft: 10, paddingRight: 10 }}
+                className="w-full rounded text-left transition hover:opacity-80 hover:bg-[var(--color-danger-bg)]"
               >
                 Sign out
               </button>

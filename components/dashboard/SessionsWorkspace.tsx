@@ -264,21 +264,21 @@ function SessionWorkspaceRow({
         <div className="flex min-h-[36px] items-center shrink-0 gap-3.5">
           <>
             {open != null && open > 0 && (
-              <div className="rounded-[9px] border border-[#EBEBEB] bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+              <div className="rounded-[9px] bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
                 <CircleDashed className="h-4 w-4 shrink-0 text-[var(--brand)]" aria-hidden />
                 <span className="whitespace-nowrap font-medium tracking-tight">{open} open</span>
               </div>
             )}
             {resolved != null && resolved > 0 && (
-              <div className="rounded-[9px] border border-[#EBEBEB] bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
-                <Check className="h-4 w-4 shrink-0 text-green-500" strokeWidth={2.5} aria-hidden />
+              <div className="rounded-[9px] bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+                <Check className="h-4 w-4 shrink-0 text-[var(--color-success)]" strokeWidth={2.5} aria-hidden />
                 <span className="whitespace-nowrap font-medium tracking-tight">{resolved} resolved</span>
               </div>
             )}
           </>
           {updatedShort ? (
-            <div className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-[9px] border border-[#EBEBEB] bg-white px-3 py-1.5 text-sm">
-              <Calendar className="h-4 w-4 shrink-0 text-orange-500" strokeWidth={2.5} aria-hidden />
+            <div className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-[9px] bg-white px-3 py-1.5 text-sm">
+              <Calendar className="h-4 w-4 shrink-0 text-[var(--color-warning)]" strokeWidth={2.5} aria-hidden />
               <span className="whitespace-nowrap font-medium tracking-tight text-gray-700">
                 {updatedShort}
               </span>
@@ -654,7 +654,7 @@ export function SessionsWorkspace({
                 type="button"
                 onClick={() => void confirmBulkDelete()}
                 disabled={bulkDeleting || selectedSessions.length === 0 || !onDeleteSession}
-                className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-danger)] text-white hover:opacity-95 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {bulkDeleting ? "Deleting…" : "Delete"}
               </button>

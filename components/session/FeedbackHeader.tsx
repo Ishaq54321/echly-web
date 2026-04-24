@@ -43,14 +43,14 @@ const secondaryBtn =
   "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-white text-[#44403C] hover:bg-[#F4F5F7] hover:border-[#D5D5D5] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
 
 const btnDelete =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-white text-[#44403C] hover:bg-[#FEF2F2] hover:text-[#B91C1C] hover:border-[#FECACA] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
+  "group inline-flex h-9 items-center px-2.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-white text-[#44403C] hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)] hover:border-[var(--color-danger-border)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
 
 function StatusBadge({ status }: { status: FeedbackStatus }) {
   const base =
     "inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium";
   if (status === "Resolved") {
     return (
-      <span className={`${base} bg-[#ECFDF5] text-[#059669]`}>Resolved</span>
+      <span className={`${base} bg-[var(--color-success-bg)] text-[var(--color-success)]`}>Resolved</span>
     );
   }
   if (status === "Open") {
@@ -60,7 +60,7 @@ function StatusBadge({ status }: { status: FeedbackStatus }) {
   }
   const styles: Record<Exclude<FeedbackStatus, "Open" | "Resolved">, string> = {
     "In Progress": "bg-[#F1F2F4] text-[#78716C]",
-    Blocked: "bg-[#FEF2F2] text-[#B91C1C]",
+    Blocked: "bg-[var(--color-danger-bg)] text-[var(--color-danger)]",
   };
   return <span className={`${base} ${styles[status]}`}>{status}</span>;
 }
@@ -227,7 +227,7 @@ export function SessionFeedbackHeader({
               <span
                 className={`inline-flex transition-all duration-200 ease-out ${
                   resolveFlash && isResolved
-                    ? "scale-105 opacity-100 ring-2 ring-emerald-300/70 ring-offset-2 ring-offset-white rounded-full"
+                    ? "scale-105 opacity-100 ring-2 ring-[var(--color-success-border)] ring-offset-2 ring-offset-white rounded-full"
                     : "scale-100 opacity-100"
                 }`}
               >
@@ -389,6 +389,27 @@ export function SessionFeedbackHeader({
                     Sign in to comment
                   </button>
                 ) : null}
+                {item && assigneeId && (
+                  <AssignDropdown
+                    feedbackId={item.id}
+                    sessionId={""}
+                    currentAssigneeId={assigneeId}
+                    currentAssigneeName={assigneeName ?? null}
+                    currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
+                    onAssigned={() => {}}
+                    disabled={true}
+                    readOnly={true}
+                  />
+                )}
+                {item && priority && (
+                  <PriorityDropdown
+                    feedbackId={item.id}
+                    currentPriority={priority}
+                    onPriorityChanged={() => {}}
+                    disabled={true}
+                    readOnly={true}
+                  />
+                )}
               </>
             ) : null
           ) : isActionable ? (
@@ -511,10 +532,17 @@ export function SessionFeedbackHeader({
               onClick={onDelete}
               className={btnDelete}
               aria-label="Delete ticket"
-              title="Delete"
+              title="Delete ticket"
             >
-              <Trash2 {...iconBtn} aria-hidden />
-              Delete
+              <Trash2
+                size={16}
+                strokeWidth={1.8}
+                aria-hidden
+                className="shrink-0 text-inherit transition-all duration-150 group-hover:w-0 group-hover:opacity-0 group-hover:overflow-hidden"
+              />
+              <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-150 ease group-hover:max-w-[100px] group-hover:opacity-100 pr-1 pl-0.5">
+                Delete ticket
+              </span>
             </button>
           </div>
         ) : null}

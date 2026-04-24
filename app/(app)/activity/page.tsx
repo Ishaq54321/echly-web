@@ -300,7 +300,7 @@ function writeActivityCache(
 const ACTIVITY_TYPE_PILL_ACTIVE_STYLES: Record<ActivityFilterCategoryId, React.CSSProperties> = {
   comments: { background: '#1775E0', borderColor: '#1775E0', color: '#FFFFFF' },
   created:  { background: '#A855F7', borderColor: '#A855F7', color: '#FFFFFF' },
-  resolved: { background: '#22C55E', borderColor: '#22C55E', color: '#FFFFFF' },
+  resolved: { background: 'var(--color-success)', borderColor: 'var(--color-success)', color: '#FFFFFF' },
 };
 
 /** Shared pill geometry + motion; hover applied via FILTER_PILL_DEFAULT when not active. */
@@ -997,7 +997,7 @@ function ActivityFeed() {
 
         {/* Error */}
         {error ? (
-          <p className="px-6 py-4 text-sm text-red-600" role="alert">
+          <p className="px-6 py-4 text-sm text-[var(--color-danger)]" role="alert">
             {error}
           </p>
         ) : null}

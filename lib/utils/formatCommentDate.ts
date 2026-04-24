@@ -1,70 +1,26 @@
-/**
- * Shared utility for formatting comment/ticket dates.
- * Accepts Firestore timestamp, { seconds: number }, string, or null/undefined.
- */
+import { isToday, isYesterday, format } from "date-fns";
 
-export interface FormatCommentDateOptions {
-  /** Fallback when value is null/undefined or invalid. Default: "Just now" */
-  fallback?: string;
-  /** Include time (hour, minute). Default: true for comment-style. */
-  includeTime?: boolean;
-  /** Include year. Default: false. When true and includeTime is false, uses date-only format. */
-  includeYear?: boolean;
-}
-
-/**
- * Formats a date value for display.
- * Handles Firestore Timestamp, { seconds: number }, ISO string, or null/undefined.
- */
 export function formatCommentDate(
-  value:
-    | { seconds: number }
-    | { toDate: () => Date }
-    | string
-    | null
-    | undefined,
-  options?: FormatCommentDateOptions
+  date: Date | string | number | { seconds: number; nanoseconds?: number } | null | undefined
 ): string {
-  const fallback = options?.fallback ?? "Just now";
-  if (value == null) return fallback;
-
+  if (!date) return "";
   let d: Date;
-  if (typeof value === "string") {
-    d = new Date(value);
-  } else if (
-    typeof value === "object" &&
-    "seconds" in value &&
-    typeof (value as { seconds: number }).seconds === "number"
-  ) {
-    d = new Date((value as { seconds: number }).seconds * 1000);
-  } else if (
-    typeof value === "object" &&
-    "toDate" in value &&
-    typeof (value as { toDate: () => Date }).toDate === "function"
-  ) {
-    d = (value as { toDate: () => Date }).toDate();
+  if (typeof date === "object" && "seconds" in date) {
+    d = new Date((date as { seconds: number }).seconds * 1000);
   } else {
-    return fallback;
+    d = new Date(date as string | number);
   }
+  if (isNaN(d.getTime())) return "";
 
-  if (Number.isNaN(d.getTime())) return fallback;
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
 
-  if (options?.includeYear && options?.includeTime !== true) {
-    return d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-
-  if (options?.includeTime !== false) {
-    return d.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (isYesterday(d)) return "Yesterday";
+  if (isToday(d)) return "Today";
+  return format(d, "MMM d");
 }

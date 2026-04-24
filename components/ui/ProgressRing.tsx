@@ -8,7 +8,7 @@ export function ProgressRing({ value }: { value: number }) {
   const offset = circumference - safeValue * circumference;
   const pct = Math.round(safeValue * 100);
   const progressClass =
-    pct < 30 ? "text-red-500" : pct < 70 ? "text-amber-500" : "text-green-500";
+    pct < 30 ? "text-[var(--color-danger)]" : pct < 70 ? "text-[var(--color-warning)]" : "text-[var(--color-success)]";
 
   return (
     <div className="relative h-10 w-10 shrink-0" aria-hidden>

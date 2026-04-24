@@ -11,9 +11,9 @@ export interface AIExecutiveSummaryBlockProps {
 
 function MomentumIndicator({ direction }: { direction: MomentumDirection }) {
   const config = {
-    improving: { icon: TrendingUp, label: "Improving", className: "text-emerald-600" },
+    improving: { icon: TrendingUp, label: "Improving", className: "text-[var(--color-success)]" },
     stable: { icon: Minus, label: "Stable", className: "text-[hsl(var(--text-tertiary))]" },
-    slowing: { icon: TrendingDown, label: "Slowing", className: "text-amber-600" },
+    slowing: { icon: TrendingDown, label: "Slowing", className: "text-[var(--color-warning)]" },
   };
   const { icon: Icon, label, className } = config[direction];
   return (
@@ -74,7 +74,7 @@ export function AIExecutiveSummaryBlock({ summary, onSelectSignal }: AIExecutive
                     onClick={() => onSelectSignal?.(item.id, item.sessionId)}
                     className="w-full text-left text-[13px] text-[hsl(var(--text-primary-strong))] hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded px-2 py-1 -mx-2 -my-1"
                   >
-                    <span className="text-red-600 font-medium text-[11px] uppercase mr-2">
+                    <span className="text-[var(--color-danger)] font-medium text-[11px] uppercase mr-2">
                       {String(item.riskLevel).replace(/^./, (c) => c.toUpperCase())}
                     </span>
                     {item.title}

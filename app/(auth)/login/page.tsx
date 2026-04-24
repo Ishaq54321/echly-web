@@ -196,18 +196,18 @@ function LoginPageContent() {
           <div className="max-w-[420px] mx-auto mt-10">
 
             {showDeletionBanner && (
-              <div className="mb-4 rounded-xl px-4 py-3 bg-amber-50 border border-amber-200 flex items-start gap-3 text-left">
-                <span className="text-amber-600 mt-0.5 shrink-0">⚠</span>
+              <div className="mb-4 rounded-xl px-4 py-3 bg-[var(--color-warning-bg)] border border-[var(--color-warning-border)] flex items-start gap-3 text-left">
+                <span className="text-[var(--color-warning)] mt-0.5 shrink-0">⚠</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-amber-900">
+                  <p className="text-sm font-medium text-[var(--color-warning-text)]">
                     Your workspace has been scheduled for deletion.
                   </p>
-                  <p className="mt-0.5 text-xs text-amber-700">Contact support to cancel.</p>
+                  <p className="mt-0.5 text-xs text-[var(--color-warning-text)]">Contact support to cancel.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setDeletionBannerDismissed(true)}
-                  className="shrink-0 text-amber-500 hover:text-amber-700"
+                  className="shrink-0 text-[var(--color-warning)] hover:text-[var(--color-warning-text)]"
                   aria-label="Dismiss"
                 >
                   ✕
@@ -261,7 +261,7 @@ function LoginPageContent() {
                 />
 
                 {error && (
-                  <p className="text-sm text-red-500">{error}</p>
+                  <p className="text-sm text-[var(--color-danger)]">{error}</p>
                 )}
 
                 <button

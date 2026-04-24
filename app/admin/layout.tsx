@@ -67,7 +67,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 bg-neutral-50 px-6">
-        <div className="text-sm font-medium text-red-600">Could not verify admin access</div>
+        <div className="text-sm font-medium text-[var(--color-danger)]">Could not verify admin access</div>
         <div className="max-w-md text-center text-sm text-neutral-600">{error.message}</div>
       </div>
     );

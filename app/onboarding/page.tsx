@@ -137,7 +137,7 @@ export default function OnboardingPage() {
                   className="w-full h-11 rounded-[10px] border border-[#E5E7EB] bg-white text-gray-900 text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]"
                   required
                 />
-                {displayNameError && <p className="mt-1 text-sm text-red-500">{displayNameError}</p>}
+                {displayNameError && <p className="mt-1 text-sm text-[var(--color-danger)]">{displayNameError}</p>}
               </div>
               <button
                 type="submit"

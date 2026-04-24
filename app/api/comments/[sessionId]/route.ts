@@ -58,6 +58,8 @@ function serializeCommentRow(row: Record<string, unknown> & { id: string }): Rec
     threadId: row.threadId ?? null,
     resolved: row.resolved,
     attachment: row.attachment,
+    attachments: row.attachments ?? undefined,
+    reactions: row.reactions ?? undefined,
   };
 }
 

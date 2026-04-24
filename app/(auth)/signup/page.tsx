@@ -148,7 +148,7 @@ function SignupPageContent() {
               required
               minLength={6}
             />
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
             <button
               type="submit"
               disabled={loading}

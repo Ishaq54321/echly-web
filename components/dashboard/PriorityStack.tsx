@@ -89,9 +89,9 @@ export function PriorityStack({ items, onView }: PriorityStackProps) {
                     <span
                       className={`text-[11px] font-medium uppercase ${
                         urgency === "High"
-                          ? "text-red-600"
+                          ? "text-[var(--color-danger)]"
                           : urgency === "Medium"
-                            ? "text-amber-600"
+                            ? "text-[var(--color-warning)]"
                             : "text-[hsl(var(--text-tertiary))]"
                       }`}
                     >

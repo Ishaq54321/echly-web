@@ -607,10 +607,10 @@ export default function GlobalRail() {
               className="mt-4 w-full px-3 py-2.5 rounded-xl border border-[#EBEBEB] text-[#1C1B1F] placeholder:text-[#C4BFBB] focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:border-transparent"
             />
             {inviteError && (
-              <p className="mt-2 text-sm text-red-600">{inviteError}</p>
+              <p className="mt-2 text-sm text-[var(--color-danger)]">{inviteError}</p>
             )}
             {inviteSent && (
-              <p className="mt-2 text-sm text-green-600">Invitation sent!</p>
+              <p className="mt-2 text-sm text-[var(--color-success)]">Invitation sent!</p>
             )}
             <div className="mt-6 flex justify-end gap-2">
               <button

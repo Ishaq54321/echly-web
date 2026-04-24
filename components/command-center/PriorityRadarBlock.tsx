@@ -9,8 +9,8 @@ export interface PriorityRadarBlockProps {
 }
 
 const BUCKET_STYLES: Record<string, string> = {
-  Critical: "border-red-200 bg-red-50/50",
-  "At Risk": "border-amber-200 bg-amber-50/50",
+  Critical: "border-[var(--color-danger-border)] bg-[var(--color-danger-bg)]/50",
+  "At Risk": "border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]/50",
   Stalled: "border-[hsl(var(--text-tertiary))]/30 bg-[var(--layer-2-bg)]",
   Trending: "border-[var(--accent-operational-border)] bg-[var(--accent-operational-muted)]",
 };

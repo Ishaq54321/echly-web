@@ -129,8 +129,8 @@ function FormError({ message }: { message: string }) {
         marginTop: 8,
       }}
     >
-      <AlertCircle size={14} color="#DC2626" style={{ flexShrink: 0, marginTop: 1 }} />
-      <span style={{ fontSize: 13, color: "#DC2626", lineHeight: 1.4 }}>{message}</span>
+      <AlertCircle size={14} color="var(--color-danger)" style={{ flexShrink: 0, marginTop: 1 }} />
+      <span style={{ fontSize: 13, color: "var(--color-danger)", lineHeight: 1.4 }}>{message}</span>
     </div>
   );
 }
@@ -1174,7 +1174,7 @@ export default function InviteAcceptPage() {
                     margin: "0 auto 16px",
                   }}
                 >
-                  <MailCheck size={24} color="#16A34A" />
+                  <MailCheck size={24} color="var(--color-success-solid)" />
                 </div>
                 <h2
                   style={{
@@ -1249,7 +1249,7 @@ export default function InviteAcceptPage() {
                   <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
                     <path
                       d="M16 32 L28 44 L48 24"
-                      stroke="#16A34A"
+                      stroke="var(--color-success-solid)"
                       strokeWidth="3"
                       strokeLinecap="round"
                       strokeLinejoin="round"

@@ -256,23 +256,25 @@ export function AssignDropdown({
 
   // READ-ONLY MODE
   if (readOnly) {
-    if (currentAssigneeId && currentAssigneeName) {
+    if (currentAssigneeId) {
       return (
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px',
-          height: '34px',
-          padding: '0 10px',
-          background: 'var(--brand-subtle)',
-          border: '1.5px solid var(--brand-muted)',
-          borderRadius: '9px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: 'var(--brand)',
-          cursor: 'default',
-          flexShrink: 0,
-        }}>
+        <div
+          title={currentAssigneeName ? `Assigned to ${currentAssigneeName}` : "Assigned"}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            height: '34px',
+            padding: '0 10px',
+            background: 'var(--brand-subtle)',
+            border: '1.5px solid var(--brand-muted)',
+            borderRadius: '9px',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: 'var(--brand)',
+            cursor: 'default',
+            flexShrink: 0,
+          }}>
           <Avatar
             name={currentAssigneeName}
             avatarUrl={currentAssigneeAvatarUrl}
@@ -284,7 +286,7 @@ export function AssignDropdown({
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
           }}>
-            {currentAssigneeName}
+            {currentAssigneeName ? currentAssigneeName.split(" ")[0] : "Assigned"}
           </span>
         </div>
       );
@@ -318,6 +320,9 @@ export function AssignDropdown({
     ? "Assigned"
     : null;
 
+  const firstName = displayName ? displayName.split(" ")[0] : "Assigned";
+  const tooltipText = displayName ? `Assigned to ${displayName}` : "Assigned";
+
   return (
     <>
       <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
@@ -326,13 +331,14 @@ export function AssignDropdown({
           style={hasAssignee ? assignedStyle : undefined}
           className={!hasAssignee ? unassignedCls : undefined}
           disabled={disabled || isSaving}
+          title={hasAssignee ? tooltipText : undefined}
           onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
         >
           {hasAssignee ? (
             <>
               <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
               <span style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {displayName ?? "Assigned"}
+                {firstName}
               </span>
               <ChevronDown size={12} style={{ flexShrink: 0, color: "var(--brand)" }} />
             </>

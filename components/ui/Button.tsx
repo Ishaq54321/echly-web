@@ -15,7 +15,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   ghost:
     "bg-transparent text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))]",
   danger:
-    "bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(185,28,28,0.25)] hover:opacity-95 active:scale-[0.998]",
+    "bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(229,72,77,0.25)] hover:opacity-95 active:scale-[0.998]",
 };
 
 export interface ButtonProps

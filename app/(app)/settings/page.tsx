@@ -529,7 +529,7 @@ function WorkspaceTab({
               type="button"
               onClick={handleRemoveLogo}
               disabled={uploadingLogo || loading || !workspaceId}
-              style={{ fontSize: 12, color: "#DC2626", cursor: "pointer", background: "none", border: "none", padding: 0 }}
+              style={{ fontSize: 12, color: "var(--color-danger)", cursor: "pointer", background: "none", border: "none", padding: 0 }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = "underline"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = "none"; }}
             >
@@ -668,7 +668,7 @@ const UPGRADE_TOOLTIP = "Upgrade your plan to unlock branding features.";
 function UpgradePlanBadge({ onClick, title }: { onClick?: () => void; title?: string }) {
   const tooltip = title ?? UPGRADE_TOOLTIP;
   const base =
-    "inline-flex items-center gap-1.5 rounded-[999px] py-1 px-2.5 bg-emerald-100/90 text-neutral-900 text-xs font-semibold transition-all duration-200 hover:bg-emerald-200/90 hover:shadow-sm [&_svg]:text-neutral-900 [&_svg]:stroke-[2.5]";
+    "inline-flex items-center gap-1.5 rounded-[999px] py-1 px-2.5 bg-[var(--color-success-bg)]/90 text-neutral-900 text-xs font-semibold transition-all duration-200 hover:bg-[var(--color-success-bg)] hover:shadow-sm [&_svg]:text-neutral-900 [&_svg]:stroke-[2.5]";
   if (onClick)
     return (
       <button
@@ -748,7 +748,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
         <div style={{ padding: "24px 28px" }}>
           {success ? (
             <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
-              <CheckCircle size={32} color="#16A34A" style={{ margin: "0 auto 12px" }} />
+              <CheckCircle size={32} color="var(--color-success-solid)" style={{ margin: "0 auto 12px" }} />
               <p style={{ fontSize: 17, fontWeight: 600, color: "#111", margin: "0 0 8px" }}>Confirmation email sent!</p>
               <p style={{ fontSize: 14, color: "#777", margin: 0 }}>Check {newEmail} for a confirmation link.</p>
             </div>
@@ -794,9 +794,9 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
               </div>
 
               {error && (
-                <div style={{ marginTop: 10, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 12px", display: "flex", gap: 8, alignItems: "center" }}>
-                  <AlertCircle size={14} color="#DC2626" style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: "#DC2626" }}>{error}</span>
+                <div style={{ marginTop: 10, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: 8, padding: "10px 12px", display: "flex", gap: 8, alignItems: "center" }}>
+                  <AlertCircle size={14} color="var(--color-danger)" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: "var(--color-danger)" }}>{error}</span>
                 </div>
               )}
 
@@ -836,7 +836,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderBottom: "1px solid #EBEBEB" }}>
-          <span style={{ fontSize: 16, fontWeight: 600, color: "#DC2626" }}>Delete account</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: "var(--color-danger)" }}>Delete account</span>
           <button type="button" onClick={onClose} style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 6, cursor: "pointer", color: "#777" }}>
             <X size={16} />
           </button>
@@ -857,7 +857,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
               type="button"
               disabled={!confirmed}
               onClick={() => { onClose(); alert("Contact support@echly.com to delete your account."); }}
-              style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "none", background: confirmed ? "#DC2626" : "#FECACA", color: "white", fontSize: 14, fontWeight: 600, cursor: confirmed ? "pointer" : "not-allowed", transition: "background 200ms" }}
+              style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "none", background: confirmed ? "var(--color-danger)" : "var(--color-danger-border)", color: "white", fontSize: 14, fontWeight: 600, cursor: confirmed ? "pointer" : "not-allowed", transition: "background 200ms" }}
             >
               Delete account
             </button>
@@ -1159,7 +1159,7 @@ function MyAccountTab() {
                   type="button"
                   onClick={() => void handleRemoveAvatar()}
                   disabled={isUploadingAvatar}
-                  style={{ fontSize: 12, color: "#DC2626", cursor: "pointer", background: "none", border: "none", padding: 0 }}
+                  style={{ fontSize: 12, color: "var(--color-danger)", cursor: "pointer", background: "none", border: "none", padding: 0 }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = "underline"; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = "none"; }}
                 >
@@ -1272,8 +1272,8 @@ function MyAccountTab() {
                   padding: "0 14px",
                   borderRadius: 8,
                   border: "1px solid #E5E5E5",
-                  background: passwordResetSent ? "#F0FDF4" : "white",
-                  color: passwordResetSent ? "#16A34A" : "#555",
+                  background: passwordResetSent ? "var(--color-success-bg)" : "white",
+                  color: passwordResetSent ? "var(--color-success-solid)" : "#555",
                   fontSize: 13,
                   fontWeight: 500,
                   cursor: passwordResetLoading || passwordResetSent ? "default" : "pointer",
@@ -1298,8 +1298,8 @@ function MyAccountTab() {
             onClick={() => setDeleteAccountOpen(true)}
             style={{
               background: "white",
-              border: "1.5px solid #FECACA",
-              color: "#DC2626",
+              border: "1.5px solid var(--color-danger-border)",
+              color: "var(--color-danger)",
               borderRadius: 9,
               height: 38,
               padding: "0 16px",
@@ -1308,8 +1308,8 @@ function MyAccountTab() {
               cursor: "pointer",
               transition: "all 150ms",
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#FEF2F2"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#FCA5A5"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "white"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#FECACA"; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--color-danger-bg)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--color-danger-border)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "white"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--color-danger-border)"; }}
           >
             Delete account
           </button>
@@ -1618,10 +1618,10 @@ function MembersTableRow({
       <button
         type="button"
         onClick={() => onRemove(row.id, row.name ?? row.email)}
-        className="text-[13px] text-[#DC2626]"
+        className="text-[13px] text-[var(--color-danger)]"
         style={{
-          background: "#FEF2F2",
-          border: "1px solid #FECACA",
+          background: "var(--color-danger-bg)",
+          border: "1px solid var(--color-danger-border)",
           borderRadius: 6,
           padding: "4px 10px",
         }}
@@ -1642,7 +1642,7 @@ function MembersTableRow({
             type="button"
             onClick={() => setConfirmingRemoveId(row.id)}
             title="Remove member"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#A8A29E] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#A8A29E] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
           >
             <UserMinus size={15} />
           </button>
@@ -1662,7 +1662,7 @@ function MembersTableRow({
             type="button"
             onClick={() => onRevoke(row.invitationToken!, row.email)}
             title="Revoke invite"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#A8A29E] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#A8A29E] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
           >
             <X size={14} />
           </button>
@@ -1734,7 +1734,7 @@ function MembersTableRow({
               <button
                 type="button"
                 onClick={() => setConfirmingRemoveId(row.id)}
-                className="flex items-center gap-1.5 text-[13px] text-[#A8A29E] hover:text-[#DC2626] transition-colors"
+                className="flex items-center gap-1.5 text-[13px] text-[#A8A29E] hover:text-[var(--color-danger)] transition-colors"
               >
                 <UserMinus size={13} />
                 Remove
@@ -1755,7 +1755,7 @@ function MembersTableRow({
             <button
               type="button"
               onClick={() => onRevoke(row.invitationToken!, row.email)}
-              className="flex items-center gap-1 text-[13px] text-[#78716C] hover:text-[#DC2626] transition-colors"
+              className="flex items-center gap-1 text-[13px] text-[#78716C] hover:text-[var(--color-danger)] transition-colors"
             >
               <X size={12} />
               Revoke
@@ -2264,7 +2264,7 @@ function SecurityTab() {
       </Card>
 
       {/* Collapsible Danger Zone */}
-      <Card className={`${SETTINGS_CARD} border-red-100`} as="article" style={{ background: "rgba(254,242,242,0.35)" }}>
+      <Card className={`${SETTINGS_CARD} border-[var(--color-danger-border)]`} as="article" style={{ background: "rgba(229,72,77,0.05)" }}>
         <button
           type="button"
           onClick={() => setAdvancedOpen(!advancedOpen)}
@@ -2290,7 +2290,7 @@ function SecurityTab() {
                 <button
                   type="button"
                   onClick={openTransferModal}
-                  className="rounded-[8px] px-4 py-2.5 text-sm font-semibold shrink-0 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all duration-200"
+                  className="rounded-[8px] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] border border-[var(--color-warning-border)] hover:bg-[var(--color-warning-bg)] transition-all duration-200"
                 >
                   Transfer
                 </button>
@@ -2304,7 +2304,7 @@ function SecurityTab() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-[8px] px-4 py-2.5 text-sm font-semibold shrink-0 bg-red-600 text-white hover:bg-red-700 hover:shadow-[0_2px_8px_rgba(220,38,38,0.35)] transition-all duration-200"
+                  className="rounded-[8px] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-danger)] text-white hover:opacity-95 hover:shadow-[0_2px_8px_rgba(229,72,77,0.35)] transition-all duration-200"
                   onClick={() => { setDeleteConfirmName(""); setDeleteError(null); setDeleteModalOpen(true); }}
                 >
                   Delete Workspace
@@ -2377,7 +2377,7 @@ function SecurityTab() {
                   onChange={(e) => setTransferConfirmName(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:border-transparent"
                 />
-                {transferError && <p className="mt-1.5 text-sm text-red-600">{transferError}</p>}
+                {transferError && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{transferError}</p>}
               </div>
               <div className="flex justify-end gap-2 pt-1">
                 <button
@@ -2434,9 +2434,9 @@ function SecurityTab() {
                   placeholder={workspaceName ?? ""}
                   value={deleteConfirmName}
                   onChange={(e) => setDeleteConfirmName(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)] focus:border-transparent"
                 />
-                {deleteError && <p className="mt-1.5 text-sm text-red-600">{deleteError}</p>}
+                {deleteError && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{deleteError}</p>}
               </div>
               <div className="flex justify-end gap-2 pt-1">
                 <button
@@ -2451,7 +2451,7 @@ function SecurityTab() {
                   disabled={deleteSubmitting || deleteConfirmName !== workspaceName}
                   className={`px-4 py-2.5 text-sm font-semibold rounded-xl transition disabled:cursor-not-allowed ${
                     deleteConfirmName === workspaceName
-                      ? "bg-red-600 text-white hover:bg-red-700"
+                      ? "bg-[var(--color-danger)] text-white hover:opacity-95"
                       : "bg-neutral-200 text-neutral-400 disabled:opacity-100"
                   }`}
                 >

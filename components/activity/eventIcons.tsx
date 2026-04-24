@@ -21,21 +21,21 @@ export type EventIconEntry = {
 
 export const eventIconMap: Record<string, EventIconEntry> = {
   "comment.added":            { icon: MessageCircle, badgeClass: "bg-[#1775E0]" },
-  "feedback.created":         { icon: Plus,          badgeClass: "bg-purple-500" },
-  "feedback.resolved":        { icon: Check,         badgeClass: "bg-green-500" },
-  "feedback.reopened":        { icon: RotateCcw,     badgeClass: "bg-amber-500" },
-  "session.created":          { icon: Layers,        badgeClass: "bg-purple-400" },
+  "feedback.created":         { icon: Plus,          badgeClass: "bg-[var(--color-insight)]" },
+  "feedback.resolved":        { icon: Check,         badgeClass: "bg-[var(--color-success)]" },
+  "feedback.reopened":        { icon: RotateCcw,     badgeClass: "bg-[var(--color-warning-dot)]" },
+  "session.created":          { icon: Layers,        badgeClass: "bg-[var(--color-insight)]" },
   "session.archived":         { icon: Archive,       badgeClass: "bg-neutral-400" },
   "session.member.added":     { icon: UserPlus,      badgeClass: "bg-neutral-300" },
   "session.member.removed":   { icon: UserMinus,     badgeClass: "bg-neutral-300" },
   "session.member.role_changed": { icon: UserPlus,   badgeClass: "bg-neutral-300" },
   "session.settings_changed": { icon: Settings,      badgeClass: "bg-neutral-300" },
-  "access_request.approved":  { icon: Shield,        badgeClass: "bg-green-400" },
-  "access_request.rejected":  { icon: Shield,        badgeClass: "bg-red-400" },
+  "access_request.approved":  { icon: Shield,        badgeClass: "bg-[var(--color-success-dot)]" },
+  "access_request.rejected":  { icon: Shield,        badgeClass: "bg-[var(--color-danger)]" },
   "invite.sent":              { icon: UserPlus,      badgeClass: "bg-blue-400" },
-  "invite.accepted":          { icon: UserCheck,     badgeClass: "bg-green-400" },
-  "session.deleted":          { icon: Trash2,        badgeClass: "bg-red-400" },
-  "feedback.deleted":         { icon: Trash2,        badgeClass: "bg-red-400" },
+  "invite.accepted":          { icon: UserCheck,     badgeClass: "bg-[var(--color-success-dot)]" },
+  "session.deleted":          { icon: Trash2,        badgeClass: "bg-[var(--color-danger)]" },
+  "feedback.deleted":         { icon: Trash2,        badgeClass: "bg-[var(--color-danger)]" },
 };
 
 export const TIER_MAP: Record<string, 1 | 2 | 3> = {

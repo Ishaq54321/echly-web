@@ -322,7 +322,7 @@ export function ResumeSessionModal({
             </div>
           )}
           {!loginRequired && error && (
-            <div style={{ padding: 24, color: "#EF4444", fontSize: 14 }}>
+            <div style={{ padding: 24, color: "var(--color-danger)", fontSize: 14 }}>
               {error}
             </div>
           )}

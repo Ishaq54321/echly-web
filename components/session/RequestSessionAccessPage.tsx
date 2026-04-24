@@ -26,19 +26,19 @@ export function RequestSessionAccessPage({
 }: RequestSessionAccessPageProps) {
   const iconBg =
     requestStatus === "submitted"
-      ? "#F0FDF4"
+      ? "var(--color-success-bg)"
       : requestStatus === "already_requested"
-        ? "#FFFBEB"
+        ? "var(--color-warning-bg)"
         : requestStatus === "rejected"
-          ? "#FEF2F2"
-          : "#FEF2F2";
+          ? "var(--color-danger-bg)"
+          : "var(--color-danger-bg)";
 
   const iconColor =
     requestStatus === "submitted"
-      ? "#16A34A"
+      ? "var(--color-success-solid)"
       : requestStatus === "already_requested"
-        ? "#D97706"
-        : "#DC2626";
+        ? "var(--color-warning-dot)"
+        : "var(--color-danger)";
 
   const IconComponent =
     requestStatus === "submitted"

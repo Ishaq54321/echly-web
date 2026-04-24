@@ -46,10 +46,10 @@ const PRIORITY_OPTIONS: FeedbackPriority[] = ["Low", "Medium", "High", "Critical
 
 function StatusDot({ status }: { status: FeedbackStatus }) {
   const colors: Record<FeedbackStatus, string> = {
-    Open: "bg-amber-400",
+    Open: "bg-[var(--color-warning-dot)]",
     "In Progress": "bg-[var(--accent-operational)]",
-    Blocked: "bg-red-500",
-    Resolved: "bg-emerald-500",
+    Blocked: "bg-[var(--color-danger)]",
+    Resolved: "bg-[var(--color-success)]",
   };
   return (
     <span
@@ -64,8 +64,8 @@ function PriorityBadge({ priority }: { priority: FeedbackPriority }) {
   const styles: Record<FeedbackPriority, string> = {
     Low: "text-[10px] text-[hsl(var(--text-tertiary))]",
     Medium: "text-[10px] text-[hsl(var(--text-secondary-soft))]",
-    High: "text-[10px] font-medium text-amber-700",
-    Critical: "text-[10px] font-medium text-red-600",
+    High: "text-[10px] font-medium text-[var(--color-warning-text)]",
+    Critical: "text-[10px] font-medium text-[var(--color-danger)]",
   };
   return (
     <span className={`shrink-0 uppercase tracking-wide ${styles[priority]}`}>

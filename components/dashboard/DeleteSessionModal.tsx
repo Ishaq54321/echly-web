@@ -59,8 +59,8 @@ export function DeleteSessionModal({
       >
         {isPermissionError ? (
           <div className="flex flex-col items-center text-center px-10 py-10 gap-5">
-            <div className="w-20 h-20 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
-              <ShieldAlert className="h-10 w-10 text-amber-500" />
+            <div className="w-20 h-20 rounded-full bg-[var(--color-warning-bg)] border border-[var(--color-warning-border)] flex items-center justify-center flex-shrink-0">
+              <ShieldAlert className="h-10 w-10 text-[var(--color-warning)]" />
             </div>
             <div className="flex flex-col gap-1.5">
               <h3 className="text-[17px] font-semibold text-foreground">
@@ -96,7 +96,7 @@ export function DeleteSessionModal({
             )}
             <div className="mt-6 flex gap-3 justify-end">
               {error && (
-                <p className="mr-auto text-[13px] text-red-600" role="alert">
+                <p className="mr-auto text-[13px] text-[var(--color-danger)]" role="alert">
                   {error}
                 </p>
               )}
@@ -112,7 +112,7 @@ export function DeleteSessionModal({
                 type="button"
                 onClick={handleConfirm}
                 disabled={deleting}
-                className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(185,28,28,0.25)] hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(229,72,77,0.25)] hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {deleting ? "Deleting…" : "Delete"}
               </button>

@@ -44,8 +44,13 @@ export async function uploadAttachmentWithProgress(
     xhr.addEventListener("load", () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          const body = JSON.parse(xhr.responseText) as UploadAttachmentResult;
-          resolve(body);
+          const body = JSON.parse(xhr.responseText) as { data?: { storagePath?: string; url?: string; name: string; size: number }; storagePath?: string; url?: string; name?: string; size?: number };
+          const data = body.data ?? body;
+          resolve({
+            url: data.url ?? data.storagePath ?? "",
+            name: data.name ?? "",
+            size: data.size ?? 0,
+          });
         } catch {
           reject(new Error("Invalid response"));
         }

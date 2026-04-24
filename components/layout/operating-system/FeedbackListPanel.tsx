@@ -130,7 +130,7 @@ export function FeedbackListPanel({
         ) : (
           <span className="shrink-0 w-5 flex items-center justify-center" aria-hidden>
             {isUnread ? (
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400/90" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warning-dot)]/90" />
             ) : (
               <Check className="h-3.5 w-3.5 text-[hsl(var(--text-tertiary))]" strokeWidth={2} />
             )}

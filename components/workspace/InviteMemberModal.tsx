@@ -92,7 +92,7 @@ export function InviteMemberModal({
                 className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:border-transparent"
                 autoFocus
               />
-              {error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
+              {error && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{error}</p>}
             </div>
             <div className="flex justify-end gap-2">
               <button

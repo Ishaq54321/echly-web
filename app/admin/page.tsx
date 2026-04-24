@@ -46,7 +46,7 @@ export default function AdminPage() {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-semibold text-neutral-900 mb-8">Dashboard</h1>
-        <p className="text-sm text-red-600">{error}</p>
+        <p className="text-sm text-[var(--color-danger)]">{error}</p>
       </div>
     );
   }

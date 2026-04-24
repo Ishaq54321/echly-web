@@ -241,7 +241,7 @@ export function WorkspaceCard({
               </span>
             ) : null}
             {counts != null && counts.resolved > 0 ? (
-              <span className="px-2.5 py-1 rounded-full text-xs bg-green-50 text-green-700 tabular-nums">
+              <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--color-success-bg)] text-[var(--color-success)] tabular-nums">
                 {counts.resolved} resolved
               </span>
             ) : null}

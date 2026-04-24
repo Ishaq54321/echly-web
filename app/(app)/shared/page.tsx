@@ -34,15 +34,15 @@ function ErrorState() {
           width: "56px",
           height: "56px",
           borderRadius: "16px",
-          background: "#FEF2F2",
-          border: "1px solid #FECACA",
+          background: "var(--color-danger-bg)",
+          border: "1px solid var(--color-danger-border)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           marginBottom: "20px",
         }}
       >
-        <WifiOff size={24} color="#EF4444" />
+        <WifiOff size={24} color="var(--color-danger)" />
       </div>
 
       <h2
@@ -314,14 +314,14 @@ function SessionRow({
 
         {resolved > 0 && (
           <div style={chipStyle}>
-            <Check size={16} strokeWidth={2.5} style={{ color: "#22C55E", flexShrink: 0 }} />
+            <Check size={16} strokeWidth={2.5} style={{ color: "var(--color-success)", flexShrink: 0 }} />
             <span style={{ letterSpacing: "-0.01em" }}>{resolved} resolved</span>
           </div>
         )}
 
         {dateLabel && (
           <div style={{ ...chipStyle, minWidth: "5.5rem" }}>
-            <Calendar size={16} strokeWidth={2.5} style={{ color: "#F97316", flexShrink: 0 }} />
+            <Calendar size={16} strokeWidth={2.5} style={{ color: "var(--color-warning)", flexShrink: 0 }} />
             <span style={{ letterSpacing: "-0.01em" }}>{dateLabel}</span>
           </div>
         )}

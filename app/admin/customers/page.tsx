@@ -404,7 +404,7 @@ export default function AdminCustomersPage() {
                       type="button"
                       onClick={() => handleResume(selected)}
                       disabled={actionLoading}
-                      className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-green-50 text-green-800 border border-green-200 hover:bg-green-100 disabled:opacity-60"
+                      className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-[var(--color-success-bg)] text-[var(--color-success-solid)] border border-[var(--color-success-border)] hover:bg-[var(--color-success-bg)] disabled:opacity-60"
                     >
                       {actionLoading ? "Updating…" : "Resume workspace"}
                     </button>
@@ -413,7 +413,7 @@ export default function AdminCustomersPage() {
                       type="button"
                       onClick={() => handleSuspend(selected)}
                       disabled={actionLoading}
-                      className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-red-50 text-red-800 border border-red-200 hover:bg-red-100 disabled:opacity-60"
+                      className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-[var(--color-danger-bg)] text-[var(--color-danger)] border border-[var(--color-danger-border)] hover:bg-[var(--color-danger-bg)] disabled:opacity-60"
                     >
                       {actionLoading ? "Suspending…" : "Suspend workspace"}
                     </button>

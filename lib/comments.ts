@@ -62,6 +62,12 @@ function commentFromApiRow(row: unknown): Comment | null {
       r.attachment && typeof r.attachment === "object"
         ? (r.attachment as Comment["attachment"])
         : undefined,
+    attachments:
+      Array.isArray(r.attachments) ? (r.attachments as Comment["attachments"]) : undefined,
+    reactions:
+      r.reactions && typeof r.reactions === "object"
+        ? (r.reactions as Comment["reactions"])
+        : undefined,
   };
 }
 
@@ -188,6 +194,7 @@ export interface AddCommentOptions {
   textRange?: CommentTextRange;
   threadId?: string | null;
   attachment?: CommentAttachment;
+  attachments?: CommentAttachment[];
 }
 
 export type OptimisticComment = Comment & {
@@ -219,6 +226,7 @@ export function createOptimisticComment(args: {
     textRange: data.textRange,
     threadId: data.threadId,
     attachment: data.attachment,
+    attachments: data.attachments,
     isOptimistic: true,
     optimisticCreatedAtMs,
   };
@@ -376,6 +384,24 @@ export async function updateComment(
     const msg = await res.text().catch(() => "");
     throw new HttpError(msg || "Failed to update comment", res.status);
   }
+}
+
+export async function toggleReaction(
+  commentId: string,
+  emoji: string
+): Promise<Record<string, { userIds: string[]; userNames: string[] }>> {
+  const res = await authFetch("/api/comments/react", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ commentId, emoji }),
+  });
+  if (!res) throw new Error("Not authenticated");
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new HttpError(msg || "Failed to toggle reaction", res.status);
+  }
+  const json = await res.json();
+  return json.data.reactions;
 }
 
 export async function deleteComment(commentId: string): Promise<void> {

@@ -55,9 +55,16 @@ export async function POST(req: Request) {
         contentType: file.type || "application/octet-stream",
       },
     });
+    const token = randomUUID();
+    await bucketFile.setMetadata({
+      metadata: { firebaseStorageDownloadTokens: token },
+    });
+    const encodedPath = encodeURIComponent(storagePath);
+    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${adminBucket.name}/o/${encodedPath}?alt=media&token=${token}`;
 
     return apiSuccess({
       storagePath,
+      url: publicUrl,
       name: originalName,
       size: file.size,
     });

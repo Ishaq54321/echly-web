@@ -87,7 +87,7 @@ export function ContextIntelligenceColumn({
         {/* Risk signals */}
         <section>
           <h3 className="flex items-center gap-2 text-[12px] font-medium text-[hsl(var(--text-primary-strong))] mb-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" strokeWidth={1.5} />
+            <AlertTriangle className="h-3.5 w-3.5 text-[var(--color-warning)]" strokeWidth={1.5} />
             Risk signals
           </h3>
           <p className="text-[12px] text-[hsl(var(--text-tertiary))]">

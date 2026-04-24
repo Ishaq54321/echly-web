@@ -196,9 +196,7 @@ function DashboardContent() {
                     <BrandLoader />
                   </div>
                 ) : listArchiveTab === "sessions" && activeSessions.length === 0 ? (
-                  <div className="mt-16">
-                    <EmptySessionsCard />
-                  </div>
+                  <EmptySessionsCard />
                 ) : listArchiveTab === "archived" && archivedSessions.length === 0 ? (
                   <ArchiveEmptyState />
                 ) : (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   addComment,
@@ -14,7 +14,7 @@ import {
   type LocalComment,
   type AddCommentOptions,
 } from "@/lib/comments";
-import type { CommentPosition, CommentTextRange } from "@/lib/domain/comment";
+import type { CommentPosition, CommentTextRange, CommentAttachment } from "@/lib/domain/comment";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import {
   useWorkspace,
@@ -193,23 +193,25 @@ export function useFeedbackDetailController(args: {
     },
   });
 
-  const sendComment = async (message: string): Promise<void> => {
+  const sendComment = async (message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[]): Promise<void> => {
     if (!authUid || !feedbackId) return;
     if (!isIdentityResolved) return;
     const trimmed = message.trim();
-    if (!trimmed) return;
+    if (!trimmed && !attachment && (!attachments || attachments.length === 0)) return;
     const payload: AddCommentOptions = {
       userId: authUid,
       userName: authDisplayName || "User",
       userAvatar: authPhotoUrl || "",
       message: trimmed,
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      ...(attachment ? { attachment } : {}),
     };
     const optimistic = createOptimisticComment({
       sessionId,
       feedbackId,
       data: payload,
     });
-    setComments((prev) => [...prev, optimistic]);
+    setComments((prev) => [optimistic, ...prev]);
     void (async () => {
       try {
         await addComment(sessionId, feedbackId, payload);
@@ -222,24 +224,26 @@ export function useFeedbackDetailController(args: {
     })();
   };
 
-  const sendReply = async (threadId: string, message: string): Promise<void> => {
+  const sendReply = async (threadId: string, message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[]): Promise<void> => {
     if (!authUid || !feedbackId) return;
     if (!isIdentityResolved) return;
     const trimmed = message.trim();
-    if (!trimmed) return;
+    if (!trimmed && !attachment && (!attachments || attachments.length === 0)) return;
     const payload: AddCommentOptions = {
       userId: authUid,
       userName: authDisplayName || "User",
       userAvatar: authPhotoUrl || "",
       message: trimmed,
       threadId,
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      ...(attachment ? { attachment } : {}),
     };
     const optimistic = createOptimisticComment({
       sessionId,
       feedbackId,
       data: payload,
     });
-    setComments((prev) => [...prev, optimistic]);
+    setComments((prev) => [optimistic, ...prev]);
     void (async () => {
       try {
         await addComment(sessionId, feedbackId, payload);
@@ -273,7 +277,7 @@ export function useFeedbackDetailController(args: {
       feedbackId,
       data: payload,
     });
-    setComments((prev) => [...prev, optimistic]);
+    setComments((prev) => [optimistic, ...prev]);
     void (async () => {
       try {
         const id = await addComment(sessionId, feedbackId, payload);
@@ -320,7 +324,7 @@ export function useFeedbackDetailController(args: {
       feedbackId,
       data: payload,
     });
-    setComments((prev) => [...prev, optimistic]);
+    setComments((prev) => [optimistic, ...prev]);
     void (async () => {
       try {
         const id = await addComment(sessionId, feedbackId, payload);
@@ -503,6 +507,27 @@ export function useFeedbackDetailController(args: {
     }
   };
 
+  const handleReactionsChanged = useCallback(
+    (commentId: string, reactions: Record<string, { userIds: string[]; userNames: string[] }>) => {
+      setComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, reactions } : c))
+      );
+    },
+    []
+  );
+
+  const [participants, setParticipants] = useState<{ uid: string; displayName: string; email: string; avatarUrl: string | null }[]>([]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    fetch(`/api/sessions/${sessionId}/participants`)
+      .then((res) => res.json())
+      .then((data: { data?: { participants?: { uid: string; displayName: string; email: string; avatarUrl: string | null }[] } }) => {
+        if (data.data?.participants) setParticipants(data.data.participants);
+      })
+      .catch(() => {});
+  }, [sessionId]);
+
   return {
     comments: comments as Comment[],
     loadingComments,
@@ -518,6 +543,8 @@ export function useFeedbackDetailController(args: {
     updatePinPosition: updatePinPositionHandler,
     updateComment: updateCommentHandler,
     deleteComment: deleteCommentHandler,
+    handleReactionsChanged,
+    participants,
   };
 }
 

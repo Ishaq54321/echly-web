@@ -37,19 +37,24 @@ const config: Config = {
           strong:  "#D5D5D5",
         },
         success: {
-          DEFAULT: "#059669",
-          bg:      "#ECFDF5",
+          DEFAULT: "#18794E",
+          bg:      "#E9F9EE",
           border:  "#A7F3D0",
         },
         danger: {
-          DEFAULT: "#B91C1C",
+          DEFAULT: "#E5484D",
           bg:      "#FEF2F2",
           border:  "#FECACA",
         },
         warning: {
-          DEFAULT: "#C2410C",
-          bg:      "#FFF7ED",
+          DEFAULT: "#F77E2C",
+          bg:      "#FFEDD5",
           border:  "#FED7AA",
+        },
+        insight: {
+          DEFAULT: "#6049E7",
+          bg:      "#F0F1FF",
+          border:  "#C4B5FD",
         },
       },
       fontFamily: {
@@ -62,6 +67,9 @@ const config: Config = {
         md:   ["16px", { lineHeight: "1.5" }],
         lg:   ["20px", { lineHeight: "1.4" }],
         xl:   ["24px", { lineHeight: "1.3" }],
+        '2xl': ['28px', { lineHeight: '1.2' }],
+        '3xl': ['32px', { lineHeight: '1.15' }],
+        'display': ['44px', { lineHeight: '1.08' }],
       },
       borderRadius: {
         xs:   "6px",

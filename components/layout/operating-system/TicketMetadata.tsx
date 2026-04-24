@@ -14,16 +14,8 @@ export function TicketMetadata({
   updatedAt,
   assignee,
 }: TicketMetadataProps) {
-  const createdStr = formatCommentDate(createdAt, {
-    fallback: "",
-    includeTime: false,
-    includeYear: true,
-  });
-  const updatedStr = formatCommentDate(updatedAt, {
-    fallback: "",
-    includeTime: false,
-    includeYear: true,
-  });
+  const createdStr = formatCommentDate(createdAt);
+  const updatedStr = formatCommentDate(updatedAt);
   const assigneeTrim = assignee?.trim() ?? "";
 
   return (

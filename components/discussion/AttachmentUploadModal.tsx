@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Upload, FileIcon } from "lucide-react";
 import type { CommentAttachment } from "@/lib/domain/comment";
 import { uploadAttachmentWithProgress } from "@/lib/uploadAttachment";
+import { ModalPortal } from "@/components/ui/ModalPortal";
+import { MODAL_LAYER_Z_INDEX } from "@/lib/ui/zIndex";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
 
@@ -169,9 +171,10 @@ export function AttachmentUploadModal({
   const showPreview = selectedFile != null;
 
   return (
-    <>
+    <ModalPortal>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 flex items-center justify-center p-4"
+        style={{ zIndex: MODAL_LAYER_Z_INDEX }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="upload-attachment-title"
@@ -248,7 +251,7 @@ export function AttachmentUploadModal({
             ) : null}
 
             {!showPreview && (validationError || uploadError) && (
-              <p className="mt-3 text-sm text-red-600" role="alert">
+              <p className="mt-3 text-sm text-[var(--color-danger)]" role="alert">
                 {validationError || uploadError}
               </p>
             )}
@@ -311,7 +314,7 @@ export function AttachmentUploadModal({
                 )}
 
                 {(validationError || uploadError) && (
-                  <p className="mt-3 text-sm text-red-600" role="alert">
+                  <p className="mt-3 text-sm text-[var(--color-danger)]" role="alert">
                     {validationError || uploadError}
                   </p>
                 )}
@@ -336,12 +339,12 @@ export function AttachmentUploadModal({
                 disabled={uploading || !uploadedAttachment}
                 className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-[#1775E0] hover:bg-[#1462C4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Send
+                Attach
               </button>
             </div>
           </div>
         </div>
       </div>
-    </>
+    </ModalPortal>
   );
 }

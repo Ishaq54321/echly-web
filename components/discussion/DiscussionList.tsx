@@ -302,7 +302,7 @@ export function DiscussionList({
                     <div className="flex items-center gap-1.5">
                       <span
                         className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                          item.status === "open" ? "bg-emerald-500/75" : "bg-neutral-400/60"
+                          item.status === "open" ? "bg-[var(--color-success)]/75" : "bg-neutral-400/60"
                         }`}
                         aria-hidden
                       />

@@ -144,11 +144,11 @@ export function ExecutionView({
         accessResolve={accessResolve}
         accessResolveSubmitting={accessResolveSubmitting}
         isAnonymousViewer={isAnonymousViewer}
-        assigneeId={(!isPublicReadOnly && !isShareSurface) ? (displayItem as { assigneeId?: string | null } | null)?.assigneeId ?? null : undefined}
-        assigneeName={(!isPublicReadOnly && !isShareSurface) ? (displayItem as { assigneeName?: string | null } | null)?.assigneeName ?? null : undefined}
-        assigneeAvatarUrl={(!isPublicReadOnly && !isShareSurface) ? (displayItem as { assigneeAvatarUrl?: string | null } | null)?.assigneeAvatarUrl ?? null : undefined}
+        assigneeId={(displayItem as { assigneeId?: string | null } | null)?.assigneeId ?? null}
+        assigneeName={(displayItem as { assigneeName?: string | null } | null)?.assigneeName ?? null}
+        assigneeAvatarUrl={(displayItem as { assigneeAvatarUrl?: string | null } | null)?.assigneeAvatarUrl ?? null}
         onAssigned={(!isPublicReadOnly && !isShareSurface) ? onAssigned : undefined}
-        priority={(!isPublicReadOnly && !isShareSurface) ? (displayItem as { priority?: string | null } | null)?.priority as ("high" | "medium" | "low" | null) ?? null : undefined}
+        priority={(displayItem as { priority?: string | null } | null)?.priority as ("high" | "medium" | "low" | null) ?? null}
         onPriorityChanged={(!isPublicReadOnly && !isShareSurface) ? onPriorityChanged : undefined}
         onSaveStateChange={(!isPublicReadOnly && !isShareSurface) ? onSaveStateChange : undefined}
         canAssignTicket={canAssignTicket}

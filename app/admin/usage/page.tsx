@@ -42,7 +42,7 @@ export default function AdminUsagePage() {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-semibold text-neutral-900 mb-8">Usage</h1>
-        <p className="text-sm text-red-600">Failed to load usage stats.</p>
+        <p className="text-sm text-[var(--color-danger)]">Failed to load usage stats.</p>
       </div>
     );
   }

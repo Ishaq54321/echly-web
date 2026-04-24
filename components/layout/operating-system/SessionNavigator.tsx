@@ -68,7 +68,7 @@ export function SessionNavigator({
     const content = (
       <>
         <span className="shrink-0 w-2 flex items-center justify-center" aria-hidden>
-          {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-amber-400/90" />}
+          {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warning-dot)]/90" />}
         </span>
         {s.session.title?.trim() ? (
           <span className="truncate text-[13px] text-[hsl(var(--text-primary-strong))]">

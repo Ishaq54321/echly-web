@@ -161,7 +161,7 @@ function NoFillSwatch({ active }: { active: boolean }) {
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(to top right, transparent calc(50% - 1px), #ef4444 calc(50% - 1px), #ef4444 calc(50% + 1px), transparent calc(50% + 1px))",
+            "linear-gradient(to top right, transparent calc(50% - 1px), var(--color-danger) calc(50% - 1px), var(--color-danger) calc(50% + 1px), transparent calc(50% + 1px))",
         }}
       />
     </span>
@@ -181,7 +181,7 @@ function NoOutlineSwatch({ active }: { active: boolean }) {
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(to top right, transparent calc(50% - 1px), #ef4444 calc(50% - 1px), #ef4444 calc(50% + 1px), transparent calc(50% + 1px))",
+            "linear-gradient(to top right, transparent calc(50% - 1px), var(--color-danger) calc(50% - 1px), var(--color-danger) calc(50% + 1px), transparent calc(50% + 1px))",
         }}
       />
     </span>
@@ -305,7 +305,7 @@ export function EditorToolbar({
           type="button"
           onClick={onApplyCrop}
           disabled={!cropPending}
-          className="h-12 px-5 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[15px] font-medium rounded-xl transition-colors flex items-center gap-2"
+          className="h-12 px-5 bg-[var(--color-success-solid)] hover:bg-[var(--color-success)] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[15px] font-medium rounded-xl transition-colors flex items-center gap-2"
         >
           <Check className="h-5 w-5" strokeWidth={2} />
           Apply
@@ -563,7 +563,7 @@ export function EditorToolbar({
             <button
               type="button"
               onClick={onApplyCrop}
-              className="h-10 px-4 bg-green-600 hover:bg-green-500 text-white text-[14px] font-medium rounded-xl transition-colors flex items-center gap-1.5"
+              className="h-10 px-4 bg-[var(--color-success-solid)] hover:bg-[var(--color-success)] text-white text-[14px] font-medium rounded-xl transition-colors flex items-center gap-1.5"
             >
               <Check className="h-4 w-4" strokeWidth={2} />
               Apply Crop

@@ -47,10 +47,10 @@ export interface ExecutionCanvasProps {
 
 function StatusPill({ status }: { status: FeedbackStatus }) {
   const styles: Record<FeedbackStatus, string> = {
-    Open: "bg-amber-50 text-amber-800 border-amber-200",
+    Open: "bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] border-[var(--color-warning-border)]",
     "In Progress": "bg-[var(--brand-subtle)] text-[var(--accent-operational)] border-[var(--accent-operational-border)]",
-    Blocked: "bg-red-50 text-red-700 border-red-200",
-    Resolved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    Blocked: "bg-[var(--color-danger-bg)] text-[var(--color-danger)] border-[var(--color-danger-border)]",
+    Resolved: "bg-[var(--color-success-bg)] text-[var(--color-success)] border-[var(--color-success-border)]",
   };
   return (
     <span
@@ -247,7 +247,7 @@ export function ExecutionCanvas({
                         setActionsOpen(false);
                         onRequestDelete();
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-red-600 hover:bg-red-50 transition-colors duration-120 text-left"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors duration-120 text-left"
                     >
                       <Trash2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                       Delete

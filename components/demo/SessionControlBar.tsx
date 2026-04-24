@@ -44,7 +44,7 @@ export default function SessionControlBar({ onPause, onResume, onEnd, highlightE
             type="button"
             data-demo-target="end"
             onClick={onEnd}
-            className="h-8 px-3 rounded-[10px] bg-red-100 hover:bg-red-200 text-red-700 text-[12px] font-medium border-none"
+            className="h-8 px-3 rounded-[10px] bg-[var(--color-danger-bg)] hover:bg-[var(--color-danger-bg)] text-[var(--color-danger)] text-[12px] font-medium border-none"
             animate={highlightEnd ? { scale: [1, 1.03, 1], boxShadow: ["0 0 0 6px rgba(59,130,246,0.08), 0 0 18px rgba(59,130,246,0.35)", "0 0 0 6px rgba(59,130,246,0.08), 0 0 22px rgba(59,130,246,0.4)", "0 0 0 6px rgba(59,130,246,0.08), 0 0 18px rgba(59,130,246,0.35)"] } : {}}
             transition={{ duration: 2, repeat: highlightEnd ? Infinity : 0, ease: "easeInOut" }}
           >

@@ -127,13 +127,13 @@ const PinMarker = memo(function PinMarker({
       data-pin-marker
       className={`absolute rounded-full flex items-center justify-center text-[11px] font-semibold tabular-nums transition-all duration-150 cursor-grab active:cursor-grabbing border-0 shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:scale-105 hover:ring-2 hover:ring-[#EA7038] hover:ring-offset-1 ${
         isResolved
-          ? "bg-emerald-100 text-emerald-900 hover:bg-emerald-200"
+          ? "bg-[var(--color-success-bg)] text-[var(--color-success-solid)] hover:bg-[var(--color-success-bg)]"
           : "bg-[#FFA566] text-black hover:bg-[#EA7038]"
       } ${
         isActive && !isResolved
           ? "bg-[#FFA566] text-black shadow-[0_0_0_2px_rgba(255,255,255,0.8),0_2px_8px_rgba(0,0,0,0.12)] scale-105 ring-2 ring-[#EA7038]"
           : ""
-      } ${isActive && isResolved ? "ring-2 ring-emerald-300 shadow-[0_1px_4px_rgba(0,0,0,0.08)] scale-105" : ""}`}
+      } ${isActive && isResolved ? "ring-2 ring-[var(--color-success-border)] shadow-[0_1px_4px_rgba(0,0,0,0.08)] scale-105" : ""}`}
       style={{
         width: PIN_SIZE_PX,
         height: PIN_SIZE_PX,
@@ -147,7 +147,7 @@ const PinMarker = memo(function PinMarker({
       onMouseLeave={() => setShowTooltip(false)}
       aria-label={`Comment ${number}${isResolved ? " (resolved)" : ""}`}
     >
-      {isResolved ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" aria-hidden /> : number}
+      {isResolved ? <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" aria-hidden /> : number}
       {showTooltip && preview && (
         <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1.5 rounded bg-neutral-800 text-white text-[11px] leading-snug whitespace-nowrap overflow-hidden max-w-[200px] truncate pointer-events-none z-30 shadow-lg">
           {preview}
@@ -429,7 +429,7 @@ const ScreenshotWithPinsInner = ({
                     type="button"
                     onClick={() => void handleSubmitDraft()}
                     disabled={!draftMessage.trim() || submitting}
-                    className="text-[12px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-4 py-2 disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 shrink-0 shadow-sm"
+                    className="text-[12px] font-medium text-white bg-[var(--color-success-solid)] hover:bg-[var(--color-success-solid)] rounded-lg px-4 py-2 disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 shrink-0 shadow-sm"
                   >
                     {submitting ? "Sending…" : "Done"}
                   </button>
@@ -477,15 +477,15 @@ const ScreenshotWithPinsInner = ({
                     <button
                       type="button"
                       onClick={() => void updateComment(root.id, { resolved: true })}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1.5 hover:bg-emerald-100"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-success)] bg-[var(--color-success-bg)] border border-[var(--color-success-border)] rounded-md px-2 py-1.5 hover:bg-[var(--color-success-bg)]"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" />
                       Resolve comment
                     </button>
                   )}
                   {root.resolved && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Resolved
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--color-success)]">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" /> Resolved
                     </span>
                   )}
                   {onOpenThreadPanel && (

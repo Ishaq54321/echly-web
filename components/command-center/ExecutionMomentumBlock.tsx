@@ -10,9 +10,9 @@ export interface ExecutionMomentumBlockProps {
 
 function Trend({ direction }: { direction: "up" | "flat" | "down" }) {
   const config = {
-    up: { icon: TrendingUp, label: "Up", className: "text-emerald-600" },
+    up: { icon: TrendingUp, label: "Up", className: "text-[var(--color-success)]" },
     flat: { icon: Minus, label: "Flat", className: "text-[hsl(var(--text-tertiary))]" },
-    down: { icon: TrendingDown, label: "Down", className: "text-amber-600" },
+    down: { icon: TrendingDown, label: "Down", className: "text-[var(--color-warning)]" },
   };
   const { icon: Icon, label, className } = config[direction];
   return (

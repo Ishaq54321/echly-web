@@ -16,6 +16,7 @@
   --text-heading:       #1C1B1F;
   --text-body:          #44403C;
   --text-secondary:     #78716C;
+  --text-body-strong: #57534E;
   --text-tertiary:      #A8A29E;
   --text-placeholder:   #C4BFBB;
 
@@ -34,18 +35,27 @@
   --border-focus:       #1775E0;
 
   /* ─── SEMANTIC ───────────────────────────── */
-  --color-success:      #059669;
-  --color-success-bg:   #ECFDF5;
+  --color-success:        #18794E;
+  --color-success-bg:     #E9F9EE;
   --color-success-border: #A7F3D0;
-  --color-danger:       #B91C1C;
-  --color-danger-bg:    #FEF2F2;
-  --color-danger-border: #FECACA;
-  --color-warning:      #C2410C;
-  --color-warning-bg:   #FFF7ED;
+  --color-success-solid:  #18794E;
+  --color-success-dot:    #18794E;
+  --color-danger:         #E5484D;
+  --color-danger-bg:      #FEF2F2;
+  --color-danger-border:  #FECACA;
+  --color-danger-solid:   #E5484D;
+  --color-warning:        #F77E2C;
+  --color-warning-bg:     #FFEDD5;
   --color-warning-border: #FED7AA;
-  --color-info:         #0F5BB5;
-  --color-info-bg:      #EBF4FF;
-  --color-info-border:  #C3DFFE;
+  --color-warning-text:   #9B573E;
+  --color-warning-dot:    #FFC53D;
+  --color-info:           #0F5BB5;
+  --color-info-bg:        #EBF4FF;
+  --color-info-border:    #C3DFFE;
+  --color-insight:        #6049E7;
+  --color-insight-bg:     #F0F1FF;
+  --color-insight-border: #C4B5FD;
+  --color-insight-dot:    #6049E7;
 
   /* ─── RADIUS ─────────────────────────────── */
   --radius-xs:    6px;
@@ -62,6 +72,9 @@
   --text-md:      16px;
   --text-lg:      20px;
   --text-xl:      24px;
+  --text-2xl:      28px;
+  --text-3xl:      32px;
+  --text-display:  44px;
   --font-sans:    'Plus Jakarta Sans', sans-serif;
 
   /* ─── SHADOWS ────────────────────────────── */
@@ -273,40 +286,34 @@
   --green-text:   var(--color-success);
   --green-bg:     var(--color-success-bg);
   --green-border: var(--color-success-border);
-  --green-dot:    #22C55E;
-  --green:        #16A34A;
+  --green-dot:    var(--color-success-dot);
+  --green:        var(--color-success-solid);
   --green-tint:   var(--color-success-bg);
   --green-light:  var(--color-success-border);
   --amber-text:   var(--color-warning);
   --amber-bg:     var(--color-warning-bg);
   --amber-border: var(--color-warning-border);
-  --amber-dot:    #F59E0B;
+  --amber-dot:    var(--color-warning-dot);
   --red-text:     var(--color-danger);
   --red-bg:       var(--color-danger-bg);
   --red-border:   var(--color-danger-border);
-  --red-dot:      #EF4444;
-  --purple-text:  #5B21B6;
-  --purple-bg:    #F5F3FF;
-  --purple-border:#C4B5FD;
-  --orange:       #EA580C;
-  --orange-hover: #C2410C;
-  --orange-tint:  #FFF7ED;
-  --orange-light: #FED7AA;
-  --orange-text:  #C2410C;
+  --red-dot:      var(--color-danger);
+  --purple-text:  var(--color-insight);
+  --purple-bg:    var(--color-insight-bg);
+  --purple-border:var(--color-insight-border);
+  --orange:       var(--color-warning);
+  --orange-hover: var(--color-warning);
+  --orange-tint:  var(--color-warning-bg);
+  --orange-light: var(--color-warning-border);
+  --orange-text:  var(--color-warning);
   --color-success-text:    var(--color-success);
-  --color-success-soft:    rgba(5,150,105,0.10);
-  --color-warning-text:    var(--color-warning);
+  --color-success-soft:    rgba(24,121,78,0.10);
   --color-danger-text:     var(--color-danger);
-  --color-danger-soft:     rgba(185,28,28,0.08);
-  --color-danger-bg-hover: #FEE2E2;
-  --color-danger-solid:    #EF4444;
-  --color-danger-solid-hover: #DC2626;
-  --color-alert:           #EF4444;
+  --color-danger-soft:     rgba(229,72,77,0.08);
+  --color-danger-bg-hover: var(--color-danger-bg);
+  --color-alert:           var(--color-danger);
   --color-info-text:       var(--brand-text);
-  --color-info-bg:         var(--color-info-bg);
-  --color-info-border:     var(--color-info-border);
-  --color-insight-text:    var(--purple-text);
-  --color-insight-bg:      var(--purple-bg);
+  --color-insight-text:    var(--color-insight);
   --color-attention-text:  var(--color-warning);
   --color-attention-bg:    var(--color-warning-bg);
   --text-primary:   var(--text-heading);

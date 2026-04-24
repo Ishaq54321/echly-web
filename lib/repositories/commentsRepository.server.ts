@@ -72,6 +72,7 @@ export interface AddCommentData {
   textRange?: CommentTextRange;
   threadId?: string | null;
   attachment?: CommentAttachment;
+  attachments?: CommentAttachment[];
 }
 
 export async function addCommentRepo(
@@ -108,6 +109,7 @@ export async function addCommentRepo(
   if (data.textRange != null) payload.textRange = data.textRange;
   if (data.threadId != null) payload.threadId = data.threadId;
   if (data.attachment != null) payload.attachment = data.attachment;
+  if (data.attachments != null && data.attachments.length > 0) payload.attachments = data.attachments;
 
   const commentRef = adminDb.collection("comments").doc();
   const sessionRef = adminDb.doc(`sessions/${sessionId}`);

@@ -86,8 +86,8 @@ function TicketGroup({
 }) {
   const isOpen = label === "Open"
   const groupStyles = isOpen
-    ? "bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-100/80"
-    : "bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100/80"
+    ? "bg-[var(--color-warning-bg)] border-[var(--color-warning-border)] text-[var(--color-warning)] hover:bg-[var(--color-warning-bg)]/80"
+    : "bg-[var(--color-success-bg)] border-[var(--color-success-border)] text-[var(--color-success)] hover:bg-[var(--color-success-bg)]/80"
   return (
     <div className="mb-2 last:mb-0">
       <button

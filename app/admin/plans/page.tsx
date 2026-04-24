@@ -92,7 +92,7 @@ export default function AdminPlansPage() {
         Edit plan definitions. Changes are saved to Firestore <code className="bg-neutral-100 px-1 rounded text-xs">plans</code>.
       </p>
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-800">
+        <div className="mb-4 rounded-lg bg-[var(--color-danger-bg)] border border-[var(--color-danger-border)] px-4 py-2 text-sm text-[var(--color-danger)]">
           {error}
         </div>
       )}

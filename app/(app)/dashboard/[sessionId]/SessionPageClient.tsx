@@ -215,7 +215,7 @@ export default function SessionPageClient({
   /** Invalidates in-flight load work when the effect re-runs (e.g. React Strict Mode). */
   const sessionLoadEffectNonceRef = useRef(0);
 
-  const { authUid, isIdentityResolved, authReady, workspaceName, authEmail } = useWorkspace();
+  const { authUid, authDisplayName, isIdentityResolved, authReady, workspaceName, authEmail, authPhotoUrl } = useWorkspace();
   const authUidRef = useRef<string | null>(null);
   useEffect(() => {
     authUidRef.current = authUid;
@@ -1384,12 +1384,15 @@ export default function SessionPageClient({
     loadingComments,
     displayCommentThreadCounts,
     refetchComments,
+    sendComment,
     sendReply,
     sendPinComment,
     sendTextComment,
     updatePinPosition,
     updateComment,
     deleteComment,
+    handleReactionsChanged,
+    participants,
   } = useFeedbackDetailController({
     sessionId,
     feedbackId: effectiveSelectedId,
@@ -2264,7 +2267,7 @@ export default function SessionPageClient({
         screenshotUrl={selectedScreenshotUrl}
         screenshotUrlLoading={selectedScreenshotUrlLoading}
         screenshotUrlError={selectedScreenshotUrlError}
-        onAssigned={isWorkspaceMember && sessionAccess?.canResolve === true ? handleAssigned : undefined}
+        onAssigned={isWorkspaceMember ? handleAssigned : undefined}
         onPriorityChanged={isWorkspaceMember ? handlePriorityChanged : undefined}
         onSaveStateChange={setActionToastState}
         canAssignTicket={sessionAccess?.canResolve === true}
@@ -2418,11 +2421,18 @@ export default function SessionPageClient({
                   threadCounts={displayCommentThreadCounts}
                   onRefreshComments={() => void refetchComments()}
                   sendReply={sendReply}
+                  sendComment={sendComment}
                   activeThreadId={activeThreadId}
                   onSelectThread={setActiveThreadId}
                   currentUserId={authUid}
+                  currentUserInitial={authDisplayName ? authDisplayName.charAt(0).toUpperCase() : "?"}
+                  currentUserName={authDisplayName || undefined}
+                  currentUserAvatarUrl={authPhotoUrl || undefined}
                   updateComment={updateComment}
                   deleteComment={deleteComment}
+                  onReactionsChanged={handleReactionsChanged}
+                  participants={participants}
+                  showToast={showToast}
                 />
               )}
             </div>

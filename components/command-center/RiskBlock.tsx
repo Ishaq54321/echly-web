@@ -20,11 +20,11 @@ export function RiskBlock({ items, onSelect }: RiskBlockProps) {
 
   return (
     <section
-      className="bg-white overflow-hidden rounded-lg border border-[var(--layer-2-border)] border-l-2 border-l-red-500/80"
+      className="bg-white overflow-hidden rounded-lg border border-[var(--layer-2-border)] border-l-2 border-l-[var(--color-danger)]/80"
       aria-label="Risk"
     >
       <header className="px-4 py-3 border-b border-[var(--layer-2-border)]">
-        <h2 className="text-[12px] font-medium uppercase tracking-wider text-red-600/90">
+        <h2 className="text-[12px] font-medium uppercase tracking-wider text-[var(--color-danger)]/90">
           Risk
         </h2>
       </header>

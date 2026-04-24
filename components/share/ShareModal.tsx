@@ -346,7 +346,7 @@ export function ShareModal({
                               type="button"
                               disabled={busy}
                               onClick={() => onRejectAccessRequest(req.id)}
-                              className="w-7 h-7 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="w-7 h-7 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:bg-[var(--color-danger-bg)] hover:border-[var(--color-danger-border)] hover:text-[var(--color-danger)] transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -459,7 +459,7 @@ export function ShareModal({
                         {/* Remove button */}
                         <button
                           type="button"
-                          className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                          className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-[var(--color-danger-bg)] hover:border-[var(--color-danger-border)] hover:text-[var(--color-danger)] transition-colors text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
                           aria-label="Remove access"
                           disabled={disabled}
                           onClick={() => onRemove(item)}
@@ -541,7 +541,7 @@ export function ShareModal({
                                 <img
                                   src={member.avatarUrl}
                                   alt={member.displayName ?? member.email}
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-cover rounded-full"
                                 />
                               ) : (
                                 <span className="share-user-avatar-initial">

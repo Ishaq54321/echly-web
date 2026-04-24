@@ -38,6 +38,10 @@ export interface Comment {
   resolved?: boolean;
   /** Optional attachment (one per comment). */
   attachment?: CommentAttachment;
+  /** Multiple attachments (up to 5 per comment). New field — preferred over singular attachment. */
+  attachments?: CommentAttachment[];
+  /** Emoji reactions — map of emoji → array of user IDs who reacted */
+  reactions?: Record<string, { userIds: string[]; userNames: string[] }>;
 }
 
 export interface CommentAttachment {

@@ -12,6 +12,7 @@ import {
   Send,
 } from "lucide-react";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
+import { Modal } from "@/components/ui/Modal";
 import { authFetch } from "@/lib/authFetch";
 import {
   addComment,
@@ -295,10 +296,10 @@ export function DiscussionThread({
 
   if (!feedbackId) {
     if (!listLoaded) {
-      return <div className="flex-1 flex h-full min-w-0 bg-white" />;
+      return <div className="flex-1 flex h-full min-w-0 bg-[var(--surface-card)]" />;
     }
     return (
-      <div className="flex-1 flex h-full items-center justify-center bg-white min-w-0">
+      <div className="flex-1 flex h-full items-center justify-center bg-[var(--surface-card)] min-w-0">
         <div className="text-center max-w-xs px-6">
           <p className="text-[16px] font-semibold text-discussion-title">
             Select a thread to view conversation
@@ -313,7 +314,7 @@ export function DiscussionThread({
 
   if (loading || !ticket) {
     return (
-      <div className="flex h-full min-h-0 min-w-0 flex-1 items-center justify-center bg-white">
+      <div className="flex h-full min-h-0 min-w-0 flex-1 items-center justify-center bg-[var(--surface-card)]">
         <MinimalLoader label="Loading conversation…" />
       </div>
     );
@@ -338,10 +339,10 @@ export function DiscussionThread({
   const userInitial = authDisplayName?.charAt(0) ?? "?";
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-white">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-[var(--surface-card)]">
 
       {/* ── Sticky header ─────────────────────────────────────────────────── */}
-      <div className="shrink-0 px-5 pt-3.5 pb-[18px] bg-white">
+      <div className="shrink-0 px-5 pt-3.5 pb-[18px] bg-[var(--surface-card)]">
         <div className="flex max-w-[720px] mx-auto w-full min-w-0 items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h2 className="mb-1.5 text-[17px] font-semibold leading-snug text-[#0F172A]">
@@ -352,7 +353,7 @@ export function DiscussionThread({
                 className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-normal tracking-wide ${
                   isResolved
                     ? "border-slate-200/90 bg-slate-50 text-slate-500"
-                    : "border-emerald-200/50 bg-emerald-50/70 text-emerald-800/75"
+                    : "border-[var(--color-success-border)]/50 bg-[var(--color-success-bg)]/70 text-[var(--color-success)]/75"
                 }`}
               >
                 {isResolved ? "Resolved" : "Open"}
@@ -370,7 +371,7 @@ export function DiscussionThread({
           {ticket.sessionId && feedbackId ? (
             <Link
               href={`/session/${ticket.sessionId}?ticket=${feedbackId}`}
-              className="group inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#EBEBEB] bg-white px-2.5 py-1.5 text-[12px] font-medium text-[#364153] shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-colors hover:border-[#D5D5D5] hover:bg-slate-50/90 hover:text-[#0F172A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/20"
+              className="group inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#EBEBEB] bg-[var(--surface-card)] px-2.5 py-1.5 text-[12px] font-medium text-[#364153] shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-colors hover:border-[#D5D5D5] hover:bg-slate-50/90 hover:text-[#0F172A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/20"
             >
               View Ticket
               <ArrowUpRight
@@ -389,7 +390,7 @@ export function DiscussionThread({
 
           {/* Screenshot */}
           {hasScreenshot && (
-            <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden shadow-level-1">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] overflow-hidden shadow-level-1">
               <div className="relative flex items-center justify-center bg-neutral-50">
                 {resolvedScreenshotSrc ? (
                   <Image
@@ -415,14 +416,14 @@ export function DiscussionThread({
                   <button
                     type="button"
                     onClick={() => setScreenshotModalOpen(true)}
-                    className="absolute top-2.5 right-2.5 w-7 h-7 rounded-md bg-white/90 flex items-center justify-center border border-neutral-200/80 shadow-level-1 hover:bg-white hover:shadow-level-2 transition-all"
+                    className="absolute top-2.5 right-2.5 w-7 h-7 rounded-md bg-[var(--surface-card)]/90 flex items-center justify-center border border-[var(--border)]/80 shadow-level-1 hover:bg-white hover:shadow-level-2 transition-all"
                     aria-label="Expand screenshot"
                   >
                     <Expand className="w-3.5 h-3.5 text-neutral-700" strokeWidth={2} />
                   </button>
                 )}
               </div>
-              <div className="px-4 py-2.5 border-t border-neutral-100 flex items-center justify-between">
+              <div className="px-4 py-2.5 border-t border-[var(--border)] flex items-center justify-between">
                 <span className="text-[13px] text-meta">Screenshot</span>
                 {ticket.sessionId && feedbackId && (
                   <Link
@@ -439,14 +440,14 @@ export function DiscussionThread({
 
           {/* Action steps */}
           {hasSteps && (
-            <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-level-1">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] p-4 shadow-level-1">
               <p className="text-sm font-semibold text-discussion-title mb-3">
                 Action Steps
               </p>
               <ul className="space-y-2">
                 {steps!.map((step, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-[14px] text-discussion-body leading-relaxed">
-                    <span className="mt-[3px] w-[6px] h-[6px] rounded-full bg-orange-400 shrink-0" />
+                    <span className="mt-[3px] w-[6px] h-[6px] rounded-full bg-[var(--color-warning-dot)] shrink-0" />
                     {step}
                   </li>
                 ))}
@@ -455,9 +456,9 @@ export function DiscussionThread({
           )}
 
           {/* Comments */}
-          <div className="rounded-xl border border-neutral-200 bg-white shadow-level-1">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] shadow-level-1">
             {/* Comments header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-100">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border)]">
               <span className="text-sm font-semibold text-discussion-title">
                 Replies
                 {commentsInitialized && rootComments.length > 0 && (
@@ -469,7 +470,7 @@ export function DiscussionThread({
               <button
                 type="button"
                 onClick={() => void refetchComments()}
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#1775E0] hover:text-[#1462C4] transition-colors"
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--brand)] hover:text-[var(--brand-hover)] transition-colors"
               >
                 <RefreshCw className="h-3 w-3 shrink-0" strokeWidth={2} />
                 Refresh
@@ -499,7 +500,7 @@ export function DiscussionThread({
                         {replies.map((r) => (
                           <div
                             key={r.id}
-                            className="mt-3 ml-4 pl-3 border-l-2 border-neutral-200"
+                            className="mt-3 ml-4 pl-3 border-l-2 border-[var(--border)]"
                           >
                             <CommentItem
                               comment={r}
@@ -518,9 +519,9 @@ export function DiscussionThread({
             </div>
 
             {/* Compose — inside the Replies card */}
-            <div className="border-t border-neutral-100 px-5 py-3.5">
+            <div className="border-t border-[var(--border)] px-5 py-3.5">
               <div className="flex items-center gap-2.5">
-                <div className="w-[28px] h-[28px] rounded-full bg-[#EBF4FF] text-[#1775E0] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden">
                   {userInitial}
                 </div>
                 <input
@@ -534,12 +535,12 @@ export function DiscussionThread({
                       handleSendComment();
                     }
                   }}
-                  className="flex-1 min-w-0 h-[38px] rounded-xl border border-neutral-200 px-4 text-[14px] text-discussion-body placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 focus:border-[#1775E0] transition"
+                  className="flex-1 min-w-0 h-[38px] rounded-xl border border-[var(--border)] px-4 text-[14px] text-discussion-body placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 focus:border-[var(--brand)] transition"
                 />
                 <button
                   type="button"
                   onClick={() => setAttachmentModalOpen(true)}
-                  className="p-2 rounded-lg text-discussion-supporting hover:bg-neutral-100 hover:text-discussion-title transition-colors shrink-0"
+                  className="p-2 rounded-lg text-discussion-supporting hover:bg-[var(--surface-hover)] hover:text-discussion-title transition-colors shrink-0"
                   aria-label="Attach file"
                 >
                   <Paperclip className="h-4 w-4" strokeWidth={1.5} />
@@ -548,7 +549,7 @@ export function DiscussionThread({
                   type="button"
                   onClick={handleSendComment}
                   disabled={sending || !commentDraft.trim()}
-                  className="h-[38px] w-[38px] rounded-xl bg-[#1775E0] text-white flex items-center justify-center shadow-level-1 hover:bg-[#1462C4] disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
+                  className="h-[38px] w-[38px] rounded-xl bg-[var(--brand)] text-white flex items-center justify-center shadow-level-1 hover:bg-[var(--brand-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
                   aria-label="Send reply"
                 >
                   <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -569,28 +570,32 @@ export function DiscussionThread({
       ) : null}
 
       {screenshotModalOpen && resolvedScreenshotSrc && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-[1000]"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Screenshot preview"
-          onClick={() => setScreenshotModalOpen(false)}
+        <Modal
+          open
+          onClose={() => setScreenshotModalOpen(false)}
+          overlayClassName="bg-black/80 backdrop-blur-md"
+          panelClassName="w-full h-full max-w-none !bg-transparent !shadow-none !rounded-none !border-0 !p-0"
         >
           <div
-            className="max-w-[85vw] max-h-[85vh] rounded-[12px] shadow-level-5 overflow-hidden bg-white animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
+            className="relative w-full h-full flex items-center justify-center p-4 sm:p-6"
+            onClick={() => setScreenshotModalOpen(false)}
           >
-            <Image
-              src={resolvedScreenshotSrc}
-              alt="Feedback screenshot"
-              width={1200}
-              height={800}
-              sizes="85vw"
-              className="w-full h-full object-contain max-w-[85vw] max-h-[85vh]"
-              unoptimized={resolvedScreenshotSrc.startsWith("data:")}
-            />
+            <div
+              className="max-w-[85vw] max-h-[85vh] rounded-[12px] shadow-xl overflow-hidden bg-[var(--surface-card)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Image
+                src={resolvedScreenshotSrc}
+                alt="Feedback screenshot"
+                width={1200}
+                height={800}
+                sizes="85vw"
+                className="w-full h-full object-contain max-w-[85vw] max-h-[85vh]"
+                unoptimized={resolvedScreenshotSrc.startsWith("data:")}
+              />
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
